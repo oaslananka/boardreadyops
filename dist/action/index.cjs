@@ -1073,14 +1073,14 @@ var require_util = __commonJS({
         }
         const port = url3.port != null ? url3.port : url3.protocol === "https:" ? 443 : 80;
         let origin = url3.origin != null ? url3.origin : `${url3.protocol || ""}//${url3.hostname || ""}:${port}`;
-        let path53 = url3.path != null ? url3.path : `${url3.pathname || ""}${url3.search || ""}`;
+        let path54 = url3.path != null ? url3.path : `${url3.pathname || ""}${url3.search || ""}`;
         if (origin[origin.length - 1] === "/") {
           origin = origin.slice(0, origin.length - 1);
         }
-        if (path53 && path53[0] !== "/") {
-          path53 = `/${path53}`;
+        if (path54 && path54[0] !== "/") {
+          path54 = `/${path54}`;
         }
-        return new URL(`${origin}${path53}`);
+        return new URL(`${origin}${path54}`);
       }
       if (!isHttpOrHttpsPrefixed(url3.origin || url3.protocol)) {
         throw new InvalidArgumentError("Invalid URL protocol: the URL must start with `http:` or `https:`.");
@@ -1531,39 +1531,39 @@ var require_diagnostics = __commonJS({
       });
       diagnosticsChannel.channel("undici:client:sendHeaders").subscribe((evt) => {
         const {
-          request: { method, path: path53, origin }
+          request: { method, path: path54, origin }
         } = evt;
-        debuglog("sending request to %s %s/%s", method, origin, path53);
+        debuglog("sending request to %s %s/%s", method, origin, path54);
       });
       diagnosticsChannel.channel("undici:request:headers").subscribe((evt) => {
         const {
-          request: { method, path: path53, origin },
+          request: { method, path: path54, origin },
           response: { statusCode }
         } = evt;
         debuglog(
           "received response to %s %s/%s - HTTP %d",
           method,
           origin,
-          path53,
+          path54,
           statusCode
         );
       });
       diagnosticsChannel.channel("undici:request:trailers").subscribe((evt) => {
         const {
-          request: { method, path: path53, origin }
+          request: { method, path: path54, origin }
         } = evt;
-        debuglog("trailers received from %s %s/%s", method, origin, path53);
+        debuglog("trailers received from %s %s/%s", method, origin, path54);
       });
       diagnosticsChannel.channel("undici:request:error").subscribe((evt) => {
         const {
-          request: { method, path: path53, origin },
+          request: { method, path: path54, origin },
           error: error52
         } = evt;
         debuglog(
           "request to %s %s/%s errored - %s",
           method,
           origin,
-          path53,
+          path54,
           error52.message
         );
       });
@@ -1612,9 +1612,9 @@ var require_diagnostics = __commonJS({
         });
         diagnosticsChannel.channel("undici:client:sendHeaders").subscribe((evt) => {
           const {
-            request: { method, path: path53, origin }
+            request: { method, path: path54, origin }
           } = evt;
-          debuglog("sending request to %s %s/%s", method, origin, path53);
+          debuglog("sending request to %s %s/%s", method, origin, path54);
         });
       }
       diagnosticsChannel.channel("undici:websocket:open").subscribe((evt) => {
@@ -1677,7 +1677,7 @@ var require_request = __commonJS({
     var kHandler = /* @__PURE__ */ Symbol("handler");
     var Request = class {
       constructor(origin, {
-        path: path53,
+        path: path54,
         method,
         body: body2,
         headers,
@@ -1692,11 +1692,11 @@ var require_request = __commonJS({
         expectContinue,
         servername
       }, handler2) {
-        if (typeof path53 !== "string") {
+        if (typeof path54 !== "string") {
           throw new InvalidArgumentError("path must be a string");
-        } else if (path53[0] !== "/" && !(path53.startsWith("http://") || path53.startsWith("https://")) && method !== "CONNECT") {
+        } else if (path54[0] !== "/" && !(path54.startsWith("http://") || path54.startsWith("https://")) && method !== "CONNECT") {
           throw new InvalidArgumentError("path must be an absolute URL or start with a slash");
-        } else if (invalidPathRegex.test(path53)) {
+        } else if (invalidPathRegex.test(path54)) {
           throw new InvalidArgumentError("invalid request path");
         }
         if (typeof method !== "string") {
@@ -1762,7 +1762,7 @@ var require_request = __commonJS({
         this.completed = false;
         this.aborted = false;
         this.upgrade = upgrade || null;
-        this.path = query ? buildURL(path53, query) : path53;
+        this.path = query ? buildURL(path54, query) : path54;
         this.origin = origin;
         this.idempotent = idempotent == null ? method === "HEAD" || method === "GET" : idempotent;
         this.blocking = blocking == null ? false : blocking;
@@ -6448,7 +6448,7 @@ var require_client_h1 = __commonJS({
       return method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && method !== "TRACE" && method !== "CONNECT";
     }
     function writeH1(client2, request2) {
-      const { method, path: path53, host, upgrade, blocking, reset } = request2;
+      const { method, path: path54, host, upgrade, blocking, reset } = request2;
       let { body: body2, headers, contentLength: contentLength2 } = request2;
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH" || method === "QUERY" || method === "PROPFIND" || method === "PROPPATCH";
       if (util3.isFormDataLike(body2)) {
@@ -6529,7 +6529,7 @@ var require_client_h1 = __commonJS({
       if (blocking) {
         socket[kBlocking] = true;
       }
-      let header = `${method} ${path53} HTTP/1.1\r
+      let header = `${method} ${path54} HTTP/1.1\r
 `;
       if (typeof host === "string") {
         header += `host: ${host}\r
@@ -7060,7 +7060,7 @@ var require_client_h2 = __commonJS({
     }
     function writeH2(client2, request2) {
       const session = client2[kHTTP2Session];
-      const { method, path: path53, host, upgrade, expectContinue, signal, headers: reqHeaders } = request2;
+      const { method, path: path54, host, upgrade, expectContinue, signal, headers: reqHeaders } = request2;
       let { body: body2 } = request2;
       if (upgrade) {
         util3.errorRequest(client2, request2, new Error("Upgrade not supported for H2"));
@@ -7157,7 +7157,7 @@ var require_client_h2 = __commonJS({
         });
         return true;
       }
-      headers[HTTP2_HEADER_PATH] = path53;
+      headers[HTTP2_HEADER_PATH] = path54;
       headers[HTTP2_HEADER_SCHEME] = "https";
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body2 && typeof body2.read === "function") {
@@ -7510,9 +7510,9 @@ var require_redirect_handler = __commonJS({
           return this.handler.onHeaders(statusCode, headers, resume, statusText);
         }
         const { origin, pathname, search } = util3.parseURL(new URL(this.location, this.opts.origin && new URL(this.opts.path, this.opts.origin)));
-        const path53 = search ? `${pathname}${search}` : pathname;
+        const path54 = search ? `${pathname}${search}` : pathname;
         this.opts.headers = cleanRequestHeaders(this.opts.headers, statusCode === 303, this.opts.origin !== origin);
-        this.opts.path = path53;
+        this.opts.path = path54;
         this.opts.origin = origin;
         this.opts.maxRedirections = 0;
         this.opts.query = null;
@@ -8747,10 +8747,10 @@ var require_proxy_agent = __commonJS({
         };
         const {
           origin,
-          path: path53 = "/",
+          path: path54 = "/",
           headers = {}
         } = opts;
-        opts.path = origin + path53;
+        opts.path = origin + path54;
         if (!("host" in headers) && !("Host" in headers)) {
           const { host } = new URL2(origin);
           headers.host = host;
@@ -10722,20 +10722,20 @@ var require_mock_utils = __commonJS({
       }
       return true;
     }
-    function safeUrl(path53) {
-      if (typeof path53 !== "string") {
-        return path53;
+    function safeUrl(path54) {
+      if (typeof path54 !== "string") {
+        return path54;
       }
-      const pathSegments = path53.split("?");
+      const pathSegments = path54.split("?");
       if (pathSegments.length !== 2) {
-        return path53;
+        return path54;
       }
       const qp = new URLSearchParams(pathSegments.pop());
       qp.sort();
       return [...pathSegments, qp.toString()].join("?");
     }
-    function matchKey(mockDispatch2, { path: path53, method, body: body2, headers }) {
-      const pathMatch = matchValue(mockDispatch2.path, path53);
+    function matchKey(mockDispatch2, { path: path54, method, body: body2, headers }) {
+      const pathMatch = matchValue(mockDispatch2.path, path54);
       const methodMatch = matchValue(mockDispatch2.method, method);
       const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body2) : true;
       const headersMatch = matchHeaders(mockDispatch2, headers);
@@ -10757,7 +10757,7 @@ var require_mock_utils = __commonJS({
     function getMockDispatch(mockDispatches, key) {
       const basePath = key.query ? buildURL(key.path, key.query) : key.path;
       const resolvedPath = typeof basePath === "string" ? safeUrl(basePath) : basePath;
-      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path53 }) => matchValue(safeUrl(path53), resolvedPath));
+      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path54 }) => matchValue(safeUrl(path54), resolvedPath));
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for path '${resolvedPath}'`);
       }
@@ -10795,9 +10795,9 @@ var require_mock_utils = __commonJS({
       }
     }
     function buildKey(opts) {
-      const { path: path53, method, body: body2, headers, query } = opts;
+      const { path: path54, method, body: body2, headers, query } = opts;
       return {
-        path: path53,
+        path: path54,
         method,
         body: body2,
         headers,
@@ -11260,10 +11260,10 @@ var require_pending_interceptors_formatter = __commonJS({
       }
       format(pendingInterceptors) {
         const withPrettyHeaders = pendingInterceptors.map(
-          ({ method, path: path53, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
+          ({ method, path: path54, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
             Method: method,
             Origin: origin,
-            Path: path53,
+            Path: path54,
             "Status code": statusCode,
             Persistent: persist ? PERSISTENT : NOT_PERSISTENT,
             Invocations: timesInvoked,
@@ -16144,9 +16144,9 @@ var require_util6 = __commonJS({
         }
       }
     }
-    function validateCookiePath(path53) {
-      for (let i = 0; i < path53.length; ++i) {
-        const code = path53.charCodeAt(i);
+    function validateCookiePath(path54) {
+      for (let i = 0; i < path54.length; ++i) {
+        const code = path54.charCodeAt(i);
         if (code < 32 || // exclude CTLs (0-31)
         code > 126 || // exclude DEL and non-ascii
         code === 59) {
@@ -18988,11 +18988,11 @@ var require_undici = __commonJS({
           if (typeof opts.path !== "string") {
             throw new InvalidArgumentError("invalid opts.path");
           }
-          let path53 = opts.path;
+          let path54 = opts.path;
           if (!opts.path.startsWith("/")) {
-            path53 = `/${path53}`;
+            path54 = `/${path54}`;
           }
-          url3 = new URL(util3.parseOrigin(url3).origin + path53);
+          url3 = new URL(util3.parseOrigin(url3).origin + path54);
         } else {
           if (!opts) {
             opts = typeof url3 === "object" ? url3 : {};
@@ -22364,8 +22364,8 @@ var require_utils2 = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path53) {
-      let input = path53;
+    function removeDotSegments(path54) {
+      let input = path54;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -22774,8 +22774,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path53 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path53 && path53 !== "/" ? path53 : void 0;
+        const path54 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path54 && path54 !== "/" ? path54 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -27112,12 +27112,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats2(ajv2, list, fs27, exportName) {
+    function addFormats2(ajv2, list, fs28, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv2.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv2.addFormat(f, fs27[f]);
+        ajv2.addFormat(f, fs28[f]);
     }
     module2.exports = exports2 = formatsPlugin;
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -27129,9 +27129,9 @@ var require_dist = __commonJS({
 var require_resolve_from = __commonJS({
   "node_modules/resolve-from/index.js"(exports2, module2) {
     "use strict";
-    var path53 = require("path");
+    var path54 = require("path");
     var Module = require("module");
-    var fs27 = require("fs");
+    var fs28 = require("fs");
     var resolveFrom = (fromDir, moduleId, silent) => {
       if (typeof fromDir !== "string") {
         throw new TypeError(`Expected \`fromDir\` to be of type \`string\`, got \`${typeof fromDir}\``);
@@ -27140,17 +27140,17 @@ var require_resolve_from = __commonJS({
         throw new TypeError(`Expected \`moduleId\` to be of type \`string\`, got \`${typeof moduleId}\``);
       }
       try {
-        fromDir = fs27.realpathSync(fromDir);
+        fromDir = fs28.realpathSync(fromDir);
       } catch (err) {
         if (err.code === "ENOENT") {
-          fromDir = path53.resolve(fromDir);
+          fromDir = path54.resolve(fromDir);
         } else if (silent) {
           return null;
         } else {
           throw err;
         }
       }
-      const fromFile = path53.join(fromDir, "noop.js");
+      const fromFile = path54.join(fromDir, "noop.js");
       const resolveFileName = () => Module._resolveFilename(moduleId, {
         id: fromFile,
         filename: fromFile,
@@ -27222,7 +27222,7 @@ var require_parent_module = __commonJS({
 var require_import_fresh = __commonJS({
   "node_modules/import-fresh/index.js"(exports2, module2) {
     "use strict";
-    var path53 = require("path");
+    var path54 = require("path");
     var resolveFrom = require_resolve_from();
     var parentModule = require_parent_module();
     module2.exports = (moduleId) => {
@@ -27230,7 +27230,7 @@ var require_import_fresh = __commonJS({
         throw new TypeError("Expected a string");
       }
       const parentPath = parentModule(__filename);
-      const cwd = parentPath ? path53.dirname(parentPath) : __dirname;
+      const cwd = parentPath ? path54.dirname(parentPath) : __dirname;
       const filePath = resolveFrom(cwd, moduleId);
       const oldModule = require.cache[filePath];
       if (oldModule && oldModule.parent) {
@@ -31166,7 +31166,7 @@ ${error52.message}`;
         return typescript.sys.fileExists(fileName);
       });
       if (filePath !== void 0) {
-        const { config: config2, error: error52 } = typescript.readConfigFile(filePath, (path53) => typescript.sys.readFile(path53));
+        const { config: config2, error: error52 } = typescript.readConfigFile(filePath, (path54) => typescript.sys.readFile(path54));
         if (error52) {
           throw new Error(`Error in ${filePath}: ${error52.messageText.toString()}`);
         }
@@ -31289,42 +31289,42 @@ var require_defaults2 = __commonJS({
 var require_env_paths = __commonJS({
   "node_modules/env-paths/index.js"(exports2, module2) {
     "use strict";
-    var path53 = require("path");
+    var path54 = require("path");
     var os10 = require("os");
     var homedir = os10.homedir();
     var tmpdir = os10.tmpdir();
     var { env } = process;
     var macos = (name) => {
-      const library = path53.join(homedir, "Library");
+      const library = path54.join(homedir, "Library");
       return {
-        data: path53.join(library, "Application Support", name),
-        config: path53.join(library, "Preferences", name),
-        cache: path53.join(library, "Caches", name),
-        log: path53.join(library, "Logs", name),
-        temp: path53.join(tmpdir, name)
+        data: path54.join(library, "Application Support", name),
+        config: path54.join(library, "Preferences", name),
+        cache: path54.join(library, "Caches", name),
+        log: path54.join(library, "Logs", name),
+        temp: path54.join(tmpdir, name)
       };
     };
     var windows = (name) => {
-      const appData = env.APPDATA || path53.join(homedir, "AppData", "Roaming");
-      const localAppData = env.LOCALAPPDATA || path53.join(homedir, "AppData", "Local");
+      const appData = env.APPDATA || path54.join(homedir, "AppData", "Roaming");
+      const localAppData = env.LOCALAPPDATA || path54.join(homedir, "AppData", "Local");
       return {
         // Data/config/cache/log are invented by me as Windows isn't opinionated about this
-        data: path53.join(localAppData, name, "Data"),
-        config: path53.join(appData, name, "Config"),
-        cache: path53.join(localAppData, name, "Cache"),
-        log: path53.join(localAppData, name, "Log"),
-        temp: path53.join(tmpdir, name)
+        data: path54.join(localAppData, name, "Data"),
+        config: path54.join(appData, name, "Config"),
+        cache: path54.join(localAppData, name, "Cache"),
+        log: path54.join(localAppData, name, "Log"),
+        temp: path54.join(tmpdir, name)
       };
     };
     var linux = (name) => {
-      const username = path53.basename(homedir);
+      const username = path54.basename(homedir);
       return {
-        data: path53.join(env.XDG_DATA_HOME || path53.join(homedir, ".local", "share"), name),
-        config: path53.join(env.XDG_CONFIG_HOME || path53.join(homedir, ".config"), name),
-        cache: path53.join(env.XDG_CACHE_HOME || path53.join(homedir, ".cache"), name),
+        data: path54.join(env.XDG_DATA_HOME || path54.join(homedir, ".local", "share"), name),
+        config: path54.join(env.XDG_CONFIG_HOME || path54.join(homedir, ".config"), name),
+        cache: path54.join(env.XDG_CACHE_HOME || path54.join(homedir, ".cache"), name),
         // https://wiki.debian.org/XDGBaseDirectorySpecification#state
-        log: path53.join(env.XDG_STATE_HOME || path53.join(homedir, ".local", "state"), name),
-        temp: path53.join(tmpdir, username, name)
+        log: path54.join(env.XDG_STATE_HOME || path54.join(homedir, ".local", "state"), name),
+        temp: path54.join(tmpdir, username, name)
       };
     };
     var envPaths = (name, options) => {
@@ -31405,11 +31405,11 @@ var require_util10 = __commonJS({
       map2.set(key, result);
       return result;
     }
-    function getPropertyByPath(source, path53) {
-      if (typeof path53 === "string" && Object.prototype.hasOwnProperty.call(source, path53)) {
-        return source[path53];
+    function getPropertyByPath(source, path54) {
+      if (typeof path54 === "string" && Object.prototype.hasOwnProperty.call(source, path54)) {
+        return source[path54];
       }
-      const parsedPath = typeof path53 === "string" ? path53.split(".") : path53;
+      const parsedPath = typeof path54 === "string" ? path54.split(".") : path54;
       return parsedPath.reduce((previous, key) => {
         if (previous === void 0) {
           return previous;
@@ -31420,9 +31420,9 @@ var require_util10 = __commonJS({
     function removeUndefinedValuesFromObject(options) {
       return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== void 0));
     }
-    async function isDirectory2(path53) {
+    async function isDirectory2(path54) {
       try {
-        const stat3 = await fs_1.promises.stat(path53);
+        const stat3 = await fs_1.promises.stat(path54);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -31431,9 +31431,9 @@ var require_util10 = __commonJS({
         throw e;
       }
     }
-    function isDirectorySync(path53) {
+    function isDirectorySync(path54) {
       try {
-        const stat3 = fs_1.default.statSync(path53);
+        const stat3 = fs_1.default.statSync(path54);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -31531,7 +31531,7 @@ var require_ExplorerBase = __commonJS({
           const idx = importStack.indexOf(fullPath);
           if (idx !== -1) {
             throw new Error(`Circular import detected:
-${[...importStack, fullPath].map((path53, i) => `${i + 1}. ${path53}`).join("\n")} (same as ${idx + 1}.)`);
+${[...importStack, fullPath].map((path54, i) => `${i + 1}. ${path54}`).join("\n")} (same as ${idx + 1}.)`);
           }
         }
       }
@@ -31718,9 +31718,9 @@ var require_Explorer = __commonJS({
           throw error52;
         }
       }
-      async #fileExists(path53) {
+      async #fileExists(path54) {
         try {
-          await promises_1.default.stat(path53);
+          await promises_1.default.stat(path54);
           return true;
         } catch (e) {
           return false;
@@ -31880,9 +31880,9 @@ var require_ExplorerSync = __commonJS({
           throw error52;
         }
       }
-      #fileExists(path53) {
+      #fileExists(path54) {
         try {
-          fs_1.default.statSync(path53);
+          fs_1.default.statSync(path54);
           return true;
         } catch (e) {
           return false;
@@ -32008,7 +32008,7 @@ var require_dist2 = __commonJS({
       };
     }
     function getResolvedSearchPlaces(moduleName, toolDefinedSearchPlaces, userConfiguredOptions) {
-      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path53) => path53.replace("{name}", moduleName));
+      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path54) => path54.replace("{name}", moduleName));
       if (userConfiguredOptions.mergeSearchPlaces) {
         return [...userConfiguredSearchPlaces ?? [], ...toolDefinedSearchPlaces];
       }
@@ -32103,1388 +32103,10 @@ var require_dist2 = __commonJS({
   }
 });
 
-// node_modules/fast-glob/out/utils/array.js
-var require_array = __commonJS({
-  "node_modules/fast-glob/out/utils/array.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.splitWhen = exports2.flatten = void 0;
-    function flatten(items) {
-      return items.reduce((collection, item) => [].concat(collection, item), []);
-    }
-    exports2.flatten = flatten;
-    function splitWhen(items, predicate) {
-      const result = [[]];
-      let groupIndex = 0;
-      for (const item of items) {
-        if (predicate(item)) {
-          groupIndex++;
-          result[groupIndex] = [];
-        } else {
-          result[groupIndex].push(item);
-        }
-      }
-      return result;
-    }
-    exports2.splitWhen = splitWhen;
-  }
-});
-
-// node_modules/fast-glob/out/utils/errno.js
-var require_errno = __commonJS({
-  "node_modules/fast-glob/out/utils/errno.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.isEnoentCodeError = void 0;
-    function isEnoentCodeError(error52) {
-      return error52.code === "ENOENT";
-    }
-    exports2.isEnoentCodeError = isEnoentCodeError;
-  }
-});
-
-// node_modules/fast-glob/out/utils/fs.js
-var require_fs = __commonJS({
-  "node_modules/fast-glob/out/utils/fs.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.createDirentFromStats = void 0;
-    var DirentFromStats = class {
-      constructor(name, stats) {
-        this.name = name;
-        this.isBlockDevice = stats.isBlockDevice.bind(stats);
-        this.isCharacterDevice = stats.isCharacterDevice.bind(stats);
-        this.isDirectory = stats.isDirectory.bind(stats);
-        this.isFIFO = stats.isFIFO.bind(stats);
-        this.isFile = stats.isFile.bind(stats);
-        this.isSocket = stats.isSocket.bind(stats);
-        this.isSymbolicLink = stats.isSymbolicLink.bind(stats);
-      }
-    };
-    function createDirentFromStats(name, stats) {
-      return new DirentFromStats(name, stats);
-    }
-    exports2.createDirentFromStats = createDirentFromStats;
-  }
-});
-
-// node_modules/fast-glob/out/utils/path.js
-var require_path = __commonJS({
-  "node_modules/fast-glob/out/utils/path.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.convertPosixPathToPattern = exports2.convertWindowsPathToPattern = exports2.convertPathToPattern = exports2.escapePosixPath = exports2.escapeWindowsPath = exports2.escape = exports2.removeLeadingDotSegment = exports2.makeAbsolute = exports2.unixify = void 0;
-    var os10 = require("os");
-    var path53 = require("path");
-    var IS_WINDOWS_PLATFORM = os10.platform() === "win32";
-    var LEADING_DOT_SEGMENT_CHARACTERS_COUNT = 2;
-    var POSIX_UNESCAPED_GLOB_SYMBOLS_RE = /(\\?)([()*?[\]{|}]|^!|[!+@](?=\()|\\(?![!()*+?@[\]{|}]))/g;
-    var WINDOWS_UNESCAPED_GLOB_SYMBOLS_RE = /(\\?)([()[\]{}]|^!|[!+@](?=\())/g;
-    var DOS_DEVICE_PATH_RE = /^\\\\([.?])/;
-    var WINDOWS_BACKSLASHES_RE = /\\(?![!()+@[\]{}])/g;
-    function unixify(filepath) {
-      return filepath.replace(/\\/g, "/");
-    }
-    exports2.unixify = unixify;
-    function makeAbsolute(cwd, filepath) {
-      return path53.resolve(cwd, filepath);
-    }
-    exports2.makeAbsolute = makeAbsolute;
-    function removeLeadingDotSegment(entry) {
-      if (entry.charAt(0) === ".") {
-        const secondCharactery = entry.charAt(1);
-        if (secondCharactery === "/" || secondCharactery === "\\") {
-          return entry.slice(LEADING_DOT_SEGMENT_CHARACTERS_COUNT);
-        }
-      }
-      return entry;
-    }
-    exports2.removeLeadingDotSegment = removeLeadingDotSegment;
-    exports2.escape = IS_WINDOWS_PLATFORM ? escapeWindowsPath : escapePosixPath;
-    function escapeWindowsPath(pattern) {
-      return pattern.replace(WINDOWS_UNESCAPED_GLOB_SYMBOLS_RE, "\\$2");
-    }
-    exports2.escapeWindowsPath = escapeWindowsPath;
-    function escapePosixPath(pattern) {
-      return pattern.replace(POSIX_UNESCAPED_GLOB_SYMBOLS_RE, "\\$2");
-    }
-    exports2.escapePosixPath = escapePosixPath;
-    exports2.convertPathToPattern = IS_WINDOWS_PLATFORM ? convertWindowsPathToPattern : convertPosixPathToPattern;
-    function convertWindowsPathToPattern(filepath) {
-      return escapeWindowsPath(filepath).replace(DOS_DEVICE_PATH_RE, "//$1").replace(WINDOWS_BACKSLASHES_RE, "/");
-    }
-    exports2.convertWindowsPathToPattern = convertWindowsPathToPattern;
-    function convertPosixPathToPattern(filepath) {
-      return escapePosixPath(filepath);
-    }
-    exports2.convertPosixPathToPattern = convertPosixPathToPattern;
-  }
-});
-
-// node_modules/is-extglob/index.js
-var require_is_extglob = __commonJS({
-  "node_modules/is-extglob/index.js"(exports2, module2) {
-    module2.exports = function isExtglob(str) {
-      if (typeof str !== "string" || str === "") {
-        return false;
-      }
-      var match;
-      while (match = /(\\).|([@?!+*]\(.*\))/g.exec(str)) {
-        if (match[2]) return true;
-        str = str.slice(match.index + match[0].length);
-      }
-      return false;
-    };
-  }
-});
-
-// node_modules/is-glob/index.js
-var require_is_glob = __commonJS({
-  "node_modules/is-glob/index.js"(exports2, module2) {
-    var isExtglob = require_is_extglob();
-    var chars = { "{": "}", "(": ")", "[": "]" };
-    var strictCheck = function(str) {
-      if (str[0] === "!") {
-        return true;
-      }
-      var index = 0;
-      var pipeIndex = -2;
-      var closeSquareIndex = -2;
-      var closeCurlyIndex = -2;
-      var closeParenIndex = -2;
-      var backSlashIndex = -2;
-      while (index < str.length) {
-        if (str[index] === "*") {
-          return true;
-        }
-        if (str[index + 1] === "?" && /[\].+)]/.test(str[index])) {
-          return true;
-        }
-        if (closeSquareIndex !== -1 && str[index] === "[" && str[index + 1] !== "]") {
-          if (closeSquareIndex < index) {
-            closeSquareIndex = str.indexOf("]", index);
-          }
-          if (closeSquareIndex > index) {
-            if (backSlashIndex === -1 || backSlashIndex > closeSquareIndex) {
-              return true;
-            }
-            backSlashIndex = str.indexOf("\\", index);
-            if (backSlashIndex === -1 || backSlashIndex > closeSquareIndex) {
-              return true;
-            }
-          }
-        }
-        if (closeCurlyIndex !== -1 && str[index] === "{" && str[index + 1] !== "}") {
-          closeCurlyIndex = str.indexOf("}", index);
-          if (closeCurlyIndex > index) {
-            backSlashIndex = str.indexOf("\\", index);
-            if (backSlashIndex === -1 || backSlashIndex > closeCurlyIndex) {
-              return true;
-            }
-          }
-        }
-        if (closeParenIndex !== -1 && str[index] === "(" && str[index + 1] === "?" && /[:!=]/.test(str[index + 2]) && str[index + 3] !== ")") {
-          closeParenIndex = str.indexOf(")", index);
-          if (closeParenIndex > index) {
-            backSlashIndex = str.indexOf("\\", index);
-            if (backSlashIndex === -1 || backSlashIndex > closeParenIndex) {
-              return true;
-            }
-          }
-        }
-        if (pipeIndex !== -1 && str[index] === "(" && str[index + 1] !== "|") {
-          if (pipeIndex < index) {
-            pipeIndex = str.indexOf("|", index);
-          }
-          if (pipeIndex !== -1 && str[pipeIndex + 1] !== ")") {
-            closeParenIndex = str.indexOf(")", pipeIndex);
-            if (closeParenIndex > pipeIndex) {
-              backSlashIndex = str.indexOf("\\", pipeIndex);
-              if (backSlashIndex === -1 || backSlashIndex > closeParenIndex) {
-                return true;
-              }
-            }
-          }
-        }
-        if (str[index] === "\\") {
-          var open2 = str[index + 1];
-          index += 2;
-          var close = chars[open2];
-          if (close) {
-            var n = str.indexOf(close, index);
-            if (n !== -1) {
-              index = n + 1;
-            }
-          }
-          if (str[index] === "!") {
-            return true;
-          }
-        } else {
-          index++;
-        }
-      }
-      return false;
-    };
-    var relaxedCheck = function(str) {
-      if (str[0] === "!") {
-        return true;
-      }
-      var index = 0;
-      while (index < str.length) {
-        if (/[*?{}()[\]]/.test(str[index])) {
-          return true;
-        }
-        if (str[index] === "\\") {
-          var open2 = str[index + 1];
-          index += 2;
-          var close = chars[open2];
-          if (close) {
-            var n = str.indexOf(close, index);
-            if (n !== -1) {
-              index = n + 1;
-            }
-          }
-          if (str[index] === "!") {
-            return true;
-          }
-        } else {
-          index++;
-        }
-      }
-      return false;
-    };
-    module2.exports = function isGlob(str, options) {
-      if (typeof str !== "string" || str === "") {
-        return false;
-      }
-      if (isExtglob(str)) {
-        return true;
-      }
-      var check2 = strictCheck;
-      if (options && options.strict === false) {
-        check2 = relaxedCheck;
-      }
-      return check2(str);
-    };
-  }
-});
-
-// node_modules/glob-parent/index.js
-var require_glob_parent = __commonJS({
-  "node_modules/glob-parent/index.js"(exports2, module2) {
-    "use strict";
-    var isGlob = require_is_glob();
-    var pathPosixDirname = require("path").posix.dirname;
-    var isWin32 = require("os").platform() === "win32";
-    var slash = "/";
-    var backslash = /\\/g;
-    var enclosure = /[\{\[].*[\}\]]$/;
-    var globby = /(^|[^\\])([\{\[]|\([^\)]+$)/;
-    var escaped = /\\([\!\*\?\|\[\]\(\)\{\}])/g;
-    module2.exports = function globParent(str, opts) {
-      var options = Object.assign({ flipBackslashes: true }, opts);
-      if (options.flipBackslashes && isWin32 && str.indexOf(slash) < 0) {
-        str = str.replace(backslash, slash);
-      }
-      if (enclosure.test(str)) {
-        str += slash;
-      }
-      str += "a";
-      do {
-        str = pathPosixDirname(str);
-      } while (isGlob(str) || globby.test(str));
-      return str.replace(escaped, "$1");
-    };
-  }
-});
-
-// node_modules/braces/lib/utils.js
-var require_utils3 = __commonJS({
-  "node_modules/braces/lib/utils.js"(exports2) {
-    "use strict";
-    exports2.isInteger = (num) => {
-      if (typeof num === "number") {
-        return Number.isInteger(num);
-      }
-      if (typeof num === "string" && num.trim() !== "") {
-        return Number.isInteger(Number(num));
-      }
-      return false;
-    };
-    exports2.find = (node, type) => node.nodes.find((node2) => node2.type === type);
-    exports2.exceedsLimit = (min, max, step = 1, limit) => {
-      if (limit === false) return false;
-      if (!exports2.isInteger(min) || !exports2.isInteger(max)) return false;
-      return (Number(max) - Number(min)) / Number(step) >= limit;
-    };
-    exports2.escapeNode = (block, n = 0, type) => {
-      const node = block.nodes[n];
-      if (!node) return;
-      if (type && node.type === type || node.type === "open" || node.type === "close") {
-        if (node.escaped !== true) {
-          node.value = "\\" + node.value;
-          node.escaped = true;
-        }
-      }
-    };
-    exports2.encloseBrace = (node) => {
-      if (node.type !== "brace") return false;
-      if (node.commas >> 0 + node.ranges >> 0 === 0) {
-        node.invalid = true;
-        return true;
-      }
-      return false;
-    };
-    exports2.isInvalidBrace = (block) => {
-      if (block.type !== "brace") return false;
-      if (block.invalid === true || block.dollar) return true;
-      if (block.commas >> 0 + block.ranges >> 0 === 0) {
-        block.invalid = true;
-        return true;
-      }
-      if (block.open !== true || block.close !== true) {
-        block.invalid = true;
-        return true;
-      }
-      return false;
-    };
-    exports2.isOpenOrClose = (node) => {
-      if (node.type === "open" || node.type === "close") {
-        return true;
-      }
-      return node.open === true || node.close === true;
-    };
-    exports2.reduce = (nodes) => nodes.reduce((acc, node) => {
-      if (node.type === "text") acc.push(node.value);
-      if (node.type === "range") node.type = "text";
-      return acc;
-    }, []);
-    exports2.flatten = (...args) => {
-      const result = [];
-      const flat = (arr) => {
-        for (let i = 0; i < arr.length; i++) {
-          const ele = arr[i];
-          if (Array.isArray(ele)) {
-            flat(ele);
-            continue;
-          }
-          if (ele !== void 0) {
-            result.push(ele);
-          }
-        }
-        return result;
-      };
-      flat(args);
-      return result;
-    };
-  }
-});
-
-// node_modules/braces/lib/stringify.js
-var require_stringify = __commonJS({
-  "node_modules/braces/lib/stringify.js"(exports2, module2) {
-    "use strict";
-    var utils = require_utils3();
-    module2.exports = (ast, options = {}) => {
-      const stringify = (node, parent = {}) => {
-        const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
-        const invalidNode = node.invalid === true && options.escapeInvalid === true;
-        let output = "";
-        if (node.value) {
-          if ((invalidBlock || invalidNode) && utils.isOpenOrClose(node)) {
-            return "\\" + node.value;
-          }
-          return node.value;
-        }
-        if (node.value) {
-          return node.value;
-        }
-        if (node.nodes) {
-          for (const child of node.nodes) {
-            output += stringify(child);
-          }
-        }
-        return output;
-      };
-      return stringify(ast);
-    };
-  }
-});
-
-// node_modules/is-number/index.js
-var require_is_number = __commonJS({
-  "node_modules/is-number/index.js"(exports2, module2) {
-    "use strict";
-    module2.exports = function(num) {
-      if (typeof num === "number") {
-        return num - num === 0;
-      }
-      if (typeof num === "string" && num.trim() !== "") {
-        return Number.isFinite ? Number.isFinite(+num) : isFinite(+num);
-      }
-      return false;
-    };
-  }
-});
-
-// node_modules/to-regex-range/index.js
-var require_to_regex_range = __commonJS({
-  "node_modules/to-regex-range/index.js"(exports2, module2) {
-    "use strict";
-    var isNumber = require_is_number();
-    var toRegexRange = (min, max, options) => {
-      if (isNumber(min) === false) {
-        throw new TypeError("toRegexRange: expected the first argument to be a number");
-      }
-      if (max === void 0 || min === max) {
-        return String(min);
-      }
-      if (isNumber(max) === false) {
-        throw new TypeError("toRegexRange: expected the second argument to be a number.");
-      }
-      let opts = { relaxZeros: true, ...options };
-      if (typeof opts.strictZeros === "boolean") {
-        opts.relaxZeros = opts.strictZeros === false;
-      }
-      let relax = String(opts.relaxZeros);
-      let shorthand = String(opts.shorthand);
-      let capture = String(opts.capture);
-      let wrap = String(opts.wrap);
-      let cacheKey = min + ":" + max + "=" + relax + shorthand + capture + wrap;
-      if (toRegexRange.cache.hasOwnProperty(cacheKey)) {
-        return toRegexRange.cache[cacheKey].result;
-      }
-      let a = Math.min(min, max);
-      let b = Math.max(min, max);
-      if (Math.abs(a - b) === 1) {
-        let result = min + "|" + max;
-        if (opts.capture) {
-          return `(${result})`;
-        }
-        if (opts.wrap === false) {
-          return result;
-        }
-        return `(?:${result})`;
-      }
-      let isPadded = hasPadding(min) || hasPadding(max);
-      let state3 = { min, max, a, b };
-      let positives = [];
-      let negatives = [];
-      if (isPadded) {
-        state3.isPadded = isPadded;
-        state3.maxLen = String(state3.max).length;
-      }
-      if (a < 0) {
-        let newMin = b < 0 ? Math.abs(b) : 1;
-        negatives = splitToPatterns(newMin, Math.abs(a), state3, opts);
-        a = state3.a = 0;
-      }
-      if (b >= 0) {
-        positives = splitToPatterns(a, b, state3, opts);
-      }
-      state3.negatives = negatives;
-      state3.positives = positives;
-      state3.result = collatePatterns(negatives, positives, opts);
-      if (opts.capture === true) {
-        state3.result = `(${state3.result})`;
-      } else if (opts.wrap !== false && positives.length + negatives.length > 1) {
-        state3.result = `(?:${state3.result})`;
-      }
-      toRegexRange.cache[cacheKey] = state3;
-      return state3.result;
-    };
-    function collatePatterns(neg, pos, options) {
-      let onlyNegative = filterPatterns(neg, pos, "-", false, options) || [];
-      let onlyPositive = filterPatterns(pos, neg, "", false, options) || [];
-      let intersected = filterPatterns(neg, pos, "-?", true, options) || [];
-      let subpatterns = onlyNegative.concat(intersected).concat(onlyPositive);
-      return subpatterns.join("|");
-    }
-    function splitToRanges(min, max) {
-      let nines = 1;
-      let zeros = 1;
-      let stop = countNines(min, nines);
-      let stops = /* @__PURE__ */ new Set([max]);
-      while (min <= stop && stop <= max) {
-        stops.add(stop);
-        nines += 1;
-        stop = countNines(min, nines);
-      }
-      stop = countZeros(max + 1, zeros) - 1;
-      while (min < stop && stop <= max) {
-        stops.add(stop);
-        zeros += 1;
-        stop = countZeros(max + 1, zeros) - 1;
-      }
-      stops = [...stops];
-      stops.sort(compare);
-      return stops;
-    }
-    function rangeToPattern(start, stop, options) {
-      if (start === stop) {
-        return { pattern: start, count: [], digits: 0 };
-      }
-      let zipped = zip(start, stop);
-      let digits = zipped.length;
-      let pattern = "";
-      let count = 0;
-      for (let i = 0; i < digits; i++) {
-        let [startDigit, stopDigit] = zipped[i];
-        if (startDigit === stopDigit) {
-          pattern += startDigit;
-        } else if (startDigit !== "0" || stopDigit !== "9") {
-          pattern += toCharacterClass(startDigit, stopDigit, options);
-        } else {
-          count++;
-        }
-      }
-      if (count) {
-        pattern += options.shorthand === true ? "\\d" : "[0-9]";
-      }
-      return { pattern, count: [count], digits };
-    }
-    function splitToPatterns(min, max, tok, options) {
-      let ranges = splitToRanges(min, max);
-      let tokens = [];
-      let start = min;
-      let prev;
-      for (let i = 0; i < ranges.length; i++) {
-        let max2 = ranges[i];
-        let obj = rangeToPattern(String(start), String(max2), options);
-        let zeros = "";
-        if (!tok.isPadded && prev && prev.pattern === obj.pattern) {
-          if (prev.count.length > 1) {
-            prev.count.pop();
-          }
-          prev.count.push(obj.count[0]);
-          prev.string = prev.pattern + toQuantifier(prev.count);
-          start = max2 + 1;
-          continue;
-        }
-        if (tok.isPadded) {
-          zeros = padZeros(max2, tok, options);
-        }
-        obj.string = zeros + obj.pattern + toQuantifier(obj.count);
-        tokens.push(obj);
-        start = max2 + 1;
-        prev = obj;
-      }
-      return tokens;
-    }
-    function filterPatterns(arr, comparison, prefix2, intersection2, options) {
-      let result = [];
-      for (let ele of arr) {
-        let { string: string4 } = ele;
-        if (!intersection2 && !contains(comparison, "string", string4)) {
-          result.push(prefix2 + string4);
-        }
-        if (intersection2 && contains(comparison, "string", string4)) {
-          result.push(prefix2 + string4);
-        }
-      }
-      return result;
-    }
-    function zip(a, b) {
-      let arr = [];
-      for (let i = 0; i < a.length; i++) arr.push([a[i], b[i]]);
-      return arr;
-    }
-    function compare(a, b) {
-      return a > b ? 1 : b > a ? -1 : 0;
-    }
-    function contains(arr, key, val) {
-      return arr.some((ele) => ele[key] === val);
-    }
-    function countNines(min, len) {
-      return Number(String(min).slice(0, -len) + "9".repeat(len));
-    }
-    function countZeros(integer2, zeros) {
-      return integer2 - integer2 % Math.pow(10, zeros);
-    }
-    function toQuantifier(digits) {
-      let [start = 0, stop = ""] = digits;
-      if (stop || start > 1) {
-        return `{${start + (stop ? "," + stop : "")}}`;
-      }
-      return "";
-    }
-    function toCharacterClass(a, b, options) {
-      return `[${a}${b - a === 1 ? "" : "-"}${b}]`;
-    }
-    function hasPadding(str) {
-      return /^-?(0+)\d/.test(str);
-    }
-    function padZeros(value, tok, options) {
-      if (!tok.isPadded) {
-        return value;
-      }
-      let diff = Math.abs(tok.maxLen - String(value).length);
-      let relax = options.relaxZeros !== false;
-      switch (diff) {
-        case 0:
-          return "";
-        case 1:
-          return relax ? "0?" : "0";
-        case 2:
-          return relax ? "0{0,2}" : "00";
-        default: {
-          return relax ? `0{0,${diff}}` : `0{${diff}}`;
-        }
-      }
-    }
-    toRegexRange.cache = {};
-    toRegexRange.clearCache = () => toRegexRange.cache = {};
-    module2.exports = toRegexRange;
-  }
-});
-
-// node_modules/fill-range/index.js
-var require_fill_range = __commonJS({
-  "node_modules/fill-range/index.js"(exports2, module2) {
-    "use strict";
-    var util3 = require("util");
-    var toRegexRange = require_to_regex_range();
-    var isObject3 = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
-    var transform2 = (toNumber2) => {
-      return (value) => toNumber2 === true ? Number(value) : String(value);
-    };
-    var isValidValue = (value) => {
-      return typeof value === "number" || typeof value === "string" && value !== "";
-    };
-    var isNumber = (num) => Number.isInteger(+num);
-    var zeros = (input) => {
-      let value = `${input}`;
-      let index = -1;
-      if (value[0] === "-") value = value.slice(1);
-      if (value === "0") return false;
-      while (value[++index] === "0") ;
-      return index > 0;
-    };
-    var stringify = (start, end, options) => {
-      if (typeof start === "string" || typeof end === "string") {
-        return true;
-      }
-      return options.stringify === true;
-    };
-    var pad = (input, maxLength, toNumber2) => {
-      if (maxLength > 0) {
-        let dash = input[0] === "-" ? "-" : "";
-        if (dash) input = input.slice(1);
-        input = dash + input.padStart(dash ? maxLength - 1 : maxLength, "0");
-      }
-      if (toNumber2 === false) {
-        return String(input);
-      }
-      return input;
-    };
-    var toMaxLen = (input, maxLength) => {
-      let negative = input[0] === "-" ? "-" : "";
-      if (negative) {
-        input = input.slice(1);
-        maxLength--;
-      }
-      while (input.length < maxLength) input = "0" + input;
-      return negative ? "-" + input : input;
-    };
-    var toSequence = (parts, options, maxLen) => {
-      parts.negatives.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
-      parts.positives.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
-      let prefix2 = options.capture ? "" : "?:";
-      let positives = "";
-      let negatives = "";
-      let result;
-      if (parts.positives.length) {
-        positives = parts.positives.map((v) => toMaxLen(String(v), maxLen)).join("|");
-      }
-      if (parts.negatives.length) {
-        negatives = `-(${prefix2}${parts.negatives.map((v) => toMaxLen(String(v), maxLen)).join("|")})`;
-      }
-      if (positives && negatives) {
-        result = `${positives}|${negatives}`;
-      } else {
-        result = positives || negatives;
-      }
-      if (options.wrap) {
-        return `(${prefix2}${result})`;
-      }
-      return result;
-    };
-    var toRange = (a, b, isNumbers, options) => {
-      if (isNumbers) {
-        return toRegexRange(a, b, { wrap: false, ...options });
-      }
-      let start = String.fromCharCode(a);
-      if (a === b) return start;
-      let stop = String.fromCharCode(b);
-      return `[${start}-${stop}]`;
-    };
-    var toRegex = (start, end, options) => {
-      if (Array.isArray(start)) {
-        let wrap = options.wrap === true;
-        let prefix2 = options.capture ? "" : "?:";
-        return wrap ? `(${prefix2}${start.join("|")})` : start.join("|");
-      }
-      return toRegexRange(start, end, options);
-    };
-    var rangeError = (...args) => {
-      return new RangeError("Invalid range arguments: " + util3.inspect(...args));
-    };
-    var invalidRange = (start, end, options) => {
-      if (options.strictRanges === true) throw rangeError([start, end]);
-      return [];
-    };
-    var invalidStep = (step, options) => {
-      if (options.strictRanges === true) {
-        throw new TypeError(`Expected step "${step}" to be a number`);
-      }
-      return [];
-    };
-    var fillNumbers = (start, end, step = 1, options = {}) => {
-      let a = Number(start);
-      let b = Number(end);
-      if (!Number.isInteger(a) || !Number.isInteger(b)) {
-        if (options.strictRanges === true) throw rangeError([start, end]);
-        return [];
-      }
-      if (a === 0) a = 0;
-      if (b === 0) b = 0;
-      let descending = a > b;
-      let startString = String(start);
-      let endString = String(end);
-      let stepString = String(step);
-      step = Math.max(Math.abs(step), 1);
-      let padded = zeros(startString) || zeros(endString) || zeros(stepString);
-      let maxLen = padded ? Math.max(startString.length, endString.length, stepString.length) : 0;
-      let toNumber2 = padded === false && stringify(start, end, options) === false;
-      let format = options.transform || transform2(toNumber2);
-      if (options.toRegex && step === 1) {
-        return toRange(toMaxLen(start, maxLen), toMaxLen(end, maxLen), true, options);
-      }
-      let parts = { negatives: [], positives: [] };
-      let push2 = (num) => parts[num < 0 ? "negatives" : "positives"].push(Math.abs(num));
-      let range2 = [];
-      let index = 0;
-      while (descending ? a >= b : a <= b) {
-        if (options.toRegex === true && step > 1) {
-          push2(a);
-        } else {
-          range2.push(pad(format(a, index), maxLen, toNumber2));
-        }
-        a = descending ? a - step : a + step;
-        index++;
-      }
-      if (options.toRegex === true) {
-        return step > 1 ? toSequence(parts, options, maxLen) : toRegex(range2, null, { wrap: false, ...options });
-      }
-      return range2;
-    };
-    var fillLetters = (start, end, step = 1, options = {}) => {
-      if (!isNumber(start) && start.length > 1 || !isNumber(end) && end.length > 1) {
-        return invalidRange(start, end, options);
-      }
-      let format = options.transform || ((val) => String.fromCharCode(val));
-      let a = `${start}`.charCodeAt(0);
-      let b = `${end}`.charCodeAt(0);
-      let descending = a > b;
-      let min = Math.min(a, b);
-      let max = Math.max(a, b);
-      if (options.toRegex && step === 1) {
-        return toRange(min, max, false, options);
-      }
-      let range2 = [];
-      let index = 0;
-      while (descending ? a >= b : a <= b) {
-        range2.push(format(a, index));
-        a = descending ? a - step : a + step;
-        index++;
-      }
-      if (options.toRegex === true) {
-        return toRegex(range2, null, { wrap: false, options });
-      }
-      return range2;
-    };
-    var fill = (start, end, step, options = {}) => {
-      if (end == null && isValidValue(start)) {
-        return [start];
-      }
-      if (!isValidValue(start) || !isValidValue(end)) {
-        return invalidRange(start, end, options);
-      }
-      if (typeof step === "function") {
-        return fill(start, end, 1, { transform: step });
-      }
-      if (isObject3(step)) {
-        return fill(start, end, 0, step);
-      }
-      let opts = { ...options };
-      if (opts.capture === true) opts.wrap = true;
-      step = step || opts.step || 1;
-      if (!isNumber(step)) {
-        if (step != null && !isObject3(step)) return invalidStep(step, opts);
-        return fill(start, end, 1, step);
-      }
-      if (isNumber(start) && isNumber(end)) {
-        return fillNumbers(start, end, step, opts);
-      }
-      return fillLetters(start, end, Math.max(Math.abs(step), 1), opts);
-    };
-    module2.exports = fill;
-  }
-});
-
-// node_modules/braces/lib/compile.js
-var require_compile2 = __commonJS({
-  "node_modules/braces/lib/compile.js"(exports2, module2) {
-    "use strict";
-    var fill = require_fill_range();
-    var utils = require_utils3();
-    var compile = (ast, options = {}) => {
-      const walk = (node, parent = {}) => {
-        const invalidBlock = utils.isInvalidBrace(parent);
-        const invalidNode = node.invalid === true && options.escapeInvalid === true;
-        const invalid = invalidBlock === true || invalidNode === true;
-        const prefix2 = options.escapeInvalid === true ? "\\" : "";
-        let output = "";
-        if (node.isOpen === true) {
-          return prefix2 + node.value;
-        }
-        if (node.isClose === true) {
-          console.log("node.isClose", prefix2, node.value);
-          return prefix2 + node.value;
-        }
-        if (node.type === "open") {
-          return invalid ? prefix2 + node.value : "(";
-        }
-        if (node.type === "close") {
-          return invalid ? prefix2 + node.value : ")";
-        }
-        if (node.type === "comma") {
-          return node.prev.type === "comma" ? "" : invalid ? node.value : "|";
-        }
-        if (node.value) {
-          return node.value;
-        }
-        if (node.nodes && node.ranges > 0) {
-          const args = utils.reduce(node.nodes);
-          const range2 = fill(...args, { ...options, wrap: false, toRegex: true, strictZeros: true });
-          if (range2.length !== 0) {
-            return args.length > 1 && range2.length > 1 ? `(${range2})` : range2;
-          }
-        }
-        if (node.nodes) {
-          for (const child of node.nodes) {
-            output += walk(child, node);
-          }
-        }
-        return output;
-      };
-      return walk(ast);
-    };
-    module2.exports = compile;
-  }
-});
-
-// node_modules/braces/lib/expand.js
-var require_expand = __commonJS({
-  "node_modules/braces/lib/expand.js"(exports2, module2) {
-    "use strict";
-    var fill = require_fill_range();
-    var stringify = require_stringify();
-    var utils = require_utils3();
-    var append = (queue = "", stash = "", enclose = false) => {
-      const result = [];
-      queue = [].concat(queue);
-      stash = [].concat(stash);
-      if (!stash.length) return queue;
-      if (!queue.length) {
-        return enclose ? utils.flatten(stash).map((ele) => `{${ele}}`) : stash;
-      }
-      for (const item of queue) {
-        if (Array.isArray(item)) {
-          for (const value of item) {
-            result.push(append(value, stash, enclose));
-          }
-        } else {
-          for (let ele of stash) {
-            if (enclose === true && typeof ele === "string") ele = `{${ele}}`;
-            result.push(Array.isArray(ele) ? append(item, ele, enclose) : item + ele);
-          }
-        }
-      }
-      return utils.flatten(result);
-    };
-    var expand2 = (ast, options = {}) => {
-      const rangeLimit = options.rangeLimit === void 0 ? 1e3 : options.rangeLimit;
-      const walk = (node, parent = {}) => {
-        node.queue = [];
-        let p = parent;
-        let q = parent.queue;
-        while (p.type !== "brace" && p.type !== "root" && p.parent) {
-          p = p.parent;
-          q = p.queue;
-        }
-        if (node.invalid || node.dollar) {
-          q.push(append(q.pop(), stringify(node, options)));
-          return;
-        }
-        if (node.type === "brace" && node.invalid !== true && node.nodes.length === 2) {
-          q.push(append(q.pop(), ["{}"]));
-          return;
-        }
-        if (node.nodes && node.ranges > 0) {
-          const args = utils.reduce(node.nodes);
-          if (utils.exceedsLimit(...args, options.step, rangeLimit)) {
-            throw new RangeError("expanded array length exceeds range limit. Use options.rangeLimit to increase or disable the limit.");
-          }
-          let range2 = fill(...args, options);
-          if (range2.length === 0) {
-            range2 = stringify(node, options);
-          }
-          q.push(append(q.pop(), range2));
-          node.nodes = [];
-          return;
-        }
-        const enclose = utils.encloseBrace(node);
-        let queue = node.queue;
-        let block = node;
-        while (block.type !== "brace" && block.type !== "root" && block.parent) {
-          block = block.parent;
-          queue = block.queue;
-        }
-        for (let i = 0; i < node.nodes.length; i++) {
-          const child = node.nodes[i];
-          if (child.type === "comma" && node.type === "brace") {
-            if (i === 1) queue.push("");
-            queue.push("");
-            continue;
-          }
-          if (child.type === "close") {
-            q.push(append(q.pop(), queue, enclose));
-            continue;
-          }
-          if (child.value && child.type !== "open") {
-            queue.push(append(queue.pop(), child.value));
-            continue;
-          }
-          if (child.nodes) {
-            walk(child, node);
-          }
-        }
-        return queue;
-      };
-      return utils.flatten(walk(ast));
-    };
-    module2.exports = expand2;
-  }
-});
-
-// node_modules/braces/lib/constants.js
-var require_constants6 = __commonJS({
-  "node_modules/braces/lib/constants.js"(exports2, module2) {
-    "use strict";
-    module2.exports = {
-      MAX_LENGTH: 1e4,
-      // Digits
-      CHAR_0: "0",
-      /* 0 */
-      CHAR_9: "9",
-      /* 9 */
-      // Alphabet chars.
-      CHAR_UPPERCASE_A: "A",
-      /* A */
-      CHAR_LOWERCASE_A: "a",
-      /* a */
-      CHAR_UPPERCASE_Z: "Z",
-      /* Z */
-      CHAR_LOWERCASE_Z: "z",
-      /* z */
-      CHAR_LEFT_PARENTHESES: "(",
-      /* ( */
-      CHAR_RIGHT_PARENTHESES: ")",
-      /* ) */
-      CHAR_ASTERISK: "*",
-      /* * */
-      // Non-alphabetic chars.
-      CHAR_AMPERSAND: "&",
-      /* & */
-      CHAR_AT: "@",
-      /* @ */
-      CHAR_BACKSLASH: "\\",
-      /* \ */
-      CHAR_BACKTICK: "`",
-      /* ` */
-      CHAR_CARRIAGE_RETURN: "\r",
-      /* \r */
-      CHAR_CIRCUMFLEX_ACCENT: "^",
-      /* ^ */
-      CHAR_COLON: ":",
-      /* : */
-      CHAR_COMMA: ",",
-      /* , */
-      CHAR_DOLLAR: "$",
-      /* . */
-      CHAR_DOT: ".",
-      /* . */
-      CHAR_DOUBLE_QUOTE: '"',
-      /* " */
-      CHAR_EQUAL: "=",
-      /* = */
-      CHAR_EXCLAMATION_MARK: "!",
-      /* ! */
-      CHAR_FORM_FEED: "\f",
-      /* \f */
-      CHAR_FORWARD_SLASH: "/",
-      /* / */
-      CHAR_HASH: "#",
-      /* # */
-      CHAR_HYPHEN_MINUS: "-",
-      /* - */
-      CHAR_LEFT_ANGLE_BRACKET: "<",
-      /* < */
-      CHAR_LEFT_CURLY_BRACE: "{",
-      /* { */
-      CHAR_LEFT_SQUARE_BRACKET: "[",
-      /* [ */
-      CHAR_LINE_FEED: "\n",
-      /* \n */
-      CHAR_NO_BREAK_SPACE: "\xA0",
-      /* \u00A0 */
-      CHAR_PERCENT: "%",
-      /* % */
-      CHAR_PLUS: "+",
-      /* + */
-      CHAR_QUESTION_MARK: "?",
-      /* ? */
-      CHAR_RIGHT_ANGLE_BRACKET: ">",
-      /* > */
-      CHAR_RIGHT_CURLY_BRACE: "}",
-      /* } */
-      CHAR_RIGHT_SQUARE_BRACKET: "]",
-      /* ] */
-      CHAR_SEMICOLON: ";",
-      /* ; */
-      CHAR_SINGLE_QUOTE: "'",
-      /* ' */
-      CHAR_SPACE: " ",
-      /*   */
-      CHAR_TAB: "	",
-      /* \t */
-      CHAR_UNDERSCORE: "_",
-      /* _ */
-      CHAR_VERTICAL_LINE: "|",
-      /* | */
-      CHAR_ZERO_WIDTH_NOBREAK_SPACE: "\uFEFF"
-      /* \uFEFF */
-    };
-  }
-});
-
-// node_modules/braces/lib/parse.js
-var require_parse2 = __commonJS({
-  "node_modules/braces/lib/parse.js"(exports2, module2) {
-    "use strict";
-    var stringify = require_stringify();
-    var {
-      MAX_LENGTH,
-      CHAR_BACKSLASH,
-      /* \ */
-      CHAR_BACKTICK,
-      /* ` */
-      CHAR_COMMA,
-      /* , */
-      CHAR_DOT,
-      /* . */
-      CHAR_LEFT_PARENTHESES,
-      /* ( */
-      CHAR_RIGHT_PARENTHESES,
-      /* ) */
-      CHAR_LEFT_CURLY_BRACE,
-      /* { */
-      CHAR_RIGHT_CURLY_BRACE,
-      /* } */
-      CHAR_LEFT_SQUARE_BRACKET,
-      /* [ */
-      CHAR_RIGHT_SQUARE_BRACKET,
-      /* ] */
-      CHAR_DOUBLE_QUOTE,
-      /* " */
-      CHAR_SINGLE_QUOTE,
-      /* ' */
-      CHAR_NO_BREAK_SPACE,
-      CHAR_ZERO_WIDTH_NOBREAK_SPACE
-    } = require_constants6();
-    var parse8 = (input, options = {}) => {
-      if (typeof input !== "string") {
-        throw new TypeError("Expected a string");
-      }
-      const opts = options || {};
-      const max = typeof opts.maxLength === "number" ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
-      if (input.length > max) {
-        throw new SyntaxError(`Input length (${input.length}), exceeds max characters (${max})`);
-      }
-      const ast = { type: "root", input, nodes: [] };
-      const stack = [ast];
-      let block = ast;
-      let prev = ast;
-      let brackets = 0;
-      const length = input.length;
-      let index = 0;
-      let depth = 0;
-      let value;
-      const advance2 = () => input[index++];
-      const push2 = (node) => {
-        if (node.type === "text" && prev.type === "dot") {
-          prev.type = "text";
-        }
-        if (prev && prev.type === "text" && node.type === "text") {
-          prev.value += node.value;
-          return;
-        }
-        block.nodes.push(node);
-        node.parent = block;
-        node.prev = prev;
-        prev = node;
-        return node;
-      };
-      push2({ type: "bos" });
-      while (index < length) {
-        block = stack[stack.length - 1];
-        value = advance2();
-        if (value === CHAR_ZERO_WIDTH_NOBREAK_SPACE || value === CHAR_NO_BREAK_SPACE) {
-          continue;
-        }
-        if (value === CHAR_BACKSLASH) {
-          push2({ type: "text", value: (options.keepEscaping ? value : "") + advance2() });
-          continue;
-        }
-        if (value === CHAR_RIGHT_SQUARE_BRACKET) {
-          push2({ type: "text", value: "\\" + value });
-          continue;
-        }
-        if (value === CHAR_LEFT_SQUARE_BRACKET) {
-          brackets++;
-          let next;
-          while (index < length && (next = advance2())) {
-            value += next;
-            if (next === CHAR_LEFT_SQUARE_BRACKET) {
-              brackets++;
-              continue;
-            }
-            if (next === CHAR_BACKSLASH) {
-              value += advance2();
-              continue;
-            }
-            if (next === CHAR_RIGHT_SQUARE_BRACKET) {
-              brackets--;
-              if (brackets === 0) {
-                break;
-              }
-            }
-          }
-          push2({ type: "text", value });
-          continue;
-        }
-        if (value === CHAR_LEFT_PARENTHESES) {
-          block = push2({ type: "paren", nodes: [] });
-          stack.push(block);
-          push2({ type: "text", value });
-          continue;
-        }
-        if (value === CHAR_RIGHT_PARENTHESES) {
-          if (block.type !== "paren") {
-            push2({ type: "text", value });
-            continue;
-          }
-          block = stack.pop();
-          push2({ type: "text", value });
-          block = stack[stack.length - 1];
-          continue;
-        }
-        if (value === CHAR_DOUBLE_QUOTE || value === CHAR_SINGLE_QUOTE || value === CHAR_BACKTICK) {
-          const open2 = value;
-          let next;
-          if (options.keepQuotes !== true) {
-            value = "";
-          }
-          while (index < length && (next = advance2())) {
-            if (next === CHAR_BACKSLASH) {
-              value += next + advance2();
-              continue;
-            }
-            if (next === open2) {
-              if (options.keepQuotes === true) value += next;
-              break;
-            }
-            value += next;
-          }
-          push2({ type: "text", value });
-          continue;
-        }
-        if (value === CHAR_LEFT_CURLY_BRACE) {
-          depth++;
-          const dollar = prev.value && prev.value.slice(-1) === "$" || block.dollar === true;
-          const brace = {
-            type: "brace",
-            open: true,
-            close: false,
-            dollar,
-            depth,
-            commas: 0,
-            ranges: 0,
-            nodes: []
-          };
-          block = push2(brace);
-          stack.push(block);
-          push2({ type: "open", value });
-          continue;
-        }
-        if (value === CHAR_RIGHT_CURLY_BRACE) {
-          if (block.type !== "brace") {
-            push2({ type: "text", value });
-            continue;
-          }
-          const type = "close";
-          block = stack.pop();
-          block.close = true;
-          push2({ type, value });
-          depth--;
-          block = stack[stack.length - 1];
-          continue;
-        }
-        if (value === CHAR_COMMA && depth > 0) {
-          if (block.ranges > 0) {
-            block.ranges = 0;
-            const open2 = block.nodes.shift();
-            block.nodes = [open2, { type: "text", value: stringify(block) }];
-          }
-          push2({ type: "comma", value });
-          block.commas++;
-          continue;
-        }
-        if (value === CHAR_DOT && depth > 0 && block.commas === 0) {
-          const siblings = block.nodes;
-          if (depth === 0 || siblings.length === 0) {
-            push2({ type: "text", value });
-            continue;
-          }
-          if (prev.type === "dot") {
-            block.range = [];
-            prev.value += value;
-            prev.type = "range";
-            if (block.nodes.length !== 3 && block.nodes.length !== 5) {
-              block.invalid = true;
-              block.ranges = 0;
-              prev.type = "text";
-              continue;
-            }
-            block.ranges++;
-            block.args = [];
-            continue;
-          }
-          if (prev.type === "range") {
-            siblings.pop();
-            const before = siblings[siblings.length - 1];
-            before.value += prev.value + value;
-            prev = before;
-            block.ranges--;
-            continue;
-          }
-          push2({ type: "dot", value });
-          continue;
-        }
-        push2({ type: "text", value });
-      }
-      do {
-        block = stack.pop();
-        if (block.type !== "root") {
-          block.nodes.forEach((node) => {
-            if (!node.nodes) {
-              if (node.type === "open") node.isOpen = true;
-              if (node.type === "close") node.isClose = true;
-              if (!node.nodes) node.type = "text";
-              node.invalid = true;
-            }
-          });
-          const parent = stack[stack.length - 1];
-          const index2 = parent.nodes.indexOf(block);
-          parent.nodes.splice(index2, 1, ...block.nodes);
-        }
-      } while (stack.length > 0);
-      push2({ type: "eos" });
-      return ast;
-    };
-    module2.exports = parse8;
-  }
-});
-
-// node_modules/braces/index.js
-var require_braces = __commonJS({
-  "node_modules/braces/index.js"(exports2, module2) {
-    "use strict";
-    var stringify = require_stringify();
-    var compile = require_compile2();
-    var expand2 = require_expand();
-    var parse8 = require_parse2();
-    var braces = (input, options = {}) => {
-      let output = [];
-      if (Array.isArray(input)) {
-        for (const pattern of input) {
-          const result = braces.create(pattern, options);
-          if (Array.isArray(result)) {
-            output.push(...result);
-          } else {
-            output.push(result);
-          }
-        }
-      } else {
-        output = [].concat(braces.create(input, options));
-      }
-      if (options && options.expand === true && options.nodupes === true) {
-        output = [...new Set(output)];
-      }
-      return output;
-    };
-    braces.parse = (input, options = {}) => parse8(input, options);
-    braces.stringify = (input, options = {}) => {
-      if (typeof input === "string") {
-        return stringify(braces.parse(input, options), options);
-      }
-      return stringify(input, options);
-    };
-    braces.compile = (input, options = {}) => {
-      if (typeof input === "string") {
-        input = braces.parse(input, options);
-      }
-      return compile(input, options);
-    };
-    braces.expand = (input, options = {}) => {
-      if (typeof input === "string") {
-        input = braces.parse(input, options);
-      }
-      let result = expand2(input, options);
-      if (options.noempty === true) {
-        result = result.filter(Boolean);
-      }
-      if (options.nodupes === true) {
-        result = [...new Set(result)];
-      }
-      return result;
-    };
-    braces.create = (input, options = {}) => {
-      if (input === "" || input.length < 3) {
-        return [input];
-      }
-      return options.expand !== true ? braces.compile(input, options) : braces.expand(input, options);
-    };
-    module2.exports = braces;
-  }
-});
-
 // node_modules/picomatch/lib/constants.js
-var require_constants7 = __commonJS({
+var require_constants6 = __commonJS({
   "node_modules/picomatch/lib/constants.js"(exports2, module2) {
     "use strict";
-    var path53 = require("path");
     var WIN_SLASH = "\\\\/";
     var WIN_NO_SLASH = `[^${WIN_SLASH}]`;
     var DEFAULT_MAX_EXTGLOB_RECURSION = 0;
@@ -33503,6 +32125,7 @@ var require_constants7 = __commonJS({
     var NO_DOTS_SLASH = `(?!${DOTS_SLASH})`;
     var QMARK_NO_DOT = `[^.${SLASH_LITERAL}]`;
     var STAR = `${QMARK}*?`;
+    var SEP = "/";
     var POSIX_CHARS = {
       DOT_LITERAL,
       PLUS_LITERAL,
@@ -33518,7 +32141,8 @@ var require_constants7 = __commonJS({
       NO_DOTS_SLASH,
       QMARK_NO_DOT,
       STAR,
-      START_ANCHOR
+      START_ANCHOR,
+      SEP
     };
     var WINDOWS_CHARS = {
       ...POSIX_CHARS,
@@ -33532,7 +32156,8 @@ var require_constants7 = __commonJS({
       NO_DOTS_SLASH: `(?!${DOT_LITERAL}{1,2}(?:[${WIN_SLASH}]|$))`,
       QMARK_NO_DOT: `[^.${WIN_SLASH}]`,
       START_ANCHOR: `(?:^|[${WIN_SLASH}])`,
-      END_ANCHOR: `(?:[${WIN_SLASH}]|$)`
+      END_ANCHOR: `(?:[${WIN_SLASH}]|$)`,
+      SEP: "\\"
     };
     var POSIX_REGEX_SOURCE = {
       __proto__: null,
@@ -33658,7 +32283,6 @@ var require_constants7 = __commonJS({
       /* | */
       CHAR_ZERO_WIDTH_NOBREAK_SPACE: 65279,
       /* \uFEFF */
-      SEP: path53.sep,
       /**
        * Create EXTGLOB_CHARS
        */
@@ -33682,39 +32306,34 @@ var require_constants7 = __commonJS({
 });
 
 // node_modules/picomatch/lib/utils.js
-var require_utils4 = __commonJS({
+var require_utils3 = __commonJS({
   "node_modules/picomatch/lib/utils.js"(exports2) {
     "use strict";
-    var path53 = require("path");
-    var win32 = process.platform === "win32";
     var {
       REGEX_BACKSLASH,
       REGEX_REMOVE_BACKSLASH,
       REGEX_SPECIAL_CHARS,
       REGEX_SPECIAL_CHARS_GLOBAL
-    } = require_constants7();
+    } = require_constants6();
     exports2.isObject = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
     exports2.hasRegexChars = (str) => REGEX_SPECIAL_CHARS.test(str);
     exports2.isRegexChar = (str) => str.length === 1 && exports2.hasRegexChars(str);
     exports2.escapeRegex = (str) => str.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
     exports2.toPosixSlashes = (str) => str.replace(REGEX_BACKSLASH, "/");
+    exports2.isWindows = () => {
+      if (typeof navigator !== "undefined" && navigator.platform) {
+        const platform2 = navigator.platform.toLowerCase();
+        return platform2 === "win32" || platform2 === "windows";
+      }
+      if (typeof process !== "undefined" && process.platform) {
+        return process.platform === "win32";
+      }
+      return false;
+    };
     exports2.removeBackslashes = (str) => {
       return str.replace(REGEX_REMOVE_BACKSLASH, (match) => {
         return match === "\\" ? "" : match;
       });
-    };
-    exports2.supportsLookbehinds = () => {
-      const segs = process.version.slice(1).split(".").map(Number);
-      if (segs.length === 3 && segs[0] >= 9 || segs[0] === 8 && segs[1] >= 10) {
-        return true;
-      }
-      return false;
-    };
-    exports2.isWindows = (options) => {
-      if (options && typeof options.windows === "boolean") {
-        return options.windows;
-      }
-      return win32 === true || path53.sep === "\\";
     };
     exports2.escapeLast = (input, char, lastIdx) => {
       const idx = input.lastIndexOf(char, lastIdx);
@@ -33739,6 +32358,14 @@ var require_utils4 = __commonJS({
       }
       return output;
     };
+    exports2.basename = (path54, { windows } = {}) => {
+      const segs = path54.split(windows ? /[\\/]/ : "/");
+      const last = segs[segs.length - 1];
+      if (last === "") {
+        return segs[segs.length - 2];
+      }
+      return last;
+    };
   }
 });
 
@@ -33746,7 +32373,7 @@ var require_utils4 = __commonJS({
 var require_scan = __commonJS({
   "node_modules/picomatch/lib/scan.js"(exports2, module2) {
     "use strict";
-    var utils = require_utils4();
+    var utils = require_utils3();
     var {
       CHAR_ASTERISK,
       /* * */
@@ -33778,7 +32405,7 @@ var require_scan = __commonJS({
       /* ) */
       CHAR_RIGHT_SQUARE_BRACKET
       /* ] */
-    } = require_constants7();
+    } = require_constants6();
     var isPathSeparator = (code) => {
       return code === CHAR_FORWARD_SLASH || code === CHAR_BACKWARD_SLASH;
     };
@@ -34073,11 +32700,11 @@ var require_scan = __commonJS({
 });
 
 // node_modules/picomatch/lib/parse.js
-var require_parse3 = __commonJS({
+var require_parse2 = __commonJS({
   "node_modules/picomatch/lib/parse.js"(exports2, module2) {
     "use strict";
-    var constants3 = require_constants7();
-    var utils = require_utils4();
+    var constants3 = require_constants6();
+    var utils = require_utils3();
     var {
       MAX_LENGTH,
       POSIX_REGEX_SOURCE,
@@ -34250,7 +32877,11 @@ var require_parse3 = __commonJS({
         }
       }
     };
-    var getStarExtglobSequenceOutput = (pattern) => {
+    var buildCharClassStar = (chars) => {
+      const source = chars.length === 1 ? utils.escapeRegex(chars[0]) : `[${chars.map((ch) => utils.escapeRegex(ch)).join("")}]`;
+      return `${source}*`;
+    };
+    var getStarExtglobSequenceChars = (pattern) => {
       let index = 0;
       const chars = [];
       while (index < pattern.length) {
@@ -34272,8 +32903,7 @@ var require_parse3 = __commonJS({
       if (chars.length < 1) {
         return;
       }
-      const source = chars.length === 1 ? utils.escapeRegex(chars[0]) : `[${chars.map((ch) => utils.escapeRegex(ch)).join("")}]`;
-      return `${source}*`;
+      return chars;
     };
     var repeatedExtglobRecursion = (pattern) => {
       let depth = 0;
@@ -34297,14 +32927,28 @@ var require_parse3 = __commonJS({
           return { risky: true };
         }
       }
+      const safeChars = [];
+      let sawStarSequence = false;
+      let combinable = true;
       for (const branch of branches) {
-        const safeOutput = getStarExtglobSequenceOutput(branch);
-        if (safeOutput) {
-          return { risky: true, safeOutput };
+        const chars = getStarExtglobSequenceChars(branch);
+        if (chars) {
+          sawStarSequence = true;
+          safeChars.push(...chars);
+          continue;
         }
+        const literal2 = normalizeSimpleBranch(branch);
+        if (literal2 && literal2.length === 1) {
+          safeChars.push(literal2);
+          continue;
+        }
+        combinable = false;
         if (repeatedExtglobRecursion(branch) > max) {
           return { risky: true };
         }
+      }
+      if (sawStarSequence) {
+        return combinable ? { risky: true, safeOutput: buildCharClassStar([...new Set(safeChars)]) } : { risky: true };
       }
       return { risky: false };
     };
@@ -34322,8 +32966,7 @@ var require_parse3 = __commonJS({
       const bos = { type: "bos", value: "", output: opts.prepend || "" };
       const tokens = [bos];
       const capture = opts.capture ? "" : "?:";
-      const win32 = utils.isWindows(options);
-      const PLATFORM_CHARS = constants3.globChars(win32);
+      const PLATFORM_CHARS = constants3.globChars(opts.windows);
       const EXTGLOB_CHARS = constants3.extglobChars(PLATFORM_CHARS);
       const {
         DOT_LITERAL,
@@ -34426,8 +33069,8 @@ var require_parse3 = __commonJS({
         }
         if (tok.value || tok.output) append(tok);
         if (prev && prev.type === "text" && tok.type === "text") {
+          prev.output = (prev.output || prev.value) + tok.value;
           prev.value += tok.value;
-          prev.output = (prev.output || "") + tok.value;
           return;
         }
         tok.prev = prev;
@@ -34785,9 +33428,6 @@ var require_parse3 = __commonJS({
           if (prev && prev.type === "paren") {
             const next = peek();
             let output = value;
-            if (next === "<" && !utils.supportsLookbehinds()) {
-              throw new Error("Node.js v10 or higher is required for regex lookbehinds");
-            }
             if (prev.value === "(" && !/[!=<:]/.test(next) || next === "<" && !/<([!=]|\w+>)/.test(remaining())) {
               output = `\\${value}`;
             }
@@ -35012,7 +33652,6 @@ var require_parse3 = __commonJS({
         throw new SyntaxError(`Input length: ${len}, exceeds maximum allowed length: ${max}`);
       }
       input = REPLACEMENTS[input] || input;
-      const win32 = utils.isWindows(options);
       const {
         DOT_LITERAL,
         SLASH_LITERAL,
@@ -35023,7 +33662,7 @@ var require_parse3 = __commonJS({
         NO_DOTS_SLASH,
         STAR,
         START_ANCHOR
-      } = constants3.globChars(win32);
+      } = constants3.globChars(opts.windows);
       const nodot = opts.dot ? NO_DOTS : NO_DOT;
       const slashDot = opts.dot ? NO_DOTS_SLASH : NO_DOT;
       const capture = opts.capture ? "" : "?:";
@@ -35078,15 +33717,14 @@ var require_parse3 = __commonJS({
 var require_picomatch = __commonJS({
   "node_modules/picomatch/lib/picomatch.js"(exports2, module2) {
     "use strict";
-    var path53 = require("path");
     var scan2 = require_scan();
-    var parse8 = require_parse3();
-    var utils = require_utils4();
-    var constants3 = require_constants7();
+    var parse8 = require_parse2();
+    var utils = require_utils3();
+    var constants3 = require_constants6();
     var isObject3 = (val) => val && typeof val === "object" && !Array.isArray(val);
-    var picomatch = (glob, options, returnState = false) => {
+    var picomatch2 = (glob, options, returnState = false) => {
       if (Array.isArray(glob)) {
-        const fns = glob.map((input) => picomatch(input, options, returnState));
+        const fns = glob.map((input) => picomatch2(input, options, returnState));
         const arrayMatcher = (str) => {
           for (const isMatch of fns) {
             const state4 = isMatch(str);
@@ -35101,17 +33739,17 @@ var require_picomatch = __commonJS({
         throw new TypeError("Expected pattern to be a non-empty string");
       }
       const opts = options || {};
-      const posix = utils.isWindows(options);
-      const regex = isState ? picomatch.compileRe(glob, options) : picomatch.makeRe(glob, options, false, true);
+      const posix = opts.windows;
+      const regex = isState ? picomatch2.compileRe(glob, options) : picomatch2.makeRe(glob, options, false, true);
       const state3 = regex.state;
       delete regex.state;
       let isIgnored = () => false;
       if (opts.ignore) {
         const ignoreOpts = { ...options, ignore: null, onMatch: null, onResult: null };
-        isIgnored = picomatch(opts.ignore, ignoreOpts, returnState);
+        isIgnored = picomatch2(opts.ignore, ignoreOpts, returnState);
       }
       const matcher = (input, returnObject = false) => {
-        const { isMatch, match, output } = picomatch.test(input, regex, options, { glob, posix });
+        const { isMatch, match, output } = picomatch2.test(input, regex, options, { glob, posix });
         const result = { glob, state: state3, regex, posix, input, output, match, isMatch };
         if (typeof opts.onResult === "function") {
           opts.onResult(result);
@@ -35137,7 +33775,7 @@ var require_picomatch = __commonJS({
       }
       return matcher;
     };
-    picomatch.test = (input, regex, options, { glob, posix } = {}) => {
+    picomatch2.test = (input, regex, options, { glob, posix } = {}) => {
       if (typeof input !== "string") {
         throw new TypeError("Expected input to be a string");
       }
@@ -35154,24 +33792,24 @@ var require_picomatch = __commonJS({
       }
       if (match === false || opts.capture === true) {
         if (opts.matchBase === true || opts.basename === true) {
-          match = picomatch.matchBase(input, regex, options, posix);
+          match = picomatch2.matchBase(input, regex, options, posix);
         } else {
           match = regex.exec(output);
         }
       }
       return { isMatch: Boolean(match), match, output };
     };
-    picomatch.matchBase = (input, glob, options, posix = utils.isWindows(options)) => {
-      const regex = glob instanceof RegExp ? glob : picomatch.makeRe(glob, options);
-      return regex.test(path53.basename(input));
+    picomatch2.matchBase = (input, glob, options, posix = options && options.windows) => {
+      const regex = glob instanceof RegExp ? glob : picomatch2.makeRe(glob, options);
+      return regex.test(utils.basename(input, { windows: posix }));
     };
-    picomatch.isMatch = (str, patterns, options) => picomatch(patterns, options)(str);
-    picomatch.parse = (pattern, options) => {
-      if (Array.isArray(pattern)) return pattern.map((p) => picomatch.parse(p, options));
+    picomatch2.isMatch = (str, patterns, options) => picomatch2(patterns, options)(str);
+    picomatch2.parse = (pattern, options) => {
+      if (Array.isArray(pattern)) return pattern.map((p) => picomatch2.parse(p, options));
       return parse8(pattern, { ...options, fastpaths: false });
     };
-    picomatch.scan = (input, options) => scan2(input, options);
-    picomatch.compileRe = (state3, options, returnOutput = false, returnState = false) => {
+    picomatch2.scan = (input, options) => scan2(input, options);
+    picomatch2.compileRe = (state3, options, returnOutput = false, returnState = false) => {
       if (returnOutput === true) {
         return state3.output;
       }
@@ -35182,13 +33820,13 @@ var require_picomatch = __commonJS({
       if (state3 && state3.negated === true) {
         source = `^(?!${source}).*$`;
       }
-      const regex = picomatch.toRegex(source, options);
+      const regex = picomatch2.toRegex(source, options);
       if (returnState === true) {
         regex.state = state3;
       }
       return regex;
     };
-    picomatch.makeRe = (input, options = {}, returnOutput = false, returnState = false) => {
+    picomatch2.makeRe = (input, options = {}, returnOutput = false, returnState = false) => {
       if (!input || typeof input !== "string") {
         throw new TypeError("Expected a non-empty string");
       }
@@ -35199,9 +33837,9 @@ var require_picomatch = __commonJS({
       if (!parsed.output) {
         parsed = parse8(input, options);
       }
-      return picomatch.compileRe(parsed, options, returnOutput, returnState);
+      return picomatch2.compileRe(parsed, options, returnOutput, returnState);
     };
-    picomatch.toRegex = (source, options) => {
+    picomatch2.toRegex = (source, options) => {
       try {
         const opts = options || {};
         return new RegExp(source, opts.flags || (opts.nocase ? "i" : ""));
@@ -35210,8 +33848,8 @@ var require_picomatch = __commonJS({
         return /$^/;
       }
     };
-    picomatch.constants = constants3;
-    module2.exports = picomatch;
+    picomatch2.constants = constants3;
+    module2.exports = picomatch2;
   }
 });
 
@@ -35219,2632 +33857,16 @@ var require_picomatch = __commonJS({
 var require_picomatch2 = __commonJS({
   "node_modules/picomatch/index.js"(exports2, module2) {
     "use strict";
-    module2.exports = require_picomatch();
-  }
-});
-
-// node_modules/micromatch/index.js
-var require_micromatch = __commonJS({
-  "node_modules/micromatch/index.js"(exports2, module2) {
-    "use strict";
-    var util3 = require("util");
-    var braces = require_braces();
-    var picomatch = require_picomatch2();
-    var utils = require_utils4();
-    var isEmptyString = (v) => v === "" || v === "./";
-    var hasBraces = (v) => {
-      const index = v.indexOf("{");
-      return index > -1 && v.indexOf("}", index) > -1;
-    };
-    var micromatch = (list, patterns, options) => {
-      patterns = [].concat(patterns);
-      list = [].concat(list);
-      let omit3 = /* @__PURE__ */ new Set();
-      let keep = /* @__PURE__ */ new Set();
-      let items = /* @__PURE__ */ new Set();
-      let negatives = 0;
-      let onResult = (state3) => {
-        items.add(state3.output);
-        if (options && options.onResult) {
-          options.onResult(state3);
-        }
-      };
-      for (let i = 0; i < patterns.length; i++) {
-        let isMatch = picomatch(String(patterns[i]), { ...options, onResult }, true);
-        let negated = isMatch.state.negated || isMatch.state.negatedExtglob;
-        if (negated) negatives++;
-        for (let item of list) {
-          let matched = isMatch(item, true);
-          let match = negated ? !matched.isMatch : matched.isMatch;
-          if (!match) continue;
-          if (negated) {
-            omit3.add(matched.output);
-          } else {
-            omit3.delete(matched.output);
-            keep.add(matched.output);
-          }
-        }
-      }
-      let result = negatives === patterns.length ? [...items] : [...keep];
-      let matches = result.filter((item) => !omit3.has(item));
-      if (options && matches.length === 0) {
-        if (options.failglob === true) {
-          throw new Error(`No matches found for "${patterns.join(", ")}"`);
-        }
-        if (options.nonull === true || options.nullglob === true) {
-          return options.unescape ? patterns.map((p) => p.replace(/\\/g, "")) : patterns;
-        }
-      }
-      return matches;
-    };
-    micromatch.match = micromatch;
-    micromatch.matcher = (pattern, options) => picomatch(pattern, options);
-    micromatch.isMatch = (str, patterns, options) => picomatch(patterns, options)(str);
-    micromatch.any = micromatch.isMatch;
-    micromatch.not = (list, patterns, options = {}) => {
-      patterns = [].concat(patterns).map(String);
-      let result = /* @__PURE__ */ new Set();
-      let items = [];
-      let onResult = (state3) => {
-        if (options.onResult) options.onResult(state3);
-        items.push(state3.output);
-      };
-      let matches = new Set(micromatch(list, patterns, { ...options, onResult }));
-      for (let item of items) {
-        if (!matches.has(item)) {
-          result.add(item);
-        }
-      }
-      return [...result];
-    };
-    micromatch.contains = (str, pattern, options) => {
-      if (typeof str !== "string") {
-        throw new TypeError(`Expected a string: "${util3.inspect(str)}"`);
-      }
-      if (Array.isArray(pattern)) {
-        return pattern.some((p) => micromatch.contains(str, p, options));
-      }
-      if (typeof pattern === "string") {
-        if (isEmptyString(str) || isEmptyString(pattern)) {
-          return false;
-        }
-        if (str.includes(pattern) || str.startsWith("./") && str.slice(2).includes(pattern)) {
-          return true;
-        }
-      }
-      return micromatch.isMatch(str, pattern, { ...options, contains: true });
-    };
-    micromatch.matchKeys = (obj, patterns, options) => {
-      if (!utils.isObject(obj)) {
-        throw new TypeError("Expected the first argument to be an object");
-      }
-      let keys = micromatch(Object.keys(obj), patterns, options);
-      let res = {};
-      for (let key of keys) res[key] = obj[key];
-      return res;
-    };
-    micromatch.some = (list, patterns, options) => {
-      let items = [].concat(list);
-      for (let pattern of [].concat(patterns)) {
-        let isMatch = picomatch(String(pattern), options);
-        if (items.some((item) => isMatch(item))) {
-          return true;
-        }
-      }
-      return false;
-    };
-    micromatch.every = (list, patterns, options) => {
-      let items = [].concat(list);
-      for (let pattern of [].concat(patterns)) {
-        let isMatch = picomatch(String(pattern), options);
-        if (!items.every((item) => isMatch(item))) {
-          return false;
-        }
-      }
-      return true;
-    };
-    micromatch.all = (str, patterns, options) => {
-      if (typeof str !== "string") {
-        throw new TypeError(`Expected a string: "${util3.inspect(str)}"`);
-      }
-      return [].concat(patterns).every((p) => picomatch(p, options)(str));
-    };
-    micromatch.capture = (glob, input, options) => {
-      let posix = utils.isWindows(options);
-      let regex = picomatch.makeRe(String(glob), { ...options, capture: true });
-      let match = regex.exec(posix ? utils.toPosixSlashes(input) : input);
-      if (match) {
-        return match.slice(1).map((v) => v === void 0 ? "" : v);
-      }
-    };
-    micromatch.makeRe = (...args) => picomatch.makeRe(...args);
-    micromatch.scan = (...args) => picomatch.scan(...args);
-    micromatch.parse = (patterns, options) => {
-      let res = [];
-      for (let pattern of [].concat(patterns || [])) {
-        for (let str of braces(String(pattern), options)) {
-          res.push(picomatch.parse(str, options));
-        }
-      }
-      return res;
-    };
-    micromatch.braces = (pattern, options) => {
-      if (typeof pattern !== "string") throw new TypeError("Expected a string");
-      if (options && options.nobrace === true || !hasBraces(pattern)) {
-        return [pattern];
-      }
-      return braces(pattern, options);
-    };
-    micromatch.braceExpand = (pattern, options) => {
-      if (typeof pattern !== "string") throw new TypeError("Expected a string");
-      return micromatch.braces(pattern, { ...options, expand: true });
-    };
-    micromatch.hasBraces = hasBraces;
-    module2.exports = micromatch;
-  }
-});
-
-// node_modules/fast-glob/out/utils/pattern.js
-var require_pattern2 = __commonJS({
-  "node_modules/fast-glob/out/utils/pattern.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.isAbsolute = exports2.partitionAbsoluteAndRelative = exports2.removeDuplicateSlashes = exports2.matchAny = exports2.convertPatternsToRe = exports2.makeRe = exports2.getPatternParts = exports2.expandBraceExpansion = exports2.expandPatternsWithBraceExpansion = exports2.isAffectDepthOfReadingPattern = exports2.endsWithSlashGlobStar = exports2.hasGlobStar = exports2.getBaseDirectory = exports2.isPatternRelatedToParentDirectory = exports2.getPatternsOutsideCurrentDirectory = exports2.getPatternsInsideCurrentDirectory = exports2.getPositivePatterns = exports2.getNegativePatterns = exports2.isPositivePattern = exports2.isNegativePattern = exports2.convertToNegativePattern = exports2.convertToPositivePattern = exports2.isDynamicPattern = exports2.isStaticPattern = void 0;
-    var path53 = require("path");
-    var globParent = require_glob_parent();
-    var micromatch = require_micromatch();
-    var GLOBSTAR = "**";
-    var ESCAPE_SYMBOL = "\\";
-    var COMMON_GLOB_SYMBOLS_RE = /[*?]|^!/;
-    var REGEX_CHARACTER_CLASS_SYMBOLS_RE = /\[[^[]*]/;
-    var REGEX_GROUP_SYMBOLS_RE = /(?:^|[^!*+?@])\([^(]*\|[^|]*\)/;
-    var GLOB_EXTENSION_SYMBOLS_RE = /[!*+?@]\([^(]*\)/;
-    var BRACE_EXPANSION_SEPARATORS_RE = /,|\.\./;
-    var DOUBLE_SLASH_RE = /(?!^)\/{2,}/g;
-    function isStaticPattern(pattern, options = {}) {
-      return !isDynamicPattern(pattern, options);
-    }
-    exports2.isStaticPattern = isStaticPattern;
-    function isDynamicPattern(pattern, options = {}) {
-      if (pattern === "") {
-        return false;
-      }
-      if (options.caseSensitiveMatch === false || pattern.includes(ESCAPE_SYMBOL)) {
-        return true;
-      }
-      if (COMMON_GLOB_SYMBOLS_RE.test(pattern) || REGEX_CHARACTER_CLASS_SYMBOLS_RE.test(pattern) || REGEX_GROUP_SYMBOLS_RE.test(pattern)) {
-        return true;
-      }
-      if (options.extglob !== false && GLOB_EXTENSION_SYMBOLS_RE.test(pattern)) {
-        return true;
-      }
-      if (options.braceExpansion !== false && hasBraceExpansion(pattern)) {
-        return true;
-      }
-      return false;
-    }
-    exports2.isDynamicPattern = isDynamicPattern;
-    function hasBraceExpansion(pattern) {
-      const openingBraceIndex = pattern.indexOf("{");
-      if (openingBraceIndex === -1) {
-        return false;
-      }
-      const closingBraceIndex = pattern.indexOf("}", openingBraceIndex + 1);
-      if (closingBraceIndex === -1) {
-        return false;
-      }
-      const braceContent = pattern.slice(openingBraceIndex, closingBraceIndex);
-      return BRACE_EXPANSION_SEPARATORS_RE.test(braceContent);
-    }
-    function convertToPositivePattern(pattern) {
-      return isNegativePattern(pattern) ? pattern.slice(1) : pattern;
-    }
-    exports2.convertToPositivePattern = convertToPositivePattern;
-    function convertToNegativePattern(pattern) {
-      return "!" + pattern;
-    }
-    exports2.convertToNegativePattern = convertToNegativePattern;
-    function isNegativePattern(pattern) {
-      return pattern.startsWith("!") && pattern[1] !== "(";
-    }
-    exports2.isNegativePattern = isNegativePattern;
-    function isPositivePattern(pattern) {
-      return !isNegativePattern(pattern);
-    }
-    exports2.isPositivePattern = isPositivePattern;
-    function getNegativePatterns(patterns) {
-      return patterns.filter(isNegativePattern);
-    }
-    exports2.getNegativePatterns = getNegativePatterns;
-    function getPositivePatterns(patterns) {
-      return patterns.filter(isPositivePattern);
-    }
-    exports2.getPositivePatterns = getPositivePatterns;
-    function getPatternsInsideCurrentDirectory(patterns) {
-      return patterns.filter((pattern) => !isPatternRelatedToParentDirectory(pattern));
-    }
-    exports2.getPatternsInsideCurrentDirectory = getPatternsInsideCurrentDirectory;
-    function getPatternsOutsideCurrentDirectory(patterns) {
-      return patterns.filter(isPatternRelatedToParentDirectory);
-    }
-    exports2.getPatternsOutsideCurrentDirectory = getPatternsOutsideCurrentDirectory;
-    function isPatternRelatedToParentDirectory(pattern) {
-      return pattern.startsWith("..") || pattern.startsWith("./..");
-    }
-    exports2.isPatternRelatedToParentDirectory = isPatternRelatedToParentDirectory;
-    function getBaseDirectory(pattern) {
-      return globParent(pattern, { flipBackslashes: false });
-    }
-    exports2.getBaseDirectory = getBaseDirectory;
-    function hasGlobStar(pattern) {
-      return pattern.includes(GLOBSTAR);
-    }
-    exports2.hasGlobStar = hasGlobStar;
-    function endsWithSlashGlobStar(pattern) {
-      return pattern.endsWith("/" + GLOBSTAR);
-    }
-    exports2.endsWithSlashGlobStar = endsWithSlashGlobStar;
-    function isAffectDepthOfReadingPattern(pattern) {
-      const basename3 = path53.basename(pattern);
-      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename3);
-    }
-    exports2.isAffectDepthOfReadingPattern = isAffectDepthOfReadingPattern;
-    function expandPatternsWithBraceExpansion(patterns) {
-      return patterns.reduce((collection, pattern) => {
-        return collection.concat(expandBraceExpansion(pattern));
-      }, []);
-    }
-    exports2.expandPatternsWithBraceExpansion = expandPatternsWithBraceExpansion;
-    function expandBraceExpansion(pattern) {
-      const patterns = micromatch.braces(pattern, { expand: true, nodupes: true, keepEscaping: true });
-      patterns.sort((a, b) => a.length - b.length);
-      return patterns.filter((pattern2) => pattern2 !== "");
-    }
-    exports2.expandBraceExpansion = expandBraceExpansion;
-    function getPatternParts(pattern, options) {
-      let { parts } = micromatch.scan(pattern, Object.assign(Object.assign({}, options), { parts: true }));
-      if (parts.length === 0) {
-        parts = [pattern];
-      }
-      if (parts[0].startsWith("/")) {
-        parts[0] = parts[0].slice(1);
-        parts.unshift("");
-      }
-      return parts;
-    }
-    exports2.getPatternParts = getPatternParts;
-    function makeRe(pattern, options) {
-      return micromatch.makeRe(pattern, options);
-    }
-    exports2.makeRe = makeRe;
-    function convertPatternsToRe(patterns, options) {
-      return patterns.map((pattern) => makeRe(pattern, options));
-    }
-    exports2.convertPatternsToRe = convertPatternsToRe;
-    function matchAny(entry, patternsRe) {
-      return patternsRe.some((patternRe) => patternRe.test(entry));
-    }
-    exports2.matchAny = matchAny;
-    function removeDuplicateSlashes(pattern) {
-      return pattern.replace(DOUBLE_SLASH_RE, "/");
-    }
-    exports2.removeDuplicateSlashes = removeDuplicateSlashes;
-    function partitionAbsoluteAndRelative(patterns) {
-      const absolute = [];
-      const relative = [];
-      for (const pattern of patterns) {
-        if (isAbsolute(pattern)) {
-          absolute.push(pattern);
-        } else {
-          relative.push(pattern);
-        }
-      }
-      return [absolute, relative];
-    }
-    exports2.partitionAbsoluteAndRelative = partitionAbsoluteAndRelative;
-    function isAbsolute(pattern) {
-      return path53.isAbsolute(pattern);
-    }
-    exports2.isAbsolute = isAbsolute;
-  }
-});
-
-// node_modules/merge2/index.js
-var require_merge22 = __commonJS({
-  "node_modules/merge2/index.js"(exports2, module2) {
-    "use strict";
-    var Stream = require("stream");
-    var PassThrough3 = Stream.PassThrough;
-    var slice = Array.prototype.slice;
-    module2.exports = merge22;
-    function merge22() {
-      const streamsQueue = [];
-      const args = slice.call(arguments);
-      let merging = false;
-      let options = args[args.length - 1];
-      if (options && !Array.isArray(options) && options.pipe == null) {
-        args.pop();
-      } else {
-        options = {};
-      }
-      const doEnd = options.end !== false;
-      const doPipeError = options.pipeError === true;
-      if (options.objectMode == null) {
-        options.objectMode = true;
-      }
-      if (options.highWaterMark == null) {
-        options.highWaterMark = 64 * 1024;
-      }
-      const mergedStream = PassThrough3(options);
-      function addStream() {
-        for (let i = 0, len = arguments.length; i < len; i++) {
-          streamsQueue.push(pauseStreams(arguments[i], options));
-        }
-        mergeStream();
-        return this;
-      }
-      function mergeStream() {
-        if (merging) {
-          return;
-        }
-        merging = true;
-        let streams = streamsQueue.shift();
-        if (!streams) {
-          process.nextTick(endStream);
-          return;
-        }
-        if (!Array.isArray(streams)) {
-          streams = [streams];
-        }
-        let pipesCount = streams.length + 1;
-        function next() {
-          if (--pipesCount > 0) {
-            return;
-          }
-          merging = false;
-          mergeStream();
-        }
-        function pipe2(stream4) {
-          function onend() {
-            stream4.removeListener("merge2UnpipeEnd", onend);
-            stream4.removeListener("end", onend);
-            if (doPipeError) {
-              stream4.removeListener("error", onerror);
-            }
-            next();
-          }
-          function onerror(err) {
-            mergedStream.emit("error", err);
-          }
-          if (stream4._readableState.endEmitted) {
-            return next();
-          }
-          stream4.on("merge2UnpipeEnd", onend);
-          stream4.on("end", onend);
-          if (doPipeError) {
-            stream4.on("error", onerror);
-          }
-          stream4.pipe(mergedStream, { end: false });
-          stream4.resume();
-        }
-        for (let i = 0; i < streams.length; i++) {
-          pipe2(streams[i]);
-        }
-        next();
-      }
-      function endStream() {
-        merging = false;
-        mergedStream.emit("queueDrain");
-        if (doEnd) {
-          mergedStream.end();
-        }
-      }
-      mergedStream.setMaxListeners(0);
-      mergedStream.add = addStream;
-      mergedStream.on("unpipe", function(stream4) {
-        stream4.emit("merge2UnpipeEnd");
-      });
-      if (args.length) {
-        addStream.apply(null, args);
-      }
-      return mergedStream;
-    }
-    function pauseStreams(streams, options) {
-      if (!Array.isArray(streams)) {
-        if (!streams._readableState && streams.pipe) {
-          streams = streams.pipe(PassThrough3(options));
-        }
-        if (!streams._readableState || !streams.pause || !streams.pipe) {
-          throw new Error("Only readable stream can be merged.");
-        }
-        streams.pause();
-      } else {
-        for (let i = 0, len = streams.length; i < len; i++) {
-          streams[i] = pauseStreams(streams[i], options);
-        }
-      }
-      return streams;
-    }
-  }
-});
-
-// node_modules/fast-glob/out/utils/stream.js
-var require_stream = __commonJS({
-  "node_modules/fast-glob/out/utils/stream.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.merge = void 0;
-    var merge22 = require_merge22();
-    function merge3(streams) {
-      const mergedStream = merge22(streams);
-      streams.forEach((stream4) => {
-        stream4.once("error", (error52) => mergedStream.emit("error", error52));
-      });
-      mergedStream.once("close", () => propagateCloseEventToSources(streams));
-      mergedStream.once("end", () => propagateCloseEventToSources(streams));
-      return mergedStream;
-    }
-    exports2.merge = merge3;
-    function propagateCloseEventToSources(streams) {
-      streams.forEach((stream4) => stream4.emit("close"));
-    }
-  }
-});
-
-// node_modules/fast-glob/out/utils/string.js
-var require_string = __commonJS({
-  "node_modules/fast-glob/out/utils/string.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.isEmpty = exports2.isString = void 0;
-    function isString(input) {
-      return typeof input === "string";
-    }
-    exports2.isString = isString;
-    function isEmpty(input) {
-      return input === "";
-    }
-    exports2.isEmpty = isEmpty;
-  }
-});
-
-// node_modules/fast-glob/out/utils/index.js
-var require_utils5 = __commonJS({
-  "node_modules/fast-glob/out/utils/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.string = exports2.stream = exports2.pattern = exports2.path = exports2.fs = exports2.errno = exports2.array = void 0;
-    var array2 = require_array();
-    exports2.array = array2;
-    var errno = require_errno();
-    exports2.errno = errno;
-    var fs27 = require_fs();
-    exports2.fs = fs27;
-    var path53 = require_path();
-    exports2.path = path53;
-    var pattern = require_pattern2();
-    exports2.pattern = pattern;
-    var stream4 = require_stream();
-    exports2.stream = stream4;
-    var string4 = require_string();
-    exports2.string = string4;
-  }
-});
-
-// node_modules/fast-glob/out/managers/tasks.js
-var require_tasks = __commonJS({
-  "node_modules/fast-glob/out/managers/tasks.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.convertPatternGroupToTask = exports2.convertPatternGroupsToTasks = exports2.groupPatternsByBaseDirectory = exports2.getNegativePatternsAsPositive = exports2.getPositivePatterns = exports2.convertPatternsToTasks = exports2.generate = void 0;
-    var utils = require_utils5();
-    function generate(input, settings) {
-      const patterns = processPatterns(input, settings);
-      const ignore = processPatterns(settings.ignore, settings);
-      const positivePatterns = getPositivePatterns(patterns);
-      const negativePatterns = getNegativePatternsAsPositive(patterns, ignore);
-      const staticPatterns = positivePatterns.filter((pattern) => utils.pattern.isStaticPattern(pattern, settings));
-      const dynamicPatterns = positivePatterns.filter((pattern) => utils.pattern.isDynamicPattern(pattern, settings));
-      const staticTasks = convertPatternsToTasks(
-        staticPatterns,
-        negativePatterns,
-        /* dynamic */
-        false
-      );
-      const dynamicTasks = convertPatternsToTasks(
-        dynamicPatterns,
-        negativePatterns,
-        /* dynamic */
-        true
-      );
-      return staticTasks.concat(dynamicTasks);
-    }
-    exports2.generate = generate;
-    function processPatterns(input, settings) {
-      let patterns = input;
-      if (settings.braceExpansion) {
-        patterns = utils.pattern.expandPatternsWithBraceExpansion(patterns);
-      }
-      if (settings.baseNameMatch) {
-        patterns = patterns.map((pattern) => pattern.includes("/") ? pattern : `**/${pattern}`);
-      }
-      return patterns.map((pattern) => utils.pattern.removeDuplicateSlashes(pattern));
-    }
-    function convertPatternsToTasks(positive, negative, dynamic) {
-      const tasks = [];
-      const patternsOutsideCurrentDirectory = utils.pattern.getPatternsOutsideCurrentDirectory(positive);
-      const patternsInsideCurrentDirectory = utils.pattern.getPatternsInsideCurrentDirectory(positive);
-      const outsideCurrentDirectoryGroup = groupPatternsByBaseDirectory(patternsOutsideCurrentDirectory);
-      const insideCurrentDirectoryGroup = groupPatternsByBaseDirectory(patternsInsideCurrentDirectory);
-      tasks.push(...convertPatternGroupsToTasks(outsideCurrentDirectoryGroup, negative, dynamic));
-      if ("." in insideCurrentDirectoryGroup) {
-        tasks.push(convertPatternGroupToTask(".", patternsInsideCurrentDirectory, negative, dynamic));
-      } else {
-        tasks.push(...convertPatternGroupsToTasks(insideCurrentDirectoryGroup, negative, dynamic));
-      }
-      return tasks;
-    }
-    exports2.convertPatternsToTasks = convertPatternsToTasks;
-    function getPositivePatterns(patterns) {
-      return utils.pattern.getPositivePatterns(patterns);
-    }
-    exports2.getPositivePatterns = getPositivePatterns;
-    function getNegativePatternsAsPositive(patterns, ignore) {
-      const negative = utils.pattern.getNegativePatterns(patterns).concat(ignore);
-      const positive = negative.map(utils.pattern.convertToPositivePattern);
-      return positive;
-    }
-    exports2.getNegativePatternsAsPositive = getNegativePatternsAsPositive;
-    function groupPatternsByBaseDirectory(patterns) {
-      const group = {};
-      return patterns.reduce((collection, pattern) => {
-        const base = utils.pattern.getBaseDirectory(pattern);
-        if (base in collection) {
-          collection[base].push(pattern);
-        } else {
-          collection[base] = [pattern];
-        }
-        return collection;
-      }, group);
-    }
-    exports2.groupPatternsByBaseDirectory = groupPatternsByBaseDirectory;
-    function convertPatternGroupsToTasks(positive, negative, dynamic) {
-      return Object.keys(positive).map((base) => {
-        return convertPatternGroupToTask(base, positive[base], negative, dynamic);
-      });
-    }
-    exports2.convertPatternGroupsToTasks = convertPatternGroupsToTasks;
-    function convertPatternGroupToTask(base, positive, negative, dynamic) {
-      return {
-        dynamic,
-        positive,
-        negative,
-        base,
-        patterns: [].concat(positive, negative.map(utils.pattern.convertToNegativePattern))
-      };
-    }
-    exports2.convertPatternGroupToTask = convertPatternGroupToTask;
-  }
-});
-
-// node_modules/@nodelib/fs.stat/out/providers/async.js
-var require_async = __commonJS({
-  "node_modules/@nodelib/fs.stat/out/providers/async.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.read = void 0;
-    function read(path53, settings, callback) {
-      settings.fs.lstat(path53, (lstatError, lstat2) => {
-        if (lstatError !== null) {
-          callFailureCallback(callback, lstatError);
-          return;
-        }
-        if (!lstat2.isSymbolicLink() || !settings.followSymbolicLink) {
-          callSuccessCallback(callback, lstat2);
-          return;
-        }
-        settings.fs.stat(path53, (statError, stat3) => {
-          if (statError !== null) {
-            if (settings.throwErrorOnBrokenSymbolicLink) {
-              callFailureCallback(callback, statError);
-              return;
-            }
-            callSuccessCallback(callback, lstat2);
-            return;
-          }
-          if (settings.markSymbolicLink) {
-            stat3.isSymbolicLink = () => true;
-          }
-          callSuccessCallback(callback, stat3);
-        });
-      });
-    }
-    exports2.read = read;
-    function callFailureCallback(callback, error52) {
-      callback(error52);
-    }
-    function callSuccessCallback(callback, result) {
-      callback(null, result);
-    }
-  }
-});
-
-// node_modules/@nodelib/fs.stat/out/providers/sync.js
-var require_sync = __commonJS({
-  "node_modules/@nodelib/fs.stat/out/providers/sync.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.read = void 0;
-    function read(path53, settings) {
-      const lstat2 = settings.fs.lstatSync(path53);
-      if (!lstat2.isSymbolicLink() || !settings.followSymbolicLink) {
-        return lstat2;
-      }
-      try {
-        const stat3 = settings.fs.statSync(path53);
-        if (settings.markSymbolicLink) {
-          stat3.isSymbolicLink = () => true;
-        }
-        return stat3;
-      } catch (error52) {
-        if (!settings.throwErrorOnBrokenSymbolicLink) {
-          return lstat2;
-        }
-        throw error52;
-      }
-    }
-    exports2.read = read;
-  }
-});
-
-// node_modules/@nodelib/fs.stat/out/adapters/fs.js
-var require_fs2 = __commonJS({
-  "node_modules/@nodelib/fs.stat/out/adapters/fs.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.createFileSystemAdapter = exports2.FILE_SYSTEM_ADAPTER = void 0;
-    var fs27 = require("fs");
-    exports2.FILE_SYSTEM_ADAPTER = {
-      lstat: fs27.lstat,
-      stat: fs27.stat,
-      lstatSync: fs27.lstatSync,
-      statSync: fs27.statSync
-    };
-    function createFileSystemAdapter(fsMethods) {
-      if (fsMethods === void 0) {
-        return exports2.FILE_SYSTEM_ADAPTER;
-      }
-      return Object.assign(Object.assign({}, exports2.FILE_SYSTEM_ADAPTER), fsMethods);
-    }
-    exports2.createFileSystemAdapter = createFileSystemAdapter;
-  }
-});
-
-// node_modules/@nodelib/fs.stat/out/settings.js
-var require_settings = __commonJS({
-  "node_modules/@nodelib/fs.stat/out/settings.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var fs27 = require_fs2();
-    var Settings = class {
-      constructor(_options = {}) {
-        this._options = _options;
-        this.followSymbolicLink = this._getValue(this._options.followSymbolicLink, true);
-        this.fs = fs27.createFileSystemAdapter(this._options.fs);
-        this.markSymbolicLink = this._getValue(this._options.markSymbolicLink, false);
-        this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, true);
-      }
-      _getValue(option, value) {
-        return option !== null && option !== void 0 ? option : value;
-      }
-    };
-    exports2.default = Settings;
-  }
-});
-
-// node_modules/@nodelib/fs.stat/out/index.js
-var require_out = __commonJS({
-  "node_modules/@nodelib/fs.stat/out/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.statSync = exports2.stat = exports2.Settings = void 0;
-    var async = require_async();
-    var sync = require_sync();
-    var settings_1 = require_settings();
-    exports2.Settings = settings_1.default;
-    function stat3(path53, optionsOrSettingsOrCallback, callback) {
-      if (typeof optionsOrSettingsOrCallback === "function") {
-        async.read(path53, getSettings(), optionsOrSettingsOrCallback);
-        return;
-      }
-      async.read(path53, getSettings(optionsOrSettingsOrCallback), callback);
-    }
-    exports2.stat = stat3;
-    function statSync2(path53, optionsOrSettings) {
-      const settings = getSettings(optionsOrSettings);
-      return sync.read(path53, settings);
-    }
-    exports2.statSync = statSync2;
-    function getSettings(settingsOrOptions = {}) {
-      if (settingsOrOptions instanceof settings_1.default) {
-        return settingsOrOptions;
-      }
-      return new settings_1.default(settingsOrOptions);
-    }
-  }
-});
-
-// node_modules/queue-microtask/index.js
-var require_queue_microtask = __commonJS({
-  "node_modules/queue-microtask/index.js"(exports2, module2) {
-    var promise2;
-    module2.exports = typeof queueMicrotask === "function" ? queueMicrotask.bind(typeof window !== "undefined" ? window : global) : (cb) => (promise2 || (promise2 = Promise.resolve())).then(cb).catch((err) => setTimeout(() => {
-      throw err;
-    }, 0));
-  }
-});
-
-// node_modules/run-parallel/index.js
-var require_run_parallel = __commonJS({
-  "node_modules/run-parallel/index.js"(exports2, module2) {
-    module2.exports = runParallel;
-    var queueMicrotask2 = require_queue_microtask();
-    function runParallel(tasks, cb) {
-      let results, pending, keys;
-      let isSync = true;
-      if (Array.isArray(tasks)) {
-        results = [];
-        pending = tasks.length;
-      } else {
-        keys = Object.keys(tasks);
-        results = {};
-        pending = keys.length;
-      }
-      function done(err) {
-        function end() {
-          if (cb) cb(err, results);
-          cb = null;
-        }
-        if (isSync) queueMicrotask2(end);
-        else end();
-      }
-      function each(i, err, result) {
-        results[i] = result;
-        if (--pending === 0 || err) {
-          done(err);
-        }
-      }
-      if (!pending) {
-        done(null);
-      } else if (keys) {
-        keys.forEach(function(key) {
-          tasks[key](function(err, result) {
-            each(key, err, result);
-          });
-        });
-      } else {
-        tasks.forEach(function(task, i) {
-          task(function(err, result) {
-            each(i, err, result);
-          });
-        });
-      }
-      isSync = false;
-    }
-  }
-});
-
-// node_modules/@nodelib/fs.scandir/out/constants.js
-var require_constants8 = __commonJS({
-  "node_modules/@nodelib/fs.scandir/out/constants.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.IS_SUPPORT_READDIR_WITH_FILE_TYPES = void 0;
-    var NODE_PROCESS_VERSION_PARTS = process.versions.node.split(".");
-    if (NODE_PROCESS_VERSION_PARTS[0] === void 0 || NODE_PROCESS_VERSION_PARTS[1] === void 0) {
-      throw new Error(`Unexpected behavior. The 'process.versions.node' variable has invalid value: ${process.versions.node}`);
-    }
-    var MAJOR_VERSION = Number.parseInt(NODE_PROCESS_VERSION_PARTS[0], 10);
-    var MINOR_VERSION = Number.parseInt(NODE_PROCESS_VERSION_PARTS[1], 10);
-    var SUPPORTED_MAJOR_VERSION = 10;
-    var SUPPORTED_MINOR_VERSION = 10;
-    var IS_MATCHED_BY_MAJOR = MAJOR_VERSION > SUPPORTED_MAJOR_VERSION;
-    var IS_MATCHED_BY_MAJOR_AND_MINOR = MAJOR_VERSION === SUPPORTED_MAJOR_VERSION && MINOR_VERSION >= SUPPORTED_MINOR_VERSION;
-    exports2.IS_SUPPORT_READDIR_WITH_FILE_TYPES = IS_MATCHED_BY_MAJOR || IS_MATCHED_BY_MAJOR_AND_MINOR;
-  }
-});
-
-// node_modules/@nodelib/fs.scandir/out/utils/fs.js
-var require_fs3 = __commonJS({
-  "node_modules/@nodelib/fs.scandir/out/utils/fs.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.createDirentFromStats = void 0;
-    var DirentFromStats = class {
-      constructor(name, stats) {
-        this.name = name;
-        this.isBlockDevice = stats.isBlockDevice.bind(stats);
-        this.isCharacterDevice = stats.isCharacterDevice.bind(stats);
-        this.isDirectory = stats.isDirectory.bind(stats);
-        this.isFIFO = stats.isFIFO.bind(stats);
-        this.isFile = stats.isFile.bind(stats);
-        this.isSocket = stats.isSocket.bind(stats);
-        this.isSymbolicLink = stats.isSymbolicLink.bind(stats);
-      }
-    };
-    function createDirentFromStats(name, stats) {
-      return new DirentFromStats(name, stats);
-    }
-    exports2.createDirentFromStats = createDirentFromStats;
-  }
-});
-
-// node_modules/@nodelib/fs.scandir/out/utils/index.js
-var require_utils6 = __commonJS({
-  "node_modules/@nodelib/fs.scandir/out/utils/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.fs = void 0;
-    var fs27 = require_fs3();
-    exports2.fs = fs27;
-  }
-});
-
-// node_modules/@nodelib/fs.scandir/out/providers/common.js
-var require_common2 = __commonJS({
-  "node_modules/@nodelib/fs.scandir/out/providers/common.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.joinPathSegments = void 0;
-    function joinPathSegments(a, b, separator) {
-      if (a.endsWith(separator)) {
-        return a + b;
-      }
-      return a + separator + b;
-    }
-    exports2.joinPathSegments = joinPathSegments;
-  }
-});
-
-// node_modules/@nodelib/fs.scandir/out/providers/async.js
-var require_async2 = __commonJS({
-  "node_modules/@nodelib/fs.scandir/out/providers/async.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.readdir = exports2.readdirWithFileTypes = exports2.read = void 0;
-    var fsStat2 = require_out();
-    var rpl = require_run_parallel();
-    var constants_1 = require_constants8();
-    var utils = require_utils6();
-    var common = require_common2();
-    function read(directory, settings, callback) {
-      if (!settings.stats && constants_1.IS_SUPPORT_READDIR_WITH_FILE_TYPES) {
-        readdirWithFileTypes(directory, settings, callback);
-        return;
-      }
-      readdir2(directory, settings, callback);
-    }
-    exports2.read = read;
-    function readdirWithFileTypes(directory, settings, callback) {
-      settings.fs.readdir(directory, { withFileTypes: true }, (readdirError, dirents) => {
-        if (readdirError !== null) {
-          callFailureCallback(callback, readdirError);
-          return;
-        }
-        const entries = dirents.map((dirent) => ({
-          dirent,
-          name: dirent.name,
-          path: common.joinPathSegments(directory, dirent.name, settings.pathSegmentSeparator)
-        }));
-        if (!settings.followSymbolicLinks) {
-          callSuccessCallback(callback, entries);
-          return;
-        }
-        const tasks = entries.map((entry) => makeRplTaskEntry(entry, settings));
-        rpl(tasks, (rplError, rplEntries) => {
-          if (rplError !== null) {
-            callFailureCallback(callback, rplError);
-            return;
-          }
-          callSuccessCallback(callback, rplEntries);
-        });
-      });
-    }
-    exports2.readdirWithFileTypes = readdirWithFileTypes;
-    function makeRplTaskEntry(entry, settings) {
-      return (done) => {
-        if (!entry.dirent.isSymbolicLink()) {
-          done(null, entry);
-          return;
-        }
-        settings.fs.stat(entry.path, (statError, stats) => {
-          if (statError !== null) {
-            if (settings.throwErrorOnBrokenSymbolicLink) {
-              done(statError);
-              return;
-            }
-            done(null, entry);
-            return;
-          }
-          entry.dirent = utils.fs.createDirentFromStats(entry.name, stats);
-          done(null, entry);
-        });
-      };
-    }
-    function readdir2(directory, settings, callback) {
-      settings.fs.readdir(directory, (readdirError, names) => {
-        if (readdirError !== null) {
-          callFailureCallback(callback, readdirError);
-          return;
-        }
-        const tasks = names.map((name) => {
-          const path53 = common.joinPathSegments(directory, name, settings.pathSegmentSeparator);
-          return (done) => {
-            fsStat2.stat(path53, settings.fsStatSettings, (error52, stats) => {
-              if (error52 !== null) {
-                done(error52);
-                return;
-              }
-              const entry = {
-                name,
-                path: path53,
-                dirent: utils.fs.createDirentFromStats(name, stats)
-              };
-              if (settings.stats) {
-                entry.stats = stats;
-              }
-              done(null, entry);
-            });
-          };
-        });
-        rpl(tasks, (rplError, entries) => {
-          if (rplError !== null) {
-            callFailureCallback(callback, rplError);
-            return;
-          }
-          callSuccessCallback(callback, entries);
-        });
-      });
-    }
-    exports2.readdir = readdir2;
-    function callFailureCallback(callback, error52) {
-      callback(error52);
-    }
-    function callSuccessCallback(callback, result) {
-      callback(null, result);
-    }
-  }
-});
-
-// node_modules/@nodelib/fs.scandir/out/providers/sync.js
-var require_sync2 = __commonJS({
-  "node_modules/@nodelib/fs.scandir/out/providers/sync.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.readdir = exports2.readdirWithFileTypes = exports2.read = void 0;
-    var fsStat2 = require_out();
-    var constants_1 = require_constants8();
-    var utils = require_utils6();
-    var common = require_common2();
-    function read(directory, settings) {
-      if (!settings.stats && constants_1.IS_SUPPORT_READDIR_WITH_FILE_TYPES) {
-        return readdirWithFileTypes(directory, settings);
-      }
-      return readdir2(directory, settings);
-    }
-    exports2.read = read;
-    function readdirWithFileTypes(directory, settings) {
-      const dirents = settings.fs.readdirSync(directory, { withFileTypes: true });
-      return dirents.map((dirent) => {
-        const entry = {
-          dirent,
-          name: dirent.name,
-          path: common.joinPathSegments(directory, dirent.name, settings.pathSegmentSeparator)
-        };
-        if (entry.dirent.isSymbolicLink() && settings.followSymbolicLinks) {
-          try {
-            const stats = settings.fs.statSync(entry.path);
-            entry.dirent = utils.fs.createDirentFromStats(entry.name, stats);
-          } catch (error52) {
-            if (settings.throwErrorOnBrokenSymbolicLink) {
-              throw error52;
-            }
-          }
-        }
-        return entry;
-      });
-    }
-    exports2.readdirWithFileTypes = readdirWithFileTypes;
-    function readdir2(directory, settings) {
-      const names = settings.fs.readdirSync(directory);
-      return names.map((name) => {
-        const entryPath = common.joinPathSegments(directory, name, settings.pathSegmentSeparator);
-        const stats = fsStat2.statSync(entryPath, settings.fsStatSettings);
-        const entry = {
-          name,
-          path: entryPath,
-          dirent: utils.fs.createDirentFromStats(name, stats)
-        };
-        if (settings.stats) {
-          entry.stats = stats;
-        }
-        return entry;
-      });
-    }
-    exports2.readdir = readdir2;
-  }
-});
-
-// node_modules/@nodelib/fs.scandir/out/adapters/fs.js
-var require_fs4 = __commonJS({
-  "node_modules/@nodelib/fs.scandir/out/adapters/fs.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.createFileSystemAdapter = exports2.FILE_SYSTEM_ADAPTER = void 0;
-    var fs27 = require("fs");
-    exports2.FILE_SYSTEM_ADAPTER = {
-      lstat: fs27.lstat,
-      stat: fs27.stat,
-      lstatSync: fs27.lstatSync,
-      statSync: fs27.statSync,
-      readdir: fs27.readdir,
-      readdirSync: fs27.readdirSync
-    };
-    function createFileSystemAdapter(fsMethods) {
-      if (fsMethods === void 0) {
-        return exports2.FILE_SYSTEM_ADAPTER;
-      }
-      return Object.assign(Object.assign({}, exports2.FILE_SYSTEM_ADAPTER), fsMethods);
-    }
-    exports2.createFileSystemAdapter = createFileSystemAdapter;
-  }
-});
-
-// node_modules/@nodelib/fs.scandir/out/settings.js
-var require_settings2 = __commonJS({
-  "node_modules/@nodelib/fs.scandir/out/settings.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var path53 = require("path");
-    var fsStat2 = require_out();
-    var fs27 = require_fs4();
-    var Settings = class {
-      constructor(_options = {}) {
-        this._options = _options;
-        this.followSymbolicLinks = this._getValue(this._options.followSymbolicLinks, false);
-        this.fs = fs27.createFileSystemAdapter(this._options.fs);
-        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path53.sep);
-        this.stats = this._getValue(this._options.stats, false);
-        this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, true);
-        this.fsStatSettings = new fsStat2.Settings({
-          followSymbolicLink: this.followSymbolicLinks,
-          fs: this.fs,
-          throwErrorOnBrokenSymbolicLink: this.throwErrorOnBrokenSymbolicLink
-        });
-      }
-      _getValue(option, value) {
-        return option !== null && option !== void 0 ? option : value;
-      }
-    };
-    exports2.default = Settings;
-  }
-});
-
-// node_modules/@nodelib/fs.scandir/out/index.js
-var require_out2 = __commonJS({
-  "node_modules/@nodelib/fs.scandir/out/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.Settings = exports2.scandirSync = exports2.scandir = void 0;
-    var async = require_async2();
-    var sync = require_sync2();
-    var settings_1 = require_settings2();
-    exports2.Settings = settings_1.default;
-    function scandir(path53, optionsOrSettingsOrCallback, callback) {
-      if (typeof optionsOrSettingsOrCallback === "function") {
-        async.read(path53, getSettings(), optionsOrSettingsOrCallback);
-        return;
-      }
-      async.read(path53, getSettings(optionsOrSettingsOrCallback), callback);
-    }
-    exports2.scandir = scandir;
-    function scandirSync(path53, optionsOrSettings) {
-      const settings = getSettings(optionsOrSettings);
-      return sync.read(path53, settings);
-    }
-    exports2.scandirSync = scandirSync;
-    function getSettings(settingsOrOptions = {}) {
-      if (settingsOrOptions instanceof settings_1.default) {
-        return settingsOrOptions;
-      }
-      return new settings_1.default(settingsOrOptions);
-    }
-  }
-});
-
-// node_modules/reusify/reusify.js
-var require_reusify = __commonJS({
-  "node_modules/reusify/reusify.js"(exports2, module2) {
-    "use strict";
-    function reusify(Constructor) {
-      var head = new Constructor();
-      var tail = head;
-      function get() {
-        var current = head;
-        if (current.next) {
-          head = current.next;
-        } else {
-          head = new Constructor();
-          tail = head;
-        }
-        current.next = null;
-        return current;
-      }
-      function release(obj) {
-        tail.next = obj;
-        tail = obj;
-      }
-      return {
-        get,
-        release
-      };
-    }
-    module2.exports = reusify;
-  }
-});
-
-// node_modules/fastq/queue.js
-var require_queue = __commonJS({
-  "node_modules/fastq/queue.js"(exports2, module2) {
-    "use strict";
-    var reusify = require_reusify();
-    function fastqueue(context5, worker, _concurrency) {
-      if (typeof context5 === "function") {
-        _concurrency = worker;
-        worker = context5;
-        context5 = null;
-      }
-      if (!(_concurrency >= 1)) {
-        throw new Error("fastqueue concurrency must be equal to or greater than 1");
-      }
-      var cache = reusify(Task);
-      var queueHead = null;
-      var queueTail = null;
-      var _running = 0;
-      var errorHandler = null;
-      var self2 = {
-        push: push2,
-        drain: noop3,
-        saturated: noop3,
-        pause,
-        paused: false,
-        get concurrency() {
-          return _concurrency;
-        },
-        set concurrency(value) {
-          if (!(value >= 1)) {
-            throw new Error("fastqueue concurrency must be equal to or greater than 1");
-          }
-          _concurrency = value;
-          if (self2.paused) return;
-          for (; queueHead && _running < _concurrency; ) {
-            _running++;
-            release();
-          }
-        },
-        running,
-        resume,
-        idle,
-        length,
-        getQueue,
-        unshift,
-        empty: noop3,
-        kill,
-        killAndDrain,
-        error: error52,
-        abort
-      };
-      return self2;
-      function running() {
-        return _running;
-      }
-      function pause() {
-        self2.paused = true;
-      }
-      function length() {
-        var current = queueHead;
-        var counter = 0;
-        while (current) {
-          current = current.next;
-          counter++;
-        }
-        return counter;
-      }
-      function getQueue() {
-        var current = queueHead;
-        var tasks = [];
-        while (current) {
-          tasks.push(current.value);
-          current = current.next;
-        }
-        return tasks;
-      }
-      function resume() {
-        if (!self2.paused) return;
-        self2.paused = false;
-        if (queueHead === null) {
-          _running++;
-          release();
-          return;
-        }
-        for (; queueHead && _running < _concurrency; ) {
-          _running++;
-          release();
-        }
-      }
-      function idle() {
-        return _running === 0 && self2.length() === 0;
-      }
-      function push2(value, done) {
-        var current = cache.get();
-        current.context = context5;
-        current.release = release;
-        current.value = value;
-        current.callback = done || noop3;
-        current.errorHandler = errorHandler;
-        if (_running >= _concurrency || self2.paused) {
-          if (queueTail) {
-            queueTail.next = current;
-            queueTail = current;
-          } else {
-            queueHead = current;
-            queueTail = current;
-            self2.saturated();
-          }
-        } else {
-          _running++;
-          worker.call(context5, current.value, current.worked);
-        }
-      }
-      function unshift(value, done) {
-        var current = cache.get();
-        current.context = context5;
-        current.release = release;
-        current.value = value;
-        current.callback = done || noop3;
-        current.errorHandler = errorHandler;
-        if (_running >= _concurrency || self2.paused) {
-          if (queueHead) {
-            current.next = queueHead;
-            queueHead = current;
-          } else {
-            queueHead = current;
-            queueTail = current;
-            self2.saturated();
-          }
-        } else {
-          _running++;
-          worker.call(context5, current.value, current.worked);
-        }
-      }
-      function release(holder) {
-        if (holder) {
-          cache.release(holder);
-        }
-        var next = queueHead;
-        if (next && _running <= _concurrency) {
-          if (!self2.paused) {
-            if (queueTail === queueHead) {
-              queueTail = null;
-            }
-            queueHead = next.next;
-            next.next = null;
-            worker.call(context5, next.value, next.worked);
-            if (queueTail === null) {
-              self2.empty();
-            }
-          } else {
-            _running--;
-          }
-        } else if (--_running === 0) {
-          self2.drain();
-        }
-      }
-      function kill() {
-        queueHead = null;
-        queueTail = null;
-        self2.drain = noop3;
-      }
-      function killAndDrain() {
-        queueHead = null;
-        queueTail = null;
-        self2.drain();
-        self2.drain = noop3;
-      }
-      function abort() {
-        var current = queueHead;
-        queueHead = null;
-        queueTail = null;
-        while (current) {
-          var next = current.next;
-          var callback = current.callback;
-          var errorHandler2 = current.errorHandler;
-          var val = current.value;
-          var context6 = current.context;
-          current.value = null;
-          current.callback = noop3;
-          current.errorHandler = null;
-          if (errorHandler2) {
-            errorHandler2(new Error("abort"), val);
-          }
-          callback.call(context6, new Error("abort"));
-          current.release(current);
-          current = next;
-        }
-        self2.drain = noop3;
-      }
-      function error52(handler2) {
-        errorHandler = handler2;
-      }
-    }
-    function noop3() {
-    }
-    function Task() {
-      this.value = null;
-      this.callback = noop3;
-      this.next = null;
-      this.release = noop3;
-      this.context = null;
-      this.errorHandler = null;
-      var self2 = this;
-      this.worked = function worked(err, result) {
-        var callback = self2.callback;
-        var errorHandler = self2.errorHandler;
-        var val = self2.value;
-        self2.value = null;
-        self2.callback = noop3;
-        if (self2.errorHandler) {
-          errorHandler(err, val);
-        }
-        callback.call(self2.context, err, result);
-        self2.release(self2);
-      };
-    }
-    function queueAsPromised(context5, worker, _concurrency) {
-      if (typeof context5 === "function") {
-        _concurrency = worker;
-        worker = context5;
-        context5 = null;
-      }
-      function asyncWrapper(arg, cb) {
-        worker.call(this, arg).then(function(res) {
-          cb(null, res);
-        }, cb);
-      }
-      var queue = fastqueue(context5, asyncWrapper, _concurrency);
-      var pushCb = queue.push;
-      var unshiftCb = queue.unshift;
-      queue.push = push2;
-      queue.unshift = unshift;
-      queue.drained = drained;
-      return queue;
-      function push2(value) {
-        var p = new Promise(function(resolve2, reject) {
-          pushCb(value, function(err, result) {
-            if (err) {
-              reject(err);
-              return;
-            }
-            resolve2(result);
-          });
-        });
-        p.catch(noop3);
-        return p;
-      }
-      function unshift(value) {
-        var p = new Promise(function(resolve2, reject) {
-          unshiftCb(value, function(err, result) {
-            if (err) {
-              reject(err);
-              return;
-            }
-            resolve2(result);
-          });
-        });
-        p.catch(noop3);
-        return p;
-      }
-      function drained() {
-        var p = new Promise(function(resolve2) {
-          process.nextTick(function() {
-            if (queue.idle()) {
-              resolve2();
-            } else {
-              var previousDrain = queue.drain;
-              queue.drain = function() {
-                if (typeof previousDrain === "function") previousDrain();
-                resolve2();
-                queue.drain = previousDrain;
-              };
-            }
-          });
-        });
-        return p;
-      }
-    }
-    module2.exports = fastqueue;
-    module2.exports.promise = queueAsPromised;
-  }
-});
-
-// node_modules/@nodelib/fs.walk/out/readers/common.js
-var require_common3 = __commonJS({
-  "node_modules/@nodelib/fs.walk/out/readers/common.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.joinPathSegments = exports2.replacePathSegmentSeparator = exports2.isAppliedFilter = exports2.isFatalError = void 0;
-    function isFatalError(settings, error52) {
-      if (settings.errorFilter === null) {
-        return true;
-      }
-      return !settings.errorFilter(error52);
-    }
-    exports2.isFatalError = isFatalError;
-    function isAppliedFilter(filter, value) {
-      return filter === null || filter(value);
-    }
-    exports2.isAppliedFilter = isAppliedFilter;
-    function replacePathSegmentSeparator(filepath, separator) {
-      return filepath.split(/[/\\]/).join(separator);
-    }
-    exports2.replacePathSegmentSeparator = replacePathSegmentSeparator;
-    function joinPathSegments(a, b, separator) {
-      if (a === "") {
-        return b;
-      }
-      if (a.endsWith(separator)) {
-        return a + b;
-      }
-      return a + separator + b;
-    }
-    exports2.joinPathSegments = joinPathSegments;
-  }
-});
-
-// node_modules/@nodelib/fs.walk/out/readers/reader.js
-var require_reader = __commonJS({
-  "node_modules/@nodelib/fs.walk/out/readers/reader.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var common = require_common3();
-    var Reader = class {
-      constructor(_root, _settings) {
-        this._root = _root;
-        this._settings = _settings;
-        this._root = common.replacePathSegmentSeparator(_root, _settings.pathSegmentSeparator);
-      }
-    };
-    exports2.default = Reader;
-  }
-});
-
-// node_modules/@nodelib/fs.walk/out/readers/async.js
-var require_async3 = __commonJS({
-  "node_modules/@nodelib/fs.walk/out/readers/async.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var events_1 = require("events");
-    var fsScandir = require_out2();
-    var fastq = require_queue();
-    var common = require_common3();
-    var reader_1 = require_reader();
-    var AsyncReader = class extends reader_1.default {
-      constructor(_root, _settings) {
-        super(_root, _settings);
-        this._settings = _settings;
-        this._scandir = fsScandir.scandir;
-        this._emitter = new events_1.EventEmitter();
-        this._queue = fastq(this._worker.bind(this), this._settings.concurrency);
-        this._isFatalError = false;
-        this._isDestroyed = false;
-        this._queue.drain = () => {
-          if (!this._isFatalError) {
-            this._emitter.emit("end");
-          }
-        };
-      }
-      read() {
-        this._isFatalError = false;
-        this._isDestroyed = false;
-        setImmediate(() => {
-          this._pushToQueue(this._root, this._settings.basePath);
-        });
-        return this._emitter;
-      }
-      get isDestroyed() {
-        return this._isDestroyed;
-      }
-      destroy() {
-        if (this._isDestroyed) {
-          throw new Error("The reader is already destroyed");
-        }
-        this._isDestroyed = true;
-        this._queue.killAndDrain();
-      }
-      onEntry(callback) {
-        this._emitter.on("entry", callback);
-      }
-      onError(callback) {
-        this._emitter.once("error", callback);
-      }
-      onEnd(callback) {
-        this._emitter.once("end", callback);
-      }
-      _pushToQueue(directory, base) {
-        const queueItem = { directory, base };
-        this._queue.push(queueItem, (error52) => {
-          if (error52 !== null) {
-            this._handleError(error52);
-          }
-        });
-      }
-      _worker(item, done) {
-        this._scandir(item.directory, this._settings.fsScandirSettings, (error52, entries) => {
-          if (error52 !== null) {
-            done(error52, void 0);
-            return;
-          }
-          for (const entry of entries) {
-            this._handleEntry(entry, item.base);
-          }
-          done(null, void 0);
-        });
-      }
-      _handleError(error52) {
-        if (this._isDestroyed || !common.isFatalError(this._settings, error52)) {
-          return;
-        }
-        this._isFatalError = true;
-        this._isDestroyed = true;
-        this._emitter.emit("error", error52);
-      }
-      _handleEntry(entry, base) {
-        if (this._isDestroyed || this._isFatalError) {
-          return;
-        }
-        const fullpath = entry.path;
-        if (base !== void 0) {
-          entry.path = common.joinPathSegments(base, entry.name, this._settings.pathSegmentSeparator);
-        }
-        if (common.isAppliedFilter(this._settings.entryFilter, entry)) {
-          this._emitEntry(entry);
-        }
-        if (entry.dirent.isDirectory() && common.isAppliedFilter(this._settings.deepFilter, entry)) {
-          this._pushToQueue(fullpath, base === void 0 ? void 0 : entry.path);
-        }
-      }
-      _emitEntry(entry) {
-        this._emitter.emit("entry", entry);
-      }
-    };
-    exports2.default = AsyncReader;
-  }
-});
-
-// node_modules/@nodelib/fs.walk/out/providers/async.js
-var require_async4 = __commonJS({
-  "node_modules/@nodelib/fs.walk/out/providers/async.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var async_1 = require_async3();
-    var AsyncProvider = class {
-      constructor(_root, _settings) {
-        this._root = _root;
-        this._settings = _settings;
-        this._reader = new async_1.default(this._root, this._settings);
-        this._storage = [];
-      }
-      read(callback) {
-        this._reader.onError((error52) => {
-          callFailureCallback(callback, error52);
-        });
-        this._reader.onEntry((entry) => {
-          this._storage.push(entry);
-        });
-        this._reader.onEnd(() => {
-          callSuccessCallback(callback, this._storage);
-        });
-        this._reader.read();
-      }
-    };
-    exports2.default = AsyncProvider;
-    function callFailureCallback(callback, error52) {
-      callback(error52);
-    }
-    function callSuccessCallback(callback, entries) {
-      callback(null, entries);
-    }
-  }
-});
-
-// node_modules/@nodelib/fs.walk/out/providers/stream.js
-var require_stream2 = __commonJS({
-  "node_modules/@nodelib/fs.walk/out/providers/stream.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var stream_1 = require("stream");
-    var async_1 = require_async3();
-    var StreamProvider = class {
-      constructor(_root, _settings) {
-        this._root = _root;
-        this._settings = _settings;
-        this._reader = new async_1.default(this._root, this._settings);
-        this._stream = new stream_1.Readable({
-          objectMode: true,
-          read: () => {
-          },
-          destroy: () => {
-            if (!this._reader.isDestroyed) {
-              this._reader.destroy();
-            }
-          }
-        });
-      }
-      read() {
-        this._reader.onError((error52) => {
-          this._stream.emit("error", error52);
-        });
-        this._reader.onEntry((entry) => {
-          this._stream.push(entry);
-        });
-        this._reader.onEnd(() => {
-          this._stream.push(null);
-        });
-        this._reader.read();
-        return this._stream;
-      }
-    };
-    exports2.default = StreamProvider;
-  }
-});
-
-// node_modules/@nodelib/fs.walk/out/readers/sync.js
-var require_sync3 = __commonJS({
-  "node_modules/@nodelib/fs.walk/out/readers/sync.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var fsScandir = require_out2();
-    var common = require_common3();
-    var reader_1 = require_reader();
-    var SyncReader = class extends reader_1.default {
-      constructor() {
-        super(...arguments);
-        this._scandir = fsScandir.scandirSync;
-        this._storage = [];
-        this._queue = /* @__PURE__ */ new Set();
-      }
-      read() {
-        this._pushToQueue(this._root, this._settings.basePath);
-        this._handleQueue();
-        return this._storage;
-      }
-      _pushToQueue(directory, base) {
-        this._queue.add({ directory, base });
-      }
-      _handleQueue() {
-        for (const item of this._queue.values()) {
-          this._handleDirectory(item.directory, item.base);
-        }
-      }
-      _handleDirectory(directory, base) {
-        try {
-          const entries = this._scandir(directory, this._settings.fsScandirSettings);
-          for (const entry of entries) {
-            this._handleEntry(entry, base);
-          }
-        } catch (error52) {
-          this._handleError(error52);
-        }
-      }
-      _handleError(error52) {
-        if (!common.isFatalError(this._settings, error52)) {
-          return;
-        }
-        throw error52;
-      }
-      _handleEntry(entry, base) {
-        const fullpath = entry.path;
-        if (base !== void 0) {
-          entry.path = common.joinPathSegments(base, entry.name, this._settings.pathSegmentSeparator);
-        }
-        if (common.isAppliedFilter(this._settings.entryFilter, entry)) {
-          this._pushToStorage(entry);
-        }
-        if (entry.dirent.isDirectory() && common.isAppliedFilter(this._settings.deepFilter, entry)) {
-          this._pushToQueue(fullpath, base === void 0 ? void 0 : entry.path);
-        }
-      }
-      _pushToStorage(entry) {
-        this._storage.push(entry);
-      }
-    };
-    exports2.default = SyncReader;
-  }
-});
-
-// node_modules/@nodelib/fs.walk/out/providers/sync.js
-var require_sync4 = __commonJS({
-  "node_modules/@nodelib/fs.walk/out/providers/sync.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var sync_1 = require_sync3();
-    var SyncProvider = class {
-      constructor(_root, _settings) {
-        this._root = _root;
-        this._settings = _settings;
-        this._reader = new sync_1.default(this._root, this._settings);
-      }
-      read() {
-        return this._reader.read();
-      }
-    };
-    exports2.default = SyncProvider;
-  }
-});
-
-// node_modules/@nodelib/fs.walk/out/settings.js
-var require_settings3 = __commonJS({
-  "node_modules/@nodelib/fs.walk/out/settings.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var path53 = require("path");
-    var fsScandir = require_out2();
-    var Settings = class {
-      constructor(_options = {}) {
-        this._options = _options;
-        this.basePath = this._getValue(this._options.basePath, void 0);
-        this.concurrency = this._getValue(this._options.concurrency, Number.POSITIVE_INFINITY);
-        this.deepFilter = this._getValue(this._options.deepFilter, null);
-        this.entryFilter = this._getValue(this._options.entryFilter, null);
-        this.errorFilter = this._getValue(this._options.errorFilter, null);
-        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path53.sep);
-        this.fsScandirSettings = new fsScandir.Settings({
-          followSymbolicLinks: this._options.followSymbolicLinks,
-          fs: this._options.fs,
-          pathSegmentSeparator: this._options.pathSegmentSeparator,
-          stats: this._options.stats,
-          throwErrorOnBrokenSymbolicLink: this._options.throwErrorOnBrokenSymbolicLink
-        });
-      }
-      _getValue(option, value) {
-        return option !== null && option !== void 0 ? option : value;
-      }
-    };
-    exports2.default = Settings;
-  }
-});
-
-// node_modules/@nodelib/fs.walk/out/index.js
-var require_out3 = __commonJS({
-  "node_modules/@nodelib/fs.walk/out/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.Settings = exports2.walkStream = exports2.walkSync = exports2.walk = void 0;
-    var async_1 = require_async4();
-    var stream_1 = require_stream2();
-    var sync_1 = require_sync4();
-    var settings_1 = require_settings3();
-    exports2.Settings = settings_1.default;
-    function walk(directory, optionsOrSettingsOrCallback, callback) {
-      if (typeof optionsOrSettingsOrCallback === "function") {
-        new async_1.default(directory, getSettings()).read(optionsOrSettingsOrCallback);
-        return;
-      }
-      new async_1.default(directory, getSettings(optionsOrSettingsOrCallback)).read(callback);
-    }
-    exports2.walk = walk;
-    function walkSync(directory, optionsOrSettings) {
-      const settings = getSettings(optionsOrSettings);
-      const provider = new sync_1.default(directory, settings);
-      return provider.read();
-    }
-    exports2.walkSync = walkSync;
-    function walkStream(directory, optionsOrSettings) {
-      const settings = getSettings(optionsOrSettings);
-      const provider = new stream_1.default(directory, settings);
-      return provider.read();
-    }
-    exports2.walkStream = walkStream;
-    function getSettings(settingsOrOptions = {}) {
-      if (settingsOrOptions instanceof settings_1.default) {
-        return settingsOrOptions;
-      }
-      return new settings_1.default(settingsOrOptions);
-    }
-  }
-});
-
-// node_modules/fast-glob/out/readers/reader.js
-var require_reader2 = __commonJS({
-  "node_modules/fast-glob/out/readers/reader.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var path53 = require("path");
-    var fsStat2 = require_out();
-    var utils = require_utils5();
-    var Reader = class {
-      constructor(_settings) {
-        this._settings = _settings;
-        this._fsStatSettings = new fsStat2.Settings({
-          followSymbolicLink: this._settings.followSymbolicLinks,
-          fs: this._settings.fs,
-          throwErrorOnBrokenSymbolicLink: this._settings.followSymbolicLinks
-        });
-      }
-      _getFullEntryPath(filepath) {
-        return path53.resolve(this._settings.cwd, filepath);
-      }
-      _makeEntry(stats, pattern) {
-        const entry = {
-          name: pattern,
-          path: pattern,
-          dirent: utils.fs.createDirentFromStats(pattern, stats)
-        };
-        if (this._settings.stats) {
-          entry.stats = stats;
-        }
-        return entry;
-      }
-      _isFatalError(error52) {
-        return !utils.errno.isEnoentCodeError(error52) && !this._settings.suppressErrors;
-      }
-    };
-    exports2.default = Reader;
-  }
-});
-
-// node_modules/fast-glob/out/readers/stream.js
-var require_stream3 = __commonJS({
-  "node_modules/fast-glob/out/readers/stream.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var stream_1 = require("stream");
-    var fsStat2 = require_out();
-    var fsWalk = require_out3();
-    var reader_1 = require_reader2();
-    var ReaderStream = class extends reader_1.default {
-      constructor() {
-        super(...arguments);
-        this._walkStream = fsWalk.walkStream;
-        this._stat = fsStat2.stat;
-      }
-      dynamic(root, options) {
-        return this._walkStream(root, options);
-      }
-      static(patterns, options) {
-        const filepaths = patterns.map(this._getFullEntryPath, this);
-        const stream4 = new stream_1.PassThrough({ objectMode: true });
-        stream4._write = (index, _enc, done) => {
-          return this._getEntry(filepaths[index], patterns[index], options).then((entry) => {
-            if (entry !== null && options.entryFilter(entry)) {
-              stream4.push(entry);
-            }
-            if (index === filepaths.length - 1) {
-              stream4.end();
-            }
-            done();
-          }).catch(done);
-        };
-        for (let i = 0; i < filepaths.length; i++) {
-          stream4.write(i);
-        }
-        return stream4;
-      }
-      _getEntry(filepath, pattern, options) {
-        return this._getStat(filepath).then((stats) => this._makeEntry(stats, pattern)).catch((error52) => {
-          if (options.errorFilter(error52)) {
-            return null;
-          }
-          throw error52;
-        });
-      }
-      _getStat(filepath) {
-        return new Promise((resolve2, reject) => {
-          this._stat(filepath, this._fsStatSettings, (error52, stats) => {
-            return error52 === null ? resolve2(stats) : reject(error52);
-          });
-        });
-      }
-    };
-    exports2.default = ReaderStream;
-  }
-});
-
-// node_modules/fast-glob/out/readers/async.js
-var require_async5 = __commonJS({
-  "node_modules/fast-glob/out/readers/async.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var fsWalk = require_out3();
-    var reader_1 = require_reader2();
-    var stream_1 = require_stream3();
-    var ReaderAsync = class extends reader_1.default {
-      constructor() {
-        super(...arguments);
-        this._walkAsync = fsWalk.walk;
-        this._readerStream = new stream_1.default(this._settings);
-      }
-      dynamic(root, options) {
-        return new Promise((resolve2, reject) => {
-          this._walkAsync(root, options, (error52, entries) => {
-            if (error52 === null) {
-              resolve2(entries);
-            } else {
-              reject(error52);
-            }
-          });
-        });
-      }
-      async static(patterns, options) {
-        const entries = [];
-        const stream4 = this._readerStream.static(patterns, options);
-        return new Promise((resolve2, reject) => {
-          stream4.once("error", reject);
-          stream4.on("data", (entry) => entries.push(entry));
-          stream4.once("end", () => resolve2(entries));
-        });
-      }
-    };
-    exports2.default = ReaderAsync;
-  }
-});
-
-// node_modules/fast-glob/out/providers/matchers/matcher.js
-var require_matcher = __commonJS({
-  "node_modules/fast-glob/out/providers/matchers/matcher.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils5();
-    var Matcher2 = class {
-      constructor(_patterns, _settings, _micromatchOptions) {
-        this._patterns = _patterns;
-        this._settings = _settings;
-        this._micromatchOptions = _micromatchOptions;
-        this._storage = [];
-        this._fillStorage();
-      }
-      _fillStorage() {
-        for (const pattern of this._patterns) {
-          const segments = this._getPatternSegments(pattern);
-          const sections = this._splitSegmentsIntoSections(segments);
-          this._storage.push({
-            complete: sections.length <= 1,
-            pattern,
-            segments,
-            sections
-          });
-        }
-      }
-      _getPatternSegments(pattern) {
-        const parts = utils.pattern.getPatternParts(pattern, this._micromatchOptions);
-        return parts.map((part) => {
-          const dynamic = utils.pattern.isDynamicPattern(part, this._settings);
-          if (!dynamic) {
-            return {
-              dynamic: false,
-              pattern: part
-            };
-          }
-          return {
-            dynamic: true,
-            pattern: part,
-            patternRe: utils.pattern.makeRe(part, this._micromatchOptions)
-          };
-        });
-      }
-      _splitSegmentsIntoSections(segments) {
-        return utils.array.splitWhen(segments, (segment) => segment.dynamic && utils.pattern.hasGlobStar(segment.pattern));
-      }
-    };
-    exports2.default = Matcher2;
-  }
-});
-
-// node_modules/fast-glob/out/providers/matchers/partial.js
-var require_partial = __commonJS({
-  "node_modules/fast-glob/out/providers/matchers/partial.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var matcher_1 = require_matcher();
-    var PartialMatcher = class extends matcher_1.default {
-      match(filepath) {
-        const parts = filepath.split("/");
-        const levels = parts.length;
-        const patterns = this._storage.filter((info2) => !info2.complete || info2.segments.length > levels);
-        for (const pattern of patterns) {
-          const section = pattern.sections[0];
-          if (!pattern.complete && levels > section.length) {
-            return true;
-          }
-          const match = parts.every((part, index) => {
-            const segment = pattern.segments[index];
-            if (segment.dynamic && segment.patternRe.test(part)) {
-              return true;
-            }
-            if (!segment.dynamic && segment.pattern === part) {
-              return true;
-            }
-            return false;
-          });
-          if (match) {
-            return true;
-          }
-        }
-        return false;
-      }
-    };
-    exports2.default = PartialMatcher;
-  }
-});
-
-// node_modules/fast-glob/out/providers/filters/deep.js
-var require_deep = __commonJS({
-  "node_modules/fast-glob/out/providers/filters/deep.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils5();
-    var partial_1 = require_partial();
-    var DeepFilter = class {
-      constructor(_settings, _micromatchOptions) {
-        this._settings = _settings;
-        this._micromatchOptions = _micromatchOptions;
-      }
-      getFilter(basePath, positive, negative) {
-        const matcher = this._getMatcher(positive);
-        const negativeRe = this._getNegativePatternsRe(negative);
-        return (entry) => this._filter(basePath, entry, matcher, negativeRe);
-      }
-      _getMatcher(patterns) {
-        return new partial_1.default(patterns, this._settings, this._micromatchOptions);
-      }
-      _getNegativePatternsRe(patterns) {
-        const affectDepthOfReadingPatterns = patterns.filter(utils.pattern.isAffectDepthOfReadingPattern);
-        return utils.pattern.convertPatternsToRe(affectDepthOfReadingPatterns, this._micromatchOptions);
-      }
-      _filter(basePath, entry, matcher, negativeRe) {
-        if (this._isSkippedByDeep(basePath, entry.path)) {
-          return false;
-        }
-        if (this._isSkippedSymbolicLink(entry)) {
-          return false;
-        }
-        const filepath = utils.path.removeLeadingDotSegment(entry.path);
-        if (this._isSkippedByPositivePatterns(filepath, matcher)) {
-          return false;
-        }
-        return this._isSkippedByNegativePatterns(filepath, negativeRe);
-      }
-      _isSkippedByDeep(basePath, entryPath) {
-        if (this._settings.deep === Infinity) {
-          return false;
-        }
-        return this._getEntryLevel(basePath, entryPath) >= this._settings.deep;
-      }
-      _getEntryLevel(basePath, entryPath) {
-        const entryPathDepth = entryPath.split("/").length;
-        if (basePath === "") {
-          return entryPathDepth;
-        }
-        const basePathDepth = basePath.split("/").length;
-        return entryPathDepth - basePathDepth;
-      }
-      _isSkippedSymbolicLink(entry) {
-        return !this._settings.followSymbolicLinks && entry.dirent.isSymbolicLink();
-      }
-      _isSkippedByPositivePatterns(entryPath, matcher) {
-        return !this._settings.baseNameMatch && !matcher.match(entryPath);
-      }
-      _isSkippedByNegativePatterns(entryPath, patternsRe) {
-        return !utils.pattern.matchAny(entryPath, patternsRe);
-      }
-    };
-    exports2.default = DeepFilter;
-  }
-});
-
-// node_modules/fast-glob/out/providers/filters/entry.js
-var require_entry = __commonJS({
-  "node_modules/fast-glob/out/providers/filters/entry.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils5();
-    var EntryFilter = class {
-      constructor(_settings, _micromatchOptions) {
-        this._settings = _settings;
-        this._micromatchOptions = _micromatchOptions;
-        this.index = /* @__PURE__ */ new Map();
-      }
-      getFilter(positive, negative) {
-        const [absoluteNegative, relativeNegative] = utils.pattern.partitionAbsoluteAndRelative(negative);
-        const patterns = {
-          positive: {
-            all: utils.pattern.convertPatternsToRe(positive, this._micromatchOptions)
-          },
-          negative: {
-            absolute: utils.pattern.convertPatternsToRe(absoluteNegative, Object.assign(Object.assign({}, this._micromatchOptions), { dot: true })),
-            relative: utils.pattern.convertPatternsToRe(relativeNegative, Object.assign(Object.assign({}, this._micromatchOptions), { dot: true }))
-          }
-        };
-        return (entry) => this._filter(entry, patterns);
-      }
-      _filter(entry, patterns) {
-        const filepath = utils.path.removeLeadingDotSegment(entry.path);
-        if (this._settings.unique && this._isDuplicateEntry(filepath)) {
-          return false;
-        }
-        if (this._onlyFileFilter(entry) || this._onlyDirectoryFilter(entry)) {
-          return false;
-        }
-        const isMatched = this._isMatchToPatternsSet(filepath, patterns, entry.dirent.isDirectory());
-        if (this._settings.unique && isMatched) {
-          this._createIndexRecord(filepath);
-        }
-        return isMatched;
-      }
-      _isDuplicateEntry(filepath) {
-        return this.index.has(filepath);
-      }
-      _createIndexRecord(filepath) {
-        this.index.set(filepath, void 0);
-      }
-      _onlyFileFilter(entry) {
-        return this._settings.onlyFiles && !entry.dirent.isFile();
-      }
-      _onlyDirectoryFilter(entry) {
-        return this._settings.onlyDirectories && !entry.dirent.isDirectory();
-      }
-      _isMatchToPatternsSet(filepath, patterns, isDirectory2) {
-        const isMatched = this._isMatchToPatterns(filepath, patterns.positive.all, isDirectory2);
-        if (!isMatched) {
-          return false;
-        }
-        const isMatchedByRelativeNegative = this._isMatchToPatterns(filepath, patterns.negative.relative, isDirectory2);
-        if (isMatchedByRelativeNegative) {
-          return false;
-        }
-        const isMatchedByAbsoluteNegative = this._isMatchToAbsoluteNegative(filepath, patterns.negative.absolute, isDirectory2);
-        if (isMatchedByAbsoluteNegative) {
-          return false;
-        }
-        return true;
-      }
-      _isMatchToAbsoluteNegative(filepath, patternsRe, isDirectory2) {
-        if (patternsRe.length === 0) {
-          return false;
-        }
-        const fullpath = utils.path.makeAbsolute(this._settings.cwd, filepath);
-        return this._isMatchToPatterns(fullpath, patternsRe, isDirectory2);
-      }
-      _isMatchToPatterns(filepath, patternsRe, isDirectory2) {
-        if (patternsRe.length === 0) {
-          return false;
-        }
-        const isMatched = utils.pattern.matchAny(filepath, patternsRe);
-        if (!isMatched && isDirectory2) {
-          return utils.pattern.matchAny(filepath + "/", patternsRe);
-        }
-        return isMatched;
-      }
-    };
-    exports2.default = EntryFilter;
-  }
-});
-
-// node_modules/fast-glob/out/providers/filters/error.js
-var require_error = __commonJS({
-  "node_modules/fast-glob/out/providers/filters/error.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils5();
-    var ErrorFilter = class {
-      constructor(_settings) {
-        this._settings = _settings;
-      }
-      getFilter() {
-        return (error52) => this._isNonFatalError(error52);
-      }
-      _isNonFatalError(error52) {
-        return utils.errno.isEnoentCodeError(error52) || this._settings.suppressErrors;
-      }
-    };
-    exports2.default = ErrorFilter;
-  }
-});
-
-// node_modules/fast-glob/out/providers/transformers/entry.js
-var require_entry2 = __commonJS({
-  "node_modules/fast-glob/out/providers/transformers/entry.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils5();
-    var EntryTransformer = class {
-      constructor(_settings) {
-        this._settings = _settings;
-      }
-      getTransformer() {
-        return (entry) => this._transform(entry);
-      }
-      _transform(entry) {
-        let filepath = entry.path;
-        if (this._settings.absolute) {
-          filepath = utils.path.makeAbsolute(this._settings.cwd, filepath);
-          filepath = utils.path.unixify(filepath);
-        }
-        if (this._settings.markDirectories && entry.dirent.isDirectory()) {
-          filepath += "/";
-        }
-        if (!this._settings.objectMode) {
-          return filepath;
-        }
-        return Object.assign(Object.assign({}, entry), { path: filepath });
-      }
-    };
-    exports2.default = EntryTransformer;
-  }
-});
-
-// node_modules/fast-glob/out/providers/provider.js
-var require_provider = __commonJS({
-  "node_modules/fast-glob/out/providers/provider.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var path53 = require("path");
-    var deep_1 = require_deep();
-    var entry_1 = require_entry();
-    var error_1 = require_error();
-    var entry_2 = require_entry2();
-    var Provider = class {
-      constructor(_settings) {
-        this._settings = _settings;
-        this.errorFilter = new error_1.default(this._settings);
-        this.entryFilter = new entry_1.default(this._settings, this._getMicromatchOptions());
-        this.deepFilter = new deep_1.default(this._settings, this._getMicromatchOptions());
-        this.entryTransformer = new entry_2.default(this._settings);
-      }
-      _getRootDirectory(task) {
-        return path53.resolve(this._settings.cwd, task.base);
-      }
-      _getReaderOptions(task) {
-        const basePath = task.base === "." ? "" : task.base;
-        return {
-          basePath,
-          pathSegmentSeparator: "/",
-          concurrency: this._settings.concurrency,
-          deepFilter: this.deepFilter.getFilter(basePath, task.positive, task.negative),
-          entryFilter: this.entryFilter.getFilter(task.positive, task.negative),
-          errorFilter: this.errorFilter.getFilter(),
-          followSymbolicLinks: this._settings.followSymbolicLinks,
-          fs: this._settings.fs,
-          stats: this._settings.stats,
-          throwErrorOnBrokenSymbolicLink: this._settings.throwErrorOnBrokenSymbolicLink,
-          transform: this.entryTransformer.getTransformer()
-        };
-      }
-      _getMicromatchOptions() {
-        return {
-          dot: this._settings.dot,
-          matchBase: this._settings.baseNameMatch,
-          nobrace: !this._settings.braceExpansion,
-          nocase: !this._settings.caseSensitiveMatch,
-          noext: !this._settings.extglob,
-          noglobstar: !this._settings.globstar,
-          posix: true,
-          strictSlashes: false
-        };
-      }
-    };
-    exports2.default = Provider;
-  }
-});
-
-// node_modules/fast-glob/out/providers/async.js
-var require_async6 = __commonJS({
-  "node_modules/fast-glob/out/providers/async.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var async_1 = require_async5();
-    var provider_1 = require_provider();
-    var ProviderAsync = class extends provider_1.default {
-      constructor() {
-        super(...arguments);
-        this._reader = new async_1.default(this._settings);
-      }
-      async read(task) {
-        const root = this._getRootDirectory(task);
-        const options = this._getReaderOptions(task);
-        const entries = await this.api(root, task, options);
-        return entries.map((entry) => options.transform(entry));
-      }
-      api(root, task, options) {
-        if (task.dynamic) {
-          return this._reader.dynamic(root, options);
-        }
-        return this._reader.static(task.patterns, options);
-      }
-    };
-    exports2.default = ProviderAsync;
-  }
-});
-
-// node_modules/fast-glob/out/providers/stream.js
-var require_stream4 = __commonJS({
-  "node_modules/fast-glob/out/providers/stream.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var stream_1 = require("stream");
-    var stream_2 = require_stream3();
-    var provider_1 = require_provider();
-    var ProviderStream = class extends provider_1.default {
-      constructor() {
-        super(...arguments);
-        this._reader = new stream_2.default(this._settings);
-      }
-      read(task) {
-        const root = this._getRootDirectory(task);
-        const options = this._getReaderOptions(task);
-        const source = this.api(root, task, options);
-        const destination = new stream_1.Readable({ objectMode: true, read: () => {
-        } });
-        source.once("error", (error52) => destination.emit("error", error52)).on("data", (entry) => destination.emit("data", options.transform(entry))).once("end", () => destination.emit("end"));
-        destination.once("close", () => source.destroy());
-        return destination;
-      }
-      api(root, task, options) {
-        if (task.dynamic) {
-          return this._reader.dynamic(root, options);
-        }
-        return this._reader.static(task.patterns, options);
-      }
-    };
-    exports2.default = ProviderStream;
-  }
-});
-
-// node_modules/fast-glob/out/readers/sync.js
-var require_sync5 = __commonJS({
-  "node_modules/fast-glob/out/readers/sync.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var fsStat2 = require_out();
-    var fsWalk = require_out3();
-    var reader_1 = require_reader2();
-    var ReaderSync = class extends reader_1.default {
-      constructor() {
-        super(...arguments);
-        this._walkSync = fsWalk.walkSync;
-        this._statSync = fsStat2.statSync;
-      }
-      dynamic(root, options) {
-        return this._walkSync(root, options);
-      }
-      static(patterns, options) {
-        const entries = [];
-        for (const pattern of patterns) {
-          const filepath = this._getFullEntryPath(pattern);
-          const entry = this._getEntry(filepath, pattern, options);
-          if (entry === null || !options.entryFilter(entry)) {
-            continue;
-          }
-          entries.push(entry);
-        }
-        return entries;
-      }
-      _getEntry(filepath, pattern, options) {
-        try {
-          const stats = this._getStat(filepath);
-          return this._makeEntry(stats, pattern);
-        } catch (error52) {
-          if (options.errorFilter(error52)) {
-            return null;
-          }
-          throw error52;
-        }
-      }
-      _getStat(filepath) {
-        return this._statSync(filepath, this._fsStatSettings);
-      }
-    };
-    exports2.default = ReaderSync;
-  }
-});
-
-// node_modules/fast-glob/out/providers/sync.js
-var require_sync6 = __commonJS({
-  "node_modules/fast-glob/out/providers/sync.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var sync_1 = require_sync5();
-    var provider_1 = require_provider();
-    var ProviderSync = class extends provider_1.default {
-      constructor() {
-        super(...arguments);
-        this._reader = new sync_1.default(this._settings);
-      }
-      read(task) {
-        const root = this._getRootDirectory(task);
-        const options = this._getReaderOptions(task);
-        const entries = this.api(root, task, options);
-        return entries.map(options.transform);
-      }
-      api(root, task, options) {
-        if (task.dynamic) {
-          return this._reader.dynamic(root, options);
-        }
-        return this._reader.static(task.patterns, options);
-      }
-    };
-    exports2.default = ProviderSync;
-  }
-});
-
-// node_modules/fast-glob/out/settings.js
-var require_settings4 = __commonJS({
-  "node_modules/fast-glob/out/settings.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.DEFAULT_FILE_SYSTEM_ADAPTER = void 0;
-    var fs27 = require("fs");
-    var os10 = require("os");
-    var CPU_COUNT = Math.max(os10.cpus().length, 1);
-    exports2.DEFAULT_FILE_SYSTEM_ADAPTER = {
-      lstat: fs27.lstat,
-      lstatSync: fs27.lstatSync,
-      stat: fs27.stat,
-      statSync: fs27.statSync,
-      readdir: fs27.readdir,
-      readdirSync: fs27.readdirSync
-    };
-    var Settings = class {
-      constructor(_options = {}) {
-        this._options = _options;
-        this.absolute = this._getValue(this._options.absolute, false);
-        this.baseNameMatch = this._getValue(this._options.baseNameMatch, false);
-        this.braceExpansion = this._getValue(this._options.braceExpansion, true);
-        this.caseSensitiveMatch = this._getValue(this._options.caseSensitiveMatch, true);
-        this.concurrency = this._getValue(this._options.concurrency, CPU_COUNT);
-        this.cwd = this._getValue(this._options.cwd, process.cwd());
-        this.deep = this._getValue(this._options.deep, Infinity);
-        this.dot = this._getValue(this._options.dot, false);
-        this.extglob = this._getValue(this._options.extglob, true);
-        this.followSymbolicLinks = this._getValue(this._options.followSymbolicLinks, true);
-        this.fs = this._getFileSystemMethods(this._options.fs);
-        this.globstar = this._getValue(this._options.globstar, true);
-        this.ignore = this._getValue(this._options.ignore, []);
-        this.markDirectories = this._getValue(this._options.markDirectories, false);
-        this.objectMode = this._getValue(this._options.objectMode, false);
-        this.onlyDirectories = this._getValue(this._options.onlyDirectories, false);
-        this.onlyFiles = this._getValue(this._options.onlyFiles, true);
-        this.stats = this._getValue(this._options.stats, false);
-        this.suppressErrors = this._getValue(this._options.suppressErrors, false);
-        this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, false);
-        this.unique = this._getValue(this._options.unique, true);
-        if (this.onlyDirectories) {
-          this.onlyFiles = false;
-        }
-        if (this.stats) {
-          this.objectMode = true;
-        }
-        this.ignore = [].concat(this.ignore);
-      }
-      _getValue(option, value) {
-        return option === void 0 ? value : option;
-      }
-      _getFileSystemMethods(methods = {}) {
-        return Object.assign(Object.assign({}, exports2.DEFAULT_FILE_SYSTEM_ADAPTER), methods);
-      }
-    };
-    exports2.default = Settings;
-  }
-});
-
-// node_modules/fast-glob/out/index.js
-var require_out4 = __commonJS({
-  "node_modules/fast-glob/out/index.js"(exports2, module2) {
-    "use strict";
-    var taskManager = require_tasks();
-    var async_1 = require_async6();
-    var stream_1 = require_stream4();
-    var sync_1 = require_sync6();
-    var settings_1 = require_settings4();
-    var utils = require_utils5();
-    async function FastGlob(source, options) {
-      assertPatternsInput(source);
-      const works = getWorks(source, async_1.default, options);
-      const result = await Promise.all(works);
-      return utils.array.flatten(result);
-    }
-    (function(FastGlob2) {
-      FastGlob2.glob = FastGlob2;
-      FastGlob2.globSync = sync;
-      FastGlob2.globStream = stream4;
-      FastGlob2.async = FastGlob2;
-      function sync(source, options) {
-        assertPatternsInput(source);
-        const works = getWorks(source, sync_1.default, options);
-        return utils.array.flatten(works);
-      }
-      FastGlob2.sync = sync;
-      function stream4(source, options) {
-        assertPatternsInput(source);
-        const works = getWorks(source, stream_1.default, options);
-        return utils.stream.merge(works);
-      }
-      FastGlob2.stream = stream4;
-      function generateTasks(source, options) {
-        assertPatternsInput(source);
-        const patterns = [].concat(source);
-        const settings = new settings_1.default(options);
-        return taskManager.generate(patterns, settings);
-      }
-      FastGlob2.generateTasks = generateTasks;
-      function isDynamicPattern(source, options) {
-        assertPatternsInput(source);
-        const settings = new settings_1.default(options);
-        return utils.pattern.isDynamicPattern(source, settings);
-      }
-      FastGlob2.isDynamicPattern = isDynamicPattern;
-      function escapePath(source) {
-        assertPatternsInput(source);
-        return utils.path.escape(source);
-      }
-      FastGlob2.escapePath = escapePath;
-      function convertPathToPattern(source) {
-        assertPatternsInput(source);
-        return utils.path.convertPathToPattern(source);
-      }
-      FastGlob2.convertPathToPattern = convertPathToPattern;
-      let posix;
-      (function(posix2) {
-        function escapePath2(source) {
-          assertPatternsInput(source);
-          return utils.path.escapePosixPath(source);
-        }
-        posix2.escapePath = escapePath2;
-        function convertPathToPattern2(source) {
-          assertPatternsInput(source);
-          return utils.path.convertPosixPathToPattern(source);
-        }
-        posix2.convertPathToPattern = convertPathToPattern2;
-      })(posix = FastGlob2.posix || (FastGlob2.posix = {}));
-      let win32;
-      (function(win322) {
-        function escapePath2(source) {
-          assertPatternsInput(source);
-          return utils.path.escapeWindowsPath(source);
-        }
-        win322.escapePath = escapePath2;
-        function convertPathToPattern2(source) {
-          assertPatternsInput(source);
-          return utils.path.convertWindowsPathToPattern(source);
-        }
-        win322.convertPathToPattern = convertPathToPattern2;
-      })(win32 = FastGlob2.win32 || (FastGlob2.win32 = {}));
-    })(FastGlob || (FastGlob = {}));
-    function getWorks(source, _Provider, options) {
-      const patterns = [].concat(source);
-      const settings = new settings_1.default(options);
-      const tasks = taskManager.generate(patterns, settings);
-      const provider = new _Provider(settings);
-      return tasks.map(provider.read, provider);
-    }
-    function assertPatternsInput(input) {
-      const source = [].concat(input);
-      const isValidSource = source.every((item) => utils.string.isString(item) && !utils.string.isEmpty(item));
-      if (!isValidSource) {
-        throw new TypeError("Patterns must be a string (non empty) or an array of strings");
-      }
-    }
-    module2.exports = FastGlob;
+    var pico = require_picomatch();
+    var utils = require_utils3();
+    function picomatch2(glob, options, returnState = false) {
+      if (options && (options.windows === null || options.windows === void 0)) {
+        options = { ...options, windows: utils.isWindows() };
+      }
+      return pico(glob, options, returnState);
+    }
+    Object.assign(picomatch2, pico);
+    module2.exports = picomatch2;
   }
 });
 
@@ -43184,7 +39206,7 @@ var require_ms = __commonJS({
 });
 
 // node_modules/debug/src/common.js
-var require_common4 = __commonJS({
+var require_common2 = __commonJS({
   "node_modules/debug/src/common.js"(exports2, module2) {
     function setup(env) {
       createDebug.debug = createDebug;
@@ -43518,7 +39540,7 @@ var require_browser = __commonJS({
       } catch (error52) {
       }
     }
-    module2.exports = require_common4()(exports2);
+    module2.exports = require_common2()(exports2);
     var { formatters } = module2.exports;
     formatters.j = function(v) {
       try {
@@ -43691,7 +39713,7 @@ var require_node = __commonJS({
         debug2.inspectOpts[keys[i]] = exports2.inspectOpts[keys[i]];
       }
     }
-    module2.exports = require_common4()(exports2);
+    module2.exports = require_common2()(exports2);
     var { formatters } = module2.exports;
     formatters.o = function(v) {
       this.inspectOpts.colors = this.useColors;
@@ -45532,11 +41554,11 @@ var require_commonjs5 = __commonJS({
       return (f) => f.length === len && f !== "." && f !== "..";
     };
     var defaultPlatform = typeof process === "object" && process ? typeof process.env === "object" && process.env && process.env.__MINIMATCH_TESTING_PLATFORM__ || process.platform : "posix";
-    var path53 = {
+    var path54 = {
       win32: { sep: "\\" },
       posix: { sep: "/" }
     };
-    exports2.sep = defaultPlatform === "win32" ? path53.win32.sep : path53.posix.sep;
+    exports2.sep = defaultPlatform === "win32" ? path54.win32.sep : path54.posix.sep;
     exports2.minimatch.sep = exports2.sep;
     exports2.GLOBSTAR = /* @__PURE__ */ Symbol("globstar **");
     exports2.minimatch.GLOBSTAR = exports2.GLOBSTAR;
@@ -46326,13 +42348,13 @@ var require_dist7 = __commonJS({
       value: mod,
       enumerable: true
     }) : target, mod));
-    var fs27 = __toESM2(require("fs"));
+    var fs28 = __toESM2(require("fs"));
     var events = __toESM2(require("events"));
     var minimatch = __toESM2(require_commonjs5());
-    var path53 = __toESM2(require("path"));
+    var path54 = __toESM2(require("path"));
     function readdir2(dir, strict) {
       return new Promise((resolve$1, reject) => {
-        fs27.readdir(dir, { withFileTypes: true }, (err, files) => {
+        fs28.readdir(dir, { withFileTypes: true }, (err, files) => {
           if (err) switch (err.code) {
             case "ENOTDIR":
               if (strict) reject(err);
@@ -46355,7 +42377,7 @@ var require_dist7 = __commonJS({
     }
     function getStat(file2, followSymlinks) {
       return new Promise((resolve$1) => {
-        const statFunc = followSymlinks ? fs27.stat : fs27.lstat;
+        const statFunc = followSymlinks ? fs28.stat : fs28.lstat;
         statFunc(file2, (err, stats) => {
           if (err) switch (err.code) {
             case "ENOENT":
@@ -46451,7 +42473,7 @@ var require_dist7 = __commonJS({
           const skipPatterns = Array.isArray(this.options.skip) ? this.options.skip : [this.options.skip];
           this.skipMatchers = skipPatterns.map((skip) => new minimatch.Minimatch(skip, { dot: true }));
         }
-        this.iterator = explore((0, path53.resolve)(cwd || "."), this.options.follow, this.options.stat, this._shouldSkipDirectory.bind(this));
+        this.iterator = explore((0, path54.resolve)(cwd || "."), this.options.follow, this.options.stat, this._shouldSkipDirectory.bind(this));
         this.paused = false;
         this.inactive = false;
         this.aborted = false;
@@ -46524,7 +42546,7 @@ var require_dist7 = __commonJS({
 });
 
 // node_modules/async/dist/async.js
-var require_async7 = __commonJS({
+var require_async = __commonJS({
   "node_modules/async/dist/async.js"(exports2, module2) {
     (function(global2, factory) {
       typeof exports2 === "object" && typeof module2 !== "undefined" ? factory(exports2) : typeof define === "function" && define.amd ? define(["exports"], factory) : (global2 = typeof globalThis !== "undefined" ? globalThis : global2 || self, factory(global2.async = {}));
@@ -48409,54 +44431,54 @@ var require_polyfills = __commonJS({
     }
     var chdir;
     module2.exports = patch;
-    function patch(fs27) {
+    function patch(fs28) {
       if (constants3.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
-        patchLchmod(fs27);
+        patchLchmod(fs28);
       }
-      if (!fs27.lutimes) {
-        patchLutimes(fs27);
+      if (!fs28.lutimes) {
+        patchLutimes(fs28);
       }
-      fs27.chown = chownFix(fs27.chown);
-      fs27.fchown = chownFix(fs27.fchown);
-      fs27.lchown = chownFix(fs27.lchown);
-      fs27.chmod = chmodFix(fs27.chmod);
-      fs27.fchmod = chmodFix(fs27.fchmod);
-      fs27.lchmod = chmodFix(fs27.lchmod);
-      fs27.chownSync = chownFixSync(fs27.chownSync);
-      fs27.fchownSync = chownFixSync(fs27.fchownSync);
-      fs27.lchownSync = chownFixSync(fs27.lchownSync);
-      fs27.chmodSync = chmodFixSync(fs27.chmodSync);
-      fs27.fchmodSync = chmodFixSync(fs27.fchmodSync);
-      fs27.lchmodSync = chmodFixSync(fs27.lchmodSync);
-      fs27.stat = statFix(fs27.stat);
-      fs27.fstat = statFix(fs27.fstat);
-      fs27.lstat = statFix(fs27.lstat);
-      fs27.statSync = statFixSync(fs27.statSync);
-      fs27.fstatSync = statFixSync(fs27.fstatSync);
-      fs27.lstatSync = statFixSync(fs27.lstatSync);
-      if (fs27.chmod && !fs27.lchmod) {
-        fs27.lchmod = function(path53, mode, cb) {
+      fs28.chown = chownFix(fs28.chown);
+      fs28.fchown = chownFix(fs28.fchown);
+      fs28.lchown = chownFix(fs28.lchown);
+      fs28.chmod = chmodFix(fs28.chmod);
+      fs28.fchmod = chmodFix(fs28.fchmod);
+      fs28.lchmod = chmodFix(fs28.lchmod);
+      fs28.chownSync = chownFixSync(fs28.chownSync);
+      fs28.fchownSync = chownFixSync(fs28.fchownSync);
+      fs28.lchownSync = chownFixSync(fs28.lchownSync);
+      fs28.chmodSync = chmodFixSync(fs28.chmodSync);
+      fs28.fchmodSync = chmodFixSync(fs28.fchmodSync);
+      fs28.lchmodSync = chmodFixSync(fs28.lchmodSync);
+      fs28.stat = statFix(fs28.stat);
+      fs28.fstat = statFix(fs28.fstat);
+      fs28.lstat = statFix(fs28.lstat);
+      fs28.statSync = statFixSync(fs28.statSync);
+      fs28.fstatSync = statFixSync(fs28.fstatSync);
+      fs28.lstatSync = statFixSync(fs28.lstatSync);
+      if (fs28.chmod && !fs28.lchmod) {
+        fs28.lchmod = function(path54, mode, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs27.lchmodSync = function() {
+        fs28.lchmodSync = function() {
         };
       }
-      if (fs27.chown && !fs27.lchown) {
-        fs27.lchown = function(path53, uid, gid, cb) {
+      if (fs28.chown && !fs28.lchown) {
+        fs28.lchown = function(path54, uid, gid, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs27.lchownSync = function() {
+        fs28.lchownSync = function() {
         };
       }
       if (platform2 === "win32") {
-        fs27.rename = typeof fs27.rename !== "function" ? fs27.rename : (function(fs$rename) {
+        fs28.rename = typeof fs28.rename !== "function" ? fs28.rename : (function(fs$rename) {
           function rename2(from, to, cb) {
             var start = Date.now();
             var backoff = 0;
             fs$rename(from, to, function CB(er) {
               if (er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4) {
                 setTimeout(function() {
-                  fs27.stat(to, function(stater, st) {
+                  fs28.stat(to, function(stater, st) {
                     if (stater && stater.code === "ENOENT")
                       fs$rename(from, to, CB);
                     else
@@ -48472,9 +44494,9 @@ var require_polyfills = __commonJS({
           }
           if (Object.setPrototypeOf) Object.setPrototypeOf(rename2, fs$rename);
           return rename2;
-        })(fs27.rename);
+        })(fs28.rename);
       }
-      fs27.read = typeof fs27.read !== "function" ? fs27.read : (function(fs$read) {
+      fs28.read = typeof fs28.read !== "function" ? fs28.read : (function(fs$read) {
         function read(fd, buffer2, offset, length, position, callback_) {
           var callback;
           if (callback_ && typeof callback_ === "function") {
@@ -48482,22 +44504,22 @@ var require_polyfills = __commonJS({
             callback = function(er, _2, __) {
               if (er && er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
-                return fs$read.call(fs27, fd, buffer2, offset, length, position, callback);
+                return fs$read.call(fs28, fd, buffer2, offset, length, position, callback);
               }
               callback_.apply(this, arguments);
             };
           }
-          return fs$read.call(fs27, fd, buffer2, offset, length, position, callback);
+          return fs$read.call(fs28, fd, buffer2, offset, length, position, callback);
         }
         if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read);
         return read;
-      })(fs27.read);
-      fs27.readSync = typeof fs27.readSync !== "function" ? fs27.readSync : /* @__PURE__ */ (function(fs$readSync) {
+      })(fs28.read);
+      fs28.readSync = typeof fs28.readSync !== "function" ? fs28.readSync : /* @__PURE__ */ (function(fs$readSync) {
         return function(fd, buffer2, offset, length, position) {
           var eagCounter = 0;
           while (true) {
             try {
-              return fs$readSync.call(fs27, fd, buffer2, offset, length, position);
+              return fs$readSync.call(fs28, fd, buffer2, offset, length, position);
             } catch (er) {
               if (er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
@@ -48507,11 +44529,11 @@ var require_polyfills = __commonJS({
             }
           }
         };
-      })(fs27.readSync);
-      function patchLchmod(fs28) {
-        fs28.lchmod = function(path53, mode, callback) {
-          fs28.open(
-            path53,
+      })(fs28.readSync);
+      function patchLchmod(fs29) {
+        fs29.lchmod = function(path54, mode, callback) {
+          fs29.open(
+            path54,
             constants3.O_WRONLY | constants3.O_SYMLINK,
             mode,
             function(err, fd) {
@@ -48519,80 +44541,80 @@ var require_polyfills = __commonJS({
                 if (callback) callback(err);
                 return;
               }
-              fs28.fchmod(fd, mode, function(err2) {
-                fs28.close(fd, function(err22) {
+              fs29.fchmod(fd, mode, function(err2) {
+                fs29.close(fd, function(err22) {
                   if (callback) callback(err2 || err22);
                 });
               });
             }
           );
         };
-        fs28.lchmodSync = function(path53, mode) {
-          var fd = fs28.openSync(path53, constants3.O_WRONLY | constants3.O_SYMLINK, mode);
+        fs29.lchmodSync = function(path54, mode) {
+          var fd = fs29.openSync(path54, constants3.O_WRONLY | constants3.O_SYMLINK, mode);
           var threw = true;
           var ret;
           try {
-            ret = fs28.fchmodSync(fd, mode);
+            ret = fs29.fchmodSync(fd, mode);
             threw = false;
           } finally {
             if (threw) {
               try {
-                fs28.closeSync(fd);
+                fs29.closeSync(fd);
               } catch (er) {
               }
             } else {
-              fs28.closeSync(fd);
+              fs29.closeSync(fd);
             }
           }
           return ret;
         };
       }
-      function patchLutimes(fs28) {
-        if (constants3.hasOwnProperty("O_SYMLINK") && fs28.futimes) {
-          fs28.lutimes = function(path53, at, mt, cb) {
-            fs28.open(path53, constants3.O_SYMLINK, function(er, fd) {
+      function patchLutimes(fs29) {
+        if (constants3.hasOwnProperty("O_SYMLINK") && fs29.futimes) {
+          fs29.lutimes = function(path54, at, mt, cb) {
+            fs29.open(path54, constants3.O_SYMLINK, function(er, fd) {
               if (er) {
                 if (cb) cb(er);
                 return;
               }
-              fs28.futimes(fd, at, mt, function(er2) {
-                fs28.close(fd, function(er22) {
+              fs29.futimes(fd, at, mt, function(er2) {
+                fs29.close(fd, function(er22) {
                   if (cb) cb(er2 || er22);
                 });
               });
             });
           };
-          fs28.lutimesSync = function(path53, at, mt) {
-            var fd = fs28.openSync(path53, constants3.O_SYMLINK);
+          fs29.lutimesSync = function(path54, at, mt) {
+            var fd = fs29.openSync(path54, constants3.O_SYMLINK);
             var ret;
             var threw = true;
             try {
-              ret = fs28.futimesSync(fd, at, mt);
+              ret = fs29.futimesSync(fd, at, mt);
               threw = false;
             } finally {
               if (threw) {
                 try {
-                  fs28.closeSync(fd);
+                  fs29.closeSync(fd);
                 } catch (er) {
                 }
               } else {
-                fs28.closeSync(fd);
+                fs29.closeSync(fd);
               }
             }
             return ret;
           };
-        } else if (fs28.futimes) {
-          fs28.lutimes = function(_a3, _b, _c, cb) {
+        } else if (fs29.futimes) {
+          fs29.lutimes = function(_a3, _b, _c, cb) {
             if (cb) process.nextTick(cb);
           };
-          fs28.lutimesSync = function() {
+          fs29.lutimesSync = function() {
           };
         }
       }
       function chmodFix(orig) {
         if (!orig) return orig;
         return function(target, mode, cb) {
-          return orig.call(fs27, target, mode, function(er) {
+          return orig.call(fs28, target, mode, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -48602,7 +44624,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, mode) {
           try {
-            return orig.call(fs27, target, mode);
+            return orig.call(fs28, target, mode);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -48611,7 +44633,7 @@ var require_polyfills = __commonJS({
       function chownFix(orig) {
         if (!orig) return orig;
         return function(target, uid, gid, cb) {
-          return orig.call(fs27, target, uid, gid, function(er) {
+          return orig.call(fs28, target, uid, gid, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -48621,7 +44643,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, uid, gid) {
           try {
-            return orig.call(fs27, target, uid, gid);
+            return orig.call(fs28, target, uid, gid);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -48641,13 +44663,13 @@ var require_polyfills = __commonJS({
             }
             if (cb) cb.apply(this, arguments);
           }
-          return options ? orig.call(fs27, target, options, callback) : orig.call(fs27, target, callback);
+          return options ? orig.call(fs28, target, options, callback) : orig.call(fs28, target, callback);
         };
       }
       function statFixSync(orig) {
         if (!orig) return orig;
         return function(target, options) {
-          var stats = options ? orig.call(fs27, target, options) : orig.call(fs27, target);
+          var stats = options ? orig.call(fs28, target, options) : orig.call(fs28, target);
           if (stats) {
             if (stats.uid < 0) stats.uid += 4294967296;
             if (stats.gid < 0) stats.gid += 4294967296;
@@ -48676,16 +44698,16 @@ var require_legacy_streams = __commonJS({
   "node_modules/graceful-fs/legacy-streams.js"(exports2, module2) {
     var Stream = require("stream").Stream;
     module2.exports = legacy;
-    function legacy(fs27) {
+    function legacy(fs28) {
       return {
         ReadStream,
         WriteStream
       };
-      function ReadStream(path53, options) {
-        if (!(this instanceof ReadStream)) return new ReadStream(path53, options);
+      function ReadStream(path54, options) {
+        if (!(this instanceof ReadStream)) return new ReadStream(path54, options);
         Stream.call(this);
         var self2 = this;
-        this.path = path53;
+        this.path = path54;
         this.fd = null;
         this.readable = true;
         this.paused = false;
@@ -48719,7 +44741,7 @@ var require_legacy_streams = __commonJS({
           });
           return;
         }
-        fs27.open(this.path, this.flags, this.mode, function(err, fd) {
+        fs28.open(this.path, this.flags, this.mode, function(err, fd) {
           if (err) {
             self2.emit("error", err);
             self2.readable = false;
@@ -48730,10 +44752,10 @@ var require_legacy_streams = __commonJS({
           self2._read();
         });
       }
-      function WriteStream(path53, options) {
-        if (!(this instanceof WriteStream)) return new WriteStream(path53, options);
+      function WriteStream(path54, options) {
+        if (!(this instanceof WriteStream)) return new WriteStream(path54, options);
         Stream.call(this);
-        this.path = path53;
+        this.path = path54;
         this.fd = null;
         this.writable = true;
         this.flags = "w";
@@ -48758,7 +44780,7 @@ var require_legacy_streams = __commonJS({
         this.busy = false;
         this._queue = [];
         if (this.fd === null) {
-          this._open = fs27.open;
+          this._open = fs28.open;
           this._queue.push([this._open, this.path, this.flags, this.mode, void 0]);
           this.flush();
         }
@@ -48793,7 +44815,7 @@ var require_clone = __commonJS({
 // node_modules/graceful-fs/graceful-fs.js
 var require_graceful_fs = __commonJS({
   "node_modules/graceful-fs/graceful-fs.js"(exports2, module2) {
-    var fs27 = require("fs");
+    var fs28 = require("fs");
     var polyfills = require_polyfills();
     var legacy = require_legacy_streams();
     var clone2 = require_clone();
@@ -48825,12 +44847,12 @@ var require_graceful_fs = __commonJS({
         m = "GFS4: " + m.split(/\n/).join("\nGFS4: ");
         console.error(m);
       };
-    if (!fs27[gracefulQueue]) {
+    if (!fs28[gracefulQueue]) {
       queue = global[gracefulQueue] || [];
-      publishQueue(fs27, queue);
-      fs27.close = (function(fs$close) {
+      publishQueue(fs28, queue);
+      fs28.close = (function(fs$close) {
         function close(fd, cb) {
-          return fs$close.call(fs27, fd, function(err) {
+          return fs$close.call(fs28, fd, function(err) {
             if (!err) {
               resetQueue();
             }
@@ -48842,48 +44864,48 @@ var require_graceful_fs = __commonJS({
           value: fs$close
         });
         return close;
-      })(fs27.close);
-      fs27.closeSync = (function(fs$closeSync) {
+      })(fs28.close);
+      fs28.closeSync = (function(fs$closeSync) {
         function closeSync(fd) {
-          fs$closeSync.apply(fs27, arguments);
+          fs$closeSync.apply(fs28, arguments);
           resetQueue();
         }
         Object.defineProperty(closeSync, previousSymbol, {
           value: fs$closeSync
         });
         return closeSync;
-      })(fs27.closeSync);
+      })(fs28.closeSync);
       if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || "")) {
         process.on("exit", function() {
-          debug2(fs27[gracefulQueue]);
-          require("assert").equal(fs27[gracefulQueue].length, 0);
+          debug2(fs28[gracefulQueue]);
+          require("assert").equal(fs28[gracefulQueue].length, 0);
         });
       }
     }
     var queue;
     if (!global[gracefulQueue]) {
-      publishQueue(global, fs27[gracefulQueue]);
+      publishQueue(global, fs28[gracefulQueue]);
     }
-    module2.exports = patch(clone2(fs27));
-    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs27.__patched) {
-      module2.exports = patch(fs27);
-      fs27.__patched = true;
+    module2.exports = patch(clone2(fs28));
+    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs28.__patched) {
+      module2.exports = patch(fs28);
+      fs28.__patched = true;
     }
-    function patch(fs28) {
-      polyfills(fs28);
-      fs28.gracefulify = patch;
-      fs28.createReadStream = createReadStream3;
-      fs28.createWriteStream = createWriteStream2;
-      var fs$readFile = fs28.readFile;
-      fs28.readFile = readFile2;
-      function readFile2(path53, options, cb) {
+    function patch(fs29) {
+      polyfills(fs29);
+      fs29.gracefulify = patch;
+      fs29.createReadStream = createReadStream3;
+      fs29.createWriteStream = createWriteStream2;
+      var fs$readFile = fs29.readFile;
+      fs29.readFile = readFile2;
+      function readFile2(path54, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$readFile(path53, options, cb);
-        function go$readFile(path54, options2, cb2, startTime) {
-          return fs$readFile(path54, options2, function(err) {
+        return go$readFile(path54, options, cb);
+        function go$readFile(path55, options2, cb2, startTime) {
+          return fs$readFile(path55, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$readFile, [path54, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$readFile, [path55, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -48891,16 +44913,16 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$writeFile = fs28.writeFile;
-      fs28.writeFile = writeFile2;
-      function writeFile2(path53, data, options, cb) {
+      var fs$writeFile = fs29.writeFile;
+      fs29.writeFile = writeFile2;
+      function writeFile2(path54, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$writeFile(path53, data, options, cb);
-        function go$writeFile(path54, data2, options2, cb2, startTime) {
-          return fs$writeFile(path54, data2, options2, function(err) {
+        return go$writeFile(path54, data, options, cb);
+        function go$writeFile(path55, data2, options2, cb2, startTime) {
+          return fs$writeFile(path55, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$writeFile, [path54, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$writeFile, [path55, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -48908,17 +44930,17 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$appendFile = fs28.appendFile;
+      var fs$appendFile = fs29.appendFile;
       if (fs$appendFile)
-        fs28.appendFile = appendFile2;
-      function appendFile2(path53, data, options, cb) {
+        fs29.appendFile = appendFile2;
+      function appendFile2(path54, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$appendFile(path53, data, options, cb);
-        function go$appendFile(path54, data2, options2, cb2, startTime) {
-          return fs$appendFile(path54, data2, options2, function(err) {
+        return go$appendFile(path54, data, options, cb);
+        function go$appendFile(path55, data2, options2, cb2, startTime) {
+          return fs$appendFile(path55, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$appendFile, [path54, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$appendFile, [path55, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -48926,9 +44948,9 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$copyFile = fs28.copyFile;
+      var fs$copyFile = fs29.copyFile;
       if (fs$copyFile)
-        fs28.copyFile = copyFile2;
+        fs29.copyFile = copyFile2;
       function copyFile2(src, dest, flags, cb) {
         if (typeof flags === "function") {
           cb = flags;
@@ -48946,34 +44968,34 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$readdir = fs28.readdir;
-      fs28.readdir = readdir2;
+      var fs$readdir = fs29.readdir;
+      fs29.readdir = readdir2;
       var noReaddirOptionVersions = /^v[0-5]\./;
-      function readdir2(path53, options, cb) {
+      function readdir2(path54, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path54, options2, cb2, startTime) {
-          return fs$readdir(path54, fs$readdirCallback(
-            path54,
+        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path55, options2, cb2, startTime) {
+          return fs$readdir(path55, fs$readdirCallback(
+            path55,
             options2,
             cb2,
             startTime
           ));
-        } : function go$readdir2(path54, options2, cb2, startTime) {
-          return fs$readdir(path54, options2, fs$readdirCallback(
-            path54,
+        } : function go$readdir2(path55, options2, cb2, startTime) {
+          return fs$readdir(path55, options2, fs$readdirCallback(
+            path55,
             options2,
             cb2,
             startTime
           ));
         };
-        return go$readdir(path53, options, cb);
-        function fs$readdirCallback(path54, options2, cb2, startTime) {
+        return go$readdir(path54, options, cb);
+        function fs$readdirCallback(path55, options2, cb2, startTime) {
           return function(err, files) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
               enqueue([
                 go$readdir,
-                [path54, options2, cb2],
+                [path55, options2, cb2],
                 err,
                 startTime || Date.now(),
                 Date.now()
@@ -48988,21 +45010,21 @@ var require_graceful_fs = __commonJS({
         }
       }
       if (process.version.substr(0, 4) === "v0.8") {
-        var legStreams = legacy(fs28);
+        var legStreams = legacy(fs29);
         ReadStream = legStreams.ReadStream;
         WriteStream = legStreams.WriteStream;
       }
-      var fs$ReadStream = fs28.ReadStream;
+      var fs$ReadStream = fs29.ReadStream;
       if (fs$ReadStream) {
         ReadStream.prototype = Object.create(fs$ReadStream.prototype);
         ReadStream.prototype.open = ReadStream$open;
       }
-      var fs$WriteStream = fs28.WriteStream;
+      var fs$WriteStream = fs29.WriteStream;
       if (fs$WriteStream) {
         WriteStream.prototype = Object.create(fs$WriteStream.prototype);
         WriteStream.prototype.open = WriteStream$open;
       }
-      Object.defineProperty(fs28, "ReadStream", {
+      Object.defineProperty(fs29, "ReadStream", {
         get: function() {
           return ReadStream;
         },
@@ -49012,7 +45034,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      Object.defineProperty(fs28, "WriteStream", {
+      Object.defineProperty(fs29, "WriteStream", {
         get: function() {
           return WriteStream;
         },
@@ -49023,7 +45045,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileReadStream = ReadStream;
-      Object.defineProperty(fs28, "FileReadStream", {
+      Object.defineProperty(fs29, "FileReadStream", {
         get: function() {
           return FileReadStream;
         },
@@ -49034,7 +45056,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileWriteStream = WriteStream;
-      Object.defineProperty(fs28, "FileWriteStream", {
+      Object.defineProperty(fs29, "FileWriteStream", {
         get: function() {
           return FileWriteStream;
         },
@@ -49044,7 +45066,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      function ReadStream(path53, options) {
+      function ReadStream(path54, options) {
         if (this instanceof ReadStream)
           return fs$ReadStream.apply(this, arguments), this;
         else
@@ -49064,7 +45086,7 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function WriteStream(path53, options) {
+      function WriteStream(path54, options) {
         if (this instanceof WriteStream)
           return fs$WriteStream.apply(this, arguments), this;
         else
@@ -49082,22 +45104,22 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function createReadStream3(path53, options) {
-        return new fs28.ReadStream(path53, options);
+      function createReadStream3(path54, options) {
+        return new fs29.ReadStream(path54, options);
       }
-      function createWriteStream2(path53, options) {
-        return new fs28.WriteStream(path53, options);
+      function createWriteStream2(path54, options) {
+        return new fs29.WriteStream(path54, options);
       }
-      var fs$open = fs28.open;
-      fs28.open = open2;
-      function open2(path53, flags, mode, cb) {
+      var fs$open = fs29.open;
+      fs29.open = open2;
+      function open2(path54, flags, mode, cb) {
         if (typeof mode === "function")
           cb = mode, mode = null;
-        return go$open(path53, flags, mode, cb);
-        function go$open(path54, flags2, mode2, cb2, startTime) {
-          return fs$open(path54, flags2, mode2, function(err, fd) {
+        return go$open(path54, flags, mode, cb);
+        function go$open(path55, flags2, mode2, cb2, startTime) {
+          return fs$open(path55, flags2, mode2, function(err, fd) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$open, [path54, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$open, [path55, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -49105,20 +45127,20 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      return fs28;
+      return fs29;
     }
     function enqueue(elem) {
       debug2("ENQUEUE", elem[0].name, elem[1]);
-      fs27[gracefulQueue].push(elem);
+      fs28[gracefulQueue].push(elem);
       retry2();
     }
     var retryTimer;
     function resetQueue() {
       var now = Date.now();
-      for (var i = 0; i < fs27[gracefulQueue].length; ++i) {
-        if (fs27[gracefulQueue][i].length > 2) {
-          fs27[gracefulQueue][i][3] = now;
-          fs27[gracefulQueue][i][4] = now;
+      for (var i = 0; i < fs28[gracefulQueue].length; ++i) {
+        if (fs28[gracefulQueue][i].length > 2) {
+          fs28[gracefulQueue][i][3] = now;
+          fs28[gracefulQueue][i][4] = now;
         }
       }
       retry2();
@@ -49126,9 +45148,9 @@ var require_graceful_fs = __commonJS({
     function retry2() {
       clearTimeout(retryTimer);
       retryTimer = void 0;
-      if (fs27[gracefulQueue].length === 0)
+      if (fs28[gracefulQueue].length === 0)
         return;
-      var elem = fs27[gracefulQueue].shift();
+      var elem = fs28[gracefulQueue].shift();
       var fn = elem[0];
       var args = elem[1];
       var err = elem[2];
@@ -49150,7 +45172,7 @@ var require_graceful_fs = __commonJS({
           debug2("RETRY", fn.name, args);
           fn.apply(null, args.concat([startTime]));
         } else {
-          fs27[gracefulQueue].push(elem);
+          fs28[gracefulQueue].push(elem);
         }
       }
       if (retryTimer === void 0) {
@@ -49229,7 +45251,7 @@ var require_isarray = __commonJS({
 });
 
 // node_modules/readable-stream/lib/internal/streams/stream.js
-var require_stream5 = __commonJS({
+var require_stream = __commonJS({
   "node_modules/readable-stream/lib/internal/streams/stream.js"(exports2, module2) {
     module2.exports = require("stream");
   }
@@ -49584,7 +45606,7 @@ var require_stream_writable = __commonJS({
     var internalUtil = {
       deprecate: require_node2()
     };
-    var Stream = require_stream5();
+    var Stream = require_stream();
     var Buffer3 = require_safe_buffer().Buffer;
     var OurUint8Array = (typeof global !== "undefined" ? global : typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : {}).Uint8Array || function() {
     };
@@ -50330,7 +46352,7 @@ var require_stream_readable = __commonJS({
     var EElistenerCount = function(emitter, type) {
       return emitter.listeners(type).length;
     };
-    var Stream = require_stream5();
+    var Stream = require_stream();
     var Buffer3 = require_safe_buffer().Buffer;
     var OurUint8Array = (typeof global !== "undefined" ? global : typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : {}).Uint8Array || function() {
     };
@@ -51202,22 +47224,22 @@ var require_lazystream = __commonJS({
 // node_modules/normalize-path/index.js
 var require_normalize_path = __commonJS({
   "node_modules/normalize-path/index.js"(exports2, module2) {
-    module2.exports = function(path53, stripTrailing) {
-      if (typeof path53 !== "string") {
+    module2.exports = function(path54, stripTrailing) {
+      if (typeof path54 !== "string") {
         throw new TypeError("expected path to be a string");
       }
-      if (path53 === "\\" || path53 === "/") return "/";
-      var len = path53.length;
-      if (len <= 1) return path53;
+      if (path54 === "\\" || path54 === "/") return "/";
+      var len = path54.length;
+      if (len <= 1) return path54;
       var prefix2 = "";
-      if (len > 4 && path53[3] === "\\") {
-        var ch = path53[2];
-        if ((ch === "?" || ch === ".") && path53.slice(0, 2) === "\\\\") {
-          path53 = path53.slice(2);
+      if (len > 4 && path54[3] === "\\") {
+        var ch = path54[2];
+        if ((ch === "?" || ch === ".") && path54.slice(0, 2) === "\\\\") {
+          path54 = path54.slice(2);
           prefix2 = "//";
         }
       }
-      var segs = path53.split(/[/\\]+/);
+      var segs = path54.split(/[/\\]+/);
       if (stripTrailing !== false && segs[segs.length - 1] === "") {
         segs.pop();
       }
@@ -53528,7 +49550,7 @@ var require_process = __commonJS({
 });
 
 // node_modules/readable-stream/lib/internal/streams/utils.js
-var require_utils7 = __commonJS({
+var require_utils4 = __commonJS({
   "node_modules/readable-stream/lib/internal/streams/utils.js"(exports2, module2) {
     "use strict";
     var { SymbolAsyncIterator, SymbolIterator, SymbolFor } = require_primordials();
@@ -53761,7 +49783,7 @@ var require_end_of_stream = __commonJS({
       isNodeStream,
       willEmitClose: _willEmitClose,
       kIsClosedPromise
-    } = require_utils7();
+    } = require_utils4();
     var addAbortListener;
     function isRequest(stream4) {
       return stream4.setHeader && typeof stream4.abort === "function";
@@ -53999,7 +50021,7 @@ var require_destroy2 = __commonJS({
       AbortError: AbortError3
     } = require_errors3();
     var { Symbol: Symbol2 } = require_primordials();
-    var { kIsDestroyed, isDestroyed, isFinished, isServerRequest } = require_utils7();
+    var { kIsDestroyed, isDestroyed, isFinished, isServerRequest } = require_utils4();
     var kDestroy = Symbol2("kDestroy");
     var kConstruct = Symbol2("kConstruct");
     function checkError(err, w, r) {
@@ -54337,7 +50359,7 @@ var require_add_abort_signal = __commonJS({
     "use strict";
     var { SymbolDispose } = require_primordials();
     var { AbortError: AbortError3, codes } = require_errors3();
-    var { isNodeStream, isWebStream, kControllerErrorFunction } = require_utils7();
+    var { isNodeStream, isWebStream, kControllerErrorFunction } = require_utils4();
     var eos2 = require_end_of_stream();
     var { ERR_INVALID_ARG_TYPE } = codes;
     var addAbortListener;
@@ -56572,7 +52594,7 @@ var require_duplexify = __commonJS({
       isDuplexNodeStream,
       isReadableStream: isReadableStream3,
       isWritableStream
-    } = require_utils7();
+    } = require_utils4();
     var eos2 = require_end_of_stream();
     var {
       AbortError: AbortError3,
@@ -57172,7 +53194,7 @@ var require_pipeline = __commonJS({
       isWebStream,
       isReadableStream: isReadableStream3,
       isReadableFinished
-    } = require_utils7();
+    } = require_utils4();
     var AbortController2 = globalThis.AbortController || require_abort_controller().AbortController;
     var PassThrough3;
     var Readable5;
@@ -57585,7 +53607,7 @@ var require_compose = __commonJS({
       isTransformStream,
       isWritableStream,
       isReadableStream: isReadableStream3
-    } = require_utils7();
+    } = require_utils4();
     var {
       AbortError: AbortError3,
       codes: { ERR_INVALID_ARG_VALUE, ERR_MISSING_ARGS }
@@ -57778,7 +53800,7 @@ var require_operators = __commonJS({
     var { finished } = require_end_of_stream();
     var staticCompose = require_compose();
     var { addAbortSignalNoValidate } = require_add_abort_signal();
-    var { isWritable, isNodeStream } = require_utils7();
+    var { isWritable, isNodeStream } = require_utils4();
     var { deprecate } = require_util12();
     var {
       ArrayPrototypePush,
@@ -58173,10 +54195,10 @@ var require_promises = __commonJS({
   "node_modules/readable-stream/lib/stream/promises.js"(exports2, module2) {
     "use strict";
     var { ArrayPrototypePop, Promise: Promise2 } = require_primordials();
-    var { isIterable, isNodeStream, isWebStream } = require_utils7();
+    var { isIterable, isNodeStream, isWebStream } = require_utils4();
     var { pipelineImpl: pl } = require_pipeline();
     var { finished } = require_end_of_stream();
-    require_stream6();
+    require_stream2();
     function pipeline(...streams) {
       return new Promise2((resolve2, reject) => {
         let signal;
@@ -58211,7 +54233,7 @@ var require_promises = __commonJS({
 });
 
 // node_modules/readable-stream/lib/stream.js
-var require_stream6 = __commonJS({
+var require_stream2 = __commonJS({
   "node_modules/readable-stream/lib/stream.js"(exports2, module2) {
     "use strict";
     var { Buffer: Buffer3 } = require("buffer");
@@ -58229,7 +54251,7 @@ var require_stream6 = __commonJS({
     var { destroyer } = require_destroy2();
     var eos2 = require_end_of_stream();
     var promises4 = require_promises();
-    var utils = require_utils7();
+    var utils = require_utils4();
     var Stream = module2.exports = require_legacy().Stream;
     Stream.isDestroyed = utils.isDestroyed;
     Stream.isDisturbed = utils.isDisturbed;
@@ -58360,7 +54382,7 @@ var require_ours = __commonJS({
       });
       module2.exports.Stream = Stream.Stream;
     } else {
-      const CustomStream = require_stream6();
+      const CustomStream = require_stream2();
       const promises4 = require_promises();
       const originalDestroy = CustomStream.Readable.destroy;
       module2.exports = CustomStream.Readable;
@@ -59973,7 +55995,7 @@ globstar while`, t2, d, e, u, m), this.matchOne(t2.slice(d), e.slice(u), s)) ret
       g.minimatch.escape = vi.escape;
       g.minimatch.unescape = Ei.unescape;
     });
-    var fs27 = R((Wt) => {
+    var fs28 = R((Wt) => {
       "use strict";
       Object.defineProperty(Wt, "__esModule", { value: true });
       Wt.LRUCache = void 0;
@@ -60842,7 +56864,7 @@ globstar while`, t2, d, e, u, m), this.matchOne(t2.slice(d), e.slice(u), s)) ret
       };
       Object.defineProperty(_2, "__esModule", { value: true });
       _2.PathScurry = _2.Path = _2.PathScurryDarwin = _2.PathScurryPosix = _2.PathScurryWin32 = _2.PathScurryBase = _2.PathPosix = _2.PathWin32 = _2.PathBase = _2.ChildrenCache = _2.ResolveCache = void 0;
-      var Qt = fs27(), Yt = require("node:path"), yr = require("node:url"), pt = require("fs"), Sr = br(require("node:fs")), vr = pt.realpathSync.native, Ht = require("node:fs/promises"), bs = Oe(), mt = { lstatSync: pt.lstatSync, readdir: pt.readdir, readdirSync: pt.readdirSync, readlinkSync: pt.readlinkSync, realpathSync: vr, promises: { lstat: Ht.lstat, readdir: Ht.readdir, readlink: Ht.readlink, realpath: Ht.realpath } }, _s = (n) => !n || n === mt || n === Sr ? mt : { ...mt, ...n, promises: { ...mt.promises, ...n.promises || {} } }, Os = /^\\\\\?\\([a-z]:)\\?$/i, Er = (n) => n.replace(/\//g, "\\").replace(Os, "$1\\"), _r = /[\\\/]/, N = 0, xs = 1, Ts = 2, G = 4, Cs = 6, Rs = 8, Q = 10, As = 12, j = 15, dt = ~j, xe = 16, ys = 32, gt = 64, W = 128, Vt = 256, Xt = 512, Ss = gt | W | Xt, Or = 1023, Te = (n) => n.isFile() ? Rs : n.isDirectory() ? G : n.isSymbolicLink() ? Q : n.isCharacterDevice() ? Ts : n.isBlockDevice() ? Cs : n.isSocket() ? As : n.isFIFO() ? xs : N, vs = new Qt.LRUCache({ max: 2 ** 12 }), wt = (n) => {
+      var Qt = fs28(), Yt = require("node:path"), yr = require("node:url"), pt = require("fs"), Sr = br(require("node:fs")), vr = pt.realpathSync.native, Ht = require("node:fs/promises"), bs = Oe(), mt = { lstatSync: pt.lstatSync, readdir: pt.readdir, readdirSync: pt.readdirSync, readlinkSync: pt.readlinkSync, realpathSync: vr, promises: { lstat: Ht.lstat, readdir: Ht.readdir, readlink: Ht.readlink, realpath: Ht.realpath } }, _s = (n) => !n || n === mt || n === Sr ? mt : { ...mt, ...n, promises: { ...mt.promises, ...n.promises || {} } }, Os = /^\\\\\?\\([a-z]:)\\?$/i, Er = (n) => n.replace(/\//g, "\\").replace(Os, "$1\\"), _r = /[\\\/]/, N = 0, xs = 1, Ts = 2, G = 4, Cs = 6, Rs = 8, Q = 10, As = 12, j = 15, dt = ~j, xe = 16, ys = 32, gt = 64, W = 128, Vt = 256, Xt = 512, Ss = gt | W | Xt, Or = 1023, Te = (n) => n.isFile() ? Rs : n.isDirectory() ? G : n.isSymbolicLink() ? Q : n.isCharacterDevice() ? Ts : n.isBlockDevice() ? Cs : n.isSocket() ? As : n.isFIFO() ? xs : N, vs = new Qt.LRUCache({ max: 2 ** 12 }), wt = (n) => {
         let t2 = vs.get(n);
         if (t2) return t2;
         let e = n.normalize("NFKD");
@@ -62220,8 +58242,8 @@ globstar while`, t2, d, e, u, m), this.matchOne(t2.slice(d), e.slice(u), s)) ret
 // node_modules/archiver-utils/file.js
 var require_file2 = __commonJS({
   "node_modules/archiver-utils/file.js"(exports2, module2) {
-    var fs27 = require_graceful_fs();
-    var path53 = require("path");
+    var fs28 = require_graceful_fs();
+    var path54 = require("path");
     var flatten = require_flatten();
     var difference = require_difference();
     var union2 = require_union();
@@ -62246,8 +58268,8 @@ var require_file2 = __commonJS({
       return result;
     };
     file2.exists = function() {
-      var filepath = path53.join.apply(path53, arguments);
-      return fs27.existsSync(filepath);
+      var filepath = path54.join.apply(path54, arguments);
+      return fs28.existsSync(filepath);
     };
     file2.expand = function(...args) {
       var options = isPlainObject5(args[0]) ? args.shift() : {};
@@ -62260,12 +58282,12 @@ var require_file2 = __commonJS({
       });
       if (options.filter) {
         matches = matches.filter(function(filepath) {
-          filepath = path53.join(options.cwd || "", filepath);
+          filepath = path54.join(options.cwd || "", filepath);
           try {
             if (typeof options.filter === "function") {
               return options.filter(filepath);
             } else {
-              return fs27.statSync(filepath)[options.filter]();
+              return fs28.statSync(filepath)[options.filter]();
             }
           } catch (e) {
             return false;
@@ -62277,7 +58299,7 @@ var require_file2 = __commonJS({
     file2.expandMapping = function(patterns, destBase, options) {
       options = Object.assign({
         rename: function(destBase2, destPath) {
-          return path53.join(destBase2 || "", destPath);
+          return path54.join(destBase2 || "", destPath);
         }
       }, options);
       var files = [];
@@ -62285,14 +58307,14 @@ var require_file2 = __commonJS({
       file2.expand(options, patterns).forEach(function(src) {
         var destPath = src;
         if (options.flatten) {
-          destPath = path53.basename(destPath);
+          destPath = path54.basename(destPath);
         }
         if (options.ext) {
           destPath = destPath.replace(/(\.[^\/]*)?$/, options.ext);
         }
         var dest = options.rename(destBase, destPath, options);
         if (options.cwd) {
-          src = path53.join(options.cwd, src);
+          src = path54.join(options.cwd, src);
         }
         dest = dest.replace(pathSeparatorRe, "/");
         src = src.replace(pathSeparatorRe, "/");
@@ -62373,8 +58395,8 @@ var require_file2 = __commonJS({
 // node_modules/archiver-utils/index.js
 var require_archiver_utils = __commonJS({
   "node_modules/archiver-utils/index.js"(exports2, module2) {
-    var fs27 = require_graceful_fs();
-    var path53 = require("path");
+    var fs28 = require_graceful_fs();
+    var path54 = require("path");
     var isStream = require_is_stream();
     var lazystream = require_lazystream();
     var normalizePath3 = require_normalize_path();
@@ -62422,7 +58444,7 @@ var require_archiver_utils = __commonJS({
     };
     utils.lazyReadStream = function(filepath) {
       return new lazystream.Readable(function() {
-        return fs27.createReadStream(filepath);
+        return fs28.createReadStream(filepath);
       });
     };
     utils.normalizeInputSource = function(source) {
@@ -62450,7 +58472,7 @@ var require_archiver_utils = __commonJS({
         callback = base;
         base = dirpath;
       }
-      fs27.readdir(dirpath, function(err, list) {
+      fs28.readdir(dirpath, function(err, list) {
         var i = 0;
         var file2;
         var filepath;
@@ -62462,11 +58484,11 @@ var require_archiver_utils = __commonJS({
           if (!file2) {
             return callback(null, results);
           }
-          filepath = path53.join(dirpath, file2);
-          fs27.stat(filepath, function(err2, stats) {
+          filepath = path54.join(dirpath, file2);
+          fs28.stat(filepath, function(err2, stats) {
             results.push({
               path: filepath,
-              relative: path53.relative(base, filepath).replace(/\\/g, "/"),
+              relative: path54.relative(base, filepath).replace(/\\/g, "/"),
               stats
             });
             if (stats && stats.isDirectory()) {
@@ -62490,7 +58512,7 @@ var require_archiver_utils = __commonJS({
 });
 
 // node_modules/archiver/lib/error.js
-var require_error2 = __commonJS({
+var require_error = __commonJS({
   "node_modules/archiver/lib/error.js"(exports2, module2) {
     var util3 = require("util");
     var ERROR_CODES = {
@@ -62525,13 +58547,13 @@ var require_error2 = __commonJS({
 // node_modules/archiver/lib/core.js
 var require_core5 = __commonJS({
   "node_modules/archiver/lib/core.js"(exports2, module2) {
-    var fs27 = require("fs");
+    var fs28 = require("fs");
     var glob = require_dist7();
-    var async = require_async7();
-    var path53 = require("path");
+    var async = require_async();
+    var path54 = require("path");
     var util3 = require_archiver_utils();
     var inherits = require("util").inherits;
-    var ArchiverError = require_error2();
+    var ArchiverError = require_error();
     var Transform3 = require_ours().Transform;
     var win32 = process.platform === "win32";
     var Archiver = function(format, options) {
@@ -62589,7 +58611,7 @@ var require_core5 = __commonJS({
       data.sourcePath = filepath;
       task.data = data;
       this._entriesCount++;
-      if (data.stats && data.stats instanceof fs27.Stats) {
+      if (data.stats && data.stats instanceof fs28.Stats) {
         task = this._updateQueueTaskWithStats(task, data.stats);
         if (task) {
           if (data.stats.size) {
@@ -62760,7 +58782,7 @@ var require_core5 = __commonJS({
         callback();
         return;
       }
-      fs27.lstat(task.filepath, function(err, stats) {
+      fs28.lstat(task.filepath, function(err, stats) {
         if (this._state.aborted) {
           setImmediate(callback);
           return;
@@ -62803,10 +58825,10 @@ var require_core5 = __commonJS({
         task.data.sourceType = "buffer";
         task.source = Buffer.concat([]);
       } else if (stats.isSymbolicLink() && this._moduleSupports("symlink")) {
-        var linkPath = fs27.readlinkSync(task.filepath);
-        var dirName = path53.dirname(task.filepath);
+        var linkPath = fs28.readlinkSync(task.filepath);
+        var dirName = path54.dirname(task.filepath);
         task.data.type = "symlink";
-        task.data.linkname = path53.relative(dirName, path53.resolve(dirName, linkPath));
+        task.data.linkname = path54.relative(dirName, path54.resolve(dirName, linkPath));
         task.data.sourceType = "buffer";
         task.source = Buffer.concat([]);
       } else {
@@ -63259,7 +59281,7 @@ var require_unix_stat = __commonJS({
 });
 
 // node_modules/compress-commons/lib/archivers/zip/constants.js
-var require_constants9 = __commonJS({
+var require_constants7 = __commonJS({
   "node_modules/compress-commons/lib/archivers/zip/constants.js"(exports2, module2) {
     module2.exports = {
       WORD: 4,
@@ -63343,7 +59365,7 @@ var require_zip_archive_entry = __commonJS({
     var ArchiveEntry = require_archive_entry();
     var GeneralPurposeBit = require_general_purpose_bit();
     var UnixStat = require_unix_stat();
-    var constants3 = require_constants9();
+    var constants3 = require_constants7();
     var zipUtil = require_util13();
     var ZipArchiveEntry = module2.exports = function(name) {
       if (!(this instanceof ZipArchiveEntry)) {
@@ -63822,7 +59844,7 @@ var require_zip_archive_output_stream = __commonJS({
     var ArchiveOutputStream = require_archive_output_stream();
     var ZipArchiveEntry = require_zip_archive_entry();
     var GeneralPurposeBit = require_general_purpose_bit();
-    var constants3 = require_constants9();
+    var constants3 = require_constants7();
     var util3 = require_util14();
     var zipUtil = require_util13();
     var ZipArchiveOutputStream = module2.exports = function(options) {
@@ -66317,7 +62339,7 @@ var require_extract = __commonJS({
 });
 
 // node_modules/tar-stream/constants.js
-var require_constants10 = __commonJS({
+var require_constants8 = __commonJS({
   "node_modules/tar-stream/constants.js"(exports2, module2) {
     var constants3 = {
       // just for envs without fs
@@ -66341,7 +62363,7 @@ var require_pack = __commonJS({
   "node_modules/tar-stream/pack.js"(exports2, module2) {
     var { Readable: Readable5, Writable, getStreamError } = require_streamx();
     var b4a = require_b4a();
-    var constants3 = require_constants10();
+    var constants3 = require_constants8();
     var headers = require_headers2();
     var DMODE = 493;
     var FMODE = 420;
@@ -67207,7 +63229,7 @@ var require_traverse = __commonJS({
       })(this.value);
     };
     function walk(root, cb, immutable) {
-      var path53 = [];
+      var path54 = [];
       var parents = [];
       var alive = true;
       return (function walker(node_) {
@@ -67216,11 +63238,11 @@ var require_traverse = __commonJS({
         var state3 = {
           node,
           node_,
-          path: [].concat(path53),
+          path: [].concat(path54),
           parent: parents.slice(-1)[0],
-          key: path53.slice(-1)[0],
-          isRoot: path53.length === 0,
-          level: path53.length,
+          key: path54.slice(-1)[0],
+          isRoot: path54.length === 0,
+          level: path54.length,
           circular: null,
           update: function(x) {
             if (!state3.isRoot) {
@@ -67275,7 +63297,7 @@ var require_traverse = __commonJS({
           parents.push(state3);
           var keys = Object.keys(state3.node);
           keys.forEach(function(key, i2) {
-            path53.push(key);
+            path54.push(key);
             if (modifiers.pre) modifiers.pre.call(state3, state3.node[key], key);
             var child = walker(state3.node[key]);
             if (immutable && Object.hasOwnProperty.call(state3.node, key)) {
@@ -67284,7 +63306,7 @@ var require_traverse = __commonJS({
             child.isLast = i2 == keys.length - 1;
             child.isFirst = i2 == 0;
             if (modifiers.post) modifiers.post.call(state3, child);
-            path53.pop();
+            path54.pop();
           });
           parents.pop();
         }
@@ -68090,7 +64112,7 @@ var require_matcher_stream = __commonJS({
 });
 
 // node_modules/unzip-stream/lib/entry.js
-var require_entry3 = __commonJS({
+var require_entry = __commonJS({
   "node_modules/unzip-stream/lib/entry.js"(exports2, module2) {
     "use strict";
     var stream4 = require("stream");
@@ -68123,7 +64145,7 @@ var require_unzip_stream = __commonJS({
     var util3 = require("util");
     var zlib3 = require("zlib");
     var MatcherStream = require_matcher_stream();
-    var Entry = require_entry3();
+    var Entry = require_entry();
     var states = {
       STREAM_START: 0,
       START: 1,
@@ -68305,11 +64327,11 @@ var require_unzip_stream = __commonJS({
           return requiredLength;
         case states.CENTRAL_DIRECTORY_FILE_HEADER_SUFFIX:
           var isUtf8 = (this.parsedEntity.flags & 2048) !== 0;
-          var path53 = this._decodeString(chunk.slice(0, this.parsedEntity.fileNameLength), isUtf8);
+          var path54 = this._decodeString(chunk.slice(0, this.parsedEntity.fileNameLength), isUtf8);
           var extraDataBuffer = chunk.slice(this.parsedEntity.fileNameLength, this.parsedEntity.fileNameLength + this.parsedEntity.extraFieldLength);
           var extra = this._readExtraFields(extraDataBuffer);
           if (extra && extra.parsed && extra.parsed.path && !isUtf8) {
-            path53 = extra.parsed.path;
+            path54 = extra.parsed.path;
           }
           this.parsedEntity.extra = extra.parsed;
           var isUnix = (this.parsedEntity.versionMadeBy & 65280) >> 8 === 3;
@@ -68321,7 +64343,7 @@ var require_unzip_stream = __commonJS({
           }
           if (this.options.debug) {
             const debugObj2 = Object.assign({}, this.parsedEntity, {
-              path: path53,
+              path: path54,
               flags: "0x" + this.parsedEntity.flags.toString(16),
               unixAttrs: unixAttrs && "0" + unixAttrs.toString(8),
               isSymlink,
@@ -68758,8 +64780,8 @@ var require_parser_stream = __commonJS({
 // node_modules/mkdirp/index.js
 var require_mkdirp = __commonJS({
   "node_modules/mkdirp/index.js"(exports2, module2) {
-    var path53 = require("path");
-    var fs27 = require("fs");
+    var path54 = require("path");
+    var fs28 = require("fs");
     var _0777 = parseInt("0777", 8);
     module2.exports = mkdirP.mkdirp = mkdirP.mkdirP = mkdirP;
     function mkdirP(p, opts, f, made) {
@@ -68770,7 +64792,7 @@ var require_mkdirp = __commonJS({
         opts = { mode: opts };
       }
       var mode = opts.mode;
-      var xfs = opts.fs || fs27;
+      var xfs = opts.fs || fs28;
       if (mode === void 0) {
         mode = _0777;
       }
@@ -68778,7 +64800,7 @@ var require_mkdirp = __commonJS({
       var cb = f || /* istanbul ignore next */
       function() {
       };
-      p = path53.resolve(p);
+      p = path54.resolve(p);
       xfs.mkdir(p, mode, function(er) {
         if (!er) {
           made = made || p;
@@ -68786,8 +64808,8 @@ var require_mkdirp = __commonJS({
         }
         switch (er.code) {
           case "ENOENT":
-            if (path53.dirname(p) === p) return cb(er);
-            mkdirP(path53.dirname(p), opts, function(er2, made2) {
+            if (path54.dirname(p) === p) return cb(er);
+            mkdirP(path54.dirname(p), opts, function(er2, made2) {
               if (er2) cb(er2, made2);
               else mkdirP(p, opts, cb, made2);
             });
@@ -68809,19 +64831,19 @@ var require_mkdirp = __commonJS({
         opts = { mode: opts };
       }
       var mode = opts.mode;
-      var xfs = opts.fs || fs27;
+      var xfs = opts.fs || fs28;
       if (mode === void 0) {
         mode = _0777;
       }
       if (!made) made = null;
-      p = path53.resolve(p);
+      p = path54.resolve(p);
       try {
         xfs.mkdirSync(p, mode);
         made = made || p;
       } catch (err0) {
         switch (err0.code) {
           case "ENOENT":
-            made = sync(path53.dirname(p), opts, made);
+            made = sync(path54.dirname(p), opts, made);
             sync(p, opts, made);
             break;
           // In the case of any other error, just see if there's a dir
@@ -68846,8 +64868,8 @@ var require_mkdirp = __commonJS({
 // node_modules/unzip-stream/lib/extract.js
 var require_extract2 = __commonJS({
   "node_modules/unzip-stream/lib/extract.js"(exports2, module2) {
-    var fs27 = require("fs");
-    var path53 = require("path");
+    var fs28 = require("fs");
+    var path54 = require("path");
     var util3 = require("util");
     var mkdirp = require_mkdirp();
     var Transform3 = require("stream").Transform;
@@ -68889,11 +64911,11 @@ var require_extract2 = __commonJS({
     };
     Extract.prototype._processEntry = function(entry) {
       var self2 = this;
-      var destPath = path53.join(this.opts.path, entry.path);
-      var directory = entry.isDirectory ? destPath : path53.dirname(destPath);
+      var destPath = path54.join(this.opts.path, entry.path);
+      var directory = entry.isDirectory ? destPath : path54.dirname(destPath);
       this.unfinishedEntries++;
       var writeFileFn = function() {
-        var pipedStream = fs27.createWriteStream(destPath);
+        var pipedStream = fs28.createWriteStream(destPath);
         pipedStream.on("close", function() {
           self2.unfinishedEntries--;
           self2._notifyAwaiter();
@@ -70261,8 +66283,8 @@ __export(index_exports, {
   runAction: () => runAction
 });
 module.exports = __toCommonJS(index_exports);
-var import_promises22 = __toESM(require("node:fs/promises"), 1);
-var import_node_path50 = __toESM(require("node:path"), 1);
+var import_promises23 = __toESM(require("node:fs/promises"), 1);
+var import_node_path51 = __toESM(require("node:path"), 1);
 
 // node_modules/@actions/core/lib/command.js
 var os = __toESM(require("os"), 1);
@@ -71691,8 +67713,8 @@ function isNoEntry(error52) {
 }
 
 // src/core/pipeline.ts
-var import_promises15 = __toESM(require("node:fs/promises"), 1);
-var import_node_path46 = __toESM(require("node:path"), 1);
+var import_promises16 = __toESM(require("node:fs/promises"), 1);
+var import_node_path47 = __toESM(require("node:path"), 1);
 
 // src/generated/version.ts
 var boardReadyVersion = "1.68.2";
@@ -75837,7 +71859,7 @@ function globLike(pattern, value) {
 }
 
 // src/rules/bom/shared.ts
-var import_node_path6 = __toESM(require("node:path"), 1);
+var import_node_path7 = __toESM(require("node:path"), 1);
 
 // src/util/delimited.ts
 function parseDelimitedRows(text, delimiter2) {
@@ -76734,17 +72756,36 @@ function boolValue(value) {
 }
 
 // src/util/glob.ts
-var import_fast_glob = __toESM(require_out4(), 1);
+var import_promises4 = __toESM(require("node:fs/promises"), 1);
+var import_node_path6 = __toESM(require("node:path"), 1);
+var import_picomatch = __toESM(require_picomatch2(), 1);
+var ignoredDirectoryNames = /* @__PURE__ */ new Set(["node_modules", ".git", "dist", "coverage"]);
+async function collectFiles(root, directory, output) {
+  let entries;
+  try {
+    entries = await import_promises4.default.readdir(directory, { withFileTypes: true });
+  } catch (error52) {
+    if (error52.code === "ENOENT") return;
+    throw error52;
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue;
+    if (entry.isDirectory() && ignoredDirectoryNames.has(entry.name)) continue;
+    const absolute = import_node_path6.default.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await collectFiles(root, absolute, output);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    output.push(toPosixPath2(import_node_path6.default.relative(root, absolute)));
+  }
+}
 async function globFiles(root, patterns) {
-  const results = await (0, import_fast_glob.default)(patterns, {
-    cwd: root,
-    absolute: true,
-    dot: false,
-    onlyFiles: true,
-    unique: true,
-    ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/coverage/**"]
-  });
-  return results.map(toPosixPath2).sort((a, b) => a.localeCompare(b));
+  const absoluteRoot = import_node_path6.default.resolve(root);
+  const relativeFiles = [];
+  await collectFiles(absoluteRoot, absoluteRoot, relativeFiles);
+  const matches = (0, import_picomatch.default)(patterns, { dot: false });
+  return relativeFiles.filter((relative) => matches(relative)).map((relative) => toPosixPath2(import_node_path6.default.resolve(absoluteRoot, relative))).sort((a, b) => a.localeCompare(b));
 }
 
 // src/rules/bom/shared.ts
@@ -76755,11 +72796,11 @@ async function loadBomContext(context5) {
   const pcbFootprints = /* @__PURE__ */ new Map();
   for (const project of context5.projects) {
     for (const schematic of project.schematicFiles) {
-      const parsed = await parseSchematic(import_node_path6.default.resolve(context5.root, schematic));
+      const parsed = await parseSchematic(import_node_path7.default.resolve(context5.root, schematic));
       schematicRows.push(...parsed.components);
     }
     for (const board of project.boardFiles) {
-      const parsed = await parsePcb(import_node_path6.default.resolve(context5.root, board));
+      const parsed = await parsePcb(import_node_path7.default.resolve(context5.root, board));
       for (const footprint of parsed.footprints) {
         pcbFootprints.set(footprint.reference, { footprint: footprint.footprint, dnp: footprint.dnp });
       }
@@ -76769,11 +72810,11 @@ async function loadBomContext(context5) {
 }
 async function resolveBomPath(context5) {
   if (context5.options.bom && context5.options.bom !== "auto") {
-    return import_node_path6.default.resolve(context5.root, context5.options.bom);
+    return import_node_path7.default.resolve(context5.root, context5.options.bom);
   }
   const configured = context5.config.projects?.find((project) => project.bom)?.bom;
   if (configured) {
-    return import_node_path6.default.resolve(context5.root, configured);
+    return import_node_path7.default.resolve(context5.root, configured);
   }
   const found = await globFiles(context5.root, ["**/bom*.csv", "**/*bom*.csv", "**/bom*.tsv", "**/*bom*.tsv"]);
   return found[0];
@@ -77051,8 +73092,8 @@ function checkBomSchematicConflicts(context5, bomRows, schematicRows) {
 }
 
 // src/rules/bom/lifecycle.ts
-var import_promises4 = __toESM(require("node:fs/promises"), 1);
-var import_node_path7 = __toESM(require("node:path"), 1);
+var import_promises5 = __toESM(require("node:fs/promises"), 1);
+var import_node_path8 = __toESM(require("node:path"), 1);
 
 // src/bom/lifecycle.ts
 var EOL_PATTERNS = /\b(eol|end[\s-]of[\s-]life)\b/i;
@@ -77109,7 +73150,7 @@ async function loadLifecycleDatabase(root, configured) {
     return /* @__PURE__ */ new Map();
   }
   try {
-    const raw = JSON.parse(await import_promises4.default.readFile(import_node_path7.default.resolve(root, configured), "utf8"));
+    const raw = JSON.parse(await import_promises5.default.readFile(import_node_path8.default.resolve(root, configured), "utf8"));
     return new Map(
       Object.entries(raw).filter((entry) => typeof entry[1] === "string").map(([mpn, status]) => [mpn, status])
     );
@@ -77404,8 +73445,8 @@ var singleSourceRule = rule(
 );
 
 // src/rules/bom/unknown-lifecycle.ts
-var import_promises5 = __toESM(require("node:fs/promises"), 1);
-var import_node_path8 = __toESM(require("node:path"), 1);
+var import_promises6 = __toESM(require("node:fs/promises"), 1);
+var import_node_path9 = __toESM(require("node:path"), 1);
 var unknownLifecycleRule = rule(
   {
     id: "bom.unknown-lifecycle",
@@ -77452,7 +73493,7 @@ async function loadLifecycleDb(root, configured) {
     return /* @__PURE__ */ new Set();
   }
   try {
-    const raw = JSON.parse(await import_promises5.default.readFile(import_node_path8.default.resolve(root, configured), "utf8"));
+    const raw = JSON.parse(await import_promises6.default.readFile(import_node_path9.default.resolve(root, configured), "utf8"));
     return new Set(
       Object.keys(raw).filter((key) => typeof raw[key] === "string").map((key) => key.trim().toUpperCase())
     );
@@ -77462,7 +73503,7 @@ async function loadLifecycleDb(root, configured) {
 }
 
 // src/rules/bom/variant-consistency.ts
-var import_node_path9 = __toESM(require("node:path"), 1);
+var import_node_path10 = __toESM(require("node:path"), 1);
 var variantConsistencyRule = rule(
   {
     id: "bom.variant-consistency",
@@ -77490,8 +73531,8 @@ var variantConsistencyRule = rule(
 async function checkProjectVariants(context5, project) {
   const output = [];
   const projectConfig = context5.config.projects?.find((candidate) => {
-    const candidateRoot = import_node_path9.default.resolve(context5.root, candidate.path);
-    const projectRoot = import_node_path9.default.resolve(context5.root, project.root);
+    const candidateRoot = import_node_path10.default.resolve(context5.root, candidate.path);
+    const projectRoot = import_node_path10.default.resolve(context5.root, project.root);
     return candidateRoot === projectRoot;
   });
   let configuredVariants = (projectConfig?.variants ?? []).filter(
@@ -77503,13 +73544,13 @@ async function checkProjectVariants(context5, project) {
   if (configuredVariants.length === 0) {
     return [];
   }
-  const parsedVariants = parseVariants(await readDesignFile(import_node_path9.default.resolve(context5.root, project.projectFile)) ?? "");
+  const parsedVariants = parseVariants(await readDesignFile(import_node_path10.default.resolve(context5.root, project.projectFile)) ?? "");
   for (const configuredVariant of configuredVariants) {
     const parsedVariant = parsedVariants.find((variant) => variant.name === configuredVariant.name);
     if (!parsedVariant || !configuredVariant.bom) {
       continue;
     }
-    const rows = await loadBom(import_node_path9.default.resolve(context5.root, configuredVariant.bom));
+    const rows = await loadBom(import_node_path10.default.resolve(context5.root, configuredVariant.bom));
     const activeDnp = new Set(
       activeVariantDnpRefs(
         parsedVariant,
@@ -77536,7 +73577,7 @@ async function checkProjectVariants(context5, project) {
 }
 
 // src/rules/design/board-outline.ts
-var import_node_path10 = __toESM(require("node:path"), 1);
+var import_node_path11 = __toESM(require("node:path"), 1);
 var boardOutlineRule = rule(
   {
     id: "design.board-outline",
@@ -77557,7 +73598,7 @@ var boardOutlineRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path10.default.resolve(context5.root, board));
+        const parsed = await parsePcb(import_node_path11.default.resolve(context5.root, board));
         if (!parsed.outlineClosed) {
           output.push(
             finding(context5, {
@@ -77577,7 +73618,7 @@ var boardOutlineRule = rule(
 );
 
 // src/rules/design/copper-balance.ts
-var import_node_path11 = __toESM(require("node:path"), 1);
+var import_node_path12 = __toESM(require("node:path"), 1);
 var copperBalanceRule = rule(
   {
     id: "design.copper-balance",
@@ -77608,7 +73649,7 @@ var copperBalanceRule = rule(
 );
 async function checkBoardCopperBalance(context5, board, minimum) {
   const output = [];
-  const parsed = await parsePcb(import_node_path11.default.resolve(context5.root, board));
+  const parsed = await parsePcb(import_node_path12.default.resolve(context5.root, board));
   if (!parsed.boardArea || parsed.boardArea <= 0) {
     return [];
   }
@@ -77633,7 +73674,7 @@ async function checkBoardCopperBalance(context5, board, minimum) {
 }
 
 // src/rules/design/unique-references.ts
-var import_node_path12 = __toESM(require("node:path"), 1);
+var import_node_path13 = __toESM(require("node:path"), 1);
 var uniqueReferencesRule = rule(
   {
     id: "design.unique-references",
@@ -77666,7 +73707,7 @@ var uniqueReferencesRule = rule(
 );
 async function checkBoardUniqueReferences(context5, board, config2) {
   const output = [];
-  const parsed = await parsePcb(import_node_path12.default.resolve(context5.root, board));
+  const parsed = await parsePcb(import_node_path13.default.resolve(context5.root, board));
   const counts = /* @__PURE__ */ new Map();
   for (const footprint of parsed.footprints) {
     if (refIgnored(footprint.reference, config2["ignore-refs"])) {
@@ -77693,16 +73734,16 @@ async function checkBoardUniqueReferences(context5, board, config2) {
 }
 
 // src/rules/kicad-report.ts
-var import_node_path15 = __toESM(require("node:path"), 1);
+var import_node_path16 = __toESM(require("node:path"), 1);
 
 // src/kicad/cli.ts
-var import_promises6 = __toESM(require("node:fs/promises"), 1);
+var import_promises7 = __toESM(require("node:fs/promises"), 1);
 var import_node_os = __toESM(require("node:os"), 1);
-var import_node_path14 = __toESM(require("node:path"), 1);
+var import_node_path15 = __toESM(require("node:path"), 1);
 
 // src/util/process.ts
 var import_node_child_process = require("node:child_process");
-var import_node_path13 = require("node:path");
+var import_node_path14 = require("node:path");
 function runProcess(command, args, options = {}) {
   if (options.signal?.aborted) {
     return Promise.reject(abortReason(options.signal));
@@ -77788,7 +73829,7 @@ function abortReason(signal) {
 function trustedCmdExe() {
   const systemRoot = process.env.SystemRoot;
   if (systemRoot && /^[a-z]:\\Windows$/i.test(systemRoot)) {
-    return (0, import_node_path13.join)(systemRoot, "System32", "cmd.exe");
+    return (0, import_node_path14.join)(systemRoot, "System32", "cmd.exe");
   }
   return String.raw`C:\Windows\System32\cmd.exe`;
 }
@@ -78580,10 +74621,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path53) {
-  if (!path53)
+function getElementAtPath(obj, path54) {
+  if (!path54)
     return obj;
-  return path53.reduce((acc, key) => acc?.[key], obj);
+  return path54.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -78992,11 +75033,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path53, issues) {
+function prefixIssues(path54, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path53);
+    iss.path.unshift(path54);
     return iss;
   });
 }
@@ -79143,16 +75184,16 @@ function flattenError(error52, mapper = (issue3) => issue3.message) {
 }
 function formatError2(error52, mapper = (issue3) => issue3.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error53, path53 = []) => {
+  const processError = (error53, path54 = []) => {
     for (const issue3 of error53.issues) {
       if (issue3.code === "invalid_union" && issue3.errors.length) {
-        issue3.errors.map((issues) => processError({ issues }, [...path53, ...issue3.path]));
+        issue3.errors.map((issues) => processError({ issues }, [...path54, ...issue3.path]));
       } else if (issue3.code === "invalid_key") {
-        processError({ issues: issue3.issues }, [...path53, ...issue3.path]);
+        processError({ issues: issue3.issues }, [...path54, ...issue3.path]);
       } else if (issue3.code === "invalid_element") {
-        processError({ issues: issue3.issues }, [...path53, ...issue3.path]);
+        processError({ issues: issue3.issues }, [...path54, ...issue3.path]);
       } else {
-        const fullpath = [...path53, ...issue3.path];
+        const fullpath = [...path54, ...issue3.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue3));
         } else {
@@ -79179,17 +75220,17 @@ function formatError2(error52, mapper = (issue3) => issue3.message) {
 }
 function treeifyError(error52, mapper = (issue3) => issue3.message) {
   const result = { errors: [] };
-  const processError = (error53, path53 = []) => {
+  const processError = (error53, path54 = []) => {
     var _a3, _b;
     for (const issue3 of error53.issues) {
       if (issue3.code === "invalid_union" && issue3.errors.length) {
-        issue3.errors.map((issues) => processError({ issues }, [...path53, ...issue3.path]));
+        issue3.errors.map((issues) => processError({ issues }, [...path54, ...issue3.path]));
       } else if (issue3.code === "invalid_key") {
-        processError({ issues: issue3.issues }, [...path53, ...issue3.path]);
+        processError({ issues: issue3.issues }, [...path54, ...issue3.path]);
       } else if (issue3.code === "invalid_element") {
-        processError({ issues: issue3.issues }, [...path53, ...issue3.path]);
+        processError({ issues: issue3.issues }, [...path54, ...issue3.path]);
       } else {
-        const fullpath = [...path53, ...issue3.path];
+        const fullpath = [...path54, ...issue3.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue3));
           continue;
@@ -79221,8 +75262,8 @@ function treeifyError(error52, mapper = (issue3) => issue3.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path53 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path53) {
+  const path54 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path54) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -91914,13 +87955,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path53 = ref.slice(1).split("/").filter(Boolean);
-  if (path53.length === 0) {
+  const path54 = ref.slice(1).split("/").filter(Boolean);
+  if (path54.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path53[0] === defsKey) {
-    const key = path53[1];
+  if (path54[0] === defsKey) {
+    const key = path54[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -92438,7 +88479,7 @@ function parseKicadMajor(version4) {
 async function detectKicadCli(explicit, signal) {
   const candidates = explicit && explicit.trim() !== "" ? [explicit] : defaultKicadCliCandidates();
   for (const candidate of candidates) {
-    if (candidate.includes(import_node_path14.default.sep) && !await pathExists(candidate)) {
+    if (candidate.includes(import_node_path15.default.sep) && !await pathExists(candidate)) {
       continue;
     }
     const version4 = await runProcess(candidate, ["version"], {
@@ -92465,8 +88506,8 @@ async function detectKicadCli(explicit, signal) {
   return { found: false };
 }
 async function runKicadReport(cliPath, kind, inputFile, options = {}) {
-  const tempDir = await import_promises6.default.mkdtemp(import_node_path14.default.join(import_node_os.default.tmpdir(), "boardreadyops-"));
-  const output = import_node_path14.default.join(tempDir, `${kind}.json`);
+  const tempDir = await import_promises7.default.mkdtemp(import_node_path15.default.join(import_node_os.default.tmpdir(), "boardreadyops-"));
+  const output = import_node_path15.default.join(tempDir, `${kind}.json`);
   const args = kicadReportArgs(kind, output, inputFile, options);
   const result = await runProcess(cliPath, args, {
     timeoutMs: 12e4,
@@ -92476,11 +88517,11 @@ async function runKicadReport(cliPath, kind, inputFile, options = {}) {
   });
   let reportText = "";
   try {
-    reportText = await import_promises6.default.readFile(output, "utf8");
+    reportText = await import_promises7.default.readFile(output, "utf8");
   } catch {
     reportText = "";
   } finally {
-    await import_promises6.default.rm(tempDir, { recursive: true, force: true }).catch(() => void 0);
+    await import_promises7.default.rm(tempDir, { recursive: true, force: true }).catch(() => void 0);
   }
   try {
     const diagnostics = parseKicadDiagnostics(reportText, kind);
@@ -92572,7 +88613,7 @@ async function runKicadReportRule(context5, options) {
   const output = [];
   for (const project of context5.projects) {
     for (const designFile of options.files(project)) {
-      const absoluteFile = import_node_path15.default.resolve(context5.root, designFile);
+      const absoluteFile = import_node_path16.default.resolve(context5.root, designFile);
       output.push(...await processDesignFileReport(context5, cli.path, cli.version, options, absoluteFile));
     }
   }
@@ -92695,10 +88736,10 @@ function ercSeverity(context5, kicadRule, fallback) {
 }
 
 // src/rules/firmware/arduino-pin-contract.ts
-var import_node_path19 = __toESM(require("node:path"), 1);
+var import_node_path20 = __toESM(require("node:path"), 1);
 
 // src/firmware/arduino.ts
-var import_promises7 = __toESM(require("node:fs/promises"), 1);
+var import_promises8 = __toESM(require("node:fs/promises"), 1);
 
 // src/firmware/contract.ts
 function normalizeHardwareKey(value) {
@@ -92736,7 +88777,7 @@ function compareFirmwareContract(pins, hardwareBySignal) {
 async function loadArduinoPinContract(file2) {
   let text;
   try {
-    text = await import_promises7.default.readFile(file2, "utf8");
+    text = await import_promises8.default.readFile(file2, "utf8");
   } catch (error52) {
     return { errors: [error52 instanceof Error ? error52.message : "Arduino pin header could not be loaded"] };
   }
@@ -92790,7 +88831,7 @@ function matchMeta(comment, key) {
 }
 
 // src/rules/firmware/shared.ts
-var import_node_path18 = __toESM(require("node:path"), 1);
+var import_node_path19 = __toESM(require("node:path"), 1);
 
 // src/pinmap/resolvers/csv.ts
 async function readCsvPinmap(file2) {
@@ -92846,14 +88887,14 @@ async function loadPinmap(file2) {
 }
 
 // src/rules/pinmap/shared.ts
-var import_node_path17 = __toESM(require("node:path"), 1);
+var import_node_path18 = __toESM(require("node:path"), 1);
 
 // src/kicad/schematic-graph.ts
-var import_promises8 = __toESM(require("node:fs/promises"), 1);
-var import_node_path16 = __toESM(require("node:path"), 1);
+var import_promises9 = __toESM(require("node:fs/promises"), 1);
+var import_node_path17 = __toESM(require("node:path"), 1);
 var MAX_SCHEMATIC_SHEETS = 5e3;
 async function buildSchematicNetGraph(rootFiles) {
-  const normalizedRoots = [...new Set(rootFiles.map((file2) => import_node_path16.default.resolve(file2)))].sort(
+  const normalizedRoots = [...new Set(rootFiles.map((file2) => import_node_path17.default.resolve(file2)))].sort(
     (left, right) => left.localeCompare(right)
   );
   if (normalizedRoots.length > MAX_SCHEMATIC_SHEETS) {
@@ -92869,7 +88910,7 @@ async function buildSchematicNetGraph(rootFiles) {
     if (!next) {
       break;
     }
-    const file2 = import_node_path16.default.resolve(next.file);
+    const file2 = import_node_path17.default.resolve(next.file);
     if (visited.has(file2)) {
       continue;
     }
@@ -92905,7 +88946,7 @@ async function processSheetQueueItem(file2, next, sheets, missingSheets, unresol
     }
   }
   for (const reference of parsed.sheetReferences) {
-    const resolvedPath = import_node_path16.default.resolve(import_node_path16.default.dirname(file2), reference.fileName);
+    const resolvedPath = import_node_path17.default.resolve(import_node_path17.default.dirname(file2), reference.fileName);
     if (!await fileExists(resolvedPath)) {
       missingSheets.push(missingSheet(file2, reference, resolvedPath));
       continue;
@@ -92953,7 +88994,7 @@ function aggregateLabels(rootFiles, sheets) {
 }
 async function fileExists(file2) {
   try {
-    const stat3 = await import_promises8.default.stat(file2);
+    const stat3 = await import_promises9.default.stat(file2);
     return stat3.isFile();
   } catch {
     return false;
@@ -92963,7 +89004,7 @@ async function fileExists(file2) {
 // src/rules/pinmap/shared.ts
 function resolvePinmap(context5) {
   const configured = context5.options.pinmap || context5.config.projects?.find((project) => project.pinmap)?.pinmap;
-  return configured ? import_node_path17.default.resolve(context5.root, configured) : void 0;
+  return configured ? import_node_path18.default.resolve(context5.root, configured) : void 0;
 }
 async function schematicNetLabels(context5) {
   return (await schematicNetGraph(context5)).visibleNetLabels;
@@ -92973,7 +89014,7 @@ async function schematicNetGraph(context5) {
   for (const project of context5.projects) {
     const firstSchematic = project.schematicFiles[0];
     if (firstSchematic) {
-      roots.push(import_node_path17.default.resolve(context5.root, firstSchematic));
+      roots.push(import_node_path18.default.resolve(context5.root, firstSchematic));
     }
   }
   return buildSchematicNetGraph(roots);
@@ -93045,7 +89086,7 @@ async function runFirmwareContractRule(context5, options) {
         path: contractPath,
         kind: "firmware",
         line: 1,
-        details: { firmware: assignment, pinmapPath: import_node_path18.default.relative(context5.root, pinmapPath) }
+        details: { firmware: assignment, pinmapPath: import_node_path19.default.relative(context5.root, pinmapPath) }
       })
     );
   }
@@ -93063,8 +89104,8 @@ async function runFirmwareContractRule(context5, options) {
           firmware: assignment,
           hardware,
           sources: {
-            firmware: import_node_path18.default.relative(context5.root, contractPath),
-            pinmap: import_node_path18.default.relative(context5.root, pinmapPath)
+            firmware: import_node_path19.default.relative(context5.root, contractPath),
+            pinmap: import_node_path19.default.relative(context5.root, pinmapPath)
           }
         }
       })
@@ -93079,7 +89120,7 @@ async function runFirmwareContractRule(context5, options) {
         path: pinmapPath,
         kind: "pinmap",
         line: 1,
-        details: { hardware, firmwarePath: import_node_path18.default.relative(context5.root, contractPath) }
+        details: { hardware, firmwarePath: import_node_path19.default.relative(context5.root, contractPath) }
       })
     );
   }
@@ -93119,11 +89160,11 @@ var arduinoPinContractRule = rule(
 function resolveArduinoContract(context5) {
   const ruleFile = configFor(context5, ruleId).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context5.config.projects?.find((project) => project.firmware?.arduino?.pinAssignments)?.firmware?.arduino?.pinAssignments ?? context5.config.firmware?.arduino?.pinAssignments;
-  return configured ? import_node_path19.default.resolve(context5.root, configured) : void 0;
+  return configured ? import_node_path20.default.resolve(context5.root, configured) : void 0;
 }
 
 // src/rules/firmware/dependency-identification.ts
-var import_node_path20 = __toESM(require("node:path"), 1);
+var import_node_path21 = __toESM(require("node:path"), 1);
 
 // src/firmware/component-identity.ts
 var mappings = [
@@ -93237,10 +89278,10 @@ function dependencyFrom(key, value, warnings) {
   const table = value;
   const versionSpec = stringField(table.version);
   const git = stringField(table.git);
-  const path53 = stringField(table.path);
+  const path54 = stringField(table.path);
   const overridePath = stringField(table.override_path);
   if (git) {
-    const subPath = path53;
+    const subPath = path54;
     return {
       declaredName: key,
       source: subPath === void 0 ? { kind: "git", url: git } : { kind: "git", url: git, path: subPath },
@@ -93252,8 +89293,8 @@ function dependencyFrom(key, value, warnings) {
     warnings.push(`Dependency "${key}" is overridden by local source at "${overridePath}".`);
     return { declaredName: key, source: { kind: "local", path: overridePath }, versionSpec, pinned: false };
   }
-  if (path53) {
-    return { declaredName: key, source: { kind: "local", path: path53 }, versionSpec, pinned: false };
+  if (path54) {
+    return { declaredName: key, source: { kind: "local", path: path54 }, versionSpec, pinned: false };
   }
   return {
     declaredName: key,
@@ -93262,7 +89303,7 @@ function dependencyFrom(key, value, warnings) {
     pinned: isPinned(versionSpec)
   };
 }
-function parseIdfManifest(content, path53) {
+function parseIdfManifest(content, path54) {
   const warnings = [];
   let document2;
   try {
@@ -93271,12 +89312,12 @@ function parseIdfManifest(content, path53) {
     return {
       dependencies: [],
       warnings: [
-        `${path53 ?? "idf_component.yml"} is not valid YAML: ${error52 instanceof Error ? error52.message : "unknown"}`
+        `${path54 ?? "idf_component.yml"} is not valid YAML: ${error52 instanceof Error ? error52.message : "unknown"}`
       ]
     };
   }
   if (typeof document2 !== "object" || document2 === null || Array.isArray(document2)) {
-    return { dependencies: [], warnings: [`${path53 ?? "idf_component.yml"} does not contain a mapping.`] };
+    return { dependencies: [], warnings: [`${path54 ?? "idf_component.yml"} does not contain a mapping.`] };
   }
   const root = document2;
   const raw = root.dependencies;
@@ -93291,7 +89332,7 @@ function parseIdfManifest(content, path53) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return {
       dependencies: [],
-      warnings: [`${path53 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
+      warnings: [`${path54 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
     };
   }
   const dependencies = [];
@@ -93332,7 +89373,7 @@ var dependencyIdentificationRule = rule(
     }
     const output = [];
     for (const file2 of manifests) {
-      const relative = import_node_path20.default.relative(context5.root, file2);
+      const relative = import_node_path21.default.relative(context5.root, file2);
       const text = await readTextFile(file2).catch(() => void 0);
       if (text === void 0) continue;
       const manifest = parseIdfManifest(text, relative);
@@ -93359,10 +89400,10 @@ var dependencyIdentificationRule = rule(
 );
 
 // src/rules/firmware/esp-idf-pin-contract.ts
-var import_node_path21 = __toESM(require("node:path"), 1);
+var import_node_path22 = __toESM(require("node:path"), 1);
 
 // src/firmware/yaml-contract.ts
-var import_promises9 = __toESM(require("node:fs/promises"), 1);
+var import_promises10 = __toESM(require("node:fs/promises"), 1);
 var pinObjectSchema = external_exports.strictObject({
   hardware: external_exports.string().min(1),
   net: external_exports.string().min(1).optional(),
@@ -93378,7 +89419,7 @@ var contractSchema = external_exports.strictObject({
 });
 async function loadYamlPinContract(file2, adapterLabel) {
   try {
-    const raw = load(await import_promises9.default.readFile(file2, "utf8"));
+    const raw = load(await import_promises10.default.readFile(file2, "utf8"));
     const parsed = contractSchema.safeParse(raw);
     if (!parsed.success) {
       return { errors: parsed.error.issues.map((issue3) => `${issue3.path.join(".")}: ${issue3.message}`) };
@@ -93440,11 +89481,11 @@ var espIdfPinContractRule = rule(
 function resolveContract(context5) {
   const ruleFile = configFor(context5, ruleId2).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context5.config.projects?.find((project) => project.firmware?.["esp-idf"]?.pinAssignments)?.firmware?.["esp-idf"]?.pinAssignments ?? context5.config.firmware?.["esp-idf"]?.pinAssignments;
-  return configured ? import_node_path21.default.resolve(context5.root, configured) : void 0;
+  return configured ? import_node_path22.default.resolve(context5.root, configured) : void 0;
 }
 
 // src/rules/firmware/platformio-pin-contract.ts
-var import_node_path22 = __toESM(require("node:path"), 1);
+var import_node_path23 = __toESM(require("node:path"), 1);
 
 // src/firmware/platformio.ts
 async function loadPlatformioPinContract(file2) {
@@ -93481,19 +89522,19 @@ var platformioPinContractRule = rule(
 function resolvePlatformioContract(context5) {
   const ruleFile = configFor(context5, ruleId3).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context5.config.projects?.find((project) => project.firmware?.platformio?.pinAssignments)?.firmware?.platformio?.pinAssignments ?? context5.config.firmware?.platformio?.pinAssignments;
-  return configured ? import_node_path22.default.resolve(context5.root, configured) : void 0;
+  return configured ? import_node_path23.default.resolve(context5.root, configured) : void 0;
 }
 
 // src/rules/firmware/stm32cubemx-pin-contract.ts
-var import_node_path23 = __toESM(require("node:path"), 1);
+var import_node_path24 = __toESM(require("node:path"), 1);
 
 // src/firmware/stm32cubemx.ts
-var import_promises10 = __toESM(require("node:fs/promises"), 1);
+var import_promises11 = __toESM(require("node:fs/promises"), 1);
 var IOC_LINE_PATTERN = /^([A-Za-z0-9_-]+(?:\.\d+)?)\.(\w+)=(.+)$/;
 async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
   let text;
   try {
-    text = await import_promises10.default.readFile(file2, "utf8");
+    text = await import_promises11.default.readFile(file2, "utf8");
   } catch (error52) {
     return { errors: [error52 instanceof Error ? error52.message : "STM32CubeMX .ioc file could not be loaded"] };
   }
@@ -93583,11 +89624,11 @@ var stm32CubeMxPinContractRule = rule(
 function resolveContract2(context5) {
   const ruleFile = configFor(context5, ruleId4).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context5.config.projects?.find((project) => project.firmware?.stm32cubemx?.project)?.firmware?.stm32cubemx?.project ?? context5.config.firmware?.stm32cubemx?.project;
-  return configured ? import_node_path23.default.resolve(context5.root, configured) : void 0;
+  return configured ? import_node_path24.default.resolve(context5.root, configured) : void 0;
 }
 
 // src/rules/firmware/zephyr-pin-contract.ts
-var import_node_path24 = __toESM(require("node:path"), 1);
+var import_node_path25 = __toESM(require("node:path"), 1);
 
 // src/firmware/zephyr.ts
 async function loadZephyrPinContract(file2) {
@@ -93624,18 +89665,18 @@ var zephyrPinContractRule = rule(
 function resolveContract3(context5) {
   const ruleFile = configFor(context5, ruleId5).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context5.config.projects?.find((project) => project.firmware?.zephyr?.pinAssignments)?.firmware?.zephyr?.pinAssignments ?? context5.config.firmware?.zephyr?.pinAssignments;
-  return configured ? import_node_path24.default.resolve(context5.root, configured) : void 0;
+  return configured ? import_node_path25.default.resolve(context5.root, configured) : void 0;
 }
 
 // src/rules/manufacturing/shared.ts
-var import_node_path25 = __toESM(require("node:path"), 1);
+var import_node_path26 = __toESM(require("node:path"), 1);
 
 // src/multicad/excellon-parser.ts
 var assumedMetricFormat = { integerDigits: 3, decimalDigits: 3 };
 var assumedInchFormat = { integerDigits: 2, decimalDigits: 4 };
 var inchToMm = 25.4;
-function warning2(code, message, path53) {
-  return path53 === void 0 ? { code, message } : { code, message, path: path53 };
+function warning2(code, message, path54) {
+  return path54 === void 0 ? { code, message } : { code, message, path: path54 };
 }
 function attributeBody(line) {
   const match = /^;\s*#@!\s*(.+)$/u.exec(line.trim());
@@ -93660,7 +89701,7 @@ function coordinateValue(raw, format) {
   const parsed = Number.parseFloat(`${integerPart}.${decimalPart || "0"}`);
   return negative ? -parsed : parsed;
 }
-function parseHeaderLine(line, state3, warnings, path53) {
+function parseHeaderLine(line, state3, warnings, path54) {
   const trimmed = line.trim();
   const attribute = attributeBody(trimmed);
   if (attribute) {
@@ -93697,14 +89738,14 @@ function parseHeaderLine(line, state3, warnings, path53) {
           state3.decimalDigits = mask[2].length;
         } else if (modifier !== "000.000") {
           warnings.push(
-            warning2("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path53)
+            warning2("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path54)
           );
         }
       }
     }
   }
 }
-function parseExcellon(content, path53) {
+function parseExcellon(content, path54) {
   const warnings = [];
   const state3 = {
     units: void 0,
@@ -93738,7 +89779,7 @@ function parseExcellon(content, path53) {
         warning2(
           "excellon.assumed-coordinate-format",
           `No coordinate format declared; assumed ${format.integerDigits}.${format.decimalDigits} for ${units}. Coordinates from this file are an assumption, not a measurement.`,
-          path53
+          path54
         )
       );
     }
@@ -93769,7 +89810,7 @@ function parseExcellon(content, path53) {
       const diameterMm = (state3.units ?? "mm") === "inch" ? rawDiameter * inchToMm : rawDiameter;
       if (!Number.isFinite(diameterMm) || diameterMm <= 0) {
         warnings.push(
-          warning2("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path53)
+          warning2("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path54)
         );
       } else {
         toolsByCode.set(code, { code, diameterMm, plated: pendingToolPlated ?? state3.filePlated });
@@ -93778,7 +89819,7 @@ function parseExcellon(content, path53) {
       continue;
     }
     if (inHeader && !bodyStarted) {
-      parseHeaderLine(trimmed, state3, warnings, path53);
+      parseHeaderLine(trimmed, state3, warnings, path54);
       continue;
     }
     const toolSelect = /^T(\d+)\s*$/u.exec(trimmed);
@@ -93789,7 +89830,7 @@ function parseExcellon(content, path53) {
           warning2(
             "excellon.undefined-tool",
             `The body selects tool T${toolSelect[1]}, which the header never defines. Its holes are not counted.`,
-            path53
+            path54
           )
         );
       }
@@ -93798,7 +89839,7 @@ function parseExcellon(content, path53) {
     const coordinate = /^(?:G0[05]\s*)?X([+-]?[\d.]+)Y([+-]?[\d.]+)(.*)$/u.exec(trimmed);
     if (!coordinate?.[1] || !coordinate[2]) continue;
     if (!currentTool) {
-      warnings.push(warning2("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path53));
+      warnings.push(warning2("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path54));
       continue;
     }
     const active = resolvedFormat();
@@ -93817,19 +89858,19 @@ function parseExcellon(content, path53) {
       warning2(
         "excellon.assumed-plating",
         "Nothing in this file states whether its holes are plated; treated as plated. A rule must not block a release on this.",
-        path53
+        path54
       )
     );
   }
   if (state3.units === void 0) {
-    warnings.push(warning2("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path53));
+    warnings.push(warning2("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path54));
   }
   if (slotCount > 0) {
     warnings.push(
       warning2(
         "excellon.slots-collapsed",
         `${slotCount} slot(s) recorded at their start point only; slot length is not represented.`,
-        path53
+        path54
       )
     );
   }
@@ -93916,13 +89957,13 @@ function applyApertureBlockWord(ledger, compact) {
   if (ledger.block !== void 0) ledger.block.selected = code;
   referenceBlockAperture(ledger, code);
 }
-function readApertureEvidence(ledger, scale, path53) {
+function readApertureEvidence(ledger, scale, path54) {
   return {
     apertures: [...ledger.file].map(([code, definition]) => inMillimetres(code, definition, scale)),
     warnings: [
-      ...definitionWarnings(ledger, path53),
-      ...undefinedApertureWarnings(ledger, path53),
-      ...placementWarnings(ledger, path53)
+      ...definitionWarnings(ledger, path54),
+      ...undefinedApertureWarnings(ledger, path54),
+      ...placementWarnings(ledger, path54)
     ]
   };
 }
@@ -94168,13 +90209,13 @@ function inMillimetres(code, definition, scale) {
 function holeInMillimetres(hole, scale) {
   return hole === void 0 ? void 0 : { kind: "diameter", diameterMm: hole.diameter * scale };
 }
-function definitionWarnings(ledger, path53) {
+function definitionWarnings(ledger, path54) {
   const shown = ledger.problems.slice(0, maxDefinitionWarnings);
   const warnings = shown.map(
     (problem) => warning3(
       problem.kind === "malformed" ? "gerber.malformed-aperture-definition" : "gerber.unsupported-aperture-definition",
       `${problemSubject(problem)}, but ${problem.detail}; ${problem.kind === "malformed" ? "nothing is read from that definition." : "its shape is not read from this file. The numbers are the file's own, in whatever units it declares."}`,
-      path53
+      path54
     )
   );
   const rest = ledger.problems.length - shown.length;
@@ -94183,7 +90224,7 @@ function definitionWarnings(ledger, path53) {
       warning3(
         "gerber.unreadable-aperture-definition",
         `There ${rest === 1 ? "is 1 further definition" : `are ${rest} further definitions`} this reader could not use, which ${rest === 1 ? "is" : "are"} not listed here.`,
-        path53
+        path54
       )
     );
   }
@@ -94194,14 +90235,14 @@ function problemSubject(problem) {
   const block = problem.blockCode === void 0 ? "An unnamed aperture block" : `Aperture block D${problem.blockCode}`;
   return `${block} defines aperture D${problem.code}`;
 }
-function undefinedApertureWarnings(ledger, path53) {
+function undefinedApertureWarnings(ledger, path54) {
   const warnings = [];
   if (ledger.undefinedInFileScope.length > 0) {
     warnings.push(
       warning3(
         "gerber.undefined-aperture",
         `The file selects ${listApertureCodes(ledger.undefinedInFileScope.map((code) => ({ code })))}, which it never defines; what is plotted with it cannot be read from this file.`,
-        path53
+        path54
       )
     );
   }
@@ -94215,20 +90256,20 @@ function undefinedApertureWarnings(ledger, path53) {
             qualifier: entry.blockCode === void 0 ? void 0 : `(in block D${entry.blockCode})`
           }))
         )}, which the block never defines; what those blocks draw cannot be read from this file.`,
-        path53
+        path54
       )
     );
   }
   return warnings;
 }
-function placementWarnings(ledger, path53) {
+function placementWarnings(ledger, path54) {
   if (ledger.placements.count === 0) return [];
   const codes = listApertureCodes(ledger.placements.codes.map((code) => ({ code })));
   return [
     warning3(
       "gerber.unmodelled-aperture-block",
       `Aperture block ${codes} is placed ${ledger.placements.count === 1 ? "once" : `${ledger.placements.count} times`}. A block's own shape is not modelled, so each placement contributes its flash point only and the geometry read from this file is incomplete.`,
-      path53
+      path54
     )
   ];
 }
@@ -94237,8 +90278,8 @@ function listApertureCodes(codes) {
   const rest = codes.length - maxListedApertureCodes;
   return rest > 0 ? `${shown} and ${rest} more` : shown;
 }
-function warning3(code, message, path53) {
-  return path53 === void 0 ? { code, message } : { code, message, path: path53 };
+function warning3(code, message, path54) {
+  return path54 === void 0 ? { code, message } : { code, message, path: path54 };
 }
 
 // src/multicad/gerber-geometry.ts
@@ -94450,7 +90491,7 @@ function recordUnterminated(evidence, body2) {
   if (evidence.count === 0) evidence.excerpt = boundedExcerpt(body2);
   evidence.count += 1;
 }
-function unterminatedWarnings(unterminated, path53) {
+function unterminatedWarnings(unterminated, path54) {
   const warnings = [];
   const extended = unterminated.extended;
   if (extended.count > 0) {
@@ -94458,7 +90499,7 @@ function unterminatedWarnings(unterminated, path53) {
       warning4(
         "gerber.unterminated-extended-command",
         `An extended command is not closed by "%". There ${extended.count === 1 ? "is 1" : `are ${extended.count}`} of them, the first reading "${extended.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path53
+        path54
       )
     );
   }
@@ -94468,7 +90509,7 @@ function unterminatedWarnings(unterminated, path53) {
       warning4(
         "gerber.unterminated-word-command",
         `A command is not terminated by "*". There ${word.count === 1 ? "is 1" : `are ${word.count}`} of them, the first reading "${word.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path53
+        path54
       )
     );
   }
@@ -94502,8 +90543,8 @@ function samePoint2(a, b) {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
 }
 var plottedOperation = /^(?:G\d+)?(?:X([+-]?\d+))?(?:Y([+-]?\d+))?(?:I[+-]?\d+)?(?:J[+-]?\d+)?D(0?[123])$/u;
-function warning4(code, message, path53) {
-  return path53 === void 0 ? { code, message } : { code, message, path: path53 };
+function warning4(code, message, path54) {
+  return path54 === void 0 ? { code, message } : { code, message, path: path54 };
 }
 function snapshotFileState(state3, apertures) {
   return {
@@ -94593,7 +90634,7 @@ function readFileState(commands, unterminated) {
   }
   return snapshotFileState(state3, apertures);
 }
-function parseGerber(content, path53) {
+function parseGerber(content, path54) {
   const commands = tokenizeGerber(content);
   const unterminated = {
     extended: { count: 0, excerpt: void 0 },
@@ -94612,14 +90653,14 @@ function parseGerber(content, path53) {
   const identity = state3.fileFunction ? identityFromFileFunction(state3.fileFunction) : void 0;
   const warnings = [];
   if (units === void 0) {
-    warnings.push(warning4("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path53));
+    warnings.push(warning4("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path54));
   }
   if (!declaredFormat) {
     warnings.push(
       warning4(
         "gerber.assumed-coordinate-format",
         "No %FS% format specification; assumed 3.5 with leading zeros omitted. Coordinates from this file are an assumption, not a measurement.",
-        path53
+        path54
       )
     );
   }
@@ -94628,7 +90669,7 @@ function parseGerber(content, path53) {
       warning4(
         "gerber.incremental-coordinates",
         "This file uses incremental coordinates, which are not interpreted; no geometry was read from it.",
-        path53
+        path54
       )
     );
   }
@@ -94637,13 +90678,13 @@ function parseGerber(content, path53) {
       warning4(
         "gerber.unmodelled-file-function",
         `The file declares TF.FileFunction "${state3.fileFunction}", which is not a stackup layer; its role comes from the filename.`,
-        path53
+        path54
       )
     );
   }
-  warnings.push(...unterminatedWarnings(unterminated, path53));
+  warnings.push(...unterminatedWarnings(unterminated, path54));
   const scale = units === "inch" ? inchToMm2 : 1;
-  const apertureEvidence = readApertureEvidence(state3.apertures, scale, path53);
+  const apertureEvidence = readApertureEvidence(state3.apertures, scale, path54);
   warnings.push(...apertureEvidence.warnings);
   const collector = createGerberGeometryCollector({
     apertures: apertureEvidence.apertures,
@@ -94960,7 +91001,7 @@ async function parsedBoards(context5) {
   const boards = [];
   for (const project of context5.projects) {
     for (const board of project.boardFiles) {
-      boards.push({ path: board, footprints: (await parsePcb(import_node_path25.default.resolve(context5.root, board))).footprints });
+      boards.push({ path: board, footprints: (await parsePcb(import_node_path26.default.resolve(context5.root, board))).footprints });
     }
   }
   return boards;
@@ -94991,20 +91032,20 @@ function assemblyFootprints(footprints2) {
 async function positionOutputText(root, searchRoots, patterns = defaultPositionPatterns()) {
   const files = /* @__PURE__ */ new Set();
   for (const searchRoot of normalizedSearchRoots(searchRoots)) {
-    const directory = import_node_path25.default.resolve(root, searchRoot);
+    const directory = import_node_path26.default.resolve(root, searchRoot);
     for (const file2 of await globFiles(directory, patterns)) {
       files.add(file2);
     }
   }
   const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
   const texts = await Promise.all(sortedFiles.map((file2) => readTextFile(file2).catch(() => "")));
-  return { files: sortedFiles.map((file2) => import_node_path25.default.relative(root, file2)), text: texts.join("\n") };
+  return { files: sortedFiles.map((file2) => import_node_path26.default.relative(root, file2)), text: texts.join("\n") };
 }
 function projectOutputSearchRoots(context5) {
   return [
     ...new Set(
       context5.projects.flatMap(
-        (project) => [project.projectFile, ...project.boardFiles, ...project.schematicFiles, ...project.jobsetFiles].map((entry) => import_node_path25.default.dirname(entry)).filter((entry) => entry.length > 0)
+        (project) => [project.projectFile, ...project.boardFiles, ...project.schematicFiles, ...project.jobsetFiles].map((entry) => import_node_path26.default.dirname(entry)).filter((entry) => entry.length > 0)
       )
     )
   ];
@@ -95102,7 +91143,7 @@ var assemblySidesRule = rule(
 );
 
 // src/rules/manufacturing/board-edge-clearance.ts
-var import_node_path26 = __toESM(require("node:path"), 1);
+var import_node_path27 = __toESM(require("node:path"), 1);
 
 // src/vendor/profiles.ts
 var unverifiedProvenance = {
@@ -95588,7 +91629,7 @@ var boardEdgeClearanceRule = rule(
     }
     const parsedFiles = await Promise.all(
       files.map(async (file2) => {
-        const relativePath = import_node_path26.default.relative(context5.root, file2);
+        const relativePath = import_node_path27.default.relative(context5.root, file2);
         const content = await readTextFile(file2).catch(() => "");
         const parsed = parseGerber(content, relativePath);
         return { path: relativePath, parsed };
@@ -95669,7 +91710,7 @@ var boardEdgeClearanceRule = rule(
 );
 
 // src/rules/manufacturing/drill-coverage.ts
-var import_node_path27 = __toESM(require("node:path"), 1);
+var import_node_path28 = __toESM(require("node:path"), 1);
 var diameterToleranceMm = 1e-3;
 var drillCoverageRule = rule(
   {
@@ -95699,12 +91740,12 @@ var drillCoverageRule = rule(
     for (const file2 of drillFiles) {
       const text = await readTextFile(file2).catch(() => "");
       if (!text) continue;
-      diameters.push(...parseExcellon(text, import_node_path27.default.relative(context5.root, file2)).tools.map((tool) => tool.diameterMm));
+      diameters.push(...parseExcellon(text, import_node_path28.default.relative(context5.root, file2)).tools.map((tool) => tool.diameterMm));
     }
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path27.default.resolve(context5.root, board));
+        const parsed = await parsePcb(import_node_path28.default.resolve(context5.root, board));
         for (const size of parsed.drillSizes) {
           const wanted = Number(size);
           if (!Number.isFinite(wanted) || wanted <= 0) continue;
@@ -95744,7 +91785,7 @@ function nearestDiameter(diameters, wanted) {
 }
 
 // src/rules/manufacturing/fab-notes.ts
-var import_node_path28 = __toESM(require("node:path"), 1);
+var import_node_path29 = __toESM(require("node:path"), 1);
 var fabNotesRule = rule(
   {
     id: "manufacturing.fab-notes",
@@ -95764,7 +91805,7 @@ var fabNotesRule = rule(
     }
     const candidates = ["fab/README.md", "manufacturing/notes.md", "docs/fab-notes.md"];
     for (const candidate of candidates) {
-      if (await pathExists(import_node_path28.default.resolve(context5.root, candidate))) {
+      if (await pathExists(import_node_path29.default.resolve(context5.root, candidate))) {
         return [];
       }
     }
@@ -95824,10 +91865,10 @@ var fiducialsRule = rule(
 );
 
 // src/rules/manufacturing/jobset-outputs.ts
-var import_node_path30 = __toESM(require("node:path"), 1);
+var import_node_path31 = __toESM(require("node:path"), 1);
 
 // src/kicad/jobset.ts
-var import_node_path29 = __toESM(require("node:path"), 1);
+var import_node_path30 = __toESM(require("node:path"), 1);
 async function parseJobset(file2) {
   const text = await readDesignFile(file2) ?? "";
   const parsed = parseJsonValue(text);
@@ -95911,7 +91952,7 @@ function uniqueJobs(jobs) {
   return output;
 }
 function normalizePath2(value) {
-  return import_node_path29.default.normalize(value).replaceAll("\\", "/");
+  return import_node_path30.default.normalize(value).replaceAll("\\", "/");
 }
 
 // src/rules/manufacturing/jobset-outputs.ts
@@ -95935,10 +91976,10 @@ var jobsetOutputsRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const jobset of project.jobsetFiles) {
-        const parsed = await parseJobset(import_node_path30.default.resolve(context5.root, jobset));
+        const parsed = await parseJobset(import_node_path31.default.resolve(context5.root, jobset));
         for (const job of parsed.jobs.filter((entry) => entry.enabled)) {
-          const outputPath = (job.destinationPath ? import_node_path30.default.join(job.destinationPath, job.outputPath) : job.outputPath).replaceAll("\\", "/");
-          const absoluteOutput = import_node_path30.default.resolve(context5.root, project.root, outputPath);
+          const outputPath = (job.destinationPath ? import_node_path31.default.join(job.destinationPath, job.outputPath) : job.outputPath).replaceAll("\\", "/");
+          const absoluteOutput = import_node_path31.default.resolve(context5.root, project.root, outputPath);
           if (!await pathExists(absoluteOutput)) {
             output.push(
               finding(context5, {
@@ -95959,7 +92000,7 @@ var jobsetOutputsRule = rule(
 );
 
 // src/rules/manufacturing/layer-stackup.ts
-var import_node_path31 = __toESM(require("node:path"), 1);
+var import_node_path32 = __toESM(require("node:path"), 1);
 var layerStackupRule = rule(
   {
     id: "manufacturing.layer-stackup",
@@ -95981,7 +92022,7 @@ var layerStackupRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path31.default.resolve(context5.root, board));
+        const parsed = await parsePcb(import_node_path32.default.resolve(context5.root, board));
         const expectedLayers = typeof expected === "number" ? expected : parsed.copperLayerCount;
         if (parsed.stackupLayerCount !== void 0 && parsed.stackupLayerCount !== expectedLayers) {
           output.push(
@@ -96057,7 +92098,7 @@ var maskCoverageRule = rule(
 );
 
 // src/rules/manufacturing/outputs-present.ts
-var import_node_path32 = __toESM(require("node:path"), 1);
+var import_node_path33 = __toESM(require("node:path"), 1);
 
 // src/vendor/outputs.ts
 var VENDOR_OUTPUT_KINDS = ["gerber", "drill", "bom", "position", "pdf", "step"];
@@ -96173,7 +92214,7 @@ async function inspectRequiredOutputs(context5) {
     0,
     ...(await Promise.all(
       context5.projects.flatMap(
-        (project) => project.boardFiles.map((board) => fileMtimeMs(import_node_path32.default.resolve(context5.root, board)))
+        (project) => project.boardFiles.map((board) => fileMtimeMs(import_node_path33.default.resolve(context5.root, board)))
       )
     )).filter((value) => typeof value === "number")
   );
@@ -96250,7 +92291,7 @@ function isPatternMap(value) {
 }
 
 // src/rules/manufacturing/package-completeness.ts
-var import_node_path33 = __toESM(require("node:path"), 1);
+var import_node_path34 = __toESM(require("node:path"), 1);
 var BASE_CATEGORIES = [
   {
     id: "gerbers",
@@ -96384,7 +92425,7 @@ async function resolveCategories(root, categories) {
 }
 async function checkFabNotes(root) {
   for (const candidate of FAB_NOTES_PATHS) {
-    if (await pathExists(import_node_path33.default.resolve(root, candidate))) {
+    if (await pathExists(import_node_path34.default.resolve(root, candidate))) {
       return true;
     }
   }
@@ -96929,7 +92970,7 @@ var pinmapNetLabelRule = rule(
 );
 
 // src/rules/pinmap/verify.ts
-var import_node_path34 = __toESM(require("node:path"), 1);
+var import_node_path35 = __toESM(require("node:path"), 1);
 var pinmapVerifyRule = rule(
   {
     id: "pinmap.verify",
@@ -96969,8 +93010,8 @@ var pinmapVerifyRule = rule(
         finding(context5, {
           ruleId: "pinmap.verify",
           severity: configuredSeverity(context5, "pinmap.verify", "high"),
-          message: `Hierarchical sheet ${missing.fileName} referenced by ${import_node_path34.default.relative(context5.root, missing.parentFile)} was not found.`,
-          path: import_node_path34.default.relative(context5.root, missing.parentFile),
+          message: `Hierarchical sheet ${missing.fileName} referenced by ${import_node_path35.default.relative(context5.root, missing.parentFile)} was not found.`,
+          path: import_node_path35.default.relative(context5.root, missing.parentFile),
           kind: "schematic",
           details: { ...missing }
         })
@@ -96981,8 +93022,8 @@ var pinmapVerifyRule = rule(
         finding(context5, {
           ruleId: "pinmap.verify",
           severity: configuredSeverity(context5, "pinmap.verify", "high"),
-          message: `Sheet pin ${unresolved.pin} on ${import_node_path34.default.relative(context5.root, unresolved.parentFile)} has no matching hierarchical label in ${import_node_path34.default.relative(context5.root, unresolved.childFile)}.`,
-          path: import_node_path34.default.relative(context5.root, unresolved.parentFile),
+          message: `Sheet pin ${unresolved.pin} on ${import_node_path35.default.relative(context5.root, unresolved.parentFile)} has no matching hierarchical label in ${import_node_path35.default.relative(context5.root, unresolved.childFile)}.`,
+          path: import_node_path35.default.relative(context5.root, unresolved.parentFile),
           kind: "schematic",
           details: { ...unresolved }
         })
@@ -97078,7 +93119,7 @@ var pinmapUnmappedPinRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const schematic of project.schematicFiles) {
-        const parsed = await parseSchematic(import_node_path34.default.resolve(context5.root, schematic));
+        const parsed = await parseSchematic(import_node_path35.default.resolve(context5.root, schematic));
         for (const pin of parsed.connectedPins) {
           const key = `${pin.designator}.${pin.pin}`;
           if (!mapped.has(key)) {
@@ -97101,12 +93142,12 @@ var pinmapUnmappedPinRule = rule(
 );
 
 // src/rules/release/artifact-provenance.ts
-var import_node_path36 = __toESM(require("node:path"), 1);
+var import_node_path37 = __toESM(require("node:path"), 1);
 
 // src/core/provenance.ts
 var import_node_crypto4 = require("node:crypto");
-var import_promises11 = __toESM(require("node:fs/promises"), 1);
-var import_node_path35 = __toESM(require("node:path"), 1);
+var import_promises12 = __toESM(require("node:fs/promises"), 1);
+var import_node_path36 = __toESM(require("node:path"), 1);
 var SOURCE_PATTERNS = [
   "**/*.kicad_pcb",
   "**/*.kicad_sch",
@@ -97121,7 +93162,7 @@ async function computeSourceFingerprint(root, customPatterns = SOURCE_PATTERNS) 
   const hasher = (0, import_node_crypto4.createHash)("sha256");
   for (const absolutePath of sortedFiles) {
     const relPath = normalizeRelative(root, absolutePath);
-    const content = await import_promises11.default.readFile(absolutePath).catch(() => Buffer.alloc(0));
+    const content = await import_promises12.default.readFile(absolutePath).catch(() => Buffer.alloc(0));
     hasher.update(`${relPath}\0`, "utf8");
     hasher.update(content);
     hasher.update("\0", "utf8");
@@ -97132,14 +93173,14 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
   let manifest;
   let manifestDir = root;
   if (typeof manifestOrPath === "string") {
-    const absManifestPath = import_node_path35.default.resolve(root, manifestOrPath);
+    const absManifestPath = import_node_path36.default.resolve(root, manifestOrPath);
     if (!isInside(root, absManifestPath)) {
       return {
         status: "mismatch",
         reasons: [`Path traversal rejected for manifest path: ${manifestOrPath}`]
       };
     }
-    manifestDir = import_node_path35.default.dirname(absManifestPath);
+    manifestDir = import_node_path36.default.dirname(absManifestPath);
     try {
       const raw = await readTextFile(absManifestPath);
       manifest = JSON.parse(raw);
@@ -97181,19 +93222,19 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
   const artifactMismatches = [];
   const missingArtifacts = [];
   for (const artifact of manifest.artifacts ?? []) {
-    if (import_node_path35.default.isAbsolute(artifact.path) || artifact.path.includes("..")) {
+    if (import_node_path36.default.isAbsolute(artifact.path) || artifact.path.includes("..")) {
       artifactMismatches.push(artifact.path);
       reasons.push(`Artifact path rejected (absolute or path traversal): ${artifact.path}`);
       continue;
     }
-    const absPath = import_node_path35.default.resolve(manifestDir, artifact.path);
+    const absPath = import_node_path36.default.resolve(manifestDir, artifact.path);
     if (!isInside(root, absPath) && !isInside(manifestDir, absPath)) {
       artifactMismatches.push(artifact.path);
       reasons.push(`Artifact path escaped directory bounds: ${artifact.path}`);
       continue;
     }
     try {
-      const content = await import_promises11.default.readFile(absPath);
+      const content = await import_promises12.default.readFile(absPath);
       const actualHash = (0, import_node_crypto4.createHash)("sha256").update(content).digest("hex");
       if (actualHash !== artifact.sha256) {
         artifactMismatches.push(artifact.path);
@@ -97265,7 +93306,7 @@ var artifactProvenanceRule = rule(
       manifestRelPath = configuredPath;
     } else {
       for (const candidate of MANIFEST_CANDIDATES) {
-        const text = await readTextFile(import_node_path36.default.resolve(context5.root, candidate)).catch(() => void 0);
+        const text = await readTextFile(import_node_path37.default.resolve(context5.root, candidate)).catch(() => void 0);
         if (text) {
           manifestRelPath = candidate;
           break;
@@ -97278,7 +93319,7 @@ var artifactProvenanceRule = rule(
           ruleId: "release.artifact-provenance",
           severity: configuredSeverity(context5, "release.artifact-provenance", "high"),
           message: "Exported manufacturing artifacts exist in the repository but lack an export provenance manifest.",
-          path: artifactFiles2[0] ? import_node_path36.default.relative(context5.root, artifactFiles2[0]) : ".",
+          path: artifactFiles2[0] ? import_node_path37.default.relative(context5.root, artifactFiles2[0]) : ".",
           kind: "pcb",
           details: {
             status: "missing",
@@ -97327,7 +93368,7 @@ var artifactProvenanceRule = rule(
 );
 
 // src/rules/release/changelog-present.ts
-var import_node_path37 = __toESM(require("node:path"), 1);
+var import_node_path38 = __toESM(require("node:path"), 1);
 var changelogPresentRule = rule(
   {
     id: "release.changelog-present",
@@ -97348,13 +93389,13 @@ var changelogPresentRule = rule(
     const revisions = /* @__PURE__ */ new Set();
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const revision2 = (await parsePcb(import_node_path37.default.resolve(context5.root, board))).revision;
+        const revision2 = (await parsePcb(import_node_path38.default.resolve(context5.root, board))).revision;
         if (revision2) {
           revisions.add(revision2);
         }
       }
     }
-    const changelog = import_node_path37.default.resolve(context5.root, "CHANGELOG.md");
+    const changelog = import_node_path38.default.resolve(context5.root, "CHANGELOG.md");
     if (!await pathExists(changelog)) {
       return [
         finding(context5, {
@@ -97389,7 +93430,7 @@ function changelogHasRevision(text, revision2) {
 }
 
 // src/rules/release/revision-set.ts
-var import_node_path38 = __toESM(require("node:path"), 1);
+var import_node_path39 = __toESM(require("node:path"), 1);
 var revisionSetRule = rule(
   {
     id: "release.revision-set",
@@ -97413,7 +93454,7 @@ var revisionSetRule = rule(
     const revisionPattern = new RegExp(tagPattern);
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path38.default.resolve(context5.root, board));
+        const parsed = await parsePcb(import_node_path39.default.resolve(context5.root, board));
         if (!parsed.revision) {
           output.push(
             finding(context5, {
@@ -97443,7 +93484,7 @@ var revisionSetRule = rule(
 );
 
 // src/rules/release/tag-matches-revision.ts
-var import_node_path39 = __toESM(require("node:path"), 1);
+var import_node_path40 = __toESM(require("node:path"), 1);
 var tagMatchesRevisionRule = rule(
   {
     id: "release.tag-matches-revision",
@@ -97468,7 +93509,7 @@ var tagMatchesRevisionRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const revision2 = (await parsePcb(import_node_path39.default.resolve(context5.root, board))).revision;
+        const revision2 = (await parsePcb(import_node_path40.default.resolve(context5.root, board))).revision;
         if (!revision2 || tag !== revision2 && tag !== `v${revision2}`) {
           output.push(
             finding(context5, {
@@ -97488,7 +93529,7 @@ var tagMatchesRevisionRule = rule(
 );
 
 // src/rules/release/version-format.ts
-var import_node_path40 = __toESM(require("node:path"), 1);
+var import_node_path41 = __toESM(require("node:path"), 1);
 var versionFormatRule = rule(
   {
     id: "release.version-format",
@@ -97531,7 +93572,7 @@ var versionFormatRule = rule(
 );
 async function checkProjectBoards(context5, project, regex, pattern, output) {
   for (const board of project.boardFiles) {
-    const revision2 = (await parsePcb(import_node_path40.default.resolve(context5.root, board))).revision;
+    const revision2 = (await parsePcb(import_node_path41.default.resolve(context5.root, board))).revision;
     if (revision2 && !regex.test(revision2)) {
       output.push(
         finding(context5, {
@@ -97548,7 +93589,7 @@ async function checkProjectBoards(context5, project, regex, pattern, output) {
 }
 async function checkProjectSchematics(context5, project, regex, pattern, output) {
   for (const schematic of project.schematicFiles) {
-    const text = await readDesignFile(import_node_path40.default.resolve(context5.root, schematic)) ?? "";
+    const text = await readDesignFile(import_node_path41.default.resolve(context5.root, schematic)) ?? "";
     const revision2 = /\(rev\s+"([^"]+)"/.exec(text)?.[1];
     if (revision2 && !regex.test(revision2)) {
       output.push(
@@ -97635,7 +93676,7 @@ function registerBuiltInRules() {
 // src/rules/fabrication-snapshot.ts
 var import_node_crypto5 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = require("node:fs");
-var import_node_path41 = __toESM(require("node:path"), 1);
+var import_node_path42 = __toESM(require("node:path"), 1);
 var manufacturingPatterns = {
   gerber: ["**/*.gbr", "**/*.gbrjob"],
   drill: ["**/*.drl"],
@@ -97660,9 +93701,9 @@ async function captureFabricationSnapshot(root, projects, options, config2) {
 }
 async function resolveBomPaths(root, options, config2) {
   if (options.bom && options.bom !== "auto") {
-    return [import_node_path41.default.resolve(root, options.bom)];
+    return [import_node_path42.default.resolve(root, options.bom)];
   }
-  const configured = config2.projects?.flatMap((project) => project.bom ? [import_node_path41.default.resolve(root, project.bom)] : []).sort((a, b) => a.localeCompare(b));
+  const configured = config2.projects?.flatMap((project) => project.bom ? [import_node_path42.default.resolve(root, project.bom)] : []).sort((a, b) => a.localeCompare(b));
   if (configured && configured.length > 0) {
     return [...new Set(configured)];
   }
@@ -97684,7 +93725,7 @@ async function loadSchematicRows(root, projects) {
   const rows = [];
   for (const project of projects) {
     for (const schematic of project.schematicFiles) {
-      rows.push(...(await parseSchematic(import_node_path41.default.resolve(root, schematic))).components);
+      rows.push(...(await parseSchematic(import_node_path42.default.resolve(root, schematic))).components);
     }
   }
   return rows;
@@ -97705,11 +93746,11 @@ function snapshotBomRow(root, row) {
   };
 }
 async function projectScopedFiles(root, projects, patterns) {
-  const files = await Promise.all(projects.map((project) => globFiles(import_node_path41.default.resolve(root, project.root), patterns)));
+  const files = await Promise.all(projects.map((project) => globFiles(import_node_path42.default.resolve(root, project.root), patterns)));
   return [...new Set(files.flat())].sort((a, b) => a.localeCompare(b));
 }
 function sourcePath(root, source) {
-  return toPosixPath2(import_node_path41.default.isAbsolute(source) ? import_node_path41.default.relative(root, source) : source);
+  return toPosixPath2(import_node_path42.default.isAbsolute(source) ? import_node_path42.default.relative(root, source) : source);
 }
 function compareSnapshotBomRows(left, right) {
   return left.reference.localeCompare(right.reference) || (left.sourcePath ?? "").localeCompare(right.sourcePath ?? "");
@@ -97719,7 +93760,7 @@ async function outputFromFiles(root, kind, files) {
     kind,
     files: await Promise.all(
       files.map(async (file2) => ({
-        path: toPosixPath2(import_node_path41.default.relative(root, file2)),
+        path: toPosixPath2(import_node_path42.default.relative(root, file2)),
         digest: await hashFile(file2)
       }))
     )
@@ -97745,13 +93786,13 @@ async function outputFromRows(kind, rows) {
 }
 
 // src/rules/firmware-snapshot.ts
-var import_node_path42 = __toESM(require("node:path"), 1);
+var import_node_path43 = __toESM(require("node:path"), 1);
 async function captureFirmwareSnapshot(root) {
   const manifests = (await globFiles(root, ["**/idf_component.yml"])).sort(compareCodePoints);
   const dependencies = [];
   const warnings = [];
   for (const file2 of manifests) {
-    const manifestPath = toPosixPath2(import_node_path42.default.relative(root, file2));
+    const manifestPath = toPosixPath2(import_node_path43.default.relative(root, file2));
     const text = await readTextFile(file2).catch(() => void 0);
     if (text === void 0) continue;
     const manifest = parseIdfManifest(text, manifestPath);
@@ -97775,8 +93816,8 @@ async function captureFirmwareSnapshot(root) {
 }
 
 // src/core/baseline.ts
-var import_promises12 = __toESM(require("node:fs/promises"), 1);
-var import_node_path43 = __toESM(require("node:path"), 1);
+var import_promises13 = __toESM(require("node:fs/promises"), 1);
+var import_node_path44 = __toESM(require("node:path"), 1);
 var defaultBaselineFile = ".boardreadyops-baseline.json";
 function applyBaseline(findings, baseline, mode) {
   if (mode !== "new-only") {
@@ -97788,7 +93829,7 @@ function applyBaseline(findings, baseline, mode) {
   );
 }
 function resolveBaselinePath(root, baseline) {
-  return import_node_path43.default.resolve(root, baseline?.file ?? defaultBaselineFile);
+  return import_node_path44.default.resolve(root, baseline?.file ?? defaultBaselineFile);
 }
 async function readBaseline(file2) {
   if (!await pathExists(file2)) {
@@ -97796,7 +93837,7 @@ async function readBaseline(file2) {
   }
   let raw;
   try {
-    raw = JSON.parse(await import_promises12.default.readFile(file2, "utf8"));
+    raw = JSON.parse(await import_promises13.default.readFile(file2, "utf8"));
   } catch {
     throw new Error(`Invalid baseline file: ${file2}`);
   }
@@ -97885,10 +93926,10 @@ function defaultConcurrency() {
 }
 
 // src/core/discovery.ts
-var import_promises13 = __toESM(require("node:fs/promises"), 1);
-var import_node_path44 = __toESM(require("node:path"), 1);
+var import_promises14 = __toESM(require("node:fs/promises"), 1);
+var import_node_path45 = __toESM(require("node:path"), 1);
 async function discoverProjects(root, explicitProject) {
-  const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path44.default.resolve(file2));
+  const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path45.default.resolve(file2));
   const contexts = [];
   const projectFilesSorted = [...projectFiles].sort(compareCodePoints);
   for (const projectFile of projectFilesSorted) {
@@ -97897,25 +93938,25 @@ async function discoverProjects(root, explicitProject) {
   return contexts;
 }
 async function explicitProjectFiles(root, explicitProject) {
-  const target = import_node_path44.default.resolve(root, normalizePathInput(explicitProject));
+  const target = import_node_path45.default.resolve(root, normalizePathInput(explicitProject));
   try {
-    const stat3 = await import_promises13.default.stat(target);
+    const stat3 = await import_promises14.default.stat(target);
     if (stat3.isDirectory()) {
       const files = await globFiles(target, ["**/*.kicad_pro"]);
-      return files.map((file2) => import_node_path44.default.resolve(file2));
+      return files.map((file2) => import_node_path45.default.resolve(file2));
     }
   } catch {
   }
   return [target];
 }
 async function projectContext(root, projectFile) {
-  const projectRoot = import_node_path44.default.dirname(projectFile);
-  const base = import_node_path44.default.basename(projectFile, ".kicad_pro");
+  const projectRoot = import_node_path45.default.dirname(projectFile);
+  const base = import_node_path45.default.basename(projectFile, ".kicad_pro");
   const entries = await safeReadDir(projectRoot);
   const schematicFiles = entries.filter(
-    (file2) => file2.endsWith(".kicad_sch") && (import_node_path44.default.basename(file2, ".kicad_sch") === base || entries.length === 1)
-  ).map((file2) => import_node_path44.default.join(projectRoot, file2));
-  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path44.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path44.default.join(projectRoot, file2));
+    (file2) => file2.endsWith(".kicad_sch") && (import_node_path45.default.basename(file2, ".kicad_sch") === base || entries.length === 1)
+  ).map((file2) => import_node_path45.default.join(projectRoot, file2));
+  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path45.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path45.default.join(projectRoot, file2));
   const jobsetFiles = await discoverJobsets(projectRoot);
   return {
     projectFile: normalizeRelative(root, projectFile),
@@ -97928,7 +93969,7 @@ async function projectContext(root, projectFile) {
 async function discoverJobsets(projectRoot) {
   const discovered = await globFiles(projectRoot, ["**/*.kicad_jobset", "**/*.kicad_jobs"]);
   const scoped = [];
-  for (const file2 of discovered.map((entry) => import_node_path44.default.resolve(entry))) {
+  for (const file2 of discovered.map((entry) => import_node_path45.default.resolve(entry))) {
     if (!await isInsideNestedProject(projectRoot, file2)) {
       scoped.push(file2);
     }
@@ -97936,20 +93977,20 @@ async function discoverJobsets(projectRoot) {
   return [...new Set(scoped)].sort(compareCodePoints);
 }
 async function isInsideNestedProject(projectRoot, file2) {
-  const stop = import_node_path44.default.resolve(projectRoot);
-  let current = import_node_path44.default.dirname(import_node_path44.default.resolve(file2));
+  const stop = import_node_path45.default.resolve(projectRoot);
+  let current = import_node_path45.default.dirname(import_node_path45.default.resolve(file2));
   while (current !== stop) {
     const entries = await safeReadDir(current);
     if (entries.some((entry) => entry.endsWith(".kicad_pro"))) {
       return true;
     }
-    current = import_node_path44.default.dirname(current);
+    current = import_node_path45.default.dirname(current);
   }
   return false;
 }
 async function safeReadDir(dir) {
   try {
-    return await import_promises13.default.readdir(dir);
+    return await import_promises14.default.readdir(dir);
   } catch {
     return [];
   }
@@ -98050,9 +94091,9 @@ function requirementMatchesFinding(requirement, finding2) {
 }
 
 // src/core/plugin-loader.ts
-var import_promises14 = __toESM(require("node:fs/promises"), 1);
+var import_promises15 = __toESM(require("node:fs/promises"), 1);
 var import_node_module = require("node:module");
-var import_node_path45 = __toESM(require("node:path"), 1);
+var import_node_path46 = __toESM(require("node:path"), 1);
 var import_node_url = require("node:url");
 
 // src/core/errors.ts
@@ -98255,21 +94296,21 @@ async function loadPlugins(root, config2) {
   return { specifiers, plugins, errors };
 }
 async function discoverPackagePlugins(root) {
-  const scoped = await readDirectory(import_node_path45.default.join(root, "node_modules", "@boardreadyops"));
+  const scoped = await readDirectory(import_node_path46.default.join(root, "node_modules", "@boardreadyops"));
   const scopedPlugins = scoped.filter(
     (entry) => entry.isDirectory() && entry.name.startsWith(scopedPluginPrefix) && entry.name !== sdkPackageName
   ).map((entry) => `@boardreadyops/${entry.name}`).sort((a, b) => a.localeCompare(b));
-  const unscoped = await readDirectory(import_node_path45.default.join(root, "node_modules"));
+  const unscoped = await readDirectory(import_node_path46.default.join(root, "node_modules"));
   const unscopedPlugins = unscoped.filter((entry) => entry.isDirectory() && entry.name.startsWith(unscopedPluginPrefix)).map((entry) => entry.name).sort((a, b) => a.localeCompare(b));
   return [...scopedPlugins, ...unscopedPlugins];
 }
 async function discoverLocalPlugins(root) {
-  const localRules = await readDirectory(import_node_path45.default.join(root, "local-rules"));
+  const localRules = await readDirectory(import_node_path46.default.join(root, "local-rules"));
   return localRules.filter((entry) => entry.isFile() && entry.name.endsWith(".js")).map((entry) => `./local-rules/${entry.name}`).sort((a, b) => a.localeCompare(b));
 }
 async function readDirectory(directory) {
   try {
-    return await import_promises14.default.readdir(directory, { withFileTypes: true });
+    return await import_promises15.default.readdir(directory, { withFileTypes: true });
   } catch (error52) {
     if (isMissingPath(error52)) {
       return [];
@@ -98282,9 +94323,9 @@ function resolvePluginEntrypoint(root, specifier) {
     return specifier;
   }
   if (isPathSpecifier(specifier)) {
-    return (0, import_node_url.pathToFileURL)(import_node_path45.default.resolve(root, specifier)).href;
+    return (0, import_node_url.pathToFileURL)(import_node_path46.default.resolve(root, specifier)).href;
   }
-  const requireFromRoot = (0, import_node_module.createRequire)(import_node_path45.default.join(root, "boardreadyops-plugin-loader.cjs"));
+  const requireFromRoot = (0, import_node_module.createRequire)(import_node_path46.default.join(root, "boardreadyops-plugin-loader.cjs"));
   return (0, import_node_url.pathToFileURL)(requireFromRoot.resolve(specifier)).href;
 }
 function validatePlugin(module2, specifier) {
@@ -98386,13 +94427,13 @@ async function readStaticPluginManifest(root, specifier) {
   try {
     let manifestPath;
     if (isPathSpecifier(specifier)) {
-      const resolved = import_node_path45.default.resolve(root, specifier);
-      const isDir = await import_promises14.default.stat(resolved).then((s) => s.isDirectory()).catch(() => false);
-      manifestPath = isDir ? import_node_path45.default.join(resolved, "package.json") : import_node_path45.default.join(import_node_path45.default.dirname(resolved), "package.json");
+      const resolved = import_node_path46.default.resolve(root, specifier);
+      const isDir = await import_promises15.default.stat(resolved).then((s) => s.isDirectory()).catch(() => false);
+      manifestPath = isDir ? import_node_path46.default.join(resolved, "package.json") : import_node_path46.default.join(import_node_path46.default.dirname(resolved), "package.json");
     } else {
-      manifestPath = import_node_path45.default.join(root, "node_modules", specifier, "package.json");
+      manifestPath = import_node_path46.default.join(root, "node_modules", specifier, "package.json");
     }
-    const content = await import_promises14.default.readFile(manifestPath, "utf8");
+    const content = await import_promises15.default.readFile(manifestPath, "utf8");
     const parsed = JSON.parse(content);
     const boardreadyops = parsed.boardreadyops && typeof parsed.boardreadyops === "object" ? parsed.boardreadyops : parsed;
     const permissions = Array.isArray(boardreadyops.permissions) ? boardreadyops.permissions.filter(isPluginPermission) : void 0;
@@ -98419,7 +94460,7 @@ function appendUnique(specifiers, seen, specifier) {
   }
 }
 function isPathSpecifier(specifier) {
-  return specifier.startsWith(".") || specifier.startsWith("/") || import_node_path45.default.isAbsolute(specifier);
+  return specifier.startsWith(".") || specifier.startsWith("/") || import_node_path46.default.isAbsolute(specifier);
 }
 function isMissingPath(error52) {
   return typeof error52 === "object" && error52 !== null && "code" in error52 && error52.code === "ENOENT";
@@ -98785,7 +94826,7 @@ async function runPipeline(input = {}, logger7) {
 }
 async function initializePipelineContext(input, logger7) {
   const cwd = input.cwd ?? process.cwd();
-  const root = await canonicalRoot(import_node_path46.default.resolve(cwd, normalizePathInput(input.path ?? ".")));
+  const root = await canonicalRoot(import_node_path47.default.resolve(cwd, normalizePathInput(input.path ?? ".")));
   const loaded = await loadConfig(root, input.config);
   const loadedConfig = { ...defaultConfig(), ...loaded.config };
   const gate = input.gate ? loadedConfig.gates?.[input.gate] : void 0;
@@ -98987,7 +95028,7 @@ async function bomWithinProject(root, project) {
   ]);
   const first = found[0];
   if (!first) return void 0;
-  const relative = import_node_path46.default.relative(root, first).split(import_node_path46.default.sep).join("/");
+  const relative = import_node_path47.default.relative(root, first).split(import_node_path47.default.sep).join("/");
   return relative.startsWith("..") ? void 0 : relative;
 }
 async function resolveProjectBoms(ctx, projects) {
@@ -99109,7 +95150,7 @@ async function controlledFindings(root, config2, options, findings) {
 }
 async function canonicalRoot(input) {
   try {
-    return await import_promises15.default.realpath(input);
+    return await import_promises16.default.realpath(input);
   } catch {
     return input;
   }
@@ -99196,8 +95237,8 @@ function ruleObjectConfig(ruleConfig2) {
 var emptyObj = Object.freeze({});
 function configForProject(root, config2, project) {
   const override = config2.projects?.find((candidate) => {
-    const target = import_node_path46.default.resolve(root, normalizePathInput(candidate.path));
-    return target === import_node_path46.default.resolve(root, project.root) || target === import_node_path46.default.resolve(root, project.projectFile);
+    const target = import_node_path47.default.resolve(root, normalizePathInput(candidate.path));
+    return target === import_node_path47.default.resolve(root, project.root) || target === import_node_path47.default.resolve(root, project.projectFile);
   });
   if (!override) {
     return {
@@ -99279,7 +95320,7 @@ function configFindings(root, loaded, criticalErrors = /* @__PURE__ */ new Set()
       severity: criticalErrors.has(error52) ? "critical" : "high",
       message: `Configuration is invalid: ${error52}`,
       resource: {
-        path: loaded.path ? import_node_path46.default.relative(root, loaded.path).replaceAll("\\", "/") : "boardreadyops.yml",
+        path: loaded.path ? import_node_path47.default.relative(root, loaded.path).replaceAll("\\", "/") : "boardreadyops.yml",
         kind: "manifest"
       },
       location: { line: 1, column: 1 },
@@ -101774,8 +97815,8 @@ var Context2 = class {
       if ((0, import_fs21.existsSync)(process.env.GITHUB_EVENT_PATH)) {
         this.payload = JSON.parse((0, import_fs21.readFileSync)(process.env.GITHUB_EVENT_PATH, { encoding: "utf8" }));
       } else {
-        const path53 = process.env.GITHUB_EVENT_PATH;
-        process.stdout.write(`GITHUB_EVENT_PATH ${path53} does not exist${import_os3.EOL}`);
+        const path54 = process.env.GITHUB_EVENT_PATH;
+        process.stdout.write(`GITHUB_EVENT_PATH ${path54} does not exist${import_os3.EOL}`);
       }
     }
     this.eventName = process.env.GITHUB_EVENT_NAME;
@@ -105827,9 +101868,9 @@ function bomRiskSection(risk) {
 }
 
 // src/action/previous-result.ts
-var import_promises19 = __toESM(require("node:fs/promises"), 1);
+var import_promises20 = __toESM(require("node:fs/promises"), 1);
 var import_node_os5 = __toESM(require("node:os"), 1);
-var import_node_path47 = __toESM(require("node:path"), 1);
+var import_node_path48 = __toESM(require("node:path"), 1);
 
 // node_modules/@actions/artifact/lib/internal/shared/config.js
 var import_os4 = __toESM(require("os"), 1);
@@ -105908,8 +101949,8 @@ function getMaxArtifactListCount() {
 }
 
 // node_modules/@actions/artifact/lib/internal/upload/upload-artifact.js
-var fs22 = __toESM(require("fs"), 1);
-var path47 = __toESM(require("path"), 1);
+var fs23 = __toESM(require("fs"), 1);
+var path48 = __toESM(require("path"), 1);
 
 // node_modules/@actions/artifact/lib/generated/google/protobuf/timestamp.js
 var import_runtime = __toESM(require_commonjs(), 1);
@@ -107587,13 +103628,13 @@ These characters are not allowed in the artifact name due to limitations with ce
   }
   info(`Artifact name is valid!`);
 }
-function validateFilePath(path53) {
-  if (!path53) {
+function validateFilePath(path54) {
+  if (!path54) {
     throw new Error(`Provided file path input during validation is empty`);
   }
   for (const [invalidCharacterKey, errorMessageForCharacter] of invalidArtifactFilePathCharacters) {
-    if (path53.includes(invalidCharacterKey)) {
-      throw new Error(`The path for one of the files in artifact is not valid: ${path53}. Contains the following character: ${errorMessageForCharacter}
+    if (path54.includes(invalidCharacterKey)) {
+      throw new Error(`The path for one of the files in artifact is not valid: ${path54}. Contains the following character: ${errorMessageForCharacter}
 
 Invalid characters include: ${Array.from(invalidArtifactFilePathCharacters.values()).toString()}
 
@@ -107947,13 +103988,13 @@ function internalArtifactTwirpClient(options) {
 }
 
 // node_modules/@actions/artifact/lib/internal/upload/upload-zip-specification.js
-var fs19 = __toESM(require("fs"), 1);
+var fs20 = __toESM(require("fs"), 1);
 var import_path13 = require("path");
 function validateRootDirectory(rootDirectory) {
-  if (!fs19.existsSync(rootDirectory)) {
+  if (!fs20.existsSync(rootDirectory)) {
     throw new Error(`The provided rootDirectory ${rootDirectory} does not exist`);
   }
-  if (!fs19.statSync(rootDirectory).isDirectory()) {
+  if (!fs20.statSync(rootDirectory).isDirectory()) {
     throw new Error(`The provided rootDirectory ${rootDirectory} is not a valid directory`);
   }
   info(`Root directory input is valid!`);
@@ -107963,7 +104004,7 @@ function getUploadZipSpecification(filesToZip, rootDirectory) {
   rootDirectory = (0, import_path13.normalize)(rootDirectory);
   rootDirectory = (0, import_path13.resolve)(rootDirectory);
   for (let file2 of filesToZip) {
-    const stats = fs19.lstatSync(file2, { throwIfNoEntry: false });
+    const stats = fs20.lstatSync(file2, { throwIfNoEntry: false });
     if (!stats) {
       throw new Error(`File ${file2} does not exist`);
     }
@@ -112001,15 +108042,15 @@ function getRequestUrl(baseUri, operationSpec, operationArguments, fallbackObjec
   let isAbsolutePath = false;
   let requestUrl = replaceAll(baseUri, urlReplacements);
   if (operationSpec.path) {
-    let path53 = replaceAll(operationSpec.path, urlReplacements);
-    if (operationSpec.path === "/{nextLink}" && path53.startsWith("/")) {
-      path53 = path53.substring(1);
+    let path54 = replaceAll(operationSpec.path, urlReplacements);
+    if (operationSpec.path === "/{nextLink}" && path54.startsWith("/")) {
+      path54 = path54.substring(1);
     }
-    if (isAbsoluteUrl(path53)) {
-      requestUrl = path53;
+    if (isAbsoluteUrl(path54)) {
+      requestUrl = path54;
       isAbsolutePath = true;
     } else {
-      requestUrl = appendPath(requestUrl, path53);
+      requestUrl = appendPath(requestUrl, path54);
     }
   }
   const { queryParams, sequenceParams } = calculateQueryParameters(operationSpec, operationArguments, fallbackObject);
@@ -112055,9 +108096,9 @@ function appendPath(url3, pathToAppend) {
   }
   const searchStart = pathToAppend.indexOf("?");
   if (searchStart !== -1) {
-    const path53 = pathToAppend.substring(0, searchStart);
+    const path54 = pathToAppend.substring(0, searchStart);
     const search = pathToAppend.substring(searchStart + 1);
-    newPath = newPath + path53;
+    newPath = newPath + path54;
     if (search) {
       parsedUrl.search = parsedUrl.search ? `${parsedUrl.search}&${search}` : search;
     }
@@ -115533,16 +111574,16 @@ var MatcherView = class {
    * @returns {string|undefined}
    */
   getCurrentTag() {
-    const path53 = this._matcher.path;
-    return path53.length > 0 ? path53[path53.length - 1].tag : void 0;
+    const path54 = this._matcher.path;
+    return path54.length > 0 ? path54[path54.length - 1].tag : void 0;
   }
   /**
    * Get current namespace.
    * @returns {string|undefined}
    */
   getCurrentNamespace() {
-    const path53 = this._matcher.path;
-    return path53.length > 0 ? path53[path53.length - 1].namespace : void 0;
+    const path54 = this._matcher.path;
+    return path54.length > 0 ? path54[path54.length - 1].namespace : void 0;
   }
   /**
    * Get current node's attribute value.
@@ -115550,9 +111591,9 @@ var MatcherView = class {
    * @returns {*}
    */
   getAttrValue(attrName) {
-    const path53 = this._matcher.path;
-    if (path53.length === 0) return void 0;
-    return path53[path53.length - 1].values?.[attrName];
+    const path54 = this._matcher.path;
+    if (path54.length === 0) return void 0;
+    return path54[path54.length - 1].values?.[attrName];
   }
   /**
    * Check if current node has an attribute.
@@ -115560,9 +111601,9 @@ var MatcherView = class {
    * @returns {boolean}
    */
   hasAttr(attrName) {
-    const path53 = this._matcher.path;
-    if (path53.length === 0) return false;
-    const current = path53[path53.length - 1];
+    const path54 = this._matcher.path;
+    if (path54.length === 0) return false;
+    const current = path54[path54.length - 1];
     return current.values !== void 0 && attrName in current.values;
   }
   /**
@@ -115570,18 +111611,18 @@ var MatcherView = class {
    * @returns {number}
    */
   getPosition() {
-    const path53 = this._matcher.path;
-    if (path53.length === 0) return -1;
-    return path53[path53.length - 1].position ?? 0;
+    const path54 = this._matcher.path;
+    if (path54.length === 0) return -1;
+    return path54[path54.length - 1].position ?? 0;
   }
   /**
    * Get current node's repeat counter (occurrence count of this tag name).
    * @returns {number}
    */
   getCounter() {
-    const path53 = this._matcher.path;
-    if (path53.length === 0) return -1;
-    return path53[path53.length - 1].counter ?? 0;
+    const path54 = this._matcher.path;
+    if (path54.length === 0) return -1;
+    return path54[path54.length - 1].counter ?? 0;
   }
   /**
    * Get current node's sibling index (alias for getPosition).
@@ -118657,9 +114698,9 @@ var StorageSharedKeyCredentialPolicy = class extends CredentialPolicy {
    * @param request -
    */
   getCanonicalizedResourceString(request2) {
-    const path53 = getURLPath(request2.url) || "/";
+    const path54 = getURLPath(request2.url) || "/";
     let canonicalizedResourceString = "";
-    canonicalizedResourceString += `/${this.factory.accountName}${path53}`;
+    canonicalizedResourceString += `/${this.factory.accountName}${path54}`;
     const queries = getURLQueries(request2.url);
     const lowercaseQueries = {};
     if (queries) {
@@ -119149,9 +115190,9 @@ function storageSharedKeyCredentialPolicy(options) {
     return canonicalizedHeadersStringToSign;
   }
   function getCanonicalizedResourceString(request2) {
-    const path53 = getURLPath(request2.url) || "/";
+    const path54 = getURLPath(request2.url) || "/";
     let canonicalizedResourceString = "";
-    canonicalizedResourceString += `/${options.accountName}${path53}`;
+    canonicalizedResourceString += `/${options.accountName}${path54}`;
     const queries = getURLQueries(request2.url);
     const lowercaseQueries = {};
     if (queries) {
@@ -133092,10 +129133,10 @@ var StorageContextClient = class extends StorageClient {
 // node_modules/@azure/storage-blob/dist/esm/utils/utils.common.js
 function escapeURLPath(url3) {
   const urlParsed = new URL(url3);
-  let path53 = urlParsed.pathname;
-  path53 = path53 || "/";
-  path53 = escape2(path53);
-  urlParsed.pathname = path53;
+  let path54 = urlParsed.pathname;
+  path54 = path54 || "/";
+  path54 = escape2(path54);
+  urlParsed.pathname = path54;
   return urlParsed.toString();
 }
 function getProxyUriFromDevConnString(connectionString) {
@@ -133180,9 +129221,9 @@ function escape2(text) {
 }
 function appendToURLPath(url3, name) {
   const urlParsed = new URL(url3);
-  let path53 = urlParsed.pathname;
-  path53 = path53 ? path53.endsWith("/") ? `${path53}${name}` : `${path53}/${name}` : name;
-  urlParsed.pathname = path53;
+  let path54 = urlParsed.pathname;
+  path54 = path54 ? path54.endsWith("/") ? `${path54}${name}` : `${path54}/${name}` : name;
+  urlParsed.pathname = path54;
   return urlParsed.toString();
 }
 function setURLParameter2(url3, name, value) {
@@ -139836,13 +135877,13 @@ function uploadToBlobStorage(authenticatedUploadURL, uploadStream, contentType2)
 }
 
 // node_modules/@actions/artifact/lib/internal/upload/zip.js
-var import_promises17 = require("fs/promises");
+var import_promises18 = require("fs/promises");
 var import_archiver = __toESM(require_archiver(), 1);
 
 // node_modules/@actions/artifact/lib/internal/upload/stream.js
 var stream2 = __toESM(require("stream"), 1);
-var fs21 = __toESM(require("fs"), 1);
-var import_promises16 = require("fs/promises");
+var fs22 = __toESM(require("fs"), 1);
+var import_promises17 = require("fs/promises");
 var __awaiter7 = function(thisArg, _arguments, P, generator) {
   function adopt(value) {
     return value instanceof P ? value : new P(function(resolve2) {
@@ -139887,11 +135928,11 @@ function createRawFileUploadStream(filePath) {
     const bufferSize = getUploadChunkSize();
     const uploadStream = new WaterMarkedUploadStream(bufferSize);
     let sourcePath2 = filePath;
-    const stats = yield fs21.promises.lstat(filePath);
+    const stats = yield fs22.promises.lstat(filePath);
     if (stats.isSymbolicLink()) {
-      sourcePath2 = yield (0, import_promises16.realpath)(filePath);
+      sourcePath2 = yield (0, import_promises17.realpath)(filePath);
     }
-    const fileStream = fs21.createReadStream(sourcePath2, {
+    const fileStream = fs22.createReadStream(sourcePath2, {
       highWaterMark: bufferSize
     });
     fileStream.on("error", (error52) => {
@@ -139948,7 +135989,7 @@ function createZipUploadStream(uploadSpecification_1) {
       if (file2.sourcePath !== null) {
         let sourcePath2 = file2.sourcePath;
         if (file2.stats.isSymbolicLink()) {
-          sourcePath2 = yield (0, import_promises17.realpath)(file2.sourcePath);
+          sourcePath2 = yield (0, import_promises18.realpath)(file2.sourcePath);
         }
         zip.file(sourcePath2, {
           name: file2.destinationPath
@@ -139988,7 +136029,7 @@ var zipEndCallback = () => {
 };
 
 // node_modules/@actions/artifact/lib/internal/upload/types.js
-var path46 = __toESM(require("path"), 1);
+var path47 = __toESM(require("path"), 1);
 var mimeTypes = {
   // Text
   ".txt": "text/plain",
@@ -140049,7 +136090,7 @@ var mimeTypes = {
   ".eot": "application/vnd.ms-fontobject"
 };
 function getMimeType(filePath) {
-  const ext = path46.extname(filePath).toLowerCase();
+  const ext = path47.extname(filePath).toLowerCase();
   return mimeTypes[ext] || "application/octet-stream";
 }
 
@@ -140091,10 +136132,10 @@ function uploadArtifact(name, files, rootDirectory, options) {
       if (files.length > 1) {
         throw new Error("skipArchive option is only supported when uploading a single file");
       }
-      if (!fs22.existsSync(files[0])) {
+      if (!fs23.existsSync(files[0])) {
         throw new FilesNotFoundError(files);
       }
-      artifactFileName = path47.basename(files[0]);
+      artifactFileName = path48.basename(files[0]);
       name = artifactFileName;
     }
     validateArtifactName(name);
@@ -140159,11 +136200,11 @@ function uploadArtifact(name, files, rootDirectory, options) {
 }
 
 // node_modules/@actions/artifact/lib/internal/download/download-artifact.js
-var import_promises18 = __toESM(require("fs/promises"), 1);
+var import_promises19 = __toESM(require("fs/promises"), 1);
 var fsSync = __toESM(require("fs"), 1);
 var crypto7 = __toESM(require("crypto"), 1);
 var stream3 = __toESM(require("stream"), 1);
-var path48 = __toESM(require("path"), 1);
+var path49 = __toESM(require("path"), 1);
 var import_unzip_stream = __toESM(require_unzip(), 1);
 var __awaiter10 = function(thisArg, _arguments, P, generator) {
   function adopt(value) {
@@ -140197,10 +136238,10 @@ var scrubQueryParameters = (url3) => {
   parsed.search = "";
   return parsed.toString();
 };
-function exists2(path53) {
+function exists2(path54) {
   return __awaiter10(this, void 0, void 0, function* () {
     try {
-      yield import_promises18.default.access(path53);
+      yield import_promises19.default.access(path54);
       return true;
     } catch (error52) {
       if (error52.code === "ENOENT") {
@@ -140245,7 +136286,7 @@ function streamExtractExternal(url_1, directory_1) {
     const filenamePlain = contentDisposition.match(/(?<!\*)filename\s*=\s*['"]?([^;\r\n"']*)['"]?/i);
     const rawName = (filenameStar === null || filenameStar === void 0 ? void 0 : filenameStar[1]) || (filenamePlain === null || filenamePlain === void 0 ? void 0 : filenamePlain[1]);
     if (rawName) {
-      fileName = path48.basename(decodeURIComponent(rawName.trim()));
+      fileName = path49.basename(decodeURIComponent(rawName.trim()));
     }
     debug(`Content-Type: ${contentType2}, mimeType: ${mimeType}, urlEndsWithZip: ${urlEndsWithZip}, isZip: ${isZip}, skipDecompress: ${skipDecompress}`);
     debug(`Content-Disposition: ${contentDisposition}, fileName: ${fileName}`);
@@ -140280,7 +136321,7 @@ function streamExtractExternal(url_1, directory_1) {
       if (isZip && !skipDecompress) {
         passThrough.pipe(import_unzip_stream.default.Extract({ path: directory })).on("close", onClose).on("error", onError);
       } else {
-        const filePath = path48.join(directory, fileName);
+        const filePath = path49.join(directory, fileName);
         const writeStream = fsSync.createWriteStream(filePath);
         info(`Downloading raw file (non-zip) to: ${filePath}`);
         passThrough.pipe(writeStream).on("close", onClose).on("error", onError);
@@ -140375,7 +136416,7 @@ function resolveOrCreateDirectory() {
   return __awaiter10(this, arguments, void 0, function* (downloadPath = getGitHubWorkspaceDir()) {
     if (!(yield exists2(downloadPath))) {
       debug(`Artifact destination folder does not exist, creating: ${downloadPath}`);
-      yield import_promises18.default.mkdir(downloadPath, { recursive: true });
+      yield import_promises19.default.mkdir(downloadPath, { recursive: true });
     } else {
       debug(`Artifact destination folder already exists: ${downloadPath}`);
     }
@@ -140411,17 +136452,17 @@ function requestLog(octokit) {
     octokit.log.debug("request", options);
     const start = Date.now();
     const requestOptions = octokit.request.endpoint.parse(options);
-    const path53 = requestOptions.url.replace(options.baseUrl, "");
+    const path54 = requestOptions.url.replace(options.baseUrl, "");
     return request2(options).then((response) => {
       const requestId2 = response.headers["x-github-request-id"];
       octokit.log.info(
-        `${requestOptions.method} ${path53} - ${response.status} with id ${requestId2} in ${Date.now() - start}ms`
+        `${requestOptions.method} ${path54} - ${response.status} with id ${requestId2} in ${Date.now() - start}ms`
       );
       return response;
     }).catch((error52) => {
       const requestId2 = error52.response?.headers["x-github-request-id"] || "UNKNOWN";
       octokit.log.error(
-        `${requestOptions.method} ${path53} - ${error52.status} with id ${requestId2} in ${Date.now() - start}ms`
+        `${requestOptions.method} ${path54} - ${error52.status} with id ${requestId2} in ${Date.now() - start}ms`
       );
       throw error52;
     });
@@ -141022,7 +137063,7 @@ async function loadExactBaseRunResult(input) {
     );
     if (!artifact) continue;
     sawNamedArtifact = true;
-    const directory = await import_promises19.default.mkdtemp(import_node_path47.default.join(import_node_os5.default.tmpdir(), "boardreadyops-exact-base-"));
+    const directory = await import_promises20.default.mkdtemp(import_node_path48.default.join(import_node_os5.default.tmpdir(), "boardreadyops-exact-base-"));
     try {
       const downloaded = await client2.downloadArtifact(artifact.id, { path: directory, findBy });
       const parsed = await findComparisonRunResultArtifact(downloaded.downloadPath ?? directory);
@@ -141031,7 +137072,7 @@ async function loadExactBaseRunResult(input) {
       }
       if (parsed.status === "unsupported") sawUnsupportedResult = true;
     } finally {
-      await import_promises19.default.rm(directory, { recursive: true, force: true }).catch(() => void 0);
+      await import_promises20.default.rm(directory, { recursive: true, force: true }).catch(() => void 0);
     }
   }
   if (!sawNamedArtifact) return { status: "unavailable", baseSha: input.baseSha, reason: "not-found" };
@@ -141054,7 +137095,7 @@ async function loadPreviousRunResult(token, owner, repo, artifactName2, pull) {
       if (!artifact) {
         continue;
       }
-      const directory = await import_promises19.default.mkdtemp(import_node_path47.default.join(import_node_os5.default.tmpdir(), "boardreadyops-previous-"));
+      const directory = await import_promises20.default.mkdtemp(import_node_path48.default.join(import_node_os5.default.tmpdir(), "boardreadyops-previous-"));
       try {
         const downloaded = await client2.downloadArtifact(artifact.id, { path: directory, findBy }).catch(() => void 0);
         const previous = await findRunResultArtifact(downloaded?.downloadPath ?? directory);
@@ -141062,7 +137103,7 @@ async function loadPreviousRunResult(token, owner, repo, artifactName2, pull) {
           return previous;
         }
       } finally {
-        await import_promises19.default.rm(directory, { recursive: true, force: true }).catch(() => void 0);
+        await import_promises20.default.rm(directory, { recursive: true, force: true }).catch(() => void 0);
       }
     }
   }
@@ -141071,7 +137112,7 @@ async function loadPreviousRunResult(token, owner, repo, artifactName2, pull) {
 async function findRunResultArtifact(root) {
   for (const file2 of await artifactFiles(root)) {
     try {
-      const payload = JSON.parse(await import_promises19.default.readFile(file2, "utf8"));
+      const payload = JSON.parse(await import_promises20.default.readFile(file2, "utf8"));
       if (isPreviousRunResult(payload)) {
         return payload;
       }
@@ -141089,7 +137130,7 @@ async function findComparisonRunResultArtifact(root) {
   for (const file2 of await artifactFiles(root)) {
     let payload;
     try {
-      payload = JSON.parse(await import_promises19.default.readFile(file2, "utf8"));
+      payload = JSON.parse(await import_promises20.default.readFile(file2, "utf8"));
     } catch {
       continue;
     }
@@ -141155,8 +137196,8 @@ function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function artifactFiles(root) {
-  const entries = await import_promises19.default.readdir(root, { recursive: true, withFileTypes: true }).catch(() => []);
-  return entries.filter((entry) => entry.isFile()).map((entry) => import_node_path47.default.join(entry.parentPath, entry.name)).sort(compareText);
+  const entries = await import_promises20.default.readdir(root, { recursive: true, withFileTypes: true }).catch(() => []);
+  return entries.filter((entry) => entry.isFile()).map((entry) => import_node_path48.default.join(entry.parentPath, entry.name)).sort(compareText);
 }
 function compareText(left, right) {
   if (left < right) return -1;
@@ -141225,8 +137266,8 @@ function reviewReports(artifactName2) {
 }
 
 // src/action/hardware-impact.ts
-var import_promises20 = require("node:fs/promises");
-var import_node_path48 = __toESM(require("node:path"), 1);
+var import_promises21 = require("node:fs/promises");
+var import_node_path49 = __toESM(require("node:path"), 1);
 
 // src/core/diff/run.ts
 function diffRuns(previous, current, options = {}) {
@@ -141565,7 +137606,7 @@ async function hostedPullRequestBinding(token, owner, repo) {
 }
 async function checkoutSha(workspace) {
   const gitDirectory = await resolveGitDirectory(workspace);
-  const head = (await (0, import_promises20.readFile)(import_node_path48.default.join(gitDirectory, "HEAD"), "utf8")).trim();
+  const head = (await (0, import_promises21.readFile)(import_node_path49.default.join(gitDirectory, "HEAD"), "utf8")).trim();
   if (fullLowercaseSha2.test(head)) return head;
   const match = /^ref: (refs\/[^\r\n]+)$/u.exec(head);
   const ref = match?.[1];
@@ -141573,9 +137614,9 @@ async function checkoutSha(workspace) {
     throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
   }
   const commonDirectory = await resolveCommonGitDirectory(gitDirectory);
-  const looseSha = await readOptionalText(import_node_path48.default.join(commonDirectory, ...ref.split("/")));
+  const looseSha = await readOptionalText(import_node_path49.default.join(commonDirectory, ...ref.split("/")));
   if (looseSha && fullLowercaseSha2.test(looseSha.trim())) return looseSha.trim();
-  const packedRefs = await readOptionalText(import_node_path48.default.join(commonDirectory, "packed-refs"));
+  const packedRefs = await readOptionalText(import_node_path49.default.join(commonDirectory, "packed-refs"));
   const packedSha = packedRefs ? packedRefSha(packedRefs, ref) : void 0;
   if (packedSha) return packedSha;
   throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
@@ -141591,22 +137632,22 @@ function packedRefSha(packedRefs, ref) {
   return void 0;
 }
 async function resolveGitDirectory(workspace) {
-  const dotGit = import_node_path48.default.join(workspace, ".git");
-  const metadata2 = await (0, import_promises20.stat)(dotGit);
+  const dotGit = import_node_path49.default.join(workspace, ".git");
+  const metadata2 = await (0, import_promises21.stat)(dotGit);
   if (metadata2.isDirectory()) return dotGit;
   if (!metadata2.isFile()) throw new Error("workspace .git metadata is unavailable");
-  const marker2 = (await (0, import_promises20.readFile)(dotGit, "utf8")).trim();
+  const marker2 = (await (0, import_promises21.readFile)(dotGit, "utf8")).trim();
   const match = /^gitdir: (.+)$/u.exec(marker2);
   if (!match?.[1]) throw new Error("workspace .git metadata is invalid");
-  return import_node_path48.default.resolve(import_node_path48.default.dirname(dotGit), match[1]);
+  return import_node_path49.default.resolve(import_node_path49.default.dirname(dotGit), match[1]);
 }
 async function resolveCommonGitDirectory(gitDirectory) {
-  const commonMarker = await readOptionalText(import_node_path48.default.join(gitDirectory, "commondir"));
-  return commonMarker ? import_node_path48.default.resolve(gitDirectory, commonMarker.trim()) : gitDirectory;
+  const commonMarker = await readOptionalText(import_node_path49.default.join(gitDirectory, "commondir"));
+  return commonMarker ? import_node_path49.default.resolve(gitDirectory, commonMarker.trim()) : gitDirectory;
 }
 async function readOptionalText(file2) {
   try {
-    return await (0, import_promises20.readFile)(file2, "utf8");
+    return await (0, import_promises21.readFile)(file2, "utf8");
   } catch (error52) {
     if (error52 instanceof Error && "code" in error52 && error52.code === "ENOENT") return void 0;
     throw error52;
@@ -141623,9 +137664,9 @@ function numericRunId(value) {
 }
 
 // src/action/inputs.ts
-var import_node_path49 = __toESM(require("node:path"), 1);
+var import_node_path50 = __toESM(require("node:path"), 1);
 function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? process.cwd()) {
-  const root = import_node_path49.default.resolve(workspace);
+  const root = import_node_path50.default.resolve(workspace);
   const gate = empty(getInput("gate"));
   return {
     cwd: root,
@@ -141764,7 +137805,7 @@ function optionalNonNegativeInteger(value, name) {
   return Number.parseInt(trimmed, 10);
 }
 function workspacePath(workspace, value) {
-  const resolved = import_node_path49.default.resolve(workspace, value);
+  const resolved = import_node_path50.default.resolve(workspace, value);
   if (!isInside(workspace, resolved)) {
     throw new Error(`Input path must stay inside GITHUB_WORKSPACE: ${value}`);
   }
@@ -141806,7 +137847,7 @@ function setActionOutputs(result, paths) {
 }
 
 // src/action/upload.ts
-var import_promises21 = __toESM(require("node:fs/promises"), 1);
+var import_promises22 = __toESM(require("node:fs/promises"), 1);
 var import_node_zlib2 = __toESM(require("node:zlib"), 1);
 async function uploadArtifacts(name, files, root) {
   if (files.length === 0 || process.env.GITHUB_ACTIONS !== "true") {
@@ -141832,7 +137873,7 @@ async function uploadSarif(sarifPath) {
     return;
   }
   const octokit = getOctokit(token);
-  const sarif = import_node_zlib2.default.gzipSync(await import_promises21.default.readFile(sarifPath)).toString("base64");
+  const sarif = import_node_zlib2.default.gzipSync(await import_promises22.default.readFile(sarifPath)).toString("base64");
   await octokit.request("POST /repos/{owner}/{repo}/code-scanning/sarifs", {
     owner,
     repo,
@@ -141941,8 +137982,8 @@ async function ensureRunnerFile(file2) {
   if (!file2) {
     return;
   }
-  await import_promises22.default.mkdir(import_node_path50.default.dirname(file2), { recursive: true });
-  await import_promises22.default.appendFile(file2, "", "utf8");
+  await import_promises23.default.mkdir(import_node_path51.default.dirname(file2), { recursive: true });
+  await import_promises23.default.appendFile(file2, "", "utf8");
 }
 function githubRunUrl() {
   const server = process.env.GITHUB_SERVER_URL;

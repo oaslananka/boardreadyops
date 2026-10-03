@@ -1,10 +1,11 @@
 import { createReadStream } from "node:fs";
-import { access, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
+import { firstAccessiblePath } from "./lib/files.mjs";
 import { runWithMkDocsWarningSuppressed } from "./lib/run-command.mjs";
 
 export const pa11yOptions = Object.freeze({
@@ -198,15 +199,7 @@ export function candidateChromeExecutables(env = process.env) {
 async function detectChromeExecutable(root) {
   const toolchainChrome = await readToolchainChromePath(root);
   const candidates = [toolchainChrome, ...candidateChromeExecutables()].filter(Boolean);
-  for (const candidate of candidates) {
-    try {
-      await access(candidate);
-      return candidate;
-    } catch {
-      // Continue to the next known browser path.
-    }
-  }
-  return undefined;
+  return firstAccessiblePath(candidates);
 }
 
 export async function readToolchainChromePath(root = process.cwd()) {

@@ -1,6 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { launch as launchChrome } from "chrome-launcher";
+import lighthouse from "lighthouse";
+import { firstAccessiblePath } from "./lib/files.mjs";
 import { discoverAuthenticatedRoutes } from "./unlighthouse-auth-routes.mjs";
 
 const defaultSite = "https://boardreadyops.com";
@@ -8,6 +11,13 @@ const outputRoot = ".unlighthouse/authenticated";
 const manifestPath = ".unlighthouse/authenticated-routes.json";
 const budgets = { performance: 70, accessibility: 90, "best-practices": 85 };
 const categories = ["performance", "accessibility", "best-practices"];
+const knownChromePaths = [
+  process.env.CHROME_PATH,
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+].filter(Boolean);
 
 function isLoopback(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
@@ -33,86 +43,30 @@ export function parseAuthenticatedAuditOptions(environment = process.env, argv =
   };
 }
 
-export function buildAuthenticatedUnlighthouseConfig({ site, session, routes, headful = false }) {
+export function buildAuthenticatedLighthouseFlags({ session, port, headful = false }) {
   return {
-    site,
-    urls: routes,
-    discovery: false,
-    outputPath: outputRoot,
-    cache: false,
-    cookies: [{ name: "brops_session", value: session, domain: new URL(site).hostname, path: "/" }],
-    scanner: {
-      device: "desktop",
-      samples: 1,
-      crawler: false,
-      robotsTxt: false,
-      sitemap: false,
-      dynamicSampling: false,
-      skipJavascript: false,
-    },
-    puppeteerClusterOptions: { maxConcurrency: 1 },
-    puppeteerOptions: { headless: !headful },
-    chrome: { useSystem: true, useDownloadFallback: false },
-    lighthouseOptions: {
-      disableStorageReset: true,
-      onlyCategories: categories,
-    },
-    ci: { budget: budgets, buildStatic: true },
+    port,
+    logLevel: "error",
+    output: "json",
+    onlyCategories: categories,
+    disableStorageReset: true,
+    formFactor: "desktop",
+    screenEmulation: { disabled: true },
+    extraHeaders: { Cookie: `brops_session=${session}` },
+    ...(headful ? { throttlingMethod: "provided" } : {}),
   };
 }
 
-function evaluateBudgetFailures(reports) {
+export function evaluateBudgetFailures(routeReports) {
   const failures = [];
-  for (const report of reports) {
-    const reportCategories = report.report?.categories ?? {};
-    for (const [category, details] of Object.entries(reportCategories)) {
-      const minimum = budgets[category];
-      if (minimum === undefined || typeof details?.score !== "number") continue;
-      const score = Math.round(details.score * 100);
-      if (score < minimum) failures.push({ path: report.route?.path ?? "unknown", category, score, minimum });
+  for (const report of routeReports) {
+    for (const [category, minimum] of Object.entries(budgets)) {
+      const score = report.scores?.[category];
+      if (typeof score !== "number") continue;
+      if (score < minimum) failures.push({ path: report.path, category, score, minimum });
     }
   }
   return failures;
-}
-
-function evaluateScanFailures(reports, expectedRoutes) {
-  const byPath = new Map(reports.map((report) => [report.route?.path, report]));
-  return expectedRoutes.flatMap((path) => {
-    const report = byPath.get(path);
-    const status = report?.tasks?.runLighthouseTask ?? "missing";
-    return status === "completed" ? [] : [{ path, status }];
-  });
-}
-
-const terminalTaskStatuses = new Set(["completed", "failed", "ignore"]);
-
-export async function closeWorkerCluster(cluster) {
-  if (cluster.display && typeof cluster.display.close !== "function") cluster.display = null;
-  await cluster.close();
-}
-
-export async function waitForWorkerCompletion(
-  worker,
-  expectedRoutes,
-  {
-    timeoutMs = 420_000,
-    pollMs = 250,
-    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-    now = () => Date.now(),
-  } = {},
-) {
-  const deadline = now() + timeoutMs;
-  while (true) {
-    const reports = worker.reports();
-    const byPath = new Map(reports.map((report) => [report.route?.path, report]));
-    const allTerminal = expectedRoutes.every((path) =>
-      terminalTaskStatuses.has(byPath.get(path)?.tasks?.runLighthouseTask),
-    );
-    const workerCompleted = worker.monitor?.().status ?? "completed";
-    if (allTerminal && workerCompleted === "completed") return reports;
-    if (now() >= deadline) throw new Error("Timed out waiting for authenticated Unlighthouse routes to finish");
-    await sleep(pollMs);
-  }
 }
 
 async function defaultWriteManifest(payload) {
@@ -120,44 +74,111 @@ async function defaultWriteManifest(payload) {
   await writeFile(resolve(manifestPath), payload, { encoding: "utf8", mode: 0o600 });
 }
 
+async function defaultWriteAuditSummary(summary) {
+  await mkdir(resolve(outputRoot), { recursive: true });
+  await writeFile(resolve(outputRoot, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+}
+
+export async function detectInstalledChrome(paths = knownChromePaths) {
+  return firstAccessiblePath(paths);
+}
+
+function scoreCategories(lhr) {
+  return Object.fromEntries(
+    categories.map((category) => {
+      const score = lhr?.categories?.[category]?.score;
+      return [category, typeof score === "number" ? Math.round(score * 100) : null];
+    }),
+  );
+}
+
 export async function runAuthenticatedAudit({
   environment = process.env,
   argv = process.argv.slice(2),
   discoverImpl = discoverAuthenticatedRoutes,
   writeManifestImpl = defaultWriteManifest,
-  coreImpl,
+  writeAuditSummaryImpl = defaultWriteAuditSummary,
+  lighthouseImpl = lighthouse,
+  launchChromeImpl = launchChrome,
+  detectChromeImpl = detectInstalledChrome,
 } = {}) {
   const options = parseAuthenticatedAuditOptions(environment, argv);
   const manifest = await discoverImpl({ site: options.site, session: options.session });
   const payload = `${JSON.stringify(manifest, null, 2)}\n`;
   await writeManifestImpl(payload);
 
-  if (options.routesOnly) return { exitCode: 0, manifest, budgetFailures: [] };
+  if (options.routesOnly) return { exitCode: 0, manifest, budgetFailures: [], scanFailures: [] };
 
-  const core = coreImpl ?? (await import("@unlighthouse/core"));
-  const config = buildAuthenticatedUnlighthouseConfig({ ...options, routes: manifest.routes });
-  const context = await core.createUnlighthouse(config, { name: "authenticated-ci" });
+  const chromePath = await detectChromeImpl();
+  if (!chromePath) throw new Error("Installed Chrome is required for authenticated Lighthouse audit");
+
+  const chrome = await launchChromeImpl({
+    chromePath,
+    chromeFlags: [
+      ...(options.headful ? [] : ["--headless=new"]),
+      "--no-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-background-networking",
+    ],
+  });
+
+  const reports = [];
+  const scanFailures = [];
   try {
-    await context.setCiContext();
-    const started = await context.start();
-    if (!started.routes?.length) throw new Error("Unlighthouse did not queue any authenticated routes");
-    const reports = await waitForWorkerCompletion(context.worker, manifest.routes);
-    await context.worker.cluster.idle?.();
+    for (const route of manifest.routes) {
+      const url = new URL(route, options.site).href;
+      let result;
+      try {
+        result = await lighthouseImpl(
+          url,
+          buildAuthenticatedLighthouseFlags({
+            session: options.session,
+            port: chrome.port,
+            headful: options.headful,
+          }),
+        );
+      } catch (error) {
+        scanFailures.push({
+          path: route,
+          status: error instanceof Error ? error.message : "lighthouse failed",
+        });
+        continue;
+      }
 
-    const budgetFailures = evaluateBudgetFailures(reports);
-    const scanFailures = evaluateScanFailures(reports, manifest.routes);
-    await core.generateClient({ static: true }, context);
-
-    return {
-      exitCode: budgetFailures.length === 0 && scanFailures.length === 0 ? 0 : 1,
-      manifest,
-      budgetFailures,
-      scanFailures,
-      reportPath: outputRoot,
-    };
+      if (!result?.lhr) {
+        scanFailures.push({ path: route, status: "missing Lighthouse result" });
+        continue;
+      }
+      reports.push({ path: route, scores: scoreCategories(result.lhr) });
+    }
   } finally {
-    await closeWorkerCluster(context.worker.cluster);
+    await chrome.kill();
   }
+
+  const budgetFailures = evaluateBudgetFailures(reports);
+  const summary = {
+    site: manifest.site,
+    generatedAt: manifest.generatedAt,
+    routes: reports,
+    scanFailures,
+    budgetFailures,
+  };
+  const serialized = JSON.stringify(summary);
+  if (serialized.includes(options.session)) {
+    throw new Error("Authenticated audit summary unexpectedly contains the session");
+  }
+  await writeAuditSummaryImpl(summary);
+
+  return {
+    exitCode: budgetFailures.length === 0 && scanFailures.length === 0 ? 0 : 1,
+    manifest,
+    budgetFailures,
+    scanFailures,
+    reportPath: outputRoot,
+  };
 }
 
 async function main() {
@@ -165,10 +186,9 @@ async function main() {
   process.stdout.write(`Authenticated UI audit routes: ${result.manifest.routes.length}\n`);
   if (result.reportPath) process.stdout.write(`Authenticated UI audit report: ${result.reportPath}\n`);
 
-  for (const failure of result.scanFailures ?? []) {
+  for (const failure of result.scanFailures) {
     process.stderr.write(`Scan failed: ${failure.path} (${failure.status})\n`);
   }
-
   for (const failure of result.budgetFailures) {
     process.stderr.write(`Budget failed: ${failure.path} ${failure.category} ${failure.score} < ${failure.minimum}\n`);
   }

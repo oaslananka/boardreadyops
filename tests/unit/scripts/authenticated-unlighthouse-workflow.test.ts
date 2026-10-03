@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const workflowPath = join(process.cwd(), ".github/workflows/authenticated-unlighthouse.yml");
 const sessionExpression = ["$", "{{ secrets.BROPS_UNLIGHTHOUSE_SESSION }}"].join("");
 
-describe("authenticated Unlighthouse workflow", () => {
+describe("authenticated Lighthouse workflow", () => {
   it("ships a dedicated manual workflow", () => {
     expect(existsSync(workflowPath)).toBe(true);
   });
@@ -23,6 +23,7 @@ describe("authenticated Unlighthouse workflow", () => {
     expect(workflow).toContain("contents: read");
     expect(workflow).toContain(`BROPS_SESSION: ${sessionExpression}`);
     expect(workflow).toContain("BROPS_UNLIGHTHOUSE_SITE: https://boardreadyops.com");
+    expect(workflow).toContain("name: authenticated-ui / lighthouse");
     expect(workflow).toContain("corepack pnpm run qa:unlighthouse:auth");
     expect(workflow).toContain(".unlighthouse/authenticated/");
     expect(workflow).toContain(".unlighthouse/authenticated-routes.json");

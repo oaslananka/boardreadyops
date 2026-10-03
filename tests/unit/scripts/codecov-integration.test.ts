@@ -1,8 +1,10 @@
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import { buildCloudCoverageArguments } from "../../../scripts/run-cloud-codecov-coverage.mjs";
-import { buildCodecovBundleOptions } from "../../../scripts/run-codecov-bundle-analysis.mjs";
+import { buildCodecovBundleOptions, collectBundleAssets } from "../../../scripts/run-codecov-bundle-analysis.mjs";
 import { buildCodecovCoverageArguments } from "../../../scripts/run-codecov-coverage.mjs";
 
 async function text(path: string): Promise<string> {
@@ -29,6 +31,21 @@ describe("Codecov integration", () => {
 
     expect(tokenless.coreOptions).not.toHaveProperty("uploadToken");
     expect(authenticated.coreOptions).toMatchObject({ uploadToken: "secret-token" });
+  });
+
+  it("collects production assets without source maps using the braces-free globber", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-codecov-bundle-"));
+    try {
+      await writeFile(path.join(root, "app.js"), "console.log('ok');\n", "utf8");
+      await writeFile(path.join(root, "app.js.map"), "{}\n", "utf8");
+      const assets = await collectBundleAssets([root], { ignorePatterns: ["*.map"] });
+
+      expect(assets.map((asset) => asset.name)).toEqual(["app.js"]);
+      expect(assets[0]).toMatchObject({ size: 19 });
+      expect(typeof assets[0]?.gzipSize).toBe("number");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("generates and uploads LCOV plus JUnit results from one coverage run", async () => {
@@ -74,10 +91,14 @@ describe("Codecov integration", () => {
     const bundleRunner = await text("scripts/run-codecov-bundle-analysis.mjs");
     const bundleConfig = JSON.parse(await text("codecov-bundle.json")) as Record<string, unknown>;
 
-    expect(packageJson.devDependencies?.["@codecov/bundle-analyzer"]).toBe("2.0.1");
+    expect(packageJson.devDependencies?.["@codecov/bundle-analyzer"]).toBeUndefined();
+    expect(packageJson.devDependencies?.["@codecov/bundler-plugin-core"]).toBe("2.0.1");
+    expect(packageJson.devDependencies?.tinyglobby).toBe("0.2.17");
     expect(packageJson.scripts?.["codecov:bundle"]).toBe("node scripts/run-codecov-bundle-analysis.mjs");
     expect(bundleRunner).toContain('"apps/web/.next/static"');
     expect(bundleRunner).toContain('bundleName: "boardreadyops-web"');
+    expect(bundleRunner).toContain('from "@codecov/bundler-plugin-core"');
+    expect(bundleRunner).toContain('from "tinyglobby"');
     expect(workflow).toContain("run: pnpm run codecov:bundle");
     expect(workflow).toContain("continue-on-error: true");
     expect(bundleConfig).toMatchObject({ gitService: "github", telemetry: false });
