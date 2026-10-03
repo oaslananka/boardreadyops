@@ -81,14 +81,11 @@ function NoMatchingReviews() {
 
 function NoReviews() {
   return (
-    <Panel id="publish-review" title="No Reviews">
+    <Panel title="No Reviews">
       <EmptyState title="No hardware reviews found">
         <p>
           Runs do not automatically appear here. Runs are execution history and evidence; a Review is created only by an
           explicit review publish step.
-        </p>
-        <p>
-          Publish from a configured Action path or CLI with <code>boardreadyops review publish</code>.
         </p>
         <p>
           <Link href="/runs" className="text-primary underline underline-offset-2">
@@ -96,6 +93,17 @@ function NoReviews() {
           </Link>
         </p>
       </EmptyState>
+    </Panel>
+  );
+}
+
+function ReviewPublishingGuidance() {
+  return (
+    <Panel id="publish-review" title="Publish a Review" tone="section">
+      <p className="text-sm text-muted-foreground">
+        Runs are execution history and evidence; Reviews are explicit decision records. Publish review evidence from a
+        configured Action path or CLI with <code>boardreadyops review publish</code>.
+      </p>
     </Panel>
   );
 }
@@ -121,6 +129,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
               <p>Sign in with GitHub so BoardReadyOps knows which repositories you can see.</p>
             </EmptyState>
           </Panel>
+          <ReviewPublishingGuidance />
         </main>
       </AppShell>
     );
@@ -177,6 +186,8 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
             Decision-ready hardware design reviews across all repositories and pull requests.
           </p>
         </header>
+
+        <ReviewPublishingGuidance />
 
         {total > 0 ? (
           <ReviewListFilterBar
