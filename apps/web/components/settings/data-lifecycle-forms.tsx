@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import type { requestErasureAction, requestExportAction } from "../../app/settings/data/actions.js";
 import { fieldError } from "../../lib/action-result.js";
+import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import { ActionForm } from "../ui/action-form.js";
 import { AlertDescription, AlertRoot, AlertTitle } from "../ui/alert.js";
 import { Button } from "../ui/button.js";
@@ -74,7 +75,7 @@ export function ExportRequestForm({
           </div>
           {issued ? (
             <AlertRoot variant="success">
-              <AlertTitle>Export {issued.status}</AlertTitle>
+              <AlertTitle>Export {customerStatusLabel(issued.status)}</AlertTitle>
               <AlertDescription>
                 Reference <code className="font-mono">{issued.exportId}</code>. Download it from{" "}
                 <a
@@ -202,7 +203,7 @@ export function ErasureRequestForm({
 
           {outcome ? (
             <AlertRoot variant={outcome.dryRun ? "info" : "warning"}>
-              <AlertTitle>{outcome.dryRun ? "Preview recorded" : `Erasure ${outcome.status}`}</AlertTitle>
+              <AlertTitle>{outcome.dryRun ? "Preview recorded" : `Erasure ${customerStatusLabel(outcome.status)}`}</AlertTitle>
               <AlertDescription>
                 {outcome.dryRun
                   ? "Nothing was deleted. Uncheck the preview box to run it for real."
