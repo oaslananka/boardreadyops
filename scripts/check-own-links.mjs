@@ -1,5 +1,5 @@
 import { access, readFile } from "node:fs/promises";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 
 /**
  * Checks that every link into this project's own GitHub namespace points at something real.

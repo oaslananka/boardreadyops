@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 
 const RELEASE_SHA_PATTERN = /^[a-f0-9]{40}$/i;
 

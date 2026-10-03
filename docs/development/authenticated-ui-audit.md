@@ -1,6 +1,6 @@
 # Authenticated UI audit
 
-BoardReadyOps keeps the existing public Lighthouse CI for anonymous routes and adds a separate authenticated Unlighthouse audit for signed-in product surfaces. The authenticated audit is manual-only because it requires a current short-lived `brops_session` cookie.
+BoardReadyOps keeps the existing public Lighthouse CI for anonymous routes and adds a separate authenticated Lighthouse audit for signed-in product surfaces. The authenticated audit is manual-only because it requires a current short-lived `brops_session` cookie.
 
 ## Security boundary
 
@@ -8,7 +8,7 @@ BoardReadyOps keeps the existing public Lighthouse CI for anonymous routes and a
 
 The runner accepts production auth only for `https://boardreadyops.com`. Loopback HTTP is allowed only for local test fixtures. Route discovery is same-origin and allowlist-only, and the generated `.unlighthouse/authenticated-routes.json` contains no cookie or response body.
 
-The report uses the Unlighthouse Puppeteer cookie path. Do not move the session into Lighthouse `extraHeaders`: Lighthouse serializes `extraHeaders` into its JSON report and would therefore expose the cookie in the artifact.
+The audit passes the cookie to Lighthouse only through the in-memory `extraHeaders` request setting. Raw Lighthouse HTML/JSON is deliberately never persisted because those formats can serialize configuration metadata. The artifact contains only BoardReadyOps-owned, secret-free route and score summaries.
 
 ## Obtain a local session
 
@@ -48,7 +48,7 @@ The **Authenticated UI audit** workflow is `workflow_dispatch` only. It has `con
 
 Before dispatching it, refresh the repository secret `BROPS_UNLIGHTHOUSE_SESSION` with a current production `brops_session`. The secret is scoped only to the explicit session-validation step and the audit step; checkout, toolchain setup, and artifact upload do not receive it.
 
-After the run, download the private `authenticated-unlighthouse-<run-id>` artifact. It contains the static Unlighthouse report and the secret-free route manifest and is retained for seven days.
+After the run, download the private `authenticated-unlighthouse-<run-id>` artifact. The historical artifact name is retained for workflow compatibility; its contents are the secret-free route manifest plus the bounded Lighthouse score summary, retained for seven days.
 
 Initial authenticated budgets are:
 
@@ -60,6 +60,6 @@ A route that never reaches a terminal Lighthouse result fails the command even i
 
 ## Implementation note
 
-The repository pins `@unlighthouse/core@0.18.0` rather than the aggregate `unlighthouse` package. The aggregate dependency graph triggered the repository's provenance no-downgrade supply-chain policy, while the programmatic core API passed it.
+The audit runner uses the pinned `lighthouse` and `chrome-launcher` packages directly. Route discovery stays BoardReadyOps-owned, and the ephemeral session cookie is supplied only through Lighthouse's in-memory request headers. Raw Lighthouse HTML/JSON is not persisted because it can include configuration metadata; the uploaded artifact contains the secret-free route manifest and a bounded score summary instead.
 
-The wrapper also waits on terminal worker state instead of relying solely on Unlighthouse's `worker-finished` hook, because retries can pass through a temporary completed cluster state before the requeued route exists. A narrow shutdown compatibility shim handles the no-op display object used by Unlighthouse 0.18.0 with `puppeteer-cluster` 0.25.0.
+Chrome is launched from the preinstalled runner browser with downloads disabled by construction. Each discovered route is audited sequentially, and Chrome is closed in a `finally` block even when one route fails.

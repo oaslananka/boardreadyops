@@ -1,0 +1,72 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { globFiles } from "../../../src/util/glob.js";
+
+const roots: string[] = [];
+
+async function fixture(files: readonly string[]): Promise<string> {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-glob-"));
+  roots.push(root);
+  for (const file of files) {
+    const target = path.join(root, file);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, file, "utf8");
+  }
+  return root;
+}
+
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
+});
+
+describe("globFiles", () => {
+  it("supports recursive wildcards and multiple patterns", async () => {
+    const root = await fixture(["board.kicad_pro", "fab/top.gbr", "fab/drill/board.drl", "docs/readme.md"]);
+
+    const files = await globFiles(root, ["**/*.gbr", "**/*.drl", "**/*.kicad_pro"]);
+    expect(files.map((file) => path.relative(root, file).split(path.sep).join("/"))).toEqual([
+      "board.kicad_pro",
+      "fab/drill/board.drl",
+      "fab/top.gbr",
+    ]);
+  });
+
+  it("preserves brace and extglob pattern support", async () => {
+    const root = await fixture(["fab/top.gbr", "fab/bottom.gbl", "fab/board.drl", "fab/notes.txt"]);
+
+    const files = await globFiles(root, ["**/*.{gbr,gbl}", "**/board.@(drl|xln)"]);
+    expect(files.map((file) => path.basename(file))).toEqual(["board.drl", "bottom.gbl", "top.gbr"]);
+  });
+
+  it("excludes hidden, dependency, build, and coverage trees", async () => {
+    const root = await fixture([
+      "visible/report.json",
+      ".hidden/report.json",
+      "node_modules/pkg/report.json",
+      "dist/report.json",
+      "coverage/report.json",
+      ".git/report.json",
+    ]);
+
+    const files = await globFiles(root, ["**/*.json"]);
+    expect(files.map((file) => path.relative(root, file).split(path.sep).join("/"))).toEqual(["visible/report.json"]);
+  });
+
+  it("returns no matches when the requested root does not exist", async () => {
+    const root = path.join(os.tmpdir(), `boardreadyops-glob-missing-${Date.now()}`);
+    await expect(globFiles(root, ["**/*.kicad_pro"])).resolves.toEqual([]);
+  });
+
+  it("does not follow symlinks outside the requested root", async () => {
+    const root = await fixture(["inside.txt"]);
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-glob-outside-"));
+    roots.push(outside);
+    await fs.writeFile(path.join(outside, "secret.txt"), "secret", "utf8");
+    await fs.symlink(outside, path.join(root, "linked"), "dir");
+
+    const files = await globFiles(root, ["**/*.txt"]);
+    expect(files.map((file) => path.basename(file))).toEqual(["inside.txt"]);
+  });
+});

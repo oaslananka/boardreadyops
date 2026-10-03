@@ -4,7 +4,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 import { runWithMkDocsWarningSuppressed } from "./lib/run-command.mjs";
 
 export const pa11yOptions = Object.freeze({

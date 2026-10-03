@@ -17,8 +17,24 @@ export interface RunCodecovBundleAnalysisOptions {
   readonly stdout?: (value: string) => void;
 }
 
+export interface BundleAsset {
+  name: string;
+  size: number;
+  gzipSize: number | null;
+  normalized: string;
+}
+
 export function buildCodecovBundleOptions(options?: CodecovBundleOptionsInput): {
   coreOptions: Record<string, unknown>;
   bundleAnalyzerOptions: Record<string, unknown>;
 };
+export function collectBundleAssets(
+  buildDirectoryPaths: string[],
+  options?: { ignorePatterns?: string[]; normalizeAssetsPattern?: string },
+): Promise<BundleAsset[]>;
+export function createAndUploadBundleReport(
+  buildDirectoryPaths: string[],
+  coreOptions: Record<string, unknown>,
+  bundleAnalyzerOptions?: Record<string, unknown>,
+): Promise<string>;
 export function runCodecovBundleAnalysis(options?: RunCodecovBundleAnalysisOptions): Promise<string>;
