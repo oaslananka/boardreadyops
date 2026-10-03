@@ -119,6 +119,27 @@ describe("composeSupplyAnnouncement", () => {
     );
   });
 
+  it("reports the complete tracked release-run impact separately from the board list", () => {
+    const announcement = composeSupplyAnnouncement([part()], {
+      boards: [board()],
+      affectedReleaseRunCount: 7,
+      truncated: true,
+    });
+
+    expect(announcement?.details).toContain("Affected tracked release runs: 7.");
+    expect(announcement?.details).toContain("This list is capped; open the parts page for the full set.");
+  });
+
+  it("omits a release-run line when no affected release resolved", () => {
+    const announcement = composeSupplyAnnouncement([part()], {
+      boards: [],
+      affectedReleaseRunCount: 0,
+      truncated: false,
+    });
+
+    expect(announcement?.details.some((line) => line.startsWith("Affected tracked release runs:"))).toBe(false);
+  });
+
   it("marks each board as current or superseded", () => {
     const announcement = composeSupplyAnnouncement([part()], {
       boards: [board(), board({ displayName: "Gateway", repositoryFullName: "acme/gw", inCurrentRevision: false })],

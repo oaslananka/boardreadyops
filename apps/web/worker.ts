@@ -705,6 +705,7 @@ async function announceSupplyRisk(
         queued,
         parts: detection.findings.length,
         affectedBoards: affected.boards.length,
+        affectedReleaseRuns: affected.affectedReleaseRunCount,
         stillBuilt: announcement.stillBuilt,
       });
     }
@@ -730,7 +731,7 @@ async function resolveAffected(
     return await affectedBoardsStore.resolveAffectedBoards(installationId, affectedPartKeys(parts));
   } catch (error) {
     log("warn", "worker.supply_affected_boards_failed", { errorClass: errorClass(error) });
-    return { boards: [], truncated: false };
+    return { boards: [], affectedReleaseRunCount: 0, truncated: false };
   }
 }
 
