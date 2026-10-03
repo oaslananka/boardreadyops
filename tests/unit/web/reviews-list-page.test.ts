@@ -124,7 +124,7 @@ describe("ReviewsListPage", () => {
     const markup = await render();
     expect(markup).not.toContain("Review filters");
     expect(markup).toContain("No hardware reviews found");
-    expect(markup).toContain("Runs do not automatically appear here");
+    expect(markup).toContain("Historical Runs remain in run history");
     expect(markup).toContain('href="/runs"');
   });
 });
