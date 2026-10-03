@@ -143,3 +143,39 @@ describe("board supply watch store: distributor classification and price breaks"
     expect(entry?.priceBreaks).toEqual([{ quantity: 1, price: 2.5, currency: "USD" }]);
   });
 });
+
+describe("board supply watch store: finding provenance", () => {
+  it("captures the provider source when a finding first opens without updating existing open findings", async () => {
+    const { store, query } = executor([{ opened: 1, resolved: 0 }]);
+
+    const result = await store.reconcileFindings(
+      "board-1",
+      [
+        {
+          boardId: "board-1",
+          mpn: "STM32F103C8T6",
+          manufacturer: "ST",
+          reference: "U1",
+          status: "eol",
+          severity: "high",
+          source: "nexar",
+        },
+      ],
+      now,
+    );
+
+    expect(result).toEqual({ opened: 1, resolved: 0 });
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("observation_source");
+    expect(sql).toContain("incoming.source");
+    expect(sql).toContain("on conflict do nothing");
+
+    const payload = JSON.parse(String(params[1])) as Record<string, unknown>[];
+    expect(payload[0]).toMatchObject({
+      mpn: "STM32F103C8T6",
+      status: "eol",
+      severity: "high",
+      source: "nexar",
+    });
+  });
+});

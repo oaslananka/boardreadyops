@@ -33,6 +33,8 @@ export type SupplyFindingInput = {
   reference?: string | undefined;
   status: "nrnd" | "eol" | "obsolete";
   severity: "critical" | "high" | "medium";
+  /** Stable provider identifier captured when the finding first opens. */
+  source: string;
 };
 
 export type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "not_entitled" | "failed";
@@ -279,13 +281,14 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           reference: finding.reference ?? null,
           status: finding.status,
           severity: finding.severity,
+          source: finding.source,
         })),
       );
       const result = await executor.query(
         `with incoming as (
-           select entry.mpn, entry.manufacturer, entry.reference, entry.status, entry.severity
+           select entry.mpn, entry.manufacturer, entry.reference, entry.status, entry.severity, entry.source
            from jsonb_to_recordset($2::jsonb) as entry(
-             mpn text, manufacturer text, reference text, status text, severity text
+             mpn text, manufacturer text, reference text, status text, severity text, source text
            )
          ),
          resolved as (
@@ -302,9 +305,11 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
            returning finding.id
          ),
          opened as (
-           insert into board_supply_findings (board_id, mpn, manufacturer, reference, status, severity, detected_at)
+           insert into board_supply_findings (
+             board_id, mpn, manufacturer, reference, status, severity, observation_source, detected_at
+           )
            select $1, incoming.mpn, incoming.manufacturer, incoming.reference,
-                  incoming.status, incoming.severity, $3::timestamptz
+                  incoming.status, incoming.severity, incoming.source, $3::timestamptz
            from incoming
            on conflict do nothing
            returning id

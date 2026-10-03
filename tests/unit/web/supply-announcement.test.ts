@@ -18,6 +18,7 @@ function part(overrides: Partial<RiskyComponentFinding> = {}): RiskyComponentFin
     mpn: "TPS62840DLCR",
     status: "nrnd",
     severity: "high",
+    source: "nexar",
     ...overrides,
   } as RiskyComponentFinding;
 }
@@ -60,7 +61,10 @@ describe("composeSupplyAnnouncement", () => {
     // The lifecycle news still has to go out. A headline reading "on 0 board(s)" would be worse
     // than one that simply does not claim to know.
     expect(announcement?.headline).toBe("TPS62840DLCR is NRND");
-    expect(announcement?.details).toEqual(["TPS62840DLCR — NRND, high risk"]);
+    expect(announcement?.details).toEqual([
+      "TPS62840DLCR — NRND, high risk · Source: Nexar",
+      "Source data was fresh under the provider cache policy when BoardReadyOps evaluated this alert.",
+    ]);
   });
 
   it("counts parts rather than naming one when several are risky", () => {
@@ -96,7 +100,23 @@ describe("composeSupplyAnnouncement", () => {
       { boards: [], truncated: false },
     );
 
-    expect(announcement?.details).toEqual(["GRM188 (C1) — EOL, critical risk", "TPS62840DLCR (U7) — NRND, high risk"]);
+    expect(announcement?.details).toEqual([
+      "GRM188 (C1) — EOL, critical risk · Source: Nexar",
+      "TPS62840DLCR (U7) — NRND, high risk · Source: Nexar",
+      "Source data was fresh under the provider cache policy when BoardReadyOps evaluated this alert.",
+    ]);
+  });
+
+  it("names the provider source and freshness contract without exposing provider payloads", () => {
+    const announcement = composeSupplyAnnouncement([part({ source: "test-provider" })], {
+      boards: [],
+      truncated: false,
+    });
+
+    expect(announcement?.details).toContain("TPS62840DLCR — NRND, high risk · Source: Test Provider");
+    expect(announcement?.details).toContain(
+      "Source data was fresh under the provider cache policy when BoardReadyOps evaluated this alert.",
+    );
   });
 
   it("marks each board as current or superseded", () => {

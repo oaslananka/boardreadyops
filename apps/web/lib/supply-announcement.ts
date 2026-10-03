@@ -1,5 +1,6 @@
 import type { RiskyComponentFinding } from "@boardreadyops/cloud-core/supply-watch";
 import type { AffectedBoard, AffectedBoardsResult } from "@boardreadyops/db/affected-boards-store";
+import { customerStatusLabel } from "./customer-nomenclature.js";
 
 /**
  * Composes the supply-watch notification.
@@ -38,7 +39,7 @@ export function composeSupplyAnnouncement(
   const stillBuilt = affected.boards.filter((board) => board.inCurrentRevision).length;
   const partLines = sorted.map(
     (part) =>
-      `${part.mpn}${part.reference ? ` (${part.reference})` : ""} — ${part.status.toUpperCase()}, ${part.severity} risk`,
+      `${part.mpn}${part.reference ? ` (${part.reference})` : ""} — ${part.status.toUpperCase()}, ${part.severity} risk · Source: ${customerStatusLabel(part.source)}`,
   );
 
   const boardLines = affected.boards
@@ -57,7 +58,11 @@ export function composeSupplyAnnouncement(
 
   return {
     headline: headline(sorted.length, worst, affected.boards.length, stillBuilt),
-    details: [...partLines, ...(boardLines.length > 0 ? ["Affected boards:", ...boardLines] : [])],
+    details: [
+      ...partLines,
+      "Source data was fresh under the provider cache policy when BoardReadyOps evaluated this alert.",
+      ...(boardLines.length > 0 ? ["Affected boards:", ...boardLines] : []),
+    ],
     repositoryFullName: affected.boards[0]?.repositoryFullName,
     stillBuilt,
   };

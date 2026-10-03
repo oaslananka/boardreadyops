@@ -101,7 +101,7 @@ describeDatabase("board supply watch", () => {
 
     const findings = rows(
       await database().query(
-        "select mpn, status, severity, reference, resolved_at from board_supply_findings where board_id = $1",
+        "select mpn, status, severity, reference, observation_source, resolved_at from board_supply_findings where board_id = $1",
         [boardId],
       ),
     );
@@ -109,6 +109,7 @@ describeDatabase("board supply watch", () => {
     expect(findings[0]?.mpn).toBe("WATCH-EOL-1");
     expect(findings[0]?.severity).toBe("high");
     expect(findings[0]?.reference).toBe("U1");
+    expect(findings[0]?.observation_source).toBe("integration-provider");
     expect(findings[0]?.resolved_at).toBeNull();
   });
 
