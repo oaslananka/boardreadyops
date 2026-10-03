@@ -135,10 +135,14 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("provider text not null");
     expect(sql).toContain("installation_id, provider, lower(mpn), lower(coalesce(manufacturer, ''))");
     expect(sql).toContain("installation_component_observations_refresh_idx");
+    expect(sql).toContain("add column if not exists provider text");
+    expect(sql).toContain("set provider = source");
+    expect(sql).toContain("alter column provider set not null");
+    expect(sql).toContain("component_lifecycle_observations_provider_valid");
     expect(sql).toContain("component_lifecycle_observations_available_units_valid");
     expect(sql).toContain("component_lifecycle_observations_lead_time_days_valid");
-    expect(sql).toContain("drop index if exists component_lifecycle_observations_part_idx");
-    expect(sql).toContain("component_lifecycle_observations(source, lower(mpn), lower(coalesce(manufacturer, '')))");
+    expect(sql).not.toContain("drop index if exists component_lifecycle_observations_part_idx");
+    expect(sql).not.toContain("create unique index concurrently");
     expect(sql).toContain("installation_component_observations_available_units_valid");
     expect(sql).toContain("installation_component_observations_lead_time_days_valid");
     expect(sql).toContain("expires_at is null or expires_at >= observed_at");

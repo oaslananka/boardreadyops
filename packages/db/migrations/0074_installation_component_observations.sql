@@ -7,14 +7,24 @@
 -- credential can never satisfy another customer's lookup.
 
 alter table component_lifecycle_observations
+  add column if not exists provider text,
   add column if not exists available_units integer,
   add column if not exists lead_time_days integer;
 
--- Provider name is part of the cache identity. The original index predated multiple provider
--- namespaces and allowed a second shareable provider to overwrite the first provider's row.
-drop index if exists component_lifecycle_observations_part_idx;
-create unique index component_lifecycle_observations_part_idx
-  on component_lifecycle_observations(source, lower(mpn), lower(coalesce(manufacturer, '')));
+-- `source` is provenance returned by the normalized observation; `provider` is the cache
+-- namespace selected by the resolver. Existing rows predate that distinction, so their provider
+-- namespace is the source that originally wrote them.
+update component_lifecycle_observations
+   set provider = source
+ where provider is null;
+
+alter table component_lifecycle_observations
+  alter column provider set not null;
+
+-- Keep the original part-identity unique index in place. A later shareable provider may replace
+-- a part's cached row, but provider-filtered reads will never reuse that row for the wrong
+-- provider. Avoiding an index rebuild also keeps this transactional migration small and
+-- non-disruptive; the migration runner intentionally wraps every migration in a transaction.
 
 create table if not exists installation_component_observations (
   id text primary key default gen_random_uuid()::text,
@@ -44,6 +54,14 @@ create index if not exists installation_component_observations_refresh_idx
 
 do $$
 begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'component_lifecycle_observations_provider_valid'
+  ) then
+    alter table component_lifecycle_observations
+      add constraint component_lifecycle_observations_provider_valid
+      check (provider ~ '^[a-z0-9]+([._-][a-z0-9]+)*$' and char_length(provider) between 1 and 64);
+  end if;
+
   if not exists (
     select 1 from pg_constraint where conname = 'component_lifecycle_observations_available_units_valid'
   ) then

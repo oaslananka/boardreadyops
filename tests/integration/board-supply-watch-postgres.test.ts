@@ -208,7 +208,9 @@ describeDatabase("board supply watch", () => {
         lookups += parts.length;
         return parts.map((part) => ({
           ...part,
-          status: "active" as const,
+          // This test is about cache isolation, not finding transitions. Preserve the eOL fixture
+          // so the later test remains responsible for resolving that finding.
+          status: part.mpn === "WATCH-EOL-1" ? ("eol" as const) : ("active" as const),
           source: "tenant-provider",
           observedAt: firstPassAt,
           availableUnits: 1000,

@@ -174,7 +174,7 @@ describe("board supply watch store: cache scope", () => {
 
     const [sql, params] = query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("from component_lifecycle_observations");
-    expect(sql).toContain("source = $3");
+    expect(sql).toContain("provider = $3");
     expect(params[2]).toBe("nexar");
     expect([...fresh.values()][0]).toMatchObject({
       status: "active",
@@ -191,8 +191,31 @@ describe("board supply watch store: cache scope", () => {
       { mpn: "STM32F103C8T6", manufacturer: "ST", status: "active", source: "nexar", observedAt: now },
     ]);
 
-    const [sql] = query.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain("on conflict (source, lower(mpn), lower(coalesce(manufacturer, ''))) do update");
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("provider, mpn, manufacturer");
+    expect(sql).toContain("on conflict (lower(mpn), lower(coalesce(manufacturer, ''))) do update");
+    expect(sql).toContain("provider = excluded.provider");
+    expect(params[1]).toBe("nexar");
+  });
+
+  it("keeps provider cache namespace separate from observation provenance source", async () => {
+    const { store, query } = executor([{ id: "shared-obs-2" }]);
+
+    await store.recordObservations(sharedScope, [
+      {
+        mpn: "STM32F103C8T6",
+        manufacturer: "ST",
+        status: "active",
+        source: "upstream-catalogue",
+        observedAt: now,
+      },
+    ]);
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("provider, mpn, manufacturer");
+    expect(params[1]).toBe("nexar");
+    const payload = JSON.parse(String(params[0])) as Record<string, unknown>[];
+    expect(payload[0]?.source).toBe("upstream-catalogue");
   });
 
   it("reads a non-transferable provider only from its owning installation and provider", async () => {

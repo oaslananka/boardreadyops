@@ -222,7 +222,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
                       available_units, lead_time_days
                  from component_lifecycle_observations
                 where lower(mpn) = any($1::text[])
-                  and source = $3
+                  and provider = $3
                   and (expires_at is null or expires_at > $2::timestamptz)`,
               [mpns, now.toISOString(), scope.providerName],
             )
@@ -290,10 +290,10 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
         scope.kind === "shared"
           ? await executor.query(
               `insert into component_lifecycle_observations (
-                 mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
+                 provider, mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
                  distributor_classification, price_breaks, available_units, lead_time_days
                )
-               select entry.mpn, entry.manufacturer, entry.status, entry.source,
+               select $2, entry.mpn, entry.manufacturer, entry.status, entry.source,
                       entry.evidence_url, entry.observed_at, entry.expires_at,
                       entry.distributor_classification, entry.price_breaks,
                       entry.available_units, entry.lead_time_days
@@ -303,8 +303,10 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
                  distributor_classification text, price_breaks jsonb,
                  available_units integer, lead_time_days integer
                )
-               on conflict (source, lower(mpn), lower(coalesce(manufacturer, ''))) do update
-                 set status = excluded.status,
+               on conflict (lower(mpn), lower(coalesce(manufacturer, ''))) do update
+                 set provider = excluded.provider,
+                     status = excluded.status,
+                     source = excluded.source,
                      evidence_url = excluded.evidence_url,
                      observed_at = excluded.observed_at,
                      expires_at = excluded.expires_at,
@@ -312,9 +314,9 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
                      price_breaks = excluded.price_breaks,
                      available_units = excluded.available_units,
                      lead_time_days = excluded.lead_time_days
-                 where excluded.observed_at >= component_lifecycle_observations.observed_at
+               where excluded.observed_at >= component_lifecycle_observations.observed_at
                returning id`,
-              [payload],
+              [payload, scope.providerName],
             )
           : await executor.query(
               `insert into installation_component_observations (
