@@ -1,3 +1,4 @@
+import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoReview } from "../../lib/demo-data.js";
 import { Panel } from "../ui.js";
 import { ReviewCanvas } from "./review-canvas.js";
@@ -36,7 +37,7 @@ export function ChangesTab({ review }: { readonly review: DemoReview }) {
             <div className="flex items-center justify-between gap-2">
               <h4 className="text-sm font-bold text-foreground">{pcb.path.split("/").pop()}</h4>
               <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs uppercase text-muted-foreground">
-                {pcb.status}
+                {customerStatusLabel(pcb.status)}
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -78,7 +79,7 @@ export function ChangesTab({ review }: { readonly review: DemoReview }) {
                 </td>
                 <td className="py-2 pr-3">
                   <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs uppercase text-muted-foreground">
-                    {change.changeType}
+                    {customerStatusLabel(change.changeType)}
                   </span>
                 </td>
                 <td className="py-2 pr-3">{change.baseMpn ? <code>{change.baseMpn}</code> : "—"}</td>
