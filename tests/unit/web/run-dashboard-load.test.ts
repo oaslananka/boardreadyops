@@ -126,6 +126,32 @@ describe("run dashboard environment loader", () => {
     expect(mocks.close).toHaveBeenCalledOnce();
   });
 
+  it("surfaces the review linked to the loaded run", async () => {
+    mocks.configuredArtifactDownloadSigningKey.mockReturnValue(undefined);
+    for (const result of [
+      { rows: [runRow({ review_id: "review-123" })] },
+      { rows: [{ total: 0 }] },
+      { rows: [{ total: 0 }] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+    ]) {
+      mocks.query.mockResolvedValueOnce(result);
+    }
+
+    const result = await loadRunDashboard(
+      "run-load",
+      { DATABASE_URL: "postgresql://boardreadyops.test/database" },
+      {},
+      dependencies,
+    );
+
+    expect(result).toMatchObject({ state: "found", run: { reviewId: "review-123" } });
+    expect(mocks.close).toHaveBeenCalledOnce();
+  });
+
   it("creates bounded signed artifact URLs with the configured pool size", async () => {
     mocks.configuredArtifactDownloadSigningKey.mockReturnValue("k".repeat(32));
     mocks.artifactDownloadExpiry.mockReturnValue(1_900_000_000);

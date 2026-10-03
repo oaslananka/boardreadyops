@@ -153,6 +153,7 @@ export type RunDetail = {
   repository: string;
   repositoryId: string;
   repositoryPrivate: boolean;
+  reviewId?: string;
   trustMode: RunTrustMode;
   safeModeReasons: RunSafeModeReason[];
   setupPreset?: string;
@@ -524,6 +525,10 @@ export function formatArtifactBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function reviewLink(reviewId: string | undefined): Pick<RunDetail, "reviewId"> {
+  return reviewId ? { reviewId } : {};
+}
+
 export async function lookupRunDashboard(
   runId: string,
   executor: RunDashboardQueryExecutor,
@@ -571,6 +576,14 @@ export async function lookupRunDashboard(
        repository_setup_revisions.workflow_contract_version as setup_workflow_contract_version,
        repository_setup_revisions.workflow_status as setup_workflow_status,
        repository_setup_revisions.config_status as setup_config_status,
+       (
+         select reviews.id
+           from reviews
+          where reviews.repository_id = release_runs.repository_id
+            and reviews.head_run_id = release_runs.id
+          order by reviews.updated_at desc, reviews.id desc
+          limit 1
+       ) as review_id,
        coalesce((
          select count(*)::int
          from control_plane_reconciliation_items
@@ -889,6 +902,7 @@ export async function lookupRunDashboard(
       repository: repositoryName,
       repositoryId: repository.id,
       repositoryPrivate: repository.private,
+      ...reviewLink(stringValue(runRow, "review_id")),
       trustMode,
       safeModeReasons,
       ...(setupPreset ? { setupPreset } : {}),

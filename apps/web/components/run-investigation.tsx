@@ -396,107 +396,149 @@ function CategoryBreakdownPanel({ run }: Readonly<{ run: RunDetail }>) {
   );
 }
 
-export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
+function ReviewLifecyclePanel({ run }: Readonly<{ run: RunDetail }>) {
+  return (
+    <Panel
+      id="review-lifecycle"
+      title="Run → Review → Release"
+      description="A Run is execution evidence, a Review is an explicit decision context, and a Release is a separate publish action."
+      tone="section"
+    >
+      <p className="text-sm text-muted-foreground">
+        Normal readiness and GitHub Action runs stay in Runs. They do not automatically become Reviews. A Review exists
+        only after review evidence is explicitly published, and neither a Run nor a Review publishes a release by
+        itself.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-3 text-sm">
+        {run.reviewId ? (
+          <Link href={`/reviews/${run.reviewId}`} className="text-primary underline underline-offset-2">
+            Open hardware review
+          </Link>
+        ) : (
+          <Link href="/reviews#publish-review" className="text-primary underline underline-offset-2">
+            How to publish a review
+          </Link>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+function RunSummaryPanel({ run }: Readonly<{ run: RunDetail }>) {
+  return (
+    <Panel
+      title="Run summary"
+      description="Repository, source, execution, and result metadata."
+      id="summary"
+      tone="section"
+    >
+      <DefinitionGrid>
+        <Definition label="Outcome">
+          <StatusBadge value={run.decision ?? run.conclusion ?? run.status} />
+        </Definition>
+        <Definition label="Trigger">{humanize(run.triggerKind)}</Definition>
+        <Definition label="Pull request">
+          {run.pullRequestNumber ? `#${run.pullRequestNumber}` : "Not a pull request"}
+        </Definition>
+        <Definition label="Started">{formatRunDate(run.startedAt)}</Definition>
+        <Definition label="Completed">{formatRunDate(run.completedAt)}</Definition>
+        <Definition label="Duration">{formatRunDuration(run.durationMs)}</Definition>
+        <Definition label="Last activity">{formatRunDate(run.lastActivityAt)}</Definition>
+      </DefinitionGrid>
+    </Panel>
+  );
+}
+
+function SourceRuntimePanel({ run }: Readonly<{ run: RunDetail }>) {
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
-    <>
-      <Panel
-        title="Run summary"
-        description="Repository, source, execution, and result metadata."
-        id="summary"
-        tone="section"
+    <Panel
+      title="Source and runtime"
+      description="Exact source identity and tool versions used by the result."
+      id="source"
+      tone="section"
+    >
+      <DefinitionGrid>
+        <Definition label="Commit">
+          <code>{run.commitSha}</code>
+        </Definition>
+        <Definition label="Ref">
+          <code>{run.ref}</code>
+        </Definition>
+        <Definition label="Check Run">
+          {run.githubCheckRunId ? <code>{run.githubCheckRunId}</code> : "Not recorded"}
+        </Definition>
+        <Definition label="Result contract">
+          {run.resultContractVersion ? `v${run.resultContractVersion}` : "Not reported"}
+        </Definition>
+        <Definition label="BoardReadyOps">{run.boardReadyOpsVersion ?? "Not reported"}</Definition>
+        <Definition label="KiCad">{run.kicadVersion ?? "Not reported"}</Definition>
+        <Definition label="Trust mode">{humanize(run.trustMode)}</Definition>
+        <Definition label="Safe-mode reasons">
+          {run.safeModeReasons.length > 0 ? run.safeModeReasons.map(humanize).join(" · ") : "None"}
+        </Definition>
+        <Definition label="Policy preset">
+          {run.setupPreset
+            ? `${humanize(run.setupPreset)} v${run.setupPresetVersion ?? "?"} · revision ${run.setupRevision ?? "?"}`
+            : "Not recorded"}
+        </Definition>
+        <Definition label="Setup readiness">
+          {run.setupWorkflowStatus || run.setupConfigStatus
+            ? `Workflow ${humanize(run.setupWorkflowStatus ?? "unknown")} · config ${humanize(run.setupConfigStatus ?? "unknown")}`
+            : "Not recorded"}
+        </Definition>
+        <Definition label="Workflow contract">
+          {run.setupWorkflowContractVersion ? `v${run.setupWorkflowContractVersion}` : "Not recorded"}
+        </Definition>
+      </DefinitionGrid>
+      {/* The links are the only way out to GitHub from this page, so they get the touch
+          minimum; `[&_a]` keeps it in one place rather than on each of the four. */}
+      <nav
+        className="mt-3 flex flex-wrap gap-4 text-sm [&_a]:flex [&_a]:min-h-11 [&_a]:items-center md:[&_a]:min-h-0"
+        aria-label="Open this run in GitHub"
       >
-        <DefinitionGrid>
-          <Definition label="Outcome">
-            <StatusBadge value={run.decision ?? run.conclusion ?? run.status} />
-          </Definition>
-          <Definition label="Trigger">{humanize(run.triggerKind)}</Definition>
-          <Definition label="Pull request">
-            {run.pullRequestNumber ? `#${run.pullRequestNumber}` : "Not a pull request"}
-          </Definition>
-          <Definition label="Started">{formatRunDate(run.startedAt)}</Definition>
-          <Definition label="Completed">{formatRunDate(run.completedAt)}</Definition>
-          <Definition label="Duration">{formatRunDuration(run.durationMs)}</Definition>
-          <Definition label="Last activity">{formatRunDate(run.lastActivityAt)}</Definition>
-        </DefinitionGrid>
-      </Panel>
+        <a
+          href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}`}
+          className="text-primary hover:underline"
+        >
+          Open source commit
+        </a>
+        <a
+          href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}/checks`}
+          className="text-primary hover:underline"
+        >
+          Open GitHub checks
+        </a>
+        {latestWorkflowRunUrl ? (
+          <a href={latestWorkflowRunUrl} className="text-primary hover:underline">
+            Open GitHub Actions run
+          </a>
+        ) : null}
+        {run.pullRequestNumber ? (
+          <a
+            href={`${githubRepositoryBaseUrl(run)}/pull/${run.pullRequestNumber}`}
+            className="text-primary hover:underline"
+          >
+            Open pull request #{run.pullRequestNumber}
+          </a>
+        ) : null}
+      </nav>
+    </Panel>
+  );
+}
+
+export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
+  return (
+    <>
+      <RunSummaryPanel run={run} />
+
+      <ReviewLifecyclePanel run={run} />
 
       <CategoryBreakdownPanel run={run} />
 
       <BoardsPanel run={run} />
 
-      <Panel
-        title="Source and runtime"
-        description="Exact source identity and tool versions used by the result."
-        id="source"
-        tone="section"
-      >
-        <DefinitionGrid>
-          <Definition label="Commit">
-            <code>{run.commitSha}</code>
-          </Definition>
-          <Definition label="Ref">
-            <code>{run.ref}</code>
-          </Definition>
-          <Definition label="Check Run">
-            {run.githubCheckRunId ? <code>{run.githubCheckRunId}</code> : "Not recorded"}
-          </Definition>
-          <Definition label="Result contract">
-            {run.resultContractVersion ? `v${run.resultContractVersion}` : "Not reported"}
-          </Definition>
-          <Definition label="BoardReadyOps">{run.boardReadyOpsVersion ?? "Not reported"}</Definition>
-          <Definition label="KiCad">{run.kicadVersion ?? "Not reported"}</Definition>
-          <Definition label="Trust mode">{humanize(run.trustMode)}</Definition>
-          <Definition label="Safe-mode reasons">
-            {run.safeModeReasons.length > 0 ? run.safeModeReasons.map(humanize).join(" · ") : "None"}
-          </Definition>
-          <Definition label="Policy preset">
-            {run.setupPreset
-              ? `${humanize(run.setupPreset)} v${run.setupPresetVersion ?? "?"} · revision ${run.setupRevision ?? "?"}`
-              : "Not recorded"}
-          </Definition>
-          <Definition label="Setup readiness">
-            {run.setupWorkflowStatus || run.setupConfigStatus
-              ? `Workflow ${humanize(run.setupWorkflowStatus ?? "unknown")} · config ${humanize(run.setupConfigStatus ?? "unknown")}`
-              : "Not recorded"}
-          </Definition>
-          <Definition label="Workflow contract">
-            {run.setupWorkflowContractVersion ? `v${run.setupWorkflowContractVersion}` : "Not recorded"}
-          </Definition>
-        </DefinitionGrid>
-        {/* The links are the only way out to GitHub from this page, so they get the touch
-            minimum; `[&_a]` keeps it in one place rather than on each of the four. */}
-        <nav
-          className="mt-3 flex flex-wrap gap-4 text-sm [&_a]:flex [&_a]:min-h-11 [&_a]:items-center md:[&_a]:min-h-0"
-          aria-label="Open this run in GitHub"
-        >
-          <a
-            href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}`}
-            className="text-primary hover:underline"
-          >
-            Open source commit
-          </a>
-          <a
-            href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}/checks`}
-            className="text-primary hover:underline"
-          >
-            Open GitHub checks
-          </a>
-          {latestWorkflowRunUrl ? (
-            <a href={latestWorkflowRunUrl} className="text-primary hover:underline">
-              Open GitHub Actions run
-            </a>
-          ) : null}
-          {run.pullRequestNumber ? (
-            <a
-              href={`${githubRepositoryBaseUrl(run)}/pull/${run.pullRequestNumber}`}
-              className="text-primary hover:underline"
-            >
-              Open pull request #{run.pullRequestNumber}
-            </a>
-          ) : null}
-        </nav>
-      </Panel>
+      <SourceRuntimePanel run={run} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel
