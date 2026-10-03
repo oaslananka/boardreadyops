@@ -17,6 +17,15 @@ function button(container: HTMLElement, label: string): HTMLButtonElement {
   return match;
 }
 
+async function renderAndClick(root: Root, container: HTMLElement, label: string): Promise<void> {
+  await act(async () => {
+    root.render(createElement(RunActionBar, { repositoryId: "repo-1", runId: "run-1", hasPullRequest: true }));
+  });
+  await act(async () => {
+    button(container, label).click();
+  });
+}
+
 describe("run action recovery", () => {
   let container: HTMLElement;
   let root: Root;
@@ -52,12 +61,7 @@ describe("run action recovery", () => {
       ),
     );
 
-    await act(async () => {
-      root.render(createElement(RunActionBar, { repositoryId: "repo-1", runId: "run-1", hasPullRequest: true }));
-    });
-    await act(async () => {
-      button(container, "Re-run readiness").click();
-    });
+    await renderAndClick(root, container, "Re-run readiness");
 
     expect(container.textContent).toContain("Try again.");
     expect(container.textContent).toContain("The action could not be queued.");
@@ -84,12 +88,7 @@ describe("run action recovery", () => {
       ),
     );
 
-    await act(async () => {
-      root.render(createElement(RunActionBar, { repositoryId: "repo-1", runId: "run-1", hasPullRequest: true }));
-    });
-    await act(async () => {
-      button(container, "Preview release").click();
-    });
+    await renderAndClick(root, container, "Preview release");
 
     expect(container.textContent).toContain("GitHub access needs attention.");
     expect(container.textContent).toContain("request-access-1");
@@ -107,12 +106,7 @@ describe("run action recovery", () => {
       }),
     );
 
-    await act(async () => {
-      root.render(createElement(RunActionBar, { repositoryId: "repo-1", runId: "run-1", hasPullRequest: true }));
-    });
-    await act(async () => {
-      button(container, "Re-run readiness").click();
-    });
+    await renderAndClick(root, container, "Re-run readiness");
 
     expect(container.textContent).toContain("Connection problem.");
     expect(container.textContent).toContain("Check your connection");
