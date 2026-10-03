@@ -3,6 +3,7 @@
 import type { RepositorySetupPreset } from "@boardreadyops/cloud-core/repository-setup";
 import Link from "next/link";
 import { useCallback, useState } from "react";
+import { customerStatusLabel } from "../lib/customer-nomenclature.js";
 import { deriveRepositorySetupState } from "../lib/repository-setup-state.js";
 import { Alert, Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
 import { YamlSyntaxHighlighter } from "./yaml-syntax-highlighter.js";
@@ -530,7 +531,7 @@ function SetupReadinessStatus({
   return (
     <DefinitionGrid>
       <Definition label="Repository">{repository.fullName}</Definition>
-      <Definition label="Probe status">{status?.replaceAll("_", " ") ?? "Not dispatched"}</Definition>
+      <Definition label="Probe status">{status ? customerStatusLabel(status) : "Not dispatched"}</Definition>
       <Definition label="Probe expires">
         {repository.setupProbeExpiresAt ? new Date(repository.setupProbeExpiresAt).toLocaleString() : "Not scheduled"}
       </Definition>
@@ -683,9 +684,9 @@ function SetupProgressDetails({
         {repository.setupRevision === undefined ? "Not created" : `#${repository.setupRevision}`}
       </Definition>
       <Definition label="Persisted policy">{repository.setupPreset?.replaceAll("-", " ") ?? "Not recorded"}</Definition>
-      <Definition label="Workflow">{repository.setupWorkflowStatus?.replaceAll("_", " ") ?? "Not checked"}</Definition>
+      <Definition label="Workflow">{repository.setupWorkflowStatus ? customerStatusLabel(repository.setupWorkflowStatus) : "Not checked"}</Definition>
       <Definition label="Configuration">
-        {repository.setupConfigStatus?.replaceAll("_", " ") ?? "Not checked"}
+        {repository.setupConfigStatus ? customerStatusLabel(repository.setupConfigStatus) : "Not checked"}
       </Definition>
       <Definition label="Verified commit">{verifiedCommit}</Definition>
     </DefinitionGrid>
