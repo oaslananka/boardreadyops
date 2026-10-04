@@ -40,6 +40,12 @@ export type PriceBreak = {
   currency: string;
 };
 
+/** One provider-normalized part that may substitute the observed component. */
+export type ComponentAlternate = {
+  mpn: string;
+  manufacturer?: string | undefined;
+};
+
 export type ComponentObservation = {
   mpn: string;
   manufacturer?: string | undefined;
@@ -76,6 +82,13 @@ export type ComponentObservation = {
    * stock; absent means the provider did not expose enough seller/offer identity to count safely.
    */
   supplierCount?: number | undefined;
+  /**
+   * Small provider-normalized set of similar/substitute parts.
+   *
+   * This is decision support for a known BOM item, not a generic component-search result.
+   * Provider adapters must bound and deduplicate the list before returning it.
+   */
+  alternates?: readonly ComponentAlternate[] | undefined;
 };
 
 /**

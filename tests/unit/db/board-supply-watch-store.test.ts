@@ -35,6 +35,10 @@ describe("board supply watch store: distributor classification and price breaks"
         availableUnits: 4200,
         leadTimeDays: 28,
         supplierCount: 3,
+        alternates: [
+          { mpn: "STM32F103CBT6", manufacturer: "ST" },
+          { mpn: "GD32F103C8T6", manufacturer: "GigaDevice" },
+        ],
       },
     ]);
 
@@ -54,6 +58,10 @@ describe("board supply watch store: distributor classification and price breaks"
       available_units: 4200,
       lead_time_days: 28,
       supplier_count: 3,
+      alternates: [
+        { mpn: "STM32F103CBT6", manufacturer: "ST" },
+        { mpn: "GD32F103C8T6", manufacturer: "GigaDevice" },
+      ],
     });
   });
 
@@ -79,6 +87,10 @@ describe("board supply watch store: distributor classification and price breaks"
         observed_at: now,
         distributor_classification: "authorized-distributor",
         price_breaks: [{ quantity: 1, price: 2.5, currency: "USD" }],
+        alternates: [
+          { mpn: "STM32F103CBT6", manufacturer: "ST" },
+          { mpn: "GD32F103C8T6", manufacturer: "GigaDevice" },
+        ],
       },
     ]);
 
@@ -91,7 +103,35 @@ describe("board supply watch store: distributor classification and price breaks"
       observedAt: now.toISOString(),
       distributorClassification: "authorized-distributor",
       priceBreaks: [{ quantity: 1, price: 2.5, currency: "USD" }],
+      alternates: [
+        { mpn: "STM32F103CBT6", manufacturer: "ST" },
+        { mpn: "GD32F103C8T6", manufacturer: "GigaDevice" },
+      ],
     });
+  });
+
+  it("parses bounded alternate parts and drops malformed or duplicate entries", async () => {
+    const { store } = executor([
+      {
+        mpn: "STM32F103C8T6",
+        manufacturer: "ST",
+        status: "active",
+        source: "nexar",
+        observed_at: now,
+        distributor_classification: null,
+        price_breaks: [],
+        alternates: JSON.stringify([
+          { mpn: "ALT-A", manufacturer: "Acme" },
+          { mpn: "alt-a", manufacturer: "ACME" },
+          { mpn: "" },
+          { mpn: "ALT-B" },
+        ]),
+      },
+    ]);
+
+    const fresh = await store.freshObservations(sharedScope, now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
+
+    expect([...fresh.values()][0]?.alternates).toEqual([{ mpn: "ALT-A", manufacturer: "Acme" }, { mpn: "ALT-B" }]);
   });
 
   it("parses a JSON-string price_breaks column the same as a native jsonb array", async () => {

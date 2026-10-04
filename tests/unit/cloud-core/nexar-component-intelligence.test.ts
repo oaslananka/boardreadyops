@@ -25,11 +25,13 @@ function part(
     }[];
   }[],
   totalAvail?: number,
+  similarParts?: { mpn?: string; manufacturer?: { name?: string } }[],
 ) {
   return {
     mpn,
     ...(totalAvail === undefined ? {} : { totalAvail }),
     ...(manufacturer ? { manufacturer: { name: manufacturer } } : {}),
+    ...(similarParts ? { similarParts } : {}),
     specs: [
       { attribute: { shortname: "lifecyclestatus" }, displayValue: lifecycle },
       { attribute: { shortname: "rohs" }, displayValue: "Compliant" },
@@ -418,6 +420,80 @@ describe("nexar distributor classification and pricing", () => {
     expect(body.query).toContain("company { id name }");
     expect(body.query).toContain("inventoryLevel");
     expect(body.query).toContain("factoryLeadDays");
+    expect(body.query).toContain("similarParts { mpn manufacturer { name } }");
+  });
+
+  it("normalizes, deduplicates, self-filters, and bounds similar parts", async () => {
+    const candidates = [
+      { mpn: "STM32F103C8T6", manufacturer: { name: "ST" } },
+      { mpn: "ALT-A", manufacturer: { name: "Acme" } },
+      { mpn: "alt-a", manufacturer: { name: "ACME" } },
+      { mpn: "ALT-B" },
+      { mpn: " " },
+      ...Array.from({ length: 10 }, (_, index) => ({
+        mpn: `ALT-${String(index + 3)}`,
+        manufacturer: { name: "Vendor" },
+      })),
+    ];
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [part("STM32F103C8T6", "Production", "ST", undefined, undefined, candidates)],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
+
+    expect(observed[0]?.alternates).toEqual([
+      { mpn: "ALT-A", manufacturer: "Acme" },
+      { mpn: "ALT-B" },
+      { mpn: "ALT-3", manufacturer: "Vendor" },
+      { mpn: "ALT-4", manufacturer: "Vendor" },
+      { mpn: "ALT-5", manufacturer: "Vendor" },
+      { mpn: "ALT-6", manufacturer: "Vendor" },
+      { mpn: "ALT-7", manufacturer: "Vendor" },
+      { mpn: "ALT-8", manufacturer: "Vendor" },
+    ]);
+  });
+
+  it("keeps an unknown-lifecycle observation when alternates are the only usable supply signal", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("MYSTERY-ALT", "Preliminary", undefined, undefined, undefined, [
+                    { mpn: "KNOWN-GOOD", manufacturer: { name: "Trusted Vendor" } },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    expect(await nexar.lookup([{ mpn: "MYSTERY-ALT" }])).toEqual([
+      {
+        mpn: "MYSTERY-ALT",
+        status: "unknown",
+        source: "nexar",
+        observedAt: now,
+        distributorClassification: "unknown",
+        alternates: [{ mpn: "KNOWN-GOOD", manufacturer: "Trusted Vendor" }],
+      },
+    ]);
   });
 
   it("counts distinct supplier companies that carry positive inventory", async () => {

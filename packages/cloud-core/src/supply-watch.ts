@@ -1,4 +1,5 @@
 import {
+  type ComponentAlternate,
   type ComponentDistributorClassification,
   type ComponentIntelligenceProvider,
   type ComponentLifecycleStatus,
@@ -73,6 +74,7 @@ export type SupplyWatchStore = {
         availableUnits?: number | undefined;
         leadTimeDays?: number | undefined;
         supplierCount?: number | undefined;
+        alternates?: readonly ComponentAlternate[] | undefined;
       }
     >
   >;
@@ -91,6 +93,7 @@ export type SupplyWatchStore = {
       availableUnits?: number | undefined;
       leadTimeDays?: number | undefined;
       supplierCount?: number | undefined;
+      alternates?: readonly ComponentAlternate[] | undefined;
     }[],
   ): Promise<number>;
   reconcileFindings(
