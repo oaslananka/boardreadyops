@@ -48,9 +48,9 @@ export const notificationEventCatalog: readonly NotificationEventDefinition[] = 
   },
   {
     type: "supply.risk_detected",
-    label: "A part went end-of-life or NRND",
+    label: "A part has a supply-chain risk",
     description:
-      "Continuous supply watch found a component on a watched board that is no longer safe to design in. This is the one that arrives months before it would otherwise hurt.",
+      "Continuous supply watch found lifecycle risk or zero availability on a component used by a watched board, before the next release catches it.",
     defaultOn: true,
   },
   {
