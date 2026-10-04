@@ -35,7 +35,7 @@ export type SupplyFindingInput = {
   mpn: string;
   manufacturer?: string | undefined;
   reference?: string | undefined;
-  status: "nrnd" | "eol" | "obsolete";
+  status: "nrnd" | "eol" | "obsolete" | "unavailable";
   severity: "critical" | "high" | "medium";
   /** Stable provider identifier captured when the finding first opens. */
   source: string;
