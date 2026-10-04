@@ -33,6 +33,8 @@ describe("board supply watch store: distributor classification and price breaks"
         ],
         availableUnits: 4200,
         leadTimeDays: 28,
+        supplierCount: 3,
+        supplierCount: 3,
       },
     ]);
 
@@ -51,6 +53,7 @@ describe("board supply watch store: distributor classification and price breaks"
       ],
       available_units: 4200,
       lead_time_days: 28,
+      supplier_count: 3,
     });
   });
 
@@ -167,6 +170,7 @@ describe("board supply watch store: cache scope", () => {
         price_breaks: [],
         available_units: 4200,
         lead_time_days: 28,
+        supplier_count: 3,
       },
     ]);
 
@@ -181,6 +185,7 @@ describe("board supply watch store: cache scope", () => {
       source: "nexar",
       availableUnits: 4200,
       leadTimeDays: 28,
+      supplierCount: 3,
     });
   });
 
@@ -251,10 +256,11 @@ describe("board supply watch store: cache scope", () => {
     expect(sql).toContain("installation_id, provider");
     expect(sql).toContain("available_units");
     expect(sql).toContain("lead_time_days");
+    expect(sql).toContain("supplier_count");
     expect(params[0]).toBe("installation-1");
     expect(params[1]).toBe("nexar");
     const payload = JSON.parse(String(params[2])) as Record<string, unknown>[];
-    expect(payload[0]).toMatchObject({ available_units: 4200, lead_time_days: 28 });
+    expect(payload[0]).toMatchObject({ available_units: 4200, lead_time_days: 28, supplier_count: 3 });
   });
 });
 
