@@ -12,6 +12,7 @@ export * from "./github-command.js";
 export * from "./github-mutation-service.js";
 export * from "./notifications.js";
 export * from "./policy-engine.js";
+export * from "./production-outcomes.js";
 export * from "./review-diff.js";
 export * from "./runner-request-signature.js";
 export * from "./storage.js";
