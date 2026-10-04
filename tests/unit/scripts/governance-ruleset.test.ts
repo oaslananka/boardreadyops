@@ -113,17 +113,29 @@ describe("main branch governance ruleset", () => {
     },
   );
 
-  it("keeps merge enforcement GitHub-native without Mergify queue automation", async () => {
+  it("keeps GitHub rules authoritative while Mergify only merges explicitly queued PRs", async () => {
     const mergifySource = await repositoryFile(".mergify.yml");
-    const mergify = (await import("js-yaml")).load(mergifySource) as Record<string, unknown>;
+    const mergify = (await import("js-yaml")).load(mergifySource) as {
+      queue_rules?: Array<{ name: string; merge_method?: string; queue_conditions?: string[] }>;
+      merge_protections_settings?: Record<string, unknown>;
+      scopes?: unknown;
+    };
     const ruleset = JSON.parse(await repositoryFile(".github/rulesets/main.json")) as {
       rules: Array<{ type: string }>;
       bypass_actors: Array<{ actor_id: number; actor_type: string; bypass_mode: string }>;
     };
 
     expect(mergify).not.toHaveProperty("merge_queue");
-    expect(mergify).not.toHaveProperty("queue_rules");
-    expect(mergify).not.toHaveProperty("scopes");
+    expect(mergify.scopes).toBeUndefined();
+    expect(mergify.merge_protections_settings).toBeUndefined();
+    expect(mergify.queue_rules).toEqual([
+      {
+        name: "main",
+        merge_method: "squash",
+        queue_conditions: ["base = main", "-draft"],
+      },
+    ]);
+    expect(mergifySource).not.toContain("auto_merge_conditions");
     expect(ruleset.rules.some((rule) => rule.type === "pull_request")).toBe(true);
     expect(ruleset.rules.some((rule) => rule.type === "required_status_checks")).toBe(true);
     expect(ruleset.bypass_actors.some((actor) => actor.actor_type === "Integration")).toBe(false);
