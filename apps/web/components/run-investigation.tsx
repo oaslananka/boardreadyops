@@ -512,7 +512,10 @@ function ProductionOutcomesPanel({ run }: Readonly<{ run: RunDetail }>) {
       title="Production outcomes"
       description="Release-linked manufacturing observations. Use them to compare outcomes; correlation alone does not prove a release caused a manufacturing change."
     >
-      <section aria-label="Production release comparison" className="mb-4 rounded-md border border-border bg-muted/30 p-3">
+      <section
+        aria-label="Production release comparison"
+        className="mb-4 rounded-md border border-border bg-muted/30 p-3"
+      >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Release comparison</h3>
@@ -540,9 +543,15 @@ function ProductionOutcomesPanel({ run }: Readonly<{ run: RunDetail }>) {
                 <Definition label="Yield change">
                   {formatYieldDelta(current.firstPassYieldBps, previous.firstPassYieldBps)}
                 </Definition>
-                <Definition label="Rework">{current.reworkCount} now · {previous.reworkCount} previous</Definition>
-                <Definition label="Scrap">{current.scrapCount} now · {previous.scrapCount} previous</Definition>
-                <Definition label="Defects">{current.defectCount} now · {previous.defectCount} previous</Definition>
+                <Definition label="Rework">
+                  {current.reworkCount} now · {previous.reworkCount} previous
+                </Definition>
+                <Definition label="Scrap">
+                  {current.scrapCount} now · {previous.scrapCount} previous
+                </Definition>
+                <Definition label="Defects">
+                  {current.defectCount} now · {previous.defectCount} previous
+                </Definition>
               </>
             ) : (
               <Definition label="Previous release">No earlier production-linked release</Definition>

@@ -780,18 +780,18 @@ export async function lookupRunDashboard(
 
   const [findingsResult, artifactsResult, categoryBreakdownResult, productionResult, productionBaselineResult] =
     await Promise.all([
-    executor.query(
-      `select findings.id, findings.rule_id, findings.severity, findings.message,
+      executor.query(
+        `select findings.id, findings.rule_id, findings.severity, findings.message,
               findings.path, findings.kind, findings.waived_at
        from findings
        where ${findingScope.sql}
        order by ${findingOrder(filters.findingSort)}
        limit $${findingScope.parameters.length + 1}
        offset $${findingScope.parameters.length + 2}`,
-      [...findingScope.parameters, filters.pageSize, findingOffset],
-    ),
-    executor.query(
-      `select artifacts.id, artifacts.kind, artifacts.name, artifacts.sha256,
+        [...findingScope.parameters, filters.pageSize, findingOffset],
+      ),
+      executor.query(
+        `select artifacts.id, artifacts.kind, artifacts.name, artifacts.sha256,
               artifacts.bytes, artifacts.role, artifacts.content_type,
               artifacts.execution_attempt_id, artifacts.retention_until, artifacts.uploaded_at
        from artifacts
@@ -799,13 +799,13 @@ export async function lookupRunDashboard(
        order by ${artifactOrder(filters.artifactSort)}
        limit $${artifactScope.parameters.length + 1}
        offset $${artifactScope.parameters.length + 2}`,
-      [...artifactScope.parameters, filters.pageSize, artifactOffset],
-    ),
-    // Whole-run domain breakdown, independent of the findings table's own filter/pagination --
-    // the score cards answer "what does this run look like overall", the table answers
-    // "show me the filtered detail". lower(severity) equivalences mirror findingOrder() below.
-    executor.query(
-      `select coalesce(category, 'unclassified') as category,
+        [...artifactScope.parameters, filters.pageSize, artifactOffset],
+      ),
+      // Whole-run domain breakdown, independent of the findings table's own filter/pagination --
+      // the score cards answer "what does this run look like overall", the table answers
+      // "show me the filtered detail". lower(severity) equivalences mirror findingOrder() below.
+      executor.query(
+        `select coalesce(category, 'unclassified') as category,
               count(*)::int as total,
               count(*) filter (where lower(severity) in ('critical', 'error'))::int as critical,
               count(*) filter (where lower(severity) = 'high')::int as high,
@@ -816,10 +816,10 @@ export async function lookupRunDashboard(
         where run_id = $1
         group by coalesce(category, 'unclassified')
         order by coalesce(category, 'unclassified')`,
-      [runId],
-    ),
-    executor.query(
-      `select production_batches.id,
+        [runId],
+      ),
+      executor.query(
+        `select production_batches.id,
               production_batches.external_batch_id,
               production_batches.manufacturer,
               production_batches.manufactured_on::text,
@@ -852,10 +852,10 @@ export async function lookupRunDashboard(
        group by production_batches.id
        order by production_batches.manufactured_on desc, production_batches.imported_at desc, production_batches.id desc
        limit 50`,
-      [runId],
-    ),
-    executor.query(
-      `with current_run as (
+        [runId],
+      ),
+      executor.query(
+        `with current_run as (
          select release_runs.repository_id, release_runs.started_at
            from release_runs
           where release_runs.id = $1
@@ -915,9 +915,9 @@ export async function lookupRunDashboard(
          join production_batches on production_batches.release_run_id = previous_run.id
          left join defect_totals on defect_totals.release_run_id = previous_run.id
         group by previous_run.id, previous_run.commit_sha, previous_run.completed_at, defect_totals.defect_count`,
-      [runId],
-    ),
-  ]);
+        [runId],
+      ),
+    ]);
 
   const findings = rows(findingsResult).map(
     (row): FindingDetail => ({

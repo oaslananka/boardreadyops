@@ -127,6 +127,17 @@ function sampleRun(): RunDetail {
         defects: [{ category: "aoi", code: "QFN_BRIDGE", count: 3, notes: "U3" }],
       },
     ],
+    productionBaseline: {
+      runId: "run-previous",
+      commitSha: "f".repeat(40),
+      completedAt: "2026-06-30T00:02:00.000Z",
+      batchCount: 2,
+      quantity: 1000,
+      firstPassYieldBps: 9700,
+      reworkCount: 18,
+      scrapCount: 5,
+      defectCount: 9,
+    },
     boards: [
       {
         boardId: "7b000000-0000-4000-8000-0000000000b1",
@@ -245,7 +256,52 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("98.75%");
     expect(markup).toContain("QFN_BRIDGE");
     expect(markup).toContain("pilot-outcomes.csv");
+    expect(markup).toContain("Previous release fffffff");
+    expect(markup).toContain('href="/runs/run-previous"');
+    expect(markup).toContain("Yield change");
+    expect(markup).toContain("+1.75 pp");
     expect(markup).toContain("correlation alone does not prove a release caused a manufacturing change");
+  });
+
+  it("weights first-pass yield by batch quantity when comparing production releases", () => {
+    const run = sampleRun();
+    run.productionBatches = [
+      ...run.productionBatches,
+      {
+        id: "batch-2",
+        externalBatchId: "PILOT-43",
+        manufacturer: "Acme EMS",
+        manufacturedOn: "2026-07-29",
+        quantity: 250,
+        firstPassYieldBps: 9500,
+        reworkCount: 4,
+        scrapCount: 1,
+        notes: undefined,
+        correctiveAction: undefined,
+        sourceKind: "csv",
+        sourceName: "pilot-outcomes-2.csv",
+        sourceSha256: "d".repeat(64),
+        importedAt: "2026-07-30T00:04:00.000Z",
+        defects: [{ category: "functional_test", code: "BOOT_FAIL", count: 1, notes: undefined }],
+      },
+    ];
+
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+
+    expect(markup).toContain("97.81%");
+    expect(markup).toContain("+0.81 pp");
+    expect(markup).toContain("10 now · 18 previous");
+    expect(markup).toContain("4 now · 9 previous");
+  });
+
+  it("explains when there is no earlier production-linked release to compare", () => {
+    const run = sampleRun();
+    run.productionBaseline = undefined;
+
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+
+    expect(markup).toContain("No earlier production-linked release");
+    expect(markup).not.toContain("Previous release fffffff");
   });
 
   it("links an unreviewed run to persistent review publishing guidance", () => {

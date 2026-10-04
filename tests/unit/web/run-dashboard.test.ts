@@ -18,10 +18,11 @@ function executorWithResults(results: unknown[]): {
 }
 
 function emptyDashboardRows(): unknown[] {
-  // findingCount, artifactCount, attempts, transitions, boards, findings, artifacts, categoryBreakdown, productionBatches
+  // findingCount, artifactCount, attempts, transitions, boards, findings, artifacts, categoryBreakdown, productionBatches, productionBaseline
   return [
     { rows: [{ total: 0 }] },
     { rows: [{ total: 0 }] },
+    { rows: [] },
     { rows: [] },
     { rows: [] },
     { rows: [] },
@@ -156,7 +157,7 @@ describe("run dashboard data", () => {
     const result = await lookupRunDashboard("public-run", executor);
 
     expect(result).toMatchObject({ state: "found", run: { repositoryPrivate: false } });
-    expect(query).toHaveBeenCalledTimes(10);
+    expect(query).toHaveBeenCalledTimes(11);
   });
 
   it("loads a private repository dashboard only after explicit repository authorization", async () => {
@@ -179,7 +180,7 @@ describe("run dashboard data", () => {
       name: "hardware",
       private: true,
     });
-    expect(query).toHaveBeenCalledTimes(10);
+    expect(query).toHaveBeenCalledTimes(11);
   });
 
   it("loads bounded release-linked production evidence and drops malformed batch or defect rows", async () => {
@@ -220,6 +221,21 @@ describe("run dashboard data", () => {
         },
       ],
     };
+    children[9] = {
+      rows: [
+        {
+          run_id: "run-previous",
+          commit_sha: "b".repeat(40),
+          completed_at: "2026-09-20T12:00:00.000Z",
+          batch_count: 2,
+          quantity: 900,
+          first_pass_yield_bps: 9725,
+          rework_count: 14,
+          scrap_count: 4,
+          defect_count: 8,
+        },
+      ],
+    };
     const { executor, query } = executorWithResults([{ rows: [baseRunRow()] }, ...children]);
 
     const result = await lookupRunDashboard("run-state", executor);
@@ -243,6 +259,17 @@ describe("run dashboard data", () => {
             defects: [{ category: "aoi", code: "QFN_BRIDGE", count: 3, notes: "U3" }],
           },
         ],
+        productionBaseline: {
+          runId: "run-previous",
+          commitSha: "b".repeat(40),
+          completedAt: "2026-09-20T12:00:00.000Z",
+          batchCount: 2,
+          quantity: 900,
+          firstPassYieldBps: 9725,
+          reworkCount: 14,
+          scrapCount: 4,
+          defectCount: 8,
+        },
       },
     });
     const productionSql = String(query.mock.calls[9]?.[0]);
@@ -250,7 +277,12 @@ describe("run dashboard data", () => {
     expect(productionSql).toContain("limit 50");
     expect(productionSql).toContain("production_batch_defects");
     expect(query.mock.calls[9]?.[1]).toEqual(["run-state"]);
-    expect(query).toHaveBeenCalledTimes(10);
+    const comparisonSql = String(query.mock.calls[10]?.[0]);
+    expect(comparisonSql).toContain("candidate.repository_id");
+    expect(comparisonSql).toContain("production_batches.release_run_id = candidate.id");
+    expect(comparisonSql).toContain("candidate.started_at < current_run.started_at");
+    expect(query.mock.calls[10]?.[1]).toEqual(["run-state"]);
+    expect(query).toHaveBeenCalledTimes(11);
   });
 
   it("normalizes malformed scalar, collection, and report-link values", async () => {
@@ -590,7 +622,7 @@ describe("run dashboard data", () => {
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
     expect(categoryBreakdownSql).toContain("group by coalesce(category, 'unclassified')");
     expect(query.mock.calls[8]?.[1]).toEqual(["run-123"]);
-    expect(query).toHaveBeenCalledTimes(10);
+    expect(query).toHaveBeenCalledTimes(11);
   });
 
   it("surfaces stale, reconciliation, dead-letter, and partial-data states from durable data", async () => {
