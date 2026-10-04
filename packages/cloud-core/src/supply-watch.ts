@@ -211,6 +211,30 @@ type RiskObservation = {
   trust?: ComponentDataTrust | undefined;
 };
 
+function riskObservationFrom(
+  observation: {
+    status: ComponentLifecycleStatus;
+    source: string;
+    availableUnits?: number | undefined;
+    restrictedSubstances?: boolean | undefined;
+    complianceNotes?: readonly string[] | undefined;
+    trust?: ComponentDataTrust | undefined;
+  },
+  retainEvidence: boolean,
+): RiskObservation {
+  return {
+    status: observation.status,
+    source: observation.source,
+    retainEvidence,
+    ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
+    ...(observation.restrictedSubstances === undefined
+      ? {}
+      : { restrictedSubstances: observation.restrictedSubstances }),
+    ...(observation.complianceNotes === undefined ? {} : { complianceNotes: observation.complianceNotes }),
+    ...(observation.trust === undefined ? {} : { trust: observation.trust }),
+  };
+}
+
 function riskStatus(observation: RiskObservation): SupplyRiskStatus | undefined {
   if (isRiskyLifecycleStatus(observation.status)) return observation.status;
   if (observation.availableUnits === 0) return "unavailable";
@@ -285,17 +309,7 @@ async function queryMissingObservations(
     );
   }
   for (const observation of observed) {
-    observations.set(componentKey(observation), {
-      status: observation.status,
-      source: observation.source,
-      retainEvidence: cacheScope !== undefined,
-      ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
-      ...(observation.restrictedSubstances === undefined
-        ? {}
-        : { restrictedSubstances: observation.restrictedSubstances }),
-      ...(observation.complianceNotes === undefined ? {} : { complianceNotes: observation.complianceNotes }),
-      ...(observation.trust === undefined ? {} : { trust: observation.trust }),
-    });
+    observations.set(componentKey(observation), riskObservationFrom(observation, cacheScope !== undefined));
   }
   return { partsQueried, observationsRecorded };
 }
@@ -346,17 +360,10 @@ async function evaluateSingleBoard(
 
   const observations = new Map<string, RiskObservation>();
   for (const [key, observation] of cached) {
-    observations.set(key, {
-      status: observation.status as ComponentLifecycleStatus,
-      source: observation.source,
-      retainEvidence: true,
-      ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
-      ...(observation.restrictedSubstances === undefined
-        ? {}
-        : { restrictedSubstances: observation.restrictedSubstances }),
-      ...(observation.complianceNotes === undefined ? {} : { complianceNotes: observation.complianceNotes }),
-      ...(observation.trust === undefined ? {} : { trust: observation.trust }),
-    });
+    observations.set(
+      key,
+      riskObservationFrom({ ...observation, status: observation.status as ComponentLifecycleStatus }, true),
+    );
   }
 
   const { partsQueried, observationsRecorded } = await queryMissingObservations(

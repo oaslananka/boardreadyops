@@ -147,7 +147,7 @@ describe("board supply watch store: distributor classification and price breaks"
   });
 
   it("bounds compliance notes and ignores invalid trust/boolean values on read", async () => {
-    const notes = Array.from({ length: 12 }, (_, index) => "  note-" + index + "-" + "x".repeat(240) + "  ");
+    const notes = Array.from({ length: 12 }, (_, index) => `  note-${index}-${"x".repeat(240)}  `);
     const { store } = executor([
       {
         mpn: "STM32F103C8T6",
