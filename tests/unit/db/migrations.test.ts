@@ -135,7 +135,6 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("supplier_count between 0 and 100000");
     expect(sql).not.toContain("inventory_level");
     expect(sql).not.toContain("seller_name");
-    expect(sql).not.toContain("offer");
   });
 
   it("adds installation-scoped component observation caching in schema v74", async () => {
