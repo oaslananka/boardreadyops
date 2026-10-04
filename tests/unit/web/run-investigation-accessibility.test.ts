@@ -127,6 +127,14 @@ function sampleRun(): RunDetail {
         defects: [{ category: "aoi", code: "QFN_BRIDGE", count: 3, notes: "U3" }],
       },
     ],
+    productionSummary: {
+      batchCount: 3,
+      quantity: 2000,
+      firstPassYieldBps: 9850,
+      reworkCount: 11,
+      scrapCount: 3,
+      defectCount: 7,
+    },
     productionBaseline: {
       runId: "run-previous",
       commitSha: "f".repeat(40),
@@ -254,17 +262,21 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("Production outcomes");
     expect(markup).toContain("PILOT-42");
     expect(markup).toContain("98.75%");
+    expect(markup).toContain("98.5%");
+    expect(markup).toContain("3");
+    expect(markup).toContain("2000");
     expect(markup).toContain("QFN_BRIDGE");
     expect(markup).toContain("pilot-outcomes.csv");
     expect(markup).toContain("Previous release fffffff");
     expect(markup).toContain('href="/runs/run-previous"');
     expect(markup).toContain("Yield change");
-    expect(markup).toContain("+1.75 pp");
+    expect(markup).toContain("+1.5 pp");
     expect(markup).toContain("correlation alone does not prove a release caused a manufacturing change");
   });
 
-  it("weights first-pass yield by batch quantity when comparing production releases", () => {
+  it("weights visible batches only as a fixture fallback when no server aggregate is supplied", () => {
     const run = sampleRun();
+    run.productionSummary = undefined;
     run.productionBatches = [
       ...run.productionBatches,
       {

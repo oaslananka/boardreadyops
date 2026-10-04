@@ -18,10 +18,11 @@ function executorWithResults(results: unknown[]): {
 }
 
 function emptyDashboardRows(): unknown[] {
-  // findingCount, artifactCount, attempts, transitions, boards, findings, artifacts, categoryBreakdown, productionBatches, productionBaseline
+  // findingCount, artifactCount, attempts, transitions, boards, findings, artifacts, categoryBreakdown, productionBatches, productionSummary, productionBaseline
   return [
     { rows: [{ total: 0 }] },
     { rows: [{ total: 0 }] },
+    { rows: [] },
     { rows: [] },
     { rows: [] },
     { rows: [] },
@@ -157,7 +158,7 @@ describe("run dashboard data", () => {
     const result = await lookupRunDashboard("public-run", executor);
 
     expect(result).toMatchObject({ state: "found", run: { repositoryPrivate: false } });
-    expect(query).toHaveBeenCalledTimes(11);
+    expect(query).toHaveBeenCalledTimes(12);
   });
 
   it("loads a private repository dashboard only after explicit repository authorization", async () => {
@@ -180,7 +181,7 @@ describe("run dashboard data", () => {
       name: "hardware",
       private: true,
     });
-    expect(query).toHaveBeenCalledTimes(11);
+    expect(query).toHaveBeenCalledTimes(12);
   });
 
   it("loads bounded release-linked production evidence and drops malformed batch or defect rows", async () => {
@@ -224,6 +225,18 @@ describe("run dashboard data", () => {
     children[9] = {
       rows: [
         {
+          batch_count: 75,
+          quantity: 50000,
+          first_pass_yield_bps: 9810,
+          rework_count: 320,
+          scrap_count: 47,
+          defect_count: 118,
+        },
+      ],
+    };
+    children[10] = {
+      rows: [
+        {
           run_id: "run-previous",
           commit_sha: "b".repeat(40),
           completed_at: "2026-09-20T12:00:00.000Z",
@@ -259,6 +272,14 @@ describe("run dashboard data", () => {
             defects: [{ category: "aoi", code: "QFN_BRIDGE", count: 3, notes: "U3" }],
           },
         ],
+        productionSummary: {
+          batchCount: 75,
+          quantity: 50000,
+          firstPassYieldBps: 9810,
+          reworkCount: 320,
+          scrapCount: 47,
+          defectCount: 118,
+        },
         productionBaseline: {
           runId: "run-previous",
           commitSha: "b".repeat(40),
@@ -277,12 +298,18 @@ describe("run dashboard data", () => {
     expect(productionSql).toContain("limit 50");
     expect(productionSql).toContain("production_batch_defects");
     expect(query.mock.calls[9]?.[1]).toEqual(["run-state"]);
-    const comparisonSql = String(query.mock.calls[10]?.[0]);
+    const currentSummarySql = String(query.mock.calls[10]?.[0]);
+    expect(currentSummarySql).toContain("count(production_batches.id)::int as batch_count");
+    expect(currentSummarySql).toContain("production_batches.release_run_id = $1");
+    expect(currentSummarySql).not.toContain("limit 50");
+    expect(query.mock.calls[10]?.[1]).toEqual(["run-state"]);
+
+    const comparisonSql = String(query.mock.calls[11]?.[0]);
     expect(comparisonSql).toContain("candidate.repository_id");
     expect(comparisonSql).toContain("production_batches.release_run_id = candidate.id");
     expect(comparisonSql).toContain("candidate.started_at < current_run.started_at");
-    expect(query.mock.calls[10]?.[1]).toEqual(["run-state"]);
-    expect(query).toHaveBeenCalledTimes(11);
+    expect(query.mock.calls[11]?.[1]).toEqual(["run-state"]);
+    expect(query).toHaveBeenCalledTimes(12);
   });
 
   it("normalizes malformed scalar, collection, and report-link values", async () => {
@@ -622,7 +649,7 @@ describe("run dashboard data", () => {
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
     expect(categoryBreakdownSql).toContain("group by coalesce(category, 'unclassified')");
     expect(query.mock.calls[8]?.[1]).toEqual(["run-123"]);
-    expect(query).toHaveBeenCalledTimes(11);
+    expect(query).toHaveBeenCalledTimes(12);
   });
 
   it("surfaces stale, reconciliation, dead-letter, and partial-data states from durable data", async () => {

@@ -497,13 +497,13 @@ function formatYieldDelta(current: number | undefined, previous: number | undefi
   if (current === undefined || previous === undefined) return "Not comparable";
   const delta = (current - previous) / 100;
   const prefix = delta > 0 ? "+" : "";
-  return `${prefix}${delta.toFixed(2).replace(/\.00$/u, "")} pp`;
+  return `${prefix}${delta.toFixed(2).replace(/\.?0+$/u, "")} pp`;
 }
 
 function ProductionOutcomesPanel({ run }: Readonly<{ run: RunDetail }>) {
   if (run.productionBatches.length === 0) return null;
 
-  const current = summarizeProductionBatches(run.productionBatches);
+  const current = run.productionSummary ?? summarizeProductionBatches(run.productionBatches);
   const previous = run.productionBaseline;
 
   return (

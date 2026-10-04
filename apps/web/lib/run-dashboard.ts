@@ -134,16 +134,19 @@ type RunProductionDefectDetail = {
   notes: string | undefined;
 };
 
-type RunProductionReleaseSummary = {
-  runId: string;
-  commitSha: string;
-  completedAt: string | undefined;
+type RunProductionMetrics = {
   batchCount: number;
   quantity: number;
   firstPassYieldBps: number | undefined;
   reworkCount: number;
   scrapCount: number;
   defectCount: number;
+};
+
+type RunProductionReleaseSummary = RunProductionMetrics & {
+  runId: string;
+  commitSha: string;
+  completedAt: string | undefined;
 };
 
 type RunProductionBatchDetail = {
@@ -213,6 +216,7 @@ export type RunDetail = {
   transitions: TransitionDetail[];
   boards: RunBoardDetail[];
   productionBatches: RunProductionBatchDetail[];
+  productionSummary?: RunProductionMetrics | undefined;
   productionBaseline?: RunProductionReleaseSummary | undefined;
 };
 
@@ -778,20 +782,26 @@ export async function lookupRunDashboard(
   const findingOffset = (findingsPage.page - 1) * filters.pageSize;
   const artifactOffset = (artifactsPage.page - 1) * filters.pageSize;
 
-  const [findingsResult, artifactsResult, categoryBreakdownResult, productionResult, productionBaselineResult] =
-    await Promise.all([
-      executor.query(
-        `select findings.id, findings.rule_id, findings.severity, findings.message,
+  const [
+    findingsResult,
+    artifactsResult,
+    categoryBreakdownResult,
+    productionResult,
+    productionSummaryResult,
+    productionBaselineResult,
+  ] = await Promise.all([
+    executor.query(
+      `select findings.id, findings.rule_id, findings.severity, findings.message,
               findings.path, findings.kind, findings.waived_at
        from findings
        where ${findingScope.sql}
        order by ${findingOrder(filters.findingSort)}
        limit $${findingScope.parameters.length + 1}
        offset $${findingScope.parameters.length + 2}`,
-        [...findingScope.parameters, filters.pageSize, findingOffset],
-      ),
-      executor.query(
-        `select artifacts.id, artifacts.kind, artifacts.name, artifacts.sha256,
+      [...findingScope.parameters, filters.pageSize, findingOffset],
+    ),
+    executor.query(
+      `select artifacts.id, artifacts.kind, artifacts.name, artifacts.sha256,
               artifacts.bytes, artifacts.role, artifacts.content_type,
               artifacts.execution_attempt_id, artifacts.retention_until, artifacts.uploaded_at
        from artifacts
@@ -799,13 +809,13 @@ export async function lookupRunDashboard(
        order by ${artifactOrder(filters.artifactSort)}
        limit $${artifactScope.parameters.length + 1}
        offset $${artifactScope.parameters.length + 2}`,
-        [...artifactScope.parameters, filters.pageSize, artifactOffset],
-      ),
-      // Whole-run domain breakdown, independent of the findings table's own filter/pagination --
-      // the score cards answer "what does this run look like overall", the table answers
-      // "show me the filtered detail". lower(severity) equivalences mirror findingOrder() below.
-      executor.query(
-        `select coalesce(category, 'unclassified') as category,
+      [...artifactScope.parameters, filters.pageSize, artifactOffset],
+    ),
+    // Whole-run domain breakdown, independent of the findings table's own filter/pagination --
+    // the score cards answer "what does this run look like overall", the table answers
+    // "show me the filtered detail". lower(severity) equivalences mirror findingOrder() below.
+    executor.query(
+      `select coalesce(category, 'unclassified') as category,
               count(*)::int as total,
               count(*) filter (where lower(severity) in ('critical', 'error'))::int as critical,
               count(*) filter (where lower(severity) = 'high')::int as high,
@@ -816,10 +826,10 @@ export async function lookupRunDashboard(
         where run_id = $1
         group by coalesce(category, 'unclassified')
         order by coalesce(category, 'unclassified')`,
-        [runId],
-      ),
-      executor.query(
-        `select production_batches.id,
+      [runId],
+    ),
+    executor.query(
+      `select production_batches.id,
               production_batches.external_batch_id,
               production_batches.manufacturer,
               production_batches.manufactured_on::text,
@@ -852,10 +862,43 @@ export async function lookupRunDashboard(
        group by production_batches.id
        order by production_batches.manufactured_on desc, production_batches.imported_at desc, production_batches.id desc
        limit 50`,
-        [runId],
-      ),
-      executor.query(
-        `with current_run as (
+      [runId],
+    ),
+    executor.query(
+      `select count(production_batches.id)::int as batch_count,
+              coalesce(sum(production_batches.quantity), 0)::int as quantity,
+              case
+                when coalesce(
+                  sum(production_batches.quantity) filter (
+                    where production_batches.first_pass_yield_bps is not null
+                  ),
+                  0
+                ) > 0
+                  then round(
+                    sum(
+                      production_batches.first_pass_yield_bps::numeric * production_batches.quantity
+                    ) filter (where production_batches.first_pass_yield_bps is not null)
+                    / sum(production_batches.quantity) filter (
+                      where production_batches.first_pass_yield_bps is not null
+                    )
+                  )::int
+                else null
+              end as first_pass_yield_bps,
+              coalesce(sum(production_batches.rework_count), 0)::int as rework_count,
+              coalesce(sum(production_batches.scrap_count), 0)::int as scrap_count,
+              coalesce(sum(defect_totals.defect_count), 0)::int as defect_count
+         from production_batches
+         left join (
+           select production_batch_defects.production_batch_id,
+                  sum(production_batch_defects.defect_count)::int as defect_count
+             from production_batch_defects
+            group by production_batch_defects.production_batch_id
+         ) as defect_totals on defect_totals.production_batch_id = production_batches.id
+        where production_batches.release_run_id = $1`,
+      [runId],
+    ),
+    executor.query(
+      `with current_run as (
          select release_runs.repository_id, release_runs.started_at
            from release_runs
           where release_runs.id = $1
@@ -915,9 +958,9 @@ export async function lookupRunDashboard(
          join production_batches on production_batches.release_run_id = previous_run.id
          left join defect_totals on defect_totals.release_run_id = previous_run.id
         group by previous_run.id, previous_run.commit_sha, previous_run.completed_at, defect_totals.defect_count`,
-        [runId],
-      ),
-    ]);
+      [runId],
+    ),
+  ]);
 
   const findings = rows(findingsResult).map(
     (row): FindingDetail => ({
@@ -1054,6 +1097,22 @@ export async function lookupRunDashboard(
     ];
   });
 
+  const productionSummaryRow = rows(productionSummaryResult)[0];
+  const productionSummary = (() => {
+    if (!productionSummaryRow) return undefined;
+    const batchCount = numberValue(productionSummaryRow, "batch_count");
+    const quantity = numberValue(productionSummaryRow, "quantity");
+    if (batchCount === undefined || batchCount < 1 || quantity === undefined) return undefined;
+    return {
+      batchCount,
+      quantity,
+      firstPassYieldBps: numberValue(productionSummaryRow, "first_pass_yield_bps"),
+      reworkCount: numberValue(productionSummaryRow, "rework_count") ?? 0,
+      scrapCount: numberValue(productionSummaryRow, "scrap_count") ?? 0,
+      defectCount: numberValue(productionSummaryRow, "defect_count") ?? 0,
+    } satisfies RunProductionMetrics;
+  })();
+
   const productionBaselineRow = rows(productionBaselineResult)[0];
   const productionBaseline = (() => {
     if (!productionBaselineRow) return undefined;
@@ -1147,6 +1206,7 @@ export async function lookupRunDashboard(
       transitions,
       boards,
       productionBatches,
+      productionSummary,
       productionBaseline,
     },
   };
@@ -1370,6 +1430,7 @@ function buildDemoRun(runId: string, filters: RunDashboardFilters = {}): RunDeta
     // Two boards, one carrying a part already at lifecycle risk, so the demo shows what the
     // supply signals look like rather than an empty panel.
     productionBatches: [],
+    productionSummary: undefined,
     productionBaseline: undefined,
     boards: [
       {
