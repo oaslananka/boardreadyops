@@ -1,10 +1,10 @@
+import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedApiContext, RepositoryApiContext } from "../../../apps/web/lib/api-auth.js";
 import {
   handleProductionOutcomeCsvImport,
   type ProductionOutcomeImportDependencies,
 } from "../../../apps/web/lib/production-outcome-routes.js";
 import type { ProductionOutcomeStore } from "../../../packages/db/src/production-outcome-store.js";
-import { describe, expect, it, vi } from "vitest";
 
 const auth: AuthenticatedApiContext = {
   ok: true,
@@ -109,10 +109,7 @@ describe("production outcome CSV import route", () => {
     const response = await handleProductionOutcomeCsvImport(request(), "run-other", h.dependencies);
 
     expect(response.status).toBe(404);
-    expect(h.query).toHaveBeenCalledWith(
-      expect.stringContaining("release_runs.id = $1"),
-      ["run-other", "repo-1"],
-    );
+    expect(h.query).toHaveBeenCalledWith(expect.stringContaining("release_runs.id = $1"), ["run-other", "repo-1"]);
     expect(String(h.query.mock.calls[0]?.[0])).toContain("repositories.id = $2");
     expect(h.importBatch).not.toHaveBeenCalled();
     expect(h.close).toHaveBeenCalledOnce();

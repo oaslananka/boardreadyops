@@ -28,8 +28,14 @@ export type ProductionOutcomeImportDependencies = {
 };
 
 const defaultDependencies: ProductionOutcomeImportDependencies = {
-  authenticate: authenticateApiRequest,
-  resolveRepository: resolveRepositoryApiContext,
+  authenticate(request, requiredScope) {
+    return authenticateApiRequest(request, requiredScope);
+  },
+  resolveRepository(auth, request, explicitRepositoryId) {
+    return explicitRepositoryId === undefined
+      ? resolveRepositoryApiContext(auth, request)
+      : resolveRepositoryApiContext(auth, request, explicitRepositoryId);
+  },
   createStore: createSqlProductionOutcomeStore,
 };
 

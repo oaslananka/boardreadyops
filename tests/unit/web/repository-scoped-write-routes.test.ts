@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as postReview } from "../../../apps/web/app/api/v1/reviews/route.js";
+import { POST as postProductionOutcome } from "../../../apps/web/app/api/v1/runs/[runId]/production-outcomes/route.js";
 import { POST as postRun } from "../../../apps/web/app/api/v1/runs/route.js";
 import { POST as postToken } from "../../../apps/web/app/api/v1/tokens/route.js";
 import * as apiAuth from "../../../apps/web/lib/api-auth.js";
@@ -62,6 +63,23 @@ describe("repository-scoped write routes", () => {
 
     expect(response.status).toBe(403);
     expect(scope).toHaveBeenCalledWith(auth, request, "repo-other");
+  });
+
+  it("routes production outcome ingestion through the central repository authorization boundary", async () => {
+    const scope = mockRepositoryScope();
+    const request = new Request(
+      "https://boardreadyops.test/api/v1/runs/run-123/production-outcomes?repositoryId=repo-other",
+      {
+        method: "POST",
+        headers: { "content-type": "text/csv" },
+        body: "batch_id,manufacturer,manufactured_on,quantity\nLOT-1,Acme,2026-10-01,10",
+      },
+    );
+
+    const response = await postProductionOutcome(request, { params: Promise.resolve({ runId: "run-123" }) });
+
+    expect(response.status).toBe(403);
+    expect(scope).toHaveBeenCalledWith(auth, request);
   });
 
   it("routes run ingestion through the central repository authorization boundary", async () => {
