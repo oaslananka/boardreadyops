@@ -46,6 +46,9 @@ export type ComponentAlternate = {
   manufacturer?: string | undefined;
 };
 
+/** Confidence assigned by a normalized supplier/component intelligence source. */
+export type ComponentDataTrust = "verified" | "estimated" | "unverified" | "unknown";
+
 export type ComponentObservation = {
   mpn: string;
   manufacturer?: string | undefined;
@@ -89,6 +92,15 @@ export type ComponentObservation = {
    * Provider adapters must bound and deduplicate the list before returning it.
    */
   alternates?: readonly ComponentAlternate[] | undefined;
+  /** True only when the provider positively flags the part for restricted-substance risk. */
+  restrictedSubstances?: boolean | undefined;
+  /**
+   * Short provider-normalized compliance notes such as RoHS/REACH/ECCN statements.
+   * Adapters must keep this list bounded and must not place raw provider payloads here.
+   */
+  complianceNotes?: readonly string[] | undefined;
+  /** Provider-normalized confidence/trust level for the observation. */
+  trust?: ComponentDataTrust | undefined;
 };
 
 /**

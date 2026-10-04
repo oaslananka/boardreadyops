@@ -1,5 +1,6 @@
 import {
   type ComponentAlternate,
+  type ComponentDataTrust,
   type ComponentDistributorClassification,
   type ComponentIntelligenceProvider,
   type ComponentLifecycleStatus,
@@ -38,7 +39,7 @@ export type WatchBoard = {
 
 type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "not_entitled" | "failed";
 
-export type SupplyRiskStatus = "nrnd" | "eol" | "obsolete" | "unavailable";
+export type SupplyRiskStatus = "nrnd" | "eol" | "obsolete" | "unavailable" | "restricted";
 
 /** One part on one board that is no longer safe to design in. */
 export type RiskyComponentFinding = {
@@ -50,6 +51,9 @@ export type RiskyComponentFinding = {
   severity: "critical" | "high" | "medium";
   /** Provider identifier that justified this finding; raw provider payloads are not retained here. */
   source: string;
+  restrictedSubstances?: boolean | undefined;
+  complianceNotes?: readonly string[] | undefined;
+  trust?: ComponentDataTrust | undefined;
 };
 
 export type ObservationCacheScope =
@@ -75,6 +79,9 @@ export type SupplyWatchStore = {
         leadTimeDays?: number | undefined;
         supplierCount?: number | undefined;
         alternates?: readonly ComponentAlternate[] | undefined;
+        restrictedSubstances?: boolean | undefined;
+        complianceNotes?: readonly string[] | undefined;
+        trust?: ComponentDataTrust | undefined;
       }
     >
   >;
@@ -94,6 +101,9 @@ export type SupplyWatchStore = {
       leadTimeDays?: number | undefined;
       supplierCount?: number | undefined;
       alternates?: readonly ComponentAlternate[] | undefined;
+      restrictedSubstances?: boolean | undefined;
+      complianceNotes?: readonly string[] | undefined;
+      trust?: ComponentDataTrust | undefined;
     }[],
   ): Promise<number>;
   reconcileFindings(
@@ -106,6 +116,9 @@ export type SupplyWatchStore = {
       status: SupplyRiskStatus;
       severity: "critical" | "high" | "medium";
       source: string;
+      restrictedSubstances?: boolean | undefined;
+      complianceNotes?: readonly string[] | undefined;
+      trust?: ComponentDataTrust | undefined;
     }[],
     now: Date,
   ): Promise<{ opened: number; resolved: number }>;
@@ -190,16 +203,23 @@ export function constantComponentIntelligence(provider: ComponentIntelligencePro
 type RiskObservation = {
   status: ComponentLifecycleStatus;
   source: string;
+  /** Whether provider terms allow normalized evidence beyond the derived risk decision to persist. */
+  retainEvidence: boolean;
   availableUnits?: number | undefined;
+  restrictedSubstances?: boolean | undefined;
+  complianceNotes?: readonly string[] | undefined;
+  trust?: ComponentDataTrust | undefined;
 };
 
 function riskStatus(observation: RiskObservation): SupplyRiskStatus | undefined {
   if (isRiskyLifecycleStatus(observation.status)) return observation.status;
-  return observation.availableUnits === 0 ? "unavailable" : undefined;
+  if (observation.availableUnits === 0) return "unavailable";
+  return observation.restrictedSubstances === true ? "restricted" : undefined;
 }
 
 function riskSeverity(status: SupplyRiskStatus): "critical" | "high" | "medium" {
-  return status === "unavailable" ? "high" : supplyFindingSeverity(status);
+  if (status === "unavailable" || status === "restricted") return "high";
+  return supplyFindingSeverity(status);
 }
 
 function buildOpenRiskyFindings(
@@ -229,6 +249,13 @@ function buildOpenRiskyFindings(
         status,
         severity: riskSeverity(status),
         source: observation.source,
+        ...(observation.retainEvidence && observation.restrictedSubstances !== undefined
+          ? { restrictedSubstances: observation.restrictedSubstances }
+          : {}),
+        ...(observation.retainEvidence && observation.complianceNotes !== undefined
+          ? { complianceNotes: observation.complianceNotes }
+          : {}),
+        ...(observation.retainEvidence && observation.trust !== undefined ? { trust: observation.trust } : {}),
       },
     ];
   });
@@ -261,7 +288,13 @@ async function queryMissingObservations(
     observations.set(componentKey(observation), {
       status: observation.status,
       source: observation.source,
+      retainEvidence: cacheScope !== undefined,
       ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
+      ...(observation.restrictedSubstances === undefined
+        ? {}
+        : { restrictedSubstances: observation.restrictedSubstances }),
+      ...(observation.complianceNotes === undefined ? {} : { complianceNotes: observation.complianceNotes }),
+      ...(observation.trust === undefined ? {} : { trust: observation.trust }),
     });
   }
   return { partsQueried, observationsRecorded };
@@ -316,7 +349,13 @@ async function evaluateSingleBoard(
     observations.set(key, {
       status: observation.status as ComponentLifecycleStatus,
       source: observation.source,
+      retainEvidence: true,
       ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
+      ...(observation.restrictedSubstances === undefined
+        ? {}
+        : { restrictedSubstances: observation.restrictedSubstances }),
+      ...(observation.complianceNotes === undefined ? {} : { complianceNotes: observation.complianceNotes }),
+      ...(observation.trust === undefined ? {} : { trust: observation.trust }),
     });
   }
 

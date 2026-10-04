@@ -39,6 +39,9 @@ describe("board supply watch store: distributor classification and price breaks"
           { mpn: "STM32F103CBT6", manufacturer: "ST" },
           { mpn: "GD32F103C8T6", manufacturer: "GigaDevice" },
         ],
+        restrictedSubstances: true,
+        complianceNotes: ["  RoHS exemption expired  ", "REACH restricted substance present"],
+        trust: "verified",
       },
     ]);
 
@@ -62,6 +65,9 @@ describe("board supply watch store: distributor classification and price breaks"
         { mpn: "STM32F103CBT6", manufacturer: "ST" },
         { mpn: "GD32F103C8T6", manufacturer: "GigaDevice" },
       ],
+      restricted_substances: true,
+      compliance_notes: ["RoHS exemption expired", "REACH restricted substance present"],
+      data_trust: "verified",
     });
   });
 
@@ -91,6 +97,9 @@ describe("board supply watch store: distributor classification and price breaks"
           { mpn: "STM32F103CBT6", manufacturer: "ST" },
           { mpn: "GD32F103C8T6", manufacturer: "GigaDevice" },
         ],
+        restricted_substances: true,
+        compliance_notes: ["RoHS restricted", "REACH note"],
+        data_trust: "estimated",
       },
     ]);
 
@@ -107,6 +116,9 @@ describe("board supply watch store: distributor classification and price breaks"
         { mpn: "STM32F103CBT6", manufacturer: "ST" },
         { mpn: "GD32F103C8T6", manufacturer: "GigaDevice" },
       ],
+      restrictedSubstances: true,
+      complianceNotes: ["RoHS restricted", "REACH note"],
+      trust: "estimated",
     });
   });
 
@@ -132,6 +144,33 @@ describe("board supply watch store: distributor classification and price breaks"
     const fresh = await store.freshObservations(sharedScope, now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
 
     expect([...fresh.values()][0]?.alternates).toEqual([{ mpn: "ALT-A", manufacturer: "Acme" }, { mpn: "ALT-B" }]);
+  });
+
+  it("bounds compliance notes and ignores invalid trust/boolean values on read", async () => {
+    const notes = Array.from({ length: 12 }, (_, index) => "  note-" + index + "-" + "x".repeat(240) + "  ");
+    const { store } = executor([
+      {
+        mpn: "STM32F103C8T6",
+        manufacturer: "ST",
+        status: "active",
+        source: "custom",
+        observed_at: now,
+        distributor_classification: null,
+        price_breaks: [],
+        restricted_substances: "yes",
+        compliance_notes: JSON.stringify(notes),
+        data_trust: "absolute",
+      },
+    ]);
+
+    const fresh = await store.freshObservations(sharedScope, now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
+    const entry = [...fresh.values()][0];
+
+    expect(entry?.restrictedSubstances).toBeUndefined();
+    expect(entry?.trust).toBeUndefined();
+    expect(entry?.complianceNotes).toHaveLength(8);
+    expect(entry?.complianceNotes?.every((note) => note.length <= 200)).toBe(true);
+    expect(entry?.complianceNotes?.[0]?.startsWith("note-0-")).toBe(true);
   });
 
   it("parses a JSON-string price_breaks column the same as a native jsonb array", async () => {
@@ -289,6 +328,9 @@ describe("board supply watch store: cache scope", () => {
         availableUnits: 4200,
         leadTimeDays: 28,
         supplierCount: 3,
+        restrictedSubstances: false,
+        complianceNotes: ["RoHS compliant"],
+        trust: "verified",
       },
     ]);
 
@@ -301,11 +343,55 @@ describe("board supply watch store: cache scope", () => {
     expect(params[0]).toBe("installation-1");
     expect(params[1]).toBe("nexar");
     const payload = JSON.parse(String(params[2])) as Record<string, unknown>[];
-    expect(payload[0]).toMatchObject({ available_units: 4200, lead_time_days: 28, supplier_count: 3 });
+    expect(payload[0]).toMatchObject({
+      available_units: 4200,
+      lead_time_days: 28,
+      supplier_count: 3,
+      restricted_substances: false,
+      compliance_notes: ["RoHS compliant"],
+      data_trust: "verified",
+    });
   });
 });
 
 describe("board supply watch store: finding provenance", () => {
+  it("persists normalized compliance/trust context on a newly-opened restricted finding", async () => {
+    const { store, query } = executor([{ opened: 1, resolved: 0 }]);
+
+    await store.reconcileFindings(
+      "board-1",
+      [
+        {
+          boardId: "board-1",
+          mpn: "ABC-123",
+          manufacturer: "Acme",
+          reference: "U3",
+          status: "restricted",
+          severity: "high",
+          source: "custom",
+          restrictedSubstances: true,
+          complianceNotes: ["  RoHS exemption expired  "],
+          trust: "verified",
+        },
+      ],
+      now,
+    );
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("restricted_substances");
+    expect(sql).toContain("compliance_notes");
+    expect(sql).toContain("observation_trust");
+    expect(sql).toContain("on conflict do nothing");
+
+    const payload = JSON.parse(String(params[1])) as Record<string, unknown>[];
+    expect(payload[0]).toMatchObject({
+      status: "restricted",
+      restricted_substances: true,
+      compliance_notes: ["RoHS exemption expired"],
+      observation_trust: "verified",
+    });
+  });
+
   it("captures the provider source when a finding first opens without updating existing open findings", async () => {
     const { store, query } = executor([{ opened: 1, resolved: 0 }]);
 

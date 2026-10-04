@@ -36,7 +36,15 @@ function storeWith(
   boards: WatchBoard[],
   cached = new Map<
     string,
-    { status: string; source: string; observedAt: string; availableUnits?: number | undefined }
+    {
+      status: string;
+      source: string;
+      observedAt: string;
+      availableUnits?: number | undefined;
+      restrictedSubstances?: boolean | undefined;
+      complianceNotes?: readonly string[] | undefined;
+      trust?: "verified" | "estimated" | "unverified" | "unknown" | undefined;
+    }
   >(),
 ) {
   const completions: Array<{ boardId: string; outcome: string; nextDueAt: Date }> = [];
@@ -74,7 +82,8 @@ function providerReturning(
 }
 
 async function liveSinglePartFindings(
-  observation: Pick<ComponentObservation, "status" | "source"> & Partial<Pick<ComponentObservation, "availableUnits">>,
+  observation: Pick<ComponentObservation, "status" | "source"> &
+    Partial<Pick<ComponentObservation, "availableUnits" | "restrictedSubstances" | "complianceNotes" | "trust">>,
 ) {
   const watched = board({
     components: [{ mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" }],
@@ -115,6 +124,91 @@ describe("supply watch pass", () => {
         source: "test-provider",
       }),
     ]);
+  });
+
+  it("raises a restricted finding and retains bounded compliance/trust evidence when retention is allowed", async () => {
+    const findings = await liveSinglePartFindings({
+      status: "active",
+      source: "test-provider",
+      restrictedSubstances: true,
+      complianceNotes: ["RoHS exemption expired", "REACH restricted substance present"],
+      trust: "verified",
+    });
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        mpn: "STM32F103C8T6",
+        status: "restricted",
+        severity: "high",
+        source: "test-provider",
+        restrictedSubstances: true,
+        complianceNotes: ["RoHS exemption expired", "REACH restricted substance present"],
+        trust: "verified",
+      }),
+    ]);
+  });
+
+  it("raises a restricted finding from cached compliance evidence", async () => {
+    const cached = new Map([
+      [
+        componentKey({ mpn: "STM32F103C8T6", manufacturer: "ST" }),
+        {
+          status: "active",
+          source: "cached-provider",
+          observedAt: now.toISOString(),
+          restrictedSubstances: true,
+          complianceNotes: ["RoHS restricted"],
+          trust: "estimated" as const,
+        },
+      ],
+    ]);
+    const { store, reconciled } = storeWith(
+      [board({ components: [{ mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" }] })],
+      cached,
+    );
+
+    await runSupplyWatchPass(store, constantComponentIntelligence(providerReturning({ STM32F103C8T6: "active" })), now);
+
+    expect(reconciled[0]?.open).toEqual([
+      expect.objectContaining({
+        status: "restricted",
+        source: "cached-provider",
+        complianceNotes: ["RoHS restricted"],
+        trust: "estimated",
+      }),
+    ]);
+  });
+
+  it("keeps lifecycle risk primary while preserving retainable compliance context", async () => {
+    const findings = await liveSinglePartFindings({
+      status: "eol",
+      source: "test-provider",
+      restrictedSubstances: true,
+      complianceNotes: ["REACH restricted"],
+      trust: "verified",
+    });
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        status: "eol",
+        severity: "high",
+        restrictedSubstances: true,
+        complianceNotes: ["REACH restricted"],
+        trust: "verified",
+      }),
+    ]);
+  });
+
+  it("does not treat an explicit compliant signal as supply risk", async () => {
+    const findings = await liveSinglePartFindings({
+      status: "active",
+      source: "test-provider",
+      restrictedSubstances: false,
+      complianceNotes: ["RoHS compliant"],
+      trust: "verified",
+    });
+
+    expect(findings).toEqual([]);
   });
 
   it("raises an unavailable finding when a live observation reports exactly zero stock", async () => {
@@ -522,6 +616,35 @@ describe("supply watch pass", () => {
     ]);
     expect(reconciled.find((entry) => entry.boardId === "board-a")?.open).toEqual([]);
     expect(reconciled.find((entry) => entry.boardId === "board-b")?.open).toHaveLength(2);
+  });
+
+  it("derives restricted risk for a no-retention provider without persisting compliance content", async () => {
+    const { store, reconciled } = storeWith([
+      board({ components: [{ mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" }] }),
+    ]);
+    const provider: ComponentIntelligenceProvider = {
+      name: "no-retention",
+      cachePolicy: { maximumCacheAgeMs: 0, shareableAcrossTenants: false },
+      async lookup(parts) {
+        return parts.map((part) => ({
+          ...part,
+          status: "active" as const,
+          source: "no-retention",
+          observedAt: now,
+          restrictedSubstances: true,
+          complianceNotes: ["provider-owned regulatory detail"],
+          trust: "verified" as const,
+        }));
+      },
+    };
+
+    await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
+
+    expect(store.recordObservations).not.toHaveBeenCalled();
+    expect(reconciled[0]?.open).toEqual([expect.objectContaining({ status: "restricted", source: "no-retention" })]);
+    expect(reconciled[0]?.open[0]).not.toHaveProperty("restrictedSubstances");
+    expect(reconciled[0]?.open[0]).not.toHaveProperty("complianceNotes");
+    expect(reconciled[0]?.open[0]).not.toHaveProperty("trust");
   });
 
   it("stores no provider cache for a no-retention provider while preserving minimal finding provenance", async () => {

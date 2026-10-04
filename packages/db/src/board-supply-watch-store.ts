@@ -2,6 +2,7 @@
 // with the same function. Two spellings of "the same part" silently miss every cache hit.
 import {
   type ComponentAlternate,
+  type ComponentDataTrust,
   type ComponentDistributorClassification,
   componentKey,
   type PriceBreak,
@@ -34,6 +35,9 @@ export type ObservationInput = {
   leadTimeDays?: number | undefined;
   supplierCount?: number | undefined;
   alternates?: readonly ComponentAlternate[] | undefined;
+  restrictedSubstances?: boolean | undefined;
+  complianceNotes?: readonly string[] | undefined;
+  trust?: ComponentDataTrust | undefined;
 };
 
 export type SupplyFindingInput = {
@@ -41,10 +45,13 @@ export type SupplyFindingInput = {
   mpn: string;
   manufacturer?: string | undefined;
   reference?: string | undefined;
-  status: "nrnd" | "eol" | "obsolete" | "unavailable";
+  status: "nrnd" | "eol" | "obsolete" | "unavailable" | "restricted";
   severity: "critical" | "high" | "medium";
   /** Stable provider identifier captured when the finding first opens. */
   source: string;
+  restrictedSubstances?: boolean | undefined;
+  complianceNotes?: readonly string[] | undefined;
+  trust?: ComponentDataTrust | undefined;
 };
 
 export type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "not_entitled" | "failed";
@@ -70,6 +77,9 @@ export type BoardSupplyWatchStore = {
         leadTimeDays?: number | undefined;
         supplierCount?: number | undefined;
         alternates?: readonly ComponentAlternate[] | undefined;
+        restrictedSubstances?: boolean | undefined;
+        complianceNotes?: readonly string[] | undefined;
+        trust?: ComponentDataTrust | undefined;
       }
     >
   >;
@@ -133,6 +143,39 @@ function optionalInteger(row: Record<string, unknown>, key: string): number | un
     return Number.isSafeInteger(parsed) ? parsed : undefined;
   }
   return undefined;
+}
+
+function optionalBoolean(row: Record<string, unknown>, key: string): boolean | undefined {
+  const value = row[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function dataTrust(row: Record<string, unknown>, key: string): ComponentDataTrust | undefined {
+  const value = row[key];
+  return value === "verified" || value === "estimated" || value === "unverified" || value === "unknown"
+    ? value
+    : undefined;
+}
+
+const maximumComplianceNotes = 8;
+const maximumComplianceNoteLength = 200;
+
+function normalizeComplianceNotes(value: readonly string[] | undefined): readonly string[] | undefined {
+  if (!value) return undefined;
+  const notes = value
+    .slice(0, maximumComplianceNotes)
+    .map((note) => note.trim().slice(0, maximumComplianceNoteLength))
+    .filter(Boolean);
+  return notes.length > 0 ? notes : undefined;
+}
+
+function complianceNotes(row: Record<string, unknown>, key: string): readonly string[] | undefined {
+  const raw = row[key];
+  let parsed: unknown;
+  if (Array.isArray(raw)) parsed = raw;
+  else if (typeof raw === "string") parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return undefined;
+  return normalizeComplianceNotes(parsed.filter((value): value is string => typeof value === "string"));
 }
 
 /** node-postgres decodes `jsonb` to a native array; a mocked executor may hand back a JSON string instead. */
@@ -253,7 +296,8 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
         scope.kind === "shared"
           ? await executor.query(
               `select mpn, manufacturer, status, source, observed_at, distributor_classification, price_breaks,
-                      available_units, lead_time_days, supplier_count, alternates
+                      available_units, lead_time_days, supplier_count, alternates,
+                      restricted_substances, compliance_notes, data_trust
                  from component_lifecycle_observations
                 where lower(mpn) = any($1::text[])
                   and provider = $3
@@ -262,7 +306,8 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
             )
           : await executor.query(
               `select mpn, manufacturer, status, source, observed_at, distributor_classification, price_breaks,
-                      available_units, lead_time_days, supplier_count, alternates
+                      available_units, lead_time_days, supplier_count, alternates,
+                      restricted_substances, compliance_notes, data_trust
                  from installation_component_observations
                 where installation_id = $1
                   and provider = $2
@@ -283,6 +328,9 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           leadTimeDays?: number | undefined;
           supplierCount?: number | undefined;
           alternates?: readonly ComponentAlternate[] | undefined;
+          restrictedSubstances?: boolean | undefined;
+          complianceNotes?: readonly string[] | undefined;
+          trust?: ComponentDataTrust | undefined;
         }
       >();
       for (const row of rows(result)) {
@@ -293,6 +341,9 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
         const leadTimeDays = optionalInteger(row, "lead_time_days");
         const supplierCount = optionalInteger(row, "supplier_count");
         const alternateParts = alternates(row, "alternates");
+        const restrictedSubstances = optionalBoolean(row, "restricted_substances");
+        const notes = complianceNotes(row, "compliance_notes");
+        const trust = dataTrust(row, "data_trust");
         fresh.set(key, {
           status: required(row, "status"),
           source: required(row, "source"),
@@ -303,6 +354,9 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           ...(leadTimeDays === undefined ? {} : { leadTimeDays }),
           ...(supplierCount === undefined ? {} : { supplierCount }),
           ...(alternateParts === undefined ? {} : { alternates: alternateParts }),
+          ...(restrictedSubstances === undefined ? {} : { restrictedSubstances }),
+          ...(notes === undefined ? {} : { complianceNotes: notes }),
+          ...(trust === undefined ? {} : { trust }),
         });
       }
       return fresh;
@@ -325,6 +379,9 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           lead_time_days: observation.leadTimeDays ?? null,
           supplier_count: observation.supplierCount ?? null,
           alternates: observation.alternates ?? [],
+          restricted_substances: observation.restrictedSubstances ?? null,
+          compliance_notes: normalizeComplianceNotes(observation.complianceNotes) ?? [],
+          data_trust: observation.trust ?? null,
         })),
       );
 
@@ -333,17 +390,20 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           ? await executor.query(
               `insert into component_lifecycle_observations (
                  provider, mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
-                 distributor_classification, price_breaks, available_units, lead_time_days, supplier_count, alternates
+                 distributor_classification, price_breaks, available_units, lead_time_days, supplier_count, alternates,
+                 restricted_substances, compliance_notes, data_trust
                )
                select $2, entry.mpn, entry.manufacturer, entry.status, entry.source,
                       entry.evidence_url, entry.observed_at, entry.expires_at,
                       entry.distributor_classification, entry.price_breaks,
-                      entry.available_units, entry.lead_time_days, entry.supplier_count, entry.alternates
+                      entry.available_units, entry.lead_time_days, entry.supplier_count, entry.alternates,
+                      entry.restricted_substances, entry.compliance_notes, entry.data_trust
                from jsonb_to_recordset($1::jsonb) as entry(
                  mpn text, manufacturer text, status text, source text,
                  evidence_url text, observed_at timestamptz, expires_at timestamptz,
                  distributor_classification text, price_breaks jsonb,
-                 available_units integer, lead_time_days integer, supplier_count integer, alternates jsonb
+                 available_units integer, lead_time_days integer, supplier_count integer, alternates jsonb,
+                 restricted_substances boolean, compliance_notes jsonb, data_trust text
                )
                on conflict (lower(mpn), lower(coalesce(manufacturer, ''))) do update
                  set provider = excluded.provider,
@@ -357,7 +417,10 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
                      available_units = excluded.available_units,
                      lead_time_days = excluded.lead_time_days,
                      supplier_count = excluded.supplier_count,
-                     alternates = excluded.alternates
+                     alternates = excluded.alternates,
+                     restricted_substances = excluded.restricted_substances,
+                     compliance_notes = excluded.compliance_notes,
+                     data_trust = excluded.data_trust
                where excluded.observed_at >= component_lifecycle_observations.observed_at
                returning id`,
               [payload, scope.providerName],
@@ -365,17 +428,20 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           : await executor.query(
               `insert into installation_component_observations (
                  installation_id, provider, mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
-                 distributor_classification, price_breaks, available_units, lead_time_days, supplier_count, alternates
+                 distributor_classification, price_breaks, available_units, lead_time_days, supplier_count, alternates,
+                 restricted_substances, compliance_notes, data_trust
                )
                select $1, $2, entry.mpn, entry.manufacturer, entry.status, entry.source,
                       entry.evidence_url, entry.observed_at, entry.expires_at,
                       entry.distributor_classification, entry.price_breaks,
-                      entry.available_units, entry.lead_time_days, entry.supplier_count, entry.alternates
+                      entry.available_units, entry.lead_time_days, entry.supplier_count, entry.alternates,
+                      entry.restricted_substances, entry.compliance_notes, entry.data_trust
                from jsonb_to_recordset($3::jsonb) as entry(
                  mpn text, manufacturer text, status text, source text,
                  evidence_url text, observed_at timestamptz, expires_at timestamptz,
                  distributor_classification text, price_breaks jsonb,
-                 available_units integer, lead_time_days integer, supplier_count integer, alternates jsonb
+                 available_units integer, lead_time_days integer, supplier_count integer, alternates jsonb,
+                 restricted_substances boolean, compliance_notes jsonb, data_trust text
                )
                on conflict (installation_id, provider, lower(mpn), lower(coalesce(manufacturer, ''))) do update
                  set status = excluded.status,
@@ -388,7 +454,10 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
                      available_units = excluded.available_units,
                      lead_time_days = excluded.lead_time_days,
                      supplier_count = excluded.supplier_count,
-                     alternates = excluded.alternates
+                     alternates = excluded.alternates,
+                     restricted_substances = excluded.restricted_substances,
+                     compliance_notes = excluded.compliance_notes,
+                     data_trust = excluded.data_trust
                  where excluded.observed_at >= installation_component_observations.observed_at
                returning id`,
               [scope.installationId, scope.providerName, payload],
@@ -405,13 +474,18 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           status: finding.status,
           severity: finding.severity,
           source: finding.source,
+          restricted_substances: finding.restrictedSubstances ?? null,
+          compliance_notes: normalizeComplianceNotes(finding.complianceNotes) ?? [],
+          observation_trust: finding.trust ?? null,
         })),
       );
       const result = await executor.query(
         `with incoming as (
-           select entry.mpn, entry.manufacturer, entry.reference, entry.status, entry.severity, entry.source
+           select entry.mpn, entry.manufacturer, entry.reference, entry.status, entry.severity, entry.source,
+                  entry.restricted_substances, entry.compliance_notes, entry.observation_trust
            from jsonb_to_recordset($2::jsonb) as entry(
-             mpn text, manufacturer text, reference text, status text, severity text, source text
+             mpn text, manufacturer text, reference text, status text, severity text, source text,
+             restricted_substances boolean, compliance_notes jsonb, observation_trust text
            )
          ),
          resolved as (
@@ -429,10 +503,13 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
          ),
          opened as (
            insert into board_supply_findings (
-             board_id, mpn, manufacturer, reference, status, severity, observation_source, detected_at
+             board_id, mpn, manufacturer, reference, status, severity, observation_source,
+             restricted_substances, compliance_notes, observation_trust, detected_at
            )
            select $1, incoming.mpn, incoming.manufacturer, incoming.reference,
-                  incoming.status, incoming.severity, incoming.source, $3::timestamptz
+                  incoming.status, incoming.severity, incoming.source,
+                  incoming.restricted_substances, incoming.compliance_notes, incoming.observation_trust,
+                  $3::timestamptz
            from incoming
            on conflict do nothing
            returning id
