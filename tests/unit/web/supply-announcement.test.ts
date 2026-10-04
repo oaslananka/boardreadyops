@@ -178,7 +178,7 @@ describe("composeSupplyAnnouncement", () => {
     });
 
     expect(announcement?.details).toContain(
-      "Policy impact: no current-revision product is affected; 4 tracked historical release run(s) retain this risk evidence.",
+      "Policy impact: no current-revision product is affected; this risk remains historical release evidence.",
     );
   });
 
