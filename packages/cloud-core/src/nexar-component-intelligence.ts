@@ -85,11 +85,13 @@ export function nexarLifecycleStatus(value: string | undefined): ComponentLifecy
 
 type NexarOffer = {
   prices?: { quantity?: number; price?: number; currency?: string }[];
+  inventoryLevel?: number;
   factoryLeadDays?: number;
 };
 
 type NexarSeller = {
   isAuthorized?: boolean;
+  company?: { id?: string; name?: string };
   offers?: NexarOffer[];
 };
 
@@ -192,6 +194,33 @@ function nexarLeadTimeDays(sellers: readonly NexarSeller[] | undefined): number 
   return any.length > 0 ? Math.min(...any) : undefined;
 }
 
+/**
+ * Counts distinct seller companies that currently carry positive inventory.
+ *
+ * Nexar exposes seller identity separately from offers. Counting offers would over-count one
+ * distributor that has several SKUs/package variants, while counting sellers with no stock would
+ * overstate sourcing diversity. A seller without a stable id/name cannot be deduplicated safely,
+ * so it is ignored rather than guessed.
+ */
+function nexarSupplierCount(sellers: readonly NexarSeller[] | undefined): number | undefined {
+  if (!sellers) return undefined;
+  const identities = new Set<string>();
+  let hadIdentifiableSeller = false;
+
+  for (const seller of sellers) {
+    const identity = seller.company?.id?.trim() || seller.company?.name?.trim().toLowerCase();
+    if (!identity) continue;
+    hadIdentifiableSeller = true;
+    const inStock = (seller.offers ?? []).some((offer) => {
+      const inventory = nonNegativeInteger(offer.inventoryLevel);
+      return inventory !== undefined && inventory > 0;
+    });
+    if (inStock) identities.add(identity);
+  }
+
+  return hadIdentifiableSeller ? identities.size : undefined;
+}
+
 function chunked<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size));
@@ -208,7 +237,9 @@ const lifecycleQuery = `query BoardReadyOpsLifecycle($queries: [SupPartMatchQuer
       specs { attribute { shortname } displayValue }
       sellers {
         isAuthorized
+        company { id name }
         offers {
+          inventoryLevel
           factoryLeadDays
           prices { quantity price currency }
         }
@@ -233,6 +264,7 @@ function parseNexarMatches(
     const distributorClassification = nexarDistributorClassification(part.sellers);
     const availableUnits = nexarAvailableUnits(part);
     const leadTimeDays = nexarLeadTimeDays(part.sellers);
+    const supplierCount = nexarSupplierCount(part.sellers);
 
     // A matched part may carry useful supply data even when its lifecycle vocabulary is unknown.
     // Preserve that observation rather than throwing availability/lead-time evidence away. A
@@ -242,6 +274,7 @@ function parseNexarMatches(
       status === "unknown" &&
       availableUnits === undefined &&
       leadTimeDays === undefined &&
+      supplierCount === undefined &&
       priceBreaks.length === 0 &&
       distributorClassification === "unknown"
     ) {
@@ -258,6 +291,7 @@ function parseNexarMatches(
       ...(priceBreaks.length > 0 ? { priceBreaks } : {}),
       ...(availableUnits === undefined ? {} : { availableUnits }),
       ...(leadTimeDays === undefined ? {} : { leadTimeDays }),
+      ...(supplierCount === undefined ? {} : { supplierCount }),
     });
   }
   return observations;

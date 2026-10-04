@@ -27,6 +27,7 @@ export type ObservationInput = {
   priceBreaks?: readonly PriceBreak[] | undefined;
   availableUnits?: number | undefined;
   leadTimeDays?: number | undefined;
+  supplierCount?: number | undefined;
 };
 
 export type SupplyFindingInput = {
@@ -219,7 +220,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
         scope.kind === "shared"
           ? await executor.query(
               `select mpn, manufacturer, status, source, observed_at, distributor_classification, price_breaks,
-                      available_units, lead_time_days
+                      available_units, lead_time_days, supplier_count
                  from component_lifecycle_observations
                 where lower(mpn) = any($1::text[])
                   and provider = $3
@@ -228,7 +229,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
             )
           : await executor.query(
               `select mpn, manufacturer, status, source, observed_at, distributor_classification, price_breaks,
-                      available_units, lead_time_days
+                      available_units, lead_time_days, supplier_count
                  from installation_component_observations
                 where installation_id = $1
                   and provider = $2
@@ -247,6 +248,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           priceBreaks?: readonly PriceBreak[] | undefined;
           availableUnits?: number | undefined;
           leadTimeDays?: number | undefined;
+          supplierCount?: number | undefined;
         }
       >();
       for (const row of rows(result)) {
@@ -255,6 +257,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
         const breaks = priceBreaks(row, "price_breaks");
         const availableUnits = optionalInteger(row, "available_units");
         const leadTimeDays = optionalInteger(row, "lead_time_days");
+        const supplierCount = optionalInteger(row, "supplier_count");
         fresh.set(key, {
           status: required(row, "status"),
           source: required(row, "source"),
@@ -263,6 +266,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           ...(breaks === undefined ? {} : { priceBreaks: breaks }),
           ...(availableUnits === undefined ? {} : { availableUnits }),
           ...(leadTimeDays === undefined ? {} : { leadTimeDays }),
+          ...(supplierCount === undefined ? {} : { supplierCount }),
         });
       }
       return fresh;
@@ -283,6 +287,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           price_breaks: observation.priceBreaks ?? [],
           available_units: observation.availableUnits ?? null,
           lead_time_days: observation.leadTimeDays ?? null,
+          supplier_count: observation.supplierCount ?? null,
         })),
       );
 
@@ -291,17 +296,17 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           ? await executor.query(
               `insert into component_lifecycle_observations (
                  provider, mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
-                 distributor_classification, price_breaks, available_units, lead_time_days
+                 distributor_classification, price_breaks, available_units, lead_time_days, supplier_count
                )
                select $2, entry.mpn, entry.manufacturer, entry.status, entry.source,
                       entry.evidence_url, entry.observed_at, entry.expires_at,
                       entry.distributor_classification, entry.price_breaks,
-                      entry.available_units, entry.lead_time_days
+                      entry.available_units, entry.lead_time_days, entry.supplier_count
                from jsonb_to_recordset($1::jsonb) as entry(
                  mpn text, manufacturer text, status text, source text,
                  evidence_url text, observed_at timestamptz, expires_at timestamptz,
                  distributor_classification text, price_breaks jsonb,
-                 available_units integer, lead_time_days integer
+                 available_units integer, lead_time_days integer, supplier_count integer
                )
                on conflict (lower(mpn), lower(coalesce(manufacturer, ''))) do update
                  set provider = excluded.provider,
@@ -313,7 +318,8 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
                      distributor_classification = excluded.distributor_classification,
                      price_breaks = excluded.price_breaks,
                      available_units = excluded.available_units,
-                     lead_time_days = excluded.lead_time_days
+                     lead_time_days = excluded.lead_time_days,
+                     supplier_count = excluded.supplier_count
                where excluded.observed_at >= component_lifecycle_observations.observed_at
                returning id`,
               [payload, scope.providerName],
@@ -321,17 +327,17 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           : await executor.query(
               `insert into installation_component_observations (
                  installation_id, provider, mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
-                 distributor_classification, price_breaks, available_units, lead_time_days
+                 distributor_classification, price_breaks, available_units, lead_time_days, supplier_count
                )
                select $1, $2, entry.mpn, entry.manufacturer, entry.status, entry.source,
                       entry.evidence_url, entry.observed_at, entry.expires_at,
                       entry.distributor_classification, entry.price_breaks,
-                      entry.available_units, entry.lead_time_days
+                      entry.available_units, entry.lead_time_days, entry.supplier_count
                from jsonb_to_recordset($3::jsonb) as entry(
                  mpn text, manufacturer text, status text, source text,
                  evidence_url text, observed_at timestamptz, expires_at timestamptz,
                  distributor_classification text, price_breaks jsonb,
-                 available_units integer, lead_time_days integer
+                 available_units integer, lead_time_days integer, supplier_count integer
                )
                on conflict (installation_id, provider, lower(mpn), lower(coalesce(manufacturer, ''))) do update
                  set status = excluded.status,
@@ -342,7 +348,8 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
                      distributor_classification = excluded.distributor_classification,
                      price_breaks = excluded.price_breaks,
                      available_units = excluded.available_units,
-                     lead_time_days = excluded.lead_time_days
+                     lead_time_days = excluded.lead_time_days,
+                     supplier_count = excluded.supplier_count
                  where excluded.observed_at >= installation_component_observations.observed_at
                returning id`,
               [scope.installationId, scope.providerName, payload],

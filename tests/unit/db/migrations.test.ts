@@ -122,7 +122,19 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0072_validated_delivery_revisions.sql",
       "0073_supply_finding_provenance.sql",
       "0074_installation_component_observations.sql",
+      "0075_component_supplier_count.sql",
     ]);
+  });
+
+  it("adds bounded supplier-count metadata to both observation caches in schema v75", async () => {
+    const sql = (await readFile(join(migrationsDir, "0075_component_supplier_count.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("alter table component_lifecycle_observations");
+    expect(sql).toContain("alter table installation_component_observations");
+    expect(sql).toContain("add column if not exists supplier_count integer");
+    expect(sql).toContain("supplier_count between 0 and 100000");
+    expect(sql).not.toContain("inventory_level");
+    expect(sql).not.toContain("seller_name");
   });
 
   it("adds installation-scoped component observation caching in schema v74", async () => {
