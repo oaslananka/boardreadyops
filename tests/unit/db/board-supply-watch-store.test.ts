@@ -34,7 +34,6 @@ describe("board supply watch store: distributor classification and price breaks"
         availableUnits: 4200,
         leadTimeDays: 28,
         supplierCount: 3,
-        supplierCount: 3,
       },
     ]);
 
@@ -248,6 +247,7 @@ describe("board supply watch store: cache scope", () => {
         observedAt: now,
         availableUnits: 4200,
         leadTimeDays: 28,
+        supplierCount: 3,
       },
     ]);
 
