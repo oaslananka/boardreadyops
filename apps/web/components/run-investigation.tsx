@@ -449,6 +449,162 @@ function RunSummaryPanel({ run }: Readonly<{ run: RunDetail }>) {
   );
 }
 
+function formatProductionYield(firstPassYieldBps: number | undefined): string {
+  if (firstPassYieldBps === undefined) return "Not reported";
+  const percentage = (firstPassYieldBps / 100).toFixed(2).replace(/\.?0+$/u, "");
+  return `${percentage}%`;
+}
+
+type ProductionReleaseMetrics = {
+  batchCount: number;
+  quantity: number;
+  firstPassYieldBps: number | undefined;
+  reworkCount: number;
+  scrapCount: number;
+  defectCount: number;
+};
+
+function summarizeProductionBatches(batches: RunDetail["productionBatches"]): ProductionReleaseMetrics {
+  let quantity = 0;
+  let yieldedQuantity = 0;
+  let weightedYield = 0;
+  let reworkCount = 0;
+  let scrapCount = 0;
+  let defectCount = 0;
+
+  for (const batch of batches) {
+    quantity += batch.quantity;
+    reworkCount += batch.reworkCount;
+    scrapCount += batch.scrapCount;
+    defectCount += batch.defects.reduce((total, defect) => total + defect.count, 0);
+    if (batch.firstPassYieldBps !== undefined) {
+      yieldedQuantity += batch.quantity;
+      weightedYield += batch.firstPassYieldBps * batch.quantity;
+    }
+  }
+
+  return {
+    batchCount: batches.length,
+    quantity,
+    firstPassYieldBps: yieldedQuantity > 0 ? Math.round(weightedYield / yieldedQuantity) : undefined,
+    reworkCount,
+    scrapCount,
+    defectCount,
+  };
+}
+
+function formatYieldDelta(current: number | undefined, previous: number | undefined): string {
+  if (current === undefined || previous === undefined) return "Not comparable";
+  const delta = (current - previous) / 100;
+  const prefix = delta > 0 ? "+" : "";
+  return `${prefix}${delta.toFixed(2).replace(/\.?0+$/u, "")} pp`;
+}
+
+function ProductionOutcomesPanel({ run }: Readonly<{ run: RunDetail }>) {
+  if (run.productionBatches.length === 0) return null;
+
+  const current = run.productionSummary ?? summarizeProductionBatches(run.productionBatches);
+  const previous = run.productionBaseline;
+
+  return (
+    <Panel
+      id="production-outcomes"
+      title="Production outcomes"
+      description="Release-linked manufacturing observations. Use them to compare outcomes; correlation alone does not prove a release caused a manufacturing change."
+    >
+      <section
+        aria-label="Production release comparison"
+        className="mb-4 rounded-md border border-border bg-muted/30 p-3"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Release comparison</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This release is summarized across all imported batches.
+              {previous ? " The baseline is the most recent earlier release with production evidence." : ""}
+            </p>
+          </div>
+          {previous ? (
+            <Link className="text-sm text-primary underline underline-offset-2" href={`/runs/${previous.runId}`}>
+              Previous release {previous.commitSha.slice(0, 7)}
+            </Link>
+          ) : null}
+        </div>
+        <div className="mt-3">
+          <DefinitionGrid>
+            <Definition label="This release batches">{current.batchCount}</Definition>
+            <Definition label="This release quantity">{current.quantity}</Definition>
+            <Definition label="This release FPY">{formatProductionYield(current.firstPassYieldBps)}</Definition>
+            {previous ? (
+              <>
+                <Definition label="Previous batches">{previous.batchCount}</Definition>
+                <Definition label="Previous quantity">{previous.quantity}</Definition>
+                <Definition label="Previous FPY">{formatProductionYield(previous.firstPassYieldBps)}</Definition>
+                <Definition label="Yield change">
+                  {formatYieldDelta(current.firstPassYieldBps, previous.firstPassYieldBps)}
+                </Definition>
+                <Definition label="Rework">
+                  {current.reworkCount} now · {previous.reworkCount} previous
+                </Definition>
+                <Definition label="Scrap">
+                  {current.scrapCount} now · {previous.scrapCount} previous
+                </Definition>
+                <Definition label="Defects">
+                  {current.defectCount} now · {previous.defectCount} previous
+                </Definition>
+              </>
+            ) : (
+              <Definition label="Previous release">No earlier production-linked release</Definition>
+            )}
+          </DefinitionGrid>
+        </div>
+      </section>
+      <ul className="flex flex-col gap-3">
+        {run.productionBatches.map((batch) => (
+          <li key={batch.id} className="rounded-md border border-border bg-card p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <strong className="text-sm text-foreground">{batch.manufacturer}</strong>
+              <code className="text-xs">{batch.externalBatchId}</code>
+              <StatusBadge value="info" label={humanize(batch.sourceKind)} />
+            </div>
+            <div className="mt-3">
+              <DefinitionGrid>
+                <Definition label="Manufactured">{batch.manufacturedOn}</Definition>
+                <Definition label="Quantity">{batch.quantity}</Definition>
+                <Definition label="First-pass yield">{formatProductionYield(batch.firstPassYieldBps)}</Definition>
+                <Definition label="Rework">{batch.reworkCount}</Definition>
+                <Definition label="Scrap">{batch.scrapCount}</Definition>
+                <Definition label="Imported">{formatRunDate(batch.importedAt)}</Definition>
+              </DefinitionGrid>
+            </div>
+            {batch.defects.length > 0 ? (
+              <div className="mt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Defect evidence</p>
+                <ul className="mt-1 flex flex-col gap-1 text-sm text-foreground">
+                  {batch.defects.map((defect) => (
+                    <li key={`${defect.category}:${defect.code}`}>
+                      {humanize(defect.category)} · <code>{defect.code}</code> · {defect.count}
+                      {defect.notes ? <span className="text-muted-foreground"> · {defect.notes}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {batch.notes ? <p className="mt-3 text-sm text-muted-foreground">Notes: {batch.notes}</p> : null}
+            {batch.correctiveAction ? (
+              <p className="mt-1 text-sm text-muted-foreground">Corrective action: {batch.correctiveAction}</p>
+            ) : null}
+            <p className="mt-3 break-all text-xs text-muted-foreground">
+              Evidence: {batch.sourceName ?? "unnamed source"} · SHA-256 <code>{batch.sourceSha256}</code>
+            </p>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-muted-foreground">Showing up to 50 newest release-linked batches.</p>
+    </Panel>
+  );
+}
+
 function SourceRuntimePanel({ run }: Readonly<{ run: RunDetail }>) {
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
@@ -537,6 +693,8 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
       <CategoryBreakdownPanel run={run} />
 
       <BoardsPanel run={run} />
+
+      <ProductionOutcomesPanel run={run} />
 
       <SourceRuntimePanel run={run} />
 

@@ -135,6 +135,11 @@
       "types": "./src/notification-store.ts",
       "import": "./src/notification-store.ts",
       "default": "./src/notification-store.ts"
+    },
+    "./production-outcome-store": {
+      "types": "./src/production-outcome-store.ts",
+      "import": "./src/production-outcome-store.ts",
+      "default": "./src/production-outcome-store.ts"
     }
   },
   "devDependencies": {

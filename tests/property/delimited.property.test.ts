@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { parseDelimitedRows } from "../../src/util/delimited.js";
+import { DelimitedParseError, parseDelimitedRows } from "../../src/util/delimited.js";
 
 describe("parseDelimitedRows properties", () => {
   it("never throws on arbitrary text and delimiter", () => {
@@ -45,6 +45,23 @@ describe("parseDelimitedRows properties", () => {
     const start = performance.now();
     expect(() => parseDelimitedRows(hostile, ",")).not.toThrow();
     expect(performance.now() - start).toBeLessThan(1_000);
+  });
+
+  it("offers strict bounded parsing without changing the permissive default", () => {
+    expect(() => parseDelimitedRows('"unterminated', ",")).not.toThrow();
+    expect(() => parseDelimitedRows('"unterminated', ",", { rejectUnterminatedQuote: true })).toThrowError(
+      DelimitedParseError,
+    );
+
+    expect(() => parseDelimitedRows("a,b,c", ",", { maxColumns: 2 })).toThrowError(
+      expect.objectContaining({ code: "column_limit" }),
+    );
+    expect(() => parseDelimitedRows("abc", ",", { maxCellLength: 2 })).toThrowError(
+      expect.objectContaining({ code: "cell_limit" }),
+    );
+    expect(() => parseDelimitedRows("a\nb", ",", { maxRows: 1 })).toThrowError(
+      expect.objectContaining({ code: "row_limit" }),
+    );
   });
 
   it("handles a large number of empty quoted cells without hanging or throwing", () => {

@@ -54,6 +54,8 @@ export const cloudDatabaseModels = [
   "Project",
   "Revision",
   "Delivery",
+  "ProductionBatch",
+  "ProductionBatchDefect",
 ] as const;
 
 export type CloudDatabaseModel = (typeof cloudDatabaseModels)[number];
@@ -64,6 +66,7 @@ export * from "./data-lifecycle-store.js";
 export * from "./external-review-store.js";
 export * from "./finding-decision-store.js";
 export * from "./lifecycle-store.js";
+export * from "./production-outcome-store.js";
 export * from "./review-approval-store.js";
 export * from "./review-collaboration-store.js";
 export * from "./review-comment-store.js";
