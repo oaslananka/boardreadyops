@@ -23,6 +23,7 @@ const dangerValues = new Set([
   "high",
   "timed_out",
   "unauthorized",
+  "unavailable",
 ]);
 const successValues = new Set(["available", "completed", "deleted", "pass", "passed", "ready", "success"]);
 const warningValues = new Set([
