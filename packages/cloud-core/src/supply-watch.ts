@@ -37,14 +37,16 @@ export type WatchBoard = {
 
 type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "not_entitled" | "failed";
 
+export type SupplyRiskStatus = "nrnd" | "eol" | "obsolete" | "unavailable";
+
 /** One part on one board that is no longer safe to design in. */
 export type RiskyComponentFinding = {
   boardId: string;
   mpn: string;
   manufacturer?: string | undefined;
   reference?: string | undefined;
-  status: ComponentLifecycleStatus;
-  severity: ReturnType<typeof supplyFindingSeverity>;
+  status: SupplyRiskStatus;
+  severity: "critical" | "high" | "medium";
   /** Provider identifier that justified this finding; raw provider payloads are not retained here. */
   source: string;
 };
@@ -98,7 +100,7 @@ export type SupplyWatchStore = {
       mpn: string;
       manufacturer?: string | undefined;
       reference?: string | undefined;
-      status: "nrnd" | "eol" | "obsolete";
+      status: SupplyRiskStatus;
       severity: "critical" | "high" | "medium";
       source: string;
     }[],
@@ -175,7 +177,20 @@ export function constantComponentIntelligence(provider: ComponentIntelligencePro
   return async () => provider;
 }
 
-type RiskObservation = { status: ComponentLifecycleStatus; source: string };
+type RiskObservation = {
+  status: ComponentLifecycleStatus;
+  source: string;
+  availableUnits?: number | undefined;
+};
+
+function riskStatus(observation: RiskObservation): SupplyRiskStatus | undefined {
+  if (isRiskyLifecycleStatus(observation.status)) return observation.status;
+  return observation.availableUnits === 0 ? "unavailable" : undefined;
+}
+
+function riskSeverity(status: SupplyRiskStatus): "critical" | "high" | "medium" {
+  return status === "unavailable" ? "high" : supplyFindingSeverity(status);
+}
 
 function buildOpenRiskyFindings(
   board: WatchBoard,
@@ -192,15 +207,17 @@ function buildOpenRiskyFindings(
   return parts.flatMap((part) => {
     const key = componentKey(part);
     const observation = observations.get(key);
-    if (!observation || !isRiskyLifecycleStatus(observation.status)) return [];
+    if (!observation) return [];
+    const status = riskStatus(observation);
+    if (!status) return [];
     return [
       {
         boardId: board.boardId,
         mpn: part.mpn,
         ...(part.manufacturer ? { manufacturer: part.manufacturer } : {}),
         ...(referenceByKey.get(key) ? { reference: referenceByKey.get(key) } : {}),
-        status: observation.status,
-        severity: supplyFindingSeverity(observation.status),
+        status,
+        severity: riskSeverity(status),
         source: observation.source,
       },
     ];
@@ -231,7 +248,11 @@ async function queryMissingObservations(
     );
   }
   for (const observation of observed) {
-    observations.set(componentKey(observation), { status: observation.status, source: observation.source });
+    observations.set(componentKey(observation), {
+      status: observation.status,
+      source: observation.source,
+      ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
+    });
   }
   return { partsQueried, observationsRecorded };
 }
@@ -282,7 +303,11 @@ async function evaluateSingleBoard(
 
   const observations = new Map<string, RiskObservation>();
   for (const [key, observation] of cached) {
-    observations.set(key, { status: observation.status as ComponentLifecycleStatus, source: observation.source });
+    observations.set(key, {
+      status: observation.status as ComponentLifecycleStatus,
+      source: observation.source,
+      ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
+    });
   }
 
   const { partsQueried, observationsRecorded } = await queryMissingObservations(
