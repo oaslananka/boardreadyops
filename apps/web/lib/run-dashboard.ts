@@ -127,14 +127,14 @@ type RunBoardDetail = {
   riskyLifecycleCount: number;
 };
 
-export type RunProductionDefectDetail = {
+type RunProductionDefectDetail = {
   category: string;
   code: string;
   count: number;
   notes: string | undefined;
 };
 
-export type RunProductionBatchDetail = {
+type RunProductionBatchDetail = {
   id: string;
   externalBatchId: string;
   manufacturer: string;
@@ -749,7 +749,6 @@ export async function lookupRunDashboard(
        limit 50`,
       [runId],
     ),
-
   ]);
 
   const findingTotal = numberValue(rows(findingCountResult)[0] ?? {}, "total") ?? 0;

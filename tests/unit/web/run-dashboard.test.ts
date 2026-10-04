@@ -18,10 +18,11 @@ function executorWithResults(results: unknown[]): {
 }
 
 function emptyDashboardRows(): unknown[] {
-  // run, findingCount, artifactCount, attempts, transitions, boards, findings, artifacts, categoryBreakdown
+  // findingCount, artifactCount, attempts, transitions, boards, findings, artifacts, categoryBreakdown, productionBatches
   return [
     { rows: [{ total: 0 }] },
     { rows: [{ total: 0 }] },
+    { rows: [] },
     { rows: [] },
     { rows: [] },
     { rows: [] },
@@ -155,7 +156,7 @@ describe("run dashboard data", () => {
     const result = await lookupRunDashboard("public-run", executor);
 
     expect(result).toMatchObject({ state: "found", run: { repositoryPrivate: false } });
-    expect(query).toHaveBeenCalledTimes(9);
+    expect(query).toHaveBeenCalledTimes(10);
   });
 
   it("loads a private repository dashboard only after explicit repository authorization", async () => {
@@ -178,7 +179,78 @@ describe("run dashboard data", () => {
       name: "hardware",
       private: true,
     });
-    expect(query).toHaveBeenCalledTimes(9);
+    expect(query).toHaveBeenCalledTimes(10);
+  });
+
+  it("loads bounded release-linked production evidence and drops malformed batch or defect rows", async () => {
+    const children = emptyDashboardRows();
+    children[8] = {
+      rows: [
+        {
+          id: "batch-1",
+          external_batch_id: "LOT-42",
+          manufacturer: "Acme EMS",
+          manufactured_on: "2026-10-02",
+          quantity: 500,
+          first_pass_yield_bps: 9875,
+          rework_count: 6,
+          scrap_count: 2,
+          notes: "Pilot batch",
+          corrective_action: "Inspect paste process",
+          source_kind: "csv",
+          source_name: "outcomes.csv",
+          source_sha256: "a".repeat(64),
+          imported_at: "2026-10-03T12:00:00.000Z",
+          defects: [
+            { category: "aoi", code: "QFN_BRIDGE", count: 3, notes: "U3" },
+            { category: "aoi", code: "ZERO_COUNT", count: 0 },
+            { category: "aoi", code: null, count: 1 },
+          ],
+        },
+        {
+          id: "malformed",
+          external_batch_id: "LOT-BAD",
+          manufacturer: "Acme EMS",
+          manufactured_on: "2026-10-02",
+          quantity: "not-a-number",
+          source_kind: "csv",
+          source_sha256: "b".repeat(64),
+          imported_at: "2026-10-03T12:00:00.000Z",
+          defects: [],
+        },
+      ],
+    };
+    const { executor, query } = executorWithResults([{ rows: [baseRunRow()] }, ...children]);
+
+    const result = await lookupRunDashboard("run-state", executor);
+
+    expect(result).toMatchObject({
+      state: "found",
+      run: {
+        productionBatches: [
+          {
+            id: "batch-1",
+            externalBatchId: "LOT-42",
+            manufacturer: "Acme EMS",
+            manufacturedOn: "2026-10-02",
+            quantity: 500,
+            firstPassYieldBps: 9875,
+            reworkCount: 6,
+            scrapCount: 2,
+            sourceKind: "csv",
+            sourceName: "outcomes.csv",
+            sourceSha256: "a".repeat(64),
+            defects: [{ category: "aoi", code: "QFN_BRIDGE", count: 3, notes: "U3" }],
+          },
+        ],
+      },
+    });
+    const productionSql = String(query.mock.calls[9]?.[0]);
+    expect(productionSql).toContain("production_batches.release_run_id = $1");
+    expect(productionSql).toContain("limit 50");
+    expect(productionSql).toContain("production_batch_defects");
+    expect(query.mock.calls[9]?.[1]).toEqual(["run-state"]);
+    expect(query).toHaveBeenCalledTimes(10);
   });
 
   it("normalizes malformed scalar, collection, and report-link values", async () => {
@@ -518,7 +590,7 @@ describe("run dashboard data", () => {
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
     expect(categoryBreakdownSql).toContain("group by coalesce(category, 'unclassified')");
     expect(query.mock.calls[8]?.[1]).toEqual(["run-123"]);
-    expect(query).toHaveBeenCalledTimes(9);
+    expect(query).toHaveBeenCalledTimes(10);
   });
 
   it("surfaces stale, reconciliation, dead-letter, and partial-data states from durable data", async () => {
