@@ -449,6 +449,67 @@ function RunSummaryPanel({ run }: Readonly<{ run: RunDetail }>) {
   );
 }
 
+function formatProductionYield(firstPassYieldBps: number | undefined): string {
+  if (firstPassYieldBps === undefined) return "Not reported";
+  const percentage = (firstPassYieldBps / 100).toFixed(2).replace(/\.?0+$/u, "");
+  return `${percentage}%`;
+}
+
+function ProductionOutcomesPanel({ run }: Readonly<{ run: RunDetail }>) {
+  if (run.productionBatches.length === 0) return null;
+
+  return (
+    <Panel
+      id="production-outcomes"
+      title="Production outcomes"
+      description="Release-linked manufacturing observations. Use them to compare outcomes; correlation alone does not prove a release caused a manufacturing change."
+    >
+      <ul className="flex flex-col gap-3">
+        {run.productionBatches.map((batch) => (
+          <li key={batch.id} className="rounded-md border border-border bg-card p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <strong className="text-sm text-foreground">{batch.manufacturer}</strong>
+              <code className="text-xs">{batch.externalBatchId}</code>
+              <StatusBadge value="info" label={humanize(batch.sourceKind)} />
+            </div>
+            <div className="mt-3">
+              <DefinitionGrid>
+                <Definition label="Manufactured">{batch.manufacturedOn}</Definition>
+                <Definition label="Quantity">{batch.quantity}</Definition>
+                <Definition label="First-pass yield">{formatProductionYield(batch.firstPassYieldBps)}</Definition>
+                <Definition label="Rework">{batch.reworkCount}</Definition>
+                <Definition label="Scrap">{batch.scrapCount}</Definition>
+                <Definition label="Imported">{formatRunDate(batch.importedAt)}</Definition>
+              </DefinitionGrid>
+            </div>
+            {batch.defects.length > 0 ? (
+              <div className="mt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Defect evidence</p>
+                <ul className="mt-1 flex flex-col gap-1 text-sm text-foreground">
+                  {batch.defects.map((defect) => (
+                    <li key={`${defect.category}:${defect.code}`}>
+                      {humanize(defect.category)} · <code>{defect.code}</code> · {defect.count}
+                      {defect.notes ? <span className="text-muted-foreground"> · {defect.notes}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {batch.notes ? <p className="mt-3 text-sm text-muted-foreground">Notes: {batch.notes}</p> : null}
+            {batch.correctiveAction ? (
+              <p className="mt-1 text-sm text-muted-foreground">Corrective action: {batch.correctiveAction}</p>
+            ) : null}
+            <p className="mt-3 break-all text-xs text-muted-foreground">
+              Evidence: {batch.sourceName ?? "unnamed source"} · SHA-256 <code>{batch.sourceSha256}</code>
+            </p>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-muted-foreground">Showing up to 50 newest release-linked batches.</p>
+    </Panel>
+  );
+}
+
 function SourceRuntimePanel({ run }: Readonly<{ run: RunDetail }>) {
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
@@ -537,6 +598,8 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
       <CategoryBreakdownPanel run={run} />
 
       <BoardsPanel run={run} />
+
+      <ProductionOutcomesPanel run={run} />
 
       <SourceRuntimePanel run={run} />
 
