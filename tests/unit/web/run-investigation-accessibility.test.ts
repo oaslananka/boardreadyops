@@ -108,6 +108,44 @@ function sampleRun(): RunDetail {
     artifactLifecycle: { deleted: 1, missing: 1, pendingDeletion: 1, failedDeletion: 0 },
     attempts: [],
     transitions: [],
+    productionBatches: [
+      {
+        id: "batch-1",
+        externalBatchId: "PILOT-42",
+        manufacturer: "Acme EMS",
+        manufacturedOn: "2026-07-28",
+        quantity: 750,
+        firstPassYieldBps: 9875,
+        reworkCount: 6,
+        scrapCount: 2,
+        notes: "Design-partner pilot",
+        correctiveAction: "Tighten paste inspection on U3",
+        sourceKind: "csv",
+        sourceName: "pilot-outcomes.csv",
+        sourceSha256: "c".repeat(64),
+        importedAt: "2026-07-30T00:03:00.000Z",
+        defects: [{ category: "aoi", code: "QFN_BRIDGE", count: 3, notes: "U3" }],
+      },
+    ],
+    productionSummary: {
+      batchCount: 3,
+      quantity: 2000,
+      firstPassYieldBps: 9850,
+      reworkCount: 11,
+      scrapCount: 3,
+      defectCount: 7,
+    },
+    productionBaseline: {
+      runId: "run-previous",
+      commitSha: "f".repeat(40),
+      completedAt: "2026-06-30T00:02:00.000Z",
+      batchCount: 2,
+      quantity: 1000,
+      firstPassYieldBps: 9700,
+      reworkCount: 18,
+      scrapCount: 5,
+      defectCount: 9,
+    },
     boards: [
       {
         boardId: "7b000000-0000-4000-8000-0000000000b1",
@@ -216,6 +254,66 @@ describe("run investigation accessibility", () => {
     // The header states which run this is; the verdict states the outcome. Repeating the
     // outcome in both is what made the page read as a status dump.
     expect(markup).not.toContain("Decision: Pass");
+  });
+
+  it("renders release-linked production evidence without claiming causality", () => {
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run: sampleRun() }));
+
+    expect(markup).toContain("Production outcomes");
+    expect(markup).toContain("PILOT-42");
+    expect(markup).toContain("98.75%");
+    expect(markup).toContain("98.5%");
+    expect(markup).toContain("3");
+    expect(markup).toContain("2000");
+    expect(markup).toContain("QFN_BRIDGE");
+    expect(markup).toContain("pilot-outcomes.csv");
+    expect(markup).toContain("Previous release fffffff");
+    expect(markup).toContain('href="/runs/run-previous"');
+    expect(markup).toContain("Yield change");
+    expect(markup).toContain("+1.5 pp");
+    expect(markup).toContain("correlation alone does not prove a release caused a manufacturing change");
+  });
+
+  it("weights visible batches only as a fixture fallback when no server aggregate is supplied", () => {
+    const run = sampleRun();
+    run.productionSummary = undefined;
+    run.productionBatches = [
+      ...run.productionBatches,
+      {
+        id: "batch-2",
+        externalBatchId: "PILOT-43",
+        manufacturer: "Acme EMS",
+        manufacturedOn: "2026-07-29",
+        quantity: 250,
+        firstPassYieldBps: 9500,
+        reworkCount: 4,
+        scrapCount: 1,
+        notes: undefined,
+        correctiveAction: undefined,
+        sourceKind: "csv",
+        sourceName: "pilot-outcomes-2.csv",
+        sourceSha256: "d".repeat(64),
+        importedAt: "2026-07-30T00:04:00.000Z",
+        defects: [{ category: "functional_test", code: "BOOT_FAIL", count: 1, notes: undefined }],
+      },
+    ];
+
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+
+    expect(markup).toContain("97.81%");
+    expect(markup).toContain("+0.81 pp");
+    expect(markup).toContain("10 now · 18 previous");
+    expect(markup).toContain("4 now · 9 previous");
+  });
+
+  it("explains when there is no earlier production-linked release to compare", () => {
+    const run = sampleRun();
+    run.productionBaseline = undefined;
+
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+
+    expect(markup).toContain("No earlier production-linked release");
+    expect(markup).not.toContain("Previous release fffffff");
   });
 
   it("links an unreviewed run to persistent review publishing guidance", () => {
