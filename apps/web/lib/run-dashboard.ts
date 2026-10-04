@@ -127,6 +127,31 @@ type RunBoardDetail = {
   riskyLifecycleCount: number;
 };
 
+export type RunProductionDefectDetail = {
+  category: string;
+  code: string;
+  count: number;
+  notes: string | undefined;
+};
+
+export type RunProductionBatchDetail = {
+  id: string;
+  externalBatchId: string;
+  manufacturer: string;
+  manufacturedOn: string;
+  quantity: number;
+  firstPassYieldBps: number | undefined;
+  reworkCount: number;
+  scrapCount: number;
+  notes: string | undefined;
+  correctiveAction: string | undefined;
+  sourceKind: string;
+  sourceName: string | undefined;
+  sourceSha256: string;
+  importedAt: string;
+  defects: RunProductionDefectDetail[];
+};
+
 export type RunDetail = {
   id: string;
   status: string;
@@ -175,6 +200,7 @@ export type RunDetail = {
   attempts: AttemptDetail[];
   transitions: TransitionDetail[];
   boards: RunBoardDetail[];
+  productionBatches: RunProductionBatchDetail[];
 };
 
 export type RunDashboardFilters = {
@@ -358,6 +384,20 @@ function metricsValue(row: Record<string, unknown>, key: string): Readonly<Recor
       (entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]),
     ),
   );
+}
+
+function productionDefectsValue(row: Record<string, unknown>, key: string): RunProductionDefectDetail[] {
+  const value = row[key];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return [];
+    const defect = entry as Record<string, unknown>;
+    const category = stringValue(defect, "category");
+    const code = stringValue(defect, "code");
+    const count = numberValue(defect, "count");
+    if (!category || !code || count === undefined || count < 1) return [];
+    return [{ category, code, count, notes: stringValue(defect, "notes") }];
+  });
 }
 
 function reportLinksValue(row: Record<string, unknown>, key: string): ReportLinkDetail[] {
@@ -635,7 +675,8 @@ export async function lookupRunDashboard(
   const findingScope = findingPredicates(runId, filters);
   const artifactScope = artifactPredicates(runId, filters);
 
-  const [findingCountResult, artifactCountResult, attemptsResult, transitionsResult, boardsResult] = await Promise.all([
+  const [findingCountResult, artifactCountResult, attemptsResult, transitionsResult, boardsResult, productionResult] =
+    await Promise.all([
     executor.query(`select count(*)::int as total from findings where ${findingScope.sql}`, findingScope.parameters),
     executor.query(
       `select count(*)::int as total,
@@ -706,6 +747,42 @@ export async function lookupRunDashboard(
        where snapshot.run_id = $1
        group by boards.id, boards.project_path, boards.display_name, snapshot.captured_at, snapshot.component_count
        order by boards.project_path
+       limit 50`,
+      [runId],
+    ),
+    executor.query(
+      `select production_batches.id,
+              production_batches.external_batch_id,
+              production_batches.manufacturer,
+              production_batches.manufactured_on::text,
+              production_batches.quantity::int,
+              production_batches.first_pass_yield_bps::int,
+              production_batches.rework_count::int,
+              production_batches.scrap_count::int,
+              production_batches.notes,
+              production_batches.corrective_action,
+              production_batches.source_kind,
+              production_batches.source_name,
+              production_batches.source_sha256,
+              production_batches.imported_at,
+              coalesce(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'category', production_batch_defects.category,
+                    'code', production_batch_defects.code,
+                    'count', production_batch_defects.defect_count,
+                    'notes', production_batch_defects.notes
+                  )
+                  order by production_batch_defects.category, production_batch_defects.code
+                ) filter (where production_batch_defects.id is not null),
+                '[]'::jsonb
+              ) as defects
+       from production_batches
+       left join production_batch_defects
+         on production_batch_defects.production_batch_id = production_batches.id
+       where production_batches.release_run_id = $1
+       group by production_batches.id
+       order by production_batches.manufactured_on desc, production_batches.imported_at desc, production_batches.id desc
        limit 50`,
       [runId],
     ),
@@ -859,6 +936,48 @@ export async function lookupRunDashboard(
     }),
   );
 
+  const productionBatches = rows(productionResult).flatMap((row): RunProductionBatchDetail[] => {
+    const id = stringValue(row, "id");
+    const externalBatchId = stringValue(row, "external_batch_id");
+    const manufacturer = stringValue(row, "manufacturer");
+    const manufacturedOn = stringValue(row, "manufactured_on");
+    const quantity = numberValue(row, "quantity");
+    const sourceKind = stringValue(row, "source_kind");
+    const sourceSha256 = stringValue(row, "source_sha256");
+    const importedAt = stringValue(row, "imported_at");
+    if (
+      !id ||
+      !externalBatchId ||
+      !manufacturer ||
+      !manufacturedOn ||
+      quantity === undefined ||
+      !sourceKind ||
+      !sourceSha256 ||
+      !importedAt
+    ) {
+      return [];
+    }
+    return [
+      {
+        id,
+        externalBatchId,
+        manufacturer,
+        manufacturedOn,
+        quantity,
+        firstPassYieldBps: numberValue(row, "first_pass_yield_bps"),
+        reworkCount: numberValue(row, "rework_count") ?? 0,
+        scrapCount: numberValue(row, "scrap_count") ?? 0,
+        notes: stringValue(row, "notes"),
+        correctiveAction: stringValue(row, "corrective_action"),
+        sourceKind,
+        sourceName: stringValue(row, "source_name"),
+        sourceSha256,
+        importedAt,
+        defects: productionDefectsValue(row, "defects"),
+      },
+    ];
+  });
+
   const status = requiredString(runRow, "status");
   const reconciliationCount = numberValue(runRow, "reconciliation_count") ?? 0;
   const deadLetterCount = numberValue(runRow, "dead_letter_count") ?? 0;
@@ -931,6 +1050,7 @@ export async function lookupRunDashboard(
       attempts,
       transitions,
       boards,
+      productionBatches,
     },
   };
 }
@@ -1152,6 +1272,7 @@ function buildDemoRun(runId: string, filters: RunDashboardFilters = {}): RunDeta
     ],
     // Two boards, one carrying a part already at lifecycle risk, so the demo shows what the
     // supply signals look like rather than an empty panel.
+    productionBatches: [],
     boards: [
       {
         boardId: "demo-board-mainboard",
