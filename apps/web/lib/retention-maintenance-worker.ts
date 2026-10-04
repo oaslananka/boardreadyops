@@ -121,8 +121,7 @@ export async function runRetentionMaintenanceCleanup(
       completedControlPlaneReconciliationItems.status === "fulfilled"
         ? completedControlPlaneReconciliationItems.value
         : 0,
-    artifactRetentionRevoked:
-      artifactRetention.status === "fulfilled" ? artifactRetention.value.revokedArtifacts : 0,
+    artifactRetentionRevoked: artifactRetention.status === "fulfilled" ? artifactRetention.value.revokedArtifacts : 0,
     artifactDeletionJobsQueued:
       artifactRetention.status === "fulfilled" ? artifactRetention.value.deletionJobsQueued : 0,
     artifactSharedObjectsRetained:

@@ -7,7 +7,7 @@ import { getPostgresTestConnectionString } from "../../scripts/postgres-test-con
 const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 4 }) : undefined;
-const testPrefix = `artifact-retention-preview-${randomUUID()}`;
+const testPrefix = `artifact-retention-expiry-${randomUUID()}`;
 const now = new Date("2026-08-30T12:00:00.000Z");
 
 function database() {
@@ -74,7 +74,7 @@ async function createArtifactFixture(input: FixtureInput): Promise<string> {
   if (input.legalHold) {
     await database().query(
       `insert into legal_holds (id, tenant_id, created_by, reason, scope)
-       values ($1, $2, 'test', 'Retention preview integration hold', 'organization')`,
+       values ($1, $2, 'test', 'Retention expiry integration hold', 'organization')`,
       [randomUUID(), tenantId],
     );
   }
@@ -86,7 +86,7 @@ afterAll(async () => {
   await executor?.close();
 });
 
-describeDatabase("artifact retention preview", () => {
+describeDatabase("artifact retention expiry", () => {
   it("prioritizes persisted deadlines, then plan policy, while tenant legal holds suppress both", async () => {
     const artifactIds = await Promise.all([
       createArtifactFixture({ suffix: "free-old", tier: "free", ageDays: 31 }),
@@ -118,11 +118,27 @@ describeDatabase("artifact retention preview", () => {
     ]);
 
     const store = createSqlRetentionMaintenanceStore(database(), { now: () => now, defaultBatchSize: 100 });
-    await expect(store.previewExpiredArtifactRetention()).resolves.toBe(4);
+    await expect(store.expireArtifactRetention({ storageDriver: "local" })).resolves.toEqual({
+      revokedArtifacts: 4,
+      deletionJobsQueued: 4,
+      sharedObjectsRetained: 0,
+    });
 
     const result = await database().query("select count(*)::int as count from artifacts where id = any($1::text[])", [
       artifactIds,
     ]);
-    expect(result).toMatchObject({ rows: [{ count: artifactIds.length }] });
+    expect(result).toMatchObject({ rows: [{ count: artifactIds.length - 4 }] });
+
+    const deletionJobs = await database().query(
+      "select count(*)::int as count from artifact_deletion_jobs where artifact_id = any($1::text[])",
+      [artifactIds],
+    );
+    expect(deletionJobs).toMatchObject({ rows: [{ count: 4 }] });
+
+    await expect(store.expireArtifactRetention({ storageDriver: "local" })).resolves.toEqual({
+      revokedArtifacts: 0,
+      deletionJobsQueued: 0,
+      sharedObjectsRetained: 0,
+    });
   });
 });
