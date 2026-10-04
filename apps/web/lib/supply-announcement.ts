@@ -92,7 +92,7 @@ function headline(partCount: number, worst: RiskyComponentFinding, boardCount: n
         : ` — on ${boardCount} board(s), none in a current revision`;
   return partCount === 1
     ? `${worst.mpn} is ${worst.status.toUpperCase()}${scope}`
-    : `${partCount} parts are end-of-life or NRND${scope}`;
+    : `${partCount} parts have supply-chain risks${scope}`;
 }
 
 /** Deduplicates the part keys a resolution should be asked for. */
