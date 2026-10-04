@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { componentKey } from "../../packages/cloud-core/src/component-intelligence.js";
 import { constantComponentIntelligence, runSupplyWatchPass } from "../../packages/cloud-core/src/supply-watch.js";
 import { createSqlBoardSupplyWatchStore } from "../../packages/db/src/board-supply-watch-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
@@ -142,6 +143,99 @@ describeDatabase("board supply watch", () => {
     );
     expect(stored?.acknowledged_by).toBe("alice");
     expect(new Date(String(stored?.acknowledged_at)).toISOString()).toBe(acknowledgedAt.toISOString());
+  });
+
+  it("suppresses one open finding with audit history and resumes alerts without deleting that history", async () => {
+    const finding = rows(
+      await database().query(
+        "select id from board_supply_findings where board_id = $1 and resolved_at is null order by detected_at desc limit 1",
+        [boardId],
+      ),
+    )[0];
+    const findingId = String(finding?.id ?? "");
+    expect(findingId).not.toBe("");
+
+    const findingStore = createSqlSupplyFindingStore(database());
+    const watchStore = createSqlBoardSupplyWatchStore(database());
+    const suppressedAt = new Date("2026-08-24T12:10:00.000Z");
+    const expiresAt = new Date("2026-08-31T12:10:00.000Z");
+
+    await expect(
+      findingStore.suppress(
+        repositoryId,
+        findingId,
+        "alice",
+        "Approved alternate is already qualified",
+        expiresAt,
+        suppressedAt,
+      ),
+    ).resolves.toBe("suppressed");
+
+    await expect(watchStore.suppressedPartKeys(boardId, suppressedAt)).resolves.toContain(
+      componentKey({ mpn: "STM32F103C8T6", manufacturer: "ST" }),
+    );
+
+    await expect(
+      findingStore.clearSuppression(repositoryId, findingId, "bob", new Date("2026-08-24T12:20:00.000Z")),
+    ).resolves.toBe("cleared");
+    await expect(watchStore.suppressedPartKeys(boardId, new Date("2026-08-24T12:21:00.000Z"))).resolves.toEqual(
+      new Set(),
+    );
+
+    const history = rows(
+      await database().query(
+        "select reason, created_by, cleared_by from supply_finding_suppressions where finding_id = $1",
+        [findingId],
+      ),
+    );
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      reason: "Approved alternate is already qualified",
+      created_by: "alice",
+      cleared_by: "bob",
+    });
+  });
+
+  it("replaces an expired suppression on the first retry while preserving both audit rows", async () => {
+    const finding = rows(
+      await database().query(
+        "select id from board_supply_findings where board_id = $1 and resolved_at is null order by detected_at desc limit 1",
+        [boardId],
+      ),
+    )[0];
+    const findingId = String(finding?.id ?? "");
+    expect(findingId).not.toBe("");
+
+    const findingStore = createSqlSupplyFindingStore(database());
+    const firstAt = new Date("2026-08-24T13:00:00.000Z");
+    const firstExpiry = new Date("2026-08-24T14:00:00.000Z");
+    const retryAt = new Date("2026-08-24T14:01:00.000Z");
+    const retryExpiry = new Date("2026-08-25T14:01:00.000Z");
+
+    await expect(
+      findingStore.suppress(repositoryId, findingId, "alice", "Short sourcing exception", firstExpiry, firstAt),
+    ).resolves.toBe("suppressed");
+    await expect(
+      findingStore.suppress(repositoryId, findingId, "bob", "Extended sourcing exception", retryExpiry, retryAt),
+    ).resolves.toBe("suppressed");
+
+    const history = rows(
+      await database().query(
+        "select reason, created_by, cleared_by from supply_finding_suppressions where finding_id = $1 order by created_at",
+        [findingId],
+      ),
+    );
+    expect(history).toHaveLength(2);
+    expect(history[0]).toMatchObject({
+      reason: "Short sourcing exception",
+      created_by: "alice",
+      cleared_by: "system:expiry",
+    });
+    expect(history[1]).toMatchObject({
+      reason: "Extended sourcing exception",
+      created_by: "bob",
+      cleared_by: null,
+    });
   });
 
   it("skips the board and never queries the provider when the plan excludes supply watch", async () => {

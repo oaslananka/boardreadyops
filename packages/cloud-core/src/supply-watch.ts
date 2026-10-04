@@ -106,6 +106,13 @@ export type SupplyWatchStore = {
     }[],
     now: Date,
   ): Promise<{ opened: number; resolved: number }>;
+  /**
+   * Part identities whose currently-open finding is under a time-bound suppression.
+   *
+   * Optional for non-SQL/test stores. A lookup failure must fail open in the evaluator so a
+   * broken suppression subsystem can never silently discard a real supply alert.
+   */
+  suppressedPartKeys?(boardId: string, now: Date): Promise<ReadonlySet<string>>;
   completeEvaluation(boardId: string, outcome: WatchOutcome, evaluatedAt: Date, nextDueAt: Date): Promise<void>;
 };
 
@@ -324,11 +331,22 @@ async function evaluateSingleBoard(
   const reconciled = await store.reconcileFindings(board.boardId, open, now);
   await store.completeEvaluation(board.boardId, "evaluated", now, new Date(now.getTime() + intervalMs));
 
-  if (open.length > 0 && options.onRiskDetected) {
+  let notifiable = open;
+  if (open.length > 0 && store.suppressedPartKeys) {
+    try {
+      const suppressed = await store.suppressedPartKeys(board.boardId, now);
+      notifiable = open.filter((finding) => !suppressed.has(componentKey(finding)));
+    } catch (error) {
+      // Fail open: suppression is a noise-control feature, never an authorization boundary.
+      options.onError?.(board.boardId, error);
+    }
+  }
+
+  if (notifiable.length > 0 && options.onRiskDetected) {
     // Awaited so a pass cannot outrun its own notifications, but never allowed to fail the
     // evaluation: the finding is already persisted and is the durable record.
     try {
-      await options.onRiskDetected({ board, findings: open, newlyOpened: reconciled.opened });
+      await options.onRiskDetected({ board, findings: notifiable, newlyOpened: reconciled.opened });
     } catch (error) {
       options.onError?.(board.boardId, error);
     }

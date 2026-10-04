@@ -349,6 +349,50 @@ describe("supply watch pass", () => {
     expect(report.boardsSkipped).toBe(1);
   });
 
+  it("keeps suppressed findings durable but omits them from the notification callback", async () => {
+    const watched = board({
+      components: [{ mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" }],
+    });
+    const { store, reconciled } = storeWith([watched]);
+    store.suppressedPartKeys = vi.fn(async () => new Set([componentKey({ mpn: "STM32F103C8T6", manufacturer: "ST" })]));
+    const onRiskDetected = vi.fn();
+
+    const report = await runSupplyWatchPass(
+      store,
+      constantComponentIntelligence(providerReturning({ STM32F103C8T6: "eol" })),
+      now,
+      { onRiskDetected },
+    );
+
+    expect(report.findingsOpened).toBe(1);
+    expect(reconciled[0]?.open).toEqual([expect.objectContaining({ mpn: "STM32F103C8T6", status: "eol" })]);
+    expect(onRiskDetected).not.toHaveBeenCalled();
+  });
+
+  it("fails open when suppression lookup fails so a real supply alert is never silently lost", async () => {
+    const watched = board({
+      components: [{ mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" }],
+    });
+    const { store } = storeWith([watched]);
+    store.suppressedPartKeys = vi.fn(async () => {
+      throw new Error("suppression store unavailable");
+    });
+    const onRiskDetected = vi.fn();
+    const onError = vi.fn();
+
+    await runSupplyWatchPass(store, constantComponentIntelligence(providerReturning({ STM32F103C8T6: "eol" })), now, {
+      onRiskDetected,
+      onError,
+    });
+
+    expect(onError).toHaveBeenCalledWith("board-1", expect.any(Error));
+    expect(onRiskDetected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        findings: [expect.objectContaining({ mpn: "STM32F103C8T6", status: "eol" })],
+      }),
+    );
+  });
+
   it("keeps evaluating the remaining boards when one board fails", async () => {
     const boards = [board({ boardId: "board-failing" }), board({ boardId: "board-healthy" })];
     const { store, completions } = storeWith(boards);

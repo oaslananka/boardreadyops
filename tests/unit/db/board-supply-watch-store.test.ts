@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { componentKey } from "../../../packages/cloud-core/src/component-intelligence.js";
 import { createSqlBoardSupplyWatchStore } from "../../../packages/db/src/board-supply-watch-store.js";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
 
@@ -297,5 +298,26 @@ describe("board supply watch store: finding provenance", () => {
       severity: "high",
       source: "nexar",
     });
+  });
+});
+
+describe("board supply watch store: active suppression lookup", () => {
+  it("returns only the normalized part identities attached to active open suppressions", async () => {
+    const { store, query } = executor([
+      { mpn: "STM32F103C8T6", manufacturer: "ST" },
+      { mpn: "RC0603FR-0710KL", manufacturer: null },
+    ]);
+
+    const keys = await store.suppressedPartKeys("board-1", now);
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("from supply_finding_suppressions as suppression");
+    expect(sql).toContain("finding.resolved_at is null");
+    expect(sql).toContain("suppression.cleared_at is null");
+    expect(sql).toContain("suppression.expires_at > $2::timestamptz");
+    expect(params).toEqual(["board-1", now.toISOString()]);
+    expect(keys).toEqual(
+      new Set([componentKey({ mpn: "STM32F103C8T6", manufacturer: "ST" }), componentKey({ mpn: "RC0603FR-0710KL" })]),
+    );
   });
 });
