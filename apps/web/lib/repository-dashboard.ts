@@ -274,6 +274,9 @@ export type RepositoryDetail = {
     detectedAt: string | undefined;
     acknowledgedAt: string | undefined;
     acknowledgedBy: string | undefined;
+    suppressionReason: string | undefined;
+    suppressedBy: string | undefined;
+    suppressedUntil: string | undefined;
   }[];
 };
 
@@ -330,9 +333,21 @@ export async function loadRepositoryDetail(
               board_supply_findings.observation_source,
               board_supply_findings.detected_at,
               board_supply_findings.acknowledged_at,
-              board_supply_findings.acknowledged_by
+              board_supply_findings.acknowledged_by,
+              suppression.reason as suppression_reason,
+              suppression.created_by as suppressed_by,
+              suppression.expires_at as suppressed_until
          from board_supply_findings
          join boards on boards.id = board_supply_findings.board_id
+         left join lateral (
+           select current.reason, current.created_by, current.expires_at
+             from supply_finding_suppressions as current
+            where current.finding_id = board_supply_findings.id
+              and current.cleared_at is null
+              and current.expires_at > now()
+            order by current.created_at desc, current.id desc
+            limit 1
+         ) as suppression on true
         where boards.repository_id = $1 and board_supply_findings.resolved_at is null
         order by board_supply_findings.detected_at desc
         limit 100`,
@@ -378,6 +393,9 @@ export async function loadRepositoryDetail(
             detectedAt: text(row, "detected_at"),
             acknowledgedAt: text(row, "acknowledged_at"),
             acknowledgedBy: text(row, "acknowledged_by"),
+            suppressionReason: text(row, "suppression_reason"),
+            suppressedBy: text(row, "suppressed_by"),
+            suppressedUntil: text(row, "suppressed_until"),
           },
         ];
       }),

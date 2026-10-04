@@ -184,6 +184,9 @@ describe("repository dashboard and viewer loader branches", () => {
             detected_at: "2026-08-20T10:00:00.000Z",
             acknowledged_at: "2026-08-20T11:00:00.000Z",
             acknowledged_by: "alice",
+            suppression_reason: "Approved alternate is already qualified",
+            suppressed_by: "alice",
+            suppressed_until: "2026-08-27T11:00:00.000Z",
           },
         ],
       });
@@ -199,6 +202,9 @@ describe("repository dashboard and viewer loader branches", () => {
     expect(detail?.supplyFindings[0]?.source).toBe("nexar");
     expect(detail?.supplyFindings[0]?.acknowledgedAt).toBe("2026-08-20T11:00:00.000Z");
     expect(detail?.supplyFindings[0]?.acknowledgedBy).toBe("alice");
+    expect(detail?.supplyFindings[0]?.suppressionReason).toBe("Approved alternate is already qualified");
+    expect(detail?.supplyFindings[0]?.suppressedBy).toBe("alice");
+    expect(detail?.supplyFindings[0]?.suppressedUntil).toBe("2026-08-27T11:00:00.000Z");
   });
 
   it("loads viewer installations from database rows", async () => {

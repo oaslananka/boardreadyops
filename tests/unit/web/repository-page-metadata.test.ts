@@ -6,6 +6,23 @@ import * as viewerAuth from "../../../apps/web/lib/viewer-authorization.js";
 const { generateMetadata } = await import("../../../apps/web/app/repositories/[repositoryId]/page.js");
 
 describe("Repository page metadata", () => {
+  it("shows explicit time-bound suppression controls and active suppression state", () => {
+    const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
+    const control = readFileSync("apps/web/components/supply-finding-suppression-control.tsx", "utf8");
+
+    expect(source).toContain('id: "alert-policy"');
+    expect(source).toContain('header: "Alert policy"');
+    expect(source).toContain("SupplyFindingSuppressionControl");
+    expect(source).toContain("suppressSupplyFindingAction");
+    expect(source).toContain("clearSupplyFindingSuppressionAction");
+    expect(control).toContain('name="reason"');
+    expect(control).toContain('name="duration"');
+    expect(control).toContain('"1d"');
+    expect(control).toContain('"7d"');
+    expect(control).toContain('"30d"');
+    expect(control).toContain("Resume alerts");
+  });
+
   it("shows acknowledgement state and an explicit action for unacknowledged supply findings", () => {
     const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
 

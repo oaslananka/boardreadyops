@@ -125,7 +125,22 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0075_component_supplier_count.sql",
       "0076_supply_unavailable_findings.sql",
       "0077_supply_finding_acknowledgement.sql",
+      "0078_supply_finding_suppressions.sql",
     ]);
+  });
+
+  it("records append-only time-bound supply suppression history in schema v78", async () => {
+    const sql = (await readFile(join(migrationsDir, "0078_supply_finding_suppressions.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("create table if not exists supply_finding_suppressions");
+    expect(sql).toContain("finding_id text not null references board_supply_findings(id) on delete cascade");
+    expect(sql).toContain("reason text not null");
+    expect(sql).toContain("expires_at timestamptz not null");
+    expect(sql).toContain("cleared_at timestamptz");
+    expect(sql).toContain("cleared_by text");
+    expect(sql).toContain("supply_finding_suppressions_current_idx");
+    expect(sql).toContain("where cleared_at is null");
+    expect(sql).not.toContain("delete from supply_finding_suppressions");
   });
 
   it("records supply finding acknowledgement without resolving or suppressing it in schema v77", async () => {

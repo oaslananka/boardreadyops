@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuidedChecklist } from "../../../components/guided-checklist.js";
 import { SupplyFindingAcknowledgeButton } from "../../../components/supply-finding-acknowledge-button.js";
+import { SupplyFindingSuppressionControl } from "../../../components/supply-finding-suppression-control.js";
 import { type DataColumn, DataTable } from "../../../components/ui/data-table.js";
 import { AppShell, Definition, DefinitionGrid, EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
 import { ViewerNav } from "../../../components/viewer-nav.js";
@@ -9,7 +10,11 @@ import { customerStatusLabel } from "../../../lib/customer-nomenclature.js";
 import { releaseRepositoryDispatchAvailability } from "../../../lib/release-rollout.js";
 import { loadRepositoryDetail, type RepositoryDetail } from "../../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
-import { acknowledgeSupplyFindingAction } from "./actions.js";
+import {
+  acknowledgeSupplyFindingAction,
+  clearSupplyFindingSuppressionAction,
+  suppressSupplyFindingAction,
+} from "./actions.js";
 
 type PageProps = {
   params: Promise<{ repositoryId: string }>;
@@ -109,6 +114,21 @@ function supplyColumns(repositoryId: string): readonly DataColumn<SupplyRow>[] {
             action={acknowledgeSupplyFindingAction}
           />
         ),
+    },
+    {
+      id: "alert-policy",
+      header: "Alert policy",
+      cell: (finding) => (
+        <SupplyFindingSuppressionControl
+          repositoryId={repositoryId}
+          findingId={finding.id}
+          suppressedUntil={finding.suppressedUntil}
+          suppressedBy={finding.suppressedBy}
+          suppressionReason={finding.suppressionReason}
+          suppressAction={suppressSupplyFindingAction}
+          clearAction={clearSupplyFindingSuppressionAction}
+        />
+      ),
     },
   ];
 }

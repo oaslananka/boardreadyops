@@ -75,6 +75,7 @@ export type BoardSupplyWatchStore = {
     opened: number;
     resolved: number;
   }>;
+  suppressedPartKeys(boardId: string, now: Date): Promise<ReadonlySet<string>>;
   completeEvaluation(boardId: string, outcome: WatchOutcome, now: Date, nextDueAt: Date): Promise<void>;
 };
 
@@ -407,6 +408,32 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
         opened: Number(row.opened ?? 0),
         resolved: Number(row.resolved ?? 0),
       };
+    },
+
+    async suppressedPartKeys(boardId, now) {
+      const result = await executor.query(
+        `select finding.mpn, finding.manufacturer
+           from board_supply_findings as finding
+          where finding.board_id = $1
+            and finding.resolved_at is null
+            and exists (
+              select 1
+                from supply_finding_suppressions as suppression
+               where suppression.finding_id = finding.id
+                 and suppression.cleared_at is null
+                 and suppression.expires_at > $2::timestamptz
+            )`,
+        [boardId, now.toISOString()],
+      );
+
+      return new Set(
+        rows(result).flatMap((row) => {
+          const mpn = text(row, "mpn");
+          if (!mpn) return [];
+          const manufacturer = text(row, "manufacturer");
+          return [componentKey({ mpn, ...(manufacturer ? { manufacturer } : {}) })];
+        }),
+      );
     },
 
     async completeEvaluation(boardId, outcome, now, nextDueAt) {
