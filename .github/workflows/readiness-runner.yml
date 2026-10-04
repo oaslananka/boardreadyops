@@ -253,31 +253,34 @@ jobs:
             const boms = rawBoms
               .filter((bom) => typeof bom?.project === "string" && Array.isArray(bom.components))
               .slice(0, 50)
-              .map((bom) => ({
-                project: boundedText(bom.project, "unknown.kicad_pro", 1024),
-                ...(releaseMode(bom.releaseMode) ? { releaseMode: releaseMode(bom.releaseMode) } : {}),
-                components: bom.components
-                  .filter((component) => componentText(component?.reference, 64) !== undefined)
-                  .slice(0, 5000)
-                  .map((component) =>
-                    defined([
-                      ["reference", componentText(component.reference, 64)],
-                      ["mpn", componentText(component.mpn, 128)],
-                      ["manufacturer", componentText(component.manufacturer, 128)],
-                      ["value", componentText(component.value, 256)],
-                      ["footprint", componentText(component.footprint, 256)],
-                      ["quantity", positiveCount(component.quantity)],
-                      ["dnp", typeof component.dnp === "boolean" ? component.dnp : undefined],
-                      ["lifecycle", componentText(component.lifecycle, 64)],
-                      [
-                        "identityKey",
-                        /^[0-9a-f]{16}$/.test(String(component.identityKey ?? ""))
-                          ? String(component.identityKey)
-                          : undefined,
-                      ],
-                    ]),
-                  ),
-              }));
+              .map((bom) => {
+                const parsedReleaseMode = releaseMode(bom.releaseMode);
+                return {
+                  project: boundedText(bom.project, "unknown.kicad_pro", 1024),
+                  ...(parsedReleaseMode ? { releaseMode: parsedReleaseMode } : {}),
+                  components: bom.components
+                    .filter((component) => componentText(component?.reference, 64) !== undefined)
+                    .slice(0, 5000)
+                    .map((component) =>
+                      defined([
+                        ["reference", componentText(component.reference, 64)],
+                        ["mpn", componentText(component.mpn, 128)],
+                        ["manufacturer", componentText(component.manufacturer, 128)],
+                        ["value", componentText(component.value, 256)],
+                        ["footprint", componentText(component.footprint, 256)],
+                        ["quantity", positiveCount(component.quantity)],
+                        ["dnp", typeof component.dnp === "boolean" ? component.dnp : undefined],
+                        ["lifecycle", componentText(component.lifecycle, 64)],
+                        [
+                          "identityKey",
+                          /^[0-9a-f]{16}$/.test(String(component.identityKey ?? ""))
+                            ? String(component.identityKey)
+                            : undefined,
+                        ],
+                      ]),
+                    ),
+                };
+              });
             const summary = reportAvailable ? report.summary : {};
             const actionsRunUrl =
               `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
