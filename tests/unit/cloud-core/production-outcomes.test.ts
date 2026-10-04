@@ -40,6 +40,31 @@ describe("production outcome CSV", () => {
     });
   });
 
+  it("uses explicit yield notation instead of guessing whether a decimal means percent or ratio", () => {
+    const parsed = parseProductionOutcomeCsv(
+      [
+        "batch_id,manufacturer,manufactured_on,quantity,first_pass_yield",
+        "RATIO-50,CM-A,2026-10-02,10,0.5",
+        "PERCENT-HALF,CM-A,2026-10-02,10,0.5%",
+        "PERCENT-50,CM-A,2026-10-02,10,50%",
+      ].join("\n"),
+    );
+
+    expect(parsed.batches.map((batch) => [batch.externalBatchId, batch.firstPassYieldBps])).toEqual([
+      ["RATIO-50", 5_000],
+      ["PERCENT-HALF", 50],
+      ["PERCENT-50", 5_000],
+    ]);
+
+    expect(() =>
+      parseProductionOutcomeCsv(
+        ["batch_id,manufacturer,manufactured_on,quantity,first_pass_yield", "AMBIGUOUS,CM-A,2026-10-02,10,50"].join(
+          "\n",
+        ),
+      ),
+    ).toThrow("without % must be a ratio between 0 and 1; append % for percentages");
+  });
+
   it("preserves quoted commas, escaped quotes, and embedded newlines", () => {
     const parsed = parseProductionOutcomeCsv(
       [
@@ -75,7 +100,8 @@ describe("production outcome CSV", () => {
   it.each([
     ["invalid calendar date", "LOT-1,CM-A,2026-02-30,100", "real calendar date"],
     ["zero quantity", "LOT-1,CM-A,2026-10-02,0", "quantity must be greater than zero"],
-    ["yield over 100 percent", "LOT-1,CM-A,2026-10-02,100,101", "between 0% and 100%"],
+    ["yield over 100 percent", "LOT-1,CM-A,2026-10-02,100,101%", "percentage must be between 0% and 100%"],
+    ["ambiguous unsuffixed percentage", "LOT-1,CM-A,2026-10-02,100,97.5", "without % must be a ratio between 0 and 1"],
     ["negative rework", "LOT-1,CM-A,2026-10-02,100,, -1", "rework_count must be a non-negative integer"],
   ])("rejects %s", (_label, data, message) => {
     const header = "batch_id,manufacturer,manufactured_on,quantity,first_pass_yield,rework_count";
@@ -89,6 +115,26 @@ describe("production outcome CSV", () => {
     expect(() =>
       parseProductionOutcomeCsv("batch_id,manufacturer,manufactured_on,quantity,batch-id\nB-1,CM,2026-10-01,2,B-1"),
     ).toThrow('duplicate header "batch_id"');
+  });
+
+  it("bounds rows, columns, and cells while parsing untrusted CSV", () => {
+    const tooManyColumns = [
+      Array.from({ length: 65 }, (_, index) => `column_${String(index)}`).join(","),
+      Array.from({ length: 65 }, () => "value").join(","),
+    ].join("\n");
+    expect(() => parseProductionOutcomeCsv(tooManyColumns)).toThrow("exceeds 64 columns");
+
+    const oversizedCell = [
+      "batch_id,manufacturer,manufactured_on,quantity,notes",
+      `LOT-1,CM-A,2026-10-02,10,${"x".repeat(4_001)}`,
+    ].join("\n");
+    expect(() => parseProductionOutcomeCsv(oversizedCell)).toThrow("cell exceeds 4000 characters");
+
+    const tooManyRows = [
+      "batch_id,manufacturer,manufactured_on,quantity",
+      ...Array.from({ length: 10_001 }, (_, index) => `LOT-${String(index)},CM-A,2026-10-02,10`),
+    ].join("\n");
+    expect(() => parseProductionOutcomeCsv(tooManyRows)).toThrow("exceeds 10000 data rows");
   });
 
   it("rejects malformed quoting and oversized inputs", () => {

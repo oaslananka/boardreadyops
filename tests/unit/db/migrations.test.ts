@@ -148,6 +148,7 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("create table if not exists production_batch_defects");
     expect(sql).toContain("category in ('aoi', 'spi', 'functional_test', 'ncr', 'rma')");
     expect(sql).toContain("unique (production_batch_id, category, code)");
+    expect(sql).not.toContain("production_batch_defects_batch_category_idx");
     expect(sql).not.toContain("customer_id");
     expect(sql).not.toContain("vendor_id");
   });

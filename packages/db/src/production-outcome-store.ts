@@ -45,33 +45,7 @@ function normalizedSourceName(value: string | undefined): string | undefined {
   return normalized;
 }
 
-export function createSqlProductionOutcomeStore(
-  executor: SqlQueryExecutor,
-  options: { now?: () => Date } = {},
-): ProductionOutcomeStore {
-  const now = options.now ?? (() => new Date());
-
-  return {
-    async importBatch(input) {
-      if (!sha256Pattern.test(input.sourceSha256)) {
-        throw new Error("Production outcome source digest must be a lowercase SHA-256 value");
-      }
-
-      const sourceName = normalizedSourceName(input.sourceName);
-      const batch = input.batch;
-      if (batch.defects.length > 1_000) {
-        throw new Error("Production outcome batch exceeds the 1000-defect import limit");
-      }
-
-      const defects = batch.defects.map((defect) => ({
-        category: defect.category,
-        code: defect.code,
-        defect_count: defect.count,
-        notes: defect.notes ?? null,
-      }));
-
-      const result = await executor.query(
-        `with scoped_run as (
+const importProductionBatchSql = `with scoped_run as (
            select release_runs.id
              from release_runs
              join repositories on repositories.id = release_runs.repository_id
@@ -147,26 +121,51 @@ export function createSqlProductionOutcomeStore(
            returning id
          )
          select target.id, target.created, (select count(*) from written_defects)::integer as defects_written
-           from target`,
-        [
-          input.releaseRunId,
-          input.installationId,
-          batch.externalBatchId,
-          batch.manufacturer,
-          batch.manufacturedOn,
-          batch.quantity,
-          batch.firstPassYieldBps ?? null,
-          batch.reworkCount,
-          batch.scrapCount,
-          batch.notes ?? null,
-          batch.correctiveAction ?? null,
-          input.sourceKind,
-          sourceName ?? null,
-          input.sourceSha256,
-          now().toISOString(),
-          JSON.stringify(defects),
-        ],
-      );
+           from target`;
+
+export function createSqlProductionOutcomeStore(
+  executor: SqlQueryExecutor,
+  options: { now?: () => Date } = {},
+): ProductionOutcomeStore {
+  const now = options.now ?? (() => new Date());
+
+  return {
+    async importBatch(input) {
+      if (!sha256Pattern.test(input.sourceSha256)) {
+        throw new Error("Production outcome source digest must be a lowercase SHA-256 value");
+      }
+
+      const sourceName = normalizedSourceName(input.sourceName);
+      const batch = input.batch;
+      if (batch.defects.length > 1_000) {
+        throw new Error("Production outcome batch exceeds the 1000-defect import limit");
+      }
+
+      const defects = batch.defects.map((defect) => ({
+        category: defect.category,
+        code: defect.code,
+        defect_count: defect.count,
+        notes: defect.notes ?? null,
+      }));
+
+      const result = await executor.query(importProductionBatchSql, [
+        input.releaseRunId,
+        input.installationId,
+        batch.externalBatchId,
+        batch.manufacturer,
+        batch.manufacturedOn,
+        batch.quantity,
+        batch.firstPassYieldBps ?? null,
+        batch.reworkCount,
+        batch.scrapCount,
+        batch.notes ?? null,
+        batch.correctiveAction ?? null,
+        input.sourceKind,
+        sourceName ?? null,
+        input.sourceSha256,
+        now().toISOString(),
+        JSON.stringify(defects),
+      ]);
 
       const row = resultRows(result)[0];
       if (!row) {

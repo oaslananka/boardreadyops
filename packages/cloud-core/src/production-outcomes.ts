@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { DelimitedParseError, parseDelimitedRows } from "./delimited.js";
 
 export type ProductionDefectCategory = "aoi" | "spi" | "functional_test" | "ncr" | "rma";
 
@@ -40,61 +41,26 @@ function parseCsvRows(text: string): string[][] {
     throw new Error("Production outcome CSV exceeds the 2 MiB import limit");
   }
 
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-
-  const pushCell = () => {
-    if (cell.length > maximumCellLength) throw new Error("Production outcome CSV cell exceeds 4000 characters");
-    row.push(cell);
-    cell = "";
-    if (row.length > maximumColumns) throw new Error("Production outcome CSV exceeds 64 columns");
-  };
-
-  const pushRow = () => {
-    pushCell();
-    rows.push(row);
-    row = [];
-    if (rows.length > maximumRows + 1) throw new Error("Production outcome CSV exceeds 10000 data rows");
-  };
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-
-    if (quoted) {
-      if (char === '"' && next === '"') {
-        cell += '"';
-        index += 1;
-      } else if (char === '"') {
-        quoted = false;
-      } else {
-        cell += char;
-      }
-      continue;
+  try {
+    return parseDelimitedRows(text, ",", {
+      maxRows: maximumRows + 1,
+      maxColumns: maximumColumns,
+      maxCellLength: maximumCellLength,
+      rejectUnterminatedQuote: true,
+    });
+  } catch (error) {
+    if (!(error instanceof DelimitedParseError)) throw error;
+    if (error.code === "cell_limit") {
+      throw new Error("Production outcome CSV cell exceeds 4000 characters");
     }
-
-    if (char === '"') {
-      quoted = true;
-    } else if (char === ",") {
-      pushCell();
-    } else if (char === "\n") {
-      cell = cell.replace(/\r$/u, "");
-      pushRow();
-    } else {
-      cell += char;
+    if (error.code === "column_limit") {
+      throw new Error("Production outcome CSV exceeds 64 columns");
     }
+    if (error.code === "row_limit") {
+      throw new Error("Production outcome CSV exceeds 10000 data rows");
+    }
+    throw new Error("Production outcome CSV contains an unterminated quoted field");
   }
-
-  if (quoted) throw new Error("Production outcome CSV contains an unterminated quoted field");
-
-  if (cell.length > 0 || row.length > 0 || (text.length > 0 && !text.endsWith("\n"))) {
-    cell = cell.replace(/\r$/u, "");
-    pushRow();
-  }
-
-  return rows;
 }
 
 function normalizedHeader(value: string): string {
@@ -136,15 +102,25 @@ function firstPassYieldBps(value: string | undefined): number | undefined {
   const percentSuffix = normalized.endsWith("%");
   const numericText = percentSuffix ? normalized.slice(0, -1).trim() : normalized;
   if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/u.test(numericText)) {
-    throw new Error("first_pass_yield must be a ratio, percentage, or percent-suffixed value");
+    throw new Error("first_pass_yield must be a ratio or percent-suffixed value");
   }
 
   const numeric = Number(numericText);
-  const ratio = percentSuffix ? numeric / 100 : numeric <= 1 ? numeric : numeric / 100;
-  if (!Number.isFinite(ratio) || ratio < 0 || ratio > 1) {
-    throw new Error("first_pass_yield must resolve to a value between 0% and 100%");
+  if (!Number.isFinite(numeric)) {
+    throw new Error("first_pass_yield must be a ratio or percent-suffixed value");
   }
-  return Math.round(ratio * 10_000);
+
+  if (percentSuffix) {
+    if (numeric < 0 || numeric > 100) {
+      throw new Error("first_pass_yield percentage must be between 0% and 100%");
+    }
+    return Math.round(numeric * 100);
+  }
+
+  if (numeric < 0 || numeric > 1) {
+    throw new Error("first_pass_yield without % must be a ratio between 0 and 1; append % for percentages");
+  }
+  return Math.round(numeric * 10_000);
 }
 
 function manufacturedOn(value: string | undefined): string {

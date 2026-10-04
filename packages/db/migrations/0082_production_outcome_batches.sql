@@ -67,9 +67,6 @@ create table if not exists production_batch_defects (
   unique (production_batch_id, category, code)
 );
 
-create index if not exists production_batch_defects_batch_category_idx
-  on production_batch_defects(production_batch_id, category, code);
-
 insert into cloud_schema_migrations (version)
 values ('0082_production_outcome_batches')
 on conflict (version) do nothing;

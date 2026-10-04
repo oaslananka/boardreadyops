@@ -49,6 +49,11 @@
       "import": "./src/component-intelligence.ts",
       "default": "./src/component-intelligence.ts"
     },
+    "./delimited": {
+      "types": "./src/delimited.ts",
+      "import": "./src/delimited.ts",
+      "default": "./src/delimited.ts"
+    },
     "./component-intelligence-resilience": {
       "types": "./src/component-intelligence-resilience.ts",
       "import": "./src/component-intelligence-resilience.ts",

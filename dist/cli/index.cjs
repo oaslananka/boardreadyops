@@ -40202,43 +40202,81 @@ function globLike(pattern, value) {
 // src/rules/bom/shared.ts
 var import_node_path8 = __toESM(require("node:path"), 1);
 
-// src/util/delimited.ts
-function parseDelimitedRows(text, delimiter) {
+// packages/cloud-core/src/delimited.ts
+var DelimitedParseError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "DelimitedParseError";
+    this.code = code;
+  }
+};
+function positiveLimit(value, name) {
+  if (value === void 0) return void 0;
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer`);
+  return value;
+}
+function parseDelimitedRows(text, delimiter, options = {}) {
+  if (delimiter.length !== 1) throw new Error("delimiter must be exactly one character");
+  const maxRows = positiveLimit(options.maxRows, "maxRows");
+  const maxColumns = positiveLimit(options.maxColumns, "maxColumns");
+  const maxCellLength = positiveLimit(options.maxCellLength, "maxCellLength");
   const rows2 = [];
   let row = [];
   let cell = "";
   let quoted = false;
+  const append = (value) => {
+    cell += value;
+    if (maxCellLength !== void 0 && cell.length > maxCellLength) {
+      throw new DelimitedParseError("cell_limit", `Delimited cell exceeds ${maxCellLength} characters`);
+    }
+  };
+  const pushCell = () => {
+    row.push(cell);
+    cell = "";
+    if (maxColumns !== void 0 && row.length > maxColumns) {
+      throw new DelimitedParseError("column_limit", `Delimited row exceeds ${maxColumns} columns`);
+    }
+  };
+  const pushRow = () => {
+    pushCell();
+    rows2.push(row);
+    row = [];
+    if (maxRows !== void 0 && rows2.length > maxRows) {
+      throw new DelimitedParseError("row_limit", `Delimited input exceeds ${maxRows} rows`);
+    }
+  };
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
     const next = text[index + 1];
     if (quoted) {
       if (char === '"' && next === '"') {
-        cell += '"';
+        append('"');
         index += 1;
       } else if (char === '"') {
         quoted = false;
       } else {
-        cell += char;
+        append(char ?? "");
       }
       continue;
     }
     if (char === '"') {
       quoted = true;
     } else if (char === delimiter) {
-      row.push(cell);
-      cell = "";
+      pushCell();
     } else if (char === "\n") {
-      row.push(cell.replace(/\r$/, ""));
-      rows2.push(row);
-      row = [];
-      cell = "";
+      cell = cell.replace(/\r$/u, "");
+      pushRow();
     } else {
-      cell += char;
+      append(char ?? "");
     }
   }
+  if (quoted && options.rejectUnterminatedQuote === true) {
+    throw new DelimitedParseError("unterminated_quote", "Delimited input contains an unterminated quoted field");
+  }
   if (cell.length > 0 || row.length > 0 || !text.endsWith("\n")) {
-    row.push(cell.replace(/\r$/, ""));
-    rows2.push(row);
+    cell = cell.replace(/\r$/u, "");
+    pushRow();
   }
   return rows2;
 }
