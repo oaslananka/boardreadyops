@@ -675,8 +675,7 @@ export async function lookupRunDashboard(
   const findingScope = findingPredicates(runId, filters);
   const artifactScope = artifactPredicates(runId, filters);
 
-  const [findingCountResult, artifactCountResult, attemptsResult, transitionsResult, boardsResult, productionResult] =
-    await Promise.all([
+  const [findingCountResult, artifactCountResult, attemptsResult, transitionsResult, boardsResult] = await Promise.all([
     executor.query(`select count(*)::int as total from findings where ${findingScope.sql}`, findingScope.parameters),
     executor.query(
       `select count(*)::int as total,
@@ -750,42 +749,7 @@ export async function lookupRunDashboard(
        limit 50`,
       [runId],
     ),
-    executor.query(
-      `select production_batches.id,
-              production_batches.external_batch_id,
-              production_batches.manufacturer,
-              production_batches.manufactured_on::text,
-              production_batches.quantity::int,
-              production_batches.first_pass_yield_bps::int,
-              production_batches.rework_count::int,
-              production_batches.scrap_count::int,
-              production_batches.notes,
-              production_batches.corrective_action,
-              production_batches.source_kind,
-              production_batches.source_name,
-              production_batches.source_sha256,
-              production_batches.imported_at,
-              coalesce(
-                jsonb_agg(
-                  jsonb_build_object(
-                    'category', production_batch_defects.category,
-                    'code', production_batch_defects.code,
-                    'count', production_batch_defects.defect_count,
-                    'notes', production_batch_defects.notes
-                  )
-                  order by production_batch_defects.category, production_batch_defects.code
-                ) filter (where production_batch_defects.id is not null),
-                '[]'::jsonb
-              ) as defects
-       from production_batches
-       left join production_batch_defects
-         on production_batch_defects.production_batch_id = production_batches.id
-       where production_batches.release_run_id = $1
-       group by production_batches.id
-       order by production_batches.manufactured_on desc, production_batches.imported_at desc, production_batches.id desc
-       limit 50`,
-      [runId],
-    ),
+
   ]);
 
   const findingTotal = numberValue(rows(findingCountResult)[0] ?? {}, "total") ?? 0;
@@ -802,7 +766,7 @@ export async function lookupRunDashboard(
   const findingOffset = (findingsPage.page - 1) * filters.pageSize;
   const artifactOffset = (artifactsPage.page - 1) * filters.pageSize;
 
-  const [findingsResult, artifactsResult, categoryBreakdownResult] = await Promise.all([
+  const [findingsResult, artifactsResult, categoryBreakdownResult, productionResult] = await Promise.all([
     executor.query(
       `select findings.id, findings.rule_id, findings.severity, findings.message,
               findings.path, findings.kind, findings.waived_at
@@ -839,6 +803,42 @@ export async function lookupRunDashboard(
         where run_id = $1
         group by coalesce(category, 'unclassified')
         order by coalesce(category, 'unclassified')`,
+      [runId],
+    ),
+    executor.query(
+      `select production_batches.id,
+              production_batches.external_batch_id,
+              production_batches.manufacturer,
+              production_batches.manufactured_on::text,
+              production_batches.quantity::int,
+              production_batches.first_pass_yield_bps::int,
+              production_batches.rework_count::int,
+              production_batches.scrap_count::int,
+              production_batches.notes,
+              production_batches.corrective_action,
+              production_batches.source_kind,
+              production_batches.source_name,
+              production_batches.source_sha256,
+              production_batches.imported_at,
+              coalesce(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'category', production_batch_defects.category,
+                    'code', production_batch_defects.code,
+                    'count', production_batch_defects.defect_count,
+                    'notes', production_batch_defects.notes
+                  )
+                  order by production_batch_defects.category, production_batch_defects.code
+                ) filter (where production_batch_defects.id is not null),
+                '[]'::jsonb
+              ) as defects
+       from production_batches
+       left join production_batch_defects
+         on production_batch_defects.production_batch_id = production_batches.id
+       where production_batches.release_run_id = $1
+       group by production_batches.id
+       order by production_batches.manufactured_on desc, production_batches.imported_at desc, production_batches.id desc
+       limit 50`,
       [runId],
     ),
   ]);
