@@ -123,7 +123,18 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0073_supply_finding_provenance.sql",
       "0074_installation_component_observations.sql",
       "0075_component_supplier_count.sql",
+      "0076_supply_unavailable_findings.sql",
     ]);
+  });
+
+  it("extends durable supply finding status with explicit zero-stock risk in schema v76", async () => {
+    const sql = (await readFile(join(migrationsDir, "0076_supply_unavailable_findings.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("alter table board_supply_findings");
+    expect(sql).toContain("drop constraint if exists board_supply_findings_status_valid");
+    expect(sql).toContain("status in ('nrnd', 'eol', 'obsolete', 'unavailable')");
+    expect(sql).not.toContain("available_units");
+    expect(sql).not.toContain("inventory_level");
   });
 
   it("adds bounded supplier-count metadata to both observation caches in schema v75", async () => {

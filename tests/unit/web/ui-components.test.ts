@@ -22,6 +22,7 @@ describe("ui.tsx shared component contract", () => {
     expect(humanize("in_progress")).toBe("In Progress");
     expect(humanize(undefined)).toBe("Unknown");
     expect(statusTone("failed")).toBe("danger");
+    expect(statusTone("unavailable")).toBe("danger");
     expect(statusTone("pass")).toBe("success");
     expect(statusTone("queued")).toBe("info");
     expect(statusTone("something-unmapped")).toBe("neutral");

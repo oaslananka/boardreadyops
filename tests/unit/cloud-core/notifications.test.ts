@@ -36,6 +36,14 @@ describe("notification event catalogue", () => {
     expect(isNotificationEventType("anything.else")).toBe(false);
   });
 
+  it("describes supply risk broadly enough to cover lifecycle and zero-stock alerts", () => {
+    const definition = notificationEventCatalog.find((entry) => entry.type === "supply.risk_detected");
+
+    expect(definition?.label).toBe("A part has a supply-chain risk");
+    expect(definition?.description).toContain("lifecycle risk or zero availability");
+    expect(definition?.description).not.toContain("end-of-life or NRND");
+  });
+
   it("defaults a new channel to the events worth interrupting someone for", () => {
     // A channel subscribed to everything gets muted, and a muted channel is the same as none.
     const defaults = defaultSubscribedEvents();

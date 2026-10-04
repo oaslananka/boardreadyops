@@ -74,8 +74,21 @@ describe("composeSupplyAnnouncement", () => {
     );
 
     expect(announcement?.headline).toBe(
-      "2 parts are end-of-life or NRND — on 1 board(s), 1 still in the current revision",
+      "2 parts have supply-chain risks — on 1 board(s), 1 still in the current revision",
     );
+  });
+
+  it("renders zero-stock risk without pretending it is a lifecycle transition", () => {
+    const announcement = composeSupplyAnnouncement(
+      [part({ status: "unavailable", severity: "high", source: "nexar" })],
+      {
+        boards: [board({ displayName: "Gateway", repositoryFullName: "acme/gateway", inCurrentRevision: true })],
+        truncated: false,
+      },
+    );
+
+    expect(announcement?.headline).toBe("TPS62840DLCR is UNAVAILABLE — on 1 board(s), 1 still in the current revision");
+    expect(announcement?.details[0]).toBe("TPS62840DLCR — UNAVAILABLE, high risk · Source: Nexar");
   });
 
   it("leads with the critical part when one part is named", () => {
