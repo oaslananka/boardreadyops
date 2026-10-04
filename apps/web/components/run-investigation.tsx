@@ -455,8 +455,56 @@ function formatProductionYield(firstPassYieldBps: number | undefined): string {
   return `${percentage}%`;
 }
 
+type ProductionReleaseMetrics = {
+  batchCount: number;
+  quantity: number;
+  firstPassYieldBps: number | undefined;
+  reworkCount: number;
+  scrapCount: number;
+  defectCount: number;
+};
+
+function summarizeProductionBatches(batches: RunDetail["productionBatches"]): ProductionReleaseMetrics {
+  let quantity = 0;
+  let yieldedQuantity = 0;
+  let weightedYield = 0;
+  let reworkCount = 0;
+  let scrapCount = 0;
+  let defectCount = 0;
+
+  for (const batch of batches) {
+    quantity += batch.quantity;
+    reworkCount += batch.reworkCount;
+    scrapCount += batch.scrapCount;
+    defectCount += batch.defects.reduce((total, defect) => total + defect.count, 0);
+    if (batch.firstPassYieldBps !== undefined) {
+      yieldedQuantity += batch.quantity;
+      weightedYield += batch.firstPassYieldBps * batch.quantity;
+    }
+  }
+
+  return {
+    batchCount: batches.length,
+    quantity,
+    firstPassYieldBps: yieldedQuantity > 0 ? Math.round(weightedYield / yieldedQuantity) : undefined,
+    reworkCount,
+    scrapCount,
+    defectCount,
+  };
+}
+
+function formatYieldDelta(current: number | undefined, previous: number | undefined): string {
+  if (current === undefined || previous === undefined) return "Not comparable";
+  const delta = (current - previous) / 100;
+  const prefix = delta > 0 ? "+" : "";
+  return `${prefix}${delta.toFixed(2).replace(/\.00$/u, "")} pp`;
+}
+
 function ProductionOutcomesPanel({ run }: Readonly<{ run: RunDetail }>) {
   if (run.productionBatches.length === 0) return null;
+
+  const current = summarizeProductionBatches(run.productionBatches);
+  const previous = run.productionBaseline;
 
   return (
     <Panel
@@ -464,6 +512,44 @@ function ProductionOutcomesPanel({ run }: Readonly<{ run: RunDetail }>) {
       title="Production outcomes"
       description="Release-linked manufacturing observations. Use them to compare outcomes; correlation alone does not prove a release caused a manufacturing change."
     >
+      <section aria-label="Production release comparison" className="mb-4 rounded-md border border-border bg-muted/30 p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Release comparison</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This release is summarized across all imported batches.
+              {previous ? " The baseline is the most recent earlier release with production evidence." : ""}
+            </p>
+          </div>
+          {previous ? (
+            <Link className="text-sm text-primary underline underline-offset-2" href={`/runs/${previous.runId}`}>
+              Previous release {previous.commitSha.slice(0, 7)}
+            </Link>
+          ) : null}
+        </div>
+        <div className="mt-3">
+          <DefinitionGrid>
+            <Definition label="This release batches">{current.batchCount}</Definition>
+            <Definition label="This release quantity">{current.quantity}</Definition>
+            <Definition label="This release FPY">{formatProductionYield(current.firstPassYieldBps)}</Definition>
+            {previous ? (
+              <>
+                <Definition label="Previous batches">{previous.batchCount}</Definition>
+                <Definition label="Previous quantity">{previous.quantity}</Definition>
+                <Definition label="Previous FPY">{formatProductionYield(previous.firstPassYieldBps)}</Definition>
+                <Definition label="Yield change">
+                  {formatYieldDelta(current.firstPassYieldBps, previous.firstPassYieldBps)}
+                </Definition>
+                <Definition label="Rework">{current.reworkCount} now · {previous.reworkCount} previous</Definition>
+                <Definition label="Scrap">{current.scrapCount} now · {previous.scrapCount} previous</Definition>
+                <Definition label="Defects">{current.defectCount} now · {previous.defectCount} previous</Definition>
+              </>
+            ) : (
+              <Definition label="Previous release">No earlier production-linked release</Definition>
+            )}
+          </DefinitionGrid>
+        </div>
+      </section>
       <ul className="flex flex-col gap-3">
         {run.productionBatches.map((batch) => (
           <li key={batch.id} className="rounded-md border border-border bg-card p-3">
