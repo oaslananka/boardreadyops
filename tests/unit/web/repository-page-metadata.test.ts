@@ -17,6 +17,12 @@ describe("Repository page metadata", () => {
     expect(source).toContain("acknowledgeSupplyFindingAction");
   });
 
+  it("uses the durable finding id as the supply table row key", () => {
+    const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
+
+    expect(source).toContain("rowKey={(finding) => finding.id}");
+  });
+
   it("shows the persisted provider source beside open supply findings", () => {
     const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
 

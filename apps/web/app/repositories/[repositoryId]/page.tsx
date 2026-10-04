@@ -228,7 +228,7 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
               caption="Open supply findings on watched boards"
               columns={supplyColumns(repository.id)}
               rows={supplyFindings}
-              rowKey={(finding) => `${finding.boardPath}:${finding.mpn}:${finding.reference ?? ""}`}
+              rowKey={(finding) => finding.id}
               empty={null}
             />
           )}
