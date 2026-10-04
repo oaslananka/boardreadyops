@@ -378,6 +378,7 @@ async function resolveProjectBoms(ctx: PipelineContext, projects: ProjectContext
     const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
     const declaredBom = variantMatch?.bom ?? override?.bom ?? explicitWorkspaceBom(ctx.options);
     const attributableBom = declaredBom ?? (await bomWithinProject(ctx.root, project));
+    const releaseMode = projectConfig.releaseMode ?? ctx.options.releaseMode;
     const scoped: RuleContext = {
       root: ctx.root,
       projects: [project],
@@ -391,7 +392,11 @@ async function resolveProjectBoms(ctx: PipelineContext, projects: ProjectContext
       // search and may belong to a different board. Attributing them here would report parts
       // this board does not contain, so fall back to its own schematic instead.
       const resolved = attributableBom && bomRows.length > 0 ? bomRows : schematicRows;
-      boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
+      boms.push({
+        project: project.projectFile,
+        ...(releaseMode ? { releaseMode } : {}),
+        components: resolved.map(projectBomComponent),
+      });
     } catch (error) {
       // Snapshot collection must never fail a run that is not about the BOM. An unreadable
       // or stale configured BOM path is reported by the BOM rules when they are enabled;
@@ -400,7 +405,7 @@ async function resolveProjectBoms(ctx: PipelineContext, projects: ProjectContext
         project: project.projectFile,
         reason: error instanceof Error ? error.message : String(error),
       });
-      boms.push({ project: project.projectFile, components: [] });
+      boms.push({ project: project.projectFile, ...(releaseMode ? { releaseMode } : {}), components: [] });
     }
   }
   return boms;

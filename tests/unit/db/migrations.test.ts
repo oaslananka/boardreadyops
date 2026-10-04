@@ -128,7 +128,17 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0078_supply_finding_suppressions.sql",
       "0079_component_alternates.sql",
       "0080_component_compliance_trust.sql",
+      "0081_board_snapshot_release_mode.sql",
     ]);
+  });
+
+  it("captures release criticality on immutable BOM snapshots in schema v81", async () => {
+    const sql = (await readFile(join(migrationsDir, "0081_board_snapshot_release_mode.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("alter table board_bom_snapshots");
+    expect(sql).toContain("add column if not exists release_mode text");
+    expect(sql).toContain("board_bom_snapshots_release_mode_valid");
+    expect(sql).toContain("'prototype', 'pilot', 'production'");
   });
 
   it("adds bounded compliance/trust signals and restricted findings in schema v80", async () => {

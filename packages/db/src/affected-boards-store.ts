@@ -34,6 +34,8 @@ export type AffectedBoard = {
   snapshotId: string;
   commitSha: string;
   capturedAt: string;
+  /** Product/release criticality configured when this affected snapshot was captured. */
+  releaseMode?: "prototype" | "pilot" | "production" | undefined;
   /** References the part occupies on that snapshot, so a reader can find it on the board. */
   references: readonly string[];
   /**
@@ -78,6 +80,11 @@ function text(row: Row, key: string): string {
   const value = row[key];
   if (typeof value === "string") return value;
   throw new Error(`expected column ${key}`);
+}
+
+function releaseMode(row: Row, key: string): AffectedBoard["releaseMode"] {
+  const value = row[key];
+  return value === "prototype" || value === "pilot" || value === "production" ? value : undefined;
 }
 
 function timestampText(row: Row, key: string): string {
@@ -141,6 +148,7 @@ export function createSqlAffectedBoardsStore(executor: SqlQueryExecutor): Affect
                   snapshots.run_id     as run_id,
                   snapshots.commit_sha as commit_sha,
                   snapshots.captured_at as captured_at,
+                  snapshots.release_mode as release_mode,
                   array_agg(distinct components.reference order by components.reference) as refs
              from board_bom_components as components
              join board_bom_snapshots as snapshots on snapshots.id = components.snapshot_id
@@ -155,7 +163,7 @@ export function createSqlAffectedBoardsStore(executor: SqlQueryExecutor): Affect
               and components.dnp = false
             group by boards.id, boards.display_name, boards.project_path, repositories.id,
                      repositories.owner, repositories.name, snapshots.id, snapshots.run_id, snapshots.commit_sha,
-                     snapshots.captured_at
+                     snapshots.captured_at, snapshots.release_mode
          ),
          release_summary as (
            select count(distinct run_id)::int as affected_release_run_count
@@ -169,7 +177,7 @@ export function createSqlAffectedBoardsStore(executor: SqlQueryExecutor): Affect
              join current_snapshot on current_snapshot.board_id = hits.board_id
          )
          select board_id, display_name, project_path, repository_id, repository_full_name,
-                snapshot_id, commit_sha, captured_at, refs, in_current_revision,
+                snapshot_id, commit_sha, captured_at, release_mode, refs, in_current_revision,
                 release_summary.affected_release_run_count
            from ranked
            cross join release_summary
@@ -180,18 +188,22 @@ export function createSqlAffectedBoardsStore(executor: SqlQueryExecutor): Affect
       );
 
       const found = rows(result);
-      const boards = found.slice(0, limit).map((row) => ({
-        boardId: text(row, "board_id"),
-        displayName: text(row, "display_name"),
-        projectPath: text(row, "project_path"),
-        repositoryId: text(row, "repository_id"),
-        repositoryFullName: text(row, "repository_full_name"),
-        snapshotId: text(row, "snapshot_id"),
-        commitSha: text(row, "commit_sha"),
-        capturedAt: timestampText(row, "captured_at"),
-        references: references(row, "refs"),
-        inCurrentRevision: row.in_current_revision === true,
-      }));
+      const boards = found.slice(0, limit).map((row) => {
+        const capturedReleaseMode = releaseMode(row, "release_mode");
+        return {
+          boardId: text(row, "board_id"),
+          displayName: text(row, "display_name"),
+          projectPath: text(row, "project_path"),
+          repositoryId: text(row, "repository_id"),
+          repositoryFullName: text(row, "repository_full_name"),
+          snapshotId: text(row, "snapshot_id"),
+          commitSha: text(row, "commit_sha"),
+          capturedAt: timestampText(row, "captured_at"),
+          ...(capturedReleaseMode ? { releaseMode: capturedReleaseMode } : {}),
+          references: references(row, "refs"),
+          inCurrentRevision: row.in_current_revision === true,
+        };
+      });
 
       const affectedReleaseRunCount = found.length === 0 ? 0 : integer(found[0] as Row, "affected_release_run_count");
 

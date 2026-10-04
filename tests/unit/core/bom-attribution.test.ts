@@ -90,6 +90,33 @@ describe("BOM attribution on the run result", () => {
     expect(byProject.get("hardware/prototype/prototype.kicad_pro")?.map((row) => row.mpn)).toEqual(["PROTO-PART-9"]);
   });
 
+  it("carries each project's resolved release mode with its BOM snapshot", async () => {
+    const root = await writeFixture({
+      "hardware/main/main.kicad_pro": "{}",
+      "hardware/main/main.kicad_sch": emptySchematic,
+      "hardware/main/main.kicad_pcb": emptyBoard,
+      "hardware/prototype/prototype.kicad_pro": "{}",
+      "hardware/prototype/prototype.kicad_sch": emptySchematic,
+      "hardware/prototype/prototype.kicad_pcb": emptyBoard,
+      "boardreadyops.yml": [
+        "version: 1",
+        "releaseMode: pilot",
+        "projects:",
+        "  - path: hardware/main",
+        "    releaseMode: production",
+        "  - path: hardware/prototype",
+        "    releaseMode: prototype",
+        "fail-on: never",
+      ].join("\n"),
+    });
+
+    const result = await runPipeline({ path: root, rules: ["release.revision-set"], failOn: "never" });
+    const modes = new Map(result.boms?.map((bom) => [bom.project, bom.releaseMode]) ?? []);
+
+    expect(modes.get("hardware/main/main.kicad_pro")).toBe("production");
+    expect(modes.get("hardware/prototype/prototype.kicad_pro")).toBe("prototype");
+  });
+
   it("carries the resolved component rows for a project that has a BOM", async () => {
     const root = await writeFixture({
       "hardware/main/main.kicad_pro": "{}",

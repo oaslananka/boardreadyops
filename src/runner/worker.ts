@@ -472,6 +472,7 @@ function boundedFirmware(
 function boundedBoms(boms: NonNullable<ReleaseRunResult["boms"]>): NonNullable<ReleaseRunResult["boms"]> {
   return boms.slice(0, 50).map((bom) => ({
     project: bom.project.slice(0, 1024),
+    ...(bom.releaseMode ? { releaseMode: bom.releaseMode } : {}),
     components: bom.components
       .filter((component) => component.reference.trim().length > 0)
       .slice(0, 5000)

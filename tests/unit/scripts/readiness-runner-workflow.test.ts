@@ -143,6 +143,9 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("const rawBoms = reportAvailable && Array.isArray(report.boms) ? report.boms : [];");
     expect(workflow).toContain(".slice(0, 50)");
     expect(workflow).toContain(".slice(0, 5000)");
+    expect(workflow).toContain('value === "prototype" || value === "pilot" || value === "production"');
+    expect(workflow).toContain("const parsedReleaseMode = releaseMode(bom.releaseMode);");
+    expect(workflow).toContain("releaseMode: parsedReleaseMode");
     expect(workflow).toContain("...(boms.length > 0 ? { boms } : {})");
   });
 

@@ -114,6 +114,7 @@ export const releaseRunBomComponentSchema = z
 export const releaseRunBoardBomSchema = z
   .object({
     project: z.string().trim().min(1).max(1024),
+    releaseMode: z.enum(["prototype", "pilot", "production"]).optional(),
     components: z.array(releaseRunBomComponentSchema).max(5000),
   })
   .strict();

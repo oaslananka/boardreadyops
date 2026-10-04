@@ -284,6 +284,7 @@ describe("board attribution and BOM rows", () => {
       boms: [
         {
           project: "hardware/mainboard/mainboard.kicad_pro",
+          releaseMode: "production",
           components: [
             { reference: "U1", mpn: "STM32F103C8T6", manufacturer: "ST", quantity: 1, dnp: false },
             { reference: "R1", value: "10k", quantity: 4 },
@@ -293,8 +294,18 @@ describe("board attribution and BOM rows", () => {
     });
 
     expect(parsed.findings[0]?.project).toBe("hardware/mainboard/mainboard.kicad_pro");
+    expect(parsed.boms?.[0]?.releaseMode).toBe("production");
     expect(parsed.boms?.[0]?.components).toHaveLength(2);
     expect(parsed.boms?.[0]?.components[0]?.mpn).toBe("STM32F103C8T6");
+  });
+
+  it("rejects an unknown BOM release mode instead of inventing criticality", () => {
+    expect(() =>
+      releaseRunResultSchema.parse({
+        ...base,
+        boms: [{ project: "board.kicad_pro", releaseMode: "urgent", components: [{ reference: "U1" }] }],
+      }),
+    ).toThrow();
   });
 
   it("rejects a BOM entry with no project attribution", () => {

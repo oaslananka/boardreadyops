@@ -91,3 +91,40 @@ describe("board BOM store: findBoardsByMpn", () => {
     expect(results).toEqual([]);
   });
 });
+
+describe("board BOM store: recordSnapshots", () => {
+  it("persists the captured project release mode on the immutable snapshot", async () => {
+    const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => ({
+      rows: [{ boards_touched: 1, snapshots_written: 1, components_written: 1, boards_enrolled: 1, run_matches: 1 }],
+    }));
+    const store = createSqlBoardBomStore({ query } as unknown as SqlQueryExecutor, {
+      now: () => new Date("2026-10-04T20:00:00.000Z"),
+    });
+
+    await store.recordSnapshots({
+      runId: "run-1",
+      repositoryId,
+      commitSha: "a".repeat(40),
+      watchedBoardLimit: 10,
+      boms: [
+        {
+          project: "hardware/mainboard/mainboard.kicad_pro",
+          releaseMode: "production",
+          components: [{ reference: "U1", mpn: "STM32F103C8T6" }],
+        },
+      ],
+    });
+
+    const call = query.mock.calls[0];
+    expect(call).toBeDefined();
+    const sql = String(call?.[0] ?? "");
+    const params = (call?.[1] ?? []) as unknown[];
+    expect(sql).toContain("release_mode text");
+    expect(sql).toContain("payload.release_mode");
+    expect(sql).toContain("board_id, run_id, commit_sha, component_count, release_mode, captured_at");
+    expect(JSON.parse(String(params[3]))[0]).toMatchObject({
+      project_path: "hardware/mainboard/mainboard.kicad_pro",
+      release_mode: "production",
+    });
+  });
+});

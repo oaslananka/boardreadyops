@@ -804,6 +804,7 @@ describe("serveRunnerWorker", () => {
             boms: [
               {
                 project: "hardware/mainboard/mainboard.kicad_pro",
+                releaseMode: "production",
                 components: [
                   { reference: "U1", mpn: "STM32F103C8T6", manufacturer: "ST", quantity: 1 },
                   { reference: "R1", value: "10k", quantity: 4 },
@@ -826,6 +827,7 @@ describe("serveRunnerWorker", () => {
     )[0]?.[0];
     expect(terminal?.result.boms).toHaveLength(1);
     expect(terminal?.result.boms?.[0]?.project).toBe("hardware/mainboard/mainboard.kicad_pro");
+    expect(terminal?.result.boms?.[0]?.releaseMode).toBe("production");
     expect(terminal?.result.boms?.[0]?.components.map((component) => component.reference)).toEqual(["U1", "R1"]);
     expect(terminal?.result.findings[0]?.project).toBe("hardware/mainboard/mainboard.kicad_pro");
   });
