@@ -173,6 +173,7 @@ describe("repository dashboard and viewer loader branches", () => {
       .mockResolvedValueOnce({
         rows: [
           {
+            id: "supply-finding-1",
             project_path: "boards/main.kicad_pro",
             mpn: "STM32F401RET6",
             manufacturer: "STMicroelectronics",
@@ -181,6 +182,8 @@ describe("repository dashboard and viewer loader branches", () => {
             severity: "low",
             observation_source: "nexar",
             detected_at: "2026-08-20T10:00:00.000Z",
+            acknowledged_at: "2026-08-20T11:00:00.000Z",
+            acknowledged_by: "alice",
           },
         ],
       });
@@ -191,8 +194,11 @@ describe("repository dashboard and viewer loader branches", () => {
     expect(detail?.runs.length).toBe(1);
     expect(detail?.runs[0]?.pullRequestNumber).toBe(42);
     expect(detail?.supplyFindings.length).toBe(1);
+    expect(detail?.supplyFindings[0]?.id).toBe("supply-finding-1");
     expect(detail?.supplyFindings[0]?.mpn).toBe("STM32F401RET6");
     expect(detail?.supplyFindings[0]?.source).toBe("nexar");
+    expect(detail?.supplyFindings[0]?.acknowledgedAt).toBe("2026-08-20T11:00:00.000Z");
+    expect(detail?.supplyFindings[0]?.acknowledgedBy).toBe("alice");
   });
 
   it("loads viewer installations from database rows", async () => {

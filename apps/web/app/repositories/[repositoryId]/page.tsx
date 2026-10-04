@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuidedChecklist } from "../../../components/guided-checklist.js";
+import { SupplyFindingAcknowledgeButton } from "../../../components/supply-finding-acknowledge-button.js";
 import { type DataColumn, DataTable } from "../../../components/ui/data-table.js";
 import { AppShell, Definition, DefinitionGrid, EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
 import { ViewerNav } from "../../../components/viewer-nav.js";
@@ -8,6 +9,7 @@ import { customerStatusLabel } from "../../../lib/customer-nomenclature.js";
 import { releaseRepositoryDispatchAvailability } from "../../../lib/release-rollout.js";
 import { loadRepositoryDetail, type RepositoryDetail } from "../../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
+import { acknowledgeSupplyFindingAction } from "./actions.js";
 
 type PageProps = {
   params: Promise<{ repositoryId: string }>;
@@ -63,32 +65,53 @@ const runColumns: readonly DataColumn<RunRow>[] = [
   },
 ];
 
-const supplyColumns: readonly DataColumn<SupplyRow>[] = [
-  {
-    id: "part",
-    header: "Part",
-    rowHeader: true,
-    cell: (finding) => (
-      <>
-        <span className="font-mono">{finding.mpn}</span>
-        {finding.manufacturer ? <span className="ml-2 text-muted-foreground">{finding.manufacturer}</span> : undefined}
-      </>
-    ),
-  },
-  { id: "board", header: "Board", cell: (finding) => finding.boardPath },
-  { id: "status", header: "Status", cell: (finding) => <StatusBadge value={finding.status} /> },
-  { id: "reference", header: "Reference", cell: (finding) => finding.reference ?? "—" },
-  {
-    id: "source",
-    header: "Source",
-    cell: (finding) => (finding.source ? customerStatusLabel(finding.source) : "—"),
-  },
-  {
-    id: "detected",
-    header: "Detected",
-    cell: (finding) => <span className="text-muted-foreground">{when(finding.detectedAt)}</span>,
-  },
-];
+function supplyColumns(repositoryId: string): readonly DataColumn<SupplyRow>[] {
+  return [
+    {
+      id: "part",
+      header: "Part",
+      rowHeader: true,
+      cell: (finding) => (
+        <>
+          <span className="font-mono">{finding.mpn}</span>
+          {finding.manufacturer ? (
+            <span className="ml-2 text-muted-foreground">{finding.manufacturer}</span>
+          ) : undefined}
+        </>
+      ),
+    },
+    { id: "board", header: "Board", cell: (finding) => finding.boardPath },
+    { id: "status", header: "Status", cell: (finding) => <StatusBadge value={finding.status} /> },
+    { id: "reference", header: "Reference", cell: (finding) => finding.reference ?? "—" },
+    {
+      id: "source",
+      header: "Source",
+      cell: (finding) => (finding.source ? customerStatusLabel(finding.source) : "—"),
+    },
+    {
+      id: "detected",
+      header: "Detected",
+      cell: (finding) => <span className="text-muted-foreground">{when(finding.detectedAt)}</span>,
+    },
+    {
+      id: "acknowledgement",
+      header: "Acknowledgement",
+      cell: (finding) =>
+        finding.acknowledgedAt ? (
+          <span className="text-muted-foreground">
+            {finding.acknowledgedBy ? `Acknowledged by ${finding.acknowledgedBy}` : "Acknowledged"} ·{" "}
+            {when(finding.acknowledgedAt)}
+          </span>
+        ) : (
+          <SupplyFindingAcknowledgeButton
+            repositoryId={repositoryId}
+            findingId={finding.id}
+            action={acknowledgeSupplyFindingAction}
+          />
+        ),
+    },
+  ];
+}
 
 export default async function RepositoryPage({ params }: Readonly<PageProps>) {
   const { repositoryId } = await params;
@@ -203,7 +226,7 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
           ) : (
             <DataTable
               caption="Open supply findings on watched boards"
-              columns={supplyColumns}
+              columns={supplyColumns(repository.id)}
               rows={supplyFindings}
               rowKey={(finding) => `${finding.boardPath}:${finding.mpn}:${finding.reference ?? ""}`}
               empty={null}
