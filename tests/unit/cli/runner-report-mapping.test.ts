@@ -29,12 +29,22 @@ describe("runnerReportFromResult", () => {
   it("carries the board BOMs the pipeline produced", () => {
     const mapped = runnerReportFromResult(
       result({
-        boms: [{ project: "board.kicad_pro", components: [{ reference: "R1", mpn: "RC0603FR-0710KL" }] }],
+        boms: [
+          {
+            project: "board.kicad_pro",
+            releaseMode: "production",
+            components: [{ reference: "R1", mpn: "RC0603FR-0710KL" }],
+          },
+        ],
       }),
     );
 
     expect(mapped.boms).toEqual([
-      { project: "board.kicad_pro", components: [{ reference: "R1", mpn: "RC0603FR-0710KL" }] },
+      {
+        project: "board.kicad_pro",
+        releaseMode: "production",
+        components: [{ reference: "R1", mpn: "RC0603FR-0710KL" }],
+      },
     ]);
   });
 

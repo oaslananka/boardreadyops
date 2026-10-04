@@ -33,6 +33,8 @@ export interface ProjectBomComponent {
 /** The component rows resolved for one KiCad project, as the BOM rules saw them. */
 export interface ProjectBom {
   project: string;
+  /** Product/release criticality already configured for this project at capture time. */
+  releaseMode?: ReleaseMode | undefined;
   components: ProjectBomComponent[];
 }
 

@@ -19,6 +19,7 @@ export type BoardBomComponentInput = {
 
 export type BoardBomInput = {
   project: string;
+  releaseMode?: "prototype" | "pilot" | "production" | undefined;
   components: readonly BoardBomComponentInput[];
 };
 
@@ -136,6 +137,7 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
         deduplicated.map((bom) => ({
           project_path: bom.project,
           display_name: displayNameFor(bom.project),
+          release_mode: bom.releaseMode ?? null,
           components: bom.components.map((component) => ({
             reference: component.reference,
             mpn: component.mpn ?? null,
@@ -161,10 +163,11 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
              and release_runs.repository_id = $2
          ),
          payload as (
-           select entry.project_path, entry.display_name, entry.components
+           select entry.project_path, entry.display_name, entry.release_mode, entry.components
            from jsonb_to_recordset($4::jsonb) as entry(
              project_path text,
              display_name text,
+             release_mode text,
              components jsonb
            )
          ),
@@ -211,11 +214,14 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
            returning board_id
          ),
          inserted_snapshots as (
-           insert into board_bom_snapshots (board_id, run_id, commit_sha, component_count, captured_at)
+           insert into board_bom_snapshots (
+             board_id, run_id, commit_sha, component_count, release_mode, captured_at
+           )
            select upserted_boards.id,
                   run_scope.run_id,
                   $3,
                   jsonb_array_length(payload.components),
+                  payload.release_mode,
                   $5::timestamptz
            from upserted_boards
            join payload on payload.project_path = upserted_boards.project_path

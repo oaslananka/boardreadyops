@@ -27,6 +27,7 @@ function row(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     snapshot_id: "snap_9",
     commit_sha: "8ae31f0",
     captured_at: new Date("2026-08-01T10:00:00.000Z"),
+    release_mode: "production",
     in_current_revision: true,
     affected_release_run_count: 3,
     refs: ["U7"],
@@ -53,10 +54,24 @@ describe("resolveAffectedBoards", () => {
         snapshotId: "snap_9",
         commitSha: "8ae31f0",
         capturedAt: "2026-08-01T10:00:00.000Z",
+        releaseMode: "production",
         references: ["U7"],
         inCurrentRevision: true,
       },
     ]);
+  });
+
+  it("keeps historical release mode with the affected snapshot and omits unknown legacy values", async () => {
+    const { executor } = executorReturning([
+      row({ board_id: "prod", release_mode: "production" }),
+      row({ board_id: "legacy", release_mode: null }),
+    ]);
+    const store = createSqlAffectedBoardsStore(executor);
+
+    const result = await store.resolveAffectedBoards("inst_1", [{ mpn: "TPS62840" }]);
+
+    expect(result.boards[0]?.releaseMode).toBe("production");
+    expect(result.boards[1]).not.toHaveProperty("releaseMode");
   });
 
   it("asks for nothing when given no parts", async () => {

@@ -26,7 +26,39 @@ export type SupplyAnnouncement = {
   stillBuilt: number;
 };
 
-type AnnouncedBoard = Pick<AffectedBoard, "displayName" | "repositoryFullName" | "inCurrentRevision">;
+type AnnouncedBoard = Pick<AffectedBoard, "displayName" | "repositoryFullName" | "inCurrentRevision" | "releaseMode">;
+
+type SupplyReleaseMode = NonNullable<AnnouncedBoard["releaseMode"]>;
+
+const releaseModeRank: Readonly<Record<SupplyReleaseMode, number>> = {
+  prototype: 0,
+  pilot: 1,
+  production: 2,
+};
+
+function policyImpactLine(boards: readonly AnnouncedBoard[], affectedReleaseRunCount: number): string | undefined {
+  const current = boards.filter((board) => board.inCurrentRevision);
+  if (current.length === 0) {
+    return affectedReleaseRunCount > 0
+      ? `Policy impact: no current-revision product is affected; ${affectedReleaseRunCount} tracked historical release run(s) retain this risk evidence.`
+      : undefined;
+  }
+
+  const modes = current
+    .flatMap((board) => (board.releaseMode ? [board.releaseMode] : []))
+    .sort((left, right) => releaseModeRank[right] - releaseModeRank[left]);
+  const mode = modes[0];
+  if (!mode) {
+    return "Policy impact: current-revision hardware is affected, but release criticality was not recorded for this snapshot.";
+  }
+  if (mode === "production") {
+    return "Policy impact: current production-mode hardware is affected; review this supply risk before the next production release.";
+  }
+  if (mode === "pilot") {
+    return "Policy impact: current pilot-mode hardware is affected; review this supply risk before the next pilot release.";
+  }
+  return "Policy impact: current prototype-mode hardware is affected; account for this supply risk before the next prototype build.";
+}
 
 export function composeSupplyAnnouncement(
   parts: readonly RiskyComponentFinding[],
@@ -50,7 +82,7 @@ export function composeSupplyAnnouncement(
     .slice(0, announcedBoardLimit)
     .map(
       (board) =>
-        `${board.displayName} (${board.repositoryFullName}) — ${board.inCurrentRevision ? "current revision" : "an earlier revision only"}`,
+        `${board.displayName} (${board.repositoryFullName}) — ${board.inCurrentRevision ? "current revision" : "an earlier revision only"}${board.releaseMode ? ` · ${board.releaseMode} mode` : ""}`,
     );
   if (affected.boards.length > announcedBoardLimit) {
     boardLines.push(`…and ${affected.boards.length - announcedBoardLimit} more board(s).`);
@@ -62,6 +94,7 @@ export function composeSupplyAnnouncement(
 
   const releaseLines =
     affected.affectedReleaseRunCount > 0 ? [`Affected tracked release runs: ${affected.affectedReleaseRunCount}.`] : [];
+  const policyImpact = policyImpactLine(affected.boards, affected.affectedReleaseRunCount);
 
   return {
     headline: headline(sorted.length, worst, affected.boards.length, stillBuilt),
@@ -69,6 +102,7 @@ export function composeSupplyAnnouncement(
       ...partLines,
       "Source data was fresh under the provider cache policy when BoardReadyOps evaluated this alert.",
       ...releaseLines,
+      ...(policyImpact ? [policyImpact] : []),
       ...(boardLines.length > 0 ? ["Affected boards:", ...boardLines] : []),
     ],
     repositoryFullName: affected.boards[0]?.repositoryFullName,

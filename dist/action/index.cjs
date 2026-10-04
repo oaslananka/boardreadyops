@@ -95039,6 +95039,7 @@ async function resolveProjectBoms(ctx, projects) {
     const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
     const declaredBom = variantMatch?.bom ?? override?.bom ?? explicitWorkspaceBom(ctx.options);
     const attributableBom = declaredBom ?? await bomWithinProject(ctx.root, project);
+    const releaseMode = projectConfig.releaseMode ?? ctx.options.releaseMode;
     const scoped = {
       root: ctx.root,
       projects: [project],
@@ -95049,13 +95050,17 @@ async function resolveProjectBoms(ctx, projects) {
     try {
       const { bomRows, schematicRows } = await loadBomContext(scoped);
       const resolved = attributableBom && bomRows.length > 0 ? bomRows : schematicRows;
-      boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
+      boms.push({
+        project: project.projectFile,
+        ...releaseMode ? { releaseMode } : {},
+        components: resolved.map(projectBomComponent)
+      });
     } catch (error52) {
       ctx.logger.debug("pipeline.bom.unresolved", {
         project: project.projectFile,
         reason: error52 instanceof Error ? error52.message : String(error52)
       });
-      boms.push({ project: project.projectFile, components: [] });
+      boms.push({ project: project.projectFile, ...releaseMode ? { releaseMode } : {}, components: [] });
     }
   }
   return boms;
@@ -97511,6 +97516,7 @@ var releaseRunBomComponentSchema = external_exports.object({
 }).strict();
 var releaseRunBoardBomSchema = external_exports.object({
   project: external_exports.string().trim().min(1).max(1024),
+  releaseMode: external_exports.enum(["prototype", "pilot", "production"]).optional(),
   components: external_exports.array(releaseRunBomComponentSchema).max(5e3)
 }).strict();
 var releaseRunFirmwareDependencySchema = external_exports.object({

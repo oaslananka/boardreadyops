@@ -24,12 +24,18 @@ function part(overrides: Partial<RiskyComponentFinding> = {}): RiskyComponentFin
 }
 
 function board(
-  overrides: Partial<{ displayName: string; repositoryFullName: string; inCurrentRevision: boolean }> = {},
+  overrides: Partial<{
+    displayName: string;
+    repositoryFullName: string;
+    inCurrentRevision: boolean;
+    releaseMode: "prototype" | "pilot" | "production";
+  }> = {},
 ) {
   return {
     displayName: "Sensor Node",
     repositoryFullName: "acme/sensor-node",
     inCurrentRevision: true,
+    releaseMode: "production" as const,
     ...overrides,
   };
 }
@@ -132,6 +138,50 @@ describe("composeSupplyAnnouncement", () => {
     );
   });
 
+  it("explains policy impact using the affected current product's configured release mode", () => {
+    const production = composeSupplyAnnouncement([part()], {
+      boards: [board({ releaseMode: "production" })],
+      affectedReleaseRunCount: 2,
+      truncated: false,
+    });
+    expect(production?.details).toContain(
+      "Policy impact: current production-mode hardware is affected; review this supply risk before the next production release.",
+    );
+
+    const prototype = composeSupplyAnnouncement([part()], {
+      boards: [board({ releaseMode: "prototype" })],
+      affectedReleaseRunCount: 1,
+      truncated: false,
+    });
+    expect(prototype?.details).toContain(
+      "Policy impact: current prototype-mode hardware is affected; account for this supply risk before the next prototype build.",
+    );
+  });
+
+  it("does not invent product criticality for legacy snapshots", () => {
+    const announcement = composeSupplyAnnouncement([part()], {
+      boards: [board({ releaseMode: undefined as never })],
+      affectedReleaseRunCount: 1,
+      truncated: false,
+    });
+
+    expect(announcement?.details).toContain(
+      "Policy impact: current-revision hardware is affected, but release criticality was not recorded for this snapshot.",
+    );
+  });
+
+  it("treats superseded-only matches as historical policy evidence", () => {
+    const announcement = composeSupplyAnnouncement([part()], {
+      boards: [board({ inCurrentRevision: false, releaseMode: "production" })],
+      affectedReleaseRunCount: 4,
+      truncated: false,
+    });
+
+    expect(announcement?.details).toContain(
+      "Policy impact: no current-revision product is affected; 4 tracked historical release run(s) retain this risk evidence.",
+    );
+  });
+
   it("reports the complete tracked release-run impact separately from the board list", () => {
     const announcement = composeSupplyAnnouncement([part()], {
       boards: [board()],
@@ -159,8 +209,8 @@ describe("composeSupplyAnnouncement", () => {
       truncated: false,
     });
 
-    expect(announcement?.details).toContain("Sensor Node (acme/sensor-node) — current revision");
-    expect(announcement?.details).toContain("Gateway (acme/gw) — an earlier revision only");
+    expect(announcement?.details).toContain("Sensor Node (acme/sensor-node) — current revision · production mode");
+    expect(announcement?.details).toContain("Gateway (acme/gw) — an earlier revision only · production mode");
   });
 
   it("summarises past the board limit instead of listing everything", () => {

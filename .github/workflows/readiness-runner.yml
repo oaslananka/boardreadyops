@@ -247,12 +247,15 @@ jobs:
               const numeric = Number(value);
               return Number.isSafeInteger(numeric) && numeric > 0 && numeric <= 1000000 ? numeric : undefined;
             };
+            const releaseMode = (value) =>
+              value === "prototype" || value === "pilot" || value === "production" ? value : undefined;
             const defined = (entries) => Object.fromEntries(entries.filter(([, value]) => value !== undefined));
             const boms = rawBoms
               .filter((bom) => typeof bom?.project === "string" && Array.isArray(bom.components))
               .slice(0, 50)
               .map((bom) => ({
                 project: boundedText(bom.project, "unknown.kicad_pro", 1024),
+                ...(releaseMode(bom.releaseMode) ? { releaseMode: releaseMode(bom.releaseMode) } : {}),
                 components: bom.components
                   .filter((component) => componentText(component?.reference, 64) !== undefined)
                   .slice(0, 5000)

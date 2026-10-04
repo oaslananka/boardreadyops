@@ -32070,6 +32070,7 @@ var init_src = __esm({
     }).strict();
     releaseRunBoardBomSchema = external_exports.object({
       project: external_exports.string().trim().min(1).max(1024),
+      releaseMode: external_exports.enum(["prototype", "pilot", "production"]).optional(),
       components: external_exports.array(releaseRunBomComponentSchema).max(5e3)
     }).strict();
     releaseRunFirmwareDependencySchema = external_exports.object({
@@ -49131,6 +49132,7 @@ async function resolveProjectBoms(ctx, projects) {
     const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
     const declaredBom = variantMatch?.bom ?? override?.bom ?? explicitWorkspaceBom(ctx.options);
     const attributableBom = declaredBom ?? await bomWithinProject(ctx.root, project);
+    const releaseMode = projectConfig.releaseMode ?? ctx.options.releaseMode;
     const scoped = {
       root: ctx.root,
       projects: [project],
@@ -49141,13 +49143,17 @@ async function resolveProjectBoms(ctx, projects) {
     try {
       const { bomRows, schematicRows } = await loadBomContext(scoped);
       const resolved = attributableBom && bomRows.length > 0 ? bomRows : schematicRows;
-      boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
+      boms.push({
+        project: project.projectFile,
+        ...releaseMode ? { releaseMode } : {},
+        components: resolved.map(projectBomComponent)
+      });
     } catch (error51) {
       ctx.logger.debug("pipeline.bom.unresolved", {
         project: project.projectFile,
         reason: error51 instanceof Error ? error51.message : String(error51)
       });
-      boms.push({ project: project.projectFile, components: [] });
+      boms.push({ project: project.projectFile, ...releaseMode ? { releaseMode } : {}, components: [] });
     }
   }
   return boms;
@@ -56784,6 +56790,7 @@ function boundedFirmware(firmware) {
 function boundedBoms(boms) {
   return boms.slice(0, 50).map((bom) => ({
     project: bom.project.slice(0, 1024),
+    ...bom.releaseMode ? { releaseMode: bom.releaseMode } : {},
     components: bom.components.filter((component) => component.reference.trim().length > 0).slice(0, 5e3).map((component) => ({
       ...component,
       reference: component.reference.slice(0, 64)
