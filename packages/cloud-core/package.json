@@ -49,6 +49,11 @@
       "import": "./src/component-intelligence.ts",
       "default": "./src/component-intelligence.ts"
     },
+    "./delimited": {
+      "types": "./src/delimited.ts",
+      "import": "./src/delimited.ts",
+      "default": "./src/delimited.ts"
+    },
     "./component-intelligence-resilience": {
       "types": "./src/component-intelligence-resilience.ts",
       "import": "./src/component-intelligence-resilience.ts",
@@ -113,6 +118,11 @@
       "types": "./src/telemetry.ts",
       "import": "./src/telemetry.ts",
       "default": "./src/telemetry.ts"
+    },
+    "./production-outcomes": {
+      "types": "./src/production-outcomes.ts",
+      "import": "./src/production-outcomes.ts",
+      "default": "./src/production-outcomes.ts"
     }
   },
   "scripts": {
