@@ -127,7 +127,24 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0077_supply_finding_acknowledgement.sql",
       "0078_supply_finding_suppressions.sql",
       "0079_component_alternates.sql",
+      "0080_component_compliance_trust.sql",
     ]);
+  });
+
+  it("adds bounded compliance/trust signals and restricted findings in schema v80", async () => {
+    const sql = (await readFile(join(migrationsDir, "0080_component_compliance_trust.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("alter table component_lifecycle_observations");
+    expect(sql).toContain("alter table installation_component_observations");
+    expect(sql).toContain("alter table board_supply_findings");
+    expect(sql).toContain("restricted_substances boolean");
+    expect(sql).toContain("compliance_notes jsonb");
+    expect(sql).toContain("data_trust text");
+    expect(sql).toContain("observation_trust text");
+    expect(sql).toContain("'restricted'");
+    expect(sql).toContain("pg_column_size(compliance_notes) <= 16384");
+    expect(sql).toContain("'verified', 'estimated', 'unverified', 'unknown'");
+    expect(sql).not.toContain("provider_payload");
   });
 
   it("adds bounded provider-neutral alternate parts to both observation caches in schema v79", async () => {

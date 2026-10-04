@@ -1,12 +1,12 @@
 import {
-  type ComponentAlternate,
-  type ComponentDistributorClassification,
+  type ComponentDataTrust,
   type ComponentIntelligenceProvider,
   type ComponentLifecycleStatus,
+  type ComponentObservation,
+  type ComponentObservationSignals,
   type ComponentQuery,
   componentKey,
   isRiskyLifecycleStatus,
-  type PriceBreak,
   queryablePartsOf,
   supplyFindingSeverity,
 } from "./component-intelligence.js";
@@ -38,7 +38,7 @@ export type WatchBoard = {
 
 type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "not_entitled" | "failed";
 
-export type SupplyRiskStatus = "nrnd" | "eol" | "obsolete" | "unavailable";
+export type SupplyRiskStatus = "nrnd" | "eol" | "obsolete" | "unavailable" | "restricted";
 
 /** One part on one board that is no longer safe to design in. */
 export type RiskyComponentFinding = {
@@ -50,11 +50,20 @@ export type RiskyComponentFinding = {
   severity: "critical" | "high" | "medium";
   /** Provider identifier that justified this finding; raw provider payloads are not retained here. */
   source: string;
+  restrictedSubstances?: boolean | undefined;
+  complianceNotes?: readonly string[] | undefined;
+  trust?: ComponentDataTrust | undefined;
 };
 
 export type ObservationCacheScope =
   | { kind: "shared"; providerName: string }
   | { kind: "installation"; installationId: string; providerName: string };
+
+export type CachedSupplyObservation = ComponentObservationSignals & {
+  status: string;
+  source: string;
+  observedAt: string;
+};
 
 export type SupplyWatchStore = {
   claimDueBoards(now: Date, limit: number): Promise<WatchBoard[]>;
@@ -62,51 +71,11 @@ export type SupplyWatchStore = {
     scope: ObservationCacheScope,
     now: Date,
     keys: readonly { mpn: string; manufacturer?: string | undefined }[],
-  ): Promise<
-    Map<
-      string,
-      {
-        status: string;
-        source: string;
-        observedAt: string;
-        distributorClassification?: ComponentDistributorClassification | undefined;
-        priceBreaks?: readonly PriceBreak[] | undefined;
-        availableUnits?: number | undefined;
-        leadTimeDays?: number | undefined;
-        supplierCount?: number | undefined;
-        alternates?: readonly ComponentAlternate[] | undefined;
-      }
-    >
-  >;
-  recordObservations(
-    scope: ObservationCacheScope,
-    observations: readonly {
-      mpn: string;
-      manufacturer?: string | undefined;
-      status: ComponentLifecycleStatus;
-      source: string;
-      evidenceUrl?: string | undefined;
-      observedAt: Date;
-      expiresAt?: Date | undefined;
-      distributorClassification?: ComponentDistributorClassification | undefined;
-      priceBreaks?: readonly PriceBreak[] | undefined;
-      availableUnits?: number | undefined;
-      leadTimeDays?: number | undefined;
-      supplierCount?: number | undefined;
-      alternates?: readonly ComponentAlternate[] | undefined;
-    }[],
-  ): Promise<number>;
+  ): Promise<Map<string, CachedSupplyObservation>>;
+  recordObservations(scope: ObservationCacheScope, observations: readonly ComponentObservation[]): Promise<number>;
   reconcileFindings(
     boardId: string,
-    open: readonly {
-      boardId: string;
-      mpn: string;
-      manufacturer?: string | undefined;
-      reference?: string | undefined;
-      status: SupplyRiskStatus;
-      severity: "critical" | "high" | "medium";
-      source: string;
-    }[],
+    open: readonly RiskyComponentFinding[],
     now: Date,
   ): Promise<{ opened: number; resolved: number }>;
   /**
@@ -187,19 +156,39 @@ export function constantComponentIntelligence(provider: ComponentIntelligencePro
   return async () => provider;
 }
 
-type RiskObservation = {
-  status: ComponentLifecycleStatus;
-  source: string;
-  availableUnits?: number | undefined;
+type RiskObservationInput = Pick<
+  ComponentObservation,
+  "status" | "source" | "availableUnits" | "restrictedSubstances" | "complianceNotes" | "trust"
+>;
+
+type RiskObservation = RiskObservationInput & {
+  /** Whether provider terms allow normalized evidence beyond the derived risk decision to persist. */
+  retainEvidence: boolean;
 };
+
+function riskObservationFrom(observation: RiskObservationInput, retainEvidence: boolean): RiskObservation {
+  return {
+    status: observation.status,
+    source: observation.source,
+    retainEvidence,
+    ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
+    ...(observation.restrictedSubstances === undefined
+      ? {}
+      : { restrictedSubstances: observation.restrictedSubstances }),
+    ...(observation.complianceNotes === undefined ? {} : { complianceNotes: observation.complianceNotes }),
+    ...(observation.trust === undefined ? {} : { trust: observation.trust }),
+  };
+}
 
 function riskStatus(observation: RiskObservation): SupplyRiskStatus | undefined {
   if (isRiskyLifecycleStatus(observation.status)) return observation.status;
-  return observation.availableUnits === 0 ? "unavailable" : undefined;
+  if (observation.availableUnits === 0) return "unavailable";
+  return observation.restrictedSubstances === true ? "restricted" : undefined;
 }
 
 function riskSeverity(status: SupplyRiskStatus): "critical" | "high" | "medium" {
-  return status === "unavailable" ? "high" : supplyFindingSeverity(status);
+  if (status === "unavailable" || status === "restricted") return "high";
+  return supplyFindingSeverity(status);
 }
 
 function buildOpenRiskyFindings(
@@ -229,6 +218,13 @@ function buildOpenRiskyFindings(
         status,
         severity: riskSeverity(status),
         source: observation.source,
+        ...(observation.retainEvidence && observation.restrictedSubstances !== undefined
+          ? { restrictedSubstances: observation.restrictedSubstances }
+          : {}),
+        ...(observation.retainEvidence && observation.complianceNotes !== undefined
+          ? { complianceNotes: observation.complianceNotes }
+          : {}),
+        ...(observation.retainEvidence && observation.trust !== undefined ? { trust: observation.trust } : {}),
       },
     ];
   });
@@ -258,11 +254,7 @@ async function queryMissingObservations(
     );
   }
   for (const observation of observed) {
-    observations.set(componentKey(observation), {
-      status: observation.status,
-      source: observation.source,
-      ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
-    });
+    observations.set(componentKey(observation), riskObservationFrom(observation, cacheScope !== undefined));
   }
   return { partsQueried, observationsRecorded };
 }
@@ -313,11 +305,10 @@ async function evaluateSingleBoard(
 
   const observations = new Map<string, RiskObservation>();
   for (const [key, observation] of cached) {
-    observations.set(key, {
-      status: observation.status as ComponentLifecycleStatus,
-      source: observation.source,
-      ...(observation.availableUnits === undefined ? {} : { availableUnits: observation.availableUnits }),
-    });
+    observations.set(
+      key,
+      riskObservationFrom({ ...observation, status: observation.status as ComponentLifecycleStatus }, true),
+    );
   }
 
   const { partsQueried, observationsRecorded } = await queryMissingObservations(
