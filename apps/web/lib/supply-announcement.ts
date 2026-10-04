@@ -40,7 +40,7 @@ function policyImpactLine(boards: readonly AnnouncedBoard[], affectedReleaseRunC
   const current = boards.filter((board) => board.inCurrentRevision);
   if (current.length === 0) {
     return affectedReleaseRunCount > 0
-      ? `Policy impact: no current-revision product is affected; ${affectedReleaseRunCount} tracked historical release run(s) retain this risk evidence.`
+      ? "Policy impact: no current-revision product is affected; this risk remains historical release evidence."
       : undefined;
   }
 
@@ -78,12 +78,11 @@ export function composeSupplyAnnouncement(
       `${part.mpn}${part.reference ? ` (${part.reference})` : ""} — ${part.status.toUpperCase()}, ${part.severity} risk · Source: ${customerStatusLabel(part.source)}`,
   );
 
-  const boardLines = affected.boards
-    .slice(0, announcedBoardLimit)
-    .map(
-      (board) =>
-        `${board.displayName} (${board.repositoryFullName}) — ${board.inCurrentRevision ? "current revision" : "an earlier revision only"}${board.releaseMode ? ` · ${board.releaseMode} mode` : ""}`,
-    );
+  const boardLines = affected.boards.slice(0, announcedBoardLimit).map((board) => {
+    const revision = board.inCurrentRevision ? "current revision" : "an earlier revision only";
+    const mode = board.releaseMode ? ` · ${board.releaseMode} mode` : "";
+    return `${board.displayName} (${board.repositoryFullName}) — ${revision}${mode}`;
+  });
   if (affected.boards.length > announcedBoardLimit) {
     boardLines.push(`…and ${affected.boards.length - announcedBoardLimit} more board(s).`);
   }
