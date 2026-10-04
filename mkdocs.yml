@@ -91,6 +91,7 @@ nav:
       - Multi-project Workspaces: multi-project.md
       - Cross-platform Paths: cross-platform.md
       - API Tokens: api-tokens.md
+      - Production Outcomes Pilot: production-outcomes.md
       - How-to Guides:
           - CI Quality Gates: how-to/ci-quality-gates.md
           - Altium Package Export: guides/export-altium.md
