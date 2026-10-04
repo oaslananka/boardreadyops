@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { constantComponentIntelligence, runSupplyWatchPass } from "../../packages/cloud-core/src/supply-watch.js";
 import { createSqlBoardSupplyWatchStore } from "../../packages/db/src/board-supply-watch-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
+import { createSqlSupplyFindingStore } from "../../packages/db/src/supply-finding-store.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
 const connectionString = getPostgresTestConnectionString();
@@ -111,6 +112,36 @@ describeDatabase("board supply watch", () => {
     expect(findings[0]?.reference).toBe("U1");
     expect(findings[0]?.observation_source).toBe("integration-provider");
     expect(findings[0]?.resolved_at).toBeNull();
+  });
+
+  it("acknowledges an open finding idempotently and refuses a cross-repository mutation", async () => {
+    const finding = rows(
+      await database().query(
+        "select id from board_supply_findings where board_id = $1 and resolved_at is null order by detected_at desc limit 1",
+        [boardId],
+      ),
+    )[0];
+    const findingId = String(finding?.id ?? "");
+    expect(findingId).not.toBe("");
+
+    const store = createSqlSupplyFindingStore(database());
+    const acknowledgedAt = new Date("2026-08-24T12:05:00.000Z");
+
+    await expect(store.acknowledge("other-repository", findingId, "mallory", acknowledgedAt)).resolves.toBe(
+      "not_found",
+    );
+    await expect(store.acknowledge(repositoryId, findingId, "alice", acknowledgedAt)).resolves.toBe("acknowledged");
+    await expect(
+      store.acknowledge(repositoryId, findingId, "bob", new Date(acknowledgedAt.getTime() + 60_000)),
+    ).resolves.toBe("already_acknowledged");
+
+    const [stored] = rows(
+      await database().query("select acknowledged_at, acknowledged_by from board_supply_findings where id = $1", [
+        findingId,
+      ]),
+    );
+    expect(stored?.acknowledged_by).toBe("alice");
+    expect(new Date(String(stored?.acknowledged_at)).toISOString()).toBe(acknowledgedAt.toISOString());
   });
 
   it("skips the board and never queries the provider when the plan excludes supply watch", async () => {

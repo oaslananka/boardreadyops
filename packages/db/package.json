@@ -121,6 +121,11 @@
       "import": "./src/board-supply-watch-store.ts",
       "default": "./src/board-supply-watch-store.ts"
     },
+    "./supply-finding-store": {
+      "types": "./src/supply-finding-store.ts",
+      "import": "./src/supply-finding-store.ts",
+      "default": "./src/supply-finding-store.ts"
+    },
     "./entitlement-store": {
       "types": "./src/entitlement-store.ts",
       "import": "./src/entitlement-store.ts",

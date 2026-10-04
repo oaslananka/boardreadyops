@@ -263,6 +263,7 @@ export type RepositoryDetail = {
   repository: RepositorySummary;
   runs: RepositoryRun[];
   supplyFindings: {
+    id: string;
     boardPath: string;
     mpn: string;
     manufacturer: string | undefined;
@@ -271,6 +272,8 @@ export type RepositoryDetail = {
     severity: string;
     source: string | undefined;
     detectedAt: string | undefined;
+    acknowledgedAt: string | undefined;
+    acknowledgedBy: string | undefined;
   }[];
 };
 
@@ -317,14 +320,17 @@ export async function loadRepositoryDetail(
     );
 
     const supplyResult = await executor.query(
-      `select boards.project_path,
+      `select board_supply_findings.id,
+              boards.project_path,
               board_supply_findings.mpn,
               board_supply_findings.manufacturer,
               board_supply_findings.reference,
               board_supply_findings.status,
               board_supply_findings.severity,
               board_supply_findings.observation_source,
-              board_supply_findings.detected_at
+              board_supply_findings.detected_at,
+              board_supply_findings.acknowledged_at,
+              board_supply_findings.acknowledged_by
          from board_supply_findings
          join boards on boards.id = board_supply_findings.board_id
         where boards.repository_id = $1 and board_supply_findings.resolved_at is null
@@ -356,10 +362,12 @@ export async function loadRepositoryDetail(
         ];
       }),
       supplyFindings: supplyRows.flatMap((row) => {
+        const id = text(row, "id");
         const mpn = text(row, "mpn");
-        if (!mpn) return [];
+        if (!id || !mpn) return [];
         return [
           {
+            id,
             boardPath: text(row, "project_path") ?? "",
             mpn,
             manufacturer: text(row, "manufacturer"),
@@ -368,6 +376,8 @@ export async function loadRepositoryDetail(
             severity: text(row, "severity") ?? "medium",
             source: text(row, "observation_source"),
             detectedAt: text(row, "detected_at"),
+            acknowledgedAt: text(row, "acknowledged_at"),
+            acknowledgedBy: text(row, "acknowledged_by"),
           },
         ];
       }),

@@ -6,6 +6,23 @@ import * as viewerAuth from "../../../apps/web/lib/viewer-authorization.js";
 const { generateMetadata } = await import("../../../apps/web/app/repositories/[repositoryId]/page.js");
 
 describe("Repository page metadata", () => {
+  it("shows acknowledgement state and an explicit action for unacknowledged supply findings", () => {
+    const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
+
+    expect(source).toContain('id: "acknowledgement"');
+    expect(source).toContain('header: "Acknowledgement"');
+    expect(source).toContain("finding.acknowledgedAt");
+    expect(source).toContain("Acknowledged by");
+    expect(source).toContain("SupplyFindingAcknowledgeButton");
+    expect(source).toContain("acknowledgeSupplyFindingAction");
+  });
+
+  it("uses the durable finding id as the supply table row key", () => {
+    const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
+
+    expect(source).toContain("rowKey={(finding) => finding.id}");
+  });
+
   it("shows the persisted provider source beside open supply findings", () => {
     const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
 

@@ -124,7 +124,19 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0074_installation_component_observations.sql",
       "0075_component_supplier_count.sql",
       "0076_supply_unavailable_findings.sql",
+      "0077_supply_finding_acknowledgement.sql",
     ]);
+  });
+
+  it("records supply finding acknowledgement without resolving or suppressing it in schema v77", async () => {
+    const sql = (await readFile(join(migrationsDir, "0077_supply_finding_acknowledgement.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("add column if not exists acknowledged_at timestamptz");
+    expect(sql).toContain("add column if not exists acknowledged_by text");
+    expect(sql).toContain("board_supply_findings_acknowledgement_pair_valid");
+    expect(sql).toContain("char_length(acknowledged_by) between 1 and 128");
+    expect(sql).not.toContain("resolved_at =");
+    expect(sql).not.toContain("suppressed_at");
   });
 
   it("extends durable supply finding status with explicit zero-stock risk in schema v76", async () => {
