@@ -4,10 +4,15 @@ import {
   type ComponentAlternate,
   type ComponentDataTrust,
   type ComponentDistributorClassification,
+  type ComponentObservation,
   componentKey,
   type PriceBreak,
 } from "@boardreadyops/cloud-core";
-import type { ObservationCacheScope } from "@boardreadyops/cloud-core/supply-watch";
+import type {
+  CachedSupplyObservation,
+  ObservationCacheScope,
+  RiskyComponentFinding,
+} from "@boardreadyops/cloud-core/supply-watch";
 import type { SqlQueryExecutor, SqlQueryResult } from "./lifecycle-store.js";
 
 export type DueBoard = {
@@ -21,38 +26,9 @@ export type DueBoard = {
   planTier: string | null | undefined;
 };
 
-export type ObservationInput = {
-  mpn: string;
-  manufacturer?: string | undefined;
-  status: "active" | "nrnd" | "eol" | "obsolete" | "unknown";
-  source: string;
-  evidenceUrl?: string | undefined;
-  observedAt: Date;
-  expiresAt?: Date | undefined;
-  distributorClassification?: ComponentDistributorClassification | undefined;
-  priceBreaks?: readonly PriceBreak[] | undefined;
-  availableUnits?: number | undefined;
-  leadTimeDays?: number | undefined;
-  supplierCount?: number | undefined;
-  alternates?: readonly ComponentAlternate[] | undefined;
-  restrictedSubstances?: boolean | undefined;
-  complianceNotes?: readonly string[] | undefined;
-  trust?: ComponentDataTrust | undefined;
-};
+export type ObservationInput = ComponentObservation;
 
-export type SupplyFindingInput = {
-  boardId: string;
-  mpn: string;
-  manufacturer?: string | undefined;
-  reference?: string | undefined;
-  status: "nrnd" | "eol" | "obsolete" | "unavailable" | "restricted";
-  severity: "critical" | "high" | "medium";
-  /** Stable provider identifier captured when the finding first opens. */
-  source: string;
-  restrictedSubstances?: boolean | undefined;
-  complianceNotes?: readonly string[] | undefined;
-  trust?: ComponentDataTrust | undefined;
-};
+export type SupplyFindingInput = RiskyComponentFinding;
 
 export type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "not_entitled" | "failed";
 
@@ -64,25 +40,7 @@ export type BoardSupplyWatchStore = {
     scope: ObservationCacheScope,
     now: Date,
     keys: readonly { mpn: string; manufacturer?: string | undefined }[],
-  ): Promise<
-    Map<
-      string,
-      {
-        status: string;
-        source: string;
-        observedAt: string;
-        distributorClassification?: ComponentDistributorClassification | undefined;
-        priceBreaks?: readonly PriceBreak[] | undefined;
-        availableUnits?: number | undefined;
-        leadTimeDays?: number | undefined;
-        supplierCount?: number | undefined;
-        alternates?: readonly ComponentAlternate[] | undefined;
-        restrictedSubstances?: boolean | undefined;
-        complianceNotes?: readonly string[] | undefined;
-        trust?: ComponentDataTrust | undefined;
-      }
-    >
-  >;
+  ): Promise<Map<string, CachedSupplyObservation>>;
   recordObservations(scope: ObservationCacheScope, observations: readonly ObservationInput[]): Promise<number>;
   /** Opens findings that are newly risky and resolves ones no longer risky. */
   reconcileFindings(

@@ -1,13 +1,12 @@
 import {
-  type ComponentAlternate,
   type ComponentDataTrust,
-  type ComponentDistributorClassification,
   type ComponentIntelligenceProvider,
   type ComponentLifecycleStatus,
+  type ComponentObservation,
+  type ComponentObservationSignals,
   type ComponentQuery,
   componentKey,
   isRiskyLifecycleStatus,
-  type PriceBreak,
   queryablePartsOf,
   supplyFindingSeverity,
 } from "./component-intelligence.js";
@@ -60,66 +59,23 @@ export type ObservationCacheScope =
   | { kind: "shared"; providerName: string }
   | { kind: "installation"; installationId: string; providerName: string };
 
+export type CachedSupplyObservation = ComponentObservationSignals & {
+  status: string;
+  source: string;
+  observedAt: string;
+};
+
 export type SupplyWatchStore = {
   claimDueBoards(now: Date, limit: number): Promise<WatchBoard[]>;
   freshObservations(
     scope: ObservationCacheScope,
     now: Date,
     keys: readonly { mpn: string; manufacturer?: string | undefined }[],
-  ): Promise<
-    Map<
-      string,
-      {
-        status: string;
-        source: string;
-        observedAt: string;
-        distributorClassification?: ComponentDistributorClassification | undefined;
-        priceBreaks?: readonly PriceBreak[] | undefined;
-        availableUnits?: number | undefined;
-        leadTimeDays?: number | undefined;
-        supplierCount?: number | undefined;
-        alternates?: readonly ComponentAlternate[] | undefined;
-        restrictedSubstances?: boolean | undefined;
-        complianceNotes?: readonly string[] | undefined;
-        trust?: ComponentDataTrust | undefined;
-      }
-    >
-  >;
-  recordObservations(
-    scope: ObservationCacheScope,
-    observations: readonly {
-      mpn: string;
-      manufacturer?: string | undefined;
-      status: ComponentLifecycleStatus;
-      source: string;
-      evidenceUrl?: string | undefined;
-      observedAt: Date;
-      expiresAt?: Date | undefined;
-      distributorClassification?: ComponentDistributorClassification | undefined;
-      priceBreaks?: readonly PriceBreak[] | undefined;
-      availableUnits?: number | undefined;
-      leadTimeDays?: number | undefined;
-      supplierCount?: number | undefined;
-      alternates?: readonly ComponentAlternate[] | undefined;
-      restrictedSubstances?: boolean | undefined;
-      complianceNotes?: readonly string[] | undefined;
-      trust?: ComponentDataTrust | undefined;
-    }[],
-  ): Promise<number>;
+  ): Promise<Map<string, CachedSupplyObservation>>;
+  recordObservations(scope: ObservationCacheScope, observations: readonly ComponentObservation[]): Promise<number>;
   reconcileFindings(
     boardId: string,
-    open: readonly {
-      boardId: string;
-      mpn: string;
-      manufacturer?: string | undefined;
-      reference?: string | undefined;
-      status: SupplyRiskStatus;
-      severity: "critical" | "high" | "medium";
-      source: string;
-      restrictedSubstances?: boolean | undefined;
-      complianceNotes?: readonly string[] | undefined;
-      trust?: ComponentDataTrust | undefined;
-    }[],
+    open: readonly RiskyComponentFinding[],
     now: Date,
   ): Promise<{ opened: number; resolved: number }>;
   /**
@@ -200,28 +156,17 @@ export function constantComponentIntelligence(provider: ComponentIntelligencePro
   return async () => provider;
 }
 
-type RiskObservation = {
-  status: ComponentLifecycleStatus;
-  source: string;
+type RiskObservationInput = Pick<
+  ComponentObservation,
+  "status" | "source" | "availableUnits" | "restrictedSubstances" | "complianceNotes" | "trust"
+>;
+
+type RiskObservation = RiskObservationInput & {
   /** Whether provider terms allow normalized evidence beyond the derived risk decision to persist. */
   retainEvidence: boolean;
-  availableUnits?: number | undefined;
-  restrictedSubstances?: boolean | undefined;
-  complianceNotes?: readonly string[] | undefined;
-  trust?: ComponentDataTrust | undefined;
 };
 
-function riskObservationFrom(
-  observation: {
-    status: ComponentLifecycleStatus;
-    source: string;
-    availableUnits?: number | undefined;
-    restrictedSubstances?: boolean | undefined;
-    complianceNotes?: readonly string[] | undefined;
-    trust?: ComponentDataTrust | undefined;
-  },
-  retainEvidence: boolean,
-): RiskObservation {
+function riskObservationFrom(observation: RiskObservationInput, retainEvidence: boolean): RiskObservation {
   return {
     status: observation.status,
     source: observation.source,
