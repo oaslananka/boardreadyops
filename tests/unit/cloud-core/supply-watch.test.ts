@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ComponentIntelligenceProvider } from "../../../packages/cloud-core/src/component-intelligence.js";
+import type {
+  ComponentIntelligenceProvider,
+  ComponentObservation,
+} from "../../../packages/cloud-core/src/component-intelligence.js";
 import {
   componentKey,
   createNullComponentIntelligenceProvider,
@@ -70,6 +73,29 @@ function providerReturning(
   };
 }
 
+async function liveSinglePartFindings(
+  observation: Pick<ComponentObservation, "status" | "source"> & Partial<Pick<ComponentObservation, "availableUnits">>,
+) {
+  const watched = board({
+    components: [{ mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" }],
+  });
+  const { store, reconciled } = storeWith([watched]);
+  const provider: ComponentIntelligenceProvider = {
+    name: "test-provider",
+    cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
+    lookup: vi.fn(async (parts: readonly { mpn: string; manufacturer?: string | undefined }[]) =>
+      parts.map((part) => ({
+        ...part,
+        ...observation,
+        observedAt: now,
+      })),
+    ),
+  };
+
+  await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
+  return reconciled[0]?.open ?? [];
+}
+
 describe("supply watch pass", () => {
   it("raises a finding for a part that went end of life with no commit involved", async () => {
     const { store, reconciled } = storeWith([board()]);
@@ -92,26 +118,13 @@ describe("supply watch pass", () => {
   });
 
   it("raises an unavailable finding when a live observation reports exactly zero stock", async () => {
-    const { store, reconciled } = storeWith([
-      board({ components: [{ mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" }] }),
-    ]);
-    const provider: ComponentIntelligenceProvider = {
-      name: "test-provider",
-      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
-      lookup: vi.fn(async (parts: readonly { mpn: string; manufacturer?: string | undefined }[]) =>
-        parts.map((part) => ({
-          ...part,
-          status: "active" as const,
-          source: "test-provider",
-          observedAt: now,
-          availableUnits: 0,
-        })),
-      ),
-    };
+    const findings = await liveSinglePartFindings({
+      status: "active",
+      source: "test-provider",
+      availableUnits: 0,
+    });
 
-    await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
-
-    expect(reconciled[0]?.open).toEqual([
+    expect(findings).toEqual([
       expect.objectContaining({
         mpn: "STM32F103C8T6",
         status: "unavailable",
@@ -147,50 +160,22 @@ describe("supply watch pass", () => {
   });
 
   it("keeps lifecycle risk ahead of zero-stock risk when both signals are present", async () => {
-    const { store, reconciled } = storeWith([
-      board({ components: [{ mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" }] }),
-    ]);
-    const provider: ComponentIntelligenceProvider = {
-      name: "test-provider",
-      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
-      lookup: vi.fn(async (parts: readonly { mpn: string; manufacturer?: string | undefined }[]) =>
-        parts.map((part) => ({
-          ...part,
-          status: "eol" as const,
-          source: "test-provider",
-          observedAt: now,
-          availableUnits: 0,
-        })),
-      ),
-    };
+    const findings = await liveSinglePartFindings({
+      status: "eol",
+      source: "test-provider",
+      availableUnits: 0,
+    });
 
-    await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
-
-    expect(reconciled[0]?.open).toEqual([
-      expect.objectContaining({ status: "eol", severity: "high", source: "test-provider" }),
-    ]);
+    expect(findings).toEqual([expect.objectContaining({ status: "eol", severity: "high", source: "test-provider" })]);
   });
 
   it("does not treat unknown availability as unavailable", async () => {
-    const { store, reconciled } = storeWith([
-      board({ components: [{ mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" }] }),
-    ]);
-    const provider: ComponentIntelligenceProvider = {
-      name: "test-provider",
-      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
-      lookup: vi.fn(async (parts: readonly { mpn: string; manufacturer?: string | undefined }[]) =>
-        parts.map((part) => ({
-          ...part,
-          status: "active" as const,
-          source: "test-provider",
-          observedAt: now,
-        })),
-      ),
-    };
+    const findings = await liveSinglePartFindings({
+      status: "active",
+      source: "test-provider",
+    });
 
-    await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
-
-    expect(reconciled[0]?.open).toEqual([]);
+    expect(findings).toEqual([]);
   });
 
   it("does not raise findings for parts that are still active", async () => {
