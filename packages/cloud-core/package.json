@@ -113,6 +113,11 @@
       "types": "./src/telemetry.ts",
       "import": "./src/telemetry.ts",
       "default": "./src/telemetry.ts"
+    },
+    "./production-outcomes": {
+      "types": "./src/production-outcomes.ts",
+      "import": "./src/production-outcomes.ts",
+      "default": "./src/production-outcomes.ts"
     }
   },
   "scripts": {
