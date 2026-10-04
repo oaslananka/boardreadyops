@@ -1,3 +1,4 @@
+STDOUT:
 import { readFileSync } from "node:fs";
 import * as yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
@@ -20,15 +21,36 @@ const stableRequiredChecks =
     ?.parameters?.required_status_checks?.map(({ context }) => context) ?? [];
 
 describe("Mergify integration contract", () => {
-  it("does not configure paid Mergify merge-queue features", () => {
-    const config = yaml.load(mergify) as Record<string, unknown>;
+  it("uses a manual-only Mergify queue without auto-merge", () => {
+    const config = yaml.load(mergify) as {
+      queue_rules?: Array<{
+        name: string;
+        merge_method?: string;
+        queue_conditions?: string[];
+      }>;
+      merge_protections_settings?: Record<string, unknown>;
+      pull_request_rules?: Array<{ actions?: Record<string, unknown> }>;
+    };
+
     expect(config).not.toHaveProperty("merge_queue");
-    expect(config).not.toHaveProperty("queue_rules");
     expect(config).not.toHaveProperty("scopes");
-    expect(mergify).not.toContain("merge_queue_scope");
-    expect(mergify).not.toContain("branch_protection_injection_mode");
-    expect(mergify).not.toMatch(/\bqueue:\s*(?:$|\n)/mu);
-    expect(mergify).not.toContain("auto-queue eligible pull requests");
+    expect(config.merge_protections_settings).toBeUndefined();
+    expect(mergify).not.toContain("auto_merge_conditions");
+    expect(mergify).not.toMatch(/\bauto_merge:\s*true\b/u);
+    expect(mergify).not.toMatch(/\bautoqueue:\s*true\b/u);
+
+    expect(config.queue_rules).toEqual([
+      {
+        name: "main",
+        merge_method: "squash",
+        queue_conditions: ["base = main", "-draft"],
+      },
+    ]);
+
+    for (const rule of config.pull_request_rules ?? []) {
+      expect(rule.actions).not.toHaveProperty("queue");
+      expect(rule.actions).not.toHaveProperty("merge");
+    }
   });
 
   it("keeps GitHub rulesets authoritative for merge gates", () => {
@@ -92,3 +114,5 @@ describe("Mergify integration contract", () => {
     expect(ci).toContain("steps.mergify-token.outputs.enabled == 'true'");
   });
 });
+
+EXIT: 0

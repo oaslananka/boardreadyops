@@ -1,3 +1,4 @@
+STDOUT:
 # Dependency Automation
 
 BoardReadyOps uses Renovate as the single source of truth for routine version-update pull requests.
@@ -38,13 +39,13 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 
 - `renovate.json` controls project-specific Renovate behavior.
 - `.github/workflows/renovate.yml` validates and runs the pinned self-hosted Renovate release.
-- `.mergify.yml` provides pull-request classification labels only; the GitHub `main` ruleset is the merge authority.
+- `.mergify.yml` provides pull-request classification plus a manual-only `main` merge queue; the GitHub `main` ruleset remains the merge authority.
 - `tests/unit/scripts/security-automation-config.test.ts` prevents accidental weakening of the automation contract.
 - Version-update PR configuration must not be duplicated in another dependency updater.
 
 ## Last verification
 
-- On October 2, 2026, paid Mergify merge-queue/scopes automation was removed. GitHub Rulesets remain authoritative, Mergify is limited to labels, and routine dependency PRs require an explicit maintainer merge decision.
+- On October 4, 2026, Mergify was configured as a manual-only queue: there is no auto-merge/auto-queue condition, and a maintainer must explicitly enqueue a PR with `@mergifyio queue main`. GitHub Rulesets remain authoritative for merge eligibility and required checks.
 - On July 20, 2026, Renovate `43.272.4` completed a full dry-run under Node.js `24.18.0`.
 - The repository reported `activated`, `enabled`, and `onboarded`, and Renovate discovered 269 dependencies across npm, GitHub Actions, Dockerfiles, and Docker Compose.
 - After the workflow reached `main`, manual workflow run `29767533207` completed both `renovate / validate` and `renovate / run` successfully.
@@ -63,6 +64,8 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 3. Confirm `security-automation-config.test.ts` and `mergify-integration.test.ts` pass.
 4. Confirm `manual-review` is present on protected updates and absent from an eligible low-risk update.
 5. Confirm the PR receives the repository's required Ruleset checks and that review conversations are resolved.
-6. Merge routine low-risk pull requests explicitly after those gates pass; an open green PR is not an automation defect by itself.
+6. After the PR is intentionally approved for merge, enqueue it with `@mergifyio queue main` (or the Mergify queue control). Do not enable Mergify auto-merge/auto-queue; an open green PR should remain open until a maintainer explicitly queues it.
 7. Run the Renovate workflow manually after first installation or credential rotation and confirm the Dependency Dashboard can be updated.
 8. Rotate `GH_AUTH_TOKEN` immediately if its owner or permissions change unexpectedly.
+
+EXIT: 0
