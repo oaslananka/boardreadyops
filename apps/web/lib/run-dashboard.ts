@@ -134,6 +134,18 @@ type RunProductionDefectDetail = {
   notes: string | undefined;
 };
 
+type RunProductionReleaseSummary = {
+  runId: string;
+  commitSha: string;
+  completedAt: string | undefined;
+  batchCount: number;
+  quantity: number;
+  firstPassYieldBps: number | undefined;
+  reworkCount: number;
+  scrapCount: number;
+  defectCount: number;
+};
+
 type RunProductionBatchDetail = {
   id: string;
   externalBatchId: string;
@@ -201,6 +213,7 @@ export type RunDetail = {
   transitions: TransitionDetail[];
   boards: RunBoardDetail[];
   productionBatches: RunProductionBatchDetail[];
+  productionBaseline: RunProductionReleaseSummary | undefined;
 };
 
 export type RunDashboardFilters = {
@@ -765,7 +778,8 @@ export async function lookupRunDashboard(
   const findingOffset = (findingsPage.page - 1) * filters.pageSize;
   const artifactOffset = (artifactsPage.page - 1) * filters.pageSize;
 
-  const [findingsResult, artifactsResult, categoryBreakdownResult, productionResult] = await Promise.all([
+  const [findingsResult, artifactsResult, categoryBreakdownResult, productionResult, productionBaselineResult] =
+    await Promise.all([
     executor.query(
       `select findings.id, findings.rule_id, findings.severity, findings.message,
               findings.path, findings.kind, findings.waived_at
@@ -838,6 +852,69 @@ export async function lookupRunDashboard(
        group by production_batches.id
        order by production_batches.manufactured_on desc, production_batches.imported_at desc, production_batches.id desc
        limit 50`,
+      [runId],
+    ),
+    executor.query(
+      `with current_run as (
+         select release_runs.repository_id, release_runs.started_at
+           from release_runs
+          where release_runs.id = $1
+       ),
+       previous_run as (
+         select candidate.id, candidate.commit_sha, candidate.completed_at, candidate.started_at
+           from release_runs as candidate
+           join current_run on current_run.repository_id = candidate.repository_id
+          where candidate.id <> $1
+            and (
+              candidate.started_at < current_run.started_at
+              or (candidate.started_at = current_run.started_at and candidate.id < $1)
+            )
+            and exists (
+              select 1
+                from production_batches
+               where production_batches.release_run_id = candidate.id
+            )
+          order by candidate.started_at desc, candidate.id desc
+          limit 1
+       ),
+       defect_totals as (
+         select production_batches.release_run_id,
+                coalesce(sum(production_batch_defects.defect_count), 0)::int as defect_count
+           from production_batches
+           left join production_batch_defects
+             on production_batch_defects.production_batch_id = production_batches.id
+          where production_batches.release_run_id = (select previous_run.id from previous_run)
+          group by production_batches.release_run_id
+       )
+       select previous_run.id as run_id,
+              previous_run.commit_sha,
+              previous_run.completed_at,
+              count(production_batches.id)::int as batch_count,
+              coalesce(sum(production_batches.quantity), 0)::int as quantity,
+              case
+                when coalesce(
+                  sum(production_batches.quantity) filter (
+                    where production_batches.first_pass_yield_bps is not null
+                  ),
+                  0
+                ) > 0
+                  then round(
+                    sum(
+                      production_batches.first_pass_yield_bps::numeric * production_batches.quantity
+                    ) filter (where production_batches.first_pass_yield_bps is not null)
+                    / sum(production_batches.quantity) filter (
+                      where production_batches.first_pass_yield_bps is not null
+                    )
+                  )::int
+                else null
+              end as first_pass_yield_bps,
+              coalesce(sum(production_batches.rework_count), 0)::int as rework_count,
+              coalesce(sum(production_batches.scrap_count), 0)::int as scrap_count,
+              coalesce(defect_totals.defect_count, 0)::int as defect_count
+         from previous_run
+         join production_batches on production_batches.release_run_id = previous_run.id
+         left join defect_totals on defect_totals.release_run_id = previous_run.id
+        group by previous_run.id, previous_run.commit_sha, previous_run.completed_at, defect_totals.defect_count`,
       [runId],
     ),
   ]);
@@ -977,6 +1054,26 @@ export async function lookupRunDashboard(
     ];
   });
 
+  const productionBaselineRow = rows(productionBaselineResult)[0];
+  const productionBaseline = (() => {
+    if (!productionBaselineRow) return undefined;
+    const baselineRunId = stringValue(productionBaselineRow, "run_id");
+    const commitSha = stringValue(productionBaselineRow, "commit_sha");
+    const batchCount = numberValue(productionBaselineRow, "batch_count");
+    const quantity = numberValue(productionBaselineRow, "quantity");
+    if (!baselineRunId || !commitSha || batchCount === undefined || quantity === undefined) return undefined;
+    return {
+      runId: baselineRunId,
+      commitSha,
+      completedAt: stringValue(productionBaselineRow, "completed_at"),
+      batchCount,
+      quantity,
+      firstPassYieldBps: numberValue(productionBaselineRow, "first_pass_yield_bps"),
+      reworkCount: numberValue(productionBaselineRow, "rework_count") ?? 0,
+      scrapCount: numberValue(productionBaselineRow, "scrap_count") ?? 0,
+      defectCount: numberValue(productionBaselineRow, "defect_count") ?? 0,
+    } satisfies RunProductionReleaseSummary;
+  })();
   const status = requiredString(runRow, "status");
   const reconciliationCount = numberValue(runRow, "reconciliation_count") ?? 0;
   const deadLetterCount = numberValue(runRow, "dead_letter_count") ?? 0;
@@ -1050,6 +1147,7 @@ export async function lookupRunDashboard(
       transitions,
       boards,
       productionBatches,
+      productionBaseline,
     },
   };
 }
@@ -1272,6 +1370,7 @@ function buildDemoRun(runId: string, filters: RunDashboardFilters = {}): RunDeta
     // Two boards, one carrying a part already at lifecycle risk, so the demo shows what the
     // supply signals look like rather than an empty panel.
     productionBatches: [],
+    productionBaseline: undefined,
     boards: [
       {
         boardId: "demo-board-mainboard",
