@@ -70,6 +70,7 @@ export type SupplyWatchStore = {
         priceBreaks?: readonly PriceBreak[] | undefined;
         availableUnits?: number | undefined;
         leadTimeDays?: number | undefined;
+        supplierCount?: number | undefined;
       }
     >
   >;
@@ -87,6 +88,7 @@ export type SupplyWatchStore = {
       priceBreaks?: readonly PriceBreak[] | undefined;
       availableUnits?: number | undefined;
       leadTimeDays?: number | undefined;
+      supplierCount?: number | undefined;
     }[],
   ): Promise<number>;
   reconcileFindings(
