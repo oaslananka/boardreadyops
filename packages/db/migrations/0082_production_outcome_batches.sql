@@ -1,3 +1,5 @@
+/* tsqllint-disable set-quoted-identifier */
+-- PostgreSQL migration: SQL Server SET QUOTED_IDENTIFIER is not valid here.
 -- Release-linked manufacturing outcome pilot foundation.
 --
 -- A production batch is immutable evidence about what was manufactured after one approved
