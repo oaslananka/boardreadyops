@@ -494,11 +494,7 @@ describe("nexar distributor classification and pricing", () => {
             supMultiMatch: [
               {
                 reference: "0",
-                parts: [
-                  part("STM32F103C8T6", "Production", undefined, [
-                    { offers: [{ inventoryLevel: 100 }] },
-                  ]),
-                ],
+                parts: [part("STM32F103C8T6", "Production", undefined, [{ offers: [{ inventoryLevel: 100 }] }])],
               },
             ],
           },
