@@ -350,6 +350,7 @@ describeDatabase("board supply watch", () => {
           observedAt: firstPassAt,
           availableUnits: 1000,
           leadTimeDays: 21,
+          alternates: [{ mpn: `ALT-${part.mpn}`, manufacturer: "Alternate Vendor" }],
         }));
       },
     });
@@ -360,7 +361,7 @@ describeDatabase("board supply watch", () => {
 
     const tenantRows = rows(
       await database().query(
-        `select installation_id, provider, available_units, lead_time_days
+        `select installation_id, provider, available_units, lead_time_days, alternates
            from installation_component_observations
           where installation_id = $1 and provider = $2`,
         [installationId, "tenant-provider"],
@@ -370,6 +371,7 @@ describeDatabase("board supply watch", () => {
     expect(tenantRows[0]?.installation_id).toBe(installationId);
     expect(tenantRows[0]?.available_units).toBe(1000);
     expect(tenantRows[0]?.lead_time_days).toBe(21);
+    expect(tenantRows[0]?.alternates).toEqual([{ mpn: "ALT-WATCH-EOL-1", manufacturer: "Alternate Vendor" }]);
 
     const sharedRows = rows(
       await database().query("select id from component_lifecycle_observations where source = $1", ["tenant-provider"]),

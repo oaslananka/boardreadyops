@@ -1,4 +1,5 @@
 import type {
+  ComponentAlternate,
   ComponentDistributorClassification,
   ComponentIntelligenceProvider,
   ComponentLifecycleStatus,
@@ -99,6 +100,7 @@ type NexarPart = {
   mpn?: string;
   totalAvail?: number;
   manufacturer?: { name?: string };
+  similarParts?: { mpn?: string; manufacturer?: { name?: string } }[];
   specs?: { attribute?: { shortname?: string }; displayValue?: string }[];
   sellers?: NexarSeller[];
 };
@@ -221,6 +223,44 @@ function nexarSupplierCount(sellers: readonly NexarSeller[] | undefined): number
   return hadIdentifiableSeller ? identities.size : undefined;
 }
 
+const maximumAlternateParts = 8;
+
+function alternateKey(alternate: ComponentAlternate): string {
+  return JSON.stringify([alternate.mpn.toLowerCase(), (alternate.manufacturer ?? "").toLowerCase()]);
+}
+
+/**
+ * Normalizes Nexar similar-parts into a small deterministic substitute set.
+ *
+ * The source MPN itself is excluded, duplicates collapse case-insensitively, malformed entries
+ * are ignored, and the list is capped so this signal stays attached to a BOM decision instead of
+ * becoming an unbounded component-search result.
+ */
+function nexarAlternates(part: NexarPart): ComponentAlternate[] {
+  const sourceMpn = part.mpn?.trim().toLowerCase();
+  const sourceManufacturer = part.manufacturer?.name?.trim().toLowerCase() ?? "";
+  const seen = new Set<string>();
+  const alternates: ComponentAlternate[] = [];
+
+  for (const candidate of part.similarParts ?? []) {
+    const mpn = candidate.mpn?.trim();
+    if (!mpn || mpn.length > 128) continue;
+    const manufacturer = candidate.manufacturer?.name?.trim();
+    if (manufacturer && manufacturer.length > 128) continue;
+
+    const normalized: ComponentAlternate = { mpn, ...(manufacturer ? { manufacturer } : {}) };
+    const key = alternateKey(normalized);
+    if (seen.has(key)) continue;
+    if (mpn.toLowerCase() === sourceMpn && (manufacturer?.toLowerCase() ?? "") === sourceManufacturer) continue;
+
+    seen.add(key);
+    alternates.push(normalized);
+    if (alternates.length >= maximumAlternateParts) break;
+  }
+
+  return alternates;
+}
+
 function chunked<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size));
@@ -234,6 +274,7 @@ const lifecycleQuery = `query BoardReadyOpsLifecycle($queries: [SupPartMatchQuer
       mpn
       totalAvail
       manufacturer { name }
+      similarParts { mpn manufacturer { name } }
       specs { attribute { shortname } displayValue }
       sellers {
         isAuthorized
@@ -265,6 +306,7 @@ function parseNexarMatches(
     const availableUnits = nexarAvailableUnits(part);
     const leadTimeDays = nexarLeadTimeDays(part.sellers);
     const supplierCount = nexarSupplierCount(part.sellers);
+    const alternates = nexarAlternates(part);
 
     // A matched part may carry useful supply data even when its lifecycle vocabulary is unknown.
     // Preserve that observation rather than throwing availability/lead-time evidence away. A
@@ -275,6 +317,7 @@ function parseNexarMatches(
       availableUnits === undefined &&
       leadTimeDays === undefined &&
       supplierCount === undefined &&
+      alternates.length === 0 &&
       priceBreaks.length === 0 &&
       distributorClassification === "unknown"
     ) {
@@ -292,6 +335,7 @@ function parseNexarMatches(
       ...(availableUnits === undefined ? {} : { availableUnits }),
       ...(leadTimeDays === undefined ? {} : { leadTimeDays }),
       ...(supplierCount === undefined ? {} : { supplierCount }),
+      ...(alternates.length > 0 ? { alternates } : {}),
     });
   }
   return observations;

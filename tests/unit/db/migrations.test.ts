@@ -126,7 +126,21 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0076_supply_unavailable_findings.sql",
       "0077_supply_finding_acknowledgement.sql",
       "0078_supply_finding_suppressions.sql",
+      "0079_component_alternates.sql",
     ]);
+  });
+
+  it("adds bounded provider-neutral alternate parts to both observation caches in schema v79", async () => {
+    const sql = (await readFile(join(migrationsDir, "0079_component_alternates.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("alter table component_lifecycle_observations");
+    expect(sql).toContain("alter table installation_component_observations");
+    expect(sql).toContain("add column if not exists alternates jsonb not null default '[]'::jsonb");
+    expect(sql).toContain("component_lifecycle_observations_alternates_valid");
+    expect(sql).toContain("installation_component_observations_alternates_valid");
+    expect(sql).toContain("pg_column_size(alternates) <= 16384");
+    expect(sql).not.toContain("description");
+    expect(sql).not.toContain("octopart_url");
   });
 
   it("records append-only time-bound supply suppression history in schema v78", async () => {
