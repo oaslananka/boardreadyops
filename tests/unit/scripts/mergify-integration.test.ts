@@ -1,4 +1,3 @@
-STDOUT:
 import { readFileSync } from "node:fs";
 import * as yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
@@ -114,5 +113,3 @@ describe("Mergify integration contract", () => {
     expect(ci).toContain("steps.mergify-token.outputs.enabled == 'true'");
   });
 });
-
-EXIT: 0

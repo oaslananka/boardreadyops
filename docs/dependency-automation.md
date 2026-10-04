@@ -1,4 +1,3 @@
-STDOUT:
 # Dependency Automation
 
 BoardReadyOps uses Renovate as the single source of truth for routine version-update pull requests.
@@ -67,5 +66,3 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 6. After the PR is intentionally approved for merge, enqueue it with `@mergifyio queue main` (or the Mergify queue control). Do not enable Mergify auto-merge/auto-queue; an open green PR should remain open until a maintainer explicitly queues it.
 7. Run the Renovate workflow manually after first installation or credential rotation and confirm the Dependency Dashboard can be updated.
 8. Rotate `GH_AUTH_TOKEN` immediately if its owner or permissions change unexpectedly.
-
-EXIT: 0

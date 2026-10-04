@@ -1,4 +1,3 @@
-STDOUT:
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -189,5 +188,3 @@ describe("main branch governance ruleset", () => {
     expect(setup).not.toContain(`branches/\${branch}/protection`);
   });
 });
-
-EXIT: 0
