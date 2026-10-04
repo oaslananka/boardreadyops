@@ -70,6 +70,12 @@ export type ComponentObservation = {
    * Absent means the provider returned no usable lead-time signal.
    */
   leadTimeDays?: number | undefined;
+  /**
+   * Number of distinct supplier companies with at least one positive-inventory offer in the
+   * provider's configured/default market. Zero means seller data was returned but nobody had
+   * stock; absent means the provider did not expose enough seller/offer identity to count safely.
+   */
+  supplierCount?: number | undefined;
 };
 
 /**
