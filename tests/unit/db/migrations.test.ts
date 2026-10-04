@@ -42,6 +42,8 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("Project");
     expect(cloudDatabaseModels).toContain("Revision");
     expect(cloudDatabaseModels).toContain("Delivery");
+    expect(cloudDatabaseModels).toContain("ProductionBatch");
+    expect(cloudDatabaseModels).toContain("ProductionBatchDefect");
   });
 
   it("discovers SQL migrations in deterministic order", async () => {
@@ -129,7 +131,25 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0079_component_alternates.sql",
       "0080_component_compliance_trust.sql",
       "0081_board_snapshot_release_mode.sql",
+      "0082_production_outcome_batches.sql",
     ]);
+  });
+
+  it("stores release-linked production batches and normalized defects in schema v82", async () => {
+    const sql = (await readFile(join(migrationsDir, "0082_production_outcome_batches.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("create table if not exists production_batches");
+    expect(sql).toContain("release_run_id text not null references release_runs(id) on delete cascade");
+    expect(sql).toContain("first_pass_yield_bps integer");
+    expect(sql).toContain("first_pass_yield_bps between 0 and 10000");
+    expect(sql).toContain("source_sha256 ~ '^[0-9a-f]{64}$'");
+    expect(sql).toContain("production_batches_release_identity_idx");
+    expect(sql).toContain("lower(manufacturer), lower(external_batch_id)");
+    expect(sql).toContain("create table if not exists production_batch_defects");
+    expect(sql).toContain("category in ('aoi', 'spi', 'functional_test', 'ncr', 'rma')");
+    expect(sql).toContain("unique (production_batch_id, category, code)");
+    expect(sql).not.toContain("customer_id");
+    expect(sql).not.toContain("vendor_id");
   });
 
   it("captures release criticality on immutable BOM snapshots in schema v81", async () => {

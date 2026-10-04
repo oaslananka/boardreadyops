@@ -54866,6 +54866,9 @@ var DEFAULT_MAX_SINGLE_FILE_BYTES = 50 * 1024 * 1024;
 // packages/cloud-core/src/evidence-ledger.ts
 init_src();
 
+// packages/cloud-core/src/production-outcomes.ts
+var maximumCsvBytes = 2 * 1024 * 1024;
+
 // packages/cloud-core/src/review-diff.ts
 var import_node_crypto11 = require("node:crypto");
 function ordinalCompare(a, b) {

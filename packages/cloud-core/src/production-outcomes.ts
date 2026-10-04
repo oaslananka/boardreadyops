@@ -252,11 +252,7 @@ export function parseProductionOutcomeCsv(text: string): ParsedProductionOutcome
 
     const defect = parseDefect(row);
     if (!defect) continue;
-    if (
-      target.defects.some(
-        (entry) => entry.category === defect.category && entry.code.toLowerCase() === defect.code.toLowerCase(),
-      )
-    ) {
+    if (target.defects.some((entry) => entry.category === defect.category && entry.code === defect.code)) {
       throw new Error(`CSV row ${rowNumber} duplicates defect ${defect.category}:${defect.code}`);
     }
     (target.defects as ProductionBatchDefect[]).push(defect);

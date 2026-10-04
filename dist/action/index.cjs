@@ -97693,6 +97693,9 @@ var runnerTerminalResultRequestSchema = runnerLeaseContextSchema.extend({
   }
 });
 
+// packages/cloud-core/src/production-outcomes.ts
+var maximumCsvBytes = 2 * 1024 * 1024;
+
 // packages/cloud-core/src/review-diff.ts
 var import_node_crypto6 = require("node:crypto");
 function ordinalCompare(a, b) {

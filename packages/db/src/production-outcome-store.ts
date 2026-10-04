@@ -33,7 +33,8 @@ function resultRows(result: unknown): readonly Row[] {
 
 function text(row: Row, key: string): string {
   const value = row[key];
-  if (typeof value !== "string" || value.length === 0) throw new Error("Production outcome import returned an invalid " + key);
+  if (typeof value !== "string" || value.length === 0)
+    throw new Error(`Production outcome import returned an invalid ${key}`);
   return value;
 }
 
@@ -65,7 +66,7 @@ export function createSqlProductionOutcomeStore(
       const defects = batch.defects.map((defect) => ({
         category: defect.category,
         code: defect.code,
-        count: defect.count,
+        defect_count: defect.count,
         notes: defect.notes ?? null,
       }));
 
