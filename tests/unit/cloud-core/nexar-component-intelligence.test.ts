@@ -17,8 +17,10 @@ function part(
   manufacturer?: string,
   sellers?: {
     isAuthorized?: boolean;
+    company?: { id?: string; name?: string };
     offers?: {
       prices?: { quantity?: number; price?: number; currency?: string }[];
+      inventoryLevel?: number;
       factoryLeadDays?: number;
     }[];
   }[],
@@ -413,7 +415,99 @@ describe("nexar distributor classification and pricing", () => {
       .mock.calls.find(([url]) => new URL(String(url)).hostname === "api.nexar.com");
     const body = JSON.parse(String(graphqlCall?.[1]?.body ?? "{}")) as { query?: string };
     expect(body.query).toContain("totalAvail");
+    expect(body.query).toContain("company { id name }");
+    expect(body.query).toContain("inventoryLevel");
     expect(body.query).toContain("factoryLeadDays");
+  });
+
+  it("counts distinct supplier companies that carry positive inventory", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("STM32F103C8T6", "Production", undefined, [
+                    {
+                      company: { id: "dist-a", name: "Distributor A" },
+                      offers: [{ inventoryLevel: 50 }, { inventoryLevel: 25 }],
+                    },
+                    {
+                      company: { id: "dist-b", name: "Distributor B" },
+                      offers: [{ inventoryLevel: 0 }],
+                    },
+                    {
+                      company: { id: "dist-c", name: "Distributor C" },
+                      offers: [{ inventoryLevel: 10 }],
+                    },
+                    {
+                      company: { id: "dist-c", name: "Distributor C duplicate" },
+                      offers: [{ inventoryLevel: 5 }],
+                    },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.supplierCount).toBe(2);
+  });
+
+  it("reports zero stocked suppliers when identifiable sellers are present but all inventory is zero", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("STM32F103C8T6", "Production", undefined, [
+                    {
+                      company: { name: "Distributor A" },
+                      offers: [{ inventoryLevel: 0 }],
+                    },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.supplierCount).toBe(0);
+  });
+
+  it("omits supplier count when seller identity is unavailable instead of counting offers", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("STM32F103C8T6", "Production", undefined, [
+                    { offers: [{ inventoryLevel: 100 }] },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.supplierCount).toBeUndefined();
   });
 
   it("normalizes total availability as units without guessing project sufficiency", async () => {
