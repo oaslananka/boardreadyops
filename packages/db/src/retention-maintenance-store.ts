@@ -10,7 +10,13 @@ export type RetentionMaintenanceStore = {
   purgeTerminalRepositorySetupProbes(input: { retentionDays: number; limit?: number }): Promise<number>;
   purgeCompletedControlPlaneOutbox(input: { retentionDays: number; limit?: number }): Promise<number>;
   purgeCompletedControlPlaneReconciliationItems(input: { retentionDays: number; limit?: number }): Promise<number>;
-  previewExpiredArtifactRetention(input?: { limit?: number }): Promise<number>;
+  expireArtifactRetention(input: { storageDriver: string; limit?: number }): Promise<ArtifactRetentionExpiryResult>;
+};
+
+export type ArtifactRetentionExpiryResult = {
+  revokedArtifacts: number;
+  deletionJobsQueued: number;
+  sharedObjectsRetained: number;
 };
 
 export type RetentionMaintenanceStoreOptions = {
@@ -47,6 +53,14 @@ function boundedLimit(requestedLimit: number | undefined, fallback: number): num
   return Number.isSafeInteger(requestedLimit) && requestedLimit !== undefined && requestedLimit > 0
     ? Math.min(requestedLimit, maximumBatchSize)
     : fallback;
+}
+
+function normalizedStorageDriver(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/u.test(normalized) || normalized.length > 64) {
+    throw new Error("storageDriver must be a valid storage driver identifier");
+  }
+  return normalized;
 }
 
 function retentionCutoff(at: Date, retentionDays: number): string {
@@ -277,11 +291,12 @@ export function createSqlRetentionMaintenanceStore(
       return nonNegativeInteger(rows(result)[0]?.affected);
     },
 
-    async previewExpiredArtifactRetention(input = {}) {
+    async expireArtifactRetention(input) {
       const at = now().toISOString();
       const limit = boundedLimit(input.limit, defaultBatchSize);
+      const storageDriver = normalizedStorageDriver(input.storageDriver);
       const result = await executor.query(
-        `with candidates as (
+        `with candidate_ids as materialized (
            select artifacts.id
            from artifacts
            join release_runs on release_runs.id = artifacts.run_id
@@ -314,12 +329,102 @@ export function createSqlRetentionMaintenanceStore(
                where legal_holds.tenant_id = installations.account_login
                  and legal_holds.active = true
              )
+           order by coalesce(artifacts.retention_until, artifacts.uploaded_at) asc, artifacts.id asc
+           for update of artifacts skip locked
            limit $2::integer
+         ), captured as materialized (
+           select artifacts.id, artifacts.run_id, artifacts.kind, artifacts.storage_path,
+                  artifacts.sha256, artifacts.bytes, artifacts.role,
+                  repositories.id as repository_id, repositories.installation_id
+           from artifacts
+           join candidate_ids on candidate_ids.id = artifacts.id
+           join release_runs on release_runs.id = artifacts.run_id
+           join repositories on repositories.id = release_runs.repository_id
+         ), object_deletion_candidates as materialized (
+           select distinct on (captured.storage_path) captured.*
+           from captured
+           where not exists (
+             select 1
+             from artifacts as retained_artifact
+             where retained_artifact.storage_path = captured.storage_path
+               and not exists (
+                 select 1 from candidate_ids where candidate_ids.id = retained_artifact.id
+               )
+           )
+           order by captured.storage_path, captured.id
+         ), queued_artifact_deletions as (
+           insert into artifact_deletion_jobs (
+             artifact_id, installation_id, repository_id, release_run_id,
+             storage_driver, storage_path, deletion_reason, artifact_kind,
+             artifact_role, artifact_sha256, artifact_bytes, available_at, created_at
+           )
+           select object_deletion_candidates.id, object_deletion_candidates.installation_id,
+                  object_deletion_candidates.repository_id, object_deletion_candidates.run_id,
+                  $3, object_deletion_candidates.storage_path, 'retention_expired',
+                  object_deletion_candidates.kind, object_deletion_candidates.role,
+                  object_deletion_candidates.sha256, object_deletion_candidates.bytes,
+                  $1::timestamptz, $1::timestamptz
+           from object_deletion_candidates
+           on conflict (artifact_id) do nothing
+           returning artifact_id
+         ), shared_object_audit as (
+           insert into audit_events (
+             installation_id, event_type, actor_type, actor_id, subject_type, subject_id,
+             repository_id, release_run_id, metadata, created_at
+           )
+           select captured.installation_id, 'artifact.object.deletion_skipped', 'system',
+                  'retention-maintenance', 'artifact', captured.id, captured.repository_id,
+                  captured.run_id,
+                  jsonb_build_object(
+                    'reason', 'storage_path_still_referenced',
+                    'retentionReason', 'retention_expired',
+                    'bytes', captured.bytes, 'sha256', captured.sha256,
+                    'itemType', captured.kind, 'scope', captured.role
+                  ),
+                  $1::timestamptz
+           from captured
+           where exists (
+             select 1
+             from artifacts as retained_artifact
+             where retained_artifact.storage_path = captured.storage_path
+               and not exists (
+                 select 1 from candidate_ids where candidate_ids.id = retained_artifact.id
+               )
+           )
+           returning id
+         ), deleted_artifacts as (
+           delete from artifacts
+           using captured
+           where artifacts.id = captured.id
+           returning artifacts.id
+         ), artifact_deletion_audit as (
+           insert into audit_events (
+             installation_id, event_type, actor_type, actor_id, subject_type, subject_id,
+             repository_id, release_run_id, metadata, created_at
+           )
+           select captured.installation_id, 'artifact.record.deleted', 'system',
+                  'retention-maintenance', 'artifact', captured.id, captured.repository_id,
+                  captured.run_id,
+                  jsonb_build_object(
+                    'reason', 'retention_expired', 'bytes', captured.bytes,
+                    'sha256', captured.sha256, 'itemType', captured.kind, 'scope', captured.role
+                  ),
+                  $1::timestamptz
+           from captured
+           join deleted_artifacts on deleted_artifacts.id = captured.id
+           returning id
          )
-         select count(*)::int as affected from candidates`,
-        [at, limit],
+         select (select count(*)::int from deleted_artifacts) as revoked,
+                (select count(*)::int from queued_artifact_deletions) as queued,
+                (select count(*)::int from shared_object_audit) as shared`,
+        [at, limit, storageDriver],
       );
-      return nonNegativeInteger(rows(result)[0]?.affected);
+      const row = rows(result)[0];
+      return {
+        revokedArtifacts: nonNegativeInteger(row?.revoked),
+        deletionJobsQueued: nonNegativeInteger(row?.queued),
+        sharedObjectsRetained: nonNegativeInteger(row?.shared),
+      };
     },
 
     async purgeCompletedControlPlaneReconciliationItems(input) {
