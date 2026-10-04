@@ -213,7 +213,7 @@ export type RunDetail = {
   transitions: TransitionDetail[];
   boards: RunBoardDetail[];
   productionBatches: RunProductionBatchDetail[];
-  productionBaseline: RunProductionReleaseSummary | undefined;
+  productionBaseline?: RunProductionReleaseSummary | undefined;
 };
 
 export type RunDashboardFilters = {
