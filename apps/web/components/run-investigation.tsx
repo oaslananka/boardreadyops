@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { releaseRepositoryDispatchAvailability } from "../lib/release-rollout.js";
 import type { RunDashboardFilters, RunDetail } from "../lib/run-dashboard.js";
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
+import { buildRunEvidenceGraph } from "../lib/run-evidence-graph.js";
 import { runVerdict } from "../lib/run-verdict.js";
 import { CopyButton } from "./copy-button.js";
 import { FindingWaiverButton } from "./finding-waiver-button.js";
@@ -1376,8 +1377,75 @@ export function PublicationView({ run }: Readonly<{ run: RunDetail }>) {
 }
 
 export function AuditView({ run }: Readonly<{ run: RunDetail }>) {
+  const { graph, trace } = buildRunEvidenceGraph(run);
+
   return (
     <>
+      <Panel
+        title="Release evidence graph"
+        description="Storage-neutral release lineage: source and decision context backward, production outcomes forward."
+        id="evidence-graph"
+      >
+        <DefinitionGrid>
+          <Definition label="Graph contract">v{graph.version}</Definition>
+          <Definition label="Backward context">{trace.backward.length}</Definition>
+          <Definition label="Production outcomes">{trace.forward.length}</Definition>
+          <Definition label="Missing links">{trace.missing.length}</Definition>
+        </DefinitionGrid>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <section>
+            <h3 className="text-sm font-semibold text-foreground">Backward context</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Source, evidence, review and policy records connected to this release.
+            </p>
+            <ul className="mt-2 flex flex-col gap-2">
+              {trace.backward.map((node) => (
+                <li key={node.id} className="rounded-md border border-border bg-muted/30 p-2 text-sm">
+                  <span className="font-medium text-foreground">{humanize(node.kind)}</span>
+                  <span className="text-muted-foreground"> · {node.label}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="text-sm font-semibold text-foreground">Forward outcomes</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Production batches linked to this exact release identity.
+            </p>
+            {trace.forward.length > 0 ? (
+              <ul className="mt-2 flex flex-col gap-2">
+                {trace.forward.map((node) => (
+                  <li key={node.id} className="rounded-md border border-border bg-muted/30 p-2 text-sm">
+                    <span className="font-medium text-foreground">{humanize(node.kind)}</span>
+                    <span className="text-muted-foreground"> · {node.label}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">No linked production outcomes yet.</p>
+            )}
+          </section>
+        </div>
+
+        {trace.missing.length > 0 ? (
+          <div className="mt-4 rounded-md border border-border bg-muted/20 p-3">
+            <h3 className="text-sm font-semibold text-foreground">Missing relationship context</h3>
+            <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
+              {trace.missing.map((entry) => (
+                <li key={`${entry.from}:${entry.relationship}:${entry.expectedKind}`}>{entry.reason}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        <p className="mt-3 text-xs text-muted-foreground">
+          This view uses dashboard-visible metadata only. It does not expand the operator audit export or copy source
+          content into a graph store.
+        </p>
+      </Panel>
+
       <Panel
         title="Audit and recovery evidence"
         description="Operational records are kept apart from your board content, and never mixed into it."

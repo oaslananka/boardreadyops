@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ArtifactsView,
   AttemptsView,
+  AuditView,
   FindingsView,
   RunPageFrame,
   SummaryView,
@@ -254,6 +255,26 @@ describe("run investigation accessibility", () => {
     // The header states which run this is; the verdict states the outcome. Repeating the
     // outcome in both is what made the page read as a status dump.
     expect(markup).not.toContain("Decision: Pass");
+  });
+
+  it("renders storage-neutral release lineage with explicit missing governance context", () => {
+    const run = sampleRun();
+    run.reviewId = "review-123";
+    run.setupPreset = "production";
+    run.setupPresetVersion = 3;
+    run.setupRevision = 7;
+
+    const markup = renderToStaticMarkup(createElement(AuditView, { run }));
+
+    expect(markup).toContain("Release evidence graph");
+    expect(markup).toContain("Backward context");
+    expect(markup).toContain("Forward outcomes");
+    expect(markup).toContain("Production Batch");
+    expect(markup).toContain("Acme EMS · PILOT-42");
+    expect(markup).toContain("production · v3 · revision 7");
+    expect(markup).toContain("Approval evidence was not loaded for this investigation.");
+    expect(markup).toContain("Waiver/decision history was not loaded for this investigation.");
+    expect(markup).toContain("does not expand the operator audit export");
   });
 
   it("renders release-linked production evidence without claiming causality", () => {

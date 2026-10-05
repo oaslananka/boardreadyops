@@ -102,3 +102,9 @@ Validation failures return `400`; an oversized body returns `413`; unsupported m
 ## What remains out of scope
 
 The pilot does not yet provide bulk multi-batch transactions, vendor-specific MES adapters, or automatic causal claims. Those should be added only after repeated design-partner demand demonstrates that the release-linked CSV/API workflow is insufficient.
+
+## Related longitudinal evidence
+
+The run Audit view connects release-linked production outcomes back to source and evidence through the
+[Release-to-production Evidence Graph](evidence-graph.md). The graph preserves correlation language
+and does not claim that a release caused a manufacturing change.

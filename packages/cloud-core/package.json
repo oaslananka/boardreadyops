@@ -123,6 +123,11 @@
       "types": "./src/production-outcomes.ts",
       "import": "./src/production-outcomes.ts",
       "default": "./src/production-outcomes.ts"
+    },
+    "./evidence-graph": {
+      "types": "./src/evidence-graph.ts",
+      "import": "./src/evidence-graph.ts",
+      "default": "./src/evidence-graph.ts"
     }
   },
   "scripts": {
