@@ -1,4 +1,3 @@
-import path from "node:path";
 import { type Severity, severityRankValue } from "../../core/findings.js";
 import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import {
@@ -97,16 +96,19 @@ export const boardEdgeClearanceRule = rule(
       typeof ruleConfig["min-clearance-mm"] === "number" ? ruleConfig["min-clearance-mm"] : undefined;
     const profileMin = profile?.fabrication?.minBoardEdgeClearanceMm;
     const minClearanceMm = configuredMin ?? profileMin ?? 0.2;
-    const limitSource = configuredMin !== undefined ? "configured" : profileMin !== undefined ? "vendor-profile" : "default";
-    const limitMayBlock = configuredMin !== undefined || (limitSource === "vendor-profile" && assurance?.mayBlock === true);
+    const limitSource =
+      configuredMin !== undefined ? "configured" : profileMin !== undefined ? "vendor-profile" : "default";
+    const limitMayBlock =
+      configuredMin !== undefined || (limitSource === "vendor-profile" && assurance?.mayBlock === true);
     const configured = configuredSeverity(context, "manufacturing.board-edge-clearance", "medium");
 
     const outlineCandidates = parsedFiles.filter((item) => item.layer?.role === "outline");
     const outlineFile =
       outlineCandidates.find((item) => item.layer?.identitySource === "declared") ?? outlineCandidates[0];
     const outlineSegments =
-      outlineFile?.parsed.geometry.primitives.filter((primitive): primitive is GerberSegment => primitive.kind === "segment") ??
-      [];
+      outlineFile?.parsed.geometry.primitives.filter(
+        (primitive): primitive is GerberSegment => primitive.kind === "segment",
+      ) ?? [];
 
     if (
       outlineFile === undefined ||
@@ -128,10 +130,9 @@ export const boardEdgeClearanceRule = rule(
             configuredSeverity: configured,
             severityCapped: advisorySeverity(configured) !== configured,
             blocking: false,
-            blockingRationale: "A closed measurable board-profile contour is required before feature-to-edge distance can block.",
-            outlineClosed: Boolean(
-              outlineFile?.parsed.hasClosedContour && outlineFile.parsed.openContourCount === 0,
-            ),
+            blockingRationale:
+              "A closed measurable board-profile contour is required before feature-to-edge distance can block.",
+            outlineClosed: Boolean(outlineFile?.parsed.hasClosedContour && outlineFile.parsed.openContourCount === 0),
             outlineRoleEvidence: outlineFile?.layer?.identitySource ?? "unknown",
             geometryConfidence: "unknown",
             profileAssurance: assurance?.state ?? "none",
@@ -253,7 +254,8 @@ export const boardEdgeClearanceRule = rule(
 
 function outlineEvidenceReasons(outline: ParsedLayer, segments: readonly GerberSegment[]): string[] {
   const reasons: string[] = [];
-  if (outline.layer?.identitySource !== "declared") reasons.push("The board-profile role comes from the filename, not TF.FileFunction.");
+  if (outline.layer?.identitySource !== "declared")
+    reasons.push("The board-profile role comes from the filename, not TF.FileFunction.");
   if (outline.parsed.unitsEvidence !== "declared") reasons.push("The board-profile units were assumed.");
   if (outline.parsed.format.evidence !== "declared") reasons.push("The board-profile coordinate format was assumed.");
   const relevantUncertainty = outline.parsed.geometry.uncertainty.filter(
@@ -269,7 +271,8 @@ function outlineEvidenceReasons(outline: ParsedLayer, segments: readonly GerberS
 
 function copperEvidenceReasons(copper: ParsedLayer): string[] {
   const reasons: string[] = [];
-  if (copper.layer?.identitySource !== "declared") reasons.push("The copper role comes from the filename, not TF.FileFunction.");
+  if (copper.layer?.identitySource !== "declared")
+    reasons.push("The copper role comes from the filename, not TF.FileFunction.");
   if (copper.parsed.unitsEvidence !== "declared") reasons.push("The copper-layer units were assumed.");
   if (copper.parsed.format.evidence !== "declared") reasons.push("The copper-layer coordinate format was assumed.");
   return reasons;
@@ -436,7 +439,8 @@ function distanceFromCoreToOutline(points: readonly GerberPoint[], outlineSegmen
 
 function distanceFromCoreToSegment(points: readonly GerberPoint[], target: GerberSegment): number {
   if (points.length === 1) return pointToSegmentDistanceMm(points[0] as GerberPoint, target);
-  if (points.length === 2) return segmentToSegmentDistanceMm(segment(points[0] as GerberPoint, points[1] as GerberPoint), target);
+  if (points.length === 2)
+    return segmentToSegmentDistanceMm(segment(points[0] as GerberPoint, points[1] as GerberPoint), target);
 
   if (pointInPolygon(target.from, points) || pointInPolygon(target.to, points)) return 0;
   let minimum = Number.POSITIVE_INFINITY;
@@ -530,7 +534,7 @@ function pointInContour(point: GerberPoint, contour: readonly GerberSegment[]): 
   let inside = false;
   for (const edge of contour) {
     if (pointOnSegment(point, edge)) return true;
-    const crossesY = (edge.from.y > point.y) !== (edge.to.y > point.y);
+    const crossesY = edge.from.y > point.y !== edge.to.y > point.y;
     if (!crossesY) continue;
     const intersectionX =
       edge.from.x + ((point.y - edge.from.y) * (edge.to.x - edge.from.x)) / (edge.to.y - edge.from.y);
@@ -546,7 +550,7 @@ function pointInPolygon(point: GerberPoint, polygon: readonly GerberPoint[]): bo
     const to = polygon[(index + 1) % polygon.length] as GerberPoint;
     const edge = segment(from, to);
     if (pointOnSegment(point, edge)) return true;
-    const crossesY = (from.y > point.y) !== (to.y > point.y);
+    const crossesY = from.y > point.y !== to.y > point.y;
     if (!crossesY) continue;
     const intersectionX = from.x + ((point.y - from.y) * (to.x - from.x)) / (to.y - from.y);
     if (intersectionX > point.x) inside = !inside;
@@ -556,8 +560,7 @@ function pointInPolygon(point: GerberPoint, polygon: readonly GerberPoint[]): bo
 
 function pointOnSegment(point: GerberPoint, edge: GerberSegment): boolean {
   const cross =
-    (edge.to.x - edge.from.x) * (point.y - edge.from.y) -
-    (edge.to.y - edge.from.y) * (point.x - edge.from.x);
+    (edge.to.x - edge.from.x) * (point.y - edge.from.y) - (edge.to.y - edge.from.y) * (point.x - edge.from.x);
   if (Math.abs(cross) > pointToleranceMm) return false;
   return (
     point.x >= Math.min(edge.from.x, edge.to.x) - pointToleranceMm &&
@@ -575,7 +578,10 @@ function convexHull(points: readonly GerberPoint[]): GerberPoint[] {
 
   const lower: GerberPoint[] = [];
   for (const point of unique) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2] as GerberPoint, lower[lower.length - 1] as GerberPoint, point) <= 0) {
+    while (
+      lower.length >= 2 &&
+      cross(lower[lower.length - 2] as GerberPoint, lower[lower.length - 1] as GerberPoint, point) <= 0
+    ) {
       lower.pop();
     }
     lower.push(point);
@@ -584,7 +590,10 @@ function convexHull(points: readonly GerberPoint[]): GerberPoint[] {
   const upper: GerberPoint[] = [];
   for (let index = unique.length - 1; index >= 0; index -= 1) {
     const point = unique[index] as GerberPoint;
-    while (upper.length >= 2 && cross(upper[upper.length - 2] as GerberPoint, upper[upper.length - 1] as GerberPoint, point) <= 0) {
+    while (
+      upper.length >= 2 &&
+      cross(upper[upper.length - 2] as GerberPoint, upper[upper.length - 1] as GerberPoint, point) <= 0
+    ) {
       upper.pop();
     }
     upper.push(point);

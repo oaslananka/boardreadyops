@@ -206,12 +206,7 @@ describe("manufacturing.board-edge-clearance", () => {
     const result = await run(
       {
         "fab/outline.gko": squareOutline,
-        "fab/mystery.gbr": traceGerber(
-          { x: 0.05, y: 1 },
-          { x: 0.05, y: 9 },
-          0.2,
-          { fileFunction: "Soldermask,Top" },
-        ),
+        "fab/mystery.gbr": traceGerber({ x: 0.05, y: 1 }, { x: 0.05, y: 9 }, 0.2, { fileFunction: "Soldermask,Top" }),
       },
       configuredLimit(),
     );
@@ -276,12 +271,7 @@ fail-on: never
     const result = await run(
       {
         "fab/outline.gko": squareOutline,
-        "fab/top.gtl": traceGerber(
-          { x: 0.25, y: 1 },
-          { x: 0.25, y: 9 },
-          0.2,
-          { transform: "%LR90*%" },
-        ),
+        "fab/top.gtl": traceGerber({ x: 0.25, y: 1 }, { x: 0.25, y: 9 }, 0.2, { transform: "%LR90*%" }),
       },
       configuredLimit(),
     );
