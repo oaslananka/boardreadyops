@@ -51,7 +51,9 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("30 days after BoardReadyOps processes the uninstall");
     expect(lifecycle).toContain("marks any still-active uninstall request `canceled`");
     expect(lifecycle).toContain("metadata refresh events do not cancel it");
-    expect(lifecycle).toContain("automatic uninstall export");
+    expect(lifecycle).toContain("creates at most one active `github_app_uninstall` export request");
+    expect(lifecycle).toContain("Export request intake is automatic");
+    expect(lifecycle).toContain("intentionally not blocked by legal hold");
     expect(lifecycle).toContain(
       "complete erasure execution across relational data and managed objects is not automated",
     );
