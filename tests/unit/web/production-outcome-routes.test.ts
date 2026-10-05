@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedApiContext, RepositoryApiContext } from "../../../apps/web/lib/api-auth.js";
 import {
@@ -19,6 +20,17 @@ const csv = [
   "LOT-7,Acme EMS,2026-10-01,100,97.25%,2,1,aoi,BRIDGE,3,First production lot,Adjust stencil",
   "LOT-7,Acme EMS,2026-10-01,100,97.25%,2,1,functional_test,NO_BOOT,1,First production lot,Adjust stencil",
 ].join("\n");
+
+const jsonBatch = JSON.stringify({
+  externalBatchId: "LOT-JSON-7",
+  manufacturer: "Acme EMS",
+  manufacturedOn: "2026-10-03",
+  quantity: 80,
+  firstPassYieldBps: 9875,
+  reworkCount: 1,
+  scrapCount: 0,
+  defects: [{ category: "aoi", code: "BRIDGE", count: 2 }],
+});
 
 type HarnessOptions = {
   authResult?: Awaited<ReturnType<ProductionOutcomeImportDependencies["authenticate"]>>;
@@ -78,17 +90,76 @@ describe("production outcome CSV import route", () => {
     expect(h.resolveRepository).not.toHaveBeenCalled();
   });
 
-  it("rejects non-CSV media types before opening repository scope", async () => {
+  it("rejects unsupported media types before opening repository scope", async () => {
     const h = harness();
 
     const response = await handleProductionOutcomeCsvImport(
-      request("{}", { contentType: "application/json" }),
+      request("{}", { contentType: "application/xml" }),
       "run-1",
       h.dependencies,
     );
 
     expect(response.status).toBe(415);
     expect(h.resolveRepository).not.toHaveBeenCalled();
+  });
+
+  it("imports one JSON API batch with exact-body provenance", async () => {
+    const h = harness();
+    const req = request(jsonBatch, {
+      contentType: "application/json; charset=utf-8",
+      url: "https://boardreadyops.test/api/v1/runs/run-1/production-outcomes?repositoryId=repo-1&sourceName=partner-api",
+    });
+
+    const response = await handleProductionOutcomeCsvImport(req, "run-1", h.dependencies);
+
+    expect(response.status).toBe(201);
+    expect(h.importBatch).toHaveBeenCalledWith({
+      installationId: "inst-1",
+      releaseRunId: "run-1",
+      sourceKind: "api",
+      sourceName: "partner-api",
+      sourceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      batch: {
+        externalBatchId: "LOT-JSON-7",
+        manufacturer: "Acme EMS",
+        manufacturedOn: "2026-10-03",
+        quantity: 80,
+        firstPassYieldBps: 9875,
+        reworkCount: 1,
+        scrapCount: 0,
+        defects: [{ category: "aoi", code: "BRIDGE", count: 2 }],
+      },
+    });
+    const expectedDigest = createHash("sha256").update(jsonBatch, "utf8").digest("hex");
+    await expect(response.json()).resolves.toMatchObject({ sourceSha256: expectedDigest, releaseRunId: "run-1" });
+    expect(h.close).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed on malformed or unsupported JSON fields", async () => {
+    for (const body of [
+      "{",
+      JSON.stringify({
+        externalBatchId: "LOT-1",
+        manufacturer: "Acme",
+        manufacturedOn: "2026-10-03",
+        quantity: 1,
+        internalTrace: "do-not-store",
+      }),
+    ]) {
+      const h = harness();
+      const response = await handleProductionOutcomeCsvImport(
+        request(body, { contentType: "application/json" }),
+        "run-1",
+        h.dependencies,
+      );
+
+      expect(response.status).toBe(400);
+      const payload = JSON.stringify(await response.json());
+      expect(payload).toContain("Production outcome JSON");
+      expect(payload).not.toContain("do-not-store");
+      expect(h.importBatch).not.toHaveBeenCalled();
+      expect(h.close).toHaveBeenCalledOnce();
+    }
   });
 
   it("honors the central repository authorization boundary", async () => {

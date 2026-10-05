@@ -128,14 +128,14 @@ function firstPassYieldBps(value: string | undefined): number | undefined {
   return Math.round(numeric * 10_000);
 }
 
-function manufacturedOn(value: string | undefined): string {
-  const normalized = requiredText(value, "manufactured_on", 10);
+function manufacturedOn(value: string | undefined, field = "manufactured_on"): string {
+  const normalized = requiredText(value, field, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(normalized)) {
-    throw new Error("manufactured_on must use YYYY-MM-DD");
+    throw new Error(`${field} must use YYYY-MM-DD`);
   }
   const parsed = new Date(`${normalized}T00:00:00.000Z`);
   if (Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== normalized) {
-    throw new Error("manufactured_on must be a real calendar date");
+    throw new Error(`${field} must be a real calendar date`);
   }
   return normalized;
 }
@@ -274,7 +274,9 @@ function rejectUnknownJsonFields(
   allowed: ReadonlySet<string>,
   label: string,
 ): void {
-  const unknown = Object.keys(record).filter((key) => !allowed.has(key)).sort()[0];
+  const unknown = Object.keys(record)
+    .filter((key) => !allowed.has(key))
+    .sort()[0];
   if (unknown) throw new Error(`Production outcome JSON ${label} contains unsupported field "${unknown}"`);
 }
 
@@ -327,9 +329,7 @@ function parseJsonDefect(value: unknown, index: number): ProductionBatchDefect {
 
   const rawCategory = jsonString(record.category, `${label}.category`, 32, { required: true });
   if (!rawCategory || !defectCategories.has(rawCategory as ProductionDefectCategory)) {
-    throw new Error(
-      `Production outcome JSON ${label}.category must be one of aoi, spi, functional_test, ncr, or rma`,
-    );
+    throw new Error(`Production outcome JSON ${label}.category must be one of aoi, spi, functional_test, ncr, or rma`);
   }
   const code = jsonString(record.code, `${label}.code`, 128, { required: true });
   const count = jsonInteger(record.count, `${label}.count`, { required: true, minimum: 1 });

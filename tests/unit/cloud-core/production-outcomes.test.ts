@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { parseProductionOutcomeCsv } from "../../../packages/cloud-core/src/production-outcomes.js";
+import {
+  parseProductionOutcomeCsv,
+  parseProductionOutcomeJson,
+} from "../../../packages/cloud-core/src/production-outcomes.js";
 
 describe("production outcome CSV", () => {
   it("normalizes realistic batch rows, yield values, defects, and provenance", () => {
@@ -143,5 +146,122 @@ describe("production outcome CSV", () => {
     ).toThrow("unterminated quoted field");
     const oversized = "x".repeat(2 * 1024 * 1024 + 1);
     expect(() => parseProductionOutcomeCsv(oversized)).toThrow("exceeds the 2 MiB import limit");
+  });
+});
+
+describe("production outcome JSON", () => {
+  it("normalizes one API batch and hashes the exact request body", () => {
+    const body = JSON.stringify({
+      externalBatchId: "LOT-JSON-1",
+      manufacturer: "Acme EMS",
+      manufacturedOn: "2026-10-03",
+      quantity: 250,
+      firstPassYieldBps: 9825,
+      reworkCount: 3,
+      scrapCount: 1,
+      notes: "Pilot batch",
+      correctiveAction: "Tune paste volume",
+      defects: [
+        { category: "spi", code: "PASTE_LOW", count: 2, notes: "QFN area" },
+        { category: "functional_test", code: "NO_BOOT", count: 1 },
+      ],
+    });
+
+    const parsed = parseProductionOutcomeJson(body);
+
+    expect(parsed.sourceSha256).toBe(createHash("sha256").update(body, "utf8").digest("hex"));
+    expect(parsed.batch).toEqual({
+      externalBatchId: "LOT-JSON-1",
+      manufacturer: "Acme EMS",
+      manufacturedOn: "2026-10-03",
+      quantity: 250,
+      firstPassYieldBps: 9825,
+      reworkCount: 3,
+      scrapCount: 1,
+      notes: "Pilot batch",
+      correctiveAction: "Tune paste volume",
+      defects: [
+        { category: "spi", code: "PASTE_LOW", count: 2, notes: "QFN area" },
+        { category: "functional_test", code: "NO_BOOT", count: 1 },
+      ],
+    });
+  });
+
+  it("defaults optional counts and defects without inventing yield data", () => {
+    const parsed = parseProductionOutcomeJson(
+      JSON.stringify({
+        externalBatchId: "LOT-JSON-2",
+        manufacturer: "Second Source",
+        manufacturedOn: "2026-10-04",
+        quantity: 10,
+      }),
+    );
+
+    expect(parsed.batch).toEqual({
+      externalBatchId: "LOT-JSON-2",
+      manufacturer: "Second Source",
+      manufacturedOn: "2026-10-04",
+      quantity: 10,
+      reworkCount: 0,
+      scrapCount: 0,
+      defects: [],
+    });
+  });
+
+  it.each([
+    ["malformed JSON", "{", "Production outcome JSON is malformed"],
+    [
+      "unknown batch field",
+      JSON.stringify({
+        externalBatchId: "B-1",
+        manufacturer: "CM",
+        manufacturedOn: "2026-10-04",
+        quantity: 1,
+        privateCustomerField: "secret",
+      }),
+      'unsupported field "privateCustomerField"',
+    ],
+    [
+      "invalid date",
+      JSON.stringify({ externalBatchId: "B-1", manufacturer: "CM", manufacturedOn: "2026-02-30", quantity: 1 }),
+      "manufacturedOn must be a real calendar date",
+    ],
+    [
+      "unsafe integer",
+      JSON.stringify({
+        externalBatchId: "B-1",
+        manufacturer: "CM",
+        manufacturedOn: "2026-10-04",
+        quantity: Number.MAX_SAFE_INTEGER + 1,
+      }),
+      "quantity must be a safe integer",
+    ],
+    [
+      "yield above 100 percent",
+      JSON.stringify({
+        externalBatchId: "B-1",
+        manufacturer: "CM",
+        manufacturedOn: "2026-10-04",
+        quantity: 1,
+        firstPassYieldBps: 10001,
+      }),
+      "firstPassYieldBps must be at most 10000",
+    ],
+    [
+      "duplicate defect identity",
+      JSON.stringify({
+        externalBatchId: "B-1",
+        manufacturer: "CM",
+        manufacturedOn: "2026-10-04",
+        quantity: 1,
+        defects: [
+          { category: "aoi", code: "BRIDGE", count: 1 },
+          { category: "aoi", code: "BRIDGE", count: 2 },
+        ],
+      }),
+      "duplicates defect aoi:BRIDGE",
+    ],
+  ])("rejects %s", (_label, body, message) => {
+    expect(() => parseProductionOutcomeJson(body)).toThrow(message);
   });
 });

@@ -1,7 +1,7 @@
 import {
+  type ProductionBatchInput,
   parseProductionOutcomeCsv,
   parseProductionOutcomeJson,
-  type ProductionBatchInput,
 } from "@boardreadyops/cloud-core/production-outcomes";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import {
@@ -92,7 +92,8 @@ function validationMessage(error: unknown, format: "csv" | "json"): string {
   if (
     format === "csv" &&
     !error.message.startsWith("Production outcome CSV") &&
-    !error.message.startsWith("CSV row")
+    !error.message.startsWith("CSV row") &&
+    !error.message.startsWith("CSV import currently")
   ) {
     return fallback;
   }
@@ -134,7 +135,7 @@ function parseImportBody(contentType: string, body: Buffer): ParsedImport {
  * batch so defects can remain row-oriented; JSON accepts one canonical batch object. Keeping the
  * write atomic avoids partially imported documents when immutable evidence conflicts.
  */
-export async function handleProductionOutcomeCsvImport(
+export async function handleProductionOutcomeImport(
   request: Request,
   releaseRunId: string,
   dependencies: ProductionOutcomeImportDependencies = defaultDependencies,
@@ -148,10 +149,7 @@ export async function handleProductionOutcomeCsvImport(
 
   const contentType = mediaType(request);
   if (contentType !== "text/csv" && contentType !== "application/json") {
-    return Response.json(
-      { ok: false, error: "Content-Type must be text/csv or application/json" },
-      { status: 415 },
-    );
+    return Response.json({ ok: false, error: "Content-Type must be text/csv or application/json" }, { status: 415 });
   }
 
   const selectedSourceName = sourceName(request);
@@ -177,10 +175,7 @@ export async function handleProductionOutcomeCsvImport(
           { status: 413 },
         );
       }
-      return Response.json(
-        { ok: false, error: `Production outcome ${format} could not be read` },
-        { status: 400 },
-      );
+      return Response.json({ ok: false, error: `Production outcome ${format} could not be read` }, { status: 400 });
     }
 
     const format = contentType === "application/json" ? "json" : "csv";
@@ -221,3 +216,6 @@ export async function handleProductionOutcomeCsvImport(
     await scope.executor.close();
   }
 }
+
+// Backward-compatible export retained for callers/tests that imported the CSV-specific name.
+export const handleProductionOutcomeCsvImport = handleProductionOutcomeImport;
