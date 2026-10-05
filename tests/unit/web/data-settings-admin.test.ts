@@ -12,7 +12,7 @@ import {
 } from "../../../apps/web/lib/data-settings-admin.js";
 import type { UserSession } from "../../../apps/web/lib/user-session.js";
 
-const session = { login: "octocat", installationIds: [11] } as unknown as UserSession;
+const session = { userId: 42, login: "octocat", installationIds: [11] } as unknown as UserSession;
 const business = { id: "inst-a", githubInstallationId: 11, accountLogin: "acme", planTier: "business" } as const;
 const team = { ...business, planTier: "team" } as const;
 
@@ -117,6 +117,9 @@ describe("data settings admin", () => {
     expect(result.status).toBe("ok");
     expect(store.upsertRetentionPolicy).toHaveBeenCalledWith({
       tenantId: "acme",
+      installationId: "inst-a",
+      actorId: "42",
+      actorLogin: "octocat",
       tier: "business",
       retentionDays: 730,
       sourceRetentionHours: 24,
@@ -144,6 +147,8 @@ describe("data settings admin", () => {
       installationId: "inst-a",
       repositoryId: "repo-1",
       retentionDays: 90,
+      actorId: "42",
+      actorLogin: "octocat",
     });
 
     const inherited = await saveRepositoryRetentionPolicyForViewer(
@@ -159,6 +164,8 @@ describe("data settings admin", () => {
     expect(store.clearRepositoryRetentionPolicy).toHaveBeenCalledWith({
       installationId: "inst-a",
       repositoryId: "repo-1",
+      actorId: "42",
+      actorLogin: "octocat",
     });
   });
 
