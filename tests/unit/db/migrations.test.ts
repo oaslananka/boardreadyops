@@ -136,6 +136,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0083_github_app_uninstall_erasure.sql",
       "0084_repository_retention_policies.sql",
       "0085_review_policy_audit_events.sql",
+      "0086_github_app_uninstall_export.sql",
     ]);
   });
 
@@ -153,6 +154,16 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("review_policy_audit_events is append-only");
     expect(sql).toContain("review_policy_audit_events_tenant_created_idx");
     expect(sql).toContain("review_policy_audit_events_policy_created_idx");
+  });
+
+  it("deduplicates active GitHub App uninstall export requests in schema v86", async () => {
+    const sql = (await readFile(join(migrationsDir, "0086_github_app_uninstall_export.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("create unique index if not exists uq_data_exports_active_github_app_uninstall");
+    expect(sql).toContain("on data_exports(tenant_id, scope)");
+    expect(sql).toContain("requested_by = 'github_app_uninstall'");
+    expect(sql).toContain("scope in ('organization', 'user')");
+    expect(sql).toContain("status in ('pending', 'running')");
   });
 
   it("deduplicates active GitHub App uninstall erasure requests in schema v83", async () => {
