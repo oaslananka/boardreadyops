@@ -145,10 +145,7 @@ async function readParsedImport(request: Request, contentType: string): Promise<
         { status: 413 },
       );
     }
-    return Response.json(
-      { ok: false, error: `Production outcome ${label} could not be read` },
-      { status: 400 },
-    );
+    return Response.json({ ok: false, error: `Production outcome ${label} could not be read` }, { status: 400 });
   }
 
   try {

@@ -208,6 +208,23 @@ describe("production outcome JSON", () => {
     });
   });
 
+  it("normalizes JSON defect categories the same way as CSV", () => {
+    const parsed = parseProductionOutcomeJson(
+      JSON.stringify({
+        externalBatchId: "LOT-CATEGORY",
+        manufacturer: "Acme EMS",
+        manufacturedOn: "2026-10-04",
+        quantity: 5,
+        defects: [
+          { category: "AOI", code: "BRIDGE", count: 1 },
+          { category: "functional-test", code: "NO_BOOT", count: 1 },
+        ],
+      }),
+    );
+
+    expect(parsed.batch.defects.map((defect) => defect.category)).toEqual(["aoi", "functional_test"]);
+  });
+
   it.each([
     ["malformed JSON", "{", "Production outcome JSON is malformed"],
     [
@@ -235,6 +252,16 @@ describe("production outcome JSON", () => {
         quantity: Number.MAX_SAFE_INTEGER + 1,
       }),
       "quantity must be a safe integer",
+    ],
+    [
+      "wrong numeric type",
+      JSON.stringify({
+        externalBatchId: "B-1",
+        manufacturer: "CM",
+        manufacturedOn: "2026-10-04",
+        quantity: "1",
+      }),
+      "quantity must be a number",
     ],
     [
       "yield above 100 percent",

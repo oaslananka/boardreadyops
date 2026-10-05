@@ -135,6 +135,30 @@ describe("production outcome CSV import route", () => {
     expect(h.close).toHaveBeenCalledOnce();
   });
 
+  it("returns a bounded specific JSON date validation error", async () => {
+    const h = harness();
+    const body = JSON.stringify({
+      externalBatchId: "LOT-BAD-DATE",
+      manufacturer: "Acme",
+      manufacturedOn: "2026-02-30",
+      quantity: 1,
+    });
+
+    const response = await handleProductionOutcomeImport(
+      request(body, { contentType: "application/json" }),
+      "run-1",
+      h.dependencies,
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "Production outcome JSON manufacturedOn must be a real calendar date",
+    });
+    expect(h.importBatch).not.toHaveBeenCalled();
+    expect(h.close).toHaveBeenCalledOnce();
+  });
+
   it("fails closed on malformed or unsupported JSON fields", async () => {
     for (const body of [
       "{",
