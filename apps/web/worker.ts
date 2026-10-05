@@ -788,7 +788,11 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
       retentionMaintenance.purgeCompletedControlPlaneReconciliationItems({
         retentionDays: retention.controlPlaneHistoryDays,
       }),
-    previewExpiredArtifactRetention: () => retentionMaintenance.previewExpiredArtifactRetention(),
+    expireArtifactRetention: () =>
+      retentionMaintenance.expireArtifactRetention({
+        storageDriver: artifactStorageDriver,
+        limit: retentionCleanupBatchSize,
+      }),
   });
   for (const failure of result.failures) {
     log("warn", "worker.retention_cleanup_failed", failure);
@@ -804,7 +808,9 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
     result.terminalRepositorySetupProbesPurged > 0 ||
     result.completedControlPlaneOutboxPurged > 0 ||
     result.completedControlPlaneReconciliationItemsPurged > 0 ||
-    result.artifactExpiryCandidatesPreviewed > 0
+    result.artifactRetentionRevoked > 0 ||
+    result.artifactDeletionJobsQueued > 0 ||
+    result.artifactSharedObjectsRetained > 0
   ) {
     log("info", "worker.retention_cleanup", {
       webhookInboxPurged: result.webhookInboxPurged,
@@ -817,7 +823,9 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
       terminalRepositorySetupProbesPurged: result.terminalRepositorySetupProbesPurged,
       completedControlPlaneOutboxPurged: result.completedControlPlaneOutboxPurged,
       completedControlPlaneReconciliationItemsPurged: result.completedControlPlaneReconciliationItemsPurged,
-      artifactExpiryCandidatesPreviewed: result.artifactExpiryCandidatesPreviewed,
+      artifactRetentionRevoked: result.artifactRetentionRevoked,
+      artifactDeletionJobsQueued: result.artifactDeletionJobsQueued,
+      artifactSharedObjectsRetained: result.artifactSharedObjectsRetained,
     });
   }
   if (result.completed) lastSuccessfulRetentionCleanupAt = new Date().toISOString();

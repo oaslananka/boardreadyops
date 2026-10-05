@@ -9,7 +9,7 @@ type RetentionCleanupScope =
   | "completed_control_plane_outbox"
   | "completed_control_plane_reconciliation_items"
   | "webhook_inbox"
-  | "artifact_retention_preview";
+  | "artifact_retention";
 
 type RetentionCleanupFailure = {
   scope: RetentionCleanupScope;
@@ -27,7 +27,9 @@ export type RetentionCleanupResult = {
   terminalRepositorySetupProbesPurged: number;
   completedControlPlaneOutboxPurged: number;
   completedControlPlaneReconciliationItemsPurged: number;
-  artifactExpiryCandidatesPreviewed: number;
+  artifactRetentionRevoked: number;
+  artifactDeletionJobsQueued: number;
+  artifactSharedObjectsRetained: number;
   failures: RetentionCleanupFailure[];
   completed: boolean;
 };
@@ -43,7 +45,11 @@ export type RetentionMaintenanceDependencies = {
   purgeTerminalRepositorySetupProbes(): Promise<number>;
   purgeCompletedControlPlaneOutbox(): Promise<number>;
   purgeCompletedControlPlaneReconciliationItems(): Promise<number>;
-  previewExpiredArtifactRetention(): Promise<number>;
+  expireArtifactRetention(): Promise<{
+    revokedArtifacts: number;
+    deletionJobsQueued: number;
+    sharedObjectsRetained: number;
+  }>;
 };
 
 function errorClass(error: unknown): string {
@@ -64,7 +70,7 @@ export async function runRetentionMaintenanceCleanup(
     terminalRepositorySetupProbes,
     completedControlPlaneOutbox,
     completedControlPlaneReconciliationItems,
-    artifactRetentionPreview,
+    artifactRetention,
   ] = await Promise.allSettled([
     dependencies.purgeWebhookInbox(),
     dependencies.purgeRunnerRequestNonces(),
@@ -76,7 +82,7 @@ export async function runRetentionMaintenanceCleanup(
     dependencies.purgeTerminalRepositorySetupProbes(),
     dependencies.purgeCompletedControlPlaneOutbox(),
     dependencies.purgeCompletedControlPlaneReconciliationItems(),
-    dependencies.previewExpiredArtifactRetention(),
+    dependencies.expireArtifactRetention(),
   ]);
   const failures: RetentionCleanupFailure[] = [];
   const results = [
@@ -90,7 +96,7 @@ export async function runRetentionMaintenanceCleanup(
     ["terminal_repository_setup_probes", terminalRepositorySetupProbes],
     ["completed_control_plane_outbox", completedControlPlaneOutbox],
     ["completed_control_plane_reconciliation_items", completedControlPlaneReconciliationItems],
-    ["artifact_retention_preview", artifactRetentionPreview],
+    ["artifact_retention", artifactRetention],
   ] as const;
   for (const [scope, result] of results) {
     if (result.status === "rejected") failures.push({ scope, errorClass: errorClass(result.reason) });
@@ -115,8 +121,11 @@ export async function runRetentionMaintenanceCleanup(
       completedControlPlaneReconciliationItems.status === "fulfilled"
         ? completedControlPlaneReconciliationItems.value
         : 0,
-    artifactExpiryCandidatesPreviewed:
-      artifactRetentionPreview.status === "fulfilled" ? artifactRetentionPreview.value : 0,
+    artifactRetentionRevoked: artifactRetention.status === "fulfilled" ? artifactRetention.value.revokedArtifacts : 0,
+    artifactDeletionJobsQueued:
+      artifactRetention.status === "fulfilled" ? artifactRetention.value.deletionJobsQueued : 0,
+    artifactSharedObjectsRetained:
+      artifactRetention.status === "fulfilled" ? artifactRetention.value.sharedObjectsRetained : 0,
     failures,
     completed: failures.length === 0,
   };

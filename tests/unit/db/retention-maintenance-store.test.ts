@@ -119,11 +119,15 @@ describe("retention maintenance store", () => {
     );
   });
 
-  it("previews age-expired artifacts without mutating data and blocks tenants under legal hold", async () => {
-    const query = vi.fn().mockResolvedValue({ rows: [{ affected: "7" }] });
+  it("revokes expired artifact metadata and queues physical deletion without crossing legal holds", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ revoked: "7", queued: 5, shared: 2 }] });
     const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now, defaultBatchSize: 80 });
 
-    await expect(store.previewExpiredArtifactRetention({ limit: 120 })).resolves.toBe(7);
+    await expect(store.expireArtifactRetention({ storageDriver: "LOCAL", limit: 120 })).resolves.toEqual({
+      revokedArtifacts: 7,
+      deletionJobsQueued: 5,
+      sharedObjectsRetained: 2,
+    });
     const [sql, params] = query.mock.calls[0] ?? [];
     expect(sql).toContain("from artifacts");
     expect(sql).toContain("join release_runs");
@@ -137,10 +141,30 @@ describe("retention maintenance store", () => {
     expect(sql).toContain("when installations.plan_tier = 'free' then 30");
     expect(sql).toContain("when installations.plan_tier = 'team' then 365");
     expect(sql).toContain("when retention_policies.retention_days is not null then retention_policies.retention_days");
-    expect(sql).toContain("retention_policies.retention_days");
-    expect(sql).not.toContain("order by artifacts.uploaded_at");
-    expect(sql).not.toMatch(/\bdelete\b|\binsert\b|\bupdate\b/iu);
-    expect(params).toEqual([now.toISOString(), 120]);
+    expect(sql).toContain("candidate_path_pool as materialized");
+    expect(sql).toContain("pg_try_advisory_xact_lock");
+    expect(sql).toContain("hashtextextended(jsonb_build_array($3::text, candidate_path_pool.storage_path)::text, 0)");
+    expect(sql).toContain("path_artifacts as materialized");
+    expect(sql).toContain("for update of artifacts");
+    expect(sql).toContain("from path_artifacts as retained_artifact");
+    expect(sql).not.toContain("for update of artifacts skip locked");
+    expect(sql).toContain("insert into artifact_deletion_jobs");
+    expect(sql).toContain("'retention_expired'");
+    expect(sql).toContain("storage_path_still_referenced");
+    expect(sql).toContain("delete from artifacts");
+    expect(sql).toContain("'artifact.record.deleted'");
+    expect(sql).toContain("'artifact.object.deletion_skipped'");
+    expect(params).toEqual([now.toISOString(), 120, "local"]);
+  });
+
+  it("rejects malformed artifact storage driver identifiers before querying", async () => {
+    const query = vi.fn();
+    const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
+
+    await expect(store.expireArtifactRetention({ storageDriver: "../private" })).rejects.toThrow(
+      "storageDriver must be a valid storage driver identifier",
+    );
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("rejects invalid terminal retention periods before querying", async () => {

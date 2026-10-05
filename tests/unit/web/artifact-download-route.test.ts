@@ -312,7 +312,7 @@ describe("signed artifact download route", () => {
     expect(response.status).toBe(403);
   });
 
-  it("distinguishes missing metadata, unconfigured metadata, and unsupported storage", async () => {
+  it("revokes stale signed URLs when artifact metadata has been deleted", async () => {
     const root = await temporaryDirectory();
     const request = signedRequest("run-123", "artifact-456");
     const params = { runId: "run-123", artifactId: "artifact-456" };
@@ -322,7 +322,16 @@ describe("signed artifact download route", () => {
       params,
       dependencies(root, async () => ({ state: "not-found" })),
     );
+
     expect(missing.status).toBe(404);
+    expect(missing.headers.get("cache-control")).toBe("private, no-store");
+    await expect(missing.json()).resolves.toEqual({ ok: false, error: "artifact not found" });
+  });
+
+  it("distinguishes unconfigured metadata and unsupported storage", async () => {
+    const root = await temporaryDirectory();
+    const request = signedRequest("run-123", "artifact-456");
+    const params = { runId: "run-123", artifactId: "artifact-456" };
 
     const unconfigured = await handleArtifactDownloadRequest(
       request,
