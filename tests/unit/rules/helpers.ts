@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect } from "vitest";
+import { expect, onTestFinished } from "vitest";
 import type { Finding } from "../../../src/core/findings.js";
 import { runPipeline } from "../../../src/core/pipeline.js";
 import type { RunResult } from "../../../src/core/result.js";
@@ -63,6 +63,9 @@ export async function copyFixture(fixture: string, removeConfig = false): Promis
 
 export async function writeFixture(files: Record<string, string>): Promise<string> {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-rule-"));
+  onTestFinished(async () => {
+    await fs.rm(temp, { recursive: true, force: true });
+  });
   for (const [file, content] of Object.entries(files)) {
     const target = path.join(temp, file);
     await fs.mkdir(path.dirname(target), { recursive: true });

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { runFixture } from "./helpers.js";
+import { runFixture, writeFixture } from "./helpers.js";
 
 const fixtureRoot = path.resolve("tests/fixtures/projects");
 const fixtureNames = ["package-completeness-missing", "package-completeness-pass"] as const;
@@ -58,4 +58,18 @@ describe("rule fixture isolation", () => {
     );
     expect(Object.keys(after["package-completeness-pass"] ?? {})).not.toContain("package-completeness-pass.kicad_prl");
   }, 120_000);
+});
+
+describe.sequential("writeFixture cleanup", () => {
+  let fixturePath = "";
+
+  it("creates the requested temporary fixture", async () => {
+    fixturePath = await writeFixture({ "nested/example.txt": "fixture" });
+
+    await expect(fs.readFile(`${fixturePath}/nested/example.txt`, "utf8")).resolves.toBe("fixture");
+  });
+
+  it("removes the temporary fixture when the owning test finishes", async () => {
+    await expect(fs.access(fixturePath)).rejects.toMatchObject({ code: "ENOENT" });
+  });
 });
