@@ -132,7 +132,19 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0080_component_compliance_trust.sql",
       "0081_board_snapshot_release_mode.sql",
       "0082_production_outcome_batches.sql",
+      "0083_github_app_uninstall_erasure.sql",
     ]);
+  });
+
+  it("deduplicates active GitHub App uninstall erasure requests in schema v83", async () => {
+    const sql = (await readFile(join(migrationsDir, "0083_github_app_uninstall_erasure.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("create unique index if not exists uq_erasure_requests_active_github_app_uninstall");
+    expect(sql).toContain("drop constraint if exists erasure_requests_status_check");
+    expect(sql).toContain("'canceled'");
+    expect(sql).toContain("requested_by = 'github_app_uninstall'");
+    expect(sql).toContain("scope in ('organization', 'user')");
+    expect(sql).toContain("status in ('pending', 'running', 'blocked_by_hold')");
   });
 
   it("stores release-linked production batches and normalized defects in schema v82", async () => {

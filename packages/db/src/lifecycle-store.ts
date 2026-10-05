@@ -254,7 +254,11 @@ export function createSqlGitHubAppMetadataStore(
       const at = iso(now);
       const audit = lifecycleAuditEventForAction(action, context);
       await executor.query(
-        `with persisted as (
+        `with existing_installation as materialized (
+           select account_login as previous_account_login
+             from installations
+            where github_installation_id = $2
+         ), persisted as (
            insert into installations (id, github_installation_id, account_login, account_type, created_at, suspended_at)
            values ($1, $2, $3, $4, $5, null)
            on conflict (github_installation_id)
@@ -276,6 +280,22 @@ export function createSqlGitHubAppMetadataStore(
                then null
                else installations.suspended_at
              end
+           returning id, account_login
+         ), canceled_uninstall_erasure as (
+           update erasure_requests
+              set status = 'canceled',
+                  completed_at = $5::timestamptz
+            where $7::text = 'github_app.installation.enabled'
+              and requested_by = 'github_app_uninstall'
+              and tenant_id in (
+                select persisted.account_login
+                  from persisted
+                union
+                select existing_installation.previous_account_login
+                  from existing_installation
+                 where btrim(existing_installation.previous_account_login) <> ''
+              )
+              and status in ('pending', 'running', 'blocked_by_hold')
            returning id
          ), audited as (
            insert into audit_events (
@@ -305,12 +325,65 @@ export function createSqlGitHubAppMetadataStore(
       await executor.query(
         `with persisted as (
            update installations
-           set suspended_at = $2
-           where github_installation_id = $1
-             and (
-               $3::text is null
-               or not exists (select 1 from audit_events where id = $3::text)
-             )
+              set suspended_at = $2
+            where github_installation_id = $1
+              and (
+                $3::text is null
+                or not exists (select 1 from audit_events where id = $3::text)
+              )
+           returning id, account_login, account_type
+         ), erasure_scope as (
+           select persisted.id,
+                  persisted.account_login as tenant_id,
+                  case
+                    when lower(persisted.account_type) = 'user' then 'user'
+                    when lower(persisted.account_type) = 'organization' then 'organization'
+                  end as scope,
+                  case when lower(persisted.account_type) = 'user' then persisted.account_login else null end as scope_id
+             from persisted
+            where btrim(persisted.account_login) <> ''
+              and lower(persisted.account_type) in ('organization', 'user')
+         ), matching_hold as (
+           select legal_holds.id
+             from legal_holds
+             join erasure_scope on erasure_scope.tenant_id = legal_holds.tenant_id
+            where legal_holds.active = true
+              and (
+                legal_holds.scope = 'organization'
+                or (
+                  legal_holds.scope = erasure_scope.scope
+                  and (legal_holds.scope_id = erasure_scope.scope_id or legal_holds.scope_id is null)
+                )
+              )
+            order by legal_holds.created_at desc, legal_holds.id desc
+            limit 1
+         ), queued_erasure as (
+           insert into erasure_requests (
+             id, tenant_id, requested_by, scope, scope_id, status, dry_run,
+             legal_hold_id, created_at, due_at
+           )
+           select gen_random_uuid()::text,
+                  erasure_scope.tenant_id,
+                  'github_app_uninstall',
+                  erasure_scope.scope,
+                  erasure_scope.scope_id,
+                  case when exists (select 1 from matching_hold) then 'blocked_by_hold' else 'pending' end,
+                  false,
+                  (select id from matching_hold),
+                  $2::timestamptz,
+                  $2::timestamptz + interval '30 days'
+             from erasure_scope
+           on conflict do nothing
+           returning id
+         ), revoked_tokens as (
+           update api_tokens
+              set revoked_at = $2::timestamptz
+            where revoked_at is null
+              and repository_id in (
+                select repositories.id
+                  from repositories
+                  join persisted on persisted.id = repositories.installation_id
+              )
            returning id
          ), audited as (
            insert into audit_events (
