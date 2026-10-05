@@ -123,6 +123,41 @@ function parseImportBody(contentType: string, body: Buffer): ParsedImport {
   return { batch, sourceKind: "csv", sourceSha256: parsed.sourceSha256 };
 }
 
+function importFormat(contentType: string): "csv" | "json" {
+  return contentType === "application/json" ? "json" : "csv";
+}
+
+function formatLabel(format: "csv" | "json"): "CSV" | "JSON" {
+  return format === "json" ? "JSON" : "CSV";
+}
+
+async function readParsedImport(request: Request, contentType: string): Promise<ParsedImport | Response> {
+  const format = importFormat(contentType);
+  const label = formatLabel(format);
+
+  let body: Buffer;
+  try {
+    body = await readBoundedRequestBody(request, maximumImportBytes);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return Response.json(
+        { ok: false, error: `Production outcome ${label} exceeds the 2 MiB import limit` },
+        { status: 413 },
+      );
+    }
+    return Response.json(
+      { ok: false, error: `Production outcome ${label} could not be read` },
+      { status: 400 },
+    );
+  }
+
+  try {
+    return parseImportBody(contentType, body);
+  } catch (error) {
+    return Response.json({ ok: false, error: validationMessage(error, format) }, { status: 400 });
+  }
+}
+
 /**
  * Imports one manufacturing batch from CSV or JSON and binds it to the exact release run in the
  * route.
@@ -164,27 +199,8 @@ export async function handleProductionOutcomeImport(
       return Response.json({ ok: false, error: "Release run is unavailable for this repository" }, { status: 404 });
     }
 
-    let body: Buffer;
-    try {
-      body = await readBoundedRequestBody(request, maximumImportBytes);
-    } catch (error) {
-      const format = contentType === "application/json" ? "JSON" : "CSV";
-      if (error instanceof RequestBodyTooLargeError) {
-        return Response.json(
-          { ok: false, error: `Production outcome ${format} exceeds the 2 MiB import limit` },
-          { status: 413 },
-        );
-      }
-      return Response.json({ ok: false, error: `Production outcome ${format} could not be read` }, { status: 400 });
-    }
-
-    const format = contentType === "application/json" ? "json" : "csv";
-    let parsed: ParsedImport;
-    try {
-      parsed = parseImportBody(contentType, body);
-    } catch (error) {
-      return Response.json({ ok: false, error: validationMessage(error, format) }, { status: 400 });
-    }
+    const parsed = await readParsedImport(request, contentType);
+    if (parsed instanceof Response) return parsed;
 
     try {
       const imported = await dependencies.createStore(scope.executor).importBatch({
