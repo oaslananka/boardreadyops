@@ -59,6 +59,7 @@ function lowestResolved(value: string): string {
 type RenovateRule = {
   description?: string;
   matchManagers?: string[];
+  matchDatasources?: string[];
   matchDepTypes?: string[];
   matchUpdateTypes?: string[];
   matchFileNames?: string[];
@@ -69,6 +70,7 @@ type RenovateRule = {
   automerge?: boolean;
   dependencyDashboardApproval?: boolean;
   minimumReleaseAge?: string | false;
+  prPriority?: number;
 };
 
 describe("dependency and security automation configuration", () => {
@@ -166,17 +168,21 @@ describe("dependency and security automation configuration", () => {
     expect(webPackageJson.dependencies?.["@octokit/auth-app"]).not.toBe("latest");
     expect(renovate.extends).toEqual(
       expect.arrayContaining([
-        "github>oaslananka/.github:renovate-config",
+        "config:best-practices",
+        ":dependencyDashboard",
+        ":semanticCommits",
         "security:openssf-scorecard",
         ":separatePatchReleases",
       ]),
     );
-    expect(renovate.extends).not.toEqual(expect.arrayContaining(["config:best-practices"]));
-    expect(renovate.prHourlyLimit).toBeUndefined();
-    expect(renovate.prConcurrentLimit).toBeUndefined();
+    expect(renovate.extends).not.toEqual(expect.arrayContaining(["github>oaslananka/.github:renovate-config"]));
+    expect(renovate.timezone).toBe("Europe/Istanbul");
+    expect(renovate.prHourlyLimit).toBe(2);
+    expect(renovate.prConcurrentLimit).toBe(5);
     expect(renovate.branchConcurrentLimit).toBeUndefined();
-    expect(renovate.minimumReleaseAge).toBeUndefined();
-    expect(renovate.internalChecksFilter).toBeUndefined();
+    expect(renovate.minimumReleaseAge).toBe("7 days");
+    expect(renovate.internalChecksFilter).toBe("strict");
+    expect(renovate.pinDigests).toBe(true);
     expect(renovate.prCreation).toBeUndefined();
     expect(renovate.enabledManagers).toEqual(
       expect.arrayContaining(["npm", "github-actions", "dockerfile", "docker-compose", "custom.regex"]),
@@ -219,6 +225,21 @@ describe("dependency and security automation configuration", () => {
 
     const rules = (renovate.packageRules ?? []) as RenovateRule[];
     const byDescription = (description: string) => rules.find((rule) => rule.description === description);
+
+    expect(
+      byDescription(
+        "Enforce the seven-day quarantine for npm even though config:best-practices includes a shorter npm minimum age.",
+      ),
+    ).toMatchObject({
+      matchDatasources: ["npm"],
+      minimumReleaseAge: "7 days",
+    });
+    expect(byDescription("Require explicit Dependency Dashboard approval for major upgrades.")).toMatchObject({
+      dependencyDashboardApproval: true,
+      automerge: false,
+      prPriority: -5,
+      addLabels: expect.arrayContaining(["breaking-change", "manual-review"]),
+    });
 
     expect(
       byDescription(

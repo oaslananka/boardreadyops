@@ -1,6 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>oaslananka/.github:renovate-config", "security:openssf-scorecard", ":separatePatchReleases"],
+  "extends": [
+    "config:best-practices",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    "security:openssf-scorecard",
+    ":separatePatchReleases"
+  ],
   "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose", "custom.regex"],
   "customManagers": [
     {
@@ -31,6 +37,11 @@
     "addLabels": ["lockfile-maintenance"]
   },
   "packageRules": [
+    {
+      "description": "Enforce the seven-day quarantine for npm even though config:best-practices includes a shorter npm minimum age.",
+      "matchDatasources": ["npm"],
+      "minimumReleaseAge": "7 days"
+    },
     {
       "description": "Allow Mergify to auto-merge low-risk development dependency updates after required checks pass.",
       "matchDepTypes": ["devDependencies"],
@@ -77,7 +88,8 @@
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true,
       "automerge": false,
-      "addLabels": ["breaking-change", "manual-review"]
+      "addLabels": ["breaking-change", "manual-review"],
+      "prPriority": -5
     },
     {
       "description": "Allow same-version GitHub Action digest refreshes outside protected workflows after required checks pass.",
@@ -134,5 +146,11 @@
     "automerge": false,
     "vulnerabilityFixStrategy": "lowest"
   },
-  "osvVulnerabilityAlerts": true
+  "osvVulnerabilityAlerts": true,
+  "timezone": "Europe/Istanbul",
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 5,
+  "pinDigests": true
 }
