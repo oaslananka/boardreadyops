@@ -80,6 +80,46 @@ async function createArtifactFixture(input: FixtureInput): Promise<string> {
   }
   return artifactId;
 }
+async function createSharedStorageFixture(): Promise<{ artifactIds: string[]; storagePath: string }> {
+  const installationId = randomUUID();
+  const repositoryId = randomUUID();
+  const tenantId = `${testPrefix}-shared-${randomUUID()}`;
+  const storagePath = `${tenantId}/shared/report.bin`;
+  const artifactIds = [randomUUID(), randomUUID()];
+
+  await database().query(
+    `insert into installations (id, github_installation_id, account_login, account_type, plan_tier)
+     values ($1, $2, $3, 'Organization', 'free')`,
+    [installationId, githubId(), tenantId],
+  );
+  await database().query(
+    `insert into repositories (id, installation_id, github_repo_id, owner, name, default_branch, private)
+     values ($1, $2, $3, $4, $5, 'main', false)`,
+    [repositoryId, installationId, githubId(), tenantId, "shared-fixture"],
+  );
+
+  for (const [index, artifactId] of artifactIds.entries()) {
+    const runId = randomUUID();
+    await database().query(
+      `insert into release_runs (id, repository_id, commit_sha, ref, trigger_kind, status, started_at)
+       values ($1, $2, $3, 'refs/heads/main', 'push', 'completed', $4::timestamptz)`,
+      [runId, repositoryId, `${index + 1}`.repeat(40), "2026-07-01T12:00:00.000Z"],
+    );
+    await database().query(
+      `insert into artifacts (
+         id, run_id, kind, name, storage_path, sha256, bytes, role, uploaded_at, retention_until
+       ) values (
+         $1, $2, 'report', 'shared-report.json', $3, $4, 1, 'report',
+         '2026-07-01T12:00:00.000Z'::timestamptz,
+         '2026-08-29T12:00:00.000Z'::timestamptz
+       )`,
+      [artifactId, runId, storagePath, `${index + 3}`.repeat(64)],
+    );
+  }
+
+  return { artifactIds, storagePath };
+}
+
 beforeEach(cleanup);
 afterAll(async () => {
   await cleanup();
@@ -87,6 +127,40 @@ afterAll(async () => {
 });
 
 describeDatabase("artifact retention expiry", () => {
+  it("serializes shared storage paths across concurrent batches and queues physical deletion exactly once", async () => {
+    const fixture = await createSharedStorageFixture();
+    const workerA = createSqlRetentionMaintenanceStore(database(), { now: () => now, defaultBatchSize: 1 });
+    const workerB = createSqlRetentionMaintenanceStore(database(), { now: () => now, defaultBatchSize: 1 });
+
+    const firstWave = await Promise.all([
+      workerA.expireArtifactRetention({ storageDriver: "local", limit: 1 }),
+      workerB.expireArtifactRetention({ storageDriver: "local", limit: 1 }),
+    ]);
+    expect(firstWave.reduce((total, result) => total + result.revokedArtifacts, 0)).toBeGreaterThanOrEqual(1);
+
+    for (let pass = 0; pass < 3; pass += 1) {
+      const remaining = await database().query(
+        "select count(*)::int as count from artifacts where id = any($1::text[])",
+        [fixture.artifactIds],
+      );
+      const count = Number((remaining as { rows?: { count?: number }[] }).rows?.[0]?.count ?? 0);
+      if (count === 0) break;
+      await workerA.expireArtifactRetention({ storageDriver: "local", limit: 1 });
+    }
+
+    const remaining = await database().query(
+      "select count(*)::int as count from artifacts where id = any($1::text[])",
+      [fixture.artifactIds],
+    );
+    expect(remaining).toMatchObject({ rows: [{ count: 0 }] });
+
+    const deletionJobs = await database().query(
+      "select count(*)::int as count from artifact_deletion_jobs where storage_path = $1",
+      [fixture.storagePath],
+    );
+    expect(deletionJobs).toMatchObject({ rows: [{ count: 1 }] });
+  });
+
   it("prioritizes persisted deadlines, then plan policy, while tenant legal holds suppress both", async () => {
     const artifactIds = await Promise.all([
       createArtifactFixture({ suffix: "free-old", tier: "free", ageDays: 31 }),

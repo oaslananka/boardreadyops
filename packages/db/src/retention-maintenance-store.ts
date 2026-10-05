@@ -73,6 +73,159 @@ function retentionCutoff(at: Date, retentionDays: number): string {
   return new Date(at.getTime() - retentionDays * millisecondsPerDay).toISOString();
 }
 
+const artifactRetentionPlanDaysSql = `case
+  when retention_policies.retention_days is not null then retention_policies.retention_days
+  when installations.plan_tier = 'free' then 30
+  when installations.plan_tier = 'team' then 365
+  else null
+end`;
+
+const artifactRetentionEligibleSql = `(
+  artifacts.retention_until <= $1::timestamptz
+  or (
+    artifacts.retention_until is null
+    and ${artifactRetentionPlanDaysSql} is not null
+    and artifacts.uploaded_at <= $1::timestamptz - make_interval(days => ${artifactRetentionPlanDaysSql})
+  )
+)
+and not exists (
+  select 1
+  from legal_holds
+  where legal_holds.tenant_id = installations.account_login
+    and legal_holds.active = true
+)`;
+
+const artifactRetentionCandidateCtes = `candidate_path_pool as materialized (
+  select artifacts.storage_path,
+         min(coalesce(artifacts.retention_until, artifacts.uploaded_at)) as retention_order
+  from artifacts
+  join release_runs on release_runs.id = artifacts.run_id
+  join repositories on repositories.id = release_runs.repository_id
+  join installations on installations.id = repositories.installation_id
+  left join retention_policies on retention_policies.tenant_id = installations.account_login
+  where ${artifactRetentionEligibleSql}
+  group by artifacts.storage_path
+  order by min(coalesce(artifacts.retention_until, artifacts.uploaded_at)) asc,
+           artifacts.storage_path asc
+  limit $2::integer
+), candidate_paths as materialized (
+  select candidate_path_pool.storage_path
+  from candidate_path_pool
+  where pg_try_advisory_xact_lock(
+    hashtextextended(jsonb_build_array($3::text, candidate_path_pool.storage_path)::text, 0)
+  )
+), path_artifacts as materialized (
+  select artifacts.id, artifacts.run_id, artifacts.kind, artifacts.storage_path,
+         artifacts.sha256, artifacts.bytes, artifacts.role,
+         repositories.id as repository_id, repositories.installation_id,
+         coalesce(artifacts.retention_until, artifacts.uploaded_at) as retention_order,
+         (${artifactRetentionEligibleSql}) as eligible
+  from artifacts
+  join candidate_paths on candidate_paths.storage_path = artifacts.storage_path
+  join release_runs on release_runs.id = artifacts.run_id
+  join repositories on repositories.id = release_runs.repository_id
+  join installations on installations.id = repositories.installation_id
+  left join retention_policies on retention_policies.tenant_id = installations.account_login
+  order by artifacts.storage_path asc, artifacts.id asc
+  for update of artifacts
+), candidate_ids as materialized (
+  select path_artifacts.id
+  from path_artifacts
+  where path_artifacts.eligible
+  order by path_artifacts.retention_order asc, path_artifacts.id asc
+  limit $2::integer
+), captured as materialized (
+  select path_artifacts.id, path_artifacts.run_id, path_artifacts.kind,
+         path_artifacts.storage_path, path_artifacts.sha256, path_artifacts.bytes,
+         path_artifacts.role, path_artifacts.repository_id, path_artifacts.installation_id
+  from path_artifacts
+  join candidate_ids on candidate_ids.id = path_artifacts.id
+)`;
+
+const artifactRetentionDeletionCtes = `object_deletion_candidates as materialized (
+  select distinct on (captured.storage_path) captured.*
+  from captured
+  where not exists (
+    select 1
+    from path_artifacts as retained_artifact
+    where retained_artifact.storage_path = captured.storage_path
+      and not exists (
+        select 1 from candidate_ids where candidate_ids.id = retained_artifact.id
+      )
+  )
+  order by captured.storage_path, captured.id
+), queued_artifact_deletions as (
+  insert into artifact_deletion_jobs (
+    artifact_id, installation_id, repository_id, release_run_id,
+    storage_driver, storage_path, deletion_reason, artifact_kind,
+    artifact_role, artifact_sha256, artifact_bytes, available_at, created_at
+  )
+  select object_deletion_candidates.id, object_deletion_candidates.installation_id,
+         object_deletion_candidates.repository_id, object_deletion_candidates.run_id,
+         $3, object_deletion_candidates.storage_path, 'retention_expired',
+         object_deletion_candidates.kind, object_deletion_candidates.role,
+         object_deletion_candidates.sha256, object_deletion_candidates.bytes,
+         $1::timestamptz, $1::timestamptz
+  from object_deletion_candidates
+  on conflict (artifact_id) do nothing
+  returning artifact_id
+), deleted_artifacts as (
+  delete from artifacts
+  using captured
+  where artifacts.id = captured.id
+  returning artifacts.id
+)`;
+
+const artifactRetentionAuditCtes = `shared_object_audit as (
+  insert into audit_events (
+    installation_id, event_type, actor_type, actor_id, subject_type, subject_id,
+    repository_id, release_run_id, metadata, created_at
+  )
+  select captured.installation_id, 'artifact.object.deletion_skipped', 'system',
+         'retention-maintenance', 'artifact', captured.id, captured.repository_id,
+         captured.run_id,
+         jsonb_build_object(
+           'reason', 'storage_path_still_referenced',
+           'retentionReason', 'retention_expired',
+           'bytes', captured.bytes, 'sha256', captured.sha256,
+           'itemType', captured.kind, 'scope', captured.role
+         ),
+         $1::timestamptz
+  from captured
+  where exists (
+    select 1
+    from path_artifacts as retained_artifact
+    where retained_artifact.storage_path = captured.storage_path
+      and not exists (
+        select 1 from candidate_ids where candidate_ids.id = retained_artifact.id
+      )
+  )
+  returning id
+), artifact_deletion_audit as (
+  insert into audit_events (
+    installation_id, event_type, actor_type, actor_id, subject_type, subject_id,
+    repository_id, release_run_id, metadata, created_at
+  )
+  select captured.installation_id, 'artifact.record.deleted', 'system',
+         'retention-maintenance', 'artifact', captured.id, captured.repository_id,
+         captured.run_id,
+         jsonb_build_object(
+           'reason', 'retention_expired', 'bytes', captured.bytes,
+           'sha256', captured.sha256, 'itemType', captured.kind, 'scope', captured.role
+         ),
+         $1::timestamptz
+  from captured
+  join deleted_artifacts on deleted_artifacts.id = captured.id
+  returning id
+)`;
+
+const artifactRetentionExpirySql = `with ${artifactRetentionCandidateCtes},
+${artifactRetentionDeletionCtes},
+${artifactRetentionAuditCtes}
+select (select count(*)::int from deleted_artifacts) as revoked,
+       (select count(*)::int from queued_artifact_deletions) as queued,
+       (select count(*)::int from shared_object_audit) as shared`;
+
 export function createSqlRetentionMaintenanceStore(
   executor: SqlQueryExecutor,
   options: RetentionMaintenanceStoreOptions = {},
@@ -295,130 +448,7 @@ export function createSqlRetentionMaintenanceStore(
       const at = now().toISOString();
       const limit = boundedLimit(input.limit, defaultBatchSize);
       const storageDriver = normalizedStorageDriver(input.storageDriver);
-      const result = await executor.query(
-        `with candidate_ids as materialized (
-           select artifacts.id
-           from artifacts
-           join release_runs on release_runs.id = artifacts.run_id
-           join repositories on repositories.id = release_runs.repository_id
-           join installations on installations.id = repositories.installation_id
-           left join retention_policies on retention_policies.tenant_id = installations.account_login
-           where (
-             artifacts.retention_until <= $1::timestamptz
-             or (
-               artifacts.retention_until is null
-               and case
-                   when retention_policies.retention_days is not null then retention_policies.retention_days
-                   when installations.plan_tier = 'free' then 30
-                   when installations.plan_tier = 'team' then 365
-                   else null
-                 end is not null
-               and artifacts.uploaded_at <= $1::timestamptz - make_interval(
-                 days => case
-                   when retention_policies.retention_days is not null then retention_policies.retention_days
-                   when installations.plan_tier = 'free' then 30
-                   when installations.plan_tier = 'team' then 365
-                   else null
-                 end
-               )
-             )
-           )
-             and not exists (
-               select 1
-               from legal_holds
-               where legal_holds.tenant_id = installations.account_login
-                 and legal_holds.active = true
-             )
-           order by coalesce(artifacts.retention_until, artifacts.uploaded_at) asc, artifacts.id asc
-           for update of artifacts skip locked
-           limit $2::integer
-         ), captured as materialized (
-           select artifacts.id, artifacts.run_id, artifacts.kind, artifacts.storage_path,
-                  artifacts.sha256, artifacts.bytes, artifacts.role,
-                  repositories.id as repository_id, repositories.installation_id
-           from artifacts
-           join candidate_ids on candidate_ids.id = artifacts.id
-           join release_runs on release_runs.id = artifacts.run_id
-           join repositories on repositories.id = release_runs.repository_id
-         ), object_deletion_candidates as materialized (
-           select distinct on (captured.storage_path) captured.*
-           from captured
-           where not exists (
-             select 1
-             from artifacts as retained_artifact
-             where retained_artifact.storage_path = captured.storage_path
-               and not exists (
-                 select 1 from candidate_ids where candidate_ids.id = retained_artifact.id
-               )
-           )
-           order by captured.storage_path, captured.id
-         ), queued_artifact_deletions as (
-           insert into artifact_deletion_jobs (
-             artifact_id, installation_id, repository_id, release_run_id,
-             storage_driver, storage_path, deletion_reason, artifact_kind,
-             artifact_role, artifact_sha256, artifact_bytes, available_at, created_at
-           )
-           select object_deletion_candidates.id, object_deletion_candidates.installation_id,
-                  object_deletion_candidates.repository_id, object_deletion_candidates.run_id,
-                  $3, object_deletion_candidates.storage_path, 'retention_expired',
-                  object_deletion_candidates.kind, object_deletion_candidates.role,
-                  object_deletion_candidates.sha256, object_deletion_candidates.bytes,
-                  $1::timestamptz, $1::timestamptz
-           from object_deletion_candidates
-           on conflict (artifact_id) do nothing
-           returning artifact_id
-         ), shared_object_audit as (
-           insert into audit_events (
-             installation_id, event_type, actor_type, actor_id, subject_type, subject_id,
-             repository_id, release_run_id, metadata, created_at
-           )
-           select captured.installation_id, 'artifact.object.deletion_skipped', 'system',
-                  'retention-maintenance', 'artifact', captured.id, captured.repository_id,
-                  captured.run_id,
-                  jsonb_build_object(
-                    'reason', 'storage_path_still_referenced',
-                    'retentionReason', 'retention_expired',
-                    'bytes', captured.bytes, 'sha256', captured.sha256,
-                    'itemType', captured.kind, 'scope', captured.role
-                  ),
-                  $1::timestamptz
-           from captured
-           where exists (
-             select 1
-             from artifacts as retained_artifact
-             where retained_artifact.storage_path = captured.storage_path
-               and not exists (
-                 select 1 from candidate_ids where candidate_ids.id = retained_artifact.id
-               )
-           )
-           returning id
-         ), deleted_artifacts as (
-           delete from artifacts
-           using captured
-           where artifacts.id = captured.id
-           returning artifacts.id
-         ), artifact_deletion_audit as (
-           insert into audit_events (
-             installation_id, event_type, actor_type, actor_id, subject_type, subject_id,
-             repository_id, release_run_id, metadata, created_at
-           )
-           select captured.installation_id, 'artifact.record.deleted', 'system',
-                  'retention-maintenance', 'artifact', captured.id, captured.repository_id,
-                  captured.run_id,
-                  jsonb_build_object(
-                    'reason', 'retention_expired', 'bytes', captured.bytes,
-                    'sha256', captured.sha256, 'itemType', captured.kind, 'scope', captured.role
-                  ),
-                  $1::timestamptz
-           from captured
-           join deleted_artifacts on deleted_artifacts.id = captured.id
-           returning id
-         )
-         select (select count(*)::int from deleted_artifacts) as revoked,
-                (select count(*)::int from queued_artifact_deletions) as queued,
-                (select count(*)::int from shared_object_audit) as shared`,
-        [at, limit, storageDriver],
-      );
+      const result = await executor.query(artifactRetentionExpirySql, [at, limit, storageDriver]);
       const row = rows(result)[0];
       return {
         revokedArtifacts: nonNegativeInteger(row?.revoked),

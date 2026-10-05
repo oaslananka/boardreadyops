@@ -141,7 +141,13 @@ describe("retention maintenance store", () => {
     expect(sql).toContain("when installations.plan_tier = 'free' then 30");
     expect(sql).toContain("when installations.plan_tier = 'team' then 365");
     expect(sql).toContain("when retention_policies.retention_days is not null then retention_policies.retention_days");
-    expect(sql).toContain("for update of artifacts skip locked");
+    expect(sql).toContain("candidate_path_pool as materialized");
+    expect(sql).toContain("pg_try_advisory_xact_lock");
+    expect(sql).toContain("hashtextextended(jsonb_build_array($3::text, candidate_path_pool.storage_path)::text, 0)");
+    expect(sql).toContain("path_artifacts as materialized");
+    expect(sql).toContain("for update of artifacts");
+    expect(sql).toContain("from path_artifacts as retained_artifact");
+    expect(sql).not.toContain("for update of artifacts skip locked");
     expect(sql).toContain("insert into artifact_deletion_jobs");
     expect(sql).toContain("'retention_expired'");
     expect(sql).toContain("storage_path_still_referenced");
