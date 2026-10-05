@@ -254,7 +254,11 @@ export function createSqlGitHubAppMetadataStore(
       const at = iso(now);
       const audit = lifecycleAuditEventForAction(action, context);
       await executor.query(
-        `with persisted as (
+        `with existing_installation as materialized (
+           select account_login as previous_account_login
+             from installations
+            where github_installation_id = $2
+         ), persisted as (
            insert into installations (id, github_installation_id, account_login, account_type, created_at, suspended_at)
            values ($1, $2, $3, $4, $5, null)
            on conflict (github_installation_id)
@@ -283,7 +287,14 @@ export function createSqlGitHubAppMetadataStore(
                   completed_at = $5::timestamptz
             where $7::text = 'github_app.installation.enabled'
               and requested_by = 'github_app_uninstall'
-              and tenant_id = (select account_login from persisted)
+              and tenant_id in (
+                select persisted.account_login
+                  from persisted
+                union
+                select existing_installation.previous_account_login
+                  from existing_installation
+                 where btrim(existing_installation.previous_account_login) <> ''
+              )
               and status in ('pending', 'running', 'blocked_by_hold')
            returning id
          ), audited as (
