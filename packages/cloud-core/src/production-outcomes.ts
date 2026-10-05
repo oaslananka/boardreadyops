@@ -28,6 +28,11 @@ export type ParsedProductionOutcomeCsv = {
   batches: readonly ProductionBatchInput[];
 };
 
+export type ParsedProductionOutcomeJson = {
+  sourceSha256: string;
+  batch: ProductionBatchInput;
+};
+
 const maximumCsvBytes = 2 * 1024 * 1024;
 const maximumRows = 10_000;
 const maximumColumns = 64;
@@ -239,5 +244,164 @@ export function parseProductionOutcomeCsv(text: string): ParsedProductionOutcome
   return {
     sourceSha256: createHash("sha256").update(text, "utf8").digest("hex"),
     batches: [...batches.values()],
+  };
+}
+
+const jsonBatchFields = new Set([
+  "externalBatchId",
+  "manufacturer",
+  "manufacturedOn",
+  "quantity",
+  "firstPassYieldBps",
+  "reworkCount",
+  "scrapCount",
+  "notes",
+  "correctiveAction",
+  "defects",
+]);
+
+const jsonDefectFields = new Set(["category", "code", "count", "notes"]);
+
+function jsonRecord(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`Production outcome JSON ${label} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function rejectUnknownJsonFields(
+  record: Readonly<Record<string, unknown>>,
+  allowed: ReadonlySet<string>,
+  label: string,
+): void {
+  const unknown = Object.keys(record).filter((key) => !allowed.has(key)).sort()[0];
+  if (unknown) throw new Error(`Production outcome JSON ${label} contains unsupported field "${unknown}"`);
+}
+
+function jsonString(
+  value: unknown,
+  field: string,
+  maximum: number,
+  options: { required?: boolean } = {},
+): string | undefined {
+  if (value === undefined || value === null) {
+    if (options.required) throw new Error(`Production outcome JSON ${field} is required`);
+    return undefined;
+  }
+  if (typeof value !== "string") throw new Error(`Production outcome JSON ${field} must be a string`);
+  const normalized = value.trim();
+  if (!normalized) {
+    if (options.required) throw new Error(`Production outcome JSON ${field} is required`);
+    return undefined;
+  }
+  if (normalized.length > maximum) {
+    throw new Error(`Production outcome JSON ${field} exceeds ${maximum} characters`);
+  }
+  return normalized;
+}
+
+function jsonInteger(
+  value: unknown,
+  field: string,
+  options: { required?: boolean; minimum?: number; maximum?: number; fallback?: number } = {},
+): number | undefined {
+  if (value === undefined || value === null) {
+    if (options.required) throw new Error(`Production outcome JSON ${field} is required`);
+    return options.fallback;
+  }
+  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+    throw new Error(`Production outcome JSON ${field} must be a safe integer`);
+  }
+  const minimum = options.minimum ?? 0;
+  if (value < minimum) throw new Error(`Production outcome JSON ${field} must be at least ${minimum}`);
+  if (options.maximum !== undefined && value > options.maximum) {
+    throw new Error(`Production outcome JSON ${field} must be at most ${options.maximum}`);
+  }
+  return value;
+}
+
+function parseJsonDefect(value: unknown, index: number): ProductionBatchDefect {
+  const label = `defects[${index}]`;
+  const record = jsonRecord(value, label);
+  rejectUnknownJsonFields(record, jsonDefectFields, label);
+
+  const rawCategory = jsonString(record.category, `${label}.category`, 32, { required: true });
+  if (!rawCategory || !defectCategories.has(rawCategory as ProductionDefectCategory)) {
+    throw new Error(
+      `Production outcome JSON ${label}.category must be one of aoi, spi, functional_test, ncr, or rma`,
+    );
+  }
+  const code = jsonString(record.code, `${label}.code`, 128, { required: true });
+  const count = jsonInteger(record.count, `${label}.count`, { required: true, minimum: 1 });
+  const notes = jsonString(record.notes, `${label}.notes`, 2_000);
+  if (!code || count === undefined) throw new Error(`Production outcome JSON ${label} is incomplete`);
+  return {
+    category: rawCategory as ProductionDefectCategory,
+    code,
+    count,
+    ...(notes ? { notes } : {}),
+  };
+}
+
+export function parseProductionOutcomeJson(text: string): ParsedProductionOutcomeJson {
+  if (Buffer.byteLength(text, "utf8") > maximumCsvBytes) {
+    throw new Error("Production outcome JSON exceeds the 2 MiB import limit");
+  }
+
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error("Production outcome JSON is malformed");
+  }
+
+  const record = jsonRecord(value, "batch");
+  rejectUnknownJsonFields(record, jsonBatchFields, "batch");
+
+  const externalBatchId = jsonString(record.externalBatchId, "externalBatchId", 160, { required: true });
+  const manufacturer = jsonString(record.manufacturer, "manufacturer", 200, { required: true });
+  const manufacturedOnInput = jsonString(record.manufacturedOn, "manufacturedOn", 10, { required: true });
+  const quantity = jsonInteger(record.quantity, "quantity", { required: true, minimum: 1 });
+  const firstPassYieldBps = jsonInteger(record.firstPassYieldBps, "firstPassYieldBps", {
+    minimum: 0,
+    maximum: 10_000,
+  });
+  const reworkCount = jsonInteger(record.reworkCount, "reworkCount", { minimum: 0, fallback: 0 });
+  const scrapCount = jsonInteger(record.scrapCount, "scrapCount", { minimum: 0, fallback: 0 });
+  const notes = jsonString(record.notes, "notes", 4_000);
+  const correctiveAction = jsonString(record.correctiveAction, "correctiveAction", 4_000);
+
+  const rawDefects = record.defects ?? [];
+  if (!Array.isArray(rawDefects)) throw new Error("Production outcome JSON defects must be an array");
+  if (rawDefects.length > 1_000) throw new Error("Production outcome JSON exceeds the 1000-defect import limit");
+
+  const defects = rawDefects.map(parseJsonDefect);
+  const seenDefects = new Set<string>();
+  for (const defect of defects) {
+    const key = `${defect.category}\u0000${defect.code}`;
+    if (seenDefects.has(key)) {
+      throw new Error(`Production outcome JSON duplicates defect ${defect.category}:${defect.code}`);
+    }
+    seenDefects.add(key);
+  }
+
+  if (!externalBatchId || !manufacturer || !manufacturedOnInput || quantity === undefined) {
+    throw new Error("Production outcome JSON batch is incomplete");
+  }
+
+  return {
+    sourceSha256: createHash("sha256").update(text, "utf8").digest("hex"),
+    batch: {
+      externalBatchId,
+      manufacturer,
+      manufacturedOn: manufacturedOn(manufacturedOnInput, "manufacturedOn"),
+      quantity,
+      ...(firstPassYieldBps === undefined ? {} : { firstPassYieldBps }),
+      reworkCount: reworkCount ?? 0,
+      scrapCount: scrapCount ?? 0,
+      ...(notes ? { notes } : {}),
+      ...(correctiveAction ? { correctiveAction } : {}),
+      defects,
+    },
   };
 }
