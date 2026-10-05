@@ -160,7 +160,13 @@ export async function saveRetentionPolicyForViewer(
   const opened = await dependencies.openStore();
   if (!opened) return fail("This deployment has no database configured.");
   try {
-    const saved = await opened.store.upsertRetentionPolicy({ tenantId: selected.accountLogin, ...policy });
+    const saved = await opened.store.upsertRetentionPolicy({
+      tenantId: selected.accountLogin,
+      installationId: selected.id,
+      actorId: String(session.userId),
+      actorLogin: session.login,
+      ...policy,
+    });
     return ok({ retentionDays: saved.retentionDays }, "Retention policy saved.");
   } finally {
     await opened.close();
@@ -204,6 +210,8 @@ export async function saveRepositoryRetentionPolicyForViewer(
       await opened.store.clearRepositoryRetentionPolicy({
         installationId: selected.id,
         repositoryId: input.repositoryId,
+        actorId: String(session.userId),
+        actorLogin: session.login,
       });
       return ok(
         { repositoryId: input.repositoryId, retentionDays: null, inherited: true },
@@ -215,6 +223,8 @@ export async function saveRepositoryRetentionPolicyForViewer(
       installationId: selected.id,
       repositoryId: input.repositoryId,
       retentionDays,
+      actorId: String(session.userId),
+      actorLogin: session.login,
     });
     if (!saved) return fail("That repository is no longer available under the selected installation.");
     return ok(
