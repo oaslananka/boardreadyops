@@ -12,7 +12,8 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("metadata allowlist");
     expect(documentation).toContain("database-owned cascade");
     expect(documentation).toContain("parent installation");
-    expect(documentation).toContain("does not expose installation erasure");
+    expect(documentation).toContain("GitHub App uninstall now queues a tenant-scoped erasure request");
+    expect(documentation).toContain("does not directly delete the parent installation");
     expect(documentation).toContain("`repositoryId`");
     expect(documentation).toContain("`releaseRunId`");
     expect(documentation).toContain("`eventType`");
