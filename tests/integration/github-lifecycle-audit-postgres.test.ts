@@ -351,6 +351,23 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
         due_at: new Date("2026-08-27T08:30:00.000Z"),
       },
     ]);
+    const uninstallExports = rows(
+      await database().query(
+        `select requested_by, scope, scope_id, status, created_at
+           from data_exports
+          where tenant_id = $1 and requested_by = 'github_app_uninstall'`,
+        [installation.accountLogin],
+      ),
+    );
+    expect(uninstallExports).toEqual([
+      {
+        requested_by: "github_app_uninstall",
+        scope: "organization",
+        scope_id: null,
+        status: "pending",
+        created_at: new Date("2026-07-28T08:30:00.000Z"),
+      },
+    ]);
     expect(rows(await database().query("select revoked_at from api_tokens where id = $1", [apiTokenId]))).toEqual([
       { revoked_at: new Date("2026-07-28T08:30:00.000Z") },
     ]);
@@ -466,6 +483,16 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
         await database().query(
           `select count(*)::int as count
              from erasure_requests
+            where tenant_id = $1 and requested_by = 'github_app_uninstall'`,
+          [installation.accountLogin],
+        ),
+      ),
+    ).toEqual([{ count: 1 }]);
+    expect(
+      rows(
+        await database().query(
+          `select count(*)::int as count
+             from data_exports
             where tenant_id = $1 and requested_by = 'github_app_uninstall'`,
           [installation.accountLogin],
         ),
