@@ -422,11 +422,15 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
       ...installation,
       accountLogin: "lifecycle-audit-org-renamed",
     };
-    await planGitHubAppLifecycleActions([{ type: "installation.upsert", installation: renamedInstallation }], lifecycle, {
-      deliveryId: "delivery-installation-recreated",
-      eventType: "installation",
-      eventAction: "created",
-    });
+    await planGitHubAppLifecycleActions(
+      [{ type: "installation.upsert", installation: renamedInstallation }],
+      lifecycle,
+      {
+        deliveryId: "delivery-installation-recreated",
+        eventType: "installation",
+        eventAction: "created",
+      },
+    );
     expect(
       rows(
         await database().query(
@@ -439,10 +443,9 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
     ).toEqual([{ status: "canceled", completed_at: new Date("2026-07-28T08:30:00.000Z") }]);
     expect(
       rows(
-        await database().query(
-          "select account_login from installations where github_installation_id = $1",
-          [installationExternalId],
-        ),
+        await database().query("select account_login from installations where github_installation_id = $1", [
+          installationExternalId,
+        ]),
       ),
     ).toEqual([{ account_login: renamedInstallation.accountLogin }]);
 
