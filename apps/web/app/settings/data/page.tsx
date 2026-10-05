@@ -269,7 +269,51 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
           </Panel>
 
           <Panel
+            title="GitHub App uninstall lifecycle"
+            description="What BoardReadyOps does when this installation is removed from GitHub."
+            id="uninstall-lifecycle"
+          >
+            <ol className="grid gap-3 text-sm text-foreground">
+              <li>
+                <span className="font-medium">1. Access stops immediately.</span> BoardReadyOps suspends the
+                installation and revokes its repository API tokens before any delayed deletion work.
+              </li>
+              <li>
+                <span className="font-medium">2. Portability is queued.</span> One tenant-scoped export request is
+                created from the persisted installation identity. Legal holds do not block export intake because
+                exporting is non-destructive.
+              </li>
+              <li>
+                <span className="font-medium">3. Destructive erasure waits 30 days.</span> One account-scoped uninstall
+                erasure request is queued with a deadline 30 days after BoardReadyOps processes the uninstall. An
+                applicable active legal hold changes that request to blocked by hold.
+              </li>
+              <li>
+                <span className="font-medium">4. Reinstall preserves portability.</span> A real GitHub App reinstall
+                cancels a still-active uninstall erasure request, while the paired export request remains available.
+              </li>
+            </ol>
+            <Alert tone="warning" title="Delete-later boundary">
+              Complete relational erasure, non-local managed-object deletion, backups, and platform-log expiry are not
+              automatically completed by uninstall today. Operators must follow the documented retention and erasure
+              procedure for those copies.
+            </Alert>
+            <div className="mt-3 flex flex-wrap gap-3 text-sm">
+              <a className="text-primary underline underline-offset-2" href="#data-export">
+                Request an export
+              </a>
+              <a className="text-primary underline underline-offset-2" href="#legal-holds">
+                Manage legal holds
+              </a>
+              <a className="text-primary underline underline-offset-2" href="#erasure-request">
+                Request erasure
+              </a>
+            </div>
+          </Panel>
+
+          <Panel
             title="Legal holds"
+            id="legal-holds"
             description="Active holds block matching retention cleanup and erasure. Released holds stay visible for audit history."
           >
             {admin.holds.length === 0 ? (
@@ -299,12 +343,14 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
         <>
           <Panel
             title="Export your data"
+            id="data-export"
             description={`Requests a signed pack of records under ${admin.selected.accountLogin}.`}
           >
             <ExportRequestForm installationId={admin.selected.id} action={requestExportAction} />
           </Panel>
           <Panel
             title="Erasure request"
+            id="erasure-request"
             description="Removes records for a scope. An active legal hold blocks it."
             tone="critical"
           >
