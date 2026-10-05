@@ -328,6 +328,11 @@ describe("SQL GitHub lifecycle audit writes", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain("with persisted as");
+    expect(calls[0]?.sql).toContain("returning id, account_login");
+    expect(calls[0]?.sql).toContain("canceled_uninstall_erasure");
+    expect(calls[0]?.sql).toContain("status = 'canceled'");
+    expect(calls[0]?.sql).toContain("$7::text = 'github_app.installation.enabled'");
+    expect(calls[0]?.sql).toContain("requested_by = 'github_app_uninstall'");
     expect(calls[0]?.sql).toContain("insert into audit_events");
     expect(calls[0]?.sql).toContain("'github_webhook'");
     expect(calls[0]?.sql).toContain("on conflict (id) do nothing");
@@ -460,6 +465,31 @@ describe("SQL GitHub lifecycle audit writes", () => {
     ]);
   });
 
+  it("derives uninstall erasure scope from the persisted installation instead of webhook account fields", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppMetadataStore(executor, {
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+    });
+
+    await store.deleteInstallation(
+      {
+        type: "installation.deleted",
+        installation: { id: 12345, accountLogin: "stale-webhook-login", accountType: "User" },
+      },
+      { deliveryId: "delivery-deleted-scope", eventType: "installation", eventAction: "deleted" },
+    );
+
+    expect(calls).toHaveLength(1);
+    const sql = calls[0]?.sql ?? "";
+    expect(sql).toContain("returning id, account_login, account_type");
+    expect(sql).toContain("lower(persisted.account_type) = 'user'");
+    expect(sql).toContain("lower(persisted.account_type) = 'organization'");
+    expect(sql).toContain("lower(persisted.account_type) in ('organization', 'user')");
+    expect(sql).toContain("persisted.account_login as tenant_id");
+    expect(sql).not.toContain("stale-webhook-login");
+    expect(calls[0]?.params[0]).toBe(12345);
+  });
+
   it("persists repository and installation disablement atomically", async () => {
     const { calls, executor } = recordingExecutor();
     const store = createSqlGitHubAppMetadataStore(executor, {
@@ -490,6 +520,15 @@ describe("SQL GitHub lifecycle audit writes", () => {
       JSON.stringify({ action: "removed", githubRepositoryId: 98765, repositoryPrivate: true }),
     ]);
     expect(calls[1]?.sql).toContain("update installations");
+    expect(calls[1]?.sql).toContain("returning id, account_login, account_type");
+    expect(calls[1]?.sql).toContain("'github_app_uninstall'");
+    expect(calls[1]?.sql).toContain("interval '30 days'");
+    expect(calls[1]?.sql).toContain("from legal_holds");
+    expect(calls[1]?.sql).toContain("legal_hold_id");
+    expect(calls[1]?.sql).toContain("then 'blocked_by_hold' else 'pending'");
+    expect(calls[1]?.sql).toContain("on conflict do nothing");
+    expect(calls[1]?.sql).toContain("update api_tokens");
+    expect(calls[1]?.sql).toContain("set revoked_at = $2::timestamptz");
     expect(calls[1]?.sql).toContain("not exists (select 1 from audit_events where id = $3::text)");
     expect(calls[1]?.sql).toContain("where $3::text is not null");
     expect(calls[1]?.params).toEqual([

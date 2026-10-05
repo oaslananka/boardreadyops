@@ -54,6 +54,10 @@ const createdActions: GitHubAppLifecycleAction[] = [
 
 afterAll(async () => {
   if (!executor) return;
+  await database().query(
+    "delete from erasure_requests where tenant_id = $1 and requested_by = 'github_app_uninstall'",
+    [installation.accountLogin],
+  );
   await database().query("delete from installations where github_installation_id = $1", [installationExternalId]);
   await executor.close();
 });
@@ -309,11 +313,47 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
       eventType: "installation_repositories",
       eventAction: "removed",
     });
+    const repositoryRows = rows(
+      await database().query("select id from repositories where github_repo_id = $1", [repositoryExternalId]),
+    );
+    const repositoryId = repositoryRows[0]?.id;
+    if (typeof repositoryId !== "string") throw new Error("repository fixture was not persisted");
+    const apiTokenId = randomUUID();
+    await database().query(
+      `insert into api_tokens (id, repository_id, name, token_prefix, token_hash, scopes, created_by)
+       values ($1, $2, 'Uninstall integration token', $3, $4, ARRAY['runs:write'], 'integration')`,
+      [apiTokenId, repositoryId, `bro_live_${apiTokenId.slice(0, 12)}`, apiTokenId.replaceAll("-", "").padEnd(64, "0")],
+    );
+
     await planGitHubAppLifecycleActions([{ type: "installation.deleted", installation }], lifecycle, {
       deliveryId: "delivery-installation-deleted",
       eventType: "installation",
       eventAction: "deleted",
     });
+
+    const uninstallRequests = rows(
+      await database().query(
+        `select requested_by, scope, scope_id, status, dry_run, legal_hold_id, created_at, due_at
+           from erasure_requests
+          where tenant_id = $1 and requested_by = 'github_app_uninstall'`,
+        [installation.accountLogin],
+      ),
+    );
+    expect(uninstallRequests).toEqual([
+      {
+        requested_by: "github_app_uninstall",
+        scope: "organization",
+        scope_id: null,
+        status: "pending",
+        dry_run: false,
+        legal_hold_id: null,
+        created_at: new Date("2026-07-28T08:30:00.000Z"),
+        due_at: new Date("2026-08-27T08:30:00.000Z"),
+      },
+    ]);
+    expect(rows(await database().query("select revoked_at from api_tokens where id = $1", [apiTokenId]))).toEqual([
+      { revoked_at: new Date("2026-07-28T08:30:00.000Z") },
+    ]);
 
     const persisted = rows(
       await database().query(
@@ -383,6 +423,17 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
       eventType: "installation",
       eventAction: "created",
     });
+    expect(
+      rows(
+        await database().query(
+          `select status, completed_at
+             from erasure_requests
+            where tenant_id = $1 and requested_by = 'github_app_uninstall'`,
+          [installation.accountLogin],
+        ),
+      ),
+    ).toEqual([{ status: "canceled", completed_at: new Date("2026-07-28T08:30:00.000Z") }]);
+
     await planGitHubAppLifecycleActions([{ type: "installation.deleted", installation }], lifecycle, {
       deliveryId: "delivery-installation-deleted",
       eventType: "installation",
@@ -395,5 +446,15 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
       ]),
     );
     expect(afterStaleDeleteReplay).toEqual([{ suspended_at: null }]);
+    expect(
+      rows(
+        await database().query(
+          `select count(*)::int as count
+             from erasure_requests
+            where tenant_id = $1 and requested_by = 'github_app_uninstall'`,
+          [installation.accountLogin],
+        ),
+      ),
+    ).toEqual([{ count: 1 }]);
   });
 });
