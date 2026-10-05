@@ -276,7 +276,7 @@ function rejectUnknownJsonFields(
 ): void {
   const unknown = Object.keys(record)
     .filter((key) => !allowed.has(key))
-    .sort()[0];
+    .sort((left, right) => left.localeCompare(right))[0];
   if (unknown) throw new Error(`Production outcome JSON ${label} contains unsupported field "${unknown}"`);
 }
 
@@ -311,7 +311,10 @@ function jsonInteger(
     if (options.required) throw new Error(`Production outcome JSON ${field} is required`);
     return options.fallback;
   }
-  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+  if (typeof value !== "number") {
+    throw new TypeError(`Production outcome JSON ${field} must be a number`);
+  }
+  if (!Number.isSafeInteger(value)) {
     throw new Error(`Production outcome JSON ${field} must be a safe integer`);
   }
   const minimum = options.minimum ?? 0;
@@ -327,7 +330,11 @@ function parseJsonDefect(value: unknown, index: number): ProductionBatchDefect {
   const record = jsonRecord(value, label);
   rejectUnknownJsonFields(record, jsonDefectFields, label);
 
-  const rawCategory = jsonString(record.category, `${label}.category`, 32, { required: true });
+  const rawCategory = jsonString(record.category, `${label}.category`, 32, {
+    required: true,
+  })
+    ?.toLowerCase()
+    .replaceAll("-", "_");
   if (!rawCategory || !defectCategories.has(rawCategory as ProductionDefectCategory)) {
     throw new Error(`Production outcome JSON ${label}.category must be one of aoi, spi, functional_test, ncr, or rma`);
   }
@@ -375,7 +382,7 @@ export function parseProductionOutcomeJson(text: string): ParsedProductionOutcom
   if (!Array.isArray(rawDefects)) throw new Error("Production outcome JSON defects must be an array");
   if (rawDefects.length > 1_000) throw new Error("Production outcome JSON exceeds the 1000-defect import limit");
 
-  const defects = rawDefects.map(parseJsonDefect);
+  const defects = rawDefects.map((defect, index) => parseJsonDefect(defect, index));
   const seenDefects = new Set<string>();
   for (const defect of defects) {
     const key = `${defect.category}\u0000${defect.code}`;
@@ -394,7 +401,7 @@ export function parseProductionOutcomeJson(text: string): ParsedProductionOutcom
     batch: {
       externalBatchId,
       manufacturer,
-      manufacturedOn: manufacturedOn(manufacturedOnInput, "manufacturedOn"),
+      manufacturedOn: manufacturedOn(manufacturedOnInput, "Production outcome JSON manufacturedOn"),
       quantity,
       ...(firstPassYieldBps === undefined ? {} : { firstPassYieldBps }),
       reworkCount: reworkCount ?? 0,
