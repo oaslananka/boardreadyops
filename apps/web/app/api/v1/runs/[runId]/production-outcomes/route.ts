@@ -1,4 +1,4 @@
-import { handleProductionOutcomeCsvImport } from "../../../../../../lib/production-outcome-routes.js";
+import { handleProductionOutcomeImport } from "../../../../../../lib/production-outcome-routes.js";
 
 export const runtime = "nodejs";
 
@@ -8,5 +8,5 @@ type ProductionOutcomeRouteProps = {
 
 export async function POST(request: Request, props: ProductionOutcomeRouteProps): Promise<Response> {
   const { runId } = await props.params;
-  return handleProductionOutcomeCsvImport(request, runId);
+  return handleProductionOutcomeImport(request, runId);
 }

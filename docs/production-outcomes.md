@@ -4,6 +4,40 @@ BoardReadyOps can link a manufacturing batch back to the exact release run that 
 
 This is deliberately a small feedback surface rather than an MES integration. It records observed production outcomes so teams can investigate correlations such as a yield change after a release; it does not claim that a release caused a manufacturing outcome.
 
+## Simple JSON API
+
+The same release-scoped endpoint accepts one canonical batch as `application/json`. This is the
+small integration surface for partners or internal tooling that already have structured
+manufacturing data and do not need to generate CSV first.
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $BOARDREADYOPS_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://boardreadyops.com/api/v1/runs/<run-id>/production-outcomes?repositoryId=<repository-id>&sourceName=partner-api" \
+  --data '{
+    "externalBatchId": "LOT-JSON-7",
+    "manufacturer": "Acme EMS",
+    "manufacturedOn": "2026-10-03",
+    "quantity": 80,
+    "firstPassYieldBps": 9875,
+    "reworkCount": 1,
+    "scrapCount": 0,
+    "defects": [
+      { "category": "aoi", "code": "BRIDGE", "count": 2 }
+    ]
+  }'
+```
+
+`firstPassYieldBps` is basis points (`9875` = `98.75%`), avoiding the ratio/percent ambiguity
+accepted by CSV. Unknown fields and invalid types are rejected rather than silently discarded.
+The exact JSON request bytes are SHA-256 hashed and stored as provenance; the payload itself is not
+duplicated into a generic blob column.
+
+The run ID in the URL is the manual mapping to the exact BoardReadyOps release identity. The same
+repository authorization and release-membership checks used by CSV imports apply before the batch
+is written.
+
 ## Import one batch
 
 Use a repository-scoped API token with the `runs:write` scope:

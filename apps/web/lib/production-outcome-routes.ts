@@ -1,4 +1,8 @@
-import { parseProductionOutcomeCsv } from "@boardreadyops/cloud-core/production-outcomes";
+import {
+  type ProductionBatchInput,
+  parseProductionOutcomeCsv,
+  parseProductionOutcomeJson,
+} from "@boardreadyops/cloud-core/production-outcomes";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import {
   createSqlProductionOutcomeStore,
@@ -12,7 +16,7 @@ import {
 } from "./api-auth.js";
 import { RequestBodyTooLargeError, readBoundedRequestBody } from "./bounded-request-body.js";
 
-const maximumCsvBytes = 2 * 1024 * 1024;
+const maximumImportBytes = 2 * 1024 * 1024;
 const maximumSourceNameLength = 255;
 
 type ApiAuthResult = Awaited<ReturnType<typeof authenticateApiRequest>>;
@@ -82,27 +86,88 @@ async function releaseInstallationId(
   return installationId(rows(result)[0]);
 }
 
-function validationMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "Invalid production outcome CSV";
-  if (!error.message.startsWith("Production outcome CSV") && !error.message.startsWith("CSV row")) {
-    return "Invalid production outcome CSV";
+function validationMessage(error: unknown, format: "csv" | "json"): string {
+  const fallback = format === "csv" ? "Invalid production outcome CSV" : "Invalid production outcome JSON";
+  if (!(error instanceof Error)) return fallback;
+  if (
+    format === "csv" &&
+    !error.message.startsWith("Production outcome CSV") &&
+    !error.message.startsWith("CSV row") &&
+    !error.message.startsWith("CSV import currently")
+  ) {
+    return fallback;
   }
+  if (format === "json" && !error.message.startsWith("Production outcome JSON")) return fallback;
   return error.message;
 }
 
+type ParsedImport = {
+  batch: ProductionBatchInput;
+  sourceKind: "csv" | "api";
+  sourceSha256: string;
+};
+
+function parseImportBody(contentType: string, body: Buffer): ParsedImport {
+  const text = body.toString("utf8");
+  if (contentType === "application/json") {
+    const parsed = parseProductionOutcomeJson(text);
+    return { batch: parsed.batch, sourceKind: "api", sourceSha256: parsed.sourceSha256 };
+  }
+
+  const parsed = parseProductionOutcomeCsv(text);
+  if (parsed.batches.length !== 1) {
+    throw new Error("CSV import currently accepts exactly one production batch per request");
+  }
+  const batch = parsed.batches[0];
+  if (!batch) throw new Error("Production outcome CSV has no data rows");
+  return { batch, sourceKind: "csv", sourceSha256: parsed.sourceSha256 };
+}
+
+function importFormat(contentType: string): "csv" | "json" {
+  return contentType === "application/json" ? "json" : "csv";
+}
+
+function formatLabel(format: "csv" | "json"): "CSV" | "JSON" {
+  return format === "json" ? "JSON" : "CSV";
+}
+
+async function readParsedImport(request: Request, contentType: string): Promise<ParsedImport | Response> {
+  const format = importFormat(contentType);
+  const label = formatLabel(format);
+
+  let body: Buffer;
+  try {
+    body = await readBoundedRequestBody(request, maximumImportBytes);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return Response.json(
+        { ok: false, error: `Production outcome ${label} exceeds the 2 MiB import limit` },
+        { status: 413 },
+      );
+    }
+    return Response.json({ ok: false, error: `Production outcome ${label} could not be read` }, { status: 400 });
+  }
+
+  try {
+    return parseImportBody(contentType, body);
+  } catch (error) {
+    return Response.json({ ok: false, error: validationMessage(error, format) }, { status: 400 });
+  }
+}
+
 /**
- * Imports one manufacturing batch from a CSV document and binds it to the exact release run in
- * the route.
+ * Imports one manufacturing batch from CSV or JSON and binds it to the exact release run in the
+ * route.
  *
  * Repository authorization happens before the body is read. The release is then required to
  * belong to that exact repository, which prevents a repository-scoped bearer token from writing
  * to another repository that happens to share the same GitHub App installation.
  *
- * CSV v1 intentionally accepts one batch per request. A batch may contain many defect rows, but
- * rejecting multi-batch documents keeps the initial import atomic with the current store contract
- * instead of leaving a partially imported file when a later batch conflicts.
+ * Both formats intentionally accept one batch per request. CSV may contain many rows for the same
+ * batch so defects can remain row-oriented; JSON accepts one canonical batch object. Keeping the
+ * write atomic avoids partially imported documents when immutable evidence conflicts.
  */
-export async function handleProductionOutcomeCsvImport(
+export async function handleProductionOutcomeImport(
   request: Request,
   releaseRunId: string,
   dependencies: ProductionOutcomeImportDependencies = defaultDependencies,
@@ -114,8 +179,9 @@ export async function handleProductionOutcomeCsvImport(
   const auth = await dependencies.authenticate(request, "runs:write");
   if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
 
-  if (mediaType(request) !== "text/csv") {
-    return Response.json({ ok: false, error: "Content-Type must be text/csv" }, { status: 415 });
+  const contentType = mediaType(request);
+  if (contentType !== "text/csv" && contentType !== "application/json") {
+    return Response.json({ ok: false, error: "Content-Type must be text/csv or application/json" }, { status: 415 });
   }
 
   const selectedSourceName = sourceName(request);
@@ -130,44 +196,15 @@ export async function handleProductionOutcomeCsvImport(
       return Response.json({ ok: false, error: "Release run is unavailable for this repository" }, { status: 404 });
     }
 
-    let body: Buffer;
-    try {
-      body = await readBoundedRequestBody(request, maximumCsvBytes);
-    } catch (error) {
-      if (error instanceof RequestBodyTooLargeError) {
-        return Response.json(
-          { ok: false, error: "Production outcome CSV exceeds the 2 MiB import limit" },
-          { status: 413 },
-        );
-      }
-      return Response.json({ ok: false, error: "Production outcome CSV could not be read" }, { status: 400 });
-    }
-
-    let parsed: ReturnType<typeof parseProductionOutcomeCsv>;
-    try {
-      parsed = parseProductionOutcomeCsv(body.toString("utf8"));
-    } catch (error) {
-      return Response.json({ ok: false, error: validationMessage(error) }, { status: 400 });
-    }
-
-    if (parsed.batches.length !== 1) {
-      return Response.json(
-        { ok: false, error: "CSV import currently accepts exactly one production batch per request" },
-        { status: 400 },
-      );
-    }
-
-    const batch = parsed.batches[0];
-    if (!batch) {
-      return Response.json({ ok: false, error: "Production outcome CSV has no data rows" }, { status: 400 });
-    }
+    const parsed = await readParsedImport(request, contentType);
+    if (parsed instanceof Response) return parsed;
 
     try {
       const imported = await dependencies.createStore(scope.executor).importBatch({
         installationId: installation,
         releaseRunId,
-        batch,
-        sourceKind: "csv",
+        batch: parsed.batch,
+        sourceKind: parsed.sourceKind,
         sourceSha256: parsed.sourceSha256,
         ...(selectedSourceName ? { sourceName: selectedSourceName } : {}),
       });
