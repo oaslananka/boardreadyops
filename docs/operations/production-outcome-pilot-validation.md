@@ -52,7 +52,13 @@ export BOARDREADYOPS_ORIGIN="https://boardreadyops.com"
 export BOARDREADYOPS_REPOSITORY_ID="<repository-id>"
 export BOARDREADYOPS_RUN_ID="<release-run-id>"
 export BOARDREADYOPS_SOURCE="/secure/path/partner-batch.csv"
+read -rsp "BoardReadyOps token: " BOARDREADYOPS_TOKEN
+export BOARDREADYOPS_TOKEN
+printf "\n"
 ```
+
+The silent prompt keeps the token out of the command itself and normal shell history. Do not store
+the token in the repository, the validation record, or a checked-in environment file.
 
 Import the exact source bytes:
 

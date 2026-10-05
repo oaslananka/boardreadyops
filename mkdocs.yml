@@ -92,7 +92,6 @@ nav:
       - Cross-platform Paths: cross-platform.md
       - API Tokens: api-tokens.md
       - Production Outcomes Pilot: production-outcomes.md
-      - Production Outcome Pilot Validation: operations/production-outcome-pilot-validation.md
       - How-to Guides:
           - CI Quality Gates: how-to/ci-quality-gates.md
           - Altium Package Export: guides/export-altium.md
@@ -129,6 +128,7 @@ nav:
       - Control-plane Load Validation: operations/control-plane-load-validation.md
       - Control-plane Restore Drill: operations/control-plane-restore-drill.md
       - Synthetic Target Canaries: operations/synthetic-target-repository-canaries.md
+      - Production Outcome Pilot Validation: operations/production-outcome-pilot-validation.md
       - Testing: testing.md
       - Accessibility: accessibility.md
       - Branch Protection: branch-protection.md
