@@ -1,4 +1,4 @@
-export const cloudDatabaseSchemaVersion = 56;
+export const cloudDatabaseSchemaVersion = 57;
 
 export const cloudDatabaseModels = [
   "Installation",
@@ -26,6 +26,7 @@ export const cloudDatabaseModels = [
   "RunnerRequestNonce",
   "RunnerArtifactUploadCapability",
   "AuditEvent",
+  "ReviewPolicyAuditEvent",
   "ReleaseRunResult",
   "ReleaseRunAttempt",
   "ReleaseRunTransitionEvent",
