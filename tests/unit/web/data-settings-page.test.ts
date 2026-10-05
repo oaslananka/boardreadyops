@@ -17,6 +17,7 @@ describe("Data & Retention settings administration", () => {
       "Runs, findings & audit events",
       "Managed artifact retention",
       "Component source cache",
+      "Repository retention overrides",
       "installation",
     ]) {
       expect(page).toContain(text);
@@ -31,6 +32,13 @@ describe("Data & Retention settings administration", () => {
     expect(page).toContain("controlPlaneRetention.controlPlaneHistoryDays");
     expect(page).toContain("No automatic age-based purge");
     expect(page).toContain("RetentionPolicyForm");
+    expect(page).toContain("RepositoryRetentionPolicyForm");
+    expect(page).toContain("saveRepositoryRetentionPolicyAction");
+    const forms = await readFile("apps/web/components/settings/data-admin-forms.tsx", "utf8");
+    expect(forms).toContain("Save override");
+    expect(forms).toContain('value="inherit"');
+    expect(forms).toContain('value="indefinite"');
+    expect(forms).toContain('value="custom"');
     expect(page).toContain("LegalHoldCreateForm");
     expect(page).toContain("LegalHoldReleaseButton");
     expect(page).toContain("installationId={admin.selected.id}");
