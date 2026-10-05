@@ -1,8 +1,6 @@
-import { type ReviewPolicyRecord, ReviewPolicyStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import type { ReviewPolicyRecord, ReviewPolicyStore } from "@boardreadyops/db";
 import { z } from "zod";
-import { optionalCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
-import { viewerAuthorization } from "../../../../../lib/viewer-authorization.js";
+import { requirePolicyViewer, withPolicyStore } from "../../../../../lib/policy-route-context.js";
 
 export const runtime = "nodejs";
 
@@ -29,10 +27,8 @@ const updatePolicySchema = z.object({
 });
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }): Promise<Response> {
-  const viewer = await viewerAuthorization();
-  if (!viewer.session) {
-    return Response.json({ ok: false, error: "authentication required" }, { status: 401 });
-  }
+  const viewer = await requirePolicyViewer();
+  if (viewer instanceof Response) return viewer;
 
   const { id } = await props.params;
 
@@ -48,50 +44,30 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     return Response.json({ ok: false, error: "Invalid policy payload", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const config = optionalCloudPersistenceConfiguration();
-  if (config?.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
-  try {
-    const store = new ReviewPolicyStore(executor);
-    const owned = await getOwnedPolicyOrError(store, id, viewer.session.login);
+  return withPolicyStore(async (store) => {
+    const owned = await getOwnedPolicyOrError(store, id, viewer.login);
     if (owned instanceof Response) return owned;
     const updated = await store.updatePolicy(id, parsed.data, {
-      githubUserId: viewer.session.userId,
-      login: viewer.session.login,
+      githubUserId: viewer.userId,
+      login: viewer.login,
     });
     return Response.json({ ok: true, policy: updated });
-  } finally {
-    await executor.close();
-  }
+  });
 }
 
 export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }): Promise<Response> {
-  const viewer = await viewerAuthorization();
-  if (!viewer.session) {
-    return Response.json({ ok: false, error: "authentication required" }, { status: 401 });
-  }
+  const viewer = await requirePolicyViewer();
+  if (viewer instanceof Response) return viewer;
 
   const { id } = await props.params;
 
-  const config = optionalCloudPersistenceConfiguration();
-  if (config?.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
-  try {
-    const store = new ReviewPolicyStore(executor);
-    const owned = await getOwnedPolicyOrError(store, id, viewer.session.login);
+  return withPolicyStore(async (store) => {
+    const owned = await getOwnedPolicyOrError(store, id, viewer.login);
     if (owned instanceof Response) return owned;
     const deleted = await store.deletePolicy(id, {
-      githubUserId: viewer.session.userId,
-      login: viewer.session.login,
+      githubUserId: viewer.userId,
+      login: viewer.login,
     });
     return Response.json({ ok: deleted });
-  } finally {
-    await executor.close();
-  }
+  });
 }

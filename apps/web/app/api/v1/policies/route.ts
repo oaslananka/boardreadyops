@@ -1,8 +1,5 @@
-import { ReviewPolicyStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { optionalCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
-import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
+import { requirePolicyViewer, withPolicyStore } from "../../../../lib/policy-route-context.js";
 
 export const runtime = "nodejs";
 
@@ -19,32 +16,18 @@ const createPolicySchema = z.object({
 });
 
 export async function GET(): Promise<Response> {
-  const viewer = await viewerAuthorization();
-  if (!viewer.session) {
-    return Response.json({ ok: false, error: "authentication required" }, { status: 401 });
-  }
+  const viewer = await requirePolicyViewer();
+  if (viewer instanceof Response) return viewer;
 
-  const config = optionalCloudPersistenceConfiguration();
-  if (config?.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
-  try {
-    const store = new ReviewPolicyStore(executor);
-    const tenantId = viewer.session.login; // simplified tenant mapping
-    const policies = await store.listPolicies(tenantId);
+  return withPolicyStore(async (store) => {
+    const policies = await store.listPolicies(viewer.login);
     return Response.json({ ok: true, policies });
-  } finally {
-    await executor.close();
-  }
+  });
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const viewer = await viewerAuthorization();
-  if (!viewer.session) {
-    return Response.json({ ok: false, error: "authentication required" }, { status: 401 });
-  }
+  const viewer = await requirePolicyViewer();
+  if (viewer instanceof Response) return viewer;
 
   let body: unknown;
   try {
@@ -62,18 +45,10 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "scopeId is required for team/repository scope" }, { status: 400 });
   }
 
-  const config = optionalCloudPersistenceConfiguration();
-  if (config?.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
-  try {
-    const store = new ReviewPolicyStore(executor);
-    const tenantId = viewer.session.login; // simplified tenant mapping
+  return withPolicyStore(async (store) => {
     const policy = await store.createPolicy(
       {
-        tenantId,
+        tenantId: viewer.login,
         scope: parsed.data.scope,
         scopeId: parsed.data.scopeId ?? null,
         name: parsed.data.name,
@@ -84,10 +59,8 @@ export async function POST(request: Request): Promise<Response> {
         requireEvidencePack: parsed.data.requireEvidencePack ?? false,
         requireExternalReview: parsed.data.requireExternalReview ?? false,
       },
-      { githubUserId: viewer.session.userId, login: viewer.session.login },
+      { githubUserId: viewer.userId, login: viewer.login },
     );
     return Response.json({ ok: true, policy }, { status: 201 });
-  } finally {
-    await executor.close();
-  }
+  });
 }
