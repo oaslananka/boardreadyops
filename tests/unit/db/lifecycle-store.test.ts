@@ -327,9 +327,13 @@ describe("SQL GitHub lifecycle audit writes", () => {
     );
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.sql).toContain("with persisted as");
+    expect(calls[0]?.sql).toContain("with existing_installation as materialized");
+    expect(calls[0]?.sql).toContain("previous_account_login");
     expect(calls[0]?.sql).toContain("returning id, account_login");
     expect(calls[0]?.sql).toContain("canceled_uninstall_erasure");
+    expect(calls[0]?.sql).toContain("tenant_id in (");
+    expect(calls[0]?.sql).toContain("select persisted.account_login");
+    expect(calls[0]?.sql).toContain("select existing_installation.previous_account_login");
     expect(calls[0]?.sql).toContain("status = 'canceled'");
     expect(calls[0]?.sql).toContain("$7::text = 'github_app.installation.enabled'");
     expect(calls[0]?.sql).toContain("requested_by = 'github_app_uninstall'");
