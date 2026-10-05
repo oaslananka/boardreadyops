@@ -55,6 +55,57 @@ describe("data lifecycle administration", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it("lists, upserts, and clears repository retention policies within one installation", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            repository_id: "repo-1",
+            owner: "acme",
+            name: "controller",
+            has_override: true,
+            retention_days: 90,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            repository_id: "repo-1",
+            owner: "acme",
+            name: "controller",
+            retention_days: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rowCount: 1 });
+    const store = new DataLifecycleStore({ query });
+
+    await expect(store.listRepositoryRetentionPolicies("inst-a")).resolves.toEqual([
+      {
+        repositoryId: "repo-1",
+        owner: "acme",
+        name: "controller",
+        hasOverride: true,
+        retentionDays: 90,
+      },
+    ]);
+    await expect(
+      store.upsertRepositoryRetentionPolicy({
+        installationId: "inst-a",
+        repositoryId: "repo-1",
+        retentionDays: null,
+      }),
+    ).resolves.toMatchObject({ repositoryId: "repo-1", hasOverride: true, retentionDays: null });
+    await expect(
+      store.clearRepositoryRetentionPolicy({ installationId: "inst-a", repositoryId: "repo-1" }),
+    ).resolves.toBe(true);
+
+    expect(query.mock.calls[1]?.[0]).toContain("repositories.installation_id = $2");
+    expect(query.mock.calls[2]?.[0]).toContain("repositories.installation_id = $2");
+  });
+
   it("lists legal holds with release metadata newest first", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [
