@@ -154,6 +154,7 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
     vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
       status: "authenticated",
       session: {
+        userId: 1,
         login: "acme-corp",
         name: "Acme Lead",
         email: "lead@acme.com",
@@ -177,6 +178,7 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
     vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
       status: "authenticated",
       session: {
+        userId: 1,
         login: "acme-corp",
         name: "Acme Lead",
         email: "lead@acme.com",
@@ -215,18 +217,21 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
     const executor = createMockPolicyExecutor();
     const store = new ReviewPolicyStore(executor);
 
-    const created = await store.createPolicy({
-      tenantId: "acme-corp",
-      scope: "organization",
-      scopeId: null,
-      name: "High-Voltage Sign-Off Policy",
-      description: "Mandatory isolation and creepage checks",
-      requiredChecklist: ["Creepage >= 2.5mm", "Clearance >= 1.5mm"],
-      requiredRoles: ["hardware-lead"],
-      severityGate: "error",
-      requireEvidencePack: true,
-      requireExternalReview: false,
-    });
+    const created = await store.createPolicy(
+      {
+        tenantId: "acme-corp",
+        scope: "organization",
+        scopeId: null,
+        name: "High-Voltage Sign-Off Policy",
+        description: "Mandatory isolation and creepage checks",
+        requiredChecklist: ["Creepage >= 2.5mm", "Clearance >= 1.5mm"],
+        requiredRoles: ["hardware-lead"],
+        severityGate: "error",
+        requireEvidencePack: true,
+        requireExternalReview: false,
+      },
+      { githubUserId: 1, login: "acme-corp" },
+    );
 
     expect(created.id).toBeDefined();
     expect(created.name).toBe("High-Voltage Sign-Off Policy");
@@ -240,6 +245,7 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
     vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
       status: "authenticated",
       session: {
+        userId: 1,
         login: "acme-corp",
         name: "Acme Lead",
         email: "lead@acme.com",

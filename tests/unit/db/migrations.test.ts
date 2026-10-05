@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(56);
+    expect(cloudDatabaseSchemaVersion).toBe(57);
     expect(cloudDatabaseModels).toContain("ApiToken");
     expect(cloudDatabaseModels).toContain("FindingDecision");
     expect(cloudDatabaseModels).toContain("FindingAssignment");
@@ -30,6 +30,7 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("RunnerArtifactUploadCapability");
     expect(cloudDatabaseModels).toContain("ArtifactDeletionJob");
     expect(cloudDatabaseModels).toContain("AuditEvent");
+    expect(cloudDatabaseModels).toContain("ReviewPolicyAuditEvent");
     expect(cloudDatabaseModels).toContain("ReleaseRunResult");
     expect(cloudDatabaseModels).toContain("ReleaseRunAttempt");
     expect(cloudDatabaseModels).toContain("ReleaseRunTransitionEvent");
@@ -134,7 +135,24 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0082_production_outcome_batches.sql",
       "0083_github_app_uninstall_erasure.sql",
       "0084_repository_retention_policies.sql",
+      "0085_review_policy_audit_events.sql",
     ]);
+  });
+
+  it("stores tenant-scoped append-only review policy audit history in schema v85", async () => {
+    const sql = (await readFile(join(migrationsDir, "0085_review_policy_audit_events.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("create table if not exists review_policy_audit_events");
+    expect(sql).toContain("tenant_id text not null");
+    expect(sql).toContain("policy_id text not null");
+    expect(sql).toContain("actor_github_user_id bigint not null");
+    expect(sql).toContain("before_policy jsonb");
+    expect(sql).toContain("after_policy jsonb");
+    expect(sql).toContain("review_policy_audit_events_snapshot_shape_valid");
+    expect(sql).toContain("before update or delete on review_policy_audit_events");
+    expect(sql).toContain("review_policy_audit_events is append-only");
+    expect(sql).toContain("review_policy_audit_events_tenant_created_idx");
+    expect(sql).toContain("review_policy_audit_events_policy_created_idx");
   });
 
   it("deduplicates active GitHub App uninstall erasure requests in schema v83", async () => {
