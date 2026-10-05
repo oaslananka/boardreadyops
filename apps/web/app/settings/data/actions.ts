@@ -7,6 +7,7 @@ import {
   releaseLegalHoldForViewer,
   requestErasureForViewer,
   requestExportForViewer,
+  saveRepositoryRetentionPolicyForViewer,
   saveRetentionPolicyForViewer,
 } from "../../../lib/data-settings-admin.js";
 import { defineAction } from "../../../lib/server-action.js";
@@ -49,6 +50,13 @@ const retentionPolicySchema = z.object({
   retentionDays: z.string().max(4).optional(),
 });
 
+const repositoryRetentionPolicySchema = z.object({
+  installationId: z.string().min(1),
+  repositoryId: z.string().min(1),
+  mode: z.enum(["inherit", "indefinite", "custom"]),
+  retentionDays: z.string().max(4).optional(),
+});
+
 const legalHoldSchema = z.object({
   installationId: z.string().min(1),
   scope: z.enum(scopes),
@@ -70,6 +78,15 @@ export const saveRetentionPolicyAction = defineAction(retentionPolicySchema, asy
   if (result.status === "ok") revalidatePath("/settings/data");
   return result;
 });
+
+export const saveRepositoryRetentionPolicyAction = defineAction(
+  repositoryRetentionPolicySchema,
+  async (input, { session }) => {
+    const result = await saveRepositoryRetentionPolicyForViewer(session, input);
+    if (result.status === "ok") revalidatePath("/settings/data");
+    return result;
+  },
+);
 
 export const createLegalHoldAction = defineAction(legalHoldSchema, async (input, { session }) => {
   const result = await createLegalHoldForViewer(session, input);
