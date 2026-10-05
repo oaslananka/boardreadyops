@@ -18,6 +18,12 @@ describe("Data & Retention settings administration", () => {
       "Managed artifact retention",
       "Component source cache",
       "Repository retention overrides",
+      "GitHub App uninstall lifecycle",
+      "Access stops immediately.",
+      "Portability is queued.",
+      "Destructive erasure waits 30 days.",
+      "Reinstall preserves portability.",
+      "Delete-later boundary",
       "installation",
     ]) {
       expect(page).toContain(text);
@@ -43,6 +49,15 @@ describe("Data & Retention settings administration", () => {
     expect(page).toContain("LegalHoldReleaseButton");
     expect(page).toContain("installationId={admin.selected.id}");
     expect(page).toContain("defaultScopeLabel={admin.selected.accountLogin}");
+    expect(page).toContain('id="uninstall-lifecycle"');
+    expect(page).toContain('href="#data-export"');
+    expect(page).toContain('href="#legal-holds"');
+    expect(page).toContain('href="#erasure-request"');
+    expect(page).toContain("Legal holds do not block export intake");
+    expect(page).toContain("deadline 30 days after BoardReadyOps");
+    expect(page).toContain("cancels a still-active uninstall erasure request");
+    expect(page).toContain("Complete relational erasure");
+    expect(page).toContain("non-local managed-object deletion");
   });
 
   it("wires server actions for save/create/release and revalidates the page", async () => {
