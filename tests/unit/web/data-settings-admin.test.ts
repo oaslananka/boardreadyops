@@ -7,6 +7,7 @@ import {
   requestErasureForViewer,
   requestExportForViewer,
   retentionPolicyForInstallation,
+  saveRepositoryRetentionPolicyForViewer,
   saveRetentionPolicyForViewer,
 } from "../../../apps/web/lib/data-settings-admin.js";
 import type { UserSession } from "../../../apps/web/lib/user-session.js";
@@ -18,6 +19,23 @@ const team = { ...business, planTier: "team" } as const;
 function deps(selected = business) {
   const store = {
     getRetentionPolicy: vi.fn().mockResolvedValue(null),
+    listRepositoryRetentionPolicies: vi.fn().mockResolvedValue([
+      {
+        repositoryId: "repo-1",
+        owner: "acme",
+        name: "controller",
+        hasOverride: false,
+        retentionDays: null,
+      },
+    ]),
+    upsertRepositoryRetentionPolicy: vi.fn().mockImplementation(async (input) => ({
+      repositoryId: input.repositoryId,
+      owner: "acme",
+      name: "controller",
+      hasOverride: true,
+      retentionDays: input.retentionDays,
+    })),
+    clearRepositoryRetentionPolicy: vi.fn().mockResolvedValue(true),
     listLegalHolds: vi.fn().mockResolvedValue([]),
     upsertRetentionPolicy: vi.fn().mockImplementation(async (input) => ({ id: "policy-1", ...input })),
     createLegalHold: vi.fn().mockImplementation(async (input) => ({
@@ -103,6 +121,78 @@ describe("data settings admin", () => {
       retentionDays: 730,
       sourceRetentionHours: 24,
     });
+  });
+
+  it("saves and clears repository retention overrides only inside the selected installation", async () => {
+    const { store, dependencies } = deps();
+
+    const saved = await saveRepositoryRetentionPolicyForViewer(
+      session,
+      {
+        installationId: "inst-a",
+        repositoryId: "repo-1",
+        mode: "custom",
+        retentionDays: "90",
+      },
+      dependencies,
+    );
+    expect(saved).toMatchObject({
+      status: "ok",
+      data: { repositoryId: "repo-1", retentionDays: 90, inherited: false },
+    });
+    expect(store.upsertRepositoryRetentionPolicy).toHaveBeenCalledWith({
+      installationId: "inst-a",
+      repositoryId: "repo-1",
+      retentionDays: 90,
+    });
+
+    const inherited = await saveRepositoryRetentionPolicyForViewer(
+      session,
+      {
+        installationId: "inst-a",
+        repositoryId: "repo-1",
+        mode: "inherit",
+      },
+      dependencies,
+    );
+    expect(inherited).toMatchObject({ status: "ok", data: { repositoryId: "repo-1", inherited: true } });
+    expect(store.clearRepositoryRetentionPolicy).toHaveBeenCalledWith({
+      installationId: "inst-a",
+      repositoryId: "repo-1",
+    });
+  });
+
+  it("rejects repository retention writes outside the selected installation and on fixed-retention plans", async () => {
+    const { store, dependencies } = deps();
+
+    const outside = await saveRepositoryRetentionPolicyForViewer(
+      session,
+      {
+        installationId: "inst-a",
+        repositoryId: "repo-other",
+        mode: "indefinite",
+      },
+      dependencies,
+    );
+    expect(outside).toMatchObject({ status: "error" });
+    expect(store.upsertRepositoryRetentionPolicy).not.toHaveBeenCalled();
+
+    dependencies.resolveTenant.mockResolvedValue({
+      installations: [{ ...business, planTier: "team" }],
+      selected: { ...business, planTier: "team" },
+    });
+    const fixed = await saveRepositoryRetentionPolicyForViewer(
+      session,
+      {
+        installationId: "inst-a",
+        repositoryId: "repo-1",
+        mode: "custom",
+        retentionDays: "30",
+      },
+      dependencies,
+    );
+    expect(fixed).toMatchObject({ status: "error" });
+    expect(store.upsertRepositoryRetentionPolicy).not.toHaveBeenCalled();
   });
 
   it("refuses writes when the installation is not authorized", async () => {
