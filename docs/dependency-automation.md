@@ -14,9 +14,9 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 
 ## Policy layers
 
-`renovate.json` extends `github>oaslananka/.github:renovate-config`. The shared preset owns the seven-day routine release quarantine, strict internal age filtering, two new PRs per hour, five concurrent PRs, digest pinning, weekly lockfile maintenance defaults, and Dependency Dashboard approval for major upgrades.
+`renovate.json` is self-contained. It directly carries the conservative baseline that BoardReadyOps previously inherited from `github>oaslananka/.github:renovate-config`: the Europe/Istanbul timezone, seven-day routine release quarantine, strict internal age filtering, two new PRs per hour, five concurrent PRs, digest pinning, weekly lockfile maintenance, semantic commits, Dependency Dashboard, and explicit approval for major upgrades.
 
-BoardReadyOps owns its weekday schedule, managed package managers, generated `NOTICE`/`dist/` refresh, protected package groups, vulnerability-PR policy, and merge routing. Generated output, dependency trees, and test fixtures remain excluded from discovery.
+This local fallback became authoritative after the scheduled run on October 2, 2026 failed to resolve the shared preset. Keeping the baseline in the repository prevents dependency maintenance from depending on a second repository or on broader token scope. BoardReadyOps-specific schedule, managed package managers, generated `NOTICE`/`dist/` refresh, protected package groups, vulnerability-PR policy, and merge routing remain local as before. Generated output, dependency trees, and test fixtures remain excluded from discovery.
 
 ## Automatic path
 
@@ -51,6 +51,7 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 - The authenticated run created Dependency Dashboard issue `#196` and populated pending-approval, awaiting-schedule, status-check, abandoned-dependency, and detected-dependency sections.
 - No update branches or pull requests were created outside the configured schedule or approval policy.
 - On September 17, 2026, the shared `oaslananka/.github` preset was verified at commit `c44946c82eeb6c5041dbc94f371c55015679cbe0` (`renovate-config.json` blob `6ad5d7c7232908a686a4b9e0404fb30f4d30c2da`).
+- On October 2, 2026, scheduled run `36992286708` failed before repository processing because that shared preset could no longer be resolved. BoardReadyOps therefore activated the documented repository-local recovery path instead of widening `GH_AUTH_TOKEN` access to another repository.
 - BoardReadyOps implementation PR `#819` merged through Mergify's `default` queue after the `main` Ruleset conditions, including `ci / risk-profile` and `security / gate`, were satisfied.
 - Post-merge manual Renovate workflow run `35251461740` ran against merge commit `6e5a7b020a335a19b57ec251969d4dd8f84efa20`; both `renovate / validate` and `renovate / run` completed successfully.
 - Dependency Dashboard `#196` updated at `2026-09-17T17:16:35Z`. No Renovate or Dependabot PR remained open after the run; routine developer-tooling, type-definition, and lockfile updates were awaiting their schedule while major updates remained pending approval.
@@ -58,7 +59,7 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 
 ## Operations
 
-1. Confirm the shared preset resolves successfully.
+1. Confirm the repository-local conservative baseline remains present in `renovate.json`; do not reintroduce an external preset dependency without a separately verified availability and credential contract.
 2. Run `corepack pnpm run renovate:validate` after policy changes.
 3. Confirm `security-automation-config.test.ts` and `mergify-integration.test.ts` pass.
 4. Confirm `manual-review` is present on protected updates and absent from an eligible low-risk update.
