@@ -133,6 +133,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0081_board_snapshot_release_mode.sql",
       "0082_production_outcome_batches.sql",
       "0083_github_app_uninstall_erasure.sql",
+      "0084_repository_retention_policies.sql",
     ]);
   });
 
@@ -735,6 +736,16 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("on audit_events(installation_id, artifact_id, created_at desc, id desc)");
     expect(sql).toContain("on audit_events(installation_id, runner_registration_id, created_at desc, id desc)");
     expect(sql).toContain("on audit_events(installation_id, request_id, created_at desc, id desc)");
+  });
+
+  it("stores repository-scoped artifact retention overrides in schema v84", async () => {
+    const sql = await readFile(join(migrationsDir, "0084_repository_retention_policies.sql"), "utf8");
+
+    expect(sql).toContain("create table if not exists repository_retention_policies");
+    expect(sql).toContain("repository_id text primary key references repositories(id) on delete cascade");
+    expect(sql).toContain("retention_days is null or retention_days between 1 and 3650");
+    expect(sql).toContain("0084_repository_retention_policies");
+    expect(sql).not.toMatch(/^\s*tenant_id\s+/gmu);
   });
 
   it("keeps the initial schema idempotent", async () => {
