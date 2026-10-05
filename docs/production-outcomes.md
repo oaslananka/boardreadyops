@@ -4,6 +4,9 @@ BoardReadyOps can link a manufacturing batch back to the exact release run that 
 
 This is deliberately a small feedback surface rather than an MES integration. It records observed production outcomes so teams can investigate correlations such as a yield change after a release; it does not claim that a release caused a manufacturing outcome.
 
+For the real-data acceptance procedure, replay checks, and redacted validation record, see
+[Production outcome design-partner validation](operations/production-outcome-pilot-validation.md).
+
 ## Simple JSON API
 
 The same release-scoped endpoint accepts one canonical batch as `application/json`. This is the

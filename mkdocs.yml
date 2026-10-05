@@ -92,6 +92,7 @@ nav:
       - Cross-platform Paths: cross-platform.md
       - API Tokens: api-tokens.md
       - Production Outcomes Pilot: production-outcomes.md
+      - Production Outcome Pilot Validation: operations/production-outcome-pilot-validation.md
       - How-to Guides:
           - CI Quality Gates: how-to/ci-quality-gates.md
           - Altium Package Export: guides/export-altium.md
