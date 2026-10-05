@@ -343,6 +343,20 @@ export function createSqlGitHubAppMetadataStore(
              from persisted
             where btrim(persisted.account_login) <> ''
               and lower(persisted.account_type) in ('organization', 'user')
+         ), queued_export as (
+           insert into data_exports (
+             id, tenant_id, requested_by, status, scope, scope_id, created_at
+           )
+           select gen_random_uuid()::text,
+                  erasure_scope.tenant_id,
+                  'github_app_uninstall',
+                  'pending',
+                  erasure_scope.scope,
+                  erasure_scope.scope_id,
+                  $2::timestamptz
+             from erasure_scope
+           on conflict do nothing
+           returning id
          ), matching_hold as (
            select legal_holds.id
              from legal_holds

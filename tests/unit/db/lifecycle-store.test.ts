@@ -469,6 +469,29 @@ describe("SQL GitHub lifecycle audit writes", () => {
     ]);
   });
 
+  it("queues an uninstall export independently from legal-hold-aware erasure", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppMetadataStore(executor, {
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+    });
+
+    await store.deleteInstallation(
+      { type: "installation.deleted", installation },
+      { deliveryId: "delivery-uninstall-export", eventType: "installation", eventAction: "deleted" },
+    );
+
+    const sql = calls[0]?.sql ?? "";
+    const exportIndex = sql.indexOf("queued_export as");
+    const holdIndex = sql.indexOf("matching_hold as");
+    expect(exportIndex).toBeGreaterThan(-1);
+    expect(holdIndex).toBeGreaterThan(exportIndex);
+    expect(sql).toContain("insert into data_exports");
+    expect(sql).toContain("'github_app_uninstall'");
+    expect(sql).toContain("'pending'");
+    expect(sql).toContain("from erasure_scope");
+    expect(sql).toContain("on conflict do nothing");
+  });
+
   it("derives uninstall erasure scope from the persisted installation instead of webhook account fields", async () => {
     const { calls, executor } = recordingExecutor();
     const store = createSqlGitHubAppMetadataStore(executor, {
@@ -525,7 +548,11 @@ describe("SQL GitHub lifecycle audit writes", () => {
     ]);
     expect(calls[1]?.sql).toContain("update installations");
     expect(calls[1]?.sql).toContain("returning id, account_login, account_type");
+    expect(calls[1]?.sql).toContain("queued_export");
+    expect(calls[1]?.sql).toContain("insert into data_exports");
     expect(calls[1]?.sql).toContain("'github_app_uninstall'");
+    expect(calls[1]?.sql).toContain("'pending'");
+    expect(calls[1]?.sql).toContain("on conflict do nothing");
     expect(calls[1]?.sql).toContain("interval '30 days'");
     expect(calls[1]?.sql).toContain("from legal_holds");
     expect(calls[1]?.sql).toContain("legal_hold_id");
