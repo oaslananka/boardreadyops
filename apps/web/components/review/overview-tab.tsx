@@ -1,3 +1,4 @@
+import type { PolicyFieldSource } from "@boardreadyops/contracts";
 import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoReview } from "../../lib/demo-data.js";
 import { Button } from "../ui/button.js";
@@ -64,6 +65,20 @@ const readinessTextClass: Record<"danger" | "success" | "warning", string> = {
   success: "text-success",
   warning: "text-warning",
 };
+
+function policySourceLabel(source: PolicyFieldSource | null): string {
+  if (!source) return "Not configured";
+  return `${customerStatusLabel(source.layer)} · ${source.policyName}`;
+}
+
+function policyValueWithSource(value: string, source: PolicyFieldSource | null) {
+  return (
+    <span>
+      {value}
+      <span className="block text-xs text-muted-foreground">Source: {policySourceLabel(source)}</span>
+    </span>
+  );
+}
 
 export function OverviewTab({
   review,
@@ -146,6 +161,55 @@ export function OverviewTab({
           </span>
         </div>
       </section>
+
+      {review.effectivePolicy ? (
+        <Panel
+          title="Effective Policy & Inheritance"
+          description="The release gate below is resolved from organization defaults plus any repository-level overrides. Each value names the policy layer that supplied it."
+          tone="inset"
+        >
+          <DefinitionGrid>
+            <Definition label="Baseline policy">{review.effectivePolicy.name}</Definition>
+            <Definition label="Effective layer">{customerStatusLabel(review.effectivePolicy.sourceLayer)}</Definition>
+            <Definition label="Severity gate">
+              {policyValueWithSource(
+                review.effectivePolicy.severityGate
+                  ? customerStatusLabel(review.effectivePolicy.severityGate)
+                  : "Not set",
+                review.effectivePolicy.provenance.severityGate,
+              )}
+            </Definition>
+            <Definition label="Required checklist">
+              {policyValueWithSource(
+                review.effectivePolicy.requiredChecklist.length > 0
+                  ? review.effectivePolicy.requiredChecklist.join(", ")
+                  : "None",
+                review.effectivePolicy.provenance.requiredChecklist,
+              )}
+            </Definition>
+            <Definition label="Required roles">
+              {policyValueWithSource(
+                review.effectivePolicy.requiredRoles.length > 0
+                  ? review.effectivePolicy.requiredRoles.join(", ")
+                  : "None",
+                review.effectivePolicy.provenance.requiredRoles,
+              )}
+            </Definition>
+            <Definition label="Evidence pack">
+              {policyValueWithSource(
+                review.effectivePolicy.requireEvidencePack ? "Required" : "Not required",
+                review.effectivePolicy.provenance.requireEvidencePack,
+              )}
+            </Definition>
+            <Definition label="External review">
+              {policyValueWithSource(
+                review.effectivePolicy.requireExternalReview ? "Required" : "Not required",
+                review.effectivePolicy.provenance.requireExternalReview,
+              )}
+            </Definition>
+          </DefinitionGrid>
+        </Panel>
+      ) : null}
 
       <Panel
         title="Changed Hardware Surfaces"

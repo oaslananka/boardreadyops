@@ -33,10 +33,30 @@ export const createPolicyInputSchema = z.object({
 });
 export type CreatePolicyInput = z.infer<typeof createPolicyInputSchema>;
 
+export const policySourceLayerSchema = z.enum(["organization", "team", "repository", "exception"]);
+export type PolicySourceLayer = z.infer<typeof policySourceLayerSchema>;
+
+export const policyFieldSourceSchema = z.object({
+  layer: policySourceLayerSchema,
+  policyId: z.string().min(1),
+  policyName: z.string().min(1),
+});
+export type PolicyFieldSource = z.infer<typeof policyFieldSourceSchema>;
+
+export const effectivePolicyProvenanceSchema = z.object({
+  requiredChecklist: policyFieldSourceSchema.nullable(),
+  requiredRoles: policyFieldSourceSchema.nullable(),
+  severityGate: policyFieldSourceSchema.nullable(),
+  requireEvidencePack: policyFieldSourceSchema.nullable(),
+  requireExternalReview: policyFieldSourceSchema.nullable(),
+});
+export type EffectivePolicyProvenance = z.infer<typeof effectivePolicyProvenanceSchema>;
+
 export const effectivePolicySchema = z.object({
   policy: reviewPolicySchema,
-  sourceLayer: z.enum(["organization", "team", "repository", "exception"]),
+  sourceLayer: policySourceLayerSchema,
   inheritedFrom: z.string().min(1).nullable(),
+  provenance: effectivePolicyProvenanceSchema.optional(),
 });
 export type EffectivePolicy = z.infer<typeof effectivePolicySchema>;
 

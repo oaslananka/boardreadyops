@@ -97390,10 +97390,24 @@ var createPolicyInputSchema = external_exports.object({
   requireEvidencePack: external_exports.boolean().default(false),
   requireExternalReview: external_exports.boolean().default(false)
 });
+var policySourceLayerSchema = external_exports.enum(["organization", "team", "repository", "exception"]);
+var policyFieldSourceSchema = external_exports.object({
+  layer: policySourceLayerSchema,
+  policyId: external_exports.string().min(1),
+  policyName: external_exports.string().min(1)
+});
+var effectivePolicyProvenanceSchema = external_exports.object({
+  requiredChecklist: policyFieldSourceSchema.nullable(),
+  requiredRoles: policyFieldSourceSchema.nullable(),
+  severityGate: policyFieldSourceSchema.nullable(),
+  requireEvidencePack: policyFieldSourceSchema.nullable(),
+  requireExternalReview: policyFieldSourceSchema.nullable()
+});
 var effectivePolicySchema = external_exports.object({
   policy: reviewPolicySchema,
-  sourceLayer: external_exports.enum(["organization", "team", "repository", "exception"]),
-  inheritedFrom: external_exports.string().min(1).nullable()
+  sourceLayer: policySourceLayerSchema,
+  inheritedFrom: external_exports.string().min(1).nullable(),
+  provenance: effectivePolicyProvenanceSchema.optional()
 });
 var policyDryRunResultSchema = external_exports.object({
   affectedRepositories: external_exports.number().int().nonnegative(),

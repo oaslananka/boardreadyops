@@ -3,7 +3,7 @@ import {
   type ReviewReadinessEvaluation,
   resolveEffectivePolicy,
 } from "@boardreadyops/cloud-core";
-import type { ReviewPolicy } from "@boardreadyops/contracts";
+import type { EffectivePolicyProvenance, PolicySourceLayer, ReviewPolicy } from "@boardreadyops/contracts";
 import {
   FindingDecisionStore,
   ReviewApprovalStore,
@@ -21,6 +21,31 @@ function toContractPolicy(record: ReviewPolicyRecord): ReviewPolicy {
   };
 }
 
+export type ResolvedReviewEffectivePolicy = ReviewPolicy & {
+  sourceLayer: PolicySourceLayer;
+  provenance: EffectivePolicyProvenance;
+};
+
+export async function resolveReviewEffectivePolicy(input: {
+  executor: PgQueryExecutor;
+  repositoryId: string;
+  tenantId: string;
+}): Promise<ResolvedReviewEffectivePolicy | null> {
+  const policyStore = new ReviewPolicyStore(input.executor);
+  const [organizationPolicy, repositoryPolicy] = await Promise.all([
+    policyStore.getPolicy(input.tenantId, "organization", null),
+    policyStore.getPolicy(input.tenantId, "repository", input.repositoryId),
+  ]);
+  const { effective, sourceLayer, provenance } = resolveEffectivePolicy({
+    organization: organizationPolicy ? toContractPolicy(organizationPolicy) : null,
+    team: null,
+    repository: repositoryPolicy ? toContractPolicy(repositoryPolicy) : null,
+    exception: null,
+  });
+
+  return effective && sourceLayer && provenance ? { ...effective, sourceLayer, provenance } : null;
+}
+
 /**
  * Single source of truth for review readiness: both the /readiness GET route
  * (what the UI renders) and the approval POST route (what actually gates an
@@ -36,7 +61,7 @@ export async function computeReviewReadiness(input: {
   tenantId: string;
 }): Promise<{
   readiness: ReviewReadinessEvaluation;
-  effectivePolicy: (ReviewPolicy & { sourceLayer: "organization" | "team" | "repository" | "exception" }) | null;
+  effectivePolicy: ResolvedReviewEffectivePolicy | null;
 }> {
   const [findingRows, decisions, approvals, checklist] = await Promise.all([
     new ReviewStore(input.executor).getFindingsForRun(input.repositoryId, input.headRunId),
@@ -45,16 +70,10 @@ export async function computeReviewReadiness(input: {
     new ReviewApprovalStore(input.executor).listChecklistItems(input.reviewId),
   ]);
 
-  const policyStore = new ReviewPolicyStore(input.executor);
-  const [organizationPolicy, repositoryPolicy] = await Promise.all([
-    policyStore.getPolicy(input.tenantId, "organization", null),
-    policyStore.getPolicy(input.tenantId, "repository", input.repositoryId),
-  ]);
-  const { effective: effectivePolicy, sourceLayer } = resolveEffectivePolicy({
-    organization: organizationPolicy ? toContractPolicy(organizationPolicy) : null,
-    team: null,
-    repository: repositoryPolicy ? toContractPolicy(repositoryPolicy) : null,
-    exception: null,
+  const effectivePolicy = await resolveReviewEffectivePolicy({
+    executor: input.executor,
+    repositoryId: input.repositoryId,
+    tenantId: input.tenantId,
   });
 
   const findings = findingRows
@@ -83,6 +102,6 @@ export async function computeReviewReadiness(input: {
 
   return {
     readiness,
-    effectivePolicy: effectivePolicy && sourceLayer ? { ...effectivePolicy, sourceLayer } : null,
+    effectivePolicy,
   };
 }

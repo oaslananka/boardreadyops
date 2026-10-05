@@ -1,7 +1,10 @@
 import type {
+  EffectivePolicyProvenance,
   EvidenceState,
   FindingDiffState,
   FindingDisposition,
+  PolicySeverityGate,
+  PolicySourceLayer,
   ReviewDecision,
   ReviewStatus,
   SnapshotArtifact,
@@ -63,6 +66,18 @@ export interface DemoEvidenceItem {
   verified?: boolean | undefined;
 }
 
+interface DemoEffectivePolicy {
+  id: string;
+  name: string;
+  sourceLayer: PolicySourceLayer;
+  requiredChecklist: string[];
+  requiredRoles: string[];
+  severityGate?: PolicySeverityGate | undefined;
+  requireEvidencePack: boolean;
+  requireExternalReview: boolean;
+  provenance: EffectivePolicyProvenance;
+}
+
 export interface DemoReview {
   id: string;
   repositoryId: string;
@@ -91,6 +106,8 @@ export interface DemoReview {
   headSnapshots?: SnapshotArtifact[] | undefined;
   /** Snapshots for the revision's base commit, when a prior run recorded them; enables overlay/diff canvas modes. */
   baseSnapshots?: SnapshotArtifact[] | undefined;
+  /** Effective cloud governance policy plus field-level inheritance provenance. */
+  effectivePolicy?: DemoEffectivePolicy | undefined;
 }
 
 type DemoChangedFile = {
