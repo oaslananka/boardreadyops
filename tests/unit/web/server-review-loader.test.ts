@@ -159,13 +159,14 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
       }
 
       if (norm.includes("from review_policies")) {
+        expect(params[0]).toBe("acme-hardware");
         const scope = params[1];
         if (scope === "organization") {
           return {
             rows: [
               {
                 id: "rpol-org",
-                tenantId: "alice",
+                tenantId: "acme-hardware",
                 scope: "organization",
                 scopeId: null,
                 name: "Org baseline",
@@ -186,7 +187,7 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
             rows: [
               {
                 id: "rpol-repo",
-                tenantId: "alice",
+                tenantId: "acme-hardware",
                 scope: "repository",
                 scopeId: "repo-hw-prod",
                 name: "Repository override",
