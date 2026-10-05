@@ -3,6 +3,7 @@ import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
 export type ReviewPolicyScope = "organization" | "team" | "repository";
 export type ReviewPolicySeverityGate = "error" | "high" | "medium";
+export type ReviewPolicyAuditAction = "create" | "update" | "delete";
 
 export interface ReviewPolicyRecord {
   id: string;
@@ -18,6 +19,25 @@ export interface ReviewPolicyRecord {
   requireExternalReview: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ReviewPolicyMutationActor {
+  githubUserId: number;
+  login: string;
+}
+
+export interface ReviewPolicyAuditEventRecord {
+  id: string;
+  tenantId: string;
+  policyId: string;
+  action: ReviewPolicyAuditAction;
+  scope: ReviewPolicyScope;
+  scopeId: string | null;
+  actorGithubUserId: string;
+  actorLogin: string;
+  beforePolicy: ReviewPolicyRecord | null;
+  afterPolicy: ReviewPolicyRecord | null;
+  createdAt: string;
 }
 
 export interface CreateReviewPolicyInput {
@@ -68,18 +88,62 @@ const SELECT_COLUMNS = `
   created_at AS "createdAt",
   updated_at AS "updatedAt"`;
 
+const AUDIT_SELECT_COLUMNS = `
+  id,
+  tenant_id AS "tenantId",
+  policy_id AS "policyId",
+  action,
+  scope,
+  scope_id AS "scopeId",
+  actor_github_user_id::text AS "actorGithubUserId",
+  actor_login AS "actorLogin",
+  before_policy AS "beforePolicy",
+  after_policy AS "afterPolicy",
+  created_at AS "createdAt"`;
+
+function policySnapshot(alias: string): string {
+  return `jsonb_build_object(
+    'id', ${alias}.id,
+    'tenantId', ${alias}.tenant_id,
+    'scope', ${alias}.scope,
+    'scopeId', ${alias}.scope_id,
+    'name', ${alias}.name,
+    'description', ${alias}.description,
+    'requiredChecklist', ${alias}.required_checklist,
+    'requiredRoles', ${alias}.required_roles,
+    'severityGate', ${alias}.severity_gate,
+    'requireEvidencePack', ${alias}.require_evidence_pack,
+    'requireExternalReview', ${alias}.require_external_review,
+    'createdAt', ${alias}.created_at,
+    'updatedAt', ${alias}.updated_at
+  )`;
+}
+
 export class ReviewPolicyStore {
   constructor(private readonly executor: SqlQueryExecutor) {}
 
-  async createPolicy(input: CreateReviewPolicyInput): Promise<ReviewPolicyRecord> {
+  async createPolicy(input: CreateReviewPolicyInput, actor: ReviewPolicyMutationActor): Promise<ReviewPolicyRecord> {
     const id = `rpol_${randomUUID()}`;
     const raw = await this.executor.query(
-      `INSERT INTO review_policies (
-        id, tenant_id, scope, scope_id, name, description,
-        required_checklist, required_roles, severity_gate,
-        require_evidence_pack, require_external_review, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, NOW(), NOW())
-      RETURNING ${SELECT_COLUMNS}`,
+      `WITH inserted AS (
+         INSERT INTO review_policies (
+           id, tenant_id, scope, scope_id, name, description,
+           required_checklist, required_roles, severity_gate,
+           require_evidence_pack, require_external_review, created_at, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, NOW(), NOW())
+         RETURNING *
+       ), audited AS (
+         INSERT INTO review_policy_audit_events (
+           id, tenant_id, policy_id, action, scope, scope_id,
+           actor_github_user_id, actor_login, before_policy, after_policy, created_at
+         )
+         SELECT gen_random_uuid()::text, inserted.tenant_id, inserted.id, 'create',
+                inserted.scope, inserted.scope_id, $12::bigint, $13::text,
+                NULL, ${policySnapshot("inserted")}, NOW()
+           FROM inserted
+       )
+       SELECT ${SELECT_COLUMNS}
+         FROM inserted`,
       [
         id,
         input.tenantId,
@@ -92,6 +156,8 @@ export class ReviewPolicyStore {
         input.severityGate ?? null,
         input.requireEvidencePack ?? false,
         input.requireExternalReview ?? false,
+        actor.githubUserId,
+        actor.login,
       ],
     );
     const rows = extractRows<ReviewPolicyRecord>(raw);
@@ -134,43 +200,100 @@ export class ReviewPolicyStore {
     return extractRows<ReviewPolicyRecord>(raw)[0];
   }
 
-  async updatePolicy(id: string, input: UpdateReviewPolicyInput): Promise<ReviewPolicyRecord | undefined> {
-    const existing = await this.getPolicyById(id);
-    if (!existing) {
-      return undefined;
-    }
-    const next: ReviewPolicyRecord = {
-      ...existing,
-      name: input.name ?? existing.name,
-      description: input.description !== undefined ? input.description : existing.description,
-      requiredChecklist: input.requiredChecklist ?? existing.requiredChecklist,
-      requiredRoles: input.requiredRoles ?? existing.requiredRoles,
-      severityGate: input.severityGate !== undefined ? input.severityGate : existing.severityGate,
-      requireEvidencePack: input.requireEvidencePack ?? existing.requireEvidencePack,
-      requireExternalReview: input.requireExternalReview ?? existing.requireExternalReview,
-    };
+  async updatePolicy(
+    id: string,
+    input: UpdateReviewPolicyInput,
+    actor: ReviewPolicyMutationActor,
+  ): Promise<ReviewPolicyRecord | undefined> {
     const raw = await this.executor.query(
-      `UPDATE review_policies
-       SET name = $2, description = $3, required_checklist = $4::jsonb, required_roles = $5::jsonb,
-           severity_gate = $6, require_evidence_pack = $7, require_external_review = $8, updated_at = NOW()
-       WHERE id = $1
-       RETURNING ${SELECT_COLUMNS}`,
+      `WITH existing AS (
+         SELECT *
+           FROM review_policies
+          WHERE id = $1
+          FOR UPDATE
+       ), updated AS (
+         UPDATE review_policies AS policy
+            SET name = CASE WHEN $2::boolean THEN $3::text ELSE existing.name END,
+                description = CASE WHEN $4::boolean THEN $5::text ELSE existing.description END,
+                required_checklist = CASE WHEN $6::boolean THEN $7::jsonb ELSE existing.required_checklist END,
+                required_roles = CASE WHEN $8::boolean THEN $9::jsonb ELSE existing.required_roles END,
+                severity_gate = CASE WHEN $10::boolean THEN $11::text ELSE existing.severity_gate END,
+                require_evidence_pack = CASE WHEN $12::boolean THEN $13::boolean ELSE existing.require_evidence_pack END,
+                require_external_review = CASE WHEN $14::boolean THEN $15::boolean ELSE existing.require_external_review END,
+                updated_at = NOW()
+           FROM existing
+          WHERE policy.id = existing.id
+         RETURNING policy.*
+       ), audited AS (
+         INSERT INTO review_policy_audit_events (
+           id, tenant_id, policy_id, action, scope, scope_id,
+           actor_github_user_id, actor_login, before_policy, after_policy, created_at
+         )
+         SELECT gen_random_uuid()::text, updated.tenant_id, updated.id, 'update',
+                updated.scope, updated.scope_id, $16::bigint, $17::text,
+                ${policySnapshot("existing")}, ${policySnapshot("updated")}, NOW()
+           FROM existing
+           JOIN updated ON updated.id = existing.id
+       )
+       SELECT ${SELECT_COLUMNS}
+         FROM updated`,
       [
         id,
-        next.name,
-        next.description,
-        JSON.stringify(next.requiredChecklist),
-        JSON.stringify(next.requiredRoles),
-        next.severityGate,
-        next.requireEvidencePack,
-        next.requireExternalReview,
+        input.name !== undefined,
+        input.name ?? null,
+        input.description !== undefined,
+        input.description ?? null,
+        input.requiredChecklist !== undefined,
+        JSON.stringify(input.requiredChecklist ?? []),
+        input.requiredRoles !== undefined,
+        JSON.stringify(input.requiredRoles ?? []),
+        input.severityGate !== undefined,
+        input.severityGate ?? null,
+        input.requireEvidencePack !== undefined,
+        input.requireEvidencePack ?? false,
+        input.requireExternalReview !== undefined,
+        input.requireExternalReview ?? false,
+        actor.githubUserId,
+        actor.login,
       ],
     );
     return extractRows<ReviewPolicyRecord>(raw)[0];
   }
 
-  async deletePolicy(id: string): Promise<boolean> {
-    const raw = await this.executor.query(`DELETE FROM review_policies WHERE id = $1 RETURNING id`, [id]);
+  async deletePolicy(id: string, actor: ReviewPolicyMutationActor): Promise<boolean> {
+    const raw = await this.executor.query(
+      `WITH deleted AS (
+         DELETE FROM review_policies
+          WHERE id = $1
+         RETURNING *
+       ), audited AS (
+         INSERT INTO review_policy_audit_events (
+           id, tenant_id, policy_id, action, scope, scope_id,
+           actor_github_user_id, actor_login, before_policy, after_policy, created_at
+         )
+         SELECT gen_random_uuid()::text, deleted.tenant_id, deleted.id, 'delete',
+                deleted.scope, deleted.scope_id, $2::bigint, $3::text,
+                ${policySnapshot("deleted")}, NULL, NOW()
+           FROM deleted
+       )
+       SELECT id
+         FROM deleted`,
+      [id, actor.githubUserId, actor.login],
+    );
     return extractRows<{ id: string }>(raw).length > 0;
+  }
+
+  async listAuditEvents(tenantId: string, policyId: string, limit = 100): Promise<ReviewPolicyAuditEventRecord[]> {
+    const boundedLimit = Math.max(1, Math.min(Math.trunc(limit), 250));
+    const raw = await this.executor.query(
+      `SELECT ${AUDIT_SELECT_COLUMNS}
+         FROM review_policy_audit_events
+        WHERE tenant_id = $1
+          AND policy_id = $2
+        ORDER BY created_at DESC, id DESC
+        LIMIT $3`,
+      [tenantId, policyId, boundedLimit],
+    );
+    return extractRows<ReviewPolicyAuditEventRecord>(raw);
   }
 }

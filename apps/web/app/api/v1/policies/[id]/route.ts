@@ -58,7 +58,10 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const store = new ReviewPolicyStore(executor);
     const owned = await getOwnedPolicyOrError(store, id, viewer.session.login);
     if (owned instanceof Response) return owned;
-    const updated = await store.updatePolicy(id, parsed.data);
+    const updated = await store.updatePolicy(id, parsed.data, {
+      githubUserId: viewer.session.userId,
+      login: viewer.session.login,
+    });
     return Response.json({ ok: true, policy: updated });
   } finally {
     await executor.close();
@@ -83,7 +86,10 @@ export async function DELETE(_request: Request, props: { params: Promise<{ id: s
     const store = new ReviewPolicyStore(executor);
     const owned = await getOwnedPolicyOrError(store, id, viewer.session.login);
     if (owned instanceof Response) return owned;
-    const deleted = await store.deletePolicy(id);
+    const deleted = await store.deletePolicy(id, {
+      githubUserId: viewer.session.userId,
+      login: viewer.session.login,
+    });
     return Response.json({ ok: deleted });
   } finally {
     await executor.close();

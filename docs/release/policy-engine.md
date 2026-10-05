@@ -72,4 +72,8 @@ Inheritance is field-aware:
 
 The review Overview shows this field-level provenance under **Effective Policy & Inheritance**. This makes repository-specific exceptions visible without pretending the whole effective policy came from one layer. The same resolver feeds review-readiness enforcement, so the displayed provenance and the approval gate use the same effective-policy calculation.
 
-This provenance describes the policy that is effective **now** for the review. Historical per-run policy snapshots and tenant-scoped audit events for policy mutations are separate work; do not treat the current-policy view as an immutable historical audit record until those records are persisted.
+This provenance describes the policy that is effective **now** for the review.
+
+Policy mutations are separately recorded in the tenant-scoped, append-only `review_policy_audit_events` history. Create, update, and delete mutations write their audit event in the same PostgreSQL statement as the policy change, including the authenticated GitHub actor plus before/after policy snapshots where applicable. The history remains available after a policy is deleted and can be read for an owned policy through `GET /api/v1/policies/:id/audit`.
+
+Historical **per-run effective-policy snapshots** are still separate work. The mutation audit proves how governance configuration changed over time; it does not by itself prove which effective policy a past release run evaluated. Do not treat the current-policy view as immutable historical run evidence until run-scoped policy snapshots are persisted.

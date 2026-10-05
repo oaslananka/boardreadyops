@@ -71,18 +71,21 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const store = new ReviewPolicyStore(executor);
     const tenantId = viewer.session.login; // simplified tenant mapping
-    const policy = await store.createPolicy({
-      tenantId,
-      scope: parsed.data.scope,
-      scopeId: parsed.data.scopeId ?? null,
-      name: parsed.data.name,
-      description: parsed.data.description ?? null,
-      requiredChecklist: parsed.data.requiredChecklist ?? [],
-      requiredRoles: parsed.data.requiredRoles ?? [],
-      severityGate: parsed.data.severityGate ?? null,
-      requireEvidencePack: parsed.data.requireEvidencePack ?? false,
-      requireExternalReview: parsed.data.requireExternalReview ?? false,
-    });
+    const policy = await store.createPolicy(
+      {
+        tenantId,
+        scope: parsed.data.scope,
+        scopeId: parsed.data.scopeId ?? null,
+        name: parsed.data.name,
+        description: parsed.data.description ?? null,
+        requiredChecklist: parsed.data.requiredChecklist ?? [],
+        requiredRoles: parsed.data.requiredRoles ?? [],
+        severityGate: parsed.data.severityGate ?? null,
+        requireEvidencePack: parsed.data.requireEvidencePack ?? false,
+        requireExternalReview: parsed.data.requireExternalReview ?? false,
+      },
+      { githubUserId: viewer.session.userId, login: viewer.session.login },
+    );
     return Response.json({ ok: true, policy }, { status: 201 });
   } finally {
     await executor.close();
