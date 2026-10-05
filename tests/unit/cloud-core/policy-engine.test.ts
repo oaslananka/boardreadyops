@@ -25,6 +25,13 @@ describe("resolveEffectivePolicy", () => {
 
     expect(result.sourceLayer).toBe("organization");
     expect(result.effective).toEqual(org);
+    expect(result.provenance).toEqual({
+      requiredChecklist: { layer: "organization", policyId: org.id, policyName: "org-default" },
+      requiredRoles: { layer: "organization", policyId: org.id, policyName: "org-default" },
+      severityGate: null,
+      requireEvidencePack: { layer: "organization", policyId: org.id, policyName: "org-default" },
+      requireExternalReview: { layer: "organization", policyId: org.id, policyName: "org-default" },
+    });
     expect(result.warnings).toEqual([]);
   });
 
@@ -32,6 +39,7 @@ describe("resolveEffectivePolicy", () => {
     const result = resolveEffectivePolicy({ organization: null, team: null, repository: null, exception: null });
     expect(result.effective).toBeNull();
     expect(result.sourceLayer).toBeNull();
+    expect(result.provenance).toBeNull();
     expect(result.warnings).toEqual([]);
   });
 
@@ -43,7 +51,15 @@ describe("resolveEffectivePolicy", () => {
 
     expect(result.sourceLayer).toBe("repository");
     expect(result.effective?.requiredChecklist).toEqual(["fab-checklist"]);
-    expect(result.warnings).toHaveLength(1);
+    expect(result.provenance?.requiredChecklist).toMatchObject({
+      layer: "repository",
+      policyName: "repo-override",
+    });
+    expect(result.provenance?.requiredRoles).toMatchObject({
+      layer: "organization",
+      policyName: "org-default",
+    });
+    expect(result.warnings).toEqual(["Policy from repository overrides requiredChecklist from inherited policy."]);
   });
 
   it("keeps the prior layer's checklist when the override layer leaves it empty", () => {
@@ -53,6 +69,11 @@ describe("resolveEffectivePolicy", () => {
     const result = resolveEffectivePolicy({ organization: org, team, repository: null, exception: null });
 
     expect(result.effective?.requiredChecklist).toEqual(["safety-review"]);
+    expect(result.sourceLayer).toBe("organization");
+    expect(result.provenance?.requiredChecklist).toMatchObject({
+      layer: "organization",
+      policyName: "org-default",
+    });
   });
 
   it("lets requireEvidencePack/requireExternalReview only turn on, never back off, across layers", () => {
@@ -62,6 +83,40 @@ describe("resolveEffectivePolicy", () => {
     const result = resolveEffectivePolicy({ organization: org, team: null, repository: repo, exception: null });
 
     expect(result.effective?.requireEvidencePack).toBe(true);
+    expect(result.provenance?.requireEvidencePack).toMatchObject({
+      layer: "organization",
+      policyName: "org-default",
+    });
+    expect(result.sourceLayer).toBe("organization");
+  });
+
+  it("attributes independently overridden fields to the layers that actually supplied them", () => {
+    const org = policy({
+      scope: "organization",
+      name: "org-default",
+      requiredChecklist: ["safety-review"],
+      requiredRoles: ["hardware-lead"],
+      severityGate: "high",
+    });
+    const repo = policy({
+      scope: "repository",
+      name: "repo-override",
+      requiredChecklist: ["fab-checklist"],
+      severityGate: "error",
+    });
+
+    const result = resolveEffectivePolicy({ organization: org, team: null, repository: repo, exception: null });
+
+    expect(result.effective).toMatchObject({
+      requiredChecklist: ["fab-checklist"],
+      requiredRoles: ["hardware-lead"],
+      severityGate: "error",
+    });
+    expect(result.provenance).toMatchObject({
+      requiredChecklist: { layer: "repository", policyName: "repo-override" },
+      requiredRoles: { layer: "organization", policyName: "org-default" },
+      severityGate: { layer: "repository", policyName: "repo-override" },
+    });
   });
 });
 

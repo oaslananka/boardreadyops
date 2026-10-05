@@ -158,6 +158,52 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
         };
       }
 
+      if (norm.includes("from review_policies")) {
+        const scope = params[1];
+        if (scope === "organization") {
+          return {
+            rows: [
+              {
+                id: "rpol-org",
+                tenantId: "alice",
+                scope: "organization",
+                scopeId: null,
+                name: "Org baseline",
+                description: null,
+                requiredChecklist: ["safety-review"],
+                requiredRoles: ["hardware-lead"],
+                severityGate: "high",
+                requireEvidencePack: true,
+                requireExternalReview: false,
+                createdAt: now,
+                updatedAt: now,
+              },
+            ],
+          };
+        }
+        if (scope === "repository") {
+          return {
+            rows: [
+              {
+                id: "rpol-repo",
+                tenantId: "alice",
+                scope: "repository",
+                scopeId: "repo-hw-prod",
+                name: "Repository override",
+                description: null,
+                requiredChecklist: ["fab-checklist"],
+                requiredRoles: [],
+                severityGate: null,
+                requireEvidencePack: false,
+                requireExternalReview: true,
+                createdAt: now,
+                updatedAt: now,
+              },
+            ],
+          };
+        }
+      }
+
       return { rows: [] };
     });
 
@@ -170,6 +216,22 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
     expect(review?.findings[0]?.ruleId).toBe("rule.clearance.high_voltage");
     expect(review?.approvals).toHaveLength(1);
     expect(review?.approvals[0]?.approverId).toBe("signoff.officer@company.com");
+    expect(review?.effectivePolicy).toMatchObject({
+      name: "Org baseline",
+      sourceLayer: "repository",
+      requiredChecklist: ["fab-checklist"],
+      requiredRoles: ["hardware-lead"],
+      severityGate: "high",
+      requireEvidencePack: true,
+      requireExternalReview: true,
+      provenance: {
+        requiredChecklist: { layer: "repository", policyName: "Repository override" },
+        requiredRoles: { layer: "organization", policyName: "Org baseline" },
+        severityGate: { layer: "organization", policyName: "Org baseline" },
+        requireEvidencePack: { layer: "organization", policyName: "Org baseline" },
+        requireExternalReview: { layer: "repository", policyName: "Repository override" },
+      },
+    });
   });
 
   it("populates headSnapshots from run_snapshots recorded for the revision's head run", async () => {

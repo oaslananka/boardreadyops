@@ -61,6 +61,41 @@ describe("Review Detail Tabs", () => {
     expect(overview).toBeDefined();
     expect(overview.props).toBeDefined();
   });
+  it("renders effective policy inheritance with field-level provenance", () => {
+    const policyReview = {
+      ...review,
+      effectivePolicy: {
+        id: "rpol-org",
+        name: "Org baseline",
+        sourceLayer: "repository" as const,
+        requiredChecklist: ["fab-checklist"],
+        requiredRoles: ["hardware-lead"],
+        severityGate: "high" as const,
+        requireEvidencePack: true,
+        requireExternalReview: true,
+        provenance: {
+          requiredChecklist: { layer: "repository" as const, policyId: "rpol-repo", policyName: "Repo override" },
+          requiredRoles: { layer: "organization" as const, policyId: "rpol-org", policyName: "Org baseline" },
+          severityGate: { layer: "organization" as const, policyId: "rpol-org", policyName: "Org baseline" },
+          requireEvidencePack: { layer: "organization" as const, policyId: "rpol-org", policyName: "Org baseline" },
+          requireExternalReview: {
+            layer: "repository" as const,
+            policyId: "rpol-repo",
+            policyName: "Repo override",
+          },
+        },
+      },
+    };
+
+    const overview = renderToStaticMarkup(createElement(OverviewTab, { review: policyReview }));
+
+    expect(overview).toContain("Effective Policy &amp; Inheritance");
+    expect(overview).toContain("Org baseline");
+    expect(overview).toContain("Repository · Repo override");
+    expect(overview).toContain("Organization · Org baseline");
+    expect(overview).toContain("fab-checklist");
+    expect(overview).toContain("hardware-lead");
+  });
 
   it("renders ChangesTab with schematic, layout, and BOM diffs", () => {
     const changes = ChangesTab({ review });

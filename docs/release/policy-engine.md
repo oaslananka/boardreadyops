@@ -56,3 +56,20 @@ boardreadyops policy . --format json
 Simulation mode is the recommended way to preview a policy change in CI before turning on enforcement: it prints the full per-rule explanation and always exits `0`.
 
 The policy result is also attached to the run result, so it appears in the JSON report under `policy` and as a badge in the [HTML release dashboard](../reports/html.md) decision banner.
+
+## Cloud policy inheritance and provenance
+
+The hosted review workflow can layer governance policy on top of repository results. The organization policy is the baseline; a repository policy may override the fields it explicitly configures. The resolver applies later layers only when they contribute a value, so an empty repository policy does not hide the organization baseline.
+
+Current hosted review enforcement resolves organization and repository layers. The policy contract also reserves team and exception layers for future governance flows.
+
+Inheritance is field-aware:
+
+- non-empty `requiredChecklist` and `requiredRoles` values replace the inherited value;
+- an explicitly configured `severityGate` replaces the inherited threshold;
+- `requireEvidencePack` and `requireExternalReview` are monotonic requirements: a repository may turn an inherited requirement on, but cannot turn an organization requirement off by setting `false`; and
+- every effective field records the policy id, policy name, and layer that supplied it.
+
+The review Overview shows this field-level provenance under **Effective Policy & Inheritance**. This makes repository-specific exceptions visible without pretending the whole effective policy came from one layer. The same resolver feeds review-readiness enforcement, so the displayed provenance and the approval gate use the same effective-policy calculation.
+
+This provenance describes the policy that is effective **now** for the review. Historical per-run policy snapshots and tenant-scoped audit events for policy mutations are separate work; do not treat the current-policy view as an immutable historical audit record until those records are persisted.

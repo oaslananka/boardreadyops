@@ -13,6 +13,7 @@ import {
 } from "./demo-data.js";
 import { buildDemoSnapshots } from "./demo-snapshots.js";
 import { reviewFixturesEnabled } from "./review-listing.js";
+import { resolveReviewEffectivePolicy } from "./review-readiness.js";
 import { cancelledSubscriptionProbe } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
@@ -486,12 +487,15 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       return null;
     }
 
-    const [findings, evidenceItems, governance, headSnapshots, baseSnapshots] = await Promise.all([
+    const [findings, evidenceItems, governance, headSnapshots, baseSnapshots, effectivePolicy] = await Promise.all([
       loadReconstructedFindings(executor, reviewId, revision.head_run_id),
       loadEvidenceArtifacts(executor, revision.head_run_id),
       loadReviewGovernanceData(executor, reviewId, row.repository_id),
       loadHeadSnapshots(executor, revision.head_run_id),
       loadBaseSnapshots(executor, row.repository_id, revision.base_commit_sha),
+      session
+        ? resolveReviewEffectivePolicy({ executor, repositoryId: row.repository_id, tenantId: session.login })
+        : Promise.resolve(null),
     ]);
 
     const baseCommit = revision.base_commit_sha ?? "0000000000000000000000000000000000000000";
@@ -522,6 +526,19 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       comments: governance.comments,
       headSnapshots: headSnapshots.length > 0 ? headSnapshots : undefined,
       baseSnapshots: baseSnapshots.length > 0 ? baseSnapshots : undefined,
+      effectivePolicy: effectivePolicy
+        ? {
+            id: effectivePolicy.id,
+            name: effectivePolicy.name,
+            sourceLayer: effectivePolicy.sourceLayer,
+            requiredChecklist: effectivePolicy.requiredChecklist,
+            requiredRoles: effectivePolicy.requiredRoles,
+            severityGate: effectivePolicy.severityGate,
+            requireEvidencePack: effectivePolicy.requireEvidencePack,
+            requireExternalReview: effectivePolicy.requireExternalReview,
+            provenance: effectivePolicy.provenance,
+          }
+        : undefined,
     };
   } finally {
     await executor.close();

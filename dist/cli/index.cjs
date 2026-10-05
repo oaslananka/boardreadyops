@@ -31678,7 +31678,7 @@ var init_multicad = __esm({
 });
 
 // packages/contracts/src/policy.ts
-var policySeverityGateSchema, reviewPolicySchema, createPolicyInputSchema, effectivePolicySchema, policyDryRunResultSchema;
+var policySeverityGateSchema, reviewPolicySchema, createPolicyInputSchema, policySourceLayerSchema, policyFieldSourceSchema, effectivePolicyProvenanceSchema, effectivePolicySchema, policyDryRunResultSchema;
 var init_policy = __esm({
   "packages/contracts/src/policy.ts"() {
     "use strict";
@@ -31710,10 +31710,24 @@ var init_policy = __esm({
       requireEvidencePack: external_exports.boolean().default(false),
       requireExternalReview: external_exports.boolean().default(false)
     });
+    policySourceLayerSchema = external_exports.enum(["organization", "team", "repository", "exception"]);
+    policyFieldSourceSchema = external_exports.object({
+      layer: policySourceLayerSchema,
+      policyId: external_exports.string().min(1),
+      policyName: external_exports.string().min(1)
+    });
+    effectivePolicyProvenanceSchema = external_exports.object({
+      requiredChecklist: policyFieldSourceSchema.nullable(),
+      requiredRoles: policyFieldSourceSchema.nullable(),
+      severityGate: policyFieldSourceSchema.nullable(),
+      requireEvidencePack: policyFieldSourceSchema.nullable(),
+      requireExternalReview: policyFieldSourceSchema.nullable()
+    });
     effectivePolicySchema = external_exports.object({
       policy: reviewPolicySchema,
-      sourceLayer: external_exports.enum(["organization", "team", "repository", "exception"]),
-      inheritedFrom: external_exports.string().min(1).nullable()
+      sourceLayer: policySourceLayerSchema,
+      inheritedFrom: external_exports.string().min(1).nullable(),
+      provenance: effectivePolicyProvenanceSchema.optional()
     });
     policyDryRunResultSchema = external_exports.object({
       affectedRepositories: external_exports.number().int().nonnegative(),
