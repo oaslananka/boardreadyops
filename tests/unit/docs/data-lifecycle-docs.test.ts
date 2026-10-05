@@ -20,8 +20,12 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("No automatic age-based purge");
     expect(lifecycle).toContain("append-only");
     expect(lifecycle).toContain("ARTIFACT_STORAGE_DRIVER=local");
-    expect(lifecycle).toContain("replaced by a newer accepted result");
-    expect(lifecycle).toContain("General age-based artifact expiry is not implemented");
+    expect(lifecycle).toContain("Replacement and age-based retention");
+    expect(lifecycle).toContain("Age-based managed-artifact retention");
+    expect(lifecycle).toContain("bounded destructive expiry");
+    expect(lifecycle).toContain("queue physical deletion exactly once");
+    expect(lifecycle).toContain("stale BoardReadyOps signed download URLs fail closed");
+    expect(lifecycle).not.toContain("Age-based artifact retention preview");
     expect(lifecycle).toContain("15 minutes");
     expect(lifecycle).toContain("Plaintext capability, lease, enrollment, and nonce secrets are not persisted");
     expect(lifecycle).toContain("Expired runner request nonce digests are removed periodically in bounded batches");
@@ -39,11 +43,14 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("`--keep-workspace` is ignored");
     expect(lifecycle).toContain("Private repository run dashboards fail closed");
     expect(lifecycle).toContain("repository authorization");
+    expect(lifecycle).toContain(
+      "Customer-facing data export, erasure-request intake, and tenant legal-hold controls exist",
+    );
     expect(lifecycle).toContain("organization, repository, and user erasure **request intake** exists");
     expect(lifecycle).toContain(
       "complete erasure execution across relational data and managed objects is not automated",
     );
-    expect(lifecycle).toContain("complete customer/operator legal-hold lifecycle is not implemented");
+    expect(lifecycle).toContain("tenant-scoped legal holds can be created, released, and enforced");
     expect(lifecycle).toContain("backup and platform-log expiry remain operator responsibilities");
   });
 
@@ -78,7 +85,9 @@ describe("data lifecycle documentation", () => {
     expect(audit).toContain("`artifact.object.deleted`");
     expect(audit).toContain("`outcome=missing`");
     expect(audit).toContain("durable physical-deletion job");
-    expect(audit).toContain("general age-based artifact expiry");
+    expect(audit).toContain("Age-based managed-artifact retention");
+    expect(audit).toContain("shared storage");
+    expect(audit).toContain("serialized");
     expect(audit).not.toContain("Issue #43 remains open");
     expect(audit).toContain("Issue #44 remains open");
   });

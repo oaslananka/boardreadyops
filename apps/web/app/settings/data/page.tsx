@@ -9,6 +9,7 @@ import { ErasureRequestForm, ExportRequestForm } from "../../../components/setti
 import { Button } from "../../../components/ui/button.js";
 import { NativeSelect } from "../../../components/ui/native-select.js";
 import { Alert, EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
+import { resolveControlPlaneRetentionConfiguration } from "../../../lib/cloud-runtime-config.js";
 import { customerPlanLabel } from "../../../lib/customer-nomenclature.js";
 import { loadDataSettingsAdmin, retentionPolicyForInstallation } from "../../../lib/data-settings-admin.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
@@ -97,6 +98,7 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
   const admin = await loadDataSettingsAdmin(viewer.session, first(parameters.installation));
+  const controlPlaneRetention = resolveControlPlaneRetentionConfiguration();
 
   return (
     <div className="flex flex-col gap-5">
@@ -106,8 +108,41 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
         id="retention"
       >
         <p className="text-sm text-muted-foreground">
-          Free keeps evidence for 30 days, Team for 365 days, and Business/Pilot can choose a custom window or retain
-          indefinitely. Raw component-provider data remains capped at 24 hours.
+          Free keeps managed artifacts for 30 days, Team for 365 days, and Business/Pilot/Enterprise can choose a custom
+          window or retain indefinitely. Component-provider source cache follows the effective installation policy shown
+          below.
+        </p>
+      </Panel>
+
+      <Panel
+        title="Control-plane lifecycle defaults"
+        description="Deployment-level windows that apply independently of tenant managed-artifact retention."
+      >
+        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-meta uppercase tracking-wide text-muted-foreground">Webhook terminal metadata</dt>
+            <dd className="mt-1 text-sm font-medium text-foreground">{controlPlaneRetention.webhookInboxDays} days</dd>
+          </div>
+          <div>
+            <dt className="text-meta uppercase tracking-wide text-muted-foreground">One-time control-plane records</dt>
+            <dd className="mt-1 text-sm font-medium text-foreground">
+              {controlPlaneRetention.ephemeralRecordsDays} days
+            </dd>
+          </div>
+          <div>
+            <dt className="text-meta uppercase tracking-wide text-muted-foreground">Completed delivery history</dt>
+            <dd className="mt-1 text-sm font-medium text-foreground">
+              {controlPlaneRetention.controlPlaneHistoryDays} days
+            </dd>
+          </div>
+          <div>
+            <dt className="text-meta uppercase tracking-wide text-muted-foreground">Runs, findings & audit events</dt>
+            <dd className="mt-1 text-sm font-medium text-foreground">No automatic age-based purge</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-meta text-muted-foreground">
+          These are operator-managed deployment settings. The tenant-scoped managed-artifact policy below controls
+          report-object expiry separately.
         </p>
       </Panel>
 
@@ -150,6 +185,9 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
             {(() => {
               const planDefault = retentionPolicyForInstallation(admin.selected, undefined);
               const retentionDays = admin.policy ? admin.policy.retentionDays : planDefault.retentionDays;
+              const sourceRetentionHours = admin.policy
+                ? admin.policy.sourceRetentionHours
+                : planDefault.sourceRetentionHours;
               return (
                 <>
                   <dl className="grid gap-3 sm:grid-cols-3">
@@ -160,16 +198,24 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-meta uppercase tracking-wide text-muted-foreground">Evidence retention</dt>
+                      <dt className="text-meta uppercase tracking-wide text-muted-foreground">
+                        Managed artifact retention
+                      </dt>
                       <dd className="mt-1 text-sm font-medium text-foreground">
                         {retentionDays === null ? "Indefinite" : `${retentionDays} days`}
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-meta uppercase tracking-wide text-muted-foreground">Source retention</dt>
-                      <dd className="mt-1 text-sm font-medium text-foreground">24 hours</dd>
+                      <dt className="text-meta uppercase tracking-wide text-muted-foreground">
+                        Component source cache
+                      </dt>
+                      <dd className="mt-1 text-sm font-medium text-foreground">{sourceRetentionHours} hours</dd>
                     </div>
                   </dl>
+                  <p className="mt-3 text-meta text-muted-foreground">
+                    Component-provider source data for this installation is retained for up to {sourceRetentionHours}{" "}
+                    hours.
+                  </p>
                   <RetentionPolicyForm
                     installationId={admin.selected.id}
                     currentRetentionDays={retentionDays}

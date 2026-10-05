@@ -192,9 +192,11 @@ creates a tenant-scoped durable physical-deletion job. The local-storage worker 
 records `artifact.object.deleted` with `outcome=deleted` after removing the regular
 file or `outcome=missing` when the object was already absent. Unsafe paths,
 unsupported storage drivers, and exhausted retries instead produce bounded failure
-evidence. This replacement path does not implement general age-based artifact expiry.
-See [Data lifecycle and privacy](data-lifecycle.md) for the full storage-boundary and
-retention contract.
+evidence. Age-based managed-artifact retention uses the same durable physical-deletion
+job and audit contract after bounded, legal-hold-aware metadata expiry; shared storage
+paths are serialized so the backing object is queued only after its last retained
+metadata reference is gone. See [Data lifecycle and privacy](data-lifecycle.md) for the
+full storage-boundary and retention contract.
 
 ## Release decision reconstruction
 
@@ -225,8 +227,10 @@ upload, signed artifact download starts, artifact-record replacement deletions,
 dead-letter replay, and reconciliation operations. The
 authenticated operator export provides the first supported query surface.
 
-Issue #44 remains open for general age-based expiry, per-tenant retention controls,
-non-local storage deletion, authenticated customer export, erasure, uninstall, backup,
-and legal-hold behavior. Result-level release decisions are reconstructable from the
-existing tenant-scoped operator export; cross-resource reconstruction will expand as
-those remaining lifecycle surfaces are implemented.
+Issue #44 remains open for age-based expiry of runs/findings/audit history,
+repository-specific retention overrides, non-local storage deletion, complete erasure
+and uninstall execution, and backup/platform-log lifecycle behavior. Tenant-scoped
+managed-artifact retention and legal holds are implemented. Result-level release
+decisions are reconstructable from the existing tenant-scoped operator export;
+cross-resource reconstruction will expand as the remaining lifecycle surfaces are
+implemented.
