@@ -216,6 +216,3 @@ export async function handleProductionOutcomeImport(
     await scope.executor.close();
   }
 }
-
-// Backward-compatible export retained for callers/tests that imported the CSV-specific name.
-export const handleProductionOutcomeCsvImport = handleProductionOutcomeImport;
