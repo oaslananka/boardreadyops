@@ -52,7 +52,7 @@ Event, actor, and subject types use lowercase dot, underscore, or hyphen-delimit
 
 `audit_events` is append-only at the database layer. PostgreSQL triggers reject direct `UPDATE` and `DELETE` operations. A database-owned cascade may remove installation-scoped audit rows only when the parent installation itself is deleted; repository, run, artifact, and runner references otherwise become nullable dimensions rather than rewriting event content.
 
-GitHub App uninstall now queues a tenant-scoped erasure request and revokes repository API tokens, but it does not directly delete the parent installation or its append-only audit evidence. Complete erasure execution across retained data classes, backup boundaries, and deletion proof remains a separate lifecycle operation; operators must not use direct database deletion as a substitute.
+GitHub App uninstall now queues a tenant-scoped erasure request and revokes repository API tokens, but it does not directly delete the parent installation or its append-only audit evidence. Complete erasure execution across retained data classes, backup boundaries, and proof of deletion remains a separate lifecycle operation; operators must not use direct database deletion as a substitute.
 
 ## Query contract
 
