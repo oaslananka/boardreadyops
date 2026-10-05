@@ -108,8 +108,9 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
         id="retention"
       >
         <p className="text-sm text-muted-foreground">
-          Free keeps managed artifacts for 30 days, Team for 365 days, and Business/Pilot can choose a custom window or
-          retain indefinitely. Component-provider source data remains capped at 24 hours.
+          Free keeps managed artifacts for 30 days, Team for 365 days, and Business/Pilot/Enterprise can choose a custom
+          window or retain indefinitely. Component-provider source cache follows the effective installation policy shown
+          below.
         </p>
       </Panel>
 
@@ -211,6 +212,10 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
                       <dd className="mt-1 text-sm font-medium text-foreground">{sourceRetentionHours} hours</dd>
                     </div>
                   </dl>
+                  <p className="mt-3 text-meta text-muted-foreground">
+                    Component-provider source data for this installation is retained for up to {sourceRetentionHours}{" "}
+                    hours.
+                  </p>
                   <RetentionPolicyForm
                     installationId={admin.selected.id}
                     currentRetentionDays={retentionDays}

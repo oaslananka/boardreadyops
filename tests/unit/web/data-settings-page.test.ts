@@ -22,6 +22,9 @@ describe("Data & Retention settings administration", () => {
       expect(page).toContain(text);
     }
     expect(page).toContain("loadDataSettingsAdmin");
+    expect(page).toContain("Business/Pilot/Enterprise");
+    expect(page).toContain("retained for up to {sourceRetentionHours}");
+    expect(page).not.toContain("source data remains capped at 24 hours");
     expect(page).toContain("resolveControlPlaneRetentionConfiguration");
     expect(page).toContain("controlPlaneRetention.webhookInboxDays");
     expect(page).toContain("controlPlaneRetention.ephemeralRecordsDays");
