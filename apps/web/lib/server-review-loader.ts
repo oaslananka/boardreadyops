@@ -494,7 +494,7 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       loadHeadSnapshots(executor, revision.head_run_id),
       loadBaseSnapshots(executor, row.repository_id, revision.base_commit_sha),
       session
-        ? resolveReviewEffectivePolicy({ executor, repositoryId: row.repository_id, tenantId: session.login })
+        ? resolveReviewEffectivePolicy({ executor, repositoryId: row.repository_id, tenantId: row.account_login })
         : Promise.resolve(null),
     ]);
 
