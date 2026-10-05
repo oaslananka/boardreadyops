@@ -120,6 +120,56 @@ describe("release evidence graph", () => {
     ]);
   });
 
+  it("keeps optional policy metadata absent instead of synthesizing defaults", () => {
+    const graph = buildReleaseEvidenceGraph({
+      release: {
+        id: "run-policy",
+        repositoryId: "repo-1",
+        repository: "acme/gateway",
+        commitSha: "1".repeat(40),
+      },
+      review: {
+        id: "review-policy",
+        policy: { id: "policy-1", label: "Repository policy" },
+        approvals: [],
+        waivers: [],
+      },
+    });
+
+    expect(graph.nodes.find((node) => node.id === "policy:policy-1")).toEqual({
+      id: "policy:policy-1",
+      kind: "policy",
+      label: "Repository policy",
+      attributes: {},
+    });
+  });
+
+  it("uses manufacturing date when a production import timestamp is unavailable", () => {
+    const graph = buildReleaseEvidenceGraph({
+      release: {
+        id: "run-production",
+        repositoryId: "repo-1",
+        repository: "acme/gateway",
+        commitSha: "2".repeat(40),
+      },
+      evidence: [],
+      productionBatches: [
+        {
+          id: "batch-date",
+          externalBatchId: "LOT-DATE",
+          manufacturer: "Acme EMS",
+          manufacturedOn: "2026-09-18",
+          sourceSha256: "3".repeat(64),
+        },
+      ],
+    });
+
+    expect(graph.nodes.find((node) => node.id === "production_batch:batch-date")).toMatchObject({
+      occurredAt: "2026-09-18",
+      integrity: { sha256: "3".repeat(64) },
+    });
+  });
+
   it("distinguishes an explicitly empty approval/waiver history from context that was never loaded", () => {
     const graph = buildReleaseEvidenceGraph({
       release: {

@@ -125,174 +125,220 @@ function addEdge(edges: EvidenceGraphEdge[], from: string, to: string, relations
   edges.push({ from, to, relationship });
 }
 
-export function buildReleaseEvidenceGraph(input: ReleaseEvidenceGraphInput): ReleaseEvidenceGraph {
-  const nodes: EvidenceGraphNode[] = [];
-  const edges: EvidenceGraphEdge[] = [];
-  const missing: MissingEvidenceRelationship[] = [];
+type GraphBuildState = {
+  nodes: EvidenceGraphNode[];
+  edges: EvidenceGraphEdge[];
+  missing: MissingEvidenceRelationship[];
+};
 
-  const releaseId = stableNodeId("release", input.release.id);
-  const sourceId = stableNodeId("source", `${input.release.repositoryId}:${input.release.commitSha}`);
+type ReleaseInput = ReleaseEvidenceGraphInput["release"];
+type ReviewInput = NonNullable<ReleaseEvidenceGraphInput["review"]>;
+type EvidenceInput = NonNullable<ReleaseEvidenceGraphInput["evidence"]>[number];
+type ProductionBatchInput = NonNullable<ReleaseEvidenceGraphInput["productionBatches"]>[number];
 
-  nodes.push(
+function addMissing(
+  state: GraphBuildState,
+  from: string,
+  relationship: EvidenceGraphRelationship,
+  expectedKind: EvidenceGraphNodeKind,
+  reason: string,
+): void {
+  state.missing.push({ from, relationship, expectedKind, reason });
+}
+
+function releaseIdentityAttributes(release: ReleaseInput): Readonly<Record<string, EvidenceGraphValue>> {
+  return {
+    repository: release.repository,
+    commitSha: release.commitSha,
+    ...(release.ref ? { ref: release.ref } : {}),
+  };
+}
+
+function addReleaseAndSource(state: GraphBuildState, release: ReleaseInput): string {
+  const releaseId = stableNodeId("release", release.id);
+  const sourceId = stableNodeId("source", `${release.repositoryId}:${release.commitSha}`);
+  const identity = releaseIdentityAttributes(release);
+
+  state.nodes.push(
     {
       id: releaseId,
       kind: "release",
-      label: input.release.id,
-      ...(input.release.completedAt ? { occurredAt: input.release.completedAt } : {}),
+      label: release.id,
+      ...(release.completedAt ? { occurredAt: release.completedAt } : {}),
       attributes: {
-        repository: input.release.repository,
-        commitSha: input.release.commitSha,
-        ...(input.release.ref ? { ref: input.release.ref } : {}),
-        ...(input.release.decision ? { decision: input.release.decision } : {}),
+        ...identity,
+        ...(release.decision ? { decision: release.decision } : {}),
       },
     },
     {
       id: sourceId,
       kind: "source",
-      label: input.release.commitSha,
-      attributes: {
-        repository: input.release.repository,
-        commitSha: input.release.commitSha,
-        ...(input.release.ref ? { ref: input.release.ref } : {}),
-      },
+      label: release.commitSha,
+      attributes: identity,
     },
   );
-  addEdge(edges, releaseId, sourceId, "derived_from");
+  addEdge(state.edges, releaseId, sourceId, "derived_from");
+  return releaseId;
+}
 
-  const evidence = input.evidence ?? [];
+function addEvidenceNode(state: GraphBuildState, releaseId: string, item: EvidenceInput): void {
+  const nodeId = stableNodeId("evidence", item.id);
+  state.nodes.push({
+    id: nodeId,
+    kind: "evidence",
+    label: item.name,
+    ...(item.uploadedAt ? { occurredAt: item.uploadedAt } : {}),
+    integrity: { sha256: item.sha256 },
+    attributes: { kind: item.kind },
+  });
+  addEdge(state.edges, releaseId, nodeId, "supported_by");
+}
+
+function addEvidence(state: GraphBuildState, releaseId: string, evidence: readonly EvidenceInput[]): void {
   if (evidence.length === 0) {
-    missing.push({
-      from: releaseId,
-      relationship: "supported_by",
-      expectedKind: "evidence",
-      reason: "No release evidence artifacts are linked to this run.",
-    });
-  } else {
-    for (const item of evidence) {
-      const nodeId = stableNodeId("evidence", item.id);
-      nodes.push({
-        id: nodeId,
-        kind: "evidence",
-        label: item.name,
-        ...(item.uploadedAt ? { occurredAt: item.uploadedAt } : {}),
-        integrity: { sha256: item.sha256 },
-        attributes: { kind: item.kind },
-      });
-      addEdge(edges, releaseId, nodeId, "supported_by");
-    }
+    addMissing(state, releaseId, "supported_by", "evidence", "No release evidence artifacts are linked to this run.");
+    return;
+  }
+  for (const item of evidence) addEvidenceNode(state, releaseId, item);
+}
+
+function addPolicy(state: GraphBuildState, reviewId: string, review: ReviewInput): void {
+  const policy = review.policy;
+  if (!policy) {
+    addMissing(
+      state,
+      reviewId,
+      "governed_by",
+      "policy",
+      "The run dashboard has no persisted policy context for this review.",
+    );
+    return;
   }
 
-  if (!input.review) {
-    missing.push({
-      from: releaseId,
-      relationship: "reviewed_in",
-      expectedKind: "review",
-      reason: "No linked review context is available for this release.",
-    });
-  } else {
-    const reviewId = stableNodeId("review", input.review.id);
-    nodes.push({
-      id: reviewId,
-      kind: "review",
-      label: input.review.id,
-      ...(input.review.evidenceDigest ? { integrity: { evidenceDigest: input.review.evidenceDigest } } : {}),
-    });
-    addEdge(edges, releaseId, reviewId, "reviewed_in");
+  const policyId = stableNodeId("policy", policy.id);
+  state.nodes.push({
+    id: policyId,
+    kind: "policy",
+    label: policy.label,
+    attributes: {
+      ...(policy.source ? { source: policy.source } : {}),
+      ...(policy.version === undefined ? {} : { version: policy.version }),
+    },
+  });
+  addEdge(state.edges, reviewId, policyId, "governed_by");
+}
 
-    if (input.review.policy) {
-      const policyId = stableNodeId("policy", input.review.policy.id);
-      nodes.push({
-        id: policyId,
-        kind: "policy",
-        label: input.review.policy.label,
-        attributes: {
-          ...(input.review.policy.source ? { source: input.review.policy.source } : {}),
-          ...(input.review.policy.version === undefined ? {} : { version: input.review.policy.version }),
-        },
-      });
-      addEdge(edges, reviewId, policyId, "governed_by");
-    } else {
-      missing.push({
-        from: reviewId,
-        relationship: "governed_by",
-        expectedKind: "policy",
-        reason: "The run dashboard has no persisted policy context for this review.",
-      });
-    }
-
-    if (input.review.approvals === undefined) {
-      missing.push({
-        from: reviewId,
-        relationship: "approved_by",
-        expectedKind: "approval",
-        reason: "Approval evidence was not loaded for this investigation.",
-      });
-    } else {
-      for (const approval of input.review.approvals) {
-        const approvalId = stableNodeId("approval", approval.id);
-        nodes.push({
-          id: approvalId,
-          kind: "approval",
-          label: `${approval.status} · ${approval.approverId}`,
-          occurredAt: approval.occurredAt,
-          ...(approval.evidenceDigest ? { integrity: { evidenceDigest: approval.evidenceDigest } } : {}),
-          attributes: { approverId: approval.approverId, status: approval.status },
-        });
-        addEdge(edges, reviewId, approvalId, "approved_by");
-      }
-    }
-
-    if (input.review.waivers === undefined) {
-      missing.push({
-        from: reviewId,
-        relationship: "waived_by",
-        expectedKind: "waiver",
-        reason: "Waiver/decision history was not loaded for this investigation.",
-      });
-    } else {
-      for (const waiver of input.review.waivers) {
-        const waiverId = stableNodeId("waiver", waiver.id);
-        nodes.push({
-          id: waiverId,
-          kind: "waiver",
-          label: `${waiver.disposition} · ${waiver.owner}`,
-          occurredAt: waiver.occurredAt,
-          ...(waiver.evidenceDigest ? { integrity: { evidenceDigest: waiver.evidenceDigest } } : {}),
-          attributes: { owner: waiver.owner, disposition: waiver.disposition },
-        });
-        addEdge(edges, reviewId, waiverId, "waived_by");
-      }
-    }
+function addApprovals(state: GraphBuildState, reviewId: string, review: ReviewInput): void {
+  if (review.approvals === undefined) {
+    addMissing(state, reviewId, "approved_by", "approval", "Approval evidence was not loaded for this investigation.");
+    return;
   }
 
-  const productionBatches = input.productionBatches ?? [];
-  if (productionBatches.length === 0) {
-    missing.push({
-      from: releaseId,
-      relationship: "produced",
-      expectedKind: "production_batch",
-      reason: "No production outcomes are linked to this release yet.",
+  for (const approval of review.approvals) {
+    const approvalId = stableNodeId("approval", approval.id);
+    state.nodes.push({
+      id: approvalId,
+      kind: "approval",
+      label: `${approval.status} · ${approval.approverId}`,
+      occurredAt: approval.occurredAt,
+      ...(approval.evidenceDigest ? { integrity: { evidenceDigest: approval.evidenceDigest } } : {}),
+      attributes: { approverId: approval.approverId, status: approval.status },
     });
-  } else {
-    for (const batch of productionBatches) {
-      const batchId = stableNodeId("production_batch", batch.id);
-      nodes.push({
-        id: batchId,
-        kind: "production_batch",
-        label: `${batch.manufacturer} · ${batch.externalBatchId}`,
-        occurredAt: batch.importedAt ?? batch.manufacturedOn,
-        integrity: { sha256: batch.sourceSha256 },
-        attributes: {
-          externalBatchId: batch.externalBatchId,
-          manufacturer: batch.manufacturer,
-          manufacturedOn: batch.manufacturedOn,
-        },
-      });
-      addEdge(edges, releaseId, batchId, "produced");
-    }
+    addEdge(state.edges, reviewId, approvalId, "approved_by");
+  }
+}
+
+function addWaivers(state: GraphBuildState, reviewId: string, review: ReviewInput): void {
+  if (review.waivers === undefined) {
+    addMissing(
+      state,
+      reviewId,
+      "waived_by",
+      "waiver",
+      "Waiver/decision history was not loaded for this investigation.",
+    );
+    return;
   }
 
-  return { version: 1, rootReleaseId: releaseId, nodes, edges, missing };
+  for (const waiver of review.waivers) {
+    const waiverId = stableNodeId("waiver", waiver.id);
+    state.nodes.push({
+      id: waiverId,
+      kind: "waiver",
+      label: `${waiver.disposition} · ${waiver.owner}`,
+      occurredAt: waiver.occurredAt,
+      ...(waiver.evidenceDigest ? { integrity: { evidenceDigest: waiver.evidenceDigest } } : {}),
+      attributes: { owner: waiver.owner, disposition: waiver.disposition },
+    });
+    addEdge(state.edges, reviewId, waiverId, "waived_by");
+  }
+}
+
+function addReview(state: GraphBuildState, releaseId: string, review: ReviewInput | undefined): void {
+  if (!review) {
+    addMissing(state, releaseId, "reviewed_in", "review", "No linked review context is available for this release.");
+    return;
+  }
+
+  const reviewId = stableNodeId("review", review.id);
+  state.nodes.push({
+    id: reviewId,
+    kind: "review",
+    label: review.id,
+    ...(review.evidenceDigest ? { integrity: { evidenceDigest: review.evidenceDigest } } : {}),
+  });
+  addEdge(state.edges, releaseId, reviewId, "reviewed_in");
+  addPolicy(state, reviewId, review);
+  addApprovals(state, reviewId, review);
+  addWaivers(state, reviewId, review);
+}
+
+function addProductionBatch(state: GraphBuildState, releaseId: string, batch: ProductionBatchInput): void {
+  const batchId = stableNodeId("production_batch", batch.id);
+  state.nodes.push({
+    id: batchId,
+    kind: "production_batch",
+    label: `${batch.manufacturer} · ${batch.externalBatchId}`,
+    occurredAt: batch.importedAt ?? batch.manufacturedOn,
+    integrity: { sha256: batch.sourceSha256 },
+    attributes: {
+      externalBatchId: batch.externalBatchId,
+      manufacturer: batch.manufacturer,
+      manufacturedOn: batch.manufacturedOn,
+    },
+  });
+  addEdge(state.edges, releaseId, batchId, "produced");
+}
+
+function addProduction(state: GraphBuildState, releaseId: string, batches: readonly ProductionBatchInput[]): void {
+  if (batches.length === 0) {
+    addMissing(
+      state,
+      releaseId,
+      "produced",
+      "production_batch",
+      "No production outcomes are linked to this release yet.",
+    );
+    return;
+  }
+  for (const batch of batches) addProductionBatch(state, releaseId, batch);
+}
+
+export function buildReleaseEvidenceGraph(input: ReleaseEvidenceGraphInput): ReleaseEvidenceGraph {
+  const state: GraphBuildState = { nodes: [], edges: [], missing: [] };
+  const releaseId = addReleaseAndSource(state, input.release);
+
+  addEvidence(state, releaseId, input.evidence ?? []);
+  addReview(state, releaseId, input.review);
+  addProduction(state, releaseId, input.productionBatches ?? []);
+
+  return {
+    version: 1,
+    rootReleaseId: releaseId,
+    nodes: state.nodes,
+    edges: state.edges,
+    missing: state.missing,
+  };
 }
 
 export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEvidenceTrace {
