@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import type {
   createLegalHoldAction,
   releaseLegalHoldAction,
+  saveRepositoryRetentionPolicyAction,
   saveRetentionPolicyAction,
 } from "../../app/settings/data/actions.js";
 import { Dialog } from "../dialog.js";
@@ -52,6 +53,82 @@ export function RetentionPolicyForm({
           </div>
           <Button type="submit" disabled={pending}>
             {pending ? "Saving…" : "Save retention"}
+          </Button>
+        </>
+      )}
+    </ActionForm>
+  );
+}
+
+export function RepositoryRetentionPolicyForm({
+  installationId,
+  repositoryId,
+  repositoryName,
+  hasOverride,
+  currentRetentionDays,
+  inheritedRetentionDays,
+  action,
+}: Readonly<{
+  installationId: string;
+  repositoryId: string;
+  repositoryName: string;
+  hasOverride: boolean;
+  currentRetentionDays: number | null;
+  inheritedRetentionDays: number | null;
+  action: typeof saveRepositoryRetentionPolicyAction;
+}>) {
+  const modeId = useId();
+  const retentionId = useId();
+  const mode = hasOverride ? (currentRetentionDays === null ? "indefinite" : "custom") : "inherit";
+  const inheritedLabel = inheritedRetentionDays === null ? "indefinite" : `${inheritedRetentionDays} days`;
+
+  return (
+    <ActionForm
+      action={action}
+      className="grid gap-3 rounded-md border border-border p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,13rem)_minmax(0,10rem)_auto] md:items-end"
+    >
+      {({ pending }) => (
+        <>
+          <input type="hidden" name="installationId" value={installationId} />
+          <input type="hidden" name="repositoryId" value={repositoryId} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{repositoryName}</p>
+            <p className="text-meta text-muted-foreground">
+              {hasOverride
+                ? currentRetentionDays === null
+                  ? "Override: retain indefinitely"
+                  : `Override: ${currentRetentionDays} days`
+                : `Inherits organization policy: ${inheritedLabel}`}
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={modeId} className="text-meta font-medium text-foreground">
+              Policy
+            </label>
+            <NativeSelect id={modeId} name="mode" defaultValue={mode}>
+              <option value="inherit">Inherit organization ({inheritedLabel})</option>
+              <option value="indefinite">Retain indefinitely</option>
+              <option value="custom">Custom days</option>
+            </NativeSelect>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={retentionId} className="text-meta font-medium text-foreground">
+              Custom days
+            </label>
+            <Input
+              id={retentionId}
+              name="retentionDays"
+              type="number"
+              min={1}
+              max={3650}
+              step={1}
+              defaultValue={hasOverride && currentRetentionDays !== null ? currentRetentionDays : ""}
+              placeholder="1–3650"
+              inputMode="numeric"
+            />
+          </div>
+          <Button type="submit" disabled={pending}>
+            {pending ? "Saving…" : "Save override"}
           </Button>
         </>
       )}
