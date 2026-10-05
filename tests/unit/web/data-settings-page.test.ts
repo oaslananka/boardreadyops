@@ -10,11 +10,23 @@ describe("Data & Retention settings administration", () => {
       "Create legal hold",
       "Export your data",
       "Erasure request",
+      "Control-plane lifecycle defaults",
+      "Webhook terminal metadata",
+      "One-time control-plane records",
+      "Completed delivery history",
+      "Runs, findings & audit events",
+      "Managed artifact retention",
+      "Component source cache",
       "installation",
     ]) {
       expect(page).toContain(text);
     }
     expect(page).toContain("loadDataSettingsAdmin");
+    expect(page).toContain("resolveControlPlaneRetentionConfiguration");
+    expect(page).toContain("controlPlaneRetention.webhookInboxDays");
+    expect(page).toContain("controlPlaneRetention.ephemeralRecordsDays");
+    expect(page).toContain("controlPlaneRetention.controlPlaneHistoryDays");
+    expect(page).toContain("No automatic age-based purge");
     expect(page).toContain("RetentionPolicyForm");
     expect(page).toContain("LegalHoldCreateForm");
     expect(page).toContain("LegalHoldReleaseButton");

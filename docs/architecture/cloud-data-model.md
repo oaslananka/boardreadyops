@@ -113,7 +113,7 @@ interface Artifact {
   bytes: number;
   role: "fabrication" | "assembly" | "documentation" | "report" | "evidence";
   contentType: string;              // normalized media type, for example application/json
-  retentionUntil?: Date;            // optional persisted policy deadline; not an automatic global expiry
+  retentionUntil?: Date;            // optional persisted deadline enforced by managed-artifact retention
   uploadedAt: Date;
 }
 ```

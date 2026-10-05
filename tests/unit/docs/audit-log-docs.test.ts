@@ -40,7 +40,9 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("`outcome=deleted`");
     expect(documentation).toContain("`outcome=missing`");
     expect(documentation).toContain("unsupported storage drivers");
-    expect(documentation).toContain("general age-based artifact expiry");
+    expect(documentation).toContain("Age-based managed-artifact retention");
+    expect(documentation).toContain("shared storage");
+    expect(documentation).toContain("serialized");
     expect(documentation).toContain("data-lifecycle.md");
   });
   it("documents privacy-safe release decision reconstruction", async () => {
