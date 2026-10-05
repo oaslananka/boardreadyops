@@ -73,19 +73,28 @@ function retentionCutoff(at: Date, retentionDays: number): string {
   return new Date(at.getTime() - retentionDays * millisecondsPerDay).toISOString();
 }
 
-const artifactRetentionPlanDaysSql = `case
+const artifactRetentionPolicyDaysSql = `case
+  when repository_retention_policies.repository_id is not null then repository_retention_policies.retention_days
   when retention_policies.retention_days is not null then retention_policies.retention_days
   when installations.plan_tier = 'free' then 30
   when installations.plan_tier = 'team' then 365
   else null
 end`;
 
+const artifactRetentionPolicySourceSql = `case
+  when artifacts.retention_until is not null then 'artifact_deadline'
+  when repository_retention_policies.repository_id is not null then 'repository_override'
+  when retention_policies.retention_days is not null then 'tenant_policy'
+  when installations.plan_tier in ('free', 'team') then 'plan_default'
+  else 'indefinite'
+end`;
+
 const artifactRetentionEligibleSql = `(
   artifacts.retention_until <= $1::timestamptz
   or (
     artifacts.retention_until is null
-    and ${artifactRetentionPlanDaysSql} is not null
-    and artifacts.uploaded_at <= $1::timestamptz - make_interval(days => ${artifactRetentionPlanDaysSql})
+    and ${artifactRetentionPolicyDaysSql} is not null
+    and artifacts.uploaded_at <= $1::timestamptz - make_interval(days => ${artifactRetentionPolicyDaysSql})
   )
 )
 and not exists (
@@ -102,6 +111,8 @@ const artifactRetentionCandidateCtes = `candidate_path_pool as materialized (
   join release_runs on release_runs.id = artifacts.run_id
   join repositories on repositories.id = release_runs.repository_id
   join installations on installations.id = repositories.installation_id
+  left join repository_retention_policies
+    on repository_retention_policies.repository_id = repositories.id
   left join retention_policies on retention_policies.tenant_id = installations.account_login
   where ${artifactRetentionEligibleSql}
   group by artifacts.storage_path
@@ -119,12 +130,15 @@ const artifactRetentionCandidateCtes = `candidate_path_pool as materialized (
          artifacts.sha256, artifacts.bytes, artifacts.role,
          repositories.id as repository_id, repositories.installation_id,
          coalesce(artifacts.retention_until, artifacts.uploaded_at) as retention_order,
+         (${artifactRetentionPolicySourceSql}) as retention_policy_source,
          (${artifactRetentionEligibleSql}) as eligible
   from artifacts
   join candidate_paths on candidate_paths.storage_path = artifacts.storage_path
   join release_runs on release_runs.id = artifacts.run_id
   join repositories on repositories.id = release_runs.repository_id
   join installations on installations.id = repositories.installation_id
+  left join repository_retention_policies
+    on repository_retention_policies.repository_id = repositories.id
   left join retention_policies on retention_policies.tenant_id = installations.account_login
   order by artifacts.storage_path asc, artifacts.id asc
   for update of artifacts
@@ -137,7 +151,8 @@ const artifactRetentionCandidateCtes = `candidate_path_pool as materialized (
 ), captured as materialized (
   select path_artifacts.id, path_artifacts.run_id, path_artifacts.kind,
          path_artifacts.storage_path, path_artifacts.sha256, path_artifacts.bytes,
-         path_artifacts.role, path_artifacts.repository_id, path_artifacts.installation_id
+         path_artifacts.role, path_artifacts.repository_id, path_artifacts.installation_id,
+         path_artifacts.retention_policy_source
   from path_artifacts
   join candidate_ids on candidate_ids.id = path_artifacts.id
 )`;
@@ -187,6 +202,7 @@ const artifactRetentionAuditCtes = `shared_object_audit as (
          jsonb_build_object(
            'reason', 'storage_path_still_referenced',
            'retentionReason', 'retention_expired',
+           'retentionPolicySource', captured.retention_policy_source,
            'bytes', captured.bytes, 'sha256', captured.sha256,
            'itemType', captured.kind, 'scope', captured.role
          ),
@@ -210,8 +226,10 @@ const artifactRetentionAuditCtes = `shared_object_audit as (
          'retention-maintenance', 'artifact', captured.id, captured.repository_id,
          captured.run_id,
          jsonb_build_object(
-           'reason', 'retention_expired', 'bytes', captured.bytes,
-           'sha256', captured.sha256, 'itemType', captured.kind, 'scope', captured.role
+           'reason', 'retention_expired',
+           'retentionPolicySource', captured.retention_policy_source,
+           'bytes', captured.bytes, 'sha256', captured.sha256,
+           'itemType', captured.kind, 'scope', captured.role
          ),
          $1::timestamptz
   from captured

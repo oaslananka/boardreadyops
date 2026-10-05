@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   LegalHoldCreateForm,
   LegalHoldReleaseButton,
+  RepositoryRetentionPolicyForm,
   RetentionPolicyForm,
 } from "../../../components/settings/data-admin-forms.js";
 import { ErasureRequestForm, ExportRequestForm } from "../../../components/settings/data-lifecycle-forms.js";
@@ -11,13 +12,18 @@ import { NativeSelect } from "../../../components/ui/native-select.js";
 import { Alert, EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
 import { resolveControlPlaneRetentionConfiguration } from "../../../lib/cloud-runtime-config.js";
 import { customerPlanLabel } from "../../../lib/customer-nomenclature.js";
-import { loadDataSettingsAdmin, retentionPolicyForInstallation } from "../../../lib/data-settings-admin.js";
+import {
+  customizableRetention,
+  loadDataSettingsAdmin,
+  retentionPolicyForInstallation,
+} from "../../../lib/data-settings-admin.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 import {
   createLegalHoldAction,
   releaseLegalHoldAction,
   requestErasureAction,
   requestExportAction,
+  saveRepositoryRetentionPolicyAction,
   saveRetentionPolicyAction,
 } from "./actions.js";
 
@@ -35,10 +41,6 @@ type DataSettingsPageProps = {
 
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function customizableRetention(planTier: string): boolean {
-  return ["business", "pilot", "enterprise"].includes(planTier.trim().toLowerCase());
 }
 
 function InstallationSelector({
@@ -225,6 +227,45 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
                 </>
               );
             })()}
+          </Panel>
+
+          <Panel
+            title="Repository retention overrides"
+            description="Override managed-artifact retention for an individual repository without changing the organization default."
+          >
+            {customizableRetention(admin.selected.planTier) ? (
+              admin.repositoryPolicies.length === 0 ? (
+                <EmptyState title="No repositories available">
+                  <p>Enable a repository under this installation before adding an override.</p>
+                </EmptyState>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {(() => {
+                    const planDefault = retentionPolicyForInstallation(admin.selected, undefined);
+                    const inheritedRetentionDays = admin.policy
+                      ? admin.policy.retentionDays
+                      : planDefault.retentionDays;
+                    return admin.repositoryPolicies.map((repository) => (
+                      <RepositoryRetentionPolicyForm
+                        key={repository.repositoryId}
+                        installationId={admin.selected.id}
+                        repositoryId={repository.repositoryId}
+                        repositoryName={`${repository.owner}/${repository.name}`}
+                        hasOverride={repository.hasOverride}
+                        currentRetentionDays={repository.retentionDays}
+                        inheritedRetentionDays={inheritedRetentionDays}
+                        action={saveRepositoryRetentionPolicyAction}
+                      />
+                    ));
+                  })()}
+                </div>
+              )
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Repository overrides are available on Business, Pilot, and Enterprise. This plan uses its fixed
+                managed-artifact retention window for every repository.
+              </p>
+            )}
           </Panel>
 
           <Panel

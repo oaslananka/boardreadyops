@@ -228,7 +228,7 @@ dead-letter replay, and reconciliation operations. The
 authenticated operator export provides the first supported query surface.
 
 Issue #44 remains open for age-based expiry of runs/findings/audit history,
-repository-specific retention overrides, non-local storage deletion, automatic uninstall export,
+non-local storage deletion, automatic uninstall export,
 complete erasure execution after the now-durable GitHub App uninstall request deadline, and
 backup/platform-log lifecycle behavior. Tenant-scoped
 managed-artifact retention and legal holds are implemented. Result-level release

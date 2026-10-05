@@ -9,6 +9,14 @@ export type RetentionPolicy = {
   sourceRetentionHours: number;
 };
 
+export type RepositoryRetentionPolicy = {
+  repositoryId: string;
+  owner: string;
+  name: string;
+  hasOverride: boolean;
+  retentionDays: number | null;
+};
+
 export type DataExport = {
   id: string;
   tenantId: string;
@@ -65,6 +73,9 @@ export class DataLifecycleStore {
 
   async upsertRetentionPolicy(input: {
     tenantId: string;
+    installationId: string;
+    actorId: string;
+    actorLogin: string;
     tier: string;
     retentionDays: number | null;
     sourceRetentionHours: number;
@@ -80,13 +91,63 @@ export class DataLifecycleStore {
     }
     const id = randomUUID();
     const r = (await this.db.query(
-      `INSERT INTO retention_policies (id, tenant_id, tier, retention_days, source_retention_hours, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,NOW(),NOW())
-       ON CONFLICT (tenant_id) DO UPDATE
-         SET tier=EXCLUDED.tier, retention_days=EXCLUDED.retention_days,
-             source_retention_hours=EXCLUDED.source_retention_hours, updated_at=NOW()
-       RETURNING *`,
-      [id, input.tenantId, input.tier, input.retentionDays, input.sourceRetentionHours],
+      `WITH selected_installation AS MATERIALIZED (
+         SELECT installations.id
+           FROM installations
+          WHERE installations.id = $6
+            AND lower(installations.account_login) = lower($2)
+       ), previous_policy AS MATERIALIZED (
+         SELECT retention_policies.retention_days,
+                retention_policies.source_retention_hours
+           FROM retention_policies
+          WHERE retention_policies.tenant_id = $2
+            AND EXISTS (SELECT 1 FROM selected_installation)
+       ), upserted AS (
+         INSERT INTO retention_policies (
+           id, tenant_id, tier, retention_days, source_retention_hours, created_at, updated_at
+         )
+         SELECT $1, $2, $3, $4, $5, NOW(), NOW()
+           FROM selected_installation
+         ON CONFLICT (tenant_id) DO UPDATE
+           SET tier = EXCLUDED.tier,
+               retention_days = EXCLUDED.retention_days,
+               source_retention_hours = EXCLUDED.source_retention_hours,
+               updated_at = NOW()
+         RETURNING *
+       ), audited AS (
+         INSERT INTO audit_events (
+           installation_id, event_type, actor_type, actor_id, actor_login,
+           subject_type, subject_id, metadata, created_at
+         )
+         SELECT selected_installation.id,
+                'retention.policy.updated',
+                'user',
+                $7,
+                $8,
+                'retention_policy',
+                $2,
+                jsonb_build_object(
+                  'previousRetentionDays', (SELECT previous_policy.retention_days FROM previous_policy),
+                  'retentionDays', upserted.retention_days,
+                  'previousSourceRetentionHours',
+                    (SELECT previous_policy.source_retention_hours FROM previous_policy),
+                  'sourceRetentionHours', upserted.source_retention_hours
+                ),
+                NOW()
+           FROM upserted
+           CROSS JOIN selected_installation
+       )
+       SELECT upserted.* FROM upserted`,
+      [
+        id,
+        input.tenantId,
+        input.tier,
+        input.retentionDays,
+        input.sourceRetentionHours,
+        input.installationId,
+        input.actorId,
+        input.actorLogin,
+      ],
     )) as { rows?: Array<Record<string, unknown>> };
     const row = r.rows?.[0];
     if (!row) throw new Error("upsert failed");
@@ -97,6 +158,150 @@ export class DataLifecycleStore {
       retentionDays: row.retention_days === null ? null : Number(row.retention_days),
       sourceRetentionHours: Number(row.source_retention_hours),
     };
+  }
+
+  async listRepositoryRetentionPolicies(installationId: string): Promise<RepositoryRetentionPolicy[]> {
+    const r = (await this.db.query(
+      `SELECT repositories.id AS repository_id,
+              repositories.owner,
+              repositories.name,
+              repository_retention_policies.repository_id IS NOT NULL AS has_override,
+              repository_retention_policies.retention_days
+         FROM repositories
+         LEFT JOIN repository_retention_policies
+           ON repository_retention_policies.repository_id = repositories.id
+        WHERE repositories.installation_id = $1
+          AND repositories.disabled_at IS NULL
+        ORDER BY lower(repositories.owner), lower(repositories.name), repositories.id`,
+      [installationId],
+    )) as { rows?: Array<Record<string, unknown>> };
+
+    return (r.rows ?? []).map((row) => ({
+      repositoryId: String(row.repository_id),
+      owner: String(row.owner),
+      name: String(row.name),
+      hasOverride: row.has_override === true,
+      retentionDays:
+        row.retention_days === null || row.retention_days === undefined ? null : Number(row.retention_days),
+    }));
+  }
+
+  async upsertRepositoryRetentionPolicy(input: {
+    installationId: string;
+    repositoryId: string;
+    retentionDays: number | null;
+    actorId: string;
+    actorLogin: string;
+  }): Promise<RepositoryRetentionPolicy | null> {
+    if (
+      input.retentionDays !== null &&
+      (!Number.isSafeInteger(input.retentionDays) || input.retentionDays < 1 || input.retentionDays > 3_650)
+    ) {
+      throw new Error("retentionDays must be null or an integer between 1 and 3650");
+    }
+
+    const r = (await this.db.query(
+      `WITH selected_repository AS MATERIALIZED (
+         SELECT repositories.id, repositories.owner, repositories.name
+           FROM repositories
+          WHERE repositories.id = $1
+            AND repositories.installation_id = $2
+            AND repositories.disabled_at IS NULL
+       ), previous_policy AS MATERIALIZED (
+         SELECT repository_retention_policies.retention_days
+           FROM repository_retention_policies
+           JOIN selected_repository
+             ON selected_repository.id = repository_retention_policies.repository_id
+       ), upserted AS (
+         INSERT INTO repository_retention_policies (repository_id, retention_days, created_at, updated_at)
+         SELECT selected_repository.id, $3, NOW(), NOW()
+           FROM selected_repository
+         ON CONFLICT (repository_id) DO UPDATE
+           SET retention_days = EXCLUDED.retention_days,
+               updated_at = NOW()
+         RETURNING repository_id, retention_days
+       ), audited AS (
+         INSERT INTO audit_events (
+           installation_id, event_type, actor_type, actor_id, actor_login,
+           subject_type, subject_id, repository_id, metadata, created_at
+         )
+         SELECT $2,
+                'retention.repository.override_set',
+                'user',
+                $4,
+                $5,
+                'repository',
+                upserted.repository_id,
+                upserted.repository_id,
+                jsonb_build_object(
+                  'previousOverride', EXISTS (SELECT 1 FROM previous_policy),
+                  'previousRetentionDays', (SELECT previous_policy.retention_days FROM previous_policy),
+                  'retentionDays', upserted.retention_days
+                ),
+                NOW()
+           FROM upserted
+       )
+       SELECT upserted.repository_id,
+              selected_repository.owner,
+              selected_repository.name,
+              upserted.retention_days
+         FROM upserted
+         JOIN selected_repository ON selected_repository.id = upserted.repository_id`,
+      [input.repositoryId, input.installationId, input.retentionDays, input.actorId, input.actorLogin],
+    )) as { rows?: Array<Record<string, unknown>> };
+
+    const row = r.rows?.[0];
+    if (!row) return null;
+
+    return {
+      repositoryId: String(row.repository_id),
+      owner: String(row.owner),
+      name: String(row.name),
+      hasOverride: true,
+      retentionDays: row.retention_days === null ? null : Number(row.retention_days),
+    };
+  }
+
+  async clearRepositoryRetentionPolicy(input: {
+    installationId: string;
+    repositoryId: string;
+    actorId: string;
+    actorLogin: string;
+  }): Promise<boolean> {
+    const r = (await this.db.query(
+      `WITH selected_repository AS MATERIALIZED (
+         SELECT repositories.id
+           FROM repositories
+          WHERE repositories.id = $1
+            AND repositories.installation_id = $2
+            AND repositories.disabled_at IS NULL
+       ), deleted AS (
+         DELETE FROM repository_retention_policies
+         USING selected_repository
+         WHERE repository_retention_policies.repository_id = selected_repository.id
+         RETURNING repository_retention_policies.repository_id,
+                   repository_retention_policies.retention_days
+       ), audited AS (
+         INSERT INTO audit_events (
+           installation_id, event_type, actor_type, actor_id, actor_login,
+           subject_type, subject_id, repository_id, metadata, created_at
+         )
+         SELECT $2,
+                'retention.repository.override_cleared',
+                'user',
+                $3,
+                $4,
+                'repository',
+                deleted.repository_id,
+                deleted.repository_id,
+                jsonb_build_object('previousRetentionDays', deleted.retention_days),
+                NOW()
+           FROM deleted
+       )
+       SELECT deleted.repository_id FROM deleted`,
+      [input.repositoryId, input.installationId, input.actorId, input.actorLogin],
+    )) as { rows?: Array<Record<string, unknown>> };
+    return (r.rows?.length ?? 0) > 0;
   }
 
   async listLegalHolds(tenantId: string): Promise<LegalHold[]> {

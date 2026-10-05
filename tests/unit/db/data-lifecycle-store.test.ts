@@ -19,6 +19,9 @@ describe("data lifecycle administration", () => {
     await expect(
       store.upsertRetentionPolicy({
         tenantId: "acme-hardware",
+        installationId: "inst-a",
+        actorId: "42",
+        actorLogin: "octocat",
         tier: "business",
         retentionDays: 730,
         sourceRetentionHours: 24,
@@ -37,7 +40,14 @@ describe("data lifecycle administration", () => {
       "business",
       730,
       24,
+      "inst-a",
+      "42",
+      "octocat",
     ]);
+    const tenantSql = String(query.mock.calls[0]?.[0]);
+    expect(tenantSql).toContain("lower(installations.account_login) = lower($2)");
+    expect(tenantSql).toContain("'retention.policy.updated'");
+    expect(tenantSql).toContain("INSERT INTO audit_events");
   });
 
   it("rejects retention values outside the maintenance worker bound", async () => {
@@ -47,12 +57,81 @@ describe("data lifecycle administration", () => {
     await expect(
       store.upsertRetentionPolicy({
         tenantId: "acme-hardware",
+        installationId: "inst-a",
+        actorId: "42",
+        actorLogin: "octocat",
         tier: "business",
         retentionDays: 3651,
         sourceRetentionHours: 24,
       }),
     ).rejects.toThrow("retentionDays must be null or an integer between 1 and 3650");
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it("lists, upserts, and clears repository retention policies within one installation", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            repository_id: "repo-1",
+            owner: "acme",
+            name: "controller",
+            has_override: true,
+            retention_days: 90,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            repository_id: "repo-1",
+            owner: "acme",
+            name: "controller",
+            retention_days: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ repository_id: "repo-1" }] });
+    const store = new DataLifecycleStore({ query });
+
+    await expect(store.listRepositoryRetentionPolicies("inst-a")).resolves.toEqual([
+      {
+        repositoryId: "repo-1",
+        owner: "acme",
+        name: "controller",
+        hasOverride: true,
+        retentionDays: 90,
+      },
+    ]);
+    await expect(
+      store.upsertRepositoryRetentionPolicy({
+        installationId: "inst-a",
+        repositoryId: "repo-1",
+        retentionDays: null,
+        actorId: "42",
+        actorLogin: "octocat",
+      }),
+    ).resolves.toMatchObject({ repositoryId: "repo-1", hasOverride: true, retentionDays: null });
+    await expect(
+      store.clearRepositoryRetentionPolicy({
+        installationId: "inst-a",
+        repositoryId: "repo-1",
+        actorId: "42",
+        actorLogin: "octocat",
+      }),
+    ).resolves.toBe(true);
+
+    const upsertSql = String(query.mock.calls[1]?.[0]);
+    const clearSql = String(query.mock.calls[2]?.[0]);
+    expect(upsertSql).toContain("repositories.installation_id = $2");
+    expect(upsertSql).toContain("'retention.repository.override_set'");
+    expect(upsertSql).toContain("INSERT INTO audit_events");
+    expect(clearSql).toContain("repositories.installation_id = $2");
+    expect(clearSql).toContain("'retention.repository.override_cleared'");
+    expect(clearSql).toContain("INSERT INTO audit_events");
+    expect(query.mock.calls[1]?.[1]).toEqual(["repo-1", "inst-a", null, "42", "octocat"]);
+    expect(query.mock.calls[2]?.[1]).toEqual(["repo-1", "inst-a", "42", "octocat"]);
   });
 
   it("lists legal holds with release metadata newest first", async () => {

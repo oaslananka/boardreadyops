@@ -133,6 +133,7 @@ describe("retention maintenance store", () => {
     expect(sql).toContain("join release_runs");
     expect(sql).toContain("join repositories");
     expect(sql).toContain("join installations");
+    expect(sql).toContain("left join repository_retention_policies");
     expect(sql).toContain("left join retention_policies");
     expect(sql).toContain("artifacts.retention_until <= $1::timestamptz");
     expect(sql).toContain("artifacts.retention_until is null");
@@ -140,7 +141,14 @@ describe("retention maintenance store", () => {
     expect(sql).toContain("legal_holds.active = true");
     expect(sql).toContain("when installations.plan_tier = 'free' then 30");
     expect(sql).toContain("when installations.plan_tier = 'team' then 365");
+    expect(sql).toContain(
+      "when repository_retention_policies.repository_id is not null then repository_retention_policies.retention_days",
+    );
     expect(sql).toContain("when retention_policies.retention_days is not null then retention_policies.retention_days");
+    expect(sql).toContain("'repository_override'");
+    expect(sql).toContain("'tenant_policy'");
+    expect(sql).toContain("'plan_default'");
+    expect(sql).toContain("'retentionPolicySource'");
     expect(sql).toContain("candidate_path_pool as materialized");
     expect(sql).toContain("pg_try_advisory_xact_lock");
     expect(sql).toContain("hashtextextended(jsonb_build_array($3::text, candidate_path_pool.storage_path)::text, 0)");

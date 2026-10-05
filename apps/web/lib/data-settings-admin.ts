@@ -1,4 +1,4 @@
-import type { DataLifecycleStore, LegalHold, RetentionPolicy } from "@boardreadyops/db";
+import type { DataLifecycleStore, LegalHold, RepositoryRetentionPolicy, RetentionPolicy } from "@boardreadyops/db";
 import { type ActionResult, fail, ok } from "./action-result.js";
 import {
   resolveSettingsTenantScope,
@@ -21,12 +21,16 @@ export type DataSettingsAdminState =
       installations: readonly SettingsTenantInstallation[];
       selected: SettingsTenantInstallation;
       policy: RetentionPolicy | null;
+      repositoryPolicies: readonly RepositoryRetentionPolicy[];
       holds: readonly LegalHold[];
     };
 
 type DataSettingsStore = Pick<
   DataLifecycleStore,
   | "getRetentionPolicy"
+  | "listRepositoryRetentionPolicies"
+  | "upsertRepositoryRetentionPolicy"
+  | "clearRepositoryRetentionPolicy"
   | "listLegalHolds"
   | "upsertRetentionPolicy"
   | "createLegalHold"
@@ -61,6 +65,22 @@ const defaultDependencies: DataSettingsAdminDependencies = {
   openStore: openDefaultStore,
 };
 
+export function customizableRetention(planTier: string): boolean {
+  return ["business", "pilot", "enterprise"].includes(planTier.trim().toLowerCase());
+}
+
+function boundedRetentionDays(value: string | undefined): number {
+  const normalized = value?.trim();
+  if (!normalized || !/^\d+$/u.test(normalized)) {
+    throw new Error("Retention must be a whole number between 1 and 3650 days.");
+  }
+  const retentionDays = Number(normalized);
+  if (!Number.isSafeInteger(retentionDays) || retentionDays < 1 || retentionDays > 3_650) {
+    throw new Error("Retention must be between 1 and 3650 days.");
+  }
+  return retentionDays;
+}
+
 function planRetentionTier(planTier: string): "free" | "team" | "business" {
   switch (planTier.trim().toLowerCase()) {
     case "team":
@@ -83,12 +103,7 @@ export function retentionPolicyForInstallation(
   if (tier === "team") return { tier, retentionDays: 365, sourceRetentionHours: 24 };
   const value = requestedRetentionDays?.trim();
   if (!value) return { tier, retentionDays: null, sourceRetentionHours: 24 };
-  if (!/^\d+$/u.test(value)) throw new Error("Retention must be a whole number between 1 and 3650 days.");
-  const retentionDays = Number(value);
-  if (!Number.isSafeInteger(retentionDays) || retentionDays < 1 || retentionDays > 3_650) {
-    throw new Error("Retention must be between 1 and 3650 days.");
-  }
-  return { tier, retentionDays, sourceRetentionHours: 24 };
+  return { tier, retentionDays: boundedRetentionDays(value), sourceRetentionHours: 24 };
 }
 
 async function authorizedTenant(
@@ -111,11 +126,19 @@ export async function loadDataSettingsAdmin(
   const opened = await dependencies.openStore();
   if (!opened) return { state: "not-configured", installations: scope.installations, selected: scope.selected };
   try {
-    const [policy, holds] = await Promise.all([
+    const [policy, repositoryPolicies, holds] = await Promise.all([
       opened.store.getRetentionPolicy(scope.selected.accountLogin),
+      opened.store.listRepositoryRetentionPolicies(scope.selected.id),
       opened.store.listLegalHolds(scope.selected.accountLogin),
     ]);
-    return { state: "ok", installations: scope.installations, selected: scope.selected, policy, holds };
+    return {
+      state: "ok",
+      installations: scope.installations,
+      selected: scope.selected,
+      policy,
+      repositoryPolicies,
+      holds,
+    };
   } finally {
     await opened.close();
   }
@@ -137,8 +160,79 @@ export async function saveRetentionPolicyForViewer(
   const opened = await dependencies.openStore();
   if (!opened) return fail("This deployment has no database configured.");
   try {
-    const saved = await opened.store.upsertRetentionPolicy({ tenantId: selected.accountLogin, ...policy });
+    const saved = await opened.store.upsertRetentionPolicy({
+      tenantId: selected.accountLogin,
+      installationId: selected.id,
+      actorId: String(session.userId),
+      actorLogin: session.login,
+      ...policy,
+    });
     return ok({ retentionDays: saved.retentionDays }, "Retention policy saved.");
+  } finally {
+    await opened.close();
+  }
+}
+
+export async function saveRepositoryRetentionPolicyForViewer(
+  session: UserSession,
+  input: {
+    installationId: string;
+    repositoryId: string;
+    mode: "inherit" | "indefinite" | "custom";
+    retentionDays?: string | undefined;
+  },
+  dependencies: DataSettingsAdminDependencies = defaultDependencies,
+): Promise<ActionResult<{ repositoryId: string; retentionDays: number | null; inherited: boolean }>> {
+  const selected = await authorizedTenant(session, input.installationId, dependencies);
+  if (!selected) return fail("You do not have access to that installation.");
+  if (!customizableRetention(selected.planTier)) {
+    return fail("Repository retention overrides require a Business, Pilot, or Enterprise plan.");
+  }
+
+  let retentionDays: number | null = null;
+  if (input.mode === "custom") {
+    try {
+      retentionDays = boundedRetentionDays(input.retentionDays);
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : "Retention policy is invalid.");
+    }
+  }
+
+  const opened = await dependencies.openStore();
+  if (!opened) return fail("This deployment has no database configured.");
+  try {
+    const repositories = await opened.store.listRepositoryRetentionPolicies(selected.id);
+    if (!repositories.some((repository) => repository.repositoryId === input.repositoryId)) {
+      return fail("That repository is not available under the selected installation.");
+    }
+
+    if (input.mode === "inherit") {
+      await opened.store.clearRepositoryRetentionPolicy({
+        installationId: selected.id,
+        repositoryId: input.repositoryId,
+        actorId: String(session.userId),
+        actorLogin: session.login,
+      });
+      return ok(
+        { repositoryId: input.repositoryId, retentionDays: null, inherited: true },
+        "Repository now inherits organization retention.",
+      );
+    }
+
+    const saved = await opened.store.upsertRepositoryRetentionPolicy({
+      installationId: selected.id,
+      repositoryId: input.repositoryId,
+      retentionDays,
+      actorId: String(session.userId),
+      actorLogin: session.login,
+    });
+    if (!saved) return fail("That repository is no longer available under the selected installation.");
+    return ok(
+      { repositoryId: saved.repositoryId, retentionDays: saved.retentionDays, inherited: false },
+      saved.retentionDays === null
+        ? "Repository artifacts will be retained indefinitely."
+        : `Repository artifact retention set to ${saved.retentionDays} days.`,
+    );
   } finally {
     await opened.close();
   }
