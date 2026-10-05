@@ -7,120 +7,63 @@
     "security:openssf-scorecard",
     ":separatePatchReleases"
   ],
-  "enabledManagers": [
-    "npm",
-    "github-actions",
-    "dockerfile",
-    "docker-compose",
-    "custom.regex"
-  ],
+  "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose", "custom.regex"],
   "customManagers": [
     {
       "customType": "regex",
       "description": "Track the immutable self-hosted Renovate validator image.",
-      "managerFilePatterns": [
-        "/^scripts\\/validate-renovate-config\\.mjs$/"
-      ],
-      "matchStrings": [
-        "renovate/renovate:(?<currentValue>[^@\"\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
-      ],
+      "managerFilePatterns": ["/^scripts\\/validate-renovate-config\\.mjs$/"],
+      "matchStrings": ["renovate/renovate:(?<currentValue>[^@\"\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"],
       "depNameTemplate": "renovate/renovate",
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
     }
   ],
-  "schedule": [
-    "after 5am and before 8am every weekday"
-  ],
-  "ignorePaths": [
-    "**/.next/**",
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/coverage/**",
-    "tests/fixtures/**",
-    "tmp/**"
-  ],
-  "labels": [
-    "dependencies"
-  ],
+  "schedule": ["after 5am and before 8am every weekday"],
+  "ignorePaths": ["**/.next/**", "**/node_modules/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**", "tmp/**"],
+  "labels": ["dependencies"],
   "rangeStrategy": "replace",
   "rebaseWhen": "conflicted",
-  "postUpdateOptions": [
-    "pnpmDedupe"
-  ],
+  "postUpdateOptions": ["pnpmDedupe"],
   "postUpgradeTasks": {
-    "commands": [
-      "corepack pnpm run renovate:post-upgrade"
-    ],
-    "fileFilters": [
-      "NOTICE",
-      "dist/**"
-    ],
+    "commands": ["corepack pnpm run renovate:post-upgrade"],
+    "fileFilters": ["NOTICE", "dist/**"],
     "executionMode": "branch"
   },
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": [
-      "before 6am on monday"
-    ],
+    "schedule": ["before 6am on monday"],
     "automerge": false,
-    "addLabels": [
-      "lockfile-maintenance"
-    ]
+    "addLabels": ["lockfile-maintenance"]
   },
   "packageRules": [
     {
       "description": "Enforce the seven-day quarantine for npm even though config:best-practices includes a shorter npm minimum age.",
-      "matchDatasources": [
-        "npm"
-      ],
+      "matchDatasources": ["npm"],
       "minimumReleaseAge": "7 days"
     },
     {
       "description": "Allow Mergify to auto-merge low-risk development dependency updates after required checks pass.",
-      "matchDepTypes": [
-        "devDependencies"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "pin",
-        "digest"
-      ],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "minimumReleaseAge": "7 days",
       "groupName": "developer tooling (non-major)",
-      "addLabels": [
-        "automerge"
-      ]
+      "addLabels": ["automerge"]
     },
     {
       "description": "Treat TypeScript compiler updates as manual because they can change type-checking behavior.",
-      "matchPackageNames": [
-        "typescript"
-      ],
+      "matchPackageNames": ["typescript"],
       "minimumReleaseAge": "7 days",
       "automerge": false,
-      "addLabels": [
-        "manual-review"
-      ]
+      "addLabels": ["manual-review"]
     },
     {
       "description": "Allow Mergify to auto-merge non-breaking type package updates after required checks pass.",
-      "matchPackageNames": [
-        "/^@types\\//"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "pin",
-        "digest"
-      ],
+      "matchPackageNames": ["/^@types\\//"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "minimumReleaseAge": "7 days",
       "groupName": "type definitions (non-major)",
-      "addLabels": [
-        "types",
-        "automerge"
-      ]
+      "addLabels": ["types", "automerge"]
     },
     {
       "description": "Require manual review for core runtime and GitHub integration dependencies.",
@@ -138,62 +81,33 @@
       ],
       "minimumReleaseAge": "7 days",
       "automerge": false,
-      "addLabels": [
-        "manual-review"
-      ]
+      "addLabels": ["manual-review"]
     },
     {
       "description": "Require explicit Dependency Dashboard approval for major upgrades.",
-      "matchUpdateTypes": [
-        "major"
-      ],
+      "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true,
       "automerge": false,
-      "addLabels": [
-        "breaking-change",
-        "manual-review"
-      ],
+      "addLabels": ["breaking-change", "manual-review"],
       "prPriority": -5
     },
     {
       "description": "Allow same-version GitHub Action digest refreshes outside protected workflows after required checks pass.",
-      "matchManagers": [
-        "github-actions"
-      ],
-      "matchUpdateTypes": [
-        "digest"
-      ],
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
       "automerge": false,
-      "addLabels": [
-        "supply-chain"
-      ]
+      "addLabels": ["supply-chain"]
     },
     {
       "description": "Require manual review for non-digest GitHub Action updates.",
-      "matchManagers": [
-        "github-actions"
-      ],
-      "matchUpdateTypes": [
-        "major",
-        "minor",
-        "patch",
-        "pin",
-        "pinDigest",
-        "rollback",
-        "bump",
-        "replacement"
-      ],
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major", "minor", "patch", "pin", "pinDigest", "rollback", "bump", "replacement"],
       "automerge": false,
-      "addLabels": [
-        "supply-chain",
-        "manual-review"
-      ]
+      "addLabels": ["supply-chain", "manual-review"]
     },
     {
       "description": "Require manual review for Actions changes in security, release, provenance, and publication workflows.",
-      "matchManagers": [
-        "github-actions"
-      ],
+      "matchManagers": ["github-actions"],
       "matchFileNames": [
         ".github/workflows/security.yml",
         ".github/workflows/osv.yml",
@@ -205,46 +119,27 @@
         ".github/workflows/binary-build.yml"
       ],
       "automerge": false,
-      "addLabels": [
-        "supply-chain",
-        "manual-review"
-      ]
+      "addLabels": ["supply-chain", "manual-review"]
     },
     {
       "description": "Keep container base-image updates in the manual exception path.",
-      "matchManagers": [
-        "dockerfile",
-        "docker-compose"
-      ],
+      "matchManagers": ["dockerfile", "docker-compose"],
       "pinDigests": true,
       "automerge": false,
-      "addLabels": [
-        "supply-chain",
-        "manual-review"
-      ]
+      "addLabels": ["supply-chain", "manual-review"]
     },
     {
       "description": "Require manual review for self-hosted Renovate runtime and validator upgrades.",
-      "matchPackageNames": [
-        "ghcr.io/renovatebot/renovate",
-        "renovate/renovate"
-      ],
+      "matchPackageNames": ["ghcr.io/renovatebot/renovate", "renovate/renovate"],
       "minimumReleaseAge": "7 days",
       "groupName": "self-hosted Renovate",
       "automerge": false,
-      "addLabels": [
-        "supply-chain",
-        "manual-review"
-      ]
+      "addLabels": ["supply-chain", "manual-review"]
     }
   ],
   "vulnerabilityAlerts": {
     "enabled": true,
-    "labels": [
-      "security",
-      "dependencies",
-      "manual-review"
-    ],
+    "labels": ["security", "dependencies", "manual-review"],
     "minimumReleaseAge": null,
     "schedule": [],
     "prCreation": "immediate",
