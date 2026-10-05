@@ -36,7 +36,9 @@ The north-star measure is **verified production releases under active BoardReady
 
 ## Current product sequence
 
-### Phase A — Release trust
+These are **product sequence** groupings, not engineering execution phases. The numeric **Phase 0–8** model remains canonical only in [master-execution-status.md](development/master-execution-status.md); implementation work keeps its numeric phase/workstream assignment there.
+
+### Product sequence 1 — Release trust
 
 Goal: make the release gate trustworthy enough to authorize real manufacturing output.
 
@@ -46,7 +48,7 @@ Goal: make the release gate trustworthy enough to authorize real manufacturing o
 
 Exit condition: exact parsed evidence may block, heuristic evidence warns by default, and retained release evidence can be tied to the approved source revision.
 
-### Phase B — Continuous product assurance
+### Product sequence 2 — Continuous product assurance
 
 Goal: identify production impact even when no Git commit changes.
 
@@ -55,7 +57,7 @@ Goal: identify production impact even when no Git commit changes.
 
 Exit condition: BoardReadyOps can re-evaluate tracked releases from external supply/security changes with explicit evidence quality and affected-release mapping.
 
-### Phase C — Manufacturing truth
+### Product sequence 3 — Manufacturing truth
 
 Goal: connect what was approved to what was actually manufactured.
 
@@ -66,7 +68,7 @@ Goal: connect what was approved to what was actually manufactured.
 
 Exit condition: an approved release can be linked to manufacturer handoff, batch/as-built data, substitutions, and production outcomes without requiring a deep MES integration.
 
-### Phase D — Evidence, compliance, and enterprise trust
+### Product sequence 4 — Evidence, compliance, and enterprise trust
 
 Goal: project the release record into the governance and evidence views customers already need.
 
@@ -96,8 +98,7 @@ These remain blocked until the required real-environment acceptance evidence is 
 
 ### Enterprise execution and governance
 
-- [#41](https://github.com/oaslananka/boardreadyops/issues/41) — outbound customer-hosted execution agent.
-- [#45](https://github.com/oaslananka/boardreadyops/issues/45) — organization policy inheritance and repository overrides.
+Enterprise execution and governance items are summarized once in **Product sequence 4** above; their delivery dependencies and sequencing remain canonical in [#191](https://github.com/oaslananka/boardreadyops/issues/191).
 
 ## Architecture discipline
 
@@ -119,4 +120,4 @@ The next proof is not “more features.” It is a trustworthy release authority
 - Discuss scope on the relevant roadmap or implementation issue.
 - Use an RFC for significant architecture or product decisions.
 - Do not create a parallel roadmap document; update [#758](https://github.com/oaslananka/boardreadyops/issues/758), [#191](https://github.com/oaslananka/boardreadyops/issues/191), or this concise summary as appropriate.
-- Follow the [Contributing guide](https://github.com/oaslananka/boardreadyops/blob/main/CONTRIBUTING.md) for implementation workflow.
+- Follow the [Contributing guide](../CONTRIBUTING.md) for implementation workflow.
