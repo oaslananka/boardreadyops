@@ -7,6 +7,7 @@ export * from "./component-intelligence.js";
 export * from "./decision-engine.js";
 export * from "./delimited.js";
 export * from "./entitlements.js";
+export * from "./evidence-graph.js";
 export * from "./evidence-ledger.js";
 export * from "./github-capabilities.js";
 export * from "./github-command.js";
