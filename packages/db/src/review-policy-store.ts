@@ -101,22 +101,27 @@ const AUDIT_SELECT_COLUMNS = `
   after_policy AS "afterPolicy",
   created_at AS "createdAt"`;
 
+const POLICY_SNAPSHOT_COLUMNS: Readonly<Record<keyof ReviewPolicyRecord, string>> = {
+  id: "id",
+  tenantId: "tenant_id",
+  scope: "scope",
+  scopeId: "scope_id",
+  name: "name",
+  description: "description",
+  requiredChecklist: "required_checklist",
+  requiredRoles: "required_roles",
+  severityGate: "severity_gate",
+  requireEvidencePack: "require_evidence_pack",
+  requireExternalReview: "require_external_review",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+};
+
 function policySnapshot(alias: string): string {
-  return `jsonb_build_object(
-    'id', ${alias}.id,
-    'tenantId', ${alias}.tenant_id,
-    'scope', ${alias}.scope,
-    'scopeId', ${alias}.scope_id,
-    'name', ${alias}.name,
-    'description', ${alias}.description,
-    'requiredChecklist', ${alias}.required_checklist,
-    'requiredRoles', ${alias}.required_roles,
-    'severityGate', ${alias}.severity_gate,
-    'requireEvidencePack', ${alias}.require_evidence_pack,
-    'requireExternalReview', ${alias}.require_external_review,
-    'createdAt', ${alias}.created_at,
-    'updatedAt', ${alias}.updated_at
-  )`;
+  const entries = Object.entries(POLICY_SNAPSHOT_COLUMNS).map(
+    ([property, column]) => `'${property}', ${alias}.${column}`,
+  );
+  return `jsonb_build_object(${entries.join(", ")})`;
 }
 
 export class ReviewPolicyStore {

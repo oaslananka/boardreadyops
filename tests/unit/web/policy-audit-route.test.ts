@@ -25,7 +25,7 @@ function signedIn(login = "octocat") {
 function postgres() {
   vi.spyOn(cloudConfig, "optionalCloudPersistenceConfiguration").mockReturnValue({
     mode: "postgres",
-    databaseUrl: "postgresql://postgres:postgres@localhost:5432/boardreadyops",
+    databaseUrl: "postgresql://localhost/boardreadyops",
   });
 }
 
