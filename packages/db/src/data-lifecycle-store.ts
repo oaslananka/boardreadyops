@@ -9,6 +9,14 @@ export type RetentionPolicy = {
   sourceRetentionHours: number;
 };
 
+export type RepositoryRetentionPolicy = {
+  repositoryId: string;
+  owner: string;
+  name: string;
+  hasOverride: boolean;
+  retentionDays: number | null;
+};
+
 export type DataExport = {
   id: string;
   tenantId: string;
@@ -97,6 +105,94 @@ export class DataLifecycleStore {
       retentionDays: row.retention_days === null ? null : Number(row.retention_days),
       sourceRetentionHours: Number(row.source_retention_hours),
     };
+  }
+
+  async listRepositoryRetentionPolicies(installationId: string): Promise<RepositoryRetentionPolicy[]> {
+    const r = (await this.db.query(
+      `SELECT repositories.id AS repository_id,
+              repositories.owner,
+              repositories.name,
+              repository_retention_policies.repository_id IS NOT NULL AS has_override,
+              repository_retention_policies.retention_days
+         FROM repositories
+         LEFT JOIN repository_retention_policies
+           ON repository_retention_policies.repository_id = repositories.id
+        WHERE repositories.installation_id = $1
+          AND repositories.disabled_at IS NULL
+        ORDER BY lower(repositories.owner), lower(repositories.name), repositories.id`,
+      [installationId],
+    )) as { rows?: Array<Record<string, unknown>> };
+
+    return (r.rows ?? []).map((row) => ({
+      repositoryId: String(row.repository_id),
+      owner: String(row.owner),
+      name: String(row.name),
+      hasOverride: row.has_override === true,
+      retentionDays:
+        row.retention_days === null || row.retention_days === undefined ? null : Number(row.retention_days),
+    }));
+  }
+
+  async upsertRepositoryRetentionPolicy(input: {
+    installationId: string;
+    repositoryId: string;
+    retentionDays: number | null;
+  }): Promise<RepositoryRetentionPolicy | null> {
+    if (
+      input.retentionDays !== null &&
+      (!Number.isSafeInteger(input.retentionDays) || input.retentionDays < 1 || input.retentionDays > 3_650)
+    ) {
+      throw new Error("retentionDays must be null or an integer between 1 and 3650");
+    }
+
+    const r = (await this.db.query(
+      `WITH selected_repository AS (
+         SELECT repositories.id, repositories.owner, repositories.name
+           FROM repositories
+          WHERE repositories.id = $1
+            AND repositories.installation_id = $2
+            AND repositories.disabled_at IS NULL
+       ), upserted AS (
+         INSERT INTO repository_retention_policies (repository_id, retention_days, created_at, updated_at)
+         SELECT selected_repository.id, $3, NOW(), NOW()
+           FROM selected_repository
+         ON CONFLICT (repository_id) DO UPDATE
+           SET retention_days = EXCLUDED.retention_days,
+               updated_at = NOW()
+         RETURNING repository_id, retention_days
+       )
+       SELECT upserted.repository_id,
+              selected_repository.owner,
+              selected_repository.name,
+              upserted.retention_days
+         FROM upserted
+         JOIN selected_repository ON selected_repository.id = upserted.repository_id`,
+      [input.repositoryId, input.installationId, input.retentionDays],
+    )) as { rows?: Array<Record<string, unknown>> };
+
+    const row = r.rows?.[0];
+    if (!row) return null;
+
+    return {
+      repositoryId: String(row.repository_id),
+      owner: String(row.owner),
+      name: String(row.name),
+      hasOverride: true,
+      retentionDays: row.retention_days === null ? null : Number(row.retention_days),
+    };
+  }
+
+  async clearRepositoryRetentionPolicy(input: { installationId: string; repositoryId: string }): Promise<boolean> {
+    const r = (await this.db.query(
+      `DELETE FROM repository_retention_policies
+       USING repositories
+       WHERE repository_retention_policies.repository_id = repositories.id
+         AND repositories.id = $1
+         AND repositories.installation_id = $2
+         AND repositories.disabled_at IS NULL`,
+      [input.repositoryId, input.installationId],
+    )) as { rowCount?: number };
+    return (r.rowCount ?? 0) > 0;
   }
 
   async listLegalHolds(tenantId: string): Promise<LegalHold[]> {
