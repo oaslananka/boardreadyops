@@ -175,9 +175,7 @@ describe("dependency and security automation configuration", () => {
         ":separatePatchReleases",
       ]),
     );
-    expect(renovate.extends).not.toEqual(
-      expect.arrayContaining(["github>oaslananka/.github:renovate-config"]),
-    );
+    expect(renovate.extends).not.toEqual(expect.arrayContaining(["github>oaslananka/.github:renovate-config"]));
     expect(renovate.timezone).toBe("Europe/Istanbul");
     expect(renovate.prHourlyLimit).toBe(2);
     expect(renovate.prConcurrentLimit).toBe(5);
