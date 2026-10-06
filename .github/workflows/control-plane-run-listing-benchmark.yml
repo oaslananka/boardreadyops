@@ -45,7 +45,7 @@ jobs:
       BOARDREADYOPS_RUN_LISTING_REPORT_PATH: control-plane-run-listing-benchmark-report.json
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
         env:
           POSTGRES_USER: boardreadyops
           POSTGRES_DB: boardreadyops_load
