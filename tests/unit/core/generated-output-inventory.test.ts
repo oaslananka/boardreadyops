@@ -82,7 +82,12 @@ describe("generated output inventory safeguards", () => {
     expect(reasons.join(" ")).toContain("Undeclared generated directory: extras");
     expect(reasons.join(" ")).toContain("Undeclared generated artifact: extras/unexpected.gbr");
     if (process.platform !== "win32") {
-      expect(reasons.join(" ")).toContain("Cross-platform generated output filename alias");
+      // macOS and some Linux mounts fold case: only assert an actual on-disk collision
+      // when the filesystem preserves both differently-cased directory entries.
+      const actualNames = await fs.readdir(root);
+      if (actualNames.includes("A.GBR") && actualNames.includes("a.gbr")) {
+        expect(reasons.join(" ")).toContain("Cross-platform generated output filename alias");
+      }
       expect(reasons.join(" ")).toContain("Non-canonical generated output filename: bad?.gbr");
     }
   });
