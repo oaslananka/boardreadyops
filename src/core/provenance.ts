@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { boardReadyVersion } from "../generated/version.js";
@@ -84,45 +85,173 @@ export async function createExportProvenanceManifest(options: {
   };
 }
 
+function compareReviewedCommit(
+  reviewedSha: string,
+  recorded: ExportProvenanceManifest["git"],
+): { match: boolean; reason?: string } {
+  if (typeof recorded?.sha !== "string" || !/^[0-9a-f]{40}$/i.test(recorded.sha)) {
+    return { match: false, reason: "Reviewed commit verification requested, but manifest has no valid Git SHA." };
+  }
+  if (recorded.dirty === true) {
+    return {
+      match: false,
+      reason: "Reviewed commit verification requested, but the export recorded a dirty source tree.",
+    };
+  }
+  if (reviewedSha !== recorded.sha) {
+    return {
+      match: false,
+      reason:
+        "Git SHA mismatch: current commit " +
+        reviewedSha.slice(0, 12) +
+        "… but manifest recorded " +
+        recorded.sha.slice(0, 12) +
+        "…",
+    };
+  }
+  return { match: true };
+}
+
+function isArtifactRecord(value: unknown): value is ProvenanceArtifact {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Partial<ProvenanceArtifact>;
+  return (
+    typeof record.path === "string" &&
+    record.path.trim() !== "" &&
+    typeof record.sha256 === "string" &&
+    /^[0-9a-f]{64}$/i.test(record.sha256) &&
+    Number.isSafeInteger(record.bytes) &&
+    (record.bytes ?? -1) >= 0
+  );
+}
+
+async function inspectArtifact(
+  root: string,
+  realRoot: string,
+  manifestDir: string,
+  artifact: ProvenanceArtifact,
+): Promise<{ kind: "valid" | "mismatch" | "missing"; reason?: string }> {
+  if (path.isAbsolute(artifact.path) || artifact.path.includes("..")) {
+    return { kind: "mismatch", reason: `Artifact path rejected (absolute or path traversal): ${artifact.path}` };
+  }
+  const absPath = path.resolve(manifestDir, artifact.path);
+  if (!isInside(root, absPath) && !isInside(manifestDir, absPath)) {
+    return { kind: "mismatch", reason: `Artifact path escaped directory bounds: ${artifact.path}` };
+  }
+  try {
+    const realPath = await fs.realpath(absPath);
+    if (!isInside(realRoot, realPath)) {
+      return {
+        kind: "mismatch",
+        reason: `Artifact ${artifact.path} symlink escapes the project and manifest directories.`,
+      };
+    }
+    const hash = createHash("sha256");
+    let streamedBytes = 0;
+    for await (const chunk of createReadStream(realPath)) {
+      hash.update(chunk);
+      streamedBytes += chunk.byteLength;
+    }
+    const actualHash = hash.digest("hex");
+    const fileStat = await fs.stat(realPath);
+    if (actualHash !== artifact.sha256 || streamedBytes !== artifact.bytes || fileStat.size !== artifact.bytes) {
+      return {
+        kind: "mismatch",
+        reason: `Artifact ${artifact.path} content modified after export (hash or byte-count mismatch).`,
+      };
+    }
+    return { kind: "valid" };
+  } catch {
+    return { kind: "missing", reason: `Artifact ${artifact.path} missing or unreadable.` };
+  }
+}
+
+type LoadedManifest =
+  | { manifest: unknown; manifestDir: string; realRoot: string }
+  | { error: ProvenanceVerificationResult };
+
+async function loadManifest(root: string, manifestOrPath: ExportProvenanceManifest | string): Promise<LoadedManifest> {
+  let realRoot: string;
+  try {
+    realRoot = await fs.realpath(root);
+  } catch {
+    return { error: { status: "missing", reasons: ["Project root is missing or unreadable."] } };
+  }
+
+  if (typeof manifestOrPath !== "string") {
+    return { manifest: manifestOrPath, manifestDir: root, realRoot };
+  }
+  const absManifestPath = path.resolve(root, manifestOrPath);
+  if (!isInside(root, absManifestPath)) {
+    return {
+      error: {
+        status: "mismatch",
+        reasons: [`Path traversal rejected for manifest path: ${manifestOrPath}`],
+      },
+    };
+  }
+  try {
+    const realManifestPath = await fs.realpath(absManifestPath);
+    if (!isInside(realRoot, realManifestPath)) {
+      return {
+        error: {
+          status: "mismatch",
+          reasons: ["Provenance manifest symlink escapes the project root."],
+        },
+      };
+    }
+    const raw = await readTextFile(absManifestPath);
+    return { manifest: JSON.parse(raw), manifestDir: path.dirname(absManifestPath), realRoot };
+  } catch (error) {
+    return {
+      error: {
+        status: "missing",
+        reasons: [
+          `Provenance manifest unreadable or malformed: ${error instanceof Error ? error.message : String(error)}`,
+        ],
+      },
+    };
+  }
+}
+
+function validateManifestStructure(manifest: unknown): ProvenanceVerificationResult | undefined {
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return { status: "unsupported", reasons: ["Invalid provenance manifest object."] };
+  }
+  const record = manifest as ExportProvenanceManifest;
+  if (record.schemaVersion !== 1 || record.tool?.name !== "boardreadyops") {
+    return {
+      status: "unsupported",
+      reasons: [`Unsupported or invalid provenance manifest schema version ${record.schemaVersion}`],
+      manifest: record,
+    };
+  }
+  if (typeof record.sourceFingerprint !== "string" || !/^[0-9a-f]{64}$/i.test(record.sourceFingerprint)) {
+    return {
+      status: "mismatch",
+      reasons: ["Provenance manifest has no valid source SHA-256 fingerprint."],
+      manifest: record,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Verifies a *self-reported* export inventory and current input file fingerprint.
+ * A "verified" result here does not authenticate a generator, workflow, or reviewed
+ * source commit. Strong source-bound provenance requires separate trusted attestation.
+ */
 export async function verifyExportProvenance(
   root: string,
   manifestOrPath: ExportProvenanceManifest | string,
   options: { currentGitSha?: string | undefined } = {},
 ): Promise<ProvenanceVerificationResult> {
-  let manifest: ExportProvenanceManifest;
-  let manifestDir = root;
-
-  if (typeof manifestOrPath === "string") {
-    const absManifestPath = path.resolve(root, manifestOrPath);
-    if (!isInside(root, absManifestPath)) {
-      return {
-        status: "mismatch",
-        reasons: [`Path traversal rejected for manifest path: ${manifestOrPath}`],
-      };
-    }
-    manifestDir = path.dirname(absManifestPath);
-    try {
-      const raw = await readTextFile(absManifestPath);
-      manifest = JSON.parse(raw) as ExportProvenanceManifest;
-    } catch (error) {
-      return {
-        status: "missing",
-        reasons: [
-          `Provenance manifest unreadable or malformed: ${error instanceof Error ? error.message : String(error)}`,
-        ],
-      };
-    }
-  } else {
-    manifest = manifestOrPath;
-  }
-
-  if (manifest.schemaVersion !== 1 || manifest.tool?.name !== "boardreadyops") {
-    return {
-      status: "unsupported",
-      reasons: [`Unsupported or invalid provenance manifest schema version ${manifest.schemaVersion}`],
-      manifest,
-    };
-  }
+  const loaded = await loadManifest(root, manifestOrPath);
+  if ("error" in loaded) return loaded.error;
+  const invalid = validateManifestStructure(loaded.manifest);
+  if (invalid) return invalid;
+  const manifest = loaded.manifest as ExportProvenanceManifest;
+  const { manifestDir, realRoot } = loaded;
 
   const reasons: string[] = [];
   const currentFingerprint = await computeSourceFingerprint(root);
@@ -135,43 +264,35 @@ export async function verifyExportProvenance(
   }
 
   let gitShaMatch: boolean | undefined;
-  if (options.currentGitSha && manifest.git?.sha) {
-    gitShaMatch = options.currentGitSha === manifest.git.sha;
-    if (!gitShaMatch) {
-      reasons.push(
-        `Git SHA mismatch: current commit ${options.currentGitSha.slice(0, 12)}… but manifest recorded ${manifest.git.sha.slice(0, 12)}…`,
-      );
-    }
+  if (options.currentGitSha) {
+    const comparison = compareReviewedCommit(options.currentGitSha, manifest.git);
+    gitShaMatch = comparison.match;
+    if (comparison.reason) reasons.push(comparison.reason);
   }
 
   const artifactMismatches: string[] = [];
   const missingArtifacts: string[] = [];
-
-  for (const artifact of manifest.artifacts ?? []) {
-    if (path.isAbsolute(artifact.path) || artifact.path.includes("..")) {
-      artifactMismatches.push(artifact.path);
-      reasons.push(`Artifact path rejected (absolute or path traversal): ${artifact.path}`);
+  if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length === 0) {
+    reasons.push("Provenance manifest is missing a non-empty artifact inventory.");
+  }
+  const seenPaths = new Set<string>();
+  for (const entry of Array.isArray(manifest.artifacts) ? manifest.artifacts : []) {
+    if (!isArtifactRecord(entry)) {
+      reasons.push("Provenance artifact entry has invalid path, SHA-256, or byte count.");
       continue;
     }
-
-    const absPath = path.resolve(manifestDir, artifact.path);
-    if (!isInside(root, absPath) && !isInside(manifestDir, absPath)) {
-      artifactMismatches.push(artifact.path);
-      reasons.push(`Artifact path escaped directory bounds: ${artifact.path}`);
+    const normalizedPath = path.posix.normalize(toPosixPath(entry.path));
+    if (seenPaths.has(normalizedPath)) {
+      artifactMismatches.push(entry.path);
+      reasons.push(`Artifact path is duplicated in provenance manifest: ${entry.path}`);
       continue;
     }
+    seenPaths.add(normalizedPath);
 
-    try {
-      const content = await fs.readFile(absPath);
-      const actualHash = createHash("sha256").update(content).digest("hex");
-      if (actualHash !== artifact.sha256) {
-        artifactMismatches.push(artifact.path);
-        reasons.push(`Artifact ${artifact.path} content modified after export (hash mismatch).`);
-      }
-    } catch {
-      missingArtifacts.push(artifact.path);
-      reasons.push(`Artifact ${artifact.path} missing or unreadable.`);
-    }
+    const outcome = await inspectArtifact(root, realRoot, manifestDir, entry);
+    if (outcome.reason) reasons.push(outcome.reason);
+    if (outcome.kind === "mismatch") artifactMismatches.push(entry.path);
+    if (outcome.kind === "missing") missingArtifacts.push(entry.path);
   }
 
   const status: ProvenanceVerificationResult["status"] = reasons.length === 0 ? "verified" : "mismatch";

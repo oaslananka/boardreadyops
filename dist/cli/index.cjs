@@ -47552,6 +47552,7 @@ var import_node_path37 = __toESM(require("node:path"), 1);
 
 // src/core/provenance.ts
 var import_node_crypto4 = require("node:crypto");
+var import_node_fs2 = require("node:fs");
 var import_promises13 = __toESM(require("node:fs/promises"), 1);
 var import_node_path36 = __toESM(require("node:path"), 1);
 init_version();
@@ -47577,39 +47578,134 @@ async function computeSourceFingerprint(root, customPatterns = SOURCE_PATTERNS) 
   }
   return hasher.digest("hex");
 }
-async function verifyExportProvenance(root, manifestOrPath, options = {}) {
-  let manifest;
-  let manifestDir = root;
-  if (typeof manifestOrPath === "string") {
-    const absManifestPath = import_node_path36.default.resolve(root, manifestOrPath);
-    if (!isInside(root, absManifestPath)) {
+function compareReviewedCommit(reviewedSha, recorded) {
+  if (typeof recorded?.sha !== "string" || !/^[0-9a-f]{40}$/i.test(recorded.sha)) {
+    return { match: false, reason: "Reviewed commit verification requested, but manifest has no valid Git SHA." };
+  }
+  if (recorded.dirty === true) {
+    return {
+      match: false,
+      reason: "Reviewed commit verification requested, but the export recorded a dirty source tree."
+    };
+  }
+  if (reviewedSha !== recorded.sha) {
+    return {
+      match: false,
+      reason: "Git SHA mismatch: current commit " + reviewedSha.slice(0, 12) + "\u2026 but manifest recorded " + recorded.sha.slice(0, 12) + "\u2026"
+    };
+  }
+  return { match: true };
+}
+function isArtifactRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record2 = value;
+  return typeof record2.path === "string" && record2.path.trim() !== "" && typeof record2.sha256 === "string" && /^[0-9a-f]{64}$/i.test(record2.sha256) && Number.isSafeInteger(record2.bytes) && (record2.bytes ?? -1) >= 0;
+}
+async function inspectArtifact(root, realRoot, manifestDir, artifact) {
+  if (import_node_path36.default.isAbsolute(artifact.path) || artifact.path.includes("..")) {
+    return { kind: "mismatch", reason: `Artifact path rejected (absolute or path traversal): ${artifact.path}` };
+  }
+  const absPath = import_node_path36.default.resolve(manifestDir, artifact.path);
+  if (!isInside(root, absPath) && !isInside(manifestDir, absPath)) {
+    return { kind: "mismatch", reason: `Artifact path escaped directory bounds: ${artifact.path}` };
+  }
+  try {
+    const realPath = await import_promises13.default.realpath(absPath);
+    if (!isInside(realRoot, realPath)) {
       return {
-        status: "mismatch",
-        reasons: [`Path traversal rejected for manifest path: ${manifestOrPath}`]
+        kind: "mismatch",
+        reason: `Artifact ${artifact.path} symlink escapes the project and manifest directories.`
       };
     }
-    manifestDir = import_node_path36.default.dirname(absManifestPath);
-    try {
-      const raw = await readTextFile(absManifestPath);
-      manifest = JSON.parse(raw);
-    } catch (error51) {
+    const hash2 = (0, import_node_crypto4.createHash)("sha256");
+    let streamedBytes = 0;
+    for await (const chunk of (0, import_node_fs2.createReadStream)(realPath)) {
+      hash2.update(chunk);
+      streamedBytes += chunk.byteLength;
+    }
+    const actualHash = hash2.digest("hex");
+    const fileStat = await import_promises13.default.stat(realPath);
+    if (actualHash !== artifact.sha256 || streamedBytes !== artifact.bytes || fileStat.size !== artifact.bytes) {
       return {
+        kind: "mismatch",
+        reason: `Artifact ${artifact.path} content modified after export (hash or byte-count mismatch).`
+      };
+    }
+    return { kind: "valid" };
+  } catch {
+    return { kind: "missing", reason: `Artifact ${artifact.path} missing or unreadable.` };
+  }
+}
+async function loadManifest(root, manifestOrPath) {
+  let realRoot;
+  try {
+    realRoot = await import_promises13.default.realpath(root);
+  } catch {
+    return { error: { status: "missing", reasons: ["Project root is missing or unreadable."] } };
+  }
+  if (typeof manifestOrPath !== "string") {
+    return { manifest: manifestOrPath, manifestDir: root, realRoot };
+  }
+  const absManifestPath = import_node_path36.default.resolve(root, manifestOrPath);
+  if (!isInside(root, absManifestPath)) {
+    return {
+      error: {
+        status: "mismatch",
+        reasons: [`Path traversal rejected for manifest path: ${manifestOrPath}`]
+      }
+    };
+  }
+  try {
+    const realManifestPath = await import_promises13.default.realpath(absManifestPath);
+    if (!isInside(realRoot, realManifestPath)) {
+      return {
+        error: {
+          status: "mismatch",
+          reasons: ["Provenance manifest symlink escapes the project root."]
+        }
+      };
+    }
+    const raw = await readTextFile(absManifestPath);
+    return { manifest: JSON.parse(raw), manifestDir: import_node_path36.default.dirname(absManifestPath), realRoot };
+  } catch (error51) {
+    return {
+      error: {
         status: "missing",
         reasons: [
           `Provenance manifest unreadable or malformed: ${error51 instanceof Error ? error51.message : String(error51)}`
         ]
-      };
-    }
-  } else {
-    manifest = manifestOrPath;
-  }
-  if (manifest.schemaVersion !== 1 || manifest.tool?.name !== "boardreadyops") {
-    return {
-      status: "unsupported",
-      reasons: [`Unsupported or invalid provenance manifest schema version ${manifest.schemaVersion}`],
-      manifest
+      }
     };
   }
+}
+function validateManifestStructure(manifest) {
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return { status: "unsupported", reasons: ["Invalid provenance manifest object."] };
+  }
+  const record2 = manifest;
+  if (record2.schemaVersion !== 1 || record2.tool?.name !== "boardreadyops") {
+    return {
+      status: "unsupported",
+      reasons: [`Unsupported or invalid provenance manifest schema version ${record2.schemaVersion}`],
+      manifest: record2
+    };
+  }
+  if (typeof record2.sourceFingerprint !== "string" || !/^[0-9a-f]{64}$/i.test(record2.sourceFingerprint)) {
+    return {
+      status: "mismatch",
+      reasons: ["Provenance manifest has no valid source SHA-256 fingerprint."],
+      manifest: record2
+    };
+  }
+  return void 0;
+}
+async function verifyExportProvenance(root, manifestOrPath, options = {}) {
+  const loaded = await loadManifest(root, manifestOrPath);
+  if ("error" in loaded) return loaded.error;
+  const invalid = validateManifestStructure(loaded.manifest);
+  if (invalid) return invalid;
+  const manifest = loaded.manifest;
+  const { manifestDir, realRoot } = loaded;
   const reasons = [];
   const currentFingerprint = await computeSourceFingerprint(root);
   const sourceFingerprintMatch = currentFingerprint === manifest.sourceFingerprint;
@@ -47619,39 +47715,33 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
     );
   }
   let gitShaMatch;
-  if (options.currentGitSha && manifest.git?.sha) {
-    gitShaMatch = options.currentGitSha === manifest.git.sha;
-    if (!gitShaMatch) {
-      reasons.push(
-        `Git SHA mismatch: current commit ${options.currentGitSha.slice(0, 12)}\u2026 but manifest recorded ${manifest.git.sha.slice(0, 12)}\u2026`
-      );
-    }
+  if (options.currentGitSha) {
+    const comparison = compareReviewedCommit(options.currentGitSha, manifest.git);
+    gitShaMatch = comparison.match;
+    if (comparison.reason) reasons.push(comparison.reason);
   }
   const artifactMismatches = [];
   const missingArtifacts = [];
-  for (const artifact of manifest.artifacts ?? []) {
-    if (import_node_path36.default.isAbsolute(artifact.path) || artifact.path.includes("..")) {
-      artifactMismatches.push(artifact.path);
-      reasons.push(`Artifact path rejected (absolute or path traversal): ${artifact.path}`);
+  if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length === 0) {
+    reasons.push("Provenance manifest is missing a non-empty artifact inventory.");
+  }
+  const seenPaths = /* @__PURE__ */ new Set();
+  for (const entry of Array.isArray(manifest.artifacts) ? manifest.artifacts : []) {
+    if (!isArtifactRecord(entry)) {
+      reasons.push("Provenance artifact entry has invalid path, SHA-256, or byte count.");
       continue;
     }
-    const absPath = import_node_path36.default.resolve(manifestDir, artifact.path);
-    if (!isInside(root, absPath) && !isInside(manifestDir, absPath)) {
-      artifactMismatches.push(artifact.path);
-      reasons.push(`Artifact path escaped directory bounds: ${artifact.path}`);
+    const normalizedPath = import_node_path36.default.posix.normalize(toPosixPath(entry.path));
+    if (seenPaths.has(normalizedPath)) {
+      artifactMismatches.push(entry.path);
+      reasons.push(`Artifact path is duplicated in provenance manifest: ${entry.path}`);
       continue;
     }
-    try {
-      const content = await import_promises13.default.readFile(absPath);
-      const actualHash = (0, import_node_crypto4.createHash)("sha256").update(content).digest("hex");
-      if (actualHash !== artifact.sha256) {
-        artifactMismatches.push(artifact.path);
-        reasons.push(`Artifact ${artifact.path} content modified after export (hash mismatch).`);
-      }
-    } catch {
-      missingArtifacts.push(artifact.path);
-      reasons.push(`Artifact ${artifact.path} missing or unreadable.`);
-    }
+    seenPaths.add(normalizedPath);
+    const outcome = await inspectArtifact(root, realRoot, manifestDir, entry);
+    if (outcome.reason) reasons.push(outcome.reason);
+    if (outcome.kind === "mismatch") artifactMismatches.push(entry.path);
+    if (outcome.kind === "missing") missingArtifacts.push(entry.path);
   }
   const status = reasons.length === 0 ? "verified" : "mismatch";
   return {
@@ -48083,7 +48173,7 @@ function registerBuiltInRules() {
 
 // src/rules/fabrication-snapshot.ts
 var import_node_crypto5 = __toESM(require("node:crypto"), 1);
-var import_node_fs2 = require("node:fs");
+var import_node_fs3 = require("node:fs");
 var import_node_path42 = __toESM(require("node:path"), 1);
 init_path();
 var manufacturingPatterns = {
@@ -48177,7 +48267,7 @@ async function outputFromFiles(root, kind, files) {
 }
 async function hashFile(file2) {
   const hash2 = import_node_crypto5.default.createHash("sha256");
-  for await (const chunk of (0, import_node_fs2.createReadStream)(file2)) {
+  for await (const chunk of (0, import_node_fs3.createReadStream)(file2)) {
     hash2.update(chunk);
   }
   return hash2.digest("hex");
@@ -48463,7 +48553,7 @@ function requirementMatchesFinding(requirement, finding2) {
 
 // src/core/logger.ts
 var import_node_crypto6 = require("node:crypto");
-var import_node_fs3 = __toESM(require("node:fs"), 1);
+var import_node_fs4 = __toESM(require("node:fs"), 1);
 var import_node_path45 = __toESM(require("node:path"), 1);
 var import_picocolors = __toESM(require_picocolors(), 1);
 var levelRank = {
@@ -48641,18 +48731,18 @@ function normalizePath2(value) {
   return import_node_path45.default.resolve(value).replaceAll("\\", "/");
 }
 function writeRotatingLine(file2, line, maxFileBytes, retention) {
-  import_node_fs3.default.mkdirSync(import_node_path45.default.dirname(file2), { recursive: true });
+  import_node_fs4.default.mkdirSync(import_node_path45.default.dirname(file2), { recursive: true });
   if (shouldRotate(file2, Buffer.byteLength(line), maxFileBytes)) {
     rotate(file2, retention);
   }
-  import_node_fs3.default.appendFileSync(file2, line, "utf8");
+  import_node_fs4.default.appendFileSync(file2, line, "utf8");
 }
 function shouldRotate(file2, nextBytes, maxFileBytes) {
   if (maxFileBytes <= 0) {
     return false;
   }
   try {
-    return import_node_fs3.default.statSync(file2).size + nextBytes > maxFileBytes;
+    return import_node_fs4.default.statSync(file2).size + nextBytes > maxFileBytes;
   } catch (error51) {
     if (isNoEntry(error51)) {
       return false;
@@ -48662,19 +48752,19 @@ function shouldRotate(file2, nextBytes, maxFileBytes) {
 }
 function rotate(file2, retention) {
   if (retention <= 0) {
-    import_node_fs3.default.rmSync(file2, { force: true });
+    import_node_fs4.default.rmSync(file2, { force: true });
     return;
   }
-  import_node_fs3.default.rmSync(`${file2}.${retention}`, { force: true });
+  import_node_fs4.default.rmSync(`${file2}.${retention}`, { force: true });
   for (let index = retention - 1; index >= 1; index -= 1) {
     const from = `${file2}.${index}`;
     const to = `${file2}.${index + 1}`;
-    if (import_node_fs3.default.existsSync(from)) {
-      import_node_fs3.default.renameSync(from, to);
+    if (import_node_fs4.default.existsSync(from)) {
+      import_node_fs4.default.renameSync(from, to);
     }
   }
-  if (import_node_fs3.default.existsSync(file2)) {
-    import_node_fs3.default.renameSync(file2, `${file2}.1`);
+  if (import_node_fs4.default.existsSync(file2)) {
+    import_node_fs4.default.renameSync(file2, `${file2}.1`);
   }
 }
 function isNoEntry(error51) {
@@ -50099,7 +50189,7 @@ function baselineDisplayPath(root, file2) {
 }
 
 // src/cli/commands/run.ts
-var import_node_fs4 = __toESM(require("node:fs"), 1);
+var import_node_fs5 = __toESM(require("node:fs"), 1);
 var import_node_path50 = __toESM(require("node:path"), 1);
 init_version();
 init_t();
@@ -51632,7 +51722,7 @@ async function runCommand(pathInput, options, streams, commandName = "run", runt
         }
       };
       await executePipeline();
-      const watcher = import_node_fs4.default.watch(root, { recursive: true }, (_eventType, filename) => {
+      const watcher = import_node_fs5.default.watch(root, { recursive: true }, (_eventType, filename) => {
         if (filename && isFileRelevant(filename)) {
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(executePipeline, 300);
@@ -53412,11 +53502,11 @@ var generate_recipe_schema_default = {
 init_version();
 
 // src/util/git-resolver.ts
-var import_node_fs5 = require("node:fs");
+var import_node_fs6 = require("node:fs");
 var import_node_path56 = require("node:path");
 function defaultIsRegularFile(filePath) {
   try {
-    return (0, import_node_fs5.statSync)(filePath).isFile();
+    return (0, import_node_fs6.statSync)(filePath).isFile();
   } catch {
     return false;
   }
