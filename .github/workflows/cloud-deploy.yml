@@ -360,9 +360,6 @@ jobs:
               run_deploy up -d --build migrate web worker
               verify_release_policy_mount
 
-              # Apply the same bounded policy after a successful real deploy. The running image is
-              # excluded and the newest three non-running images remain rollback targets.
-              retire_superseded_runtime_images "3"
               ;;
             *)
               printf '%s\n' 'cloud-deploy preflight: unexpected deploy argument set' >&2
@@ -379,6 +376,12 @@ jobs:
             exit 78
           fi
           printf 'cloud-deploy cache: %s MiB free after cache cap\n' "$(free_mib "${docker_root}")"
+          # Both dry-runs and real deployments leave a new, tagged runtime image.
+          # After the build succeeds and cache is bounded, apply one canonical
+          # rollback-retention path to both. Identity checks fail closed before
+          # deleting any tag; the running images and three newest non-running
+          # rollback targets remain available.
+          retire_superseded_runtime_images "3"
           # Report bounded aggregate usage after every rehearsal or real deployment,
           # not only when a preflight is already out of space. No other Docker
           # projects, rollback volumes, or private per-container metadata are altered.
