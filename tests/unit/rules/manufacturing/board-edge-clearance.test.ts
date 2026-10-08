@@ -69,6 +69,10 @@ function flashGerber(at: Point, diameterMm = 0.2): string {
   ].join("\n");
 }
 
+function flashWithAperture(at: Point, definition: string): string {
+  return [...header, "%TF.FileFunction,Copper,L1,Top*%", definition, "D10*", position(at, "D03"), "M02*"].join("\n");
+}
+
 function regionGerber(points: readonly Point[]): string {
   const first = points[0] as Point;
   return [
@@ -319,6 +323,149 @@ fail-on: never
     expect(issue?.severity).toBe("low");
     expect(issue?.confidence).toBe("low");
     expect(issue?.details?.geometryConfidence).not.toBe("exact");
+  });
+
+  it.each([
+    ["rectangle", "%ADD10R,0.6X0.2*%"],
+    ["horizontal obround", "%ADD10O,0.6X0.2*%"],
+    ["vertical obround", "%ADD10O,0.2X0.6*%"],
+    ["regular polygon", "%ADD10P,0.6X6X0*%"],
+    ["rotated triangle", "%ADD10P,0.6X3X30*%"],
+  ])("measures a %s flash from copper extent, not the nominal centre", async (_name, aperture) => {
+    const result = await run(
+      {
+        "fab/outline.gko": squareOutline,
+        "fab/top.gtl": flashWithAperture({ x: 0.4, y: 5 }, aperture),
+      },
+      configuredLimit(0.4),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({
+      featureKind: "flash",
+      blocking: true,
+      geometryConfidence: "exact",
+    });
+    expect(Number(issue?.details?.measuredClearanceMm)).toBeGreaterThanOrEqual(0);
+    expect(Number(issue?.details?.measuredClearanceMm)).toBeLessThan(0.4);
+  });
+
+  it.each([
+    ["rectangle", "%ADD10R,0.6X0.2*%"],
+    ["horizontal obround", "%ADD10O,0.6X0.2*%"],
+    ["vertical obround", "%ADD10O,0.2X0.6*%"],
+    ["regular polygon", "%ADD10P,0.6X6X0*%"],
+    ["rotated triangle", "%ADD10P,0.6X3X30*%"],
+  ])("measures a swept %s trace using the full aperture", async (_name, aperture) => {
+    const result = await run(
+      {
+        "fab/outline.gko": squareOutline,
+        "fab/top.gtl": traceGerber({ x: 0.4, y: 2 }, { x: 0.4, y: 8 }, 0.2, { aperture }),
+      },
+      configuredLimit(0.4),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({ featureKind: "trace", blocking: true, geometryConfidence: "exact" });
+    expect(Number(issue?.details?.measuredClearanceMm)).toBeGreaterThanOrEqual(0);
+    expect(Number(issue?.details?.measuredClearanceMm)).toBeLessThan(0.4);
+  });
+
+  it("keeps undefined trace/flash aperture extents advisory instead of declaring a pass", async () => {
+    for (const kind of ["trace", "flash"] as const) {
+      const gerber =
+        kind === "trace"
+          ? traceGerber({ x: 0.3, y: 2 }, { x: 0.3, y: 8 }, 0.2, { aperture: "%ADD11C,0.2*%" })
+          : flashWithAperture({ x: 0.3, y: 5 }, "%ADD11C,0.2*%");
+      const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": gerber }, configuredLimit(0.4));
+      const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+      expect(issue?.confidence).toBe("low");
+      expect(issue?.details).toMatchObject({ blocking: false, geometryConfidence: "partial" });
+      expect(String(issue?.message)).toContain("Cannot fully verify");
+    }
+  });
+
+  it("advises rather than inventing an edge when the Gerber package lacks an outline", async () => {
+    const result = await run({ "fab/top.gtl": traceGerber({ x: 0.2, y: 2 }, { x: 0.2, y: 8 }) }, configuredLimit(0.4));
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.severity).toBe("low");
+    expect(issue?.details).toMatchObject({ blocking: false, geometryConfidence: "unknown" });
+  });
+
+  it("never blocks against a filename-inferred board profile", async () => {
+    const outline = outlineGerber(
+      [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+      ],
+      false,
+    );
+    const result = await run(
+      { "fab/outline.gko": outline, "fab/top.gtl": traceGerber({ x: 0.25, y: 1 }, { x: 0.25, y: 9 }) },
+      configuredLimit(),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({ blocking: false, outlineRoleEvidence: "assumed" });
+    expect(issue?.confidence).toBe("low");
+  });
+
+  it("does not trust outline files that mix a closed profile with flashed geometry", async () => {
+    const outline = squareOutline.replace("M02*", [position({ x: 5, y: 5 }, "D03"), "M02*"].join("\n"));
+    const result = await run(
+      { "fab/outline.gko": outline, "fab/top.gtl": traceGerber({ x: 0.25, y: 2 }, { x: 0.25, y: 8 }) },
+      configuredLimit(),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({ blocking: false, geometryConfidence: "partial" });
+  });
+
+  it("detects the board perimeter immersed inside a copper region", async () => {
+    const spanning = regionGerber([
+      { x: -1, y: -1 },
+      { x: 11, y: -1 },
+      { x: 11, y: 11 },
+      { x: -1, y: 11 },
+    ]);
+    const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": spanning }, configuredLimit());
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({
+      blocking: true,
+      featureKind: "region",
+      measuredClearanceMm: 0,
+      featureLocation: { relation: "board-edge-inside-region" },
+    });
+  });
+
+  it("never treats incomplete copper region geometry as exact clearance", async () => {
+    const broken = [
+      ...header,
+      "%TF.FileFunction,Copper,L1,Top*%",
+      "G36*",
+      position({ x: 0.3, y: 2 }, "D02"),
+      position({ x: 1, y: 2 }, "D01"),
+      position({ x: 1, y: 4 }, "D01"),
+      position({ x: 0.3, y: 4 }, "D02"),
+      position({ x: 0.3, y: 6 }, "D01"),
+      "G37*",
+      "M02*",
+    ].join("\n");
+    const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": broken }, configuredLimit(0.4));
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({ blocking: false, geometryConfidence: "partial" });
+  });
+
+  it("measures circular obround copper without discarding the aperture radius", async () => {
+    const result = await run(
+      { "fab/outline.gko": squareOutline, "fab/top.gtl": flashWithAperture({ x: 0.3, y: 5 }, "%ADD10O,0.4X0.4*%") },
+      configuredLimit(0.2),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({
+      featureKind: "flash",
+      blocking: true,
+      measuredClearanceMm: 0.1,
+      geometryConfidence: "exact",
+    });
   });
 
   it("never turns incomplete transformed geometry into an exact blocking verdict", async () => {
