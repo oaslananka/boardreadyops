@@ -369,6 +369,26 @@ fail-on: never
     expect(Number(issue?.details?.measuredClearanceMm)).toBeLessThan(0.4);
   });
 
+  it("treats a declared Gerber macro aperture as uncertain instead of inventing copper clearance", async () => {
+    const copper = [
+      ...header,
+      "%TF.FileFunction,Copper,L1,Top*%",
+      "%AMDONUT*1,1,0.6,0,0*%",
+      "%ADD10DONUT,0.6*%",
+      "D10*",
+      position({ x: 0.25, y: 5 }, "D03"),
+      "M02*",
+    ].join("\n");
+    const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": copper }, configuredLimit(0.4));
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.confidence).toBe("low");
+    expect(issue?.details).toMatchObject({
+      blocking: false,
+      geometryConfidence: "partial",
+    });
+    expect(issue?.details?.geometryUncertainty).not.toEqual([]);
+  });
+
   it("keeps undefined trace/flash aperture extents advisory instead of declaring a pass", async () => {
     for (const kind of ["trace", "flash"] as const) {
       const gerber =
