@@ -75,20 +75,8 @@ export const boardEdgeClearanceRule = rule(
     const limits = resolveLimit(context);
     const { profile, assurance, minClearanceMm, limitSource, configured } = limits;
 
-    const outlineCandidates = parsedFiles.filter((item) => item.layer?.role === "outline");
-    const outlineFile =
-      outlineCandidates.find((item) => item.layer?.identitySource === "declared") ?? outlineCandidates[0];
-    const outlineSegments =
-      outlineFile?.parsed.geometry.primitives.filter(
-        (primitive): primitive is GerberSegment => primitive.kind === "segment",
-      ) ?? [];
-
-    if (
-      outlineFile === undefined ||
-      outlineSegments.length === 0 ||
-      !outlineFile.parsed.hasClosedContour ||
-      outlineFile.parsed.openContourCount > 0
-    ) {
+    const { outlineFile, outlineSegments } = selectOutline(parsedFiles);
+    if (outlineFile === undefined || !isCompleteOutline(outlineFile, outlineSegments)) {
       return [
         finding(context, {
           ruleId: "manufacturing.board-edge-clearance",
@@ -125,6 +113,20 @@ export const boardEdgeClearanceRule = rule(
     );
   },
 );
+
+function selectOutline(parsedFiles: readonly ParsedLayer[]) {
+  const candidates = parsedFiles.filter((item) => item.layer?.role === "outline");
+  const outlineFile = candidates.find((item) => item.layer?.identitySource === "declared") ?? candidates[0];
+  const outlineSegments =
+    outlineFile?.parsed.geometry.primitives.filter(
+      (primitive): primitive is GerberSegment => primitive.kind === "segment",
+    ) ?? [];
+  return { outlineFile, outlineSegments };
+}
+
+function isCompleteOutline(outlineFile: ParsedLayer, outlineSegments: readonly GerberSegment[]): boolean {
+  return outlineSegments.length > 0 && outlineFile.parsed.hasClosedContour && outlineFile.parsed.openContourCount === 0;
+}
 
 function evaluateCopperLayer(
   context: RuleContext,
