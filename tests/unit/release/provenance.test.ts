@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   computeSourceFingerprint,
   createExportProvenanceManifest,
@@ -28,6 +28,41 @@ describe("release/provenance", () => {
     const emptyRoot = await writeFixture({});
     const emptyFp = await computeSourceFingerprint(emptyRoot);
     expect(emptyFp).toHaveLength(64);
+  });
+
+  it("fails closed on unreadable KiCad inputs instead of hashing invented zero-byte content", async () => {
+    const root = await writeFixture({
+      "board.kicad_pcb": "(kicad_pcb)",
+      "top.gtl": "fabrication-bytes",
+    });
+    const manifest = await createExportProvenanceManifest({
+      root,
+      artifacts: [
+        {
+          path: "top.gtl",
+          sha256: createHash("sha256").update("fabrication-bytes").digest("hex"),
+          bytes: Buffer.byteLength("fabrication-bytes"),
+        },
+      ],
+    });
+
+    const originalRead = fs.readFile.bind(fs);
+    const unreadable = vi.spyOn(fs, "readFile").mockImplementation(async (...args) => {
+      if (String(args[0]).endsWith("board.kicad_pcb")) throw new Error("simulated EACCES");
+      return originalRead(...args);
+    });
+    try {
+      await expect(computeSourceFingerprint(root)).rejects.toThrow("simulated EACCES");
+      await expect(createExportProvenanceManifest({ root, artifacts: [] })).rejects.toThrow("simulated EACCES");
+      const verified = await verifyExportProvenance(root, manifest);
+      expect(verified.status).toBe("mismatch");
+      expect(verified.sourceFingerprintMatch).toBeUndefined();
+      expect(verified.reasons).toEqual([
+        "Source fingerprint could not be computed because a source input is unreadable or missing.",
+      ]);
+    } finally {
+      unreadable.mockRestore();
+    }
   });
 
   it("verifies matching export provenance manifest and artifacts", async () => {
