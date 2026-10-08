@@ -344,6 +344,7 @@ describe("dependency and security automation configuration", () => {
     expect([...new Set(Object.keys(overrides).map(overridePackage))].sort()).toEqual([
       "@babel/core",
       "@hono/node-server",
+      "@modelcontextprotocol/sdk",
       "@octokit/plugin-paginate-rest",
       "@octokit/request",
       "@octokit/request-error",
