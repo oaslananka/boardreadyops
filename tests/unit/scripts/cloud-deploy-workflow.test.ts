@@ -71,7 +71,7 @@ describe("cloud-deploy topology preflight", () => {
 
     expect(workflow).toContain("build_cache_max_used_space=3GB");
     expect(workflow).toContain("docker builder prune --all --force || true");
-    expect(workflow).toContain(`docker builder prune --all --force --max-used-space "${buildCacheMaxUsedSpace}"`);
+    expect(workflow).toContain(`docker buildx prune --all --force --max-used-space "${buildCacheMaxUsedSpace}"`);
     expect(workflow).toContain("cloud-deploy cache: unable to enforce");
     expect(workflow).not.toContain(`--max-used-space "${buildCacheMaxUsedSpace}" || true`);
     expect(workflow).not.toContain("--filter until=168h");

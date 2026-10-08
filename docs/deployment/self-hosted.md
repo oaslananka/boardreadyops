@@ -273,7 +273,7 @@ docker image prune --force
 ```
 
 After every successful build, including `dry_run`, the workflow enforces the normal 3 GB BuildKit
-cache cap with `docker builder prune --all --force --max-used-space 3GB`.
+cache cap with `docker buildx prune --all --force --max-used-space 3GB`.
 If cache budget enforcement fails, the workflow reports a failure rather than silently allowing
 unbounded build garbage; for a real deploy, inspect the live stack because replacement may already
 have occurred. Every successful build prints an aggregate disk and BoardReadyOps image summary

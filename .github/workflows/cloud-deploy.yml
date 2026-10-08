@@ -210,7 +210,7 @@ jobs:
             docker builder prune --all --force || true
           }
           trim_build_cache() {
-            if ! docker builder prune --all --force --max-used-space "${build_cache_max_used_space}"; then
+            if ! docker buildx prune --all --force --max-used-space "${build_cache_max_used_space}"; then
               printf 'cloud-deploy cache: unable to enforce %s cache budget; investigate host capacity after deploy\n' "${build_cache_max_used_space}" >&2
               return 1
             fi
