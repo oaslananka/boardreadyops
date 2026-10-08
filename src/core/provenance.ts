@@ -56,7 +56,8 @@ export async function computeSourceFingerprint(
   const hasher = createHash("sha256");
   for (const absolutePath of sortedFiles) {
     const relPath = normalizeRelative(root, absolutePath);
-    const content = await fs.readFile(absolutePath).catch(() => Buffer.alloc(0));
+    // Missing or unreadable KiCad inputs cannot be represented as empty source bytes.
+    const content = await fs.readFile(absolutePath);
     hasher.update(`${relPath}\0`, "utf8");
     hasher.update(content);
     hasher.update("\0", "utf8");
@@ -275,7 +276,16 @@ export async function verifyExportProvenance(
   const { manifestDir, realRoot } = loaded;
 
   const reasons: string[] = [];
-  const currentFingerprint = await computeSourceFingerprint(root);
+  let currentFingerprint: string;
+  try {
+    currentFingerprint = await computeSourceFingerprint(root);
+  } catch {
+    return {
+      status: "mismatch",
+      reasons: ["Source fingerprint could not be computed because a source input is unreadable or missing."],
+      manifest,
+    };
+  }
   const sourceFingerprintMatch = currentFingerprint === manifest.sourceFingerprint;
 
   if (!sourceFingerprintMatch) {

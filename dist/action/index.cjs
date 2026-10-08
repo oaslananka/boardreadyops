@@ -93777,7 +93777,7 @@ async function computeSourceFingerprint(root, customPatterns = SOURCE_PATTERNS) 
   const hasher = (0, import_node_crypto4.createHash)("sha256");
   for (const absolutePath of sortedFiles) {
     const relPath = normalizeRelative(root, absolutePath);
-    const content = await import_promises13.default.readFile(absolutePath).catch(() => Buffer.alloc(0));
+    const content = await import_promises13.default.readFile(absolutePath);
     hasher.update(`${relPath}\0`, "utf8");
     hasher.update(content);
     hasher.update("\0", "utf8");
@@ -93925,7 +93925,16 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
   const manifest = loaded.manifest;
   const { manifestDir, realRoot } = loaded;
   const reasons = [];
-  const currentFingerprint = await computeSourceFingerprint(root);
+  let currentFingerprint;
+  try {
+    currentFingerprint = await computeSourceFingerprint(root);
+  } catch {
+    return {
+      status: "mismatch",
+      reasons: ["Source fingerprint could not be computed because a source input is unreadable or missing."],
+      manifest
+    };
+  }
   const sourceFingerprintMatch = currentFingerprint === manifest.sourceFingerprint;
   if (!sourceFingerprintMatch) {
     reasons.push(
