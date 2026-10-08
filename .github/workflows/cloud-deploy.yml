@@ -210,7 +210,10 @@ jobs:
             docker builder prune --all --force || true
           }
           trim_build_cache() {
-            docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true
+            if ! docker buildx prune --all --force --max-used-space "${build_cache_max_used_space}"; then
+              printf 'cloud-deploy cache: unable to enforce %s cache budget; investigate host capacity after deploy\n' "${build_cache_max_used_space}" >&2
+              return 1
+            fi
           }
           report_disk_summary() {
             local runtime_image_ids
@@ -244,7 +247,10 @@ jobs:
 
           retire_superseded_runtime_images() {
             local retain="$1"
-            local running_images_file="/tmp/boardreadyops-running-images.${BASHPID}"
+            local running_images
+            local service
+            local container
+            local current_image
             local superseded
 
             case "${retain}" in
@@ -255,20 +261,34 @@ jobs:
                 ;;
             esac
 
-            (
-              cd "${deploy_root}"
-              docker compose -p boardreadyops-cloud images --format '{{.Repository}}:{{.Tag}}'
-            ) 2>/dev/null > "${running_images_file}" || : > "${running_images_file}"
+            # Compose v5 does not accept Go-template output for its image listing.
+            # Use the already-checked project/service container identity instead.
+            # Unknown running image references must prevent any cleanup.
+            running_images="$(
+              for service in web worker; do
+                container="$(container_for_service "$service")" || exit 78
+                current_image="$(docker inspect "$container" --format '{{.Config.Image}}')" || exit 78
+                case "$current_image" in
+                  boardreadyops-web-runtime:*) printf '%s\n' "$current_image" ;;
+                  *)
+                    printf 'cloud-deploy retention: unexpected running image for %s\n' "$service" >&2
+                    exit 78
+                    ;;
+                esac
+              done
+            )" || {
+              printf '%s\n' 'cloud-deploy retention: cannot verify both running runtime images; nothing retired' >&2
+              return 78
+            }
 
             superseded="$(
               docker image ls 'boardreadyops-web-runtime:*' \
                 --format '{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}' 2>/dev/null \
                 | sort -r \
                 | cut -f2 \
-                | grep -vxF -f "${running_images_file}" \
+                | grep -vxF -f <(printf '%s\n' "$running_images") \
                 | tail -n +$((retain + 1)) || true
             )"
-            rm -f "${running_images_file}"
 
             if [ -n "${superseded}" ]; then
               printf 'cloud-deploy retention: retiring %s superseded runtime image(s), keeping the running image and newest %s rollback targets\n' \
@@ -340,9 +360,6 @@ jobs:
               run_deploy up -d --build migrate web worker
               verify_release_policy_mount
 
-              # Apply the same bounded policy after a successful real deploy. The running image is
-              # excluded and the newest three non-running images remain rollback targets.
-              retire_superseded_runtime_images "3"
               ;;
             *)
               printf '%s\n' 'cloud-deploy preflight: unexpected deploy argument set' >&2
@@ -354,8 +371,21 @@ jobs:
           # amount of reusable BuildKit state after every successful build so a sequence of
           # dry-runs cannot refill a small host between disk preflights.
           printf 'cloud-deploy cache: capping BuildKit cache at %s\n' "${build_cache_max_used_space}"
-          trim_build_cache
+          if ! trim_build_cache; then
+            report_disk_summary
+            exit 78
+          fi
           printf 'cloud-deploy cache: %s MiB free after cache cap\n' "$(free_mib "${docker_root}")"
+          # Both dry-runs and real deployments leave a new, tagged runtime image.
+          # After the build succeeds and cache is bounded, apply one canonical
+          # rollback-retention path to both. Identity checks fail closed before
+          # deleting any tag; the running images and three newest non-running
+          # rollback targets remain available.
+          retire_superseded_runtime_images "3"
+          # Report bounded aggregate usage after every rehearsal or real deployment,
+          # not only when a preflight is already out of space. No other Docker
+          # projects, rollback volumes, or private per-container metadata are altered.
+          report_disk_summary
           REMOTE_DEPLOY
 
       - name: Verify production browser security headers

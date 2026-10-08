@@ -25,28 +25,21 @@ const proofItems = [
   "Every result tied to a file and a checksum",
 ] as const;
 
-/**
- * The two public repositories that run the published Action on a real pull request.
- *
- * Everything else on this page is described rather than shown, including the panel in the
- * hero, which says so. Someone deciding whether to install a GitHub App on a repository
- * holding their board files wants to watch it work on someone else's board first, and until
- * these existed there was nowhere to send them.
- */
+/** Reproducible, repository-owned source fixtures; no external demo PR is implied. */
 const liveDemos = [
   {
     verdict: "pass" as const,
-    title: "A board that gets fixed",
-    href: "https://github.com/oaslananka/boardreadyops-demo-pass/pull/1",
-    baseline: "main is blocked: five findings",
-    body: "The pull request closes the outline, deduplicates a reference designator, and sources the BOM. The check goes green and the comment shows which BOM lines changed.",
+    title: "A board ready to release",
+    href: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed",
+    baseline: "Fixed fixture: no blocking findings",
+    body: "Inspect the corrected source files and BOM, then run the local review to verify the clean result.",
   },
   {
     verdict: "fail" as const,
-    title: "A board that gets broken",
-    href: "https://github.com/oaslananka/boardreadyops-demo-fail/pull/1",
-    baseline: "main is clean: no findings",
-    body: "The pull request reads as routine housekeeping and makes the board unfabricable. Nothing in the diff says so. The check goes red and names all five reasons.",
+    title: "A board with release blockers",
+    href: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/broken",
+    baseline: "Broken fixture: five findings",
+    body: "Inspect the open outline, repeated reference, and BOM risk in a synthetic board. Reproduce the blocked outcome locally.",
   },
 ] as const;
 
@@ -430,14 +423,14 @@ export default function HomePage() {
         <section className="border-b border-border py-16" id="live-demos" aria-labelledby="live-demos-heading">
           <div className="mx-auto max-w-6xl px-6">
             <div className="flex max-w-2xl flex-col gap-2">
-              <p className="text-sm font-medium text-primary">Live pull requests</p>
+              <p className="text-sm font-medium text-primary">Reproducible source demos</p>
               <h2 id="live-demos-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
-                Watch it work before you install anything.
+                Inspect real fixtures before connecting a repository.
               </h2>
               <p className="text-sm text-muted-foreground">
-                Two public repositories running the published Action on the same board, in opposite directions. Open
-                either pull request and read the check: the findings, the files they point at, and the fabrication diff
-                showing which BOM lines and outputs changed.
+                Two checked-in synthetic board states show what passes and what blocks a release. Open the source,
+                inspect the actual files, then run the reproducible checks locally. These links are source fixtures, not
+                live GitHub pull-request checks.
               </p>
             </div>
             <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -450,7 +443,7 @@ export default function HomePage() {
                     />
                     <span>{demo.baseline}</span>
                     <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-foreground">
-                      Check on the PR: {demo.verdict === "pass" ? "green" : "red"}
+                      Expected result: {demo.verdict === "pass" ? "pass" : "block"}
                     </span>
                   </div>
                   <strong className="mt-3 text-base text-foreground">{demo.title}</strong>
@@ -461,16 +454,17 @@ export default function HomePage() {
                     rel="noreferrer"
                     className="mt-4 inline-flex items-center gap-1.5 self-start text-sm text-primary underline underline-offset-2"
                   >
-                    <span>Open the pull request</span>
+                    <span>Inspect source fixture</span>
                     <span aria-hidden="true">↗</span>
                   </a>
                 </li>
               ))}
             </ul>
             <p className="mt-4 text-xs text-muted-foreground">
-              Synthetic hardware under MIT, so you can copy it. Reproduce either locally with{" "}
-              <code className="rounded-sm bg-muted px-1.5 py-0.5">npx @boardreadyops/cli run .</code> — no KiCad
-              installation needed.
+              Synthetic hardware is included in the repository. Run{" "}
+              <code className="rounded-sm bg-muted px-1.5 py-0.5">boardreadyops run examples/golden-demo/broken</code>{" "}
+              or <code className="rounded-sm bg-muted px-1.5 py-0.5">boardreadyops run examples/golden-demo/fixed</code>{" "}
+              — no KiCad installation needed.
             </p>
           </div>
         </section>

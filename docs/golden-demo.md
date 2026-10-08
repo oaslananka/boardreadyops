@@ -2,18 +2,17 @@
 
 The golden demo is a tiny, self-contained corpus that shows BoardReadyOps catching realistic release problems on a broken board and then confirming a fixed board is clean. It ships in the repository under [`examples/golden-demo`](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo) and is part of the [BoardReadyOps v2 roadmap](https://github.com/oaslananka/boardreadyops/issues/192).
 
-## Live pull request demos
+## Reproducible source demos
 
-Two public repositories turn the local fixture into a reviewable GitHub experience. Both carry the same synthetic hardware as `examples/golden-demo` and run the published Action pinned to a commit SHA. The two demo repositories are published under MIT so a reader can lift the board, the config, or the workflow straight into their own project; this is deliberately more permissive than BoardReadyOps itself, which is [PolyForm Noncommercial](https://github.com/oaslananka/boardreadyops/blob/main/LICENSE). No GitHub App installation is needed to read them.
+The public source fixtures are part of this repository. Inspect
+[the blocked board](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/broken)
+and [the corrected board](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed).
+They demonstrate **expected fail** and **expected pass** outcomes without needing credentials or a hosted service.
 
-| Repository | Pull request | Check on the PR | What it shows |
-| --- | --- | --- | --- |
-| [`oaslananka/boardreadyops-demo-pass`](https://github.com/oaslananka/boardreadyops-demo-pass) | [PR #1 — repair the board](https://github.com/oaslananka/boardreadyops-demo-pass/pull/1) | **green** | `main` is the blocked baseline. The pull request closes the outline, deduplicates the reference designator, and sources the BOM, and readiness goes from five findings to none. |
-| [`oaslananka/boardreadyops-demo-fail`](https://github.com/oaslananka/boardreadyops-demo-fail) | [PR #1 — a plausible layout tweak](https://github.com/oaslananka/boardreadyops-demo-fail/pull/1) | **red** | `main` is clean. The pull request reads as routine housekeeping and makes the board unfabricable; nothing in the diff says so, and the check does. |
-
-Each pull request carries the Action's sticky comment: the finding list, and the fabrication diff — the BOM lines and outputs that changed, which is what a reviewer cannot get from the diff itself. That diff compares against the most recent earlier run it can find on the head branch, and falls back to the base branch only when the head branch has none; so the first run on a branch answers "what does this pull request change" and later ones answer "what changed since my last push". JSON, SARIF, and Markdown reports upload as workflow artifacts on every run.
-
-Both repositories also ship the target-repository `readiness-runner.yml`, so installing the GitHub App on them lights up the hosted review at `app.boardreadyops.com` without any further setup.
+The former external PR demos are not currently available, so no live Check Run or sticky
+PR comment is promised by these links. To evaluate the GitHub Action and uploaded workflow
+artifacts, install the reviewed workflow in a repository you control and run it against a
+test commit. This corpus tests the local deterministic engine directly.
 
 ## Run it in two commands
 
