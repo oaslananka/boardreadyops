@@ -47636,6 +47636,98 @@ async function inspectArtifact(root, realRoot, manifestDir, artifact) {
     return { kind: "missing", reason: `Artifact ${artifact.path} missing or unreadable.` };
   }
 }
+var MAX_FIRST_PARTY_OUTPUT_ENTRIES = 4096;
+var MAX_FIRST_PARTY_OUTPUT_DEPTH = 32;
+function canonicalGeneratedPath(value) {
+  if (!value || value.includes("\\") || import_node_path36.default.isAbsolute(value) || import_node_path36.default.win32.isAbsolute(value)) return false;
+  if (import_node_path36.default.posix.normalize(value) !== value) return false;
+  return value.split("/").every(
+    (part) => part !== "" && part !== "." && part !== ".." && !/[<>:"|?*]/u.test(part) && part.split("").every((character) => character.charCodeAt(0) >= 32) && !/[. ]$/u.test(part) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(part)
+  );
+}
+async function checkFirstPartyOutputSet(directory, manifestPath, artifacts) {
+  const reasons = [];
+  const declaredFiles = /* @__PURE__ */ new Set();
+  const declaredAliases = /* @__PURE__ */ new Set();
+  const expectedDirectories = /* @__PURE__ */ new Set();
+  for (const artifact of artifacts) {
+    const name = artifact.path;
+    if (!canonicalGeneratedPath(name) || name === import_node_path36.default.basename(manifestPath)) {
+      reasons.push(`Non-canonical generated artifact path or manifest self-reference: ${name}`);
+      continue;
+    }
+    const portableKey = name.normalize("NFC").toLowerCase();
+    if (declaredAliases.has(portableKey)) {
+      reasons.push(`Cross-platform generated artifact alias: ${name}`);
+      continue;
+    }
+    declaredAliases.add(portableKey);
+    declaredFiles.add(name);
+    const parts = name.split("/");
+    for (let index = 1; index < parts.length; index++) {
+      expectedDirectories.add(parts.slice(0, index).join("/"));
+    }
+  }
+  const actualFiles = /* @__PURE__ */ new Set();
+  const actualAliases = /* @__PURE__ */ new Set();
+  const pending = [{ dir: directory, relative: "", depth: 0 }];
+  let entriesVisited = 0;
+  try {
+    const actualRoot = await import_promises13.default.realpath(directory);
+    while (pending.length > 0) {
+      const current = pending.shift();
+      if (!current) break;
+      const iterator = await import_promises13.default.opendir(current.dir);
+      for await (const entry of iterator) {
+        entriesVisited++;
+        if (entriesVisited > MAX_FIRST_PARTY_OUTPUT_ENTRIES) {
+          throw new Error(`Output tree scan exceeds ${MAX_FIRST_PARTY_OUTPUT_ENTRIES} entries.`);
+        }
+        const relative = current.relative ? `${current.relative}/${entry.name}` : entry.name;
+        const absolute = import_node_path36.default.join(current.dir, entry.name);
+        const metadata = await import_promises13.default.lstat(absolute);
+        if (metadata.isSymbolicLink()) {
+          reasons.push(`Symlink in generated output: ${relative}`);
+        } else if (metadata.isDirectory()) {
+          if (!expectedDirectories.has(relative)) {
+            reasons.push(`Undeclared generated directory: ${relative}`);
+          }
+          if (current.depth >= MAX_FIRST_PARTY_OUTPUT_DEPTH) {
+            throw new Error(`Output tree scan exceeds depth ${MAX_FIRST_PARTY_OUTPUT_DEPTH}.`);
+          }
+          const realDirectory = await import_promises13.default.realpath(absolute);
+          if (realDirectory !== import_node_path36.default.resolve(actualRoot, relative)) {
+            throw new Error(`Generated directory has a noncanonical real path: ${relative}`);
+          }
+          pending.push({ dir: absolute, relative, depth: current.depth + 1 });
+        } else if (!metadata.isFile()) {
+          reasons.push(`Non-file entry in generated output: ${relative}`);
+        } else if (absolute !== manifestPath) {
+          if (!canonicalGeneratedPath(relative)) {
+            reasons.push(`Non-canonical generated output filename: ${relative}`);
+          }
+          const portableKey = relative.normalize("NFC").toLowerCase();
+          if (actualAliases.has(portableKey)) {
+            reasons.push(`Cross-platform generated output filename alias: ${relative}`);
+          }
+          actualAliases.add(portableKey);
+          actualFiles.add(relative);
+        }
+      }
+    }
+  } catch (error51) {
+    reasons.push(
+      `Generated output enumeration failed closed: ${error51 instanceof Error ? error51.message : String(error51)}`
+    );
+  }
+  for (const file2 of [...actualFiles].sort()) {
+    if (!declaredFiles.has(file2)) reasons.push(`Undeclared generated artifact: ${file2}`);
+  }
+  for (const file2 of [...declaredFiles].sort()) {
+    if (!actualFiles.has(file2)) reasons.push(`Declared generated artifact missing from file set: ${file2}`);
+  }
+  return reasons;
+}
 async function loadManifest(root, manifestOrPath) {
   let realRoot;
   try {
@@ -47666,7 +47758,12 @@ async function loadManifest(root, manifestOrPath) {
       };
     }
     const raw = await readTextFile(absManifestPath);
-    return { manifest: JSON.parse(raw), manifestDir: import_node_path36.default.dirname(absManifestPath), realRoot };
+    return {
+      manifest: JSON.parse(raw),
+      manifestDir: import_node_path36.default.dirname(absManifestPath),
+      realRoot,
+      manifestPath: absManifestPath
+    };
   } catch (error51) {
     return {
       error: {
@@ -47749,6 +47846,14 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
     if (outcome.reason) reasons.push(outcome.reason);
     if (outcome.kind === "mismatch") artifactMismatches.push(entry.path);
     if (outcome.kind === "missing") missingArtifacts.push(entry.path);
+  }
+  if (manifest.kind === "boardreadyops.export-provenance") {
+    if (!loaded.manifestPath) {
+      reasons.push("First-party output completeness requires an on-disk manifest.");
+    } else {
+      const validArtifacts = (Array.isArray(manifest.artifacts) ? manifest.artifacts : []).filter(isArtifactRecord);
+      reasons.push(...await checkFirstPartyOutputSet(manifestDir, loaded.manifestPath, validArtifacts));
+    }
   }
   const status = reasons.length === 0 ? "verified" : "mismatch";
   return {
