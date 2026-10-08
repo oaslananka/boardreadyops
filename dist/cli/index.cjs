@@ -47666,6 +47666,7 @@ async function checkFirstPartyOutputSet(directory, manifestPath, artifacts) {
 }
 
 // src/core/provenance.ts
+var NO_SOURCE_INPUTS_REASON = "No KiCad source inputs were found; source-to-export consistency cannot be established.";
 var SOURCE_PATTERNS = [
   "**/*.kicad_pcb",
   "**/*.kicad_sch",
@@ -47674,7 +47675,7 @@ var SOURCE_PATTERNS = [
   "**/*.kicad_dru",
   "**/*.kicad_wks"
 ];
-async function computeSourceFingerprint(root, customPatterns = SOURCE_PATTERNS) {
+async function sourceFingerprintDetail(root, customPatterns = SOURCE_PATTERNS) {
   const files = await globFiles(root, customPatterns);
   const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
   const hasher = (0, import_node_crypto4.createHash)("sha256");
@@ -47685,7 +47686,10 @@ async function computeSourceFingerprint(root, customPatterns = SOURCE_PATTERNS) 
     hasher.update(content);
     hasher.update("\0", "utf8");
   }
-  return hasher.digest("hex");
+  return { fingerprint: hasher.digest("hex"), sourceCount: sortedFiles.length };
+}
+async function computeSourceFingerprint(root, customPatterns = SOURCE_PATTERNS) {
+  return (await sourceFingerprintDetail(root, customPatterns)).fingerprint;
 }
 function compareReviewedCommit(reviewedSha, recorded) {
   if (typeof recorded?.sha !== "string" || !/^[0-9a-f]{40}$/i.test(recorded.sha)) {
@@ -47829,12 +47833,22 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
   const { manifestDir, realRoot } = loaded;
   const reasons = [];
   let currentFingerprint;
+  let sourceCount;
   try {
-    currentFingerprint = await computeSourceFingerprint(root);
+    const current = await sourceFingerprintDetail(root);
+    currentFingerprint = current.fingerprint;
+    sourceCount = current.sourceCount;
   } catch {
     return {
       status: "mismatch",
       reasons: ["Source fingerprint could not be computed because a source input is unreadable or missing."],
+      manifest
+    };
+  }
+  if (sourceCount === 0) {
+    return {
+      status: "mismatch",
+      reasons: [NO_SOURCE_INPUTS_REASON],
       manifest
     };
   }

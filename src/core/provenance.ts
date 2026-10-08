@@ -37,6 +37,9 @@ export interface ProvenanceVerificationResult {
   manifest?: ExportProvenanceManifest | undefined;
 }
 
+const NO_SOURCE_INPUTS_REASON =
+  "No KiCad source inputs were found; source-to-export consistency cannot be established.";
+
 const SOURCE_PATTERNS = [
   "**/*.kicad_pcb",
   "**/*.kicad_sch",
@@ -46,10 +49,10 @@ const SOURCE_PATTERNS = [
   "**/*.kicad_wks",
 ];
 
-export async function computeSourceFingerprint(
+async function sourceFingerprintDetail(
   root: string,
   customPatterns: string[] = SOURCE_PATTERNS,
-): Promise<string> {
+): Promise<{ fingerprint: string; sourceCount: number }> {
   const files = await globFiles(root, customPatterns);
   const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
 
@@ -63,7 +66,14 @@ export async function computeSourceFingerprint(
     hasher.update("\0", "utf8");
   }
 
-  return hasher.digest("hex");
+  return { fingerprint: hasher.digest("hex"), sourceCount: sortedFiles.length };
+}
+
+export async function computeSourceFingerprint(
+  root: string,
+  customPatterns: string[] = SOURCE_PATTERNS,
+): Promise<string> {
+  return (await sourceFingerprintDetail(root, customPatterns)).fingerprint;
 }
 
 export async function createExportProvenanceManifest(options: {
@@ -72,7 +82,8 @@ export async function createExportProvenanceManifest(options: {
   git?: { sha?: string | undefined; dirty?: boolean | undefined } | undefined;
   generatedAt?: string | undefined;
 }): Promise<ExportProvenanceManifest> {
-  const sourceFingerprint = await computeSourceFingerprint(options.root);
+  const { fingerprint: sourceFingerprint, sourceCount } = await sourceFingerprintDetail(options.root);
+  if (sourceCount === 0) throw new Error(NO_SOURCE_INPUTS_REASON);
   const sortedArtifacts = [...options.artifacts]
     .map((a) => ({
       path: toPosixPath(a.path).replace(/^\.\//, ""),
@@ -277,12 +288,22 @@ export async function verifyExportProvenance(
 
   const reasons: string[] = [];
   let currentFingerprint: string;
+  let sourceCount: number;
   try {
-    currentFingerprint = await computeSourceFingerprint(root);
+    const current = await sourceFingerprintDetail(root);
+    currentFingerprint = current.fingerprint;
+    sourceCount = current.sourceCount;
   } catch {
     return {
       status: "mismatch",
       reasons: ["Source fingerprint could not be computed because a source input is unreadable or missing."],
+      manifest,
+    };
+  }
+  if (sourceCount === 0) {
+    return {
+      status: "mismatch",
+      reasons: [NO_SOURCE_INPUTS_REASON],
       manifest,
     };
   }
