@@ -39,6 +39,16 @@ describe("as-built BOM reconciliation foundation", () => {
     });
   });
 
+  it("does not certify empty approved BOM evidence as a matching shipment record", () => {
+    const empty = compareApprovedAndBuiltBom({ ...baseline, approved: [], built: [] });
+    expect(empty.status).toBe("insufficient_identity");
+    expect(empty.divergences).toEqual([]);
+
+    const missingBaseline = compareApprovedAndBuiltBom({ ...baseline, approved: [], built: [u1] });
+    expect(missingBaseline.status).toBe("insufficient_identity");
+    expect(missingBaseline.divergences[0]?.kind).toBe("additional_part");
+  });
+
   it("distinguishes a listed alternate from documented proof of approval", () => {
     const replacement = { ...u1, mpn: "XYZ-2", manufacturer: "OtherFab" };
     const report = compareApprovedAndBuiltBom({

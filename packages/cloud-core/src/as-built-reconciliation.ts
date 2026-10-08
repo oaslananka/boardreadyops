@@ -217,10 +217,11 @@ export function compareApprovedAndBuiltBom(input: AsBuiltComparisonInput): AsBui
     externalBatchId: input.productionBatch.externalBatchId,
     batchSourceSha256: input.productionBatch.sourceSha256,
     divergences,
-    status: divergences.some((entry) => entry.kind === "identity_incomplete")
-      ? "insufficient_identity"
-      : divergences.length > 0
-        ? "different_records"
-        : "matching_records",
+    status:
+      approved.size === 0 || divergences.some((entry) => entry.kind === "identity_incomplete")
+        ? "insufficient_identity"
+        : divergences.length > 0
+          ? "different_records"
+          : "matching_records",
   };
 }
