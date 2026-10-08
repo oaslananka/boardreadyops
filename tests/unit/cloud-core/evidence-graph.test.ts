@@ -84,6 +84,95 @@ describe("release evidence graph", () => {
     expect(trace.missing).toEqual([]);
   });
 
+  it("rejects malformed release commits and advertised integrity digests before graph construction", () => {
+    const base = {
+      release: {
+        id: "run-digest",
+        repositoryId: "repo-one",
+        repository: "acme/board",
+        commitSha: "a".repeat(40),
+      },
+    };
+    expect(() =>
+      buildReleaseEvidenceGraph({ ...base, release: { ...base.release, commitSha: "not-a-commit" } }),
+    ).toThrow("Invalid evidence graph release commit SHA");
+    expect(() =>
+      buildReleaseEvidenceGraph({
+        ...base,
+        evidence: [{ id: "artifact-1", kind: "report", name: "report.json", sha256: "not-a-digest" }],
+      }),
+    ).toThrow("Invalid evidence graph SHA-256 digest for evidence artifact");
+    expect(() =>
+      buildReleaseEvidenceGraph({
+        ...base,
+        productionBatches: [
+          {
+            id: "batch-1",
+            externalBatchId: "LOT-1",
+            manufacturer: "Fab",
+            manufacturedOn: "2026-10-01",
+            sourceSha256: "not-a-digest",
+          },
+        ],
+      }),
+    ).toThrow("Invalid evidence graph SHA-256 digest for production batch");
+    expect(() => buildReleaseEvidenceGraph({ ...base, review: { id: "review-1", evidenceDigest: "bad" } })).toThrow(
+      "Invalid evidence graph SHA-256 digest for review",
+    );
+    expect(() =>
+      buildReleaseEvidenceGraph({
+        ...base,
+        review: {
+          id: "review-1",
+          approvals: [
+            { id: "approval-1", approverId: "u1", status: "approved", occurredAt: "2026-10-01", evidenceDigest: "bad" },
+          ],
+        },
+      }),
+    ).toThrow("Invalid evidence graph SHA-256 digest for approval");
+    expect(() =>
+      buildReleaseEvidenceGraph({
+        ...base,
+        review: {
+          id: "review-1",
+          waivers: [
+            {
+              id: "waiver-1",
+              owner: "owner",
+              disposition: "accepted",
+              occurredAt: "2026-10-01",
+              evidenceDigest: "bad",
+            },
+          ],
+        },
+      }),
+    ).toThrow("Invalid evidence graph SHA-256 digest for waiver");
+  });
+
+  it("rejects corrupt externally supplied graph integrity instead of exposing it as authenticated evidence", () => {
+    const graph = buildReleaseEvidenceGraph({
+      release: {
+        id: "run-forged-hash",
+        repositoryId: "repo-one",
+        repository: "acme/board",
+        commitSha: "f".repeat(40),
+      },
+      evidence: [{ id: "artifact-1", kind: "report", name: "report.json", sha256: "c".repeat(64) }],
+    });
+    const tamperedEvidence = graph.nodes.map((node) =>
+      node.kind === "evidence" ? { ...node, integrity: { sha256: "tampered" } } : node,
+    );
+    expect(() => traceReleaseEvidence({ ...graph, nodes: tamperedEvidence })).toThrow(
+      "Invalid evidence graph SHA-256 digest for evidence",
+    );
+    const tamperedSource = graph.nodes.map((node) =>
+      node.kind === "source" ? { ...node, label: "bad-commit" } : node,
+    );
+    expect(() => traceReleaseEvidence({ ...graph, nodes: tamperedSource })).toThrow(
+      "Invalid evidence graph source commit SHA",
+    );
+  });
+
   it("rejects duplicate evidence or production identities instead of conflating digests", () => {
     const base = {
       release: {
