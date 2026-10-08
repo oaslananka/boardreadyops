@@ -170,8 +170,120 @@ async function inspectArtifact(
   }
 }
 
+// Exact-file-set checking is limited to first-party generated output directories.
+// Matching self-reported bytes does NOT authenticate the reviewed Git commit or exporter.
+const MAX_FIRST_PARTY_OUTPUT_ENTRIES = 4096;
+const MAX_FIRST_PARTY_OUTPUT_DEPTH = 32;
+
+function canonicalGeneratedPath(value: string): boolean {
+  if (!value || value.includes("\\") || path.isAbsolute(value) || path.win32.isAbsolute(value)) return false;
+  if (path.posix.normalize(value) !== value) return false;
+  return value.split("/").every(
+    (part) =>
+      part !== "" &&
+      part !== "." &&
+      part !== ".." &&
+      !/[<>:"|?*\u0000-\u001f]/u.test(part) &&
+      !/[. ]$/u.test(part) &&
+      !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(part),
+  );
+}
+
+async function checkFirstPartyOutputSet(
+  directory: string,
+  manifestPath: string,
+  artifacts: ProvenanceArtifact[],
+): Promise<string[]> {
+  const reasons: string[] = [];
+  const declaredFiles = new Set<string>();
+  const declaredAliases = new Set<string>();
+  const expectedDirectories = new Set<string>();
+
+  for (const artifact of artifacts) {
+    const name = artifact.path;
+    if (!canonicalGeneratedPath(name) || name === path.basename(manifestPath)) {
+      reasons.push("Non-canonical generated artifact path or manifest self-reference: " + name);
+      continue;
+    }
+    const portableKey = name.normalize("NFC").toLowerCase();
+    if (declaredAliases.has(portableKey)) {
+      reasons.push("Cross-platform generated artifact alias: " + name);
+      continue;
+    }
+    declaredAliases.add(portableKey);
+    declaredFiles.add(name);
+    const parts = name.split("/");
+    for (let index = 1; index < parts.length; index++) {
+      expectedDirectories.add(parts.slice(0, index).join("/"));
+    }
+  }
+
+  const actualFiles = new Set<string>();
+  const actualAliases = new Set<string>();
+  const pending: Array<{ dir: string; relative: string; depth: number }> = [
+    { dir: directory, relative: "", depth: 0 },
+  ];
+  let entriesVisited = 0;
+
+  try {
+    const actualRoot = await fs.realpath(directory);
+    while (pending.length > 0) {
+      const current = pending.shift();
+      if (!current) break;
+      const iterator = await fs.opendir(current.dir);
+      for await (const entry of iterator) {
+        entriesVisited++;
+        if (entriesVisited > MAX_FIRST_PARTY_OUTPUT_ENTRIES) {
+          throw new Error("Output tree scan exceeds " + MAX_FIRST_PARTY_OUTPUT_ENTRIES + " entries.");
+        }
+        const relative = current.relative ? current.relative + "/" + entry.name : entry.name;
+        const absolute = path.join(current.dir, entry.name);
+        const metadata = await fs.lstat(absolute);
+        if (metadata.isSymbolicLink()) {
+          reasons.push("Symlink in generated output: " + relative);
+        } else if (metadata.isDirectory()) {
+          if (!expectedDirectories.has(relative)) {
+            reasons.push("Undeclared generated directory: " + relative);
+          }
+          if (current.depth >= MAX_FIRST_PARTY_OUTPUT_DEPTH) {
+            throw new Error("Output tree scan exceeds depth " + MAX_FIRST_PARTY_OUTPUT_DEPTH + ".");
+          }
+          const realDirectory = await fs.realpath(absolute);
+          if (realDirectory !== path.resolve(actualRoot, relative)) {
+            throw new Error("Generated directory has a noncanonical real path: " + relative);
+          }
+          pending.push({ dir: absolute, relative, depth: current.depth + 1 });
+        } else if (!metadata.isFile()) {
+          reasons.push("Non-file entry in generated output: " + relative);
+        } else if (absolute !== manifestPath) {
+          if (!canonicalGeneratedPath(relative)) {
+            reasons.push("Non-canonical generated output filename: " + relative);
+          }
+          const portableKey = relative.normalize("NFC").toLowerCase();
+          if (actualAliases.has(portableKey)) {
+            reasons.push("Cross-platform generated output filename alias: " + relative);
+          }
+          actualAliases.add(portableKey);
+          actualFiles.add(relative);
+        }
+      }
+    }
+  } catch (error) {
+    reasons.push(
+      "Generated output enumeration failed closed: " + (error instanceof Error ? error.message : String(error)),
+    );
+  }
+  for (const file of [...actualFiles].sort()) {
+    if (!declaredFiles.has(file)) reasons.push("Undeclared generated artifact: " + file);
+  }
+  for (const file of [...declaredFiles].sort()) {
+    if (!actualFiles.has(file)) reasons.push("Declared generated artifact missing from file set: " + file);
+  }
+  return reasons;
+}
+
 type LoadedManifest =
-  | { manifest: unknown; manifestDir: string; realRoot: string }
+  | { manifest: unknown; manifestDir: string; realRoot: string; manifestPath?: string }
   | { error: ProvenanceVerificationResult };
 
 async function loadManifest(root: string, manifestOrPath: ExportProvenanceManifest | string): Promise<LoadedManifest> {
@@ -205,7 +317,7 @@ async function loadManifest(root: string, manifestOrPath: ExportProvenanceManife
       };
     }
     const raw = await readTextFile(absManifestPath);
-    return { manifest: JSON.parse(raw), manifestDir: path.dirname(absManifestPath), realRoot };
+    return { manifest: JSON.parse(raw), manifestDir: path.dirname(absManifestPath), realRoot, manifestPath: absManifestPath };
   } catch (error) {
     return {
       error: {
@@ -308,6 +420,15 @@ export async function verifyExportProvenance(
     if (outcome.reason) reasons.push(outcome.reason);
     if (outcome.kind === "mismatch") artifactMismatches.push(entry.path);
     if (outcome.kind === "missing") missingArtifacts.push(entry.path);
+  }
+
+  if (manifest.kind === "boardreadyops.export-provenance") {
+    if (!loaded.manifestPath) {
+      reasons.push("First-party output completeness requires an on-disk manifest.");
+    } else {
+      const validArtifacts = (Array.isArray(manifest.artifacts) ? manifest.artifacts : []).filter(isArtifactRecord);
+      reasons.push(...(await checkFirstPartyOutputSet(manifestDir, loaded.manifestPath, validArtifacts)));
+    }
   }
 
   const status: ProvenanceVerificationResult["status"] = reasons.length === 0 ? "verified" : "mismatch";

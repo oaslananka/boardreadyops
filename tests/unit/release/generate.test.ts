@@ -171,6 +171,117 @@ describe("generator self-reported source inventory", () => {
     expect(verified.status).toBe("verified");
   });
 
+  it("rejects an undeclared Gerber, even when the manifest's declared hashes still match", async () => {
+    const root = await makeTempDir();
+    const { pcb } = await projectInputs(root);
+    const result = await runGenerate(
+      { steps: [{ kind: "gerbers" }] },
+      {
+        outputDir: path.join(root, "build", "boardreadyops-generate"),
+        boardFile: pcb,
+        gitRoot: root,
+        runner: writingRunner(),
+      },
+    );
+    const manifest = path.relative(root, result.manifestPath);
+    expect((await verifyExportProvenance(root, manifest)).status).toBe("verified");
+
+    const added = path.join(result.outputDir, "gerbers", "unlisted.gbr");
+    await fs.writeFile(added, "surprise Gerber");
+    const wrong = await verifyExportProvenance(root, manifest);
+    expect(wrong.status).toBe("mismatch");
+    expect(wrong.reasons).toContain("Undeclared generated artifact: gerbers/unlisted.gbr");
+  });
+
+  it("accepts declared nested files but rejects undeclared directories and noncanonical manifest entries", async () => {
+    const root = await makeTempDir();
+    const { pcb } = await projectInputs(root);
+    const result = await runGenerate(
+      { steps: [{ kind: "gerbers" }] },
+      {
+        outputDir: path.join(root, "build", "boardreadyops-generate"),
+        boardFile: pcb,
+        gitRoot: root,
+        runner: writingRunner(),
+      },
+    );
+    const manifestPath = path.relative(root, result.manifestPath);
+    const onDisk = JSON.parse(await fs.readFile(result.manifestPath, "utf8")) as {
+      artifacts: Array<{ path: string; sha256: string; bytes: number }>;
+    };
+    await fs.mkdir(path.join(result.outputDir, "gerbers", "nested"));
+    const content = "inner file";
+    const nested = path.join(result.outputDir, "gerbers", "nested", "inner.gbr");
+    await fs.writeFile(nested, content);
+    const { createHash } = await import("node:crypto");
+    onDisk.artifacts.push({
+      path: "gerbers/nested/inner.gbr",
+      sha256: createHash("sha256").update(content).digest("hex"),
+      bytes: Buffer.byteLength(content),
+    });
+    await fs.writeFile(result.manifestPath, JSON.stringify(onDisk));
+    expect((await verifyExportProvenance(root, manifestPath)).status).toBe("verified");
+
+    await fs.mkdir(path.join(result.outputDir, "gerbers", "extra-dir"));
+    const addedDirectory = await verifyExportProvenance(root, manifestPath);
+    expect(addedDirectory.status).toBe("mismatch");
+    expect(addedDirectory.reasons).toContain("Undeclared generated directory: gerbers/extra-dir");
+    await fs.rmdir(path.join(result.outputDir, "gerbers", "extra-dir"));
+
+    onDisk.artifacts[0]!.path = "gerbers\\F_Cu.gbr";
+    await fs.writeFile(result.manifestPath, JSON.stringify(onDisk));
+    const windows = await verifyExportProvenance(root, manifestPath);
+    expect(windows.status).toBe("mismatch");
+    expect(windows.reasons.some((reason) => reason.includes("Non-canonical generated artifact path"))).toBe(true);
+
+    onDisk.artifacts[0]!.path = "../outside.gbr";
+    await fs.writeFile(result.manifestPath, JSON.stringify(onDisk));
+    const traversal = await verifyExportProvenance(root, manifestPath);
+    expect(traversal.status).toBe("mismatch");
+    expect(traversal.reasons.some((reason) => reason.includes("Non-canonical generated artifact path"))).toBe(true);
+  });
+
+  it.skipIf(process.platform === "win32")("rejects symlinks within first-party generated output", async () => {
+    const root = await makeTempDir();
+    const { pcb } = await projectInputs(root);
+    const result = await runGenerate(
+      { steps: [{ kind: "gerbers" }] },
+      {
+        outputDir: path.join(root, "build", "boardreadyops-generate"),
+        boardFile: pcb,
+        gitRoot: root,
+        runner: writingRunner(),
+      },
+    );
+    const manifest = path.relative(root, result.manifestPath);
+    await fs.symlink(path.join(result.outputDir, "gerbers", "F_Cu.gbr"), path.join(result.outputDir, "gerbers", "alias.gbr"));
+    const found = await verifyExportProvenance(root, manifest);
+    expect(found.status).toBe("mismatch");
+    expect(found.reasons).toContain("Symlink in generated output: gerbers/alias.gbr");
+  });
+
+  it("fails closed when a first-party output tree exceeds its depth budget", async () => {
+    const root = await makeTempDir();
+    const { pcb } = await projectInputs(root);
+    const result = await runGenerate(
+      { steps: [{ kind: "gerbers" }] },
+      {
+        outputDir: path.join(root, "build", "boardreadyops-generate"),
+        boardFile: pcb,
+        gitRoot: root,
+        runner: writingRunner(),
+      },
+    );
+    let nested = path.join(result.outputDir, "gerbers");
+    for (let index = 0; index < 34; index++) {
+      nested = path.join(nested, "depth-" + index);
+      await fs.mkdir(nested);
+    }
+    const found = await verifyExportProvenance(root, path.relative(root, result.manifestPath));
+    expect(found.status).toBe("mismatch");
+    expect(found.reasons.some((reason) => reason.includes("Output tree scan exceeds depth"))).toBe(true);
+  });
+
   it("withholds source-fingerprint PASS when KiCad input changes mid-export", async () => {
     const root = await makeTempDir();
     const { pcb, sch } = await projectInputs(root);
