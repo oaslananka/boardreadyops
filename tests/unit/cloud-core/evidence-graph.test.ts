@@ -213,13 +213,15 @@ describe("release evidence graph", () => {
         ...graph,
         edges: [{ ...sourceEdge, relationship: "produced" }],
       }),
-    ).toThrow("Evidence graph edge relationship conflicts with node kinds.");
+    ).toThrow(
+      `Evidence graph edge relationship "produced" expects release -> production_batch, received release -> source.`,
+    );
     expect(() =>
       traceReleaseEvidence({
         ...graph,
         edges: [{ ...sourceEdge, from: "review:review-roles" }],
       }),
-    ).toThrow("Evidence graph edge relationship conflicts with node kinds.");
+    ).toThrow(`Evidence graph edge relationship "derived_from" expects release -> source, received review -> source.`);
 
     expect(() =>
       traceReleaseEvidence({
@@ -233,7 +235,9 @@ describe("release evidence graph", () => {
           },
         ],
       }),
-    ).toThrow("Evidence graph missing-evidence relationship conflicts with node kinds.");
+    ).toThrow(
+      `Evidence graph missing-evidence relationship "approved_by" expects review -> approval, received release -> approval.`,
+    );
     expect(() =>
       traceReleaseEvidence({
         ...graph,
@@ -246,7 +250,9 @@ describe("release evidence graph", () => {
           },
         ],
       }),
-    ).toThrow("Evidence graph missing-evidence relationship conflicts with node kinds.");
+    ).toThrow(
+      `Evidence graph missing-evidence relationship "approved_by" expects review -> approval, received review -> source.`,
+    );
   });
 
   it("traces hundreds of distinct evidence edges deterministically without dropping relationships", () => {

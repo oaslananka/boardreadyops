@@ -382,8 +382,11 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
       throw new Error("Evidence graph edge references an unknown node.");
     }
     const kinds = relationshipKinds[edge.relationship];
-    if (!kinds || from.kind !== kinds[0] || to.kind !== kinds[1]) {
-      throw new Error("Evidence graph edge relationship conflicts with node kinds.");
+    if (!kinds) throw new Error("Evidence graph edge has an unknown relationship.");
+    if (from.kind !== kinds[0] || to.kind !== kinds[1]) {
+      throw new Error(
+        `Evidence graph edge relationship "${edge.relationship}" expects ${kinds[0]} -> ${kinds[1]}, received ${from.kind} -> ${to.kind}.`,
+      );
     }
     const outgoing = edgesBySource.get(edge.from) ?? [];
     outgoing.push(edge);
@@ -395,8 +398,11 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
       throw new Error("Evidence graph missing-evidence record references an unknown node.");
     }
     const kinds = relationshipKinds[missing.relationship];
-    if (!kinds || from.kind !== kinds[0] || missing.expectedKind !== kinds[1]) {
-      throw new Error("Evidence graph missing-evidence relationship conflicts with node kinds.");
+    if (!kinds) throw new Error("Evidence graph missing-evidence record has an unknown relationship.");
+    if (from.kind !== kinds[0] || missing.expectedKind !== kinds[1]) {
+      throw new Error(
+        `Evidence graph missing-evidence relationship "${missing.relationship}" expects ${kinds[0]} -> ${kinds[1]}, received ${from.kind} -> ${missing.expectedKind}.`,
+      );
     }
   }
   const backwardRelationships = new Set<EvidenceGraphRelationship>([
