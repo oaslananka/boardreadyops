@@ -2,8 +2,8 @@ import type { ReleasePassport } from "./passport.js";
 import { verifyPassportDigest } from "./passport.js";
 
 /** Caller-supplied standard/clause IDs; NOT an authoritative normative clause catalogue. */
-export type AuditStandard = "ISO 13485" | "IATF 16949" | "AS9100" | "DO-254";
-export type PassportEvidenceKind =
+type AuditStandard = "ISO 13485" | "IATF 16949" | "AS9100" | "DO-254";
+type PassportEvidenceKind =
   | "reviewed_revision"
   | "policy_evaluation"
   | "release_decision"
