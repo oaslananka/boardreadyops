@@ -84,6 +84,63 @@ describe("release evidence graph", () => {
     expect(trace.missing).toEqual([]);
   });
 
+  it("rejects duplicate evidence or production identities instead of conflating digests", () => {
+    const base = {
+      release: {
+        id: "run-identity",
+        repositoryId: "repo-one",
+        repository: "acme/board",
+        commitSha: "f".repeat(40),
+      },
+    };
+    expect(() =>
+      buildReleaseEvidenceGraph({
+        ...base,
+        evidence: [
+          { id: "artifact-a", kind: "report", name: "old.json", sha256: "1".repeat(64) },
+          { id: "artifact-a", kind: "report", name: "replaced.json", sha256: "2".repeat(64) },
+        ],
+      }),
+    ).toThrow("Duplicate evidence graph node identity: evidence:artifact-a");
+
+    expect(() =>
+      buildReleaseEvidenceGraph({
+        ...base,
+        productionBatches: [
+          {
+            id: "batch-a",
+            externalBatchId: "LOT-A",
+            manufacturer: "Acme",
+            manufacturedOn: "2026-10-01",
+            sourceSha256: "3".repeat(64),
+          },
+          {
+            id: "batch-a",
+            externalBatchId: "LOT-B",
+            manufacturer: "Acme",
+            manufacturedOn: "2026-10-02",
+            sourceSha256: "4".repeat(64),
+          },
+        ],
+      }),
+    ).toThrow("Duplicate evidence graph node identity: production_batch:batch-a");
+  });
+
+  it("refuses ambiguous externally supplied graph nodes or an absent root", () => {
+    const root = { id: "release:run-1", kind: "release" as const, label: "run-1" };
+    const graph = {
+      version: 1 as const,
+      rootReleaseId: root.id,
+      nodes: [root, { ...root, label: "forged run" }],
+      edges: [],
+      missing: [],
+    };
+    expect(() => traceReleaseEvidence(graph)).toThrow("Evidence graph contains duplicate node identities.");
+    expect(() => traceReleaseEvidence({ ...graph, nodes: [], rootReleaseId: "release:missing" })).toThrow(
+      "Evidence graph root release node is missing.",
+    );
+  });
+
   it("keeps absent optional relationships explicit instead of inventing evidence", () => {
     const graph = buildReleaseEvidenceGraph({
       release: {
