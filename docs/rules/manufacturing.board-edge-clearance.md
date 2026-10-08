@@ -16,7 +16,7 @@ Checks that copper features in the Gerber package maintain the required minimum 
 
 ## When It Fires
 
-Fires when copper features in the Gerber artwork are closer to the board outline than the required minimum edge clearance.
+Reports copper traces, flashed pads, and filled regions that violate board-edge clearance. A blocking result requires a declared board outline and copper layer, complete modeled geometry, and an explicit or assured vendor clearance limit. Missing/open outlines, unsupported arcs/macros, unknown copper extents, or unverified vendor-limit provenance produce non-blocking advisory findings.
 
 ## Configuration Example
 
@@ -31,7 +31,9 @@ rules:
 ## JSON Finding Details Shape
 
 ```text
-{ measuredClearanceMm, minClearanceMm, confidence, layer, profileRevision }
+{ minClearanceMm, limitSource, blocking, blockingRationale, configuredSeverity, severityCapped, geometryConfidence, profileAssurance, profileMayBlock, outlineRoleEvidence }
+Measured: { measuredClearanceMm, layerRoleEvidence, featureKind, featureLocation, apertureCode, featureExtentEvidence, geometryUncertainty, profileRevision, profileSource, verifiedAt }
+Incomplete geometry: { measuredClearanceMm: number | null, geometryUncertainty }
 ```
 
 ## Report Context

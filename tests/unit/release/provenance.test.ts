@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -88,6 +90,37 @@ describe("release/provenance", () => {
     expect(result.gitShaMatch).toBe(false);
   });
 
+  it("fails closed when explicit reviewed SHA comparison lacks a clean pinned export SHA", async () => {
+    const root = await writeFixture({ "board.kicad_pcb": "(kicad_pcb)", "top.gtl": "gerber-contents" });
+    const content = "gerber-contents";
+    const sha = "1".repeat(40);
+    const manifest = await createExportProvenanceManifest({
+      root,
+      artifacts: [
+        {
+          path: "top.gtl",
+          sha256: createHash("sha256").update(content).digest("hex"),
+          bytes: Buffer.byteLength(content),
+        },
+      ],
+    });
+    const absent = await verifyExportProvenance(root, manifest, { currentGitSha: sha });
+    expect(absent.status).toBe("mismatch");
+    expect(absent.gitShaMatch).toBe(false);
+    expect(absent.reasons).toContain("Reviewed commit verification requested, but manifest has no valid Git SHA.");
+
+    const dirty = await verifyExportProvenance(
+      root,
+      { ...manifest, git: { sha, dirty: true } },
+      { currentGitSha: sha },
+    );
+    expect(dirty.status).toBe("mismatch");
+    expect(dirty.gitShaMatch).toBe(false);
+    expect(dirty.reasons).toContain(
+      "Reviewed commit verification requested, but the export recorded a dirty source tree.",
+    );
+  });
+
   it("detects stale manufacturing artifacts when source file changes", async () => {
     const root = await writeFixture({
       "board.kicad_pcb": "(kicad_pcb)",
@@ -141,8 +174,8 @@ describe("release/provenance", () => {
     const manifest = await createExportProvenanceManifest({
       root,
       artifacts: [
-        { path: "../outside.gtl", sha256: "1234", bytes: 10 },
-        { path: "missing.gtl", sha256: "1234", bytes: 10 },
+        { path: "../outside.gtl", sha256: "a".repeat(64), bytes: 10 },
+        { path: "missing.gtl", sha256: "a".repeat(64), bytes: 10 },
       ],
     });
 
@@ -160,6 +193,174 @@ describe("release/provenance", () => {
     const malformedRes = await verifyExportProvenance(root, "malformed.json");
     expect(malformedRes.status).toBe("missing");
     expect(malformedRes.reasons[0]).toContain("unreadable or malformed");
+  });
+
+  it("refuses to verify an empty or malformed artifact inventory", async () => {
+    const root = await writeFixture({ "board.kicad_pcb": "(kicad_pcb)", "top.gtl": "gerber-contents" });
+    const manifest = await createExportProvenanceManifest({ root, artifacts: [] });
+    const empty = await verifyExportProvenance(root, manifest);
+    expect(empty.status).toBe("mismatch");
+    expect(empty.reasons).toContain("Provenance manifest is missing a non-empty artifact inventory.");
+
+    const malformed = await verifyExportProvenance(root, {
+      ...manifest,
+      artifacts: [{ path: "top.gtl", sha256: "not-a-hash", bytes: -5 }],
+    });
+    expect(malformed.status).toBe("mismatch");
+    expect(malformed.reasons).toContain("Provenance artifact entry has invalid path, SHA-256, or byte count.");
+
+    const missingSource = await verifyExportProvenance(root, {
+      ...manifest,
+      sourceFingerprint: undefined,
+    } as unknown as ExportProvenanceManifest);
+    expect(missingSource.status).toBe("mismatch");
+    expect(missingSource.reasons).toContain("Provenance manifest has no valid source SHA-256 fingerprint.");
+
+    const invalid = await verifyExportProvenance(root, null as unknown as ExportProvenanceManifest);
+    expect(invalid.status).toBe("unsupported");
+  });
+
+  it("rejects mismatched byte count and duplicate artifact records even with a matching hash", async () => {
+    const content = "gerber-contents";
+    const root = await writeFixture({ "board.kicad_pcb": "(kicad_pcb)", "top.gtl": content });
+    const digest = createHash("sha256").update(content).digest("hex");
+    const manifest = await createExportProvenanceManifest({
+      root,
+      artifacts: [{ path: "top.gtl", sha256: digest, bytes: Buffer.byteLength(content) + 1 }],
+    });
+    const badSize = await verifyExportProvenance(root, manifest);
+    expect(badSize.status).toBe("mismatch");
+    expect(badSize.artifactMismatches).toContain("top.gtl");
+    expect(badSize.reasons.some((reason) => reason.includes("byte-count mismatch"))).toBe(true);
+
+    const duplicated = await verifyExportProvenance(root, {
+      ...manifest,
+      artifacts: [
+        { path: "top.gtl", sha256: digest, bytes: Buffer.byteLength(content) },
+        { path: "./top.gtl", sha256: digest, bytes: Buffer.byteLength(content) },
+      ],
+    });
+    expect(duplicated.status).toBe("mismatch");
+    expect(duplicated.reasons.some((reason) => reason.includes("duplicated"))).toBe(true);
+    const windowsAlias = await verifyExportProvenance(root, {
+      ...manifest,
+      artifacts: [
+        { path: "top.gtl", sha256: digest, bytes: Buffer.byteLength(content) },
+        { path: ".\\\\top.gtl", sha256: digest, bytes: Buffer.byteLength(content) },
+      ],
+    });
+    expect(windowsAlias.status).toBe("mismatch");
+    expect(windowsAlias.reasons.some((reason) => reason.includes("duplicated"))).toBe(true);
+  });
+
+  it("rejects artifact symlink escapes rather than trusting their declared digests", async () => {
+    const root = await writeFixture({ "board.kicad_pcb": "(kicad_pcb)" });
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), "brops-untrusted-gerber-"));
+    try {
+      const bytes = "secret external gerber";
+      const externalFile = path.join(outside, "external.gtl");
+      await fs.writeFile(externalFile, bytes);
+      await fs.symlink(externalFile, path.join(root, "outside.gtl"));
+      const manifest = await createExportProvenanceManifest({
+        root,
+        artifacts: [
+          {
+            path: "outside.gtl",
+            sha256: createHash("sha256").update(bytes).digest("hex"),
+            bytes: Buffer.byteLength(bytes),
+          },
+        ],
+      });
+      const result = await verifyExportProvenance(root, manifest);
+      expect(result.status).toBe("mismatch");
+      expect(result.artifactMismatches).toContain("outside.gtl");
+      expect(result.reasons.some((reason) => reason.includes("symlink escapes"))).toBe(true);
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a provenance manifest symlink that resolves outside the project", async () => {
+    const root = await writeFixture({ "board.kicad_pcb": "(kicad_pcb)" });
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), "brops-untrusted-manifest-"));
+    try {
+      const manifest = await createExportProvenanceManifest({
+        root,
+        artifacts: [
+          {
+            path: "top.gtl",
+            sha256: "a".repeat(64),
+            bytes: 16,
+          },
+        ],
+      });
+      const externalManifest = path.join(outside, "manifest.json");
+      await fs.writeFile(externalManifest, JSON.stringify(manifest));
+      await fs.symlink(externalManifest, path.join(root, "manifest.json"));
+      const result = await verifyExportProvenance(root, "manifest.json");
+      expect(result.status).toBe("mismatch");
+      expect(result.reasons).toContain("Provenance manifest symlink escapes the project root.");
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "accepts an in-root manifest through a canonicalized source-root alias",
+    async () => {
+      const root = await writeFixture({
+        "board.kicad_pcb": "(kicad_pcb)",
+        "top.gtl": "D10*X0Y0D03*M02*",
+      });
+      const content = "D10*X0Y0D03*M02*";
+      const manifest = await createExportProvenanceManifest({
+        root,
+        artifacts: [
+          {
+            path: "top.gtl",
+            sha256: createHash("sha256").update(content).digest("hex"),
+            bytes: Buffer.byteLength(content),
+          },
+        ],
+      });
+      await fs.writeFile(path.join(root, "manifest.json"), JSON.stringify(manifest));
+      const aliasDir = await fs.mkdtemp(path.join(os.tmpdir(), "brops-verified-root-alias-"));
+      try {
+        const alias = path.join(aliasDir, "root-alias");
+        await fs.symlink(root, alias, "dir");
+        const verified = await verifyExportProvenance(alias, "manifest.json");
+        expect(verified.status).toBe("verified");
+        expect(verified.reasons).toEqual([]);
+      } finally {
+        await fs.rm(aliasDir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("verifies a multi-megabyte artifact by streamed digest and exact length", async () => {
+    const root = await writeFixture({ "board.kicad_pcb": "(kicad_pcb)" });
+    const bytes = Buffer.alloc(2 * 1024 * 1024 + 17, 0x41);
+    await fs.writeFile(path.join(root, "large.gtl"), bytes);
+    const manifest = await createExportProvenanceManifest({
+      root,
+      artifacts: [
+        {
+          path: "large.gtl",
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+          bytes: bytes.length,
+        },
+      ],
+    });
+    const verified = await verifyExportProvenance(root, manifest);
+    expect(verified.status).toBe("verified");
+    const undersized = await verifyExportProvenance(root, {
+      ...manifest,
+      artifacts: [
+        { path: "large.gtl", sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length - 1 },
+      ],
+    });
+    expect(undersized.status).toBe("mismatch");
+    expect(undersized.artifactMismatches).toContain("large.gtl");
   });
 
   it("rejects unsupported schema versions", async () => {

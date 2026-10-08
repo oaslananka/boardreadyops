@@ -168,12 +168,19 @@ The `v1` and `latest` container tags resolve to the most recent release
 image. Check the [release channel verification](docs/release/channel-verification.md)
 for the current digest and manifest list.
 
-## Live demos
+## Reproducible demos
 
-- [A board that gets fixed](https://github.com/oaslananka/boardreadyops-demo-pass/pull/1) — a blocked baseline, and the pull request that closes all five findings. The check goes green.
-- [A board that gets broken](https://github.com/oaslananka/boardreadyops-demo-fail/pull/1) — a clean baseline, and a pull request that reads as routine housekeeping and makes the board unfabricable. The check goes red and says why.
+Explore the checked-in [golden demo source](examples/golden-demo/README.md) before connecting a repository.
+The [broken board](examples/golden-demo/broken) has five findings and blocks release;
+the [fixed board](examples/golden-demo/fixed) resolves them.
 
-Both are public and run the published Action, so you can read the findings, the sticky comment, and the fabrication diff without installing anything. The hardware is synthetic, so there is no customer data or secret to worry about. See the [golden demo walkthrough](docs/golden-demo.md).
+```bash
+boardreadyops run examples/golden-demo/broken
+boardreadyops run examples/golden-demo/fixed
+```
+
+These are reproducible source fixtures, not externally hosted pull requests. See the
+[golden demo walkthrough](docs/golden-demo.md) for the expected evidence and decisions.
 
 ## CLI
 
