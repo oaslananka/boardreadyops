@@ -1073,14 +1073,14 @@ var require_util = __commonJS({
         }
         const port = url3.port != null ? url3.port : url3.protocol === "https:" ? 443 : 80;
         let origin = url3.origin != null ? url3.origin : `${url3.protocol || ""}//${url3.hostname || ""}:${port}`;
-        let path54 = url3.path != null ? url3.path : `${url3.pathname || ""}${url3.search || ""}`;
+        let path53 = url3.path != null ? url3.path : `${url3.pathname || ""}${url3.search || ""}`;
         if (origin[origin.length - 1] === "/") {
           origin = origin.slice(0, origin.length - 1);
         }
-        if (path54 && path54[0] !== "/") {
-          path54 = `/${path54}`;
+        if (path53 && path53[0] !== "/") {
+          path53 = `/${path53}`;
         }
-        return new URL(`${origin}${path54}`);
+        return new URL(`${origin}${path53}`);
       }
       if (!isHttpOrHttpsPrefixed(url3.origin || url3.protocol)) {
         throw new InvalidArgumentError("Invalid URL protocol: the URL must start with `http:` or `https:`.");
@@ -1531,39 +1531,39 @@ var require_diagnostics = __commonJS({
       });
       diagnosticsChannel.channel("undici:client:sendHeaders").subscribe((evt) => {
         const {
-          request: { method, path: path54, origin }
+          request: { method, path: path53, origin }
         } = evt;
-        debuglog("sending request to %s %s/%s", method, origin, path54);
+        debuglog("sending request to %s %s/%s", method, origin, path53);
       });
       diagnosticsChannel.channel("undici:request:headers").subscribe((evt) => {
         const {
-          request: { method, path: path54, origin },
+          request: { method, path: path53, origin },
           response: { statusCode }
         } = evt;
         debuglog(
           "received response to %s %s/%s - HTTP %d",
           method,
           origin,
-          path54,
+          path53,
           statusCode
         );
       });
       diagnosticsChannel.channel("undici:request:trailers").subscribe((evt) => {
         const {
-          request: { method, path: path54, origin }
+          request: { method, path: path53, origin }
         } = evt;
-        debuglog("trailers received from %s %s/%s", method, origin, path54);
+        debuglog("trailers received from %s %s/%s", method, origin, path53);
       });
       diagnosticsChannel.channel("undici:request:error").subscribe((evt) => {
         const {
-          request: { method, path: path54, origin },
+          request: { method, path: path53, origin },
           error: error52
         } = evt;
         debuglog(
           "request to %s %s/%s errored - %s",
           method,
           origin,
-          path54,
+          path53,
           error52.message
         );
       });
@@ -1612,9 +1612,9 @@ var require_diagnostics = __commonJS({
         });
         diagnosticsChannel.channel("undici:client:sendHeaders").subscribe((evt) => {
           const {
-            request: { method, path: path54, origin }
+            request: { method, path: path53, origin }
           } = evt;
-          debuglog("sending request to %s %s/%s", method, origin, path54);
+          debuglog("sending request to %s %s/%s", method, origin, path53);
         });
       }
       diagnosticsChannel.channel("undici:websocket:open").subscribe((evt) => {
@@ -1677,7 +1677,7 @@ var require_request = __commonJS({
     var kHandler = /* @__PURE__ */ Symbol("handler");
     var Request = class {
       constructor(origin, {
-        path: path54,
+        path: path53,
         method,
         body: body2,
         headers,
@@ -1692,11 +1692,11 @@ var require_request = __commonJS({
         expectContinue,
         servername
       }, handler2) {
-        if (typeof path54 !== "string") {
+        if (typeof path53 !== "string") {
           throw new InvalidArgumentError("path must be a string");
-        } else if (path54[0] !== "/" && !(path54.startsWith("http://") || path54.startsWith("https://")) && method !== "CONNECT") {
+        } else if (path53[0] !== "/" && !(path53.startsWith("http://") || path53.startsWith("https://")) && method !== "CONNECT") {
           throw new InvalidArgumentError("path must be an absolute URL or start with a slash");
-        } else if (invalidPathRegex.test(path54)) {
+        } else if (invalidPathRegex.test(path53)) {
           throw new InvalidArgumentError("invalid request path");
         }
         if (typeof method !== "string") {
@@ -1762,7 +1762,7 @@ var require_request = __commonJS({
         this.completed = false;
         this.aborted = false;
         this.upgrade = upgrade || null;
-        this.path = query ? buildURL(path54, query) : path54;
+        this.path = query ? buildURL(path53, query) : path53;
         this.origin = origin;
         this.idempotent = idempotent == null ? method === "HEAD" || method === "GET" : idempotent;
         this.blocking = blocking == null ? false : blocking;
@@ -6448,7 +6448,7 @@ var require_client_h1 = __commonJS({
       return method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && method !== "TRACE" && method !== "CONNECT";
     }
     function writeH1(client2, request2) {
-      const { method, path: path54, host, upgrade, blocking, reset } = request2;
+      const { method, path: path53, host, upgrade, blocking, reset } = request2;
       let { body: body2, headers, contentLength: contentLength2 } = request2;
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH" || method === "QUERY" || method === "PROPFIND" || method === "PROPPATCH";
       if (util3.isFormDataLike(body2)) {
@@ -6529,7 +6529,7 @@ var require_client_h1 = __commonJS({
       if (blocking) {
         socket[kBlocking] = true;
       }
-      let header = `${method} ${path54} HTTP/1.1\r
+      let header = `${method} ${path53} HTTP/1.1\r
 `;
       if (typeof host === "string") {
         header += `host: ${host}\r
@@ -7060,7 +7060,7 @@ var require_client_h2 = __commonJS({
     }
     function writeH2(client2, request2) {
       const session = client2[kHTTP2Session];
-      const { method, path: path54, host, upgrade, expectContinue, signal, headers: reqHeaders } = request2;
+      const { method, path: path53, host, upgrade, expectContinue, signal, headers: reqHeaders } = request2;
       let { body: body2 } = request2;
       if (upgrade) {
         util3.errorRequest(client2, request2, new Error("Upgrade not supported for H2"));
@@ -7157,7 +7157,7 @@ var require_client_h2 = __commonJS({
         });
         return true;
       }
-      headers[HTTP2_HEADER_PATH] = path54;
+      headers[HTTP2_HEADER_PATH] = path53;
       headers[HTTP2_HEADER_SCHEME] = "https";
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body2 && typeof body2.read === "function") {
@@ -7510,9 +7510,9 @@ var require_redirect_handler = __commonJS({
           return this.handler.onHeaders(statusCode, headers, resume, statusText);
         }
         const { origin, pathname, search } = util3.parseURL(new URL(this.location, this.opts.origin && new URL(this.opts.path, this.opts.origin)));
-        const path54 = search ? `${pathname}${search}` : pathname;
+        const path53 = search ? `${pathname}${search}` : pathname;
         this.opts.headers = cleanRequestHeaders(this.opts.headers, statusCode === 303, this.opts.origin !== origin);
-        this.opts.path = path54;
+        this.opts.path = path53;
         this.opts.origin = origin;
         this.opts.maxRedirections = 0;
         this.opts.query = null;
@@ -8747,10 +8747,10 @@ var require_proxy_agent = __commonJS({
         };
         const {
           origin,
-          path: path54 = "/",
+          path: path53 = "/",
           headers = {}
         } = opts;
-        opts.path = origin + path54;
+        opts.path = origin + path53;
         if (!("host" in headers) && !("Host" in headers)) {
           const { host } = new URL2(origin);
           headers.host = host;
@@ -10722,20 +10722,20 @@ var require_mock_utils = __commonJS({
       }
       return true;
     }
-    function safeUrl(path54) {
-      if (typeof path54 !== "string") {
-        return path54;
+    function safeUrl(path53) {
+      if (typeof path53 !== "string") {
+        return path53;
       }
-      const pathSegments = path54.split("?");
+      const pathSegments = path53.split("?");
       if (pathSegments.length !== 2) {
-        return path54;
+        return path53;
       }
       const qp = new URLSearchParams(pathSegments.pop());
       qp.sort();
       return [...pathSegments, qp.toString()].join("?");
     }
-    function matchKey(mockDispatch2, { path: path54, method, body: body2, headers }) {
-      const pathMatch = matchValue(mockDispatch2.path, path54);
+    function matchKey(mockDispatch2, { path: path53, method, body: body2, headers }) {
+      const pathMatch = matchValue(mockDispatch2.path, path53);
       const methodMatch = matchValue(mockDispatch2.method, method);
       const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body2) : true;
       const headersMatch = matchHeaders(mockDispatch2, headers);
@@ -10757,7 +10757,7 @@ var require_mock_utils = __commonJS({
     function getMockDispatch(mockDispatches, key) {
       const basePath = key.query ? buildURL(key.path, key.query) : key.path;
       const resolvedPath = typeof basePath === "string" ? safeUrl(basePath) : basePath;
-      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path54 }) => matchValue(safeUrl(path54), resolvedPath));
+      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path53 }) => matchValue(safeUrl(path53), resolvedPath));
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for path '${resolvedPath}'`);
       }
@@ -10795,9 +10795,9 @@ var require_mock_utils = __commonJS({
       }
     }
     function buildKey(opts) {
-      const { path: path54, method, body: body2, headers, query } = opts;
+      const { path: path53, method, body: body2, headers, query } = opts;
       return {
-        path: path54,
+        path: path53,
         method,
         body: body2,
         headers,
@@ -11260,10 +11260,10 @@ var require_pending_interceptors_formatter = __commonJS({
       }
       format(pendingInterceptors) {
         const withPrettyHeaders = pendingInterceptors.map(
-          ({ method, path: path54, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
+          ({ method, path: path53, data: { statusCode }, persist, times, timesInvoked, origin }) => ({
             Method: method,
             Origin: origin,
-            Path: path54,
+            Path: path53,
             "Status code": statusCode,
             Persistent: persist ? PERSISTENT : NOT_PERSISTENT,
             Invocations: timesInvoked,
@@ -16144,9 +16144,9 @@ var require_util6 = __commonJS({
         }
       }
     }
-    function validateCookiePath(path54) {
-      for (let i = 0; i < path54.length; ++i) {
-        const code = path54.charCodeAt(i);
+    function validateCookiePath(path53) {
+      for (let i = 0; i < path53.length; ++i) {
+        const code = path53.charCodeAt(i);
         if (code < 32 || // exclude CTLs (0-31)
         code > 126 || // exclude DEL and non-ascii
         code === 59) {
@@ -18988,11 +18988,11 @@ var require_undici = __commonJS({
           if (typeof opts.path !== "string") {
             throw new InvalidArgumentError("invalid opts.path");
           }
-          let path54 = opts.path;
+          let path53 = opts.path;
           if (!opts.path.startsWith("/")) {
-            path54 = `/${path54}`;
+            path53 = `/${path53}`;
           }
-          url3 = new URL(util3.parseOrigin(url3).origin + path54);
+          url3 = new URL(util3.parseOrigin(url3).origin + path53);
         } else {
           if (!opts) {
             opts = typeof url3 === "object" ? url3 : {};
@@ -21914,9 +21914,9 @@ var require_validate = __commonJS({
       }
       let expr = data;
       const segments = jsonPointer.split("/");
-      for (const segment of segments) {
-        if (segment) {
-          data = (0, codegen_1._)`${data}${(0, codegen_1.getProperty)((0, util_1.unescapeJsonPointer)(segment))}`;
+      for (const segment2 of segments) {
+        if (segment2) {
+          data = (0, codegen_1._)`${data}${(0, codegen_1.getProperty)((0, util_1.unescapeJsonPointer)(segment2))}`;
           expr = (0, codegen_1._)`${expr} && ${data}`;
         }
       }
@@ -22364,8 +22364,8 @@ var require_utils2 = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path54) {
-      let input = path54;
+    function removeDotSegments(path53) {
+      let input = path53;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -22774,8 +22774,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path54 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path54 && path54 !== "/" ? path54 : void 0;
+        const path53 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path53 && path53 !== "/" ? path53 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -27129,7 +27129,7 @@ var require_dist = __commonJS({
 var require_resolve_from = __commonJS({
   "node_modules/resolve-from/index.js"(exports2, module2) {
     "use strict";
-    var path54 = require("path");
+    var path53 = require("path");
     var Module = require("module");
     var fs28 = require("fs");
     var resolveFrom = (fromDir, moduleId, silent) => {
@@ -27143,14 +27143,14 @@ var require_resolve_from = __commonJS({
         fromDir = fs28.realpathSync(fromDir);
       } catch (err) {
         if (err.code === "ENOENT") {
-          fromDir = path54.resolve(fromDir);
+          fromDir = path53.resolve(fromDir);
         } else if (silent) {
           return null;
         } else {
           throw err;
         }
       }
-      const fromFile = path54.join(fromDir, "noop.js");
+      const fromFile = path53.join(fromDir, "noop.js");
       const resolveFileName = () => Module._resolveFilename(moduleId, {
         id: fromFile,
         filename: fromFile,
@@ -27222,7 +27222,7 @@ var require_parent_module = __commonJS({
 var require_import_fresh = __commonJS({
   "node_modules/import-fresh/index.js"(exports2, module2) {
     "use strict";
-    var path54 = require("path");
+    var path53 = require("path");
     var resolveFrom = require_resolve_from();
     var parentModule = require_parent_module();
     module2.exports = (moduleId) => {
@@ -27230,7 +27230,7 @@ var require_import_fresh = __commonJS({
         throw new TypeError("Expected a string");
       }
       const parentPath = parentModule(__filename);
-      const cwd = parentPath ? path54.dirname(parentPath) : __dirname;
+      const cwd = parentPath ? path53.dirname(parentPath) : __dirname;
       const filePath = resolveFrom(cwd, moduleId);
       const oldModule = require.cache[filePath];
       if (oldModule && oldModule.parent) {
@@ -31166,7 +31166,7 @@ ${error52.message}`;
         return typescript.sys.fileExists(fileName);
       });
       if (filePath !== void 0) {
-        const { config: config2, error: error52 } = typescript.readConfigFile(filePath, (path54) => typescript.sys.readFile(path54));
+        const { config: config2, error: error52 } = typescript.readConfigFile(filePath, (path53) => typescript.sys.readFile(path53));
         if (error52) {
           throw new Error(`Error in ${filePath}: ${error52.messageText.toString()}`);
         }
@@ -31289,42 +31289,42 @@ var require_defaults2 = __commonJS({
 var require_env_paths = __commonJS({
   "node_modules/env-paths/index.js"(exports2, module2) {
     "use strict";
-    var path54 = require("path");
+    var path53 = require("path");
     var os10 = require("os");
     var homedir = os10.homedir();
     var tmpdir = os10.tmpdir();
     var { env } = process;
     var macos = (name) => {
-      const library = path54.join(homedir, "Library");
+      const library = path53.join(homedir, "Library");
       return {
-        data: path54.join(library, "Application Support", name),
-        config: path54.join(library, "Preferences", name),
-        cache: path54.join(library, "Caches", name),
-        log: path54.join(library, "Logs", name),
-        temp: path54.join(tmpdir, name)
+        data: path53.join(library, "Application Support", name),
+        config: path53.join(library, "Preferences", name),
+        cache: path53.join(library, "Caches", name),
+        log: path53.join(library, "Logs", name),
+        temp: path53.join(tmpdir, name)
       };
     };
     var windows = (name) => {
-      const appData = env.APPDATA || path54.join(homedir, "AppData", "Roaming");
-      const localAppData = env.LOCALAPPDATA || path54.join(homedir, "AppData", "Local");
+      const appData = env.APPDATA || path53.join(homedir, "AppData", "Roaming");
+      const localAppData = env.LOCALAPPDATA || path53.join(homedir, "AppData", "Local");
       return {
         // Data/config/cache/log are invented by me as Windows isn't opinionated about this
-        data: path54.join(localAppData, name, "Data"),
-        config: path54.join(appData, name, "Config"),
-        cache: path54.join(localAppData, name, "Cache"),
-        log: path54.join(localAppData, name, "Log"),
-        temp: path54.join(tmpdir, name)
+        data: path53.join(localAppData, name, "Data"),
+        config: path53.join(appData, name, "Config"),
+        cache: path53.join(localAppData, name, "Cache"),
+        log: path53.join(localAppData, name, "Log"),
+        temp: path53.join(tmpdir, name)
       };
     };
     var linux = (name) => {
-      const username = path54.basename(homedir);
+      const username = path53.basename(homedir);
       return {
-        data: path54.join(env.XDG_DATA_HOME || path54.join(homedir, ".local", "share"), name),
-        config: path54.join(env.XDG_CONFIG_HOME || path54.join(homedir, ".config"), name),
-        cache: path54.join(env.XDG_CACHE_HOME || path54.join(homedir, ".cache"), name),
+        data: path53.join(env.XDG_DATA_HOME || path53.join(homedir, ".local", "share"), name),
+        config: path53.join(env.XDG_CONFIG_HOME || path53.join(homedir, ".config"), name),
+        cache: path53.join(env.XDG_CACHE_HOME || path53.join(homedir, ".cache"), name),
         // https://wiki.debian.org/XDGBaseDirectorySpecification#state
-        log: path54.join(env.XDG_STATE_HOME || path54.join(homedir, ".local", "state"), name),
-        temp: path54.join(tmpdir, username, name)
+        log: path53.join(env.XDG_STATE_HOME || path53.join(homedir, ".local", "state"), name),
+        temp: path53.join(tmpdir, username, name)
       };
     };
     var envPaths = (name, options) => {
@@ -31405,11 +31405,11 @@ var require_util10 = __commonJS({
       map2.set(key, result);
       return result;
     }
-    function getPropertyByPath(source, path54) {
-      if (typeof path54 === "string" && Object.prototype.hasOwnProperty.call(source, path54)) {
-        return source[path54];
+    function getPropertyByPath(source, path53) {
+      if (typeof path53 === "string" && Object.prototype.hasOwnProperty.call(source, path53)) {
+        return source[path53];
       }
-      const parsedPath = typeof path54 === "string" ? path54.split(".") : path54;
+      const parsedPath = typeof path53 === "string" ? path53.split(".") : path53;
       return parsedPath.reduce((previous, key) => {
         if (previous === void 0) {
           return previous;
@@ -31420,9 +31420,9 @@ var require_util10 = __commonJS({
     function removeUndefinedValuesFromObject(options) {
       return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== void 0));
     }
-    async function isDirectory2(path54) {
+    async function isDirectory2(path53) {
       try {
-        const stat3 = await fs_1.promises.stat(path54);
+        const stat3 = await fs_1.promises.stat(path53);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -31431,9 +31431,9 @@ var require_util10 = __commonJS({
         throw e;
       }
     }
-    function isDirectorySync(path54) {
+    function isDirectorySync(path53) {
       try {
-        const stat3 = fs_1.default.statSync(path54);
+        const stat3 = fs_1.default.statSync(path53);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -31531,7 +31531,7 @@ var require_ExplorerBase = __commonJS({
           const idx = importStack.indexOf(fullPath);
           if (idx !== -1) {
             throw new Error(`Circular import detected:
-${[...importStack, fullPath].map((path54, i) => `${i + 1}. ${path54}`).join("\n")} (same as ${idx + 1}.)`);
+${[...importStack, fullPath].map((path53, i) => `${i + 1}. ${path53}`).join("\n")} (same as ${idx + 1}.)`);
           }
         }
       }
@@ -31718,9 +31718,9 @@ var require_Explorer = __commonJS({
           throw error52;
         }
       }
-      async #fileExists(path54) {
+      async #fileExists(path53) {
         try {
-          await promises_1.default.stat(path54);
+          await promises_1.default.stat(path53);
           return true;
         } catch (e) {
           return false;
@@ -31880,9 +31880,9 @@ var require_ExplorerSync = __commonJS({
           throw error52;
         }
       }
-      #fileExists(path54) {
+      #fileExists(path53) {
         try {
-          fs_1.default.statSync(path54);
+          fs_1.default.statSync(path53);
           return true;
         } catch (e) {
           return false;
@@ -32008,7 +32008,7 @@ var require_dist2 = __commonJS({
       };
     }
     function getResolvedSearchPlaces(moduleName, toolDefinedSearchPlaces, userConfiguredOptions) {
-      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path54) => path54.replace("{name}", moduleName));
+      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path53) => path53.replace("{name}", moduleName));
       if (userConfiguredOptions.mergeSearchPlaces) {
         return [...userConfiguredSearchPlaces ?? [], ...toolDefinedSearchPlaces];
       }
@@ -32358,8 +32358,8 @@ var require_utils3 = __commonJS({
       }
       return output;
     };
-    exports2.basename = (path54, { windows } = {}) => {
-      const segs = path54.split(windows ? /[\\/]/ : "/");
+    exports2.basename = (path53, { windows } = {}) => {
+      const segs = path53.split(windows ? /[\\/]/ : "/");
       const last = segs[segs.length - 1];
       if (last === "") {
         return segs[segs.length - 2];
@@ -41554,11 +41554,11 @@ var require_commonjs5 = __commonJS({
       return (f) => f.length === len && f !== "." && f !== "..";
     };
     var defaultPlatform = typeof process === "object" && process ? typeof process.env === "object" && process.env && process.env.__MINIMATCH_TESTING_PLATFORM__ || process.platform : "posix";
-    var path54 = {
+    var path53 = {
       win32: { sep: "\\" },
       posix: { sep: "/" }
     };
-    exports2.sep = defaultPlatform === "win32" ? path54.win32.sep : path54.posix.sep;
+    exports2.sep = defaultPlatform === "win32" ? path53.win32.sep : path53.posix.sep;
     exports2.minimatch.sep = exports2.sep;
     exports2.GLOBSTAR = /* @__PURE__ */ Symbol("globstar **");
     exports2.minimatch.GLOBSTAR = exports2.GLOBSTAR;
@@ -42351,7 +42351,7 @@ var require_dist7 = __commonJS({
     var fs28 = __toESM2(require("fs"));
     var events = __toESM2(require("events"));
     var minimatch = __toESM2(require_commonjs5());
-    var path54 = __toESM2(require("path"));
+    var path53 = __toESM2(require("path"));
     function readdir2(dir, strict) {
       return new Promise((resolve$1, reject) => {
         fs28.readdir(dir, { withFileTypes: true }, (err, files) => {
@@ -42473,7 +42473,7 @@ var require_dist7 = __commonJS({
           const skipPatterns = Array.isArray(this.options.skip) ? this.options.skip : [this.options.skip];
           this.skipMatchers = skipPatterns.map((skip) => new minimatch.Minimatch(skip, { dot: true }));
         }
-        this.iterator = explore((0, path54.resolve)(cwd || "."), this.options.follow, this.options.stat, this._shouldSkipDirectory.bind(this));
+        this.iterator = explore((0, path53.resolve)(cwd || "."), this.options.follow, this.options.stat, this._shouldSkipDirectory.bind(this));
         this.paused = false;
         this.inactive = false;
         this.aborted = false;
@@ -44457,14 +44457,14 @@ var require_polyfills = __commonJS({
       fs28.fstatSync = statFixSync(fs28.fstatSync);
       fs28.lstatSync = statFixSync(fs28.lstatSync);
       if (fs28.chmod && !fs28.lchmod) {
-        fs28.lchmod = function(path54, mode, cb) {
+        fs28.lchmod = function(path53, mode, cb) {
           if (cb) process.nextTick(cb);
         };
         fs28.lchmodSync = function() {
         };
       }
       if (fs28.chown && !fs28.lchown) {
-        fs28.lchown = function(path54, uid, gid, cb) {
+        fs28.lchown = function(path53, uid, gid, cb) {
           if (cb) process.nextTick(cb);
         };
         fs28.lchownSync = function() {
@@ -44531,9 +44531,9 @@ var require_polyfills = __commonJS({
         };
       })(fs28.readSync);
       function patchLchmod(fs29) {
-        fs29.lchmod = function(path54, mode, callback) {
+        fs29.lchmod = function(path53, mode, callback) {
           fs29.open(
-            path54,
+            path53,
             constants3.O_WRONLY | constants3.O_SYMLINK,
             mode,
             function(err, fd) {
@@ -44549,8 +44549,8 @@ var require_polyfills = __commonJS({
             }
           );
         };
-        fs29.lchmodSync = function(path54, mode) {
-          var fd = fs29.openSync(path54, constants3.O_WRONLY | constants3.O_SYMLINK, mode);
+        fs29.lchmodSync = function(path53, mode) {
+          var fd = fs29.openSync(path53, constants3.O_WRONLY | constants3.O_SYMLINK, mode);
           var threw = true;
           var ret;
           try {
@@ -44571,8 +44571,8 @@ var require_polyfills = __commonJS({
       }
       function patchLutimes(fs29) {
         if (constants3.hasOwnProperty("O_SYMLINK") && fs29.futimes) {
-          fs29.lutimes = function(path54, at, mt, cb) {
-            fs29.open(path54, constants3.O_SYMLINK, function(er, fd) {
+          fs29.lutimes = function(path53, at, mt, cb) {
+            fs29.open(path53, constants3.O_SYMLINK, function(er, fd) {
               if (er) {
                 if (cb) cb(er);
                 return;
@@ -44584,8 +44584,8 @@ var require_polyfills = __commonJS({
               });
             });
           };
-          fs29.lutimesSync = function(path54, at, mt) {
-            var fd = fs29.openSync(path54, constants3.O_SYMLINK);
+          fs29.lutimesSync = function(path53, at, mt) {
+            var fd = fs29.openSync(path53, constants3.O_SYMLINK);
             var ret;
             var threw = true;
             try {
@@ -44703,11 +44703,11 @@ var require_legacy_streams = __commonJS({
         ReadStream,
         WriteStream
       };
-      function ReadStream(path54, options) {
-        if (!(this instanceof ReadStream)) return new ReadStream(path54, options);
+      function ReadStream(path53, options) {
+        if (!(this instanceof ReadStream)) return new ReadStream(path53, options);
         Stream.call(this);
         var self2 = this;
-        this.path = path54;
+        this.path = path53;
         this.fd = null;
         this.readable = true;
         this.paused = false;
@@ -44752,10 +44752,10 @@ var require_legacy_streams = __commonJS({
           self2._read();
         });
       }
-      function WriteStream(path54, options) {
-        if (!(this instanceof WriteStream)) return new WriteStream(path54, options);
+      function WriteStream(path53, options) {
+        if (!(this instanceof WriteStream)) return new WriteStream(path53, options);
         Stream.call(this);
-        this.path = path54;
+        this.path = path53;
         this.fd = null;
         this.writable = true;
         this.flags = "w";
@@ -44898,14 +44898,14 @@ var require_graceful_fs = __commonJS({
       fs29.createWriteStream = createWriteStream2;
       var fs$readFile = fs29.readFile;
       fs29.readFile = readFile2;
-      function readFile2(path54, options, cb) {
+      function readFile2(path53, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$readFile(path54, options, cb);
-        function go$readFile(path55, options2, cb2, startTime) {
-          return fs$readFile(path55, options2, function(err) {
+        return go$readFile(path53, options, cb);
+        function go$readFile(path54, options2, cb2, startTime) {
+          return fs$readFile(path54, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$readFile, [path55, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$readFile, [path54, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -44915,14 +44915,14 @@ var require_graceful_fs = __commonJS({
       }
       var fs$writeFile = fs29.writeFile;
       fs29.writeFile = writeFile2;
-      function writeFile2(path54, data, options, cb) {
+      function writeFile2(path53, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$writeFile(path54, data, options, cb);
-        function go$writeFile(path55, data2, options2, cb2, startTime) {
-          return fs$writeFile(path55, data2, options2, function(err) {
+        return go$writeFile(path53, data, options, cb);
+        function go$writeFile(path54, data2, options2, cb2, startTime) {
+          return fs$writeFile(path54, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$writeFile, [path55, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$writeFile, [path54, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -44933,14 +44933,14 @@ var require_graceful_fs = __commonJS({
       var fs$appendFile = fs29.appendFile;
       if (fs$appendFile)
         fs29.appendFile = appendFile2;
-      function appendFile2(path54, data, options, cb) {
+      function appendFile2(path53, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$appendFile(path54, data, options, cb);
-        function go$appendFile(path55, data2, options2, cb2, startTime) {
-          return fs$appendFile(path55, data2, options2, function(err) {
+        return go$appendFile(path53, data, options, cb);
+        function go$appendFile(path54, data2, options2, cb2, startTime) {
+          return fs$appendFile(path54, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$appendFile, [path55, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$appendFile, [path54, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -44971,31 +44971,31 @@ var require_graceful_fs = __commonJS({
       var fs$readdir = fs29.readdir;
       fs29.readdir = readdir2;
       var noReaddirOptionVersions = /^v[0-5]\./;
-      function readdir2(path54, options, cb) {
+      function readdir2(path53, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path55, options2, cb2, startTime) {
-          return fs$readdir(path55, fs$readdirCallback(
-            path55,
+        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path54, options2, cb2, startTime) {
+          return fs$readdir(path54, fs$readdirCallback(
+            path54,
             options2,
             cb2,
             startTime
           ));
-        } : function go$readdir2(path55, options2, cb2, startTime) {
-          return fs$readdir(path55, options2, fs$readdirCallback(
-            path55,
+        } : function go$readdir2(path54, options2, cb2, startTime) {
+          return fs$readdir(path54, options2, fs$readdirCallback(
+            path54,
             options2,
             cb2,
             startTime
           ));
         };
-        return go$readdir(path54, options, cb);
-        function fs$readdirCallback(path55, options2, cb2, startTime) {
+        return go$readdir(path53, options, cb);
+        function fs$readdirCallback(path54, options2, cb2, startTime) {
           return function(err, files) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
               enqueue([
                 go$readdir,
-                [path55, options2, cb2],
+                [path54, options2, cb2],
                 err,
                 startTime || Date.now(),
                 Date.now()
@@ -45066,7 +45066,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      function ReadStream(path54, options) {
+      function ReadStream(path53, options) {
         if (this instanceof ReadStream)
           return fs$ReadStream.apply(this, arguments), this;
         else
@@ -45086,7 +45086,7 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function WriteStream(path54, options) {
+      function WriteStream(path53, options) {
         if (this instanceof WriteStream)
           return fs$WriteStream.apply(this, arguments), this;
         else
@@ -45104,22 +45104,22 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function createReadStream3(path54, options) {
-        return new fs29.ReadStream(path54, options);
+      function createReadStream3(path53, options) {
+        return new fs29.ReadStream(path53, options);
       }
-      function createWriteStream2(path54, options) {
-        return new fs29.WriteStream(path54, options);
+      function createWriteStream2(path53, options) {
+        return new fs29.WriteStream(path53, options);
       }
       var fs$open = fs29.open;
       fs29.open = open2;
-      function open2(path54, flags, mode, cb) {
+      function open2(path53, flags, mode, cb) {
         if (typeof mode === "function")
           cb = mode, mode = null;
-        return go$open(path54, flags, mode, cb);
-        function go$open(path55, flags2, mode2, cb2, startTime) {
-          return fs$open(path55, flags2, mode2, function(err, fd) {
+        return go$open(path53, flags, mode, cb);
+        function go$open(path54, flags2, mode2, cb2, startTime) {
+          return fs$open(path54, flags2, mode2, function(err, fd) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$open, [path55, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$open, [path54, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -47224,22 +47224,22 @@ var require_lazystream = __commonJS({
 // node_modules/normalize-path/index.js
 var require_normalize_path = __commonJS({
   "node_modules/normalize-path/index.js"(exports2, module2) {
-    module2.exports = function(path54, stripTrailing) {
-      if (typeof path54 !== "string") {
+    module2.exports = function(path53, stripTrailing) {
+      if (typeof path53 !== "string") {
         throw new TypeError("expected path to be a string");
       }
-      if (path54 === "\\" || path54 === "/") return "/";
-      var len = path54.length;
-      if (len <= 1) return path54;
+      if (path53 === "\\" || path53 === "/") return "/";
+      var len = path53.length;
+      if (len <= 1) return path53;
       var prefix2 = "";
-      if (len > 4 && path54[3] === "\\") {
-        var ch = path54[2];
-        if ((ch === "?" || ch === ".") && path54.slice(0, 2) === "\\\\") {
-          path54 = path54.slice(2);
+      if (len > 4 && path53[3] === "\\") {
+        var ch = path53[2];
+        if ((ch === "?" || ch === ".") && path53.slice(0, 2) === "\\\\") {
+          path53 = path53.slice(2);
           prefix2 = "//";
         }
       }
-      var segs = path54.split(/[/\\]+/);
+      var segs = path53.split(/[/\\]+/);
       if (stripTrailing !== false && segs[segs.length - 1] === "") {
         segs.pop();
       }
@@ -58243,7 +58243,7 @@ globstar while`, t2, d, e, u, m), this.matchOne(t2.slice(d), e.slice(u), s)) ret
 var require_file2 = __commonJS({
   "node_modules/archiver-utils/file.js"(exports2, module2) {
     var fs28 = require_graceful_fs();
-    var path54 = require("path");
+    var path53 = require("path");
     var flatten = require_flatten();
     var difference = require_difference();
     var union2 = require_union();
@@ -58268,7 +58268,7 @@ var require_file2 = __commonJS({
       return result;
     };
     file2.exists = function() {
-      var filepath = path54.join.apply(path54, arguments);
+      var filepath = path53.join.apply(path53, arguments);
       return fs28.existsSync(filepath);
     };
     file2.expand = function(...args) {
@@ -58282,7 +58282,7 @@ var require_file2 = __commonJS({
       });
       if (options.filter) {
         matches = matches.filter(function(filepath) {
-          filepath = path54.join(options.cwd || "", filepath);
+          filepath = path53.join(options.cwd || "", filepath);
           try {
             if (typeof options.filter === "function") {
               return options.filter(filepath);
@@ -58299,7 +58299,7 @@ var require_file2 = __commonJS({
     file2.expandMapping = function(patterns, destBase, options) {
       options = Object.assign({
         rename: function(destBase2, destPath) {
-          return path54.join(destBase2 || "", destPath);
+          return path53.join(destBase2 || "", destPath);
         }
       }, options);
       var files = [];
@@ -58307,14 +58307,14 @@ var require_file2 = __commonJS({
       file2.expand(options, patterns).forEach(function(src) {
         var destPath = src;
         if (options.flatten) {
-          destPath = path54.basename(destPath);
+          destPath = path53.basename(destPath);
         }
         if (options.ext) {
           destPath = destPath.replace(/(\.[^\/]*)?$/, options.ext);
         }
         var dest = options.rename(destBase, destPath, options);
         if (options.cwd) {
-          src = path54.join(options.cwd, src);
+          src = path53.join(options.cwd, src);
         }
         dest = dest.replace(pathSeparatorRe, "/");
         src = src.replace(pathSeparatorRe, "/");
@@ -58396,7 +58396,7 @@ var require_file2 = __commonJS({
 var require_archiver_utils = __commonJS({
   "node_modules/archiver-utils/index.js"(exports2, module2) {
     var fs28 = require_graceful_fs();
-    var path54 = require("path");
+    var path53 = require("path");
     var isStream = require_is_stream();
     var lazystream = require_lazystream();
     var normalizePath3 = require_normalize_path();
@@ -58484,11 +58484,11 @@ var require_archiver_utils = __commonJS({
           if (!file2) {
             return callback(null, results);
           }
-          filepath = path54.join(dirpath, file2);
+          filepath = path53.join(dirpath, file2);
           fs28.stat(filepath, function(err2, stats) {
             results.push({
               path: filepath,
-              relative: path54.relative(base, filepath).replace(/\\/g, "/"),
+              relative: path53.relative(base, filepath).replace(/\\/g, "/"),
               stats
             });
             if (stats && stats.isDirectory()) {
@@ -58550,7 +58550,7 @@ var require_core5 = __commonJS({
     var fs28 = require("fs");
     var glob = require_dist7();
     var async = require_async();
-    var path54 = require("path");
+    var path53 = require("path");
     var util3 = require_archiver_utils();
     var inherits = require("util").inherits;
     var ArchiverError = require_error();
@@ -58826,9 +58826,9 @@ var require_core5 = __commonJS({
         task.source = Buffer.concat([]);
       } else if (stats.isSymbolicLink() && this._moduleSupports("symlink")) {
         var linkPath = fs28.readlinkSync(task.filepath);
-        var dirName = path54.dirname(task.filepath);
+        var dirName = path53.dirname(task.filepath);
         task.data.type = "symlink";
-        task.data.linkname = path54.relative(dirName, path54.resolve(dirName, linkPath));
+        task.data.linkname = path53.relative(dirName, path53.resolve(dirName, linkPath));
         task.data.sourceType = "buffer";
         task.source = Buffer.concat([]);
       } else {
@@ -63229,7 +63229,7 @@ var require_traverse = __commonJS({
       })(this.value);
     };
     function walk(root, cb, immutable) {
-      var path54 = [];
+      var path53 = [];
       var parents = [];
       var alive = true;
       return (function walker(node_) {
@@ -63238,11 +63238,11 @@ var require_traverse = __commonJS({
         var state3 = {
           node,
           node_,
-          path: [].concat(path54),
+          path: [].concat(path53),
           parent: parents.slice(-1)[0],
-          key: path54.slice(-1)[0],
-          isRoot: path54.length === 0,
-          level: path54.length,
+          key: path53.slice(-1)[0],
+          isRoot: path53.length === 0,
+          level: path53.length,
           circular: null,
           update: function(x) {
             if (!state3.isRoot) {
@@ -63297,7 +63297,7 @@ var require_traverse = __commonJS({
           parents.push(state3);
           var keys = Object.keys(state3.node);
           keys.forEach(function(key, i2) {
-            path54.push(key);
+            path53.push(key);
             if (modifiers.pre) modifiers.pre.call(state3, state3.node[key], key);
             var child = walker(state3.node[key]);
             if (immutable && Object.hasOwnProperty.call(state3.node, key)) {
@@ -63306,7 +63306,7 @@ var require_traverse = __commonJS({
             child.isLast = i2 == keys.length - 1;
             child.isFirst = i2 == 0;
             if (modifiers.post) modifiers.post.call(state3, child);
-            path54.pop();
+            path53.pop();
           });
           parents.pop();
         }
@@ -64327,11 +64327,11 @@ var require_unzip_stream = __commonJS({
           return requiredLength;
         case states.CENTRAL_DIRECTORY_FILE_HEADER_SUFFIX:
           var isUtf8 = (this.parsedEntity.flags & 2048) !== 0;
-          var path54 = this._decodeString(chunk.slice(0, this.parsedEntity.fileNameLength), isUtf8);
+          var path53 = this._decodeString(chunk.slice(0, this.parsedEntity.fileNameLength), isUtf8);
           var extraDataBuffer = chunk.slice(this.parsedEntity.fileNameLength, this.parsedEntity.fileNameLength + this.parsedEntity.extraFieldLength);
           var extra = this._readExtraFields(extraDataBuffer);
           if (extra && extra.parsed && extra.parsed.path && !isUtf8) {
-            path54 = extra.parsed.path;
+            path53 = extra.parsed.path;
           }
           this.parsedEntity.extra = extra.parsed;
           var isUnix = (this.parsedEntity.versionMadeBy & 65280) >> 8 === 3;
@@ -64343,7 +64343,7 @@ var require_unzip_stream = __commonJS({
           }
           if (this.options.debug) {
             const debugObj2 = Object.assign({}, this.parsedEntity, {
-              path: path54,
+              path: path53,
               flags: "0x" + this.parsedEntity.flags.toString(16),
               unixAttrs: unixAttrs && "0" + unixAttrs.toString(8),
               isSymlink,
@@ -64780,7 +64780,7 @@ var require_parser_stream = __commonJS({
 // node_modules/mkdirp/index.js
 var require_mkdirp = __commonJS({
   "node_modules/mkdirp/index.js"(exports2, module2) {
-    var path54 = require("path");
+    var path53 = require("path");
     var fs28 = require("fs");
     var _0777 = parseInt("0777", 8);
     module2.exports = mkdirP.mkdirp = mkdirP.mkdirP = mkdirP;
@@ -64800,7 +64800,7 @@ var require_mkdirp = __commonJS({
       var cb = f || /* istanbul ignore next */
       function() {
       };
-      p = path54.resolve(p);
+      p = path53.resolve(p);
       xfs.mkdir(p, mode, function(er) {
         if (!er) {
           made = made || p;
@@ -64808,8 +64808,8 @@ var require_mkdirp = __commonJS({
         }
         switch (er.code) {
           case "ENOENT":
-            if (path54.dirname(p) === p) return cb(er);
-            mkdirP(path54.dirname(p), opts, function(er2, made2) {
+            if (path53.dirname(p) === p) return cb(er);
+            mkdirP(path53.dirname(p), opts, function(er2, made2) {
               if (er2) cb(er2, made2);
               else mkdirP(p, opts, cb, made2);
             });
@@ -64836,14 +64836,14 @@ var require_mkdirp = __commonJS({
         mode = _0777;
       }
       if (!made) made = null;
-      p = path54.resolve(p);
+      p = path53.resolve(p);
       try {
         xfs.mkdirSync(p, mode);
         made = made || p;
       } catch (err0) {
         switch (err0.code) {
           case "ENOENT":
-            made = sync(path54.dirname(p), opts, made);
+            made = sync(path53.dirname(p), opts, made);
             sync(p, opts, made);
             break;
           // In the case of any other error, just see if there's a dir
@@ -64869,7 +64869,7 @@ var require_mkdirp = __commonJS({
 var require_extract2 = __commonJS({
   "node_modules/unzip-stream/lib/extract.js"(exports2, module2) {
     var fs28 = require("fs");
-    var path54 = require("path");
+    var path53 = require("path");
     var util3 = require("util");
     var mkdirp = require_mkdirp();
     var Transform3 = require("stream").Transform;
@@ -64911,8 +64911,8 @@ var require_extract2 = __commonJS({
     };
     Extract.prototype._processEntry = function(entry) {
       var self2 = this;
-      var destPath = path54.join(this.opts.path, entry.path);
-      var directory = entry.isDirectory ? destPath : path54.dirname(destPath);
+      var destPath = path53.join(this.opts.path, entry.path);
+      var directory = entry.isDirectory ? destPath : path53.dirname(destPath);
       this.unfinishedEntries++;
       var writeFileFn = function() {
         var pipedStream = fs28.createWriteStream(destPath);
@@ -66284,7 +66284,7 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 var import_promises23 = __toESM(require("node:fs/promises"), 1);
-var import_node_path51 = __toESM(require("node:path"), 1);
+var import_node_path50 = __toESM(require("node:path"), 1);
 
 // node_modules/@actions/core/lib/command.js
 var os = __toESM(require("os"), 1);
@@ -67714,7 +67714,7 @@ function isNoEntry(error52) {
 
 // src/core/pipeline.ts
 var import_promises16 = __toESM(require("node:fs/promises"), 1);
-var import_node_path47 = __toESM(require("node:path"), 1);
+var import_node_path46 = __toESM(require("node:path"), 1);
 
 // src/generated/version.ts
 var boardReadyVersion = "1.68.3";
@@ -72591,11 +72591,11 @@ function copperAreas(model) {
   return areas;
 }
 function boardArea(model) {
-  const rect = edgePrimitiveLists(model, "gr_rect").map((block) => startEndFromList(block)).find((segment) => Boolean(segment));
+  const rect = edgePrimitiveLists(model, "gr_rect").map((block) => startEndFromList(block)).find((segment2) => Boolean(segment2));
   if (rect) {
     return Math.abs((rect.end.x - rect.start.x) * (rect.end.y - rect.start.y));
   }
-  const circle = edgePrimitiveLists(model, "gr_circle").map((block) => circleRadiusPoints(block)).find((segment) => Boolean(segment));
+  const circle = edgePrimitiveLists(model, "gr_circle").map((block) => circleRadiusPoints(block)).find((segment2) => Boolean(segment2));
   if (circle) {
     const radius = distance(circle.start, circle.end);
     return Math.PI * radius * radius;
@@ -72607,8 +72607,8 @@ function isOutlineClosed(model) {
     return true;
   }
   const counts = /* @__PURE__ */ new Map();
-  for (const segment of edgeSegments(model)) {
-    for (const point of [segment.start, segment.end]) {
+  for (const segment2 of edgeSegments(model)) {
+    for (const point of [segment2.start, segment2.end]) {
       const key = `${point.x.toFixed(4)},${point.y.toFixed(4)}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
@@ -72623,7 +72623,7 @@ function stackupLayerCount(model) {
   return findKiCadLists(stackup, "layer").filter((layer) => (listValue(layer) ?? "").endsWith(".Cu")).length;
 }
 function edgeSegments(model) {
-  return [...edgePrimitiveLists(model, "gr_line"), ...edgePrimitiveLists(model, "gr_arc")].map(startEndFromList).filter((segment) => Boolean(segment));
+  return [...edgePrimitiveLists(model, "gr_line"), ...edgePrimitiveLists(model, "gr_arc")].map(startEndFromList).filter((segment2) => Boolean(segment2));
 }
 function edgePrimitiveLists(model, head) {
   return findKiCadLists(model, head).filter((block) => layerName(block) === "Edge.Cuts");
@@ -72679,7 +72679,7 @@ function orderedLoopArea(segments) {
     const points = [first.start, first.end];
     while (!samePoint(points[0], points.at(-1))) {
       const tail = points.at(-1);
-      const nextIndex = unused.findIndex((segment) => samePoint(segment.start, tail) || samePoint(segment.end, tail));
+      const nextIndex = unused.findIndex((segment2) => samePoint(segment2.start, tail) || samePoint(segment2.end, tail));
       if (nextIndex === -1) {
         return void 0;
       }
@@ -74659,10 +74659,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path54) {
-  if (!path54)
+function getElementAtPath(obj, path53) {
+  if (!path53)
     return obj;
-  return path54.reduce((acc, key) => acc?.[key], obj);
+  return path53.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -75071,11 +75071,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path54, issues) {
+function prefixIssues(path53, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path54);
+    iss.path.unshift(path53);
     return iss;
   });
 }
@@ -75222,16 +75222,16 @@ function flattenError(error52, mapper = (issue3) => issue3.message) {
 }
 function formatError2(error52, mapper = (issue3) => issue3.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error53, path54 = []) => {
+  const processError = (error53, path53 = []) => {
     for (const issue3 of error53.issues) {
       if (issue3.code === "invalid_union" && issue3.errors.length) {
-        issue3.errors.map((issues) => processError({ issues }, [...path54, ...issue3.path]));
+        issue3.errors.map((issues) => processError({ issues }, [...path53, ...issue3.path]));
       } else if (issue3.code === "invalid_key") {
-        processError({ issues: issue3.issues }, [...path54, ...issue3.path]);
+        processError({ issues: issue3.issues }, [...path53, ...issue3.path]);
       } else if (issue3.code === "invalid_element") {
-        processError({ issues: issue3.issues }, [...path54, ...issue3.path]);
+        processError({ issues: issue3.issues }, [...path53, ...issue3.path]);
       } else {
-        const fullpath = [...path54, ...issue3.path];
+        const fullpath = [...path53, ...issue3.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue3));
         } else {
@@ -75258,17 +75258,17 @@ function formatError2(error52, mapper = (issue3) => issue3.message) {
 }
 function treeifyError(error52, mapper = (issue3) => issue3.message) {
   const result = { errors: [] };
-  const processError = (error53, path54 = []) => {
+  const processError = (error53, path53 = []) => {
     var _a3, _b;
     for (const issue3 of error53.issues) {
       if (issue3.code === "invalid_union" && issue3.errors.length) {
-        issue3.errors.map((issues) => processError({ issues }, [...path54, ...issue3.path]));
+        issue3.errors.map((issues) => processError({ issues }, [...path53, ...issue3.path]));
       } else if (issue3.code === "invalid_key") {
-        processError({ issues: issue3.issues }, [...path54, ...issue3.path]);
+        processError({ issues: issue3.issues }, [...path53, ...issue3.path]);
       } else if (issue3.code === "invalid_element") {
-        processError({ issues: issue3.issues }, [...path54, ...issue3.path]);
+        processError({ issues: issue3.issues }, [...path53, ...issue3.path]);
       } else {
-        const fullpath = [...path54, ...issue3.path];
+        const fullpath = [...path53, ...issue3.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue3));
           continue;
@@ -75300,8 +75300,8 @@ function treeifyError(error52, mapper = (issue3) => issue3.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path54 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path54) {
+  const path53 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path53) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -87993,13 +87993,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path54 = ref.slice(1).split("/").filter(Boolean);
-  if (path54.length === 0) {
+  const path53 = ref.slice(1).split("/").filter(Boolean);
+  if (path53.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path54[0] === defsKey) {
-    const key = path54[1];
+  if (path53[0] === defsKey) {
+    const key = path53[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -89316,10 +89316,10 @@ function dependencyFrom(key, value, warnings) {
   const table = value;
   const versionSpec = stringField(table.version);
   const git = stringField(table.git);
-  const path54 = stringField(table.path);
+  const path53 = stringField(table.path);
   const overridePath = stringField(table.override_path);
   if (git) {
-    const subPath = path54;
+    const subPath = path53;
     return {
       declaredName: key,
       source: subPath === void 0 ? { kind: "git", url: git } : { kind: "git", url: git, path: subPath },
@@ -89331,8 +89331,8 @@ function dependencyFrom(key, value, warnings) {
     warnings.push(`Dependency "${key}" is overridden by local source at "${overridePath}".`);
     return { declaredName: key, source: { kind: "local", path: overridePath }, versionSpec, pinned: false };
   }
-  if (path54) {
-    return { declaredName: key, source: { kind: "local", path: path54 }, versionSpec, pinned: false };
+  if (path53) {
+    return { declaredName: key, source: { kind: "local", path: path53 }, versionSpec, pinned: false };
   }
   return {
     declaredName: key,
@@ -89341,7 +89341,7 @@ function dependencyFrom(key, value, warnings) {
     pinned: isPinned(versionSpec)
   };
 }
-function parseIdfManifest(content, path54) {
+function parseIdfManifest(content, path53) {
   const warnings = [];
   let document2;
   try {
@@ -89350,12 +89350,12 @@ function parseIdfManifest(content, path54) {
     return {
       dependencies: [],
       warnings: [
-        `${path54 ?? "idf_component.yml"} is not valid YAML: ${error52 instanceof Error ? error52.message : "unknown"}`
+        `${path53 ?? "idf_component.yml"} is not valid YAML: ${error52 instanceof Error ? error52.message : "unknown"}`
       ]
     };
   }
   if (typeof document2 !== "object" || document2 === null || Array.isArray(document2)) {
-    return { dependencies: [], warnings: [`${path54 ?? "idf_component.yml"} does not contain a mapping.`] };
+    return { dependencies: [], warnings: [`${path53 ?? "idf_component.yml"} does not contain a mapping.`] };
   }
   const root = document2;
   const raw = root.dependencies;
@@ -89370,7 +89370,7 @@ function parseIdfManifest(content, path54) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return {
       dependencies: [],
-      warnings: [`${path54 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
+      warnings: [`${path53 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
     };
   }
   const dependencies = [];
@@ -89713,8 +89713,8 @@ var import_node_path26 = __toESM(require("node:path"), 1);
 var assumedMetricFormat = { integerDigits: 3, decimalDigits: 3 };
 var assumedInchFormat = { integerDigits: 2, decimalDigits: 4 };
 var inchToMm = 25.4;
-function warning2(code, message, path54) {
-  return path54 === void 0 ? { code, message } : { code, message, path: path54 };
+function warning2(code, message, path53) {
+  return path53 === void 0 ? { code, message } : { code, message, path: path53 };
 }
 function attributeBody(line) {
   const match = /^;\s*#@!\s*(.+)$/u.exec(line.trim());
@@ -89739,7 +89739,7 @@ function coordinateValue(raw, format) {
   const parsed = Number.parseFloat(`${integerPart}.${decimalPart || "0"}`);
   return negative ? -parsed : parsed;
 }
-function parseHeaderLine(line, state3, warnings, path54) {
+function parseHeaderLine(line, state3, warnings, path53) {
   const trimmed = line.trim();
   const attribute = attributeBody(trimmed);
   if (attribute) {
@@ -89776,14 +89776,14 @@ function parseHeaderLine(line, state3, warnings, path54) {
           state3.decimalDigits = mask[2].length;
         } else if (modifier !== "000.000") {
           warnings.push(
-            warning2("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path54)
+            warning2("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path53)
           );
         }
       }
     }
   }
 }
-function parseExcellon(content, path54) {
+function parseExcellon(content, path53) {
   const warnings = [];
   const state3 = {
     units: void 0,
@@ -89817,7 +89817,7 @@ function parseExcellon(content, path54) {
         warning2(
           "excellon.assumed-coordinate-format",
           `No coordinate format declared; assumed ${format.integerDigits}.${format.decimalDigits} for ${units}. Coordinates from this file are an assumption, not a measurement.`,
-          path54
+          path53
         )
       );
     }
@@ -89848,7 +89848,7 @@ function parseExcellon(content, path54) {
       const diameterMm = (state3.units ?? "mm") === "inch" ? rawDiameter * inchToMm : rawDiameter;
       if (!Number.isFinite(diameterMm) || diameterMm <= 0) {
         warnings.push(
-          warning2("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path54)
+          warning2("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path53)
         );
       } else {
         toolsByCode.set(code, { code, diameterMm, plated: pendingToolPlated ?? state3.filePlated });
@@ -89857,7 +89857,7 @@ function parseExcellon(content, path54) {
       continue;
     }
     if (inHeader && !bodyStarted) {
-      parseHeaderLine(trimmed, state3, warnings, path54);
+      parseHeaderLine(trimmed, state3, warnings, path53);
       continue;
     }
     const toolSelect = /^T(\d+)\s*$/u.exec(trimmed);
@@ -89868,7 +89868,7 @@ function parseExcellon(content, path54) {
           warning2(
             "excellon.undefined-tool",
             `The body selects tool T${toolSelect[1]}, which the header never defines. Its holes are not counted.`,
-            path54
+            path53
           )
         );
       }
@@ -89877,7 +89877,7 @@ function parseExcellon(content, path54) {
     const coordinate = /^(?:G0[05]\s*)?X([+-]?[\d.]+)Y([+-]?[\d.]+)(.*)$/u.exec(trimmed);
     if (!coordinate?.[1] || !coordinate[2]) continue;
     if (!currentTool) {
-      warnings.push(warning2("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path54));
+      warnings.push(warning2("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path53));
       continue;
     }
     const active = resolvedFormat();
@@ -89896,19 +89896,19 @@ function parseExcellon(content, path54) {
       warning2(
         "excellon.assumed-plating",
         "Nothing in this file states whether its holes are plated; treated as plated. A rule must not block a release on this.",
-        path54
+        path53
       )
     );
   }
   if (state3.units === void 0) {
-    warnings.push(warning2("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path54));
+    warnings.push(warning2("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path53));
   }
   if (slotCount > 0) {
     warnings.push(
       warning2(
         "excellon.slots-collapsed",
         `${slotCount} slot(s) recorded at their start point only; slot length is not represented.`,
-        path54
+        path53
       )
     );
   }
@@ -89995,13 +89995,13 @@ function applyApertureBlockWord(ledger, compact) {
   if (ledger.block !== void 0) ledger.block.selected = code;
   referenceBlockAperture(ledger, code);
 }
-function readApertureEvidence(ledger, scale, path54) {
+function readApertureEvidence(ledger, scale, path53) {
   return {
     apertures: [...ledger.file].map(([code, definition]) => inMillimetres(code, definition, scale)),
     warnings: [
-      ...definitionWarnings(ledger, path54),
-      ...undefinedApertureWarnings(ledger, path54),
-      ...placementWarnings(ledger, path54)
+      ...definitionWarnings(ledger, path53),
+      ...undefinedApertureWarnings(ledger, path53),
+      ...placementWarnings(ledger, path53)
     ]
   };
 }
@@ -90247,13 +90247,13 @@ function inMillimetres(code, definition, scale) {
 function holeInMillimetres(hole, scale) {
   return hole === void 0 ? void 0 : { kind: "diameter", diameterMm: hole.diameter * scale };
 }
-function definitionWarnings(ledger, path54) {
+function definitionWarnings(ledger, path53) {
   const shown = ledger.problems.slice(0, maxDefinitionWarnings);
   const warnings = shown.map(
     (problem) => warning3(
       problem.kind === "malformed" ? "gerber.malformed-aperture-definition" : "gerber.unsupported-aperture-definition",
       `${problemSubject(problem)}, but ${problem.detail}; ${problem.kind === "malformed" ? "nothing is read from that definition." : "its shape is not read from this file. The numbers are the file's own, in whatever units it declares."}`,
-      path54
+      path53
     )
   );
   const rest = ledger.problems.length - shown.length;
@@ -90262,7 +90262,7 @@ function definitionWarnings(ledger, path54) {
       warning3(
         "gerber.unreadable-aperture-definition",
         `There ${rest === 1 ? "is 1 further definition" : `are ${rest} further definitions`} this reader could not use, which ${rest === 1 ? "is" : "are"} not listed here.`,
-        path54
+        path53
       )
     );
   }
@@ -90273,14 +90273,14 @@ function problemSubject(problem) {
   const block = problem.blockCode === void 0 ? "An unnamed aperture block" : `Aperture block D${problem.blockCode}`;
   return `${block} defines aperture D${problem.code}`;
 }
-function undefinedApertureWarnings(ledger, path54) {
+function undefinedApertureWarnings(ledger, path53) {
   const warnings = [];
   if (ledger.undefinedInFileScope.length > 0) {
     warnings.push(
       warning3(
         "gerber.undefined-aperture",
         `The file selects ${listApertureCodes(ledger.undefinedInFileScope.map((code) => ({ code })))}, which it never defines; what is plotted with it cannot be read from this file.`,
-        path54
+        path53
       )
     );
   }
@@ -90294,20 +90294,20 @@ function undefinedApertureWarnings(ledger, path54) {
             qualifier: entry.blockCode === void 0 ? void 0 : `(in block D${entry.blockCode})`
           }))
         )}, which the block never defines; what those blocks draw cannot be read from this file.`,
-        path54
+        path53
       )
     );
   }
   return warnings;
 }
-function placementWarnings(ledger, path54) {
+function placementWarnings(ledger, path53) {
   if (ledger.placements.count === 0) return [];
   const codes = listApertureCodes(ledger.placements.codes.map((code) => ({ code })));
   return [
     warning3(
       "gerber.unmodelled-aperture-block",
       `Aperture block ${codes} is placed ${ledger.placements.count === 1 ? "once" : `${ledger.placements.count} times`}. A block's own shape is not modelled, so each placement contributes its flash point only and the geometry read from this file is incomplete.`,
-      path54
+      path53
     )
   ];
 }
@@ -90316,8 +90316,8 @@ function listApertureCodes(codes) {
   const rest = codes.length - maxListedApertureCodes;
   return rest > 0 ? `${shown} and ${rest} more` : shown;
 }
-function warning3(code, message, path54) {
-  return path54 === void 0 ? { code, message } : { code, message, path: path54 };
+function warning3(code, message, path53) {
+  return path53 === void 0 ? { code, message } : { code, message, path: path53 };
 }
 
 // src/multicad/gerber-geometry.ts
@@ -90456,6 +90456,52 @@ function frozenPoint(point) {
 function sweptWidthMm(aperture) {
   return aperture.shape === "circle" ? aperture.diameterMm : void 0;
 }
+function distanceMm(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+function pointToSegmentDistanceMm(point, segment2) {
+  const dx = segment2.to.x - segment2.from.x;
+  const dy = segment2.to.y - segment2.from.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return distanceMm(point, segment2.from);
+  const along = ((point.x - segment2.from.x) * dx + (point.y - segment2.from.y) * dy) / lengthSquared;
+  const fraction = Math.min(1, Math.max(0, along));
+  return distanceMm(point, { x: segment2.from.x + fraction * dx, y: segment2.from.y + fraction * dy });
+}
+function segmentToSegmentDistanceMm(first, second) {
+  if (crosses(first, second)) return 0;
+  return Math.min(
+    pointToSegmentDistanceMm(first.from, second),
+    pointToSegmentDistanceMm(first.to, second),
+    pointToSegmentDistanceMm(second.from, first),
+    pointToSegmentDistanceMm(second.to, first)
+  );
+}
+function isDegenerate(segment2) {
+  return segment2.from.x === segment2.to.x && segment2.from.y === segment2.to.y;
+}
+function orientation(a, b, c) {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+function isBetween(start, end, point) {
+  return Math.min(start.x, end.x) <= point.x && point.x <= Math.max(start.x, end.x) && Math.min(start.y, end.y) <= point.y && point.y <= Math.max(start.y, end.y);
+}
+function crosses(first, second) {
+  if (isDegenerate(first) || isDegenerate(second)) return false;
+  const a = orientation(first.from, first.to, second.from);
+  const b = orientation(first.from, first.to, second.to);
+  const c = orientation(second.from, second.to, first.from);
+  const d = orientation(second.from, second.to, first.to);
+  if (opposite(a, b) && opposite(c, d)) return true;
+  if (a === 0 && isBetween(first.from, first.to, second.from)) return true;
+  if (b === 0 && isBetween(first.from, first.to, second.to)) return true;
+  if (c === 0 && isBetween(second.from, second.to, first.from)) return true;
+  if (d === 0 && isBetween(second.from, second.to, first.to)) return true;
+  return false;
+}
+function opposite(a, b) {
+  return a > 0 && b < 0 || a < 0 && b > 0;
+}
 
 // src/multicad/gerber-parser.ts
 var inchToMm2 = 25.4;
@@ -90529,7 +90575,7 @@ function recordUnterminated(evidence, body2) {
   if (evidence.count === 0) evidence.excerpt = boundedExcerpt(body2);
   evidence.count += 1;
 }
-function unterminatedWarnings(unterminated, path54) {
+function unterminatedWarnings(unterminated, path53) {
   const warnings = [];
   const extended = unterminated.extended;
   if (extended.count > 0) {
@@ -90537,7 +90583,7 @@ function unterminatedWarnings(unterminated, path54) {
       warning4(
         "gerber.unterminated-extended-command",
         `An extended command is not closed by "%". There ${extended.count === 1 ? "is 1" : `are ${extended.count}`} of them, the first reading "${extended.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path54
+        path53
       )
     );
   }
@@ -90547,7 +90593,7 @@ function unterminatedWarnings(unterminated, path54) {
       warning4(
         "gerber.unterminated-word-command",
         `A command is not terminated by "*". There ${word.count === 1 ? "is 1" : `are ${word.count}`} of them, the first reading "${word.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path54
+        path53
       )
     );
   }
@@ -90581,8 +90627,8 @@ function samePoint2(a, b) {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
 }
 var plottedOperation = /^(?:G\d+)?(?:X([+-]?\d+))?(?:Y([+-]?\d+))?(?:I[+-]?\d+)?(?:J[+-]?\d+)?D(0?[123])$/u;
-function warning4(code, message, path54) {
-  return path54 === void 0 ? { code, message } : { code, message, path: path54 };
+function warning4(code, message, path53) {
+  return path53 === void 0 ? { code, message } : { code, message, path: path53 };
 }
 function snapshotFileState(state3, apertures) {
   return {
@@ -90672,7 +90718,7 @@ function readFileState(commands, unterminated) {
   }
   return snapshotFileState(state3, apertures);
 }
-function parseGerber(content, path54) {
+function parseGerber(content, path53) {
   const commands = tokenizeGerber(content);
   const unterminated = {
     extended: { count: 0, excerpt: void 0 },
@@ -90691,14 +90737,14 @@ function parseGerber(content, path54) {
   const identity = state3.fileFunction ? identityFromFileFunction(state3.fileFunction) : void 0;
   const warnings = [];
   if (units === void 0) {
-    warnings.push(warning4("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path54));
+    warnings.push(warning4("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path53));
   }
   if (!declaredFormat) {
     warnings.push(
       warning4(
         "gerber.assumed-coordinate-format",
         "No %FS% format specification; assumed 3.5 with leading zeros omitted. Coordinates from this file are an assumption, not a measurement.",
-        path54
+        path53
       )
     );
   }
@@ -90707,7 +90753,7 @@ function parseGerber(content, path54) {
       warning4(
         "gerber.incremental-coordinates",
         "This file uses incremental coordinates, which are not interpreted; no geometry was read from it.",
-        path54
+        path53
       )
     );
   }
@@ -90716,13 +90762,13 @@ function parseGerber(content, path54) {
       warning4(
         "gerber.unmodelled-file-function",
         `The file declares TF.FileFunction "${state3.fileFunction}", which is not a stackup layer; its role comes from the filename.`,
-        path54
+        path53
       )
     );
   }
-  warnings.push(...unterminatedWarnings(unterminated, path54));
+  warnings.push(...unterminatedWarnings(unterminated, path53));
   const scale = units === "inch" ? inchToMm2 : 1;
-  const apertureEvidence = readApertureEvidence(state3.apertures, scale, path54);
+  const apertureEvidence = readApertureEvidence(state3.apertures, scale, path53);
   warnings.push(...apertureEvidence.warnings);
   const collector = createGerberGeometryCollector({
     apertures: apertureEvidence.apertures,
@@ -91180,14 +91226,20 @@ var assemblySidesRule = rule(
   }
 );
 
-// src/rules/manufacturing/board-edge-clearance.ts
-var import_node_path27 = __toESM(require("node:path"), 1);
-
 // src/vendor/profiles.ts
 var unverifiedProvenance = {
   revision: "unverified-0",
   confidence: "unverified"
 };
+var stalenessHorizonDays = 180;
+function vendorProfileAssurance(profile, now = /* @__PURE__ */ new Date()) {
+  const { confidence, verifiedAt, verifiedBy } = profile.provenance;
+  if (confidence === "unverified" || !verifiedAt || !verifiedBy) return { state: "unverified", mayBlock: false };
+  const verified = new Date(verifiedAt);
+  if (Number.isNaN(verified.getTime())) return { state: "unverified", mayBlock: false };
+  const ageDays = Math.floor((now.getTime() - verified.getTime()) / 864e5);
+  return ageDays > stalenessHorizonDays ? { state: "stale", ageDays, mayBlock: false } : { state: "verified", ageDays, mayBlock: true };
+}
 var profiles = [
   {
     id: "jlcpcb",
@@ -91641,6 +91693,8 @@ function cloneProfile(profile) {
 }
 
 // src/rules/manufacturing/board-edge-clearance.ts
+var outlineIgnoredUncertainty = /* @__PURE__ */ new Set(["undefined-aperture", "unsupported-aperture"]);
+var pointToleranceMm = 1e-9;
 var boardEdgeClearanceRule = rule(
   {
     id: "manufacturing.board-edge-clearance",
@@ -91658,97 +91712,510 @@ var boardEdgeClearanceRule = rule(
     ...RULE_CLASSIFICATIONS.manufacturabilityVendorProfile
   },
   async (context5) => {
-    if (!shouldRun(context5, "manufacturing.board-edge-clearance")) {
-      return [];
-    }
+    if (!shouldRun(context5, "manufacturing.board-edge-clearance")) return [];
     const files = await globFiles(context5.root, DEFAULT_GERBER_PATTERNS);
-    if (files.length === 0) {
-      return [];
-    }
-    const parsedFiles = await Promise.all(
-      files.map(async (file2) => {
-        const relativePath = import_node_path27.default.relative(context5.root, file2);
-        const content = await readTextFile(file2).catch(() => "");
-        const parsed = parseGerber(content, relativePath);
-        return { path: relativePath, parsed };
-      })
-    );
-    const vendorId = typeof context5.config.vendor === "string" ? context5.config.vendor : context5.config.vendor?.profile;
-    const profile = findVendorProfile(vendorId) ?? findVendorProfile("generic-prototype");
-    const ruleConfig2 = configFor(context5, "manufacturing.board-edge-clearance");
-    const configuredMin = typeof ruleConfig2["min-clearance-mm"] === "number" ? ruleConfig2["min-clearance-mm"] : void 0;
-    const minClearanceMm = configuredMin ?? profile?.fabrication?.minBoardEdgeClearanceMm ?? 0.2;
-    const outlineFile = parsedFiles.find(
-      (item) => item.parsed.identity?.role === "outline" || item.path.endsWith(".gko") || item.path.endsWith(".gm1")
-    );
-    const output = [];
-    if (!outlineFile?.parsed.boundingBoxMm || outlineFile.parsed.openContourCount > 0) {
-      output.push(
+    if (files.length === 0) return [];
+    const parsedFiles = await parseLayers(context5.root, files);
+    const limits = resolveLimit(context5);
+    const { profile, assurance, minClearanceMm, limitSource, configured } = limits;
+    const { outlineFile, outlineSegments } = selectOutline(parsedFiles);
+    if (outlineFile === void 0 || !isCompleteOutline(outlineFile, outlineSegments)) {
+      return [
         finding(context5, {
           ruleId: "manufacturing.board-edge-clearance",
-          severity: configuredSeverity(context5, "manufacturing.board-edge-clearance", "medium"),
+          severity: advisorySeverity(configured),
+          confidence: "low",
           message: "Cannot verify board edge clearance because the Gerber board outline is missing or open.",
-          path: parsedFiles[0]?.path ?? ".",
+          path: outlineFile?.path ?? parsedFiles[0]?.path ?? ".",
           kind: "pcb",
           details: {
-            confidence: "unknown",
-            outlineClosed: Boolean(outlineFile?.parsed.hasClosedContour && outlineFile.parsed.openContourCount === 0),
             minClearanceMm,
-            profileRevision: profile?.provenance.revision ?? "v1",
-            profileSource: profile?.provenance.source ?? "default",
+            limitSource,
+            configuredSeverity: configured,
+            severityCapped: advisorySeverity(configured) !== configured,
+            blocking: false,
+            blockingRationale: "A closed measurable board-profile contour is required before feature-to-edge distance can block.",
+            outlineClosed: Boolean(outlineFile?.parsed.hasClosedContour && outlineFile.parsed.openContourCount === 0),
+            outlineRoleEvidence: outlineFile?.layer?.identitySource ?? "unknown",
+            geometryConfidence: "unknown",
+            profileAssurance: assurance?.state ?? "none",
+            profileMayBlock: assurance?.mayBlock ?? false,
+            profileRevision: profile?.provenance.revision ?? null,
+            profileSource: profile?.provenance.source ?? null,
             verifiedAt: profile?.provenance.verifiedAt ?? null
           }
         })
-      );
-      return output;
+      ];
     }
-    const outlineBox = outlineFile.parsed.boundingBoxMm;
-    const copperFiles = parsedFiles.filter(
-      (item) => item.parsed.identity?.role === "copper" || item.path.endsWith(".gtl") || item.path.endsWith(".gbl") || item.path.endsWith(".gbr")
+    const outlineReasons = outlineEvidenceReasons(outlineFile, outlineSegments);
+    const copperFiles = parsedFiles.filter((item) => item.layer?.role === "copper");
+    return copperFiles.flatMap(
+      (copper) => evaluateCopperLayer(context5, copper, outlineFile, outlineSegments, outlineReasons, limits)
     );
-    for (const copper of copperFiles) {
-      if (!copper.parsed.boundingBoxMm) continue;
-      const left = copper.parsed.boundingBoxMm.minX - outlineBox.minX;
-      const right = outlineBox.maxX - copper.parsed.boundingBoxMm.maxX;
-      const bottom = copper.parsed.boundingBoxMm.minY - outlineBox.minY;
-      const top = outlineBox.maxY - copper.parsed.boundingBoxMm.maxY;
-      const minMeasured = Math.min(left, right, bottom, top);
-      if (minMeasured < minClearanceMm) {
-        output.push(
-          finding(context5, {
-            ruleId: "manufacturing.board-edge-clearance",
-            severity: configuredSeverity(context5, "manufacturing.board-edge-clearance", "medium"),
-            message: `Copper layer ${copper.path} clearance to board edge is ${minMeasured.toFixed(3)}mm, which is below the required ${minClearanceMm}mm.`,
-            path: copper.path,
-            kind: "pcb",
-            details: {
-              measuredClearanceMm: Number(minMeasured.toFixed(3)),
-              minClearanceMm,
-              confidence: "exact",
-              filename: copper.path,
-              profileRevision: profile?.provenance.revision ?? "v1",
-              profileSource: profile?.provenance.source ?? "default",
-              verifiedAt: profile?.provenance.verifiedAt ?? null
-            },
-            fix: {
-              description: `Pull copper features back at least ${minClearanceMm}mm from the board outline on ${copper.path}.`,
-              steps: [
-                "Open PCB Editor in KiCad.",
-                `Inspect copper fills and tracks near Edge.Cuts on layer ${copper.path}.`,
-                `Set copper clearance to Edge.Cuts to at least ${minClearanceMm}mm in Board Setup > Design Rules.`,
-                "Re-fill copper zones and re-export Gerber files."
-              ]
-            }
-          })
-        );
-      }
-    }
-    return output;
   }
 );
+function selectOutline(parsedFiles) {
+  const candidates = parsedFiles.filter((item) => item.layer?.role === "outline");
+  const outlineFile = candidates.find((item) => item.layer?.identitySource === "declared") ?? candidates[0];
+  const outlineSegments = outlineFile?.parsed.geometry.primitives.filter(
+    (primitive) => primitive.kind === "segment"
+  ) ?? [];
+  return { outlineFile, outlineSegments };
+}
+function isCompleteOutline(outlineFile, outlineSegments) {
+  return outlineSegments.length > 0 && outlineFile.parsed.hasClosedContour && outlineFile.parsed.openContourCount === 0;
+}
+function evaluateCopperLayer(context5, copper, outlineFile, outlineSegments, outlineReasons, limits) {
+  const { assurance, minClearanceMm, limitSource, limitMayBlock } = limits;
+  const { measurements, extentUncertainty } = measureCopperFeatures(copper.parsed, outlineSegments);
+  const best = minimumMeasurement(measurements);
+  const geometryReasons = [
+    ...copper.parsed.geometry.uncertainty.map((reason) => `copper:${reason}`),
+    ...extentUncertainty
+  ];
+  const assessment = { context: context5, copper, outlineFile, outlineReasons, geometryReasons, limits };
+  if (best !== void 0 && best.clearanceMm < minClearanceMm) {
+    const evidenceReasons = [
+      ...outlineReasons,
+      ...copperEvidenceReasons(copper),
+      ...geometryReasons,
+      ...limitMayBlock ? [] : [limitBlockingReason(limitSource, assurance?.state ?? "none")]
+    ];
+    return [measuredViolationFinding(assessment, best, evidenceReasons)];
+  }
+  if (geometryReasons.length > 0) return [incompleteGeometryFinding(assessment, best)];
+  return [];
+}
+function profileFindingEvidence(limits) {
+  const { profile, assurance } = limits;
+  return {
+    profileAssurance: assurance?.state ?? "none",
+    profileMayBlock: assurance?.mayBlock ?? false,
+    profileRevision: profile?.provenance.revision ?? null,
+    profileSource: profile?.provenance.source ?? null,
+    verifiedAt: profile?.provenance.verifiedAt ?? null
+  };
+}
+function measuredViolationFinding(assessment, best, evidenceReasons) {
+  const { context: context5, copper, outlineFile, outlineReasons, geometryReasons, limits } = assessment;
+  const { minClearanceMm, limitSource, configured } = limits;
+  const blocking = evidenceReasons.length === 0;
+  const severity = blocking ? configured : advisorySeverity(configured);
+  return finding(context5, {
+    ruleId: "manufacturing.board-edge-clearance",
+    severity,
+    confidence: blocking ? "definite" : "low",
+    message: blocking ? `Copper feature on ${copper.path} is ${formatMm(best.clearanceMm)}mm from the board edge, below the required ${minClearanceMm}mm.` : `Measured copper feature on ${copper.path} at ${formatMm(best.clearanceMm)}mm from the board edge, below the ${minClearanceMm}mm limit, but the evidence is advisory.`,
+    path: copper.path,
+    kind: "pcb",
+    details: {
+      measuredClearanceMm: roundedMm(best.clearanceMm),
+      minClearanceMm,
+      limitSource,
+      layerRole: "copper",
+      layerRoleEvidence: copper.layer?.identitySource ?? "unknown",
+      outlineRoleEvidence: outlineFile.layer?.identitySource ?? "unknown",
+      featureKind: best.kind,
+      featureLocation: best.location,
+      apertureCode: best.apertureCode ?? null,
+      featureExtentEvidence: best.extentEvidence,
+      geometryConfidence: geometryReasons.length === 0 && outlineReasons.length === 0 ? "exact" : "partial",
+      geometryUncertainty: [...outlineReasons, ...geometryReasons],
+      ...profileFindingEvidence(limits),
+      configuredSeverity: configured,
+      severityCapped: severity !== configured,
+      blocking,
+      blockingRationale: blocking ? "Declared layer roles, declared coordinate evidence, complete modelled geometry, and the selected limit all support a blocking measurement." : evidenceReasons.join(" ")
+    },
+    fix: {
+      description: `Pull copper features back at least ${minClearanceMm}mm from the board outline on ${copper.path}.`,
+      steps: [
+        "Open PCB Editor in KiCad.",
+        `Inspect copper fills, pads, and tracks near Edge.Cuts on layer ${copper.path}.`,
+        `Set copper clearance to Edge.Cuts to at least ${minClearanceMm}mm in Board Setup > Design Rules.`,
+        "Re-fill copper zones and re-export Gerber files."
+      ]
+    }
+  });
+}
+function incompleteGeometryFinding(assessment, best) {
+  const { context: context5, copper, outlineFile, geometryReasons, limits } = assessment;
+  const { minClearanceMm, limitSource, configured } = limits;
+  const { profileAssurance, profileMayBlock } = profileFindingEvidence(limits);
+  const severity = advisorySeverity(configured);
+  return finding(context5, {
+    ruleId: "manufacturing.board-edge-clearance",
+    severity,
+    confidence: "low",
+    message: `Cannot fully verify board edge clearance for ${copper.path} because some copper geometry is incomplete or has an unmodelled extent.`,
+    path: copper.path,
+    kind: "pcb",
+    details: {
+      measuredClearanceMm: best === void 0 ? null : roundedMm(best.clearanceMm),
+      minClearanceMm,
+      limitSource,
+      layerRole: "copper",
+      layerRoleEvidence: copper.layer?.identitySource ?? "unknown",
+      outlineRoleEvidence: outlineFile.layer?.identitySource ?? "unknown",
+      geometryConfidence: "partial",
+      geometryUncertainty: geometryReasons,
+      profileAssurance,
+      profileMayBlock,
+      configuredSeverity: configured,
+      severityCapped: severity !== configured,
+      blocking: false,
+      blockingRationale: "Incomplete or unmodelled copper geometry cannot establish an exact production verdict even when measured primitives are clear."
+    }
+  });
+}
+async function parseLayers(root, files) {
+  const { entries, stackup } = await loadGerberStackup(root, files);
+  const layersByFilename = new Map(
+    stackup.layers.map((layer) => [
+      layer.filename.replaceAll("\\", "/"),
+      {
+        role: layer.role,
+        side: layer.side,
+        filename: layer.filename,
+        identitySource: layer.identitySource
+      }
+    ])
+  );
+  return entries.map((entry) => ({
+    path: entry.filename,
+    parsed: parseGerber(entry.content ?? "", entry.filename),
+    layer: layersByFilename.get(entry.filename.replaceAll("\\", "/"))
+  }));
+}
+function resolveLimit(context5) {
+  const vendorId = typeof context5.config.vendor === "string" ? context5.config.vendor : context5.config.vendor?.profile;
+  const profile = findVendorProfile(vendorId) ?? findVendorProfile("generic-prototype");
+  const assurance = profile === void 0 ? void 0 : vendorProfileAssurance(profile);
+  const ruleConfig2 = configFor(context5, "manufacturing.board-edge-clearance");
+  const configuredMin = typeof ruleConfig2["min-clearance-mm"] === "number" ? ruleConfig2["min-clearance-mm"] : void 0;
+  const profileMin = profile?.fabrication?.minBoardEdgeClearanceMm;
+  const minClearanceMm = configuredMin ?? profileMin ?? 0.2;
+  const limitSource = configuredMin !== void 0 ? "configured" : profileMin !== void 0 ? "vendor-profile" : "default";
+  const limitMayBlock = configuredMin !== void 0 || limitSource === "vendor-profile" && assurance?.mayBlock === true;
+  const configured = configuredSeverity(context5, "manufacturing.board-edge-clearance", "medium");
+  return { profile, assurance, minClearanceMm, limitSource, limitMayBlock, configured };
+}
+function outlineEvidenceReasons(outline, segments) {
+  const reasons = [];
+  if (outline.layer?.identitySource !== "declared")
+    reasons.push("The board-profile role comes from the filename, not TF.FileFunction.");
+  if (outline.parsed.unitsEvidence !== "declared") reasons.push("The board-profile units were assumed.");
+  if (outline.parsed.format.evidence !== "declared") reasons.push("The board-profile coordinate format was assumed.");
+  const relevantUncertainty = outline.parsed.geometry.uncertainty.filter(
+    (reason) => !outlineIgnoredUncertainty.has(reason)
+  );
+  for (const reason of relevantUncertainty) reasons.push(`The board-profile geometry is incomplete: ${reason}.`);
+  if (segments.length === 0) reasons.push("The board profile exposes no measurable segments.");
+  if (outline.parsed.geometry.primitives.some((primitive) => primitive.kind !== "segment")) {
+    reasons.push("The board profile contains plotted objects that are not profile segments.");
+  }
+  return reasons;
+}
+function copperEvidenceReasons(copper) {
+  const reasons = [];
+  if (copper.layer?.identitySource !== "declared")
+    reasons.push("The copper role comes from the filename, not TF.FileFunction.");
+  if (copper.parsed.unitsEvidence !== "declared") reasons.push("The copper-layer units were assumed.");
+  if (copper.parsed.format.evidence !== "declared") reasons.push("The copper-layer coordinate format was assumed.");
+  return reasons;
+}
+function limitBlockingReason(limitSource, assuranceState) {
+  if (limitSource === "vendor-profile") {
+    return `The vendor-profile limit is ${assuranceState} and is advisory-only.`;
+  }
+  return "The fallback board-edge limit has no blocking provenance.";
+}
+function measureCopperFeatures(parsed, outlineSegments) {
+  const measurements = [];
+  const extentUncertainty = /* @__PURE__ */ new Set();
+  const apertures = new Map(parsed.apertures.map((aperture) => [aperture.code, aperture]));
+  for (const primitive of parsed.geometry.primitives) {
+    if (primitive.kind === "segment" && !primitive.inRegion) {
+      const aperture = primitive.apertureCode === void 0 ? void 0 : apertures.get(primitive.apertureCode);
+      if (!isModelledAperture(aperture)) {
+        extentUncertainty.add(
+          `Trace D${primitive.apertureCode ?? "?"} has no modelled aperture extent for board-edge measurement.`
+        );
+        continue;
+      }
+      measurements.push({
+        clearanceMm: sweptApertureClearance(aperture, primitive.from, primitive.to, outlineSegments),
+        kind: "trace",
+        location: { from: primitive.from, to: primitive.to },
+        apertureCode: primitive.apertureCode,
+        extentEvidence: aperture.shape
+      });
+      continue;
+    }
+    if (primitive.kind === "flash" && !primitive.inRegion) {
+      if (primitive.aperture === void 0) {
+        extentUncertainty.add(
+          `Flash D${primitive.apertureCode ?? "?"} has no modelled aperture extent for board-edge measurement.`
+        );
+        continue;
+      }
+      measurements.push({
+        clearanceMm: flashedApertureClearance(primitive.aperture, primitive.at, outlineSegments),
+        kind: "flash",
+        location: { at: primitive.at },
+        apertureCode: primitive.apertureCode,
+        extentEvidence: primitive.aperture.shape
+      });
+    }
+  }
+  const region = measureRegions(parsed.geometry.primitives, outlineSegments);
+  if (region.measurement !== void 0) measurements.push(region.measurement);
+  if (!region.exact) extentUncertainty.add("A region contour is not explicitly closed in the exposed geometry.");
+  return { measurements, extentUncertainty: [...extentUncertainty] };
+}
+function isModelledAperture(aperture) {
+  return aperture !== void 0 && (aperture.shape === "circle" || aperture.shape === "rectangle" || aperture.shape === "obround" || aperture.shape === "polygon");
+}
+function flashedApertureClearance(aperture, at, outlineSegments) {
+  const core = apertureCore(aperture);
+  const points = core.points.map((point) => translate(point, at));
+  return Math.max(0, distanceFromCoreToOutline(points, outlineSegments) - core.roundRadiusMm);
+}
+function sweptApertureClearance(aperture, from, to, outlineSegments) {
+  const core = apertureCore(aperture);
+  const swept = [
+    ...core.points.map((point) => translate(point, from)),
+    ...core.points.map((point) => translate(point, to))
+  ];
+  return Math.max(0, distanceFromCoreToOutline(convexHull(swept), outlineSegments) - core.roundRadiusMm);
+}
+function apertureCore(aperture) {
+  if (aperture.shape === "circle") {
+    return { points: [{ x: 0, y: 0 }], roundRadiusMm: aperture.diameterMm / 2 };
+  }
+  if (aperture.shape === "rectangle") {
+    const halfWidth = aperture.widthMm / 2;
+    const halfHeight = aperture.heightMm / 2;
+    return {
+      points: [
+        { x: -halfWidth, y: -halfHeight },
+        { x: halfWidth, y: -halfHeight },
+        { x: halfWidth, y: halfHeight },
+        { x: -halfWidth, y: halfHeight }
+      ],
+      roundRadiusMm: 0
+    };
+  }
+  if (aperture.shape === "obround") {
+    const radius2 = Math.min(aperture.widthMm, aperture.heightMm) / 2;
+    if (aperture.widthMm === aperture.heightMm) {
+      return { points: [{ x: 0, y: 0 }], roundRadiusMm: radius2 };
+    }
+    if (aperture.widthMm > aperture.heightMm) {
+      const halfCore2 = (aperture.widthMm - aperture.heightMm) / 2;
+      return {
+        points: [
+          { x: -halfCore2, y: 0 },
+          { x: halfCore2, y: 0 }
+        ],
+        roundRadiusMm: radius2
+      };
+    }
+    const halfCore = (aperture.heightMm - aperture.widthMm) / 2;
+    return {
+      points: [
+        { x: 0, y: -halfCore },
+        { x: 0, y: halfCore }
+      ],
+      roundRadiusMm: radius2
+    };
+  }
+  const rotation = (aperture.rotationDegrees ?? 0) * Math.PI / 180;
+  const radius = aperture.diameterMm / 2;
+  return {
+    points: Array.from({ length: aperture.vertices }, (_unused, index) => {
+      const angle = rotation + index * Math.PI * 2 / aperture.vertices;
+      return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+    }),
+    roundRadiusMm: 0
+  };
+}
+function distanceFromCoreToOutline(points, outlineSegments) {
+  if (points.length === 0 || outlineSegments.length === 0) return Number.POSITIVE_INFINITY;
+  let minimum = Number.POSITIVE_INFINITY;
+  for (const outline of outlineSegments) {
+    minimum = Math.min(minimum, distanceFromCoreToSegment(points, outline));
+    if (minimum === 0) return 0;
+  }
+  return minimum;
+}
+function distanceFromCoreToSegment(points, target) {
+  if (points.length === 1) return pointToSegmentDistanceMm(points[0], target);
+  if (points.length === 2)
+    return segmentToSegmentDistanceMm(segment(points[0], points[1]), target);
+  if (pointInPolygon(target.from, points) || pointInPolygon(target.to, points)) return 0;
+  let minimum = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < points.length; index += 1) {
+    const from = points[index];
+    const to = points[(index + 1) % points.length];
+    minimum = Math.min(minimum, segmentToSegmentDistanceMm(segment(from, to), target));
+    if (minimum === 0) return 0;
+  }
+  return minimum;
+}
+function measureRegions(primitives, outlineSegments) {
+  const regionSegments = primitives.filter(
+    (primitive) => primitive.kind === "segment" && primitive.inRegion
+  );
+  if (regionSegments.length === 0) return { measurement: void 0, exact: true };
+  const { contours, exact } = splitRegionContours(regionSegments);
+  let minimum = Number.POSITIVE_INFINITY;
+  let location2 = {};
+  for (const regionSegment of regionSegments) {
+    for (const outline of outlineSegments) {
+      const distance2 = segmentToSegmentDistanceMm(regionSegment, outline);
+      if (distance2 < minimum) {
+        minimum = distance2;
+        location2 = { from: regionSegment.from, to: regionSegment.to };
+      }
+      if (minimum === 0) break;
+    }
+    if (minimum === 0) break;
+  }
+  if (minimum > 0 && contours.length > 0) {
+    for (const outline of outlineSegments) {
+      const midpoint = {
+        x: (outline.from.x + outline.to.x) / 2,
+        y: (outline.from.y + outline.to.y) / 2
+      };
+      if (contours.some((contour) => pointInContour(midpoint, contour))) {
+        minimum = 0;
+        location2 = { at: midpoint, relation: "board-edge-inside-region" };
+        break;
+      }
+    }
+  }
+  return {
+    measurement: {
+      clearanceMm: minimum,
+      kind: "region",
+      location: location2,
+      extentEvidence: "filled-region-contour"
+    },
+    exact
+  };
+}
+function splitRegionContours(segments) {
+  const contours = [];
+  let current = [];
+  let exact = true;
+  for (const candidate of segments) {
+    if (current.length > 0 && !samePoint3(current[current.length - 1].to, candidate.from)) {
+      exact = false;
+      current = [];
+    }
+    if (current.length === 0) current = [candidate];
+    else current.push(candidate);
+    if (samePoint3(candidate.to, current[0].from)) {
+      contours.push(current);
+      current = [];
+    }
+  }
+  if (current.length > 0) exact = false;
+  return { contours, exact };
+}
+function pointInContour(point, contour) {
+  let inside = false;
+  for (const edge of contour) {
+    if (pointOnSegment(point, edge)) return true;
+    const crossesY = edge.from.y > point.y !== edge.to.y > point.y;
+    if (!crossesY) continue;
+    const intersectionX = edge.from.x + (point.y - edge.from.y) * (edge.to.x - edge.from.x) / (edge.to.y - edge.from.y);
+    if (intersectionX > point.x) inside = !inside;
+  }
+  return inside;
+}
+function pointInPolygon(point, polygon) {
+  let inside = false;
+  for (let index = 0; index < polygon.length; index += 1) {
+    const from = polygon[index];
+    const to = polygon[(index + 1) % polygon.length];
+    const edge = segment(from, to);
+    if (pointOnSegment(point, edge)) return true;
+    const crossesY = from.y > point.y !== to.y > point.y;
+    if (!crossesY) continue;
+    const intersectionX = from.x + (point.y - from.y) * (to.x - from.x) / (to.y - from.y);
+    if (intersectionX > point.x) inside = !inside;
+  }
+  return inside;
+}
+function pointOnSegment(point, edge) {
+  const cross2 = (edge.to.x - edge.from.x) * (point.y - edge.from.y) - (edge.to.y - edge.from.y) * (point.x - edge.from.x);
+  if (Math.abs(cross2) > pointToleranceMm) return false;
+  return point.x >= Math.min(edge.from.x, edge.to.x) - pointToleranceMm && point.x <= Math.max(edge.from.x, edge.to.x) + pointToleranceMm && point.y >= Math.min(edge.from.y, edge.to.y) - pointToleranceMm && point.y <= Math.max(edge.from.y, edge.to.y) + pointToleranceMm;
+}
+function convexHull(points) {
+  const unique = [...new Map(points.map((point) => [`${point.x},${point.y}`, point])).values()].sort(
+    (left, right) => left.x - right.x || left.y - right.y
+  );
+  if (unique.length <= 2) return unique;
+  const lower = [];
+  for (const point of unique) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+      lower.pop();
+    }
+    lower.push(point);
+  }
+  const upper = [];
+  for (let index = unique.length - 1; index >= 0; index -= 1) {
+    const point = unique[index];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
+}
+function cross(origin, first, second) {
+  return (first.x - origin.x) * (second.y - origin.y) - (first.y - origin.y) * (second.x - origin.x);
+}
+function translate(point, offset) {
+  return { x: point.x + offset.x, y: point.y + offset.y };
+}
+function segment(from, to) {
+  return {
+    kind: "segment",
+    from,
+    to,
+    inRegion: false,
+    apertureCode: void 0,
+    widthMm: void 0
+  };
+}
+function samePoint3(left, right) {
+  return Math.abs(left.x - right.x) <= pointToleranceMm && Math.abs(left.y - right.y) <= pointToleranceMm;
+}
+function minimumMeasurement(measurements) {
+  let minimum;
+  for (const measurement of measurements) {
+    if (minimum === void 0 || measurement.clearanceMm < minimum.clearanceMm) minimum = measurement;
+  }
+  return minimum;
+}
+function roundedMm(value) {
+  return Number(value.toFixed(3));
+}
+function formatMm(value) {
+  return roundedMm(value).toFixed(3);
+}
+function advisorySeverity(configured) {
+  return severityRankValue(configured) > severityRankValue("low") ? "low" : configured;
+}
 
 // src/rules/manufacturing/drill-coverage.ts
-var import_node_path28 = __toESM(require("node:path"), 1);
+var import_node_path27 = __toESM(require("node:path"), 1);
 var diameterToleranceMm = 1e-3;
 var drillCoverageRule = rule(
   {
@@ -91778,12 +92245,12 @@ var drillCoverageRule = rule(
     for (const file2 of drillFiles) {
       const text = await readTextFile(file2).catch(() => "");
       if (!text) continue;
-      diameters.push(...parseExcellon(text, import_node_path28.default.relative(context5.root, file2)).tools.map((tool) => tool.diameterMm));
+      diameters.push(...parseExcellon(text, import_node_path27.default.relative(context5.root, file2)).tools.map((tool) => tool.diameterMm));
     }
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path28.default.resolve(context5.root, board));
+        const parsed = await parsePcb(import_node_path27.default.resolve(context5.root, board));
         for (const size of parsed.drillSizes) {
           const wanted = Number(size);
           if (!Number.isFinite(wanted) || wanted <= 0) continue;
@@ -91823,7 +92290,7 @@ function nearestDiameter(diameters, wanted) {
 }
 
 // src/rules/manufacturing/fab-notes.ts
-var import_node_path29 = __toESM(require("node:path"), 1);
+var import_node_path28 = __toESM(require("node:path"), 1);
 var fabNotesRule = rule(
   {
     id: "manufacturing.fab-notes",
@@ -91843,7 +92310,7 @@ var fabNotesRule = rule(
     }
     const candidates = ["fab/README.md", "manufacturing/notes.md", "docs/fab-notes.md"];
     for (const candidate of candidates) {
-      if (await pathExists(import_node_path29.default.resolve(context5.root, candidate))) {
+      if (await pathExists(import_node_path28.default.resolve(context5.root, candidate))) {
         return [];
       }
     }
@@ -91903,10 +92370,10 @@ var fiducialsRule = rule(
 );
 
 // src/rules/manufacturing/jobset-outputs.ts
-var import_node_path31 = __toESM(require("node:path"), 1);
+var import_node_path30 = __toESM(require("node:path"), 1);
 
 // src/kicad/jobset.ts
-var import_node_path30 = __toESM(require("node:path"), 1);
+var import_node_path29 = __toESM(require("node:path"), 1);
 async function parseJobset(file2) {
   const text = await readDesignFile(file2) ?? "";
   const parsed = parseJsonValue(text);
@@ -91990,7 +92457,7 @@ function uniqueJobs(jobs) {
   return output;
 }
 function normalizePath2(value) {
-  return import_node_path30.default.normalize(value).replaceAll("\\", "/");
+  return import_node_path29.default.normalize(value).replaceAll("\\", "/");
 }
 
 // src/rules/manufacturing/jobset-outputs.ts
@@ -92014,10 +92481,10 @@ var jobsetOutputsRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const jobset of project.jobsetFiles) {
-        const parsed = await parseJobset(import_node_path31.default.resolve(context5.root, jobset));
+        const parsed = await parseJobset(import_node_path30.default.resolve(context5.root, jobset));
         for (const job of parsed.jobs.filter((entry) => entry.enabled)) {
-          const outputPath = (job.destinationPath ? import_node_path31.default.join(job.destinationPath, job.outputPath) : job.outputPath).replaceAll("\\", "/");
-          const absoluteOutput = import_node_path31.default.resolve(context5.root, project.root, outputPath);
+          const outputPath = (job.destinationPath ? import_node_path30.default.join(job.destinationPath, job.outputPath) : job.outputPath).replaceAll("\\", "/");
+          const absoluteOutput = import_node_path30.default.resolve(context5.root, project.root, outputPath);
           if (!await pathExists(absoluteOutput)) {
             output.push(
               finding(context5, {
@@ -92038,7 +92505,7 @@ var jobsetOutputsRule = rule(
 );
 
 // src/rules/manufacturing/layer-stackup.ts
-var import_node_path32 = __toESM(require("node:path"), 1);
+var import_node_path31 = __toESM(require("node:path"), 1);
 var layerStackupRule = rule(
   {
     id: "manufacturing.layer-stackup",
@@ -92060,7 +92527,7 @@ var layerStackupRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path32.default.resolve(context5.root, board));
+        const parsed = await parsePcb(import_node_path31.default.resolve(context5.root, board));
         const expectedLayers = typeof expected === "number" ? expected : parsed.copperLayerCount;
         if (parsed.stackupLayerCount !== void 0 && parsed.stackupLayerCount !== expectedLayers) {
           output.push(
@@ -92136,7 +92603,7 @@ var maskCoverageRule = rule(
 );
 
 // src/rules/manufacturing/outputs-present.ts
-var import_node_path33 = __toESM(require("node:path"), 1);
+var import_node_path32 = __toESM(require("node:path"), 1);
 
 // src/vendor/outputs.ts
 var VENDOR_OUTPUT_KINDS = ["gerber", "drill", "bom", "position", "pdf", "step"];
@@ -92252,7 +92719,7 @@ async function inspectRequiredOutputs(context5) {
     0,
     ...(await Promise.all(
       context5.projects.flatMap(
-        (project) => project.boardFiles.map((board) => fileMtimeMs(import_node_path33.default.resolve(context5.root, board)))
+        (project) => project.boardFiles.map((board) => fileMtimeMs(import_node_path32.default.resolve(context5.root, board)))
       )
     )).filter((value) => typeof value === "number")
   );
@@ -92329,7 +92796,7 @@ function isPatternMap(value) {
 }
 
 // src/rules/manufacturing/package-completeness.ts
-var import_node_path34 = __toESM(require("node:path"), 1);
+var import_node_path33 = __toESM(require("node:path"), 1);
 var BASE_CATEGORIES = [
   {
     id: "gerbers",
@@ -92463,7 +92930,7 @@ async function resolveCategories(root, categories) {
 }
 async function checkFabNotes(root) {
   for (const candidate of FAB_NOTES_PATHS) {
-    if (await pathExists(import_node_path34.default.resolve(root, candidate))) {
+    if (await pathExists(import_node_path33.default.resolve(root, candidate))) {
       return true;
     }
   }
@@ -92543,7 +93010,7 @@ var pasteCoverageRule = rule(
       if (pasteLayers.some((layer) => layer.side === side)) continue;
       const reasons = unprovenReasons(evidence, identity, side);
       const blocking = reasons.length === 0;
-      const severity = blocking ? configured : advisorySeverity(configured);
+      const severity = blocking ? configured : advisorySeverity2(configured);
       output.push(
         finding(context5, {
           ruleId: "manufacturing.paste-coverage",
@@ -92636,7 +93103,7 @@ function coverageMessage(side, evidence, blocking) {
   }
   return `The board has SMT assembly on the ${side} side, but the Gerber package lacks a ${side} solder paste stencil layer.`;
 }
-function advisorySeverity(configured) {
+function advisorySeverity2(configured) {
   return severityRankValue(configured) > severityRankValue("low") ? "low" : configured;
 }
 
@@ -93008,7 +93475,7 @@ var pinmapNetLabelRule = rule(
 );
 
 // src/rules/pinmap/verify.ts
-var import_node_path35 = __toESM(require("node:path"), 1);
+var import_node_path34 = __toESM(require("node:path"), 1);
 var pinmapVerifyRule = rule(
   {
     id: "pinmap.verify",
@@ -93048,8 +93515,8 @@ var pinmapVerifyRule = rule(
         finding(context5, {
           ruleId: "pinmap.verify",
           severity: configuredSeverity(context5, "pinmap.verify", "high"),
-          message: `Hierarchical sheet ${missing.fileName} referenced by ${import_node_path35.default.relative(context5.root, missing.parentFile)} was not found.`,
-          path: import_node_path35.default.relative(context5.root, missing.parentFile),
+          message: `Hierarchical sheet ${missing.fileName} referenced by ${import_node_path34.default.relative(context5.root, missing.parentFile)} was not found.`,
+          path: import_node_path34.default.relative(context5.root, missing.parentFile),
           kind: "schematic",
           details: { ...missing }
         })
@@ -93060,8 +93527,8 @@ var pinmapVerifyRule = rule(
         finding(context5, {
           ruleId: "pinmap.verify",
           severity: configuredSeverity(context5, "pinmap.verify", "high"),
-          message: `Sheet pin ${unresolved.pin} on ${import_node_path35.default.relative(context5.root, unresolved.parentFile)} has no matching hierarchical label in ${import_node_path35.default.relative(context5.root, unresolved.childFile)}.`,
-          path: import_node_path35.default.relative(context5.root, unresolved.parentFile),
+          message: `Sheet pin ${unresolved.pin} on ${import_node_path34.default.relative(context5.root, unresolved.parentFile)} has no matching hierarchical label in ${import_node_path34.default.relative(context5.root, unresolved.childFile)}.`,
+          path: import_node_path34.default.relative(context5.root, unresolved.parentFile),
           kind: "schematic",
           details: { ...unresolved }
         })
@@ -93157,7 +93624,7 @@ var pinmapUnmappedPinRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const schematic of project.schematicFiles) {
-        const parsed = await parseSchematic(import_node_path35.default.resolve(context5.root, schematic));
+        const parsed = await parseSchematic(import_node_path34.default.resolve(context5.root, schematic));
         for (const pin of parsed.connectedPins) {
           const key = `${pin.designator}.${pin.pin}`;
           if (!mapped.has(key)) {
@@ -93180,12 +93647,12 @@ var pinmapUnmappedPinRule = rule(
 );
 
 // src/rules/release/artifact-provenance.ts
-var import_node_path37 = __toESM(require("node:path"), 1);
+var import_node_path36 = __toESM(require("node:path"), 1);
 
 // src/core/provenance.ts
 var import_node_crypto4 = require("node:crypto");
 var import_promises12 = __toESM(require("node:fs/promises"), 1);
-var import_node_path36 = __toESM(require("node:path"), 1);
+var import_node_path35 = __toESM(require("node:path"), 1);
 var SOURCE_PATTERNS = [
   "**/*.kicad_pcb",
   "**/*.kicad_sch",
@@ -93211,14 +93678,14 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
   let manifest;
   let manifestDir = root;
   if (typeof manifestOrPath === "string") {
-    const absManifestPath = import_node_path36.default.resolve(root, manifestOrPath);
+    const absManifestPath = import_node_path35.default.resolve(root, manifestOrPath);
     if (!isInside(root, absManifestPath)) {
       return {
         status: "mismatch",
         reasons: [`Path traversal rejected for manifest path: ${manifestOrPath}`]
       };
     }
-    manifestDir = import_node_path36.default.dirname(absManifestPath);
+    manifestDir = import_node_path35.default.dirname(absManifestPath);
     try {
       const raw = await readTextFile(absManifestPath);
       manifest = JSON.parse(raw);
@@ -93260,12 +93727,12 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
   const artifactMismatches = [];
   const missingArtifacts = [];
   for (const artifact of manifest.artifacts ?? []) {
-    if (import_node_path36.default.isAbsolute(artifact.path) || artifact.path.includes("..")) {
+    if (import_node_path35.default.isAbsolute(artifact.path) || artifact.path.includes("..")) {
       artifactMismatches.push(artifact.path);
       reasons.push(`Artifact path rejected (absolute or path traversal): ${artifact.path}`);
       continue;
     }
-    const absPath = import_node_path36.default.resolve(manifestDir, artifact.path);
+    const absPath = import_node_path35.default.resolve(manifestDir, artifact.path);
     if (!isInside(root, absPath) && !isInside(manifestDir, absPath)) {
       artifactMismatches.push(artifact.path);
       reasons.push(`Artifact path escaped directory bounds: ${artifact.path}`);
@@ -93344,7 +93811,7 @@ var artifactProvenanceRule = rule(
       manifestRelPath = configuredPath;
     } else {
       for (const candidate of MANIFEST_CANDIDATES) {
-        const text = await readTextFile(import_node_path37.default.resolve(context5.root, candidate)).catch(() => void 0);
+        const text = await readTextFile(import_node_path36.default.resolve(context5.root, candidate)).catch(() => void 0);
         if (text) {
           manifestRelPath = candidate;
           break;
@@ -93357,7 +93824,7 @@ var artifactProvenanceRule = rule(
           ruleId: "release.artifact-provenance",
           severity: configuredSeverity(context5, "release.artifact-provenance", "high"),
           message: "Exported manufacturing artifacts exist in the repository but lack an export provenance manifest.",
-          path: artifactFiles2[0] ? import_node_path37.default.relative(context5.root, artifactFiles2[0]) : ".",
+          path: artifactFiles2[0] ? import_node_path36.default.relative(context5.root, artifactFiles2[0]) : ".",
           kind: "pcb",
           details: {
             status: "missing",
@@ -93406,7 +93873,7 @@ var artifactProvenanceRule = rule(
 );
 
 // src/rules/release/changelog-present.ts
-var import_node_path38 = __toESM(require("node:path"), 1);
+var import_node_path37 = __toESM(require("node:path"), 1);
 var changelogPresentRule = rule(
   {
     id: "release.changelog-present",
@@ -93427,13 +93894,13 @@ var changelogPresentRule = rule(
     const revisions = /* @__PURE__ */ new Set();
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const revision2 = (await parsePcb(import_node_path38.default.resolve(context5.root, board))).revision;
+        const revision2 = (await parsePcb(import_node_path37.default.resolve(context5.root, board))).revision;
         if (revision2) {
           revisions.add(revision2);
         }
       }
     }
-    const changelog = import_node_path38.default.resolve(context5.root, "CHANGELOG.md");
+    const changelog = import_node_path37.default.resolve(context5.root, "CHANGELOG.md");
     if (!await pathExists(changelog)) {
       return [
         finding(context5, {
@@ -93468,7 +93935,7 @@ function changelogHasRevision(text, revision2) {
 }
 
 // src/rules/release/revision-set.ts
-var import_node_path39 = __toESM(require("node:path"), 1);
+var import_node_path38 = __toESM(require("node:path"), 1);
 var revisionSetRule = rule(
   {
     id: "release.revision-set",
@@ -93492,7 +93959,7 @@ var revisionSetRule = rule(
     const revisionPattern = new RegExp(tagPattern);
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path39.default.resolve(context5.root, board));
+        const parsed = await parsePcb(import_node_path38.default.resolve(context5.root, board));
         if (!parsed.revision) {
           output.push(
             finding(context5, {
@@ -93522,7 +93989,7 @@ var revisionSetRule = rule(
 );
 
 // src/rules/release/tag-matches-revision.ts
-var import_node_path40 = __toESM(require("node:path"), 1);
+var import_node_path39 = __toESM(require("node:path"), 1);
 var tagMatchesRevisionRule = rule(
   {
     id: "release.tag-matches-revision",
@@ -93547,7 +94014,7 @@ var tagMatchesRevisionRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const revision2 = (await parsePcb(import_node_path40.default.resolve(context5.root, board))).revision;
+        const revision2 = (await parsePcb(import_node_path39.default.resolve(context5.root, board))).revision;
         if (!revision2 || tag !== revision2 && tag !== `v${revision2}`) {
           output.push(
             finding(context5, {
@@ -93567,7 +94034,7 @@ var tagMatchesRevisionRule = rule(
 );
 
 // src/rules/release/version-format.ts
-var import_node_path41 = __toESM(require("node:path"), 1);
+var import_node_path40 = __toESM(require("node:path"), 1);
 var versionFormatRule = rule(
   {
     id: "release.version-format",
@@ -93610,7 +94077,7 @@ var versionFormatRule = rule(
 );
 async function checkProjectBoards(context5, project, regex, pattern, output) {
   for (const board of project.boardFiles) {
-    const revision2 = (await parsePcb(import_node_path41.default.resolve(context5.root, board))).revision;
+    const revision2 = (await parsePcb(import_node_path40.default.resolve(context5.root, board))).revision;
     if (revision2 && !regex.test(revision2)) {
       output.push(
         finding(context5, {
@@ -93627,7 +94094,7 @@ async function checkProjectBoards(context5, project, regex, pattern, output) {
 }
 async function checkProjectSchematics(context5, project, regex, pattern, output) {
   for (const schematic of project.schematicFiles) {
-    const text = await readDesignFile(import_node_path41.default.resolve(context5.root, schematic)) ?? "";
+    const text = await readDesignFile(import_node_path40.default.resolve(context5.root, schematic)) ?? "";
     const revision2 = /\(rev\s+"([^"]+)"/.exec(text)?.[1];
     if (revision2 && !regex.test(revision2)) {
       output.push(
@@ -93714,7 +94181,7 @@ function registerBuiltInRules() {
 // src/rules/fabrication-snapshot.ts
 var import_node_crypto5 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = require("node:fs");
-var import_node_path42 = __toESM(require("node:path"), 1);
+var import_node_path41 = __toESM(require("node:path"), 1);
 var manufacturingPatterns = {
   gerber: ["**/*.gbr", "**/*.gbrjob"],
   drill: ["**/*.drl"],
@@ -93739,9 +94206,9 @@ async function captureFabricationSnapshot(root, projects, options, config2) {
 }
 async function resolveBomPaths(root, options, config2) {
   if (options.bom && options.bom !== "auto") {
-    return [import_node_path42.default.resolve(root, options.bom)];
+    return [import_node_path41.default.resolve(root, options.bom)];
   }
-  const configured = config2.projects?.flatMap((project) => project.bom ? [import_node_path42.default.resolve(root, project.bom)] : []).sort((a, b) => a.localeCompare(b));
+  const configured = config2.projects?.flatMap((project) => project.bom ? [import_node_path41.default.resolve(root, project.bom)] : []).sort((a, b) => a.localeCompare(b));
   if (configured && configured.length > 0) {
     return [...new Set(configured)];
   }
@@ -93763,7 +94230,7 @@ async function loadSchematicRows(root, projects) {
   const rows = [];
   for (const project of projects) {
     for (const schematic of project.schematicFiles) {
-      rows.push(...(await parseSchematic(import_node_path42.default.resolve(root, schematic))).components);
+      rows.push(...(await parseSchematic(import_node_path41.default.resolve(root, schematic))).components);
     }
   }
   return rows;
@@ -93784,11 +94251,11 @@ function snapshotBomRow(root, row) {
   };
 }
 async function projectScopedFiles(root, projects, patterns) {
-  const files = await Promise.all(projects.map((project) => globFiles(import_node_path42.default.resolve(root, project.root), patterns)));
+  const files = await Promise.all(projects.map((project) => globFiles(import_node_path41.default.resolve(root, project.root), patterns)));
   return [...new Set(files.flat())].sort((a, b) => a.localeCompare(b));
 }
 function sourcePath(root, source) {
-  return toPosixPath2(import_node_path42.default.isAbsolute(source) ? import_node_path42.default.relative(root, source) : source);
+  return toPosixPath2(import_node_path41.default.isAbsolute(source) ? import_node_path41.default.relative(root, source) : source);
 }
 function compareSnapshotBomRows(left, right) {
   return left.reference.localeCompare(right.reference) || (left.sourcePath ?? "").localeCompare(right.sourcePath ?? "");
@@ -93798,7 +94265,7 @@ async function outputFromFiles(root, kind, files) {
     kind,
     files: await Promise.all(
       files.map(async (file2) => ({
-        path: toPosixPath2(import_node_path42.default.relative(root, file2)),
+        path: toPosixPath2(import_node_path41.default.relative(root, file2)),
         digest: await hashFile(file2)
       }))
     )
@@ -93824,13 +94291,13 @@ async function outputFromRows(kind, rows) {
 }
 
 // src/rules/firmware-snapshot.ts
-var import_node_path43 = __toESM(require("node:path"), 1);
+var import_node_path42 = __toESM(require("node:path"), 1);
 async function captureFirmwareSnapshot(root) {
   const manifests = (await globFiles(root, ["**/idf_component.yml"])).sort(compareCodePoints);
   const dependencies = [];
   const warnings = [];
   for (const file2 of manifests) {
-    const manifestPath = toPosixPath2(import_node_path43.default.relative(root, file2));
+    const manifestPath = toPosixPath2(import_node_path42.default.relative(root, file2));
     const text = await readTextFile(file2).catch(() => void 0);
     if (text === void 0) continue;
     const manifest = parseIdfManifest(text, manifestPath);
@@ -93855,7 +94322,7 @@ async function captureFirmwareSnapshot(root) {
 
 // src/core/baseline.ts
 var import_promises13 = __toESM(require("node:fs/promises"), 1);
-var import_node_path44 = __toESM(require("node:path"), 1);
+var import_node_path43 = __toESM(require("node:path"), 1);
 var defaultBaselineFile = ".boardreadyops-baseline.json";
 function applyBaseline(findings, baseline, mode) {
   if (mode !== "new-only") {
@@ -93867,7 +94334,7 @@ function applyBaseline(findings, baseline, mode) {
   );
 }
 function resolveBaselinePath(root, baseline) {
-  return import_node_path44.default.resolve(root, baseline?.file ?? defaultBaselineFile);
+  return import_node_path43.default.resolve(root, baseline?.file ?? defaultBaselineFile);
 }
 async function readBaseline(file2) {
   if (!await pathExists(file2)) {
@@ -93965,9 +94432,9 @@ function defaultConcurrency() {
 
 // src/core/discovery.ts
 var import_promises14 = __toESM(require("node:fs/promises"), 1);
-var import_node_path45 = __toESM(require("node:path"), 1);
+var import_node_path44 = __toESM(require("node:path"), 1);
 async function discoverProjects(root, explicitProject) {
-  const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path45.default.resolve(file2));
+  const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path44.default.resolve(file2));
   const contexts = [];
   const projectFilesSorted = [...projectFiles].sort(compareCodePoints);
   for (const projectFile of projectFilesSorted) {
@@ -93976,25 +94443,25 @@ async function discoverProjects(root, explicitProject) {
   return contexts;
 }
 async function explicitProjectFiles(root, explicitProject) {
-  const target = import_node_path45.default.resolve(root, normalizePathInput(explicitProject));
+  const target = import_node_path44.default.resolve(root, normalizePathInput(explicitProject));
   try {
     const stat3 = await import_promises14.default.stat(target);
     if (stat3.isDirectory()) {
       const files = await globFiles(target, ["**/*.kicad_pro"]);
-      return files.map((file2) => import_node_path45.default.resolve(file2));
+      return files.map((file2) => import_node_path44.default.resolve(file2));
     }
   } catch {
   }
   return [target];
 }
 async function projectContext(root, projectFile) {
-  const projectRoot = import_node_path45.default.dirname(projectFile);
-  const base = import_node_path45.default.basename(projectFile, ".kicad_pro");
+  const projectRoot = import_node_path44.default.dirname(projectFile);
+  const base = import_node_path44.default.basename(projectFile, ".kicad_pro");
   const entries = await safeReadDir(projectRoot);
   const schematicFiles = entries.filter(
-    (file2) => file2.endsWith(".kicad_sch") && (import_node_path45.default.basename(file2, ".kicad_sch") === base || entries.length === 1)
-  ).map((file2) => import_node_path45.default.join(projectRoot, file2));
-  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path45.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path45.default.join(projectRoot, file2));
+    (file2) => file2.endsWith(".kicad_sch") && (import_node_path44.default.basename(file2, ".kicad_sch") === base || entries.length === 1)
+  ).map((file2) => import_node_path44.default.join(projectRoot, file2));
+  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path44.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path44.default.join(projectRoot, file2));
   const jobsetFiles = await discoverJobsets(projectRoot);
   return {
     projectFile: normalizeRelative(root, projectFile),
@@ -94007,7 +94474,7 @@ async function projectContext(root, projectFile) {
 async function discoverJobsets(projectRoot) {
   const discovered = await globFiles(projectRoot, ["**/*.kicad_jobset", "**/*.kicad_jobs"]);
   const scoped = [];
-  for (const file2 of discovered.map((entry) => import_node_path45.default.resolve(entry))) {
+  for (const file2 of discovered.map((entry) => import_node_path44.default.resolve(entry))) {
     if (!await isInsideNestedProject(projectRoot, file2)) {
       scoped.push(file2);
     }
@@ -94015,14 +94482,14 @@ async function discoverJobsets(projectRoot) {
   return [...new Set(scoped)].sort(compareCodePoints);
 }
 async function isInsideNestedProject(projectRoot, file2) {
-  const stop = import_node_path45.default.resolve(projectRoot);
-  let current = import_node_path45.default.dirname(import_node_path45.default.resolve(file2));
+  const stop = import_node_path44.default.resolve(projectRoot);
+  let current = import_node_path44.default.dirname(import_node_path44.default.resolve(file2));
   while (current !== stop) {
     const entries = await safeReadDir(current);
     if (entries.some((entry) => entry.endsWith(".kicad_pro"))) {
       return true;
     }
-    current = import_node_path45.default.dirname(current);
+    current = import_node_path44.default.dirname(current);
   }
   return false;
 }
@@ -94131,7 +94598,7 @@ function requirementMatchesFinding(requirement, finding2) {
 // src/core/plugin-loader.ts
 var import_promises15 = __toESM(require("node:fs/promises"), 1);
 var import_node_module = require("node:module");
-var import_node_path46 = __toESM(require("node:path"), 1);
+var import_node_path45 = __toESM(require("node:path"), 1);
 var import_node_url = require("node:url");
 
 // src/core/errors.ts
@@ -94334,16 +94801,16 @@ async function loadPlugins(root, config2) {
   return { specifiers, plugins, errors };
 }
 async function discoverPackagePlugins(root) {
-  const scoped = await readDirectory(import_node_path46.default.join(root, "node_modules", "@boardreadyops"));
+  const scoped = await readDirectory(import_node_path45.default.join(root, "node_modules", "@boardreadyops"));
   const scopedPlugins = scoped.filter(
     (entry) => entry.isDirectory() && entry.name.startsWith(scopedPluginPrefix) && entry.name !== sdkPackageName
   ).map((entry) => `@boardreadyops/${entry.name}`).sort((a, b) => a.localeCompare(b));
-  const unscoped = await readDirectory(import_node_path46.default.join(root, "node_modules"));
+  const unscoped = await readDirectory(import_node_path45.default.join(root, "node_modules"));
   const unscopedPlugins = unscoped.filter((entry) => entry.isDirectory() && entry.name.startsWith(unscopedPluginPrefix)).map((entry) => entry.name).sort((a, b) => a.localeCompare(b));
   return [...scopedPlugins, ...unscopedPlugins];
 }
 async function discoverLocalPlugins(root) {
-  const localRules = await readDirectory(import_node_path46.default.join(root, "local-rules"));
+  const localRules = await readDirectory(import_node_path45.default.join(root, "local-rules"));
   return localRules.filter((entry) => entry.isFile() && entry.name.endsWith(".js")).map((entry) => `./local-rules/${entry.name}`).sort((a, b) => a.localeCompare(b));
 }
 async function readDirectory(directory) {
@@ -94361,9 +94828,9 @@ function resolvePluginEntrypoint(root, specifier) {
     return specifier;
   }
   if (isPathSpecifier(specifier)) {
-    return (0, import_node_url.pathToFileURL)(import_node_path46.default.resolve(root, specifier)).href;
+    return (0, import_node_url.pathToFileURL)(import_node_path45.default.resolve(root, specifier)).href;
   }
-  const requireFromRoot = (0, import_node_module.createRequire)(import_node_path46.default.join(root, "boardreadyops-plugin-loader.cjs"));
+  const requireFromRoot = (0, import_node_module.createRequire)(import_node_path45.default.join(root, "boardreadyops-plugin-loader.cjs"));
   return (0, import_node_url.pathToFileURL)(requireFromRoot.resolve(specifier)).href;
 }
 function validatePlugin(module2, specifier) {
@@ -94465,11 +94932,11 @@ async function readStaticPluginManifest(root, specifier) {
   try {
     let manifestPath;
     if (isPathSpecifier(specifier)) {
-      const resolved = import_node_path46.default.resolve(root, specifier);
+      const resolved = import_node_path45.default.resolve(root, specifier);
       const isDir = await import_promises15.default.stat(resolved).then((s) => s.isDirectory()).catch(() => false);
-      manifestPath = isDir ? import_node_path46.default.join(resolved, "package.json") : import_node_path46.default.join(import_node_path46.default.dirname(resolved), "package.json");
+      manifestPath = isDir ? import_node_path45.default.join(resolved, "package.json") : import_node_path45.default.join(import_node_path45.default.dirname(resolved), "package.json");
     } else {
-      manifestPath = import_node_path46.default.join(root, "node_modules", specifier, "package.json");
+      manifestPath = import_node_path45.default.join(root, "node_modules", specifier, "package.json");
     }
     const content = await import_promises15.default.readFile(manifestPath, "utf8");
     const parsed = JSON.parse(content);
@@ -94498,7 +94965,7 @@ function appendUnique(specifiers, seen, specifier) {
   }
 }
 function isPathSpecifier(specifier) {
-  return specifier.startsWith(".") || specifier.startsWith("/") || import_node_path46.default.isAbsolute(specifier);
+  return specifier.startsWith(".") || specifier.startsWith("/") || import_node_path45.default.isAbsolute(specifier);
 }
 function isMissingPath(error52) {
   return typeof error52 === "object" && error52 !== null && "code" in error52 && error52.code === "ENOENT";
@@ -94864,7 +95331,7 @@ async function runPipeline(input = {}, logger7) {
 }
 async function initializePipelineContext(input, logger7) {
   const cwd = input.cwd ?? process.cwd();
-  const root = await canonicalRoot(import_node_path47.default.resolve(cwd, normalizePathInput(input.path ?? ".")));
+  const root = await canonicalRoot(import_node_path46.default.resolve(cwd, normalizePathInput(input.path ?? ".")));
   const loaded = await loadConfig(root, input.config);
   const loadedConfig = { ...defaultConfig(), ...loaded.config };
   const gate = input.gate ? loadedConfig.gates?.[input.gate] : void 0;
@@ -95066,7 +95533,7 @@ async function bomWithinProject(root, project) {
   ]);
   const first = found[0];
   if (!first) return void 0;
-  const relative = import_node_path47.default.relative(root, first).split(import_node_path47.default.sep).join("/");
+  const relative = import_node_path46.default.relative(root, first).split(import_node_path46.default.sep).join("/");
   return relative.startsWith("..") ? void 0 : relative;
 }
 async function resolveProjectBoms(ctx, projects) {
@@ -95280,8 +95747,8 @@ function ruleObjectConfig(ruleConfig2) {
 var emptyObj = Object.freeze({});
 function configForProject(root, config2, project) {
   const override = config2.projects?.find((candidate) => {
-    const target = import_node_path47.default.resolve(root, normalizePathInput(candidate.path));
-    return target === import_node_path47.default.resolve(root, project.root) || target === import_node_path47.default.resolve(root, project.projectFile);
+    const target = import_node_path46.default.resolve(root, normalizePathInput(candidate.path));
+    return target === import_node_path46.default.resolve(root, project.root) || target === import_node_path46.default.resolve(root, project.projectFile);
   });
   if (!override) {
     return {
@@ -95363,7 +95830,7 @@ function configFindings(root, loaded, criticalErrors = /* @__PURE__ */ new Set()
       severity: criticalErrors.has(error52) ? "critical" : "high",
       message: `Configuration is invalid: ${error52}`,
       resource: {
-        path: loaded.path ? import_node_path47.default.relative(root, loaded.path).replaceAll("\\", "/") : "boardreadyops.yml",
+        path: loaded.path ? import_node_path46.default.relative(root, loaded.path).replaceAll("\\", "/") : "boardreadyops.yml",
         kind: "manifest"
       },
       location: { line: 1, column: 1 },
@@ -96915,7 +97382,7 @@ function validArtifactStoragePath(value) {
   return !value.startsWith("/") && !value.includes("\\") && Array.from(value).every((character) => {
     const code = character.codePointAt(0) ?? 0;
     return code >= 32 && code !== 127;
-  }) && segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
+  }) && segments.every((segment2) => segment2.length > 0 && segment2 !== "." && segment2 !== "..");
 }
 var runnerArtifactUploadCapabilitySchema = external_exports.object({
   artifactId: runnerIdentifierSchema,
@@ -97863,7 +98330,7 @@ async function publishActionRunToCloud(result, inputs, _workspace, logger7) {
 }
 
 // node_modules/@actions/github/lib/context.js
-var import_fs21 = require("fs");
+var import_fs20 = require("fs");
 var import_os3 = require("os");
 var Context2 = class {
   /**
@@ -97873,11 +98340,11 @@ var Context2 = class {
     var _a3, _b, _c;
     this.payload = {};
     if (process.env.GITHUB_EVENT_PATH) {
-      if ((0, import_fs21.existsSync)(process.env.GITHUB_EVENT_PATH)) {
-        this.payload = JSON.parse((0, import_fs21.readFileSync)(process.env.GITHUB_EVENT_PATH, { encoding: "utf8" }));
+      if ((0, import_fs20.existsSync)(process.env.GITHUB_EVENT_PATH)) {
+        this.payload = JSON.parse((0, import_fs20.readFileSync)(process.env.GITHUB_EVENT_PATH, { encoding: "utf8" }));
       } else {
-        const path54 = process.env.GITHUB_EVENT_PATH;
-        process.stdout.write(`GITHUB_EVENT_PATH ${path54} does not exist${import_os3.EOL}`);
+        const path53 = process.env.GITHUB_EVENT_PATH;
+        process.stdout.write(`GITHUB_EVENT_PATH ${path53} does not exist${import_os3.EOL}`);
       }
     }
     this.eventName = process.env.GITHUB_EVENT_NAME;
@@ -101931,7 +102398,7 @@ function bomRiskSection(risk) {
 // src/action/previous-result.ts
 var import_promises20 = __toESM(require("node:fs/promises"), 1);
 var import_node_os5 = __toESM(require("node:os"), 1);
-var import_node_path48 = __toESM(require("node:path"), 1);
+var import_node_path47 = __toESM(require("node:path"), 1);
 
 // node_modules/@actions/artifact/lib/internal/shared/config.js
 var import_os4 = __toESM(require("os"), 1);
@@ -102011,7 +102478,7 @@ function getMaxArtifactListCount() {
 
 // node_modules/@actions/artifact/lib/internal/upload/upload-artifact.js
 var fs23 = __toESM(require("fs"), 1);
-var path48 = __toESM(require("path"), 1);
+var path47 = __toESM(require("path"), 1);
 
 // node_modules/@actions/artifact/lib/generated/google/protobuf/timestamp.js
 var import_runtime = __toESM(require_commonjs(), 1);
@@ -103689,13 +104156,13 @@ These characters are not allowed in the artifact name due to limitations with ce
   }
   info(`Artifact name is valid!`);
 }
-function validateFilePath(path54) {
-  if (!path54) {
+function validateFilePath(path53) {
+  if (!path53) {
     throw new Error(`Provided file path input during validation is empty`);
   }
   for (const [invalidCharacterKey, errorMessageForCharacter] of invalidArtifactFilePathCharacters) {
-    if (path54.includes(invalidCharacterKey)) {
-      throw new Error(`The path for one of the files in artifact is not valid: ${path54}. Contains the following character: ${errorMessageForCharacter}
+    if (path53.includes(invalidCharacterKey)) {
+      throw new Error(`The path for one of the files in artifact is not valid: ${path53}. Contains the following character: ${errorMessageForCharacter}
 
 Invalid characters include: ${Array.from(invalidArtifactFilePathCharacters.values()).toString()}
 
@@ -108103,15 +108570,15 @@ function getRequestUrl(baseUri, operationSpec, operationArguments, fallbackObjec
   let isAbsolutePath = false;
   let requestUrl = replaceAll(baseUri, urlReplacements);
   if (operationSpec.path) {
-    let path54 = replaceAll(operationSpec.path, urlReplacements);
-    if (operationSpec.path === "/{nextLink}" && path54.startsWith("/")) {
-      path54 = path54.substring(1);
+    let path53 = replaceAll(operationSpec.path, urlReplacements);
+    if (operationSpec.path === "/{nextLink}" && path53.startsWith("/")) {
+      path53 = path53.substring(1);
     }
-    if (isAbsoluteUrl(path54)) {
-      requestUrl = path54;
+    if (isAbsoluteUrl(path53)) {
+      requestUrl = path53;
       isAbsolutePath = true;
     } else {
-      requestUrl = appendPath(requestUrl, path54);
+      requestUrl = appendPath(requestUrl, path53);
     }
   }
   const { queryParams, sequenceParams } = calculateQueryParameters(operationSpec, operationArguments, fallbackObject);
@@ -108157,9 +108624,9 @@ function appendPath(url3, pathToAppend) {
   }
   const searchStart = pathToAppend.indexOf("?");
   if (searchStart !== -1) {
-    const path54 = pathToAppend.substring(0, searchStart);
+    const path53 = pathToAppend.substring(0, searchStart);
     const search = pathToAppend.substring(searchStart + 1);
-    newPath = newPath + path54;
+    newPath = newPath + path53;
     if (search) {
       parsedUrl.search = parsedUrl.search ? `${parsedUrl.search}&${search}` : search;
     }
@@ -111357,7 +111824,7 @@ var Expression = class {
    * @returns {Object} Segment object
    */
   _parseSegment(part) {
-    const segment = { type: "tag" };
+    const segment2 = { type: "tag" };
     let bracketContent = null;
     let withoutBrackets = part;
     const bracketMatch = part.match(/^([^\[]+)(\[[^\]]*\])(.*)$/);
@@ -111399,29 +111866,29 @@ var Expression = class {
     if (!tag) {
       throw new Error(`Invalid segment pattern: ${part}`);
     }
-    segment.tag = tag;
+    segment2.tag = tag;
     if (namespace) {
-      segment.namespace = namespace;
+      segment2.namespace = namespace;
     }
     if (bracketContent) {
       if (bracketContent.includes("=")) {
         const eqIndex = bracketContent.indexOf("=");
-        segment.attrName = bracketContent.substring(0, eqIndex).trim();
-        segment.attrValue = bracketContent.substring(eqIndex + 1).trim();
+        segment2.attrName = bracketContent.substring(0, eqIndex).trim();
+        segment2.attrValue = bracketContent.substring(eqIndex + 1).trim();
       } else {
-        segment.attrName = bracketContent.trim();
+        segment2.attrName = bracketContent.trim();
       }
     }
     if (positionMatch) {
       const nthMatch = positionMatch.match(/^nth\((\d+)\)$/);
       if (nthMatch) {
-        segment.position = "nth";
-        segment.positionValue = parseInt(nthMatch[1], 10);
+        segment2.position = "nth";
+        segment2.positionValue = parseInt(nthMatch[1], 10);
       } else {
-        segment.position = positionMatch;
+        segment2.position = positionMatch;
       }
     }
-    return segment;
+    return segment2;
   }
   /**
    * Get the number of segments
@@ -111635,16 +112102,16 @@ var MatcherView = class {
    * @returns {string|undefined}
    */
   getCurrentTag() {
-    const path54 = this._matcher.path;
-    return path54.length > 0 ? path54[path54.length - 1].tag : void 0;
+    const path53 = this._matcher.path;
+    return path53.length > 0 ? path53[path53.length - 1].tag : void 0;
   }
   /**
    * Get current namespace.
    * @returns {string|undefined}
    */
   getCurrentNamespace() {
-    const path54 = this._matcher.path;
-    return path54.length > 0 ? path54[path54.length - 1].namespace : void 0;
+    const path53 = this._matcher.path;
+    return path53.length > 0 ? path53[path53.length - 1].namespace : void 0;
   }
   /**
    * Get current node's attribute value.
@@ -111652,9 +112119,9 @@ var MatcherView = class {
    * @returns {*}
    */
   getAttrValue(attrName) {
-    const path54 = this._matcher.path;
-    if (path54.length === 0) return void 0;
-    return path54[path54.length - 1].values?.[attrName];
+    const path53 = this._matcher.path;
+    if (path53.length === 0) return void 0;
+    return path53[path53.length - 1].values?.[attrName];
   }
   /**
    * Check if current node has an attribute.
@@ -111662,9 +112129,9 @@ var MatcherView = class {
    * @returns {boolean}
    */
   hasAttr(attrName) {
-    const path54 = this._matcher.path;
-    if (path54.length === 0) return false;
-    const current = path54[path54.length - 1];
+    const path53 = this._matcher.path;
+    if (path53.length === 0) return false;
+    const current = path53[path53.length - 1];
     return current.values !== void 0 && attrName in current.values;
   }
   /**
@@ -111672,18 +112139,18 @@ var MatcherView = class {
    * @returns {number}
    */
   getPosition() {
-    const path54 = this._matcher.path;
-    if (path54.length === 0) return -1;
-    return path54[path54.length - 1].position ?? 0;
+    const path53 = this._matcher.path;
+    if (path53.length === 0) return -1;
+    return path53[path53.length - 1].position ?? 0;
   }
   /**
    * Get current node's repeat counter (occurrence count of this tag name).
    * @returns {number}
    */
   getCounter() {
-    const path54 = this._matcher.path;
-    if (path54.length === 0) return -1;
-    return path54[path54.length - 1].counter ?? 0;
+    const path53 = this._matcher.path;
+    if (path53.length === 0) return -1;
+    return path53[path53.length - 1].counter ?? 0;
   }
   /**
    * Get current node's sibling index (alias for getPosition).
@@ -111946,8 +112413,8 @@ var Matcher = class {
     let pathIdx = this.path.length - 1;
     let segIdx = segments.length - 1;
     while (segIdx >= 0 && pathIdx >= 0) {
-      const segment = segments[segIdx];
-      if (segment.type === "deep-wildcard") {
+      const segment2 = segments[segIdx];
+      if (segment2.type === "deep-wildcard") {
         segIdx--;
         if (segIdx < 0) {
           return true;
@@ -111966,7 +112433,7 @@ var Matcher = class {
           return false;
         }
       } else {
-        if (!this._matchSegment(segment, this.path[pathIdx], pathIdx === this.path.length - 1)) {
+        if (!this._matchSegment(segment2, this.path[pathIdx], pathIdx === this.path.length - 1)) {
           return false;
         }
         pathIdx--;
@@ -111978,40 +112445,40 @@ var Matcher = class {
   /**
    * @private
    */
-  _matchSegment(segment, node, isCurrentNode) {
-    if (segment.tag !== "*" && segment.tag !== node.tag) {
+  _matchSegment(segment2, node, isCurrentNode) {
+    if (segment2.tag !== "*" && segment2.tag !== node.tag) {
       return false;
     }
-    if (segment.namespace !== void 0) {
-      if (segment.namespace !== "*" && segment.namespace !== node.namespace) {
+    if (segment2.namespace !== void 0) {
+      if (segment2.namespace !== "*" && segment2.namespace !== node.namespace) {
         return false;
       }
     }
-    if (segment.attrName !== void 0) {
+    if (segment2.attrName !== void 0) {
       if (!isCurrentNode) {
         return false;
       }
-      if (!node.values || !(segment.attrName in node.values)) {
+      if (!node.values || !(segment2.attrName in node.values)) {
         return false;
       }
-      if (segment.attrValue !== void 0) {
-        if (String(node.values[segment.attrName]) !== String(segment.attrValue)) {
+      if (segment2.attrValue !== void 0) {
+        if (String(node.values[segment2.attrName]) !== String(segment2.attrValue)) {
           return false;
         }
       }
     }
-    if (segment.position !== void 0) {
+    if (segment2.position !== void 0) {
       if (!isCurrentNode) {
         return false;
       }
       const counter = node.counter ?? 0;
-      if (segment.position === "first" && counter !== 0) {
+      if (segment2.position === "first" && counter !== 0) {
         return false;
-      } else if (segment.position === "odd" && counter % 2 !== 1) {
+      } else if (segment2.position === "odd" && counter % 2 !== 1) {
         return false;
-      } else if (segment.position === "even" && counter % 2 !== 0) {
+      } else if (segment2.position === "even" && counter % 2 !== 0) {
         return false;
-      } else if (segment.position === "nth" && counter !== segment.positionValue) {
+      } else if (segment2.position === "nth" && counter !== segment2.positionValue) {
         return false;
       }
     }
@@ -114759,9 +115226,9 @@ var StorageSharedKeyCredentialPolicy = class extends CredentialPolicy {
    * @param request -
    */
   getCanonicalizedResourceString(request2) {
-    const path54 = getURLPath(request2.url) || "/";
+    const path53 = getURLPath(request2.url) || "/";
     let canonicalizedResourceString = "";
-    canonicalizedResourceString += `/${this.factory.accountName}${path54}`;
+    canonicalizedResourceString += `/${this.factory.accountName}${path53}`;
     const queries = getURLQueries(request2.url);
     const lowercaseQueries = {};
     if (queries) {
@@ -115251,9 +115718,9 @@ function storageSharedKeyCredentialPolicy(options) {
     return canonicalizedHeadersStringToSign;
   }
   function getCanonicalizedResourceString(request2) {
-    const path54 = getURLPath(request2.url) || "/";
+    const path53 = getURLPath(request2.url) || "/";
     let canonicalizedResourceString = "";
-    canonicalizedResourceString += `/${options.accountName}${path54}`;
+    canonicalizedResourceString += `/${options.accountName}${path53}`;
     const queries = getURLQueries(request2.url);
     const lowercaseQueries = {};
     if (queries) {
@@ -129194,10 +129661,10 @@ var StorageContextClient = class extends StorageClient {
 // node_modules/@azure/storage-blob/dist/esm/utils/utils.common.js
 function escapeURLPath(url3) {
   const urlParsed = new URL(url3);
-  let path54 = urlParsed.pathname;
-  path54 = path54 || "/";
-  path54 = escape2(path54);
-  urlParsed.pathname = path54;
+  let path53 = urlParsed.pathname;
+  path53 = path53 || "/";
+  path53 = escape2(path53);
+  urlParsed.pathname = path53;
   return urlParsed.toString();
 }
 function getProxyUriFromDevConnString(connectionString) {
@@ -129282,9 +129749,9 @@ function escape2(text) {
 }
 function appendToURLPath(url3, name) {
   const urlParsed = new URL(url3);
-  let path54 = urlParsed.pathname;
-  path54 = path54 ? path54.endsWith("/") ? `${path54}${name}` : `${path54}/${name}` : name;
-  urlParsed.pathname = path54;
+  let path53 = urlParsed.pathname;
+  path53 = path53 ? path53.endsWith("/") ? `${path53}${name}` : `${path53}/${name}` : name;
+  urlParsed.pathname = path53;
   return urlParsed.toString();
 }
 function setURLParameter2(url3, name, value) {
@@ -136090,7 +136557,7 @@ var zipEndCallback = () => {
 };
 
 // node_modules/@actions/artifact/lib/internal/upload/types.js
-var path47 = __toESM(require("path"), 1);
+var path46 = __toESM(require("path"), 1);
 var mimeTypes = {
   // Text
   ".txt": "text/plain",
@@ -136151,7 +136618,7 @@ var mimeTypes = {
   ".eot": "application/vnd.ms-fontobject"
 };
 function getMimeType(filePath) {
-  const ext = path47.extname(filePath).toLowerCase();
+  const ext = path46.extname(filePath).toLowerCase();
   return mimeTypes[ext] || "application/octet-stream";
 }
 
@@ -136196,7 +136663,7 @@ function uploadArtifact(name, files, rootDirectory, options) {
       if (!fs23.existsSync(files[0])) {
         throw new FilesNotFoundError(files);
       }
-      artifactFileName = path48.basename(files[0]);
+      artifactFileName = path47.basename(files[0]);
       name = artifactFileName;
     }
     validateArtifactName(name);
@@ -136265,7 +136732,7 @@ var import_promises19 = __toESM(require("fs/promises"), 1);
 var fsSync = __toESM(require("fs"), 1);
 var crypto7 = __toESM(require("crypto"), 1);
 var stream3 = __toESM(require("stream"), 1);
-var path49 = __toESM(require("path"), 1);
+var path48 = __toESM(require("path"), 1);
 var import_unzip_stream = __toESM(require_unzip(), 1);
 var __awaiter10 = function(thisArg, _arguments, P, generator) {
   function adopt(value) {
@@ -136299,10 +136766,10 @@ var scrubQueryParameters = (url3) => {
   parsed.search = "";
   return parsed.toString();
 };
-function exists2(path54) {
+function exists2(path53) {
   return __awaiter10(this, void 0, void 0, function* () {
     try {
-      yield import_promises19.default.access(path54);
+      yield import_promises19.default.access(path53);
       return true;
     } catch (error52) {
       if (error52.code === "ENOENT") {
@@ -136347,7 +136814,7 @@ function streamExtractExternal(url_1, directory_1) {
     const filenamePlain = contentDisposition.match(/(?<!\*)filename\s*=\s*['"]?([^;\r\n"']*)['"]?/i);
     const rawName = (filenameStar === null || filenameStar === void 0 ? void 0 : filenameStar[1]) || (filenamePlain === null || filenamePlain === void 0 ? void 0 : filenamePlain[1]);
     if (rawName) {
-      fileName = path49.basename(decodeURIComponent(rawName.trim()));
+      fileName = path48.basename(decodeURIComponent(rawName.trim()));
     }
     debug(`Content-Type: ${contentType2}, mimeType: ${mimeType}, urlEndsWithZip: ${urlEndsWithZip}, isZip: ${isZip}, skipDecompress: ${skipDecompress}`);
     debug(`Content-Disposition: ${contentDisposition}, fileName: ${fileName}`);
@@ -136382,7 +136849,7 @@ function streamExtractExternal(url_1, directory_1) {
       if (isZip && !skipDecompress) {
         passThrough.pipe(import_unzip_stream.default.Extract({ path: directory })).on("close", onClose).on("error", onError);
       } else {
-        const filePath = path49.join(directory, fileName);
+        const filePath = path48.join(directory, fileName);
         const writeStream = fsSync.createWriteStream(filePath);
         info(`Downloading raw file (non-zip) to: ${filePath}`);
         passThrough.pipe(writeStream).on("close", onClose).on("error", onError);
@@ -136513,17 +136980,17 @@ function requestLog(octokit) {
     octokit.log.debug("request", options);
     const start = Date.now();
     const requestOptions = octokit.request.endpoint.parse(options);
-    const path54 = requestOptions.url.replace(options.baseUrl, "");
+    const path53 = requestOptions.url.replace(options.baseUrl, "");
     return request2(options).then((response) => {
       const requestId2 = response.headers["x-github-request-id"];
       octokit.log.info(
-        `${requestOptions.method} ${path54} - ${response.status} with id ${requestId2} in ${Date.now() - start}ms`
+        `${requestOptions.method} ${path53} - ${response.status} with id ${requestId2} in ${Date.now() - start}ms`
       );
       return response;
     }).catch((error52) => {
       const requestId2 = error52.response?.headers["x-github-request-id"] || "UNKNOWN";
       octokit.log.error(
-        `${requestOptions.method} ${path54} - ${error52.status} with id ${requestId2} in ${Date.now() - start}ms`
+        `${requestOptions.method} ${path53} - ${error52.status} with id ${requestId2} in ${Date.now() - start}ms`
       );
       throw error52;
     });
@@ -137124,7 +137591,7 @@ async function loadExactBaseRunResult(input) {
     );
     if (!artifact) continue;
     sawNamedArtifact = true;
-    const directory = await import_promises20.default.mkdtemp(import_node_path48.default.join(import_node_os5.default.tmpdir(), "boardreadyops-exact-base-"));
+    const directory = await import_promises20.default.mkdtemp(import_node_path47.default.join(import_node_os5.default.tmpdir(), "boardreadyops-exact-base-"));
     try {
       const downloaded = await client2.downloadArtifact(artifact.id, { path: directory, findBy });
       const parsed = await findComparisonRunResultArtifact(downloaded.downloadPath ?? directory);
@@ -137156,7 +137623,7 @@ async function loadPreviousRunResult(token, owner, repo, artifactName2, pull) {
       if (!artifact) {
         continue;
       }
-      const directory = await import_promises20.default.mkdtemp(import_node_path48.default.join(import_node_os5.default.tmpdir(), "boardreadyops-previous-"));
+      const directory = await import_promises20.default.mkdtemp(import_node_path47.default.join(import_node_os5.default.tmpdir(), "boardreadyops-previous-"));
       try {
         const downloaded = await client2.downloadArtifact(artifact.id, { path: directory, findBy }).catch(() => void 0);
         const previous = await findRunResultArtifact(downloaded?.downloadPath ?? directory);
@@ -137258,7 +137725,7 @@ function isRecord(value) {
 }
 async function artifactFiles(root) {
   const entries = await import_promises20.default.readdir(root, { recursive: true, withFileTypes: true }).catch(() => []);
-  return entries.filter((entry) => entry.isFile()).map((entry) => import_node_path48.default.join(entry.parentPath, entry.name)).sort(compareText);
+  return entries.filter((entry) => entry.isFile()).map((entry) => import_node_path47.default.join(entry.parentPath, entry.name)).sort(compareText);
 }
 function compareText(left, right) {
   if (left < right) return -1;
@@ -137328,7 +137795,7 @@ function reviewReports(artifactName2) {
 
 // src/action/hardware-impact.ts
 var import_promises21 = require("node:fs/promises");
-var import_node_path49 = __toESM(require("node:path"), 1);
+var import_node_path48 = __toESM(require("node:path"), 1);
 
 // src/core/diff/run.ts
 function diffRuns(previous, current, options = {}) {
@@ -137667,7 +138134,7 @@ async function hostedPullRequestBinding(token, owner, repo) {
 }
 async function checkoutSha(workspace) {
   const gitDirectory = await resolveGitDirectory(workspace);
-  const head = (await (0, import_promises21.readFile)(import_node_path49.default.join(gitDirectory, "HEAD"), "utf8")).trim();
+  const head = (await (0, import_promises21.readFile)(import_node_path48.default.join(gitDirectory, "HEAD"), "utf8")).trim();
   if (fullLowercaseSha2.test(head)) return head;
   const match = /^ref: (refs\/[^\r\n]+)$/u.exec(head);
   const ref = match?.[1];
@@ -137675,9 +138142,9 @@ async function checkoutSha(workspace) {
     throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
   }
   const commonDirectory = await resolveCommonGitDirectory(gitDirectory);
-  const looseSha = await readOptionalText(import_node_path49.default.join(commonDirectory, ...ref.split("/")));
+  const looseSha = await readOptionalText(import_node_path48.default.join(commonDirectory, ...ref.split("/")));
   if (looseSha && fullLowercaseSha2.test(looseSha.trim())) return looseSha.trim();
-  const packedRefs = await readOptionalText(import_node_path49.default.join(commonDirectory, "packed-refs"));
+  const packedRefs = await readOptionalText(import_node_path48.default.join(commonDirectory, "packed-refs"));
   const packedSha = packedRefs ? packedRefSha(packedRefs, ref) : void 0;
   if (packedSha) return packedSha;
   throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
@@ -137693,18 +138160,18 @@ function packedRefSha(packedRefs, ref) {
   return void 0;
 }
 async function resolveGitDirectory(workspace) {
-  const dotGit = import_node_path49.default.join(workspace, ".git");
+  const dotGit = import_node_path48.default.join(workspace, ".git");
   const metadata2 = await (0, import_promises21.stat)(dotGit);
   if (metadata2.isDirectory()) return dotGit;
   if (!metadata2.isFile()) throw new Error("workspace .git metadata is unavailable");
   const marker2 = (await (0, import_promises21.readFile)(dotGit, "utf8")).trim();
   const match = /^gitdir: (.+)$/u.exec(marker2);
   if (!match?.[1]) throw new Error("workspace .git metadata is invalid");
-  return import_node_path49.default.resolve(import_node_path49.default.dirname(dotGit), match[1]);
+  return import_node_path48.default.resolve(import_node_path48.default.dirname(dotGit), match[1]);
 }
 async function resolveCommonGitDirectory(gitDirectory) {
-  const commonMarker = await readOptionalText(import_node_path49.default.join(gitDirectory, "commondir"));
-  return commonMarker ? import_node_path49.default.resolve(gitDirectory, commonMarker.trim()) : gitDirectory;
+  const commonMarker = await readOptionalText(import_node_path48.default.join(gitDirectory, "commondir"));
+  return commonMarker ? import_node_path48.default.resolve(gitDirectory, commonMarker.trim()) : gitDirectory;
 }
 async function readOptionalText(file2) {
   try {
@@ -137716,7 +138183,7 @@ async function readOptionalText(file2) {
 }
 function safeGitRef(ref) {
   if (!ref.startsWith("refs/") || ref.includes("\\")) return false;
-  return ref.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
+  return ref.split("/").every((segment2) => segment2.length > 0 && segment2 !== "." && segment2 !== "..");
 }
 function numericRunId(value) {
   if (!value) return void 0;
@@ -137725,9 +138192,9 @@ function numericRunId(value) {
 }
 
 // src/action/inputs.ts
-var import_node_path50 = __toESM(require("node:path"), 1);
+var import_node_path49 = __toESM(require("node:path"), 1);
 function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? process.cwd()) {
-  const root = import_node_path50.default.resolve(workspace);
+  const root = import_node_path49.default.resolve(workspace);
   const gate = empty(getInput("gate"));
   return {
     cwd: root,
@@ -137866,7 +138333,7 @@ function optionalNonNegativeInteger(value, name) {
   return Number.parseInt(trimmed, 10);
 }
 function workspacePath(workspace, value) {
-  const resolved = import_node_path50.default.resolve(workspace, value);
+  const resolved = import_node_path49.default.resolve(workspace, value);
   if (!isInside(workspace, resolved)) {
     throw new Error(`Input path must stay inside GITHUB_WORKSPACE: ${value}`);
   }
@@ -138043,7 +138510,7 @@ async function ensureRunnerFile(file2) {
   if (!file2) {
     return;
   }
-  await import_promises23.default.mkdir(import_node_path51.default.dirname(file2), { recursive: true });
+  await import_promises23.default.mkdir(import_node_path50.default.dirname(file2), { recursive: true });
   await import_promises23.default.appendFile(file2, "", "utf8");
 }
 function githubRunUrl() {
