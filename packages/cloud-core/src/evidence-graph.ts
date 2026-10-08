@@ -359,6 +359,19 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
   if (!nodesById.has(graph.rootReleaseId)) {
     throw new Error("Evidence graph root release node is missing.");
   }
+  if (nodesById.get(graph.rootReleaseId)?.kind !== "release") {
+    throw new Error("Evidence graph root does not identify a release node.");
+  }
+  for (const edge of graph.edges) {
+    if (!nodesById.has(edge.from) || !nodesById.has(edge.to)) {
+      throw new Error("Evidence graph edge references an unknown node.");
+    }
+  }
+  for (const missing of graph.missing) {
+    if (!nodesById.has(missing.from)) {
+      throw new Error("Evidence graph missing-evidence record references an unknown source node.");
+    }
+  }
   const backwardRelationships = new Set<EvidenceGraphRelationship>([
     "approved_by",
     "derived_from",

@@ -141,6 +141,60 @@ describe("release evidence graph", () => {
     );
   });
 
+  it("rejects dangling evidence graph edges instead of silently hiding missing evidence", () => {
+    const valid = buildReleaseEvidenceGraph({
+      release: {
+        id: "run-integrity",
+        repositoryId: "repo-one",
+        repository: "acme/board",
+        commitSha: "a".repeat(40),
+      },
+    });
+    const firstEdge = valid.edges[0];
+    if (!firstEdge) throw new Error("Missing canonical source edge");
+    expect(() =>
+      traceReleaseEvidence({
+        ...valid,
+        edges: [{ ...firstEdge, to: "source:unrecognized" }],
+      }),
+    ).toThrow("Evidence graph edge references an unknown node.");
+    expect(() =>
+      traceReleaseEvidence({
+        ...valid,
+        edges: [{ ...firstEdge, from: "release:forged" }],
+      }),
+    ).toThrow("Evidence graph edge references an unknown node.");
+    expect(() =>
+      traceReleaseEvidence({
+        ...valid,
+        missing: [
+          {
+            from: "review:not-present",
+            relationship: "approved_by",
+            expectedKind: "approval",
+            reason: "Missing approval",
+          },
+        ],
+      }),
+    ).toThrow("Evidence graph missing-evidence record references an unknown source node.");
+  });
+
+  it("requires a release node at the graph's claimed root", () => {
+    const valid = buildReleaseEvidenceGraph({
+      release: {
+        id: "run-root",
+        repositoryId: "repo-one",
+        repository: "acme/board",
+        commitSha: "b".repeat(40),
+      },
+    });
+    const source = valid.nodes.find((node) => node.kind === "source");
+    if (!source) throw new Error("Missing expected source");
+    expect(() => traceReleaseEvidence({ ...valid, rootReleaseId: source.id })).toThrow(
+      "Evidence graph root does not identify a release node.",
+    );
+  });
+
   it("keeps absent optional relationships explicit instead of inventing evidence", () => {
     const graph = buildReleaseEvidenceGraph({
       release: {
