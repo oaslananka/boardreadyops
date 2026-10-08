@@ -97,6 +97,9 @@ describe("release evidence graph", () => {
       buildReleaseEvidenceGraph({ ...base, release: { ...base.release, commitSha: "not-a-commit" } }),
     ).toThrow("Invalid evidence graph release commit SHA");
     expect(() =>
+      buildReleaseEvidenceGraph({ ...base, release: { ...base.release, commitSha: "A".repeat(40) } }),
+    ).toThrow("Invalid evidence graph release commit SHA");
+    expect(() =>
       buildReleaseEvidenceGraph({
         ...base,
         evidence: [{ id: "artifact-1", kind: "report", name: "report.json", sha256: "not-a-digest" }],
@@ -163,6 +166,12 @@ describe("release evidence graph", () => {
       node.kind === "evidence" ? { ...node, integrity: { sha256: "tampered" } } : node,
     );
     expect(() => traceReleaseEvidence({ ...graph, nodes: tamperedEvidence })).toThrow(
+      "Invalid evidence graph SHA-256 digest for evidence",
+    );
+    const uppercaseEvidence = graph.nodes.map((node) =>
+      node.kind === "evidence" ? { ...node, integrity: { sha256: "C".repeat(64) } } : node,
+    );
+    expect(() => traceReleaseEvidence({ ...graph, nodes: uppercaseEvidence })).toThrow(
       "Invalid evidence graph SHA-256 digest for evidence",
     );
     const tamperedSource = graph.nodes.map((node) =>

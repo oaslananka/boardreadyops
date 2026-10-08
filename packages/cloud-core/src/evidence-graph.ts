@@ -117,8 +117,8 @@ export type ReleaseEvidenceTrace = {
   missing: readonly MissingEvidenceRelationship[];
 };
 
-const commitShaPattern = /^[0-9a-f]{40}$/iu;
-const digestPattern = /^[0-9a-f]{64}$/iu;
+const commitShaPattern = /^[0-9a-f]{40}$/u;
+const digestPattern = /^[0-9a-f]{64}$/u;
 
 function requireIntegrityDigest(value: string, subject: string): void {
   if (!digestPattern.test(value)) throw new Error(`Invalid evidence graph SHA-256 digest for ${subject}.`);
