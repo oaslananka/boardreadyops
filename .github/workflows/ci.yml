@@ -298,8 +298,23 @@ jobs:
             echo "::error::Expected KiCad ${{ matrix.kicad-version }}.*, got ${version}"
             exit 1
           fi
-      - name: Install PostgreSQL client
+      - name: Install PostgreSQL 16 client
+        if: matrix.postgres-version == '16'
         run: sudo apt-get install --yes postgresql-client
+      - name: Prepare PostgreSQL 17 client wrappers
+        if: matrix.postgres-version == '17'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pg17-client"
+          for command in pg_dump pg_restore; do
+            cat > "$RUNNER_TEMP/pg17-client/$command" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec docker run --rm --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 "$(basename "$0")" "$@"
+          SH
+            chmod 0755 "$RUNNER_TEMP/pg17-client/$command"
+          done
       - run: corepack pnpm run deps:install-ci
       - name: Apply cloud migrations
         run: pnpm --filter @boardreadyops/db db:migrate
@@ -317,7 +332,13 @@ jobs:
           fi
       - name: Run integration tests with JUnit report
         id: tests
-        run: pnpm run test:int --reporter=junit --outputFile=junit.xml
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.postgres-version }}" == "17" ]]; then
+            export PATH="$RUNNER_TEMP/pg17-client:$PATH"
+          fi
+          pnpm run test:int --reporter=default --reporter=junit --outputFile.junit=junit.xml
         continue-on-error: true
       - name: Upload test results to Mergify CI Insights
         if: ${{ always() && steps.mergify-token.outputs.enabled == 'true' }}

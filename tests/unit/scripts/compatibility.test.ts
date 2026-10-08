@@ -448,6 +448,13 @@ describe("compatibility matrix", () => {
       ports: ["5432:5432"],
     });
     expect(integration?.services?.postgres?.options).toContain("pg_isready -U boardreadyops -d boardreadyops_test");
+    const pg17Setup = (integration?.steps ?? []).find((step) => (step.run ?? "").includes("pg_dump pg_restore"));
+    expect(pg17Setup?.run).toContain("pg_dump pg_restore");
+    expect(pg17Setup?.run).toContain("docker run --rm --network host");
+    expect(pg17Setup?.run).toContain(
+      "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+    );
+    expect(integrationRuns).toContain("--reporter=default --reporter=junit");
     expect(integrationRuns).toContain("pnpm --filter @boardreadyops/db db:migrate");
     expect(integrationRuns).toContain("pnpm run test:int");
     expect(config.kicad.tested).toEqual(["10.0"]);
