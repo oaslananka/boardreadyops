@@ -12,7 +12,10 @@ describe("public golden demo links", () => {
   it("links real local fixtures without promising missing external pull requests", async () => {
     const files = await Promise.all(sources.map((source) => readFile(source, "utf8")));
     const combined = files.join("\n");
+    const homepage = files.at(-1) ?? "";
 
+    expect(homepage).toContain("boardreadyops run examples/golden-demo/broken");
+    expect(homepage).toContain("boardreadyops run examples/golden-demo/fixed");
     expect(combined).toContain("examples/golden-demo/broken");
     expect(combined).toContain("examples/golden-demo/fixed");
     expect(combined.toLowerCase()).toContain("expected pass");

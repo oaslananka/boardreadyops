@@ -463,8 +463,8 @@ export default function HomePage() {
             <p className="mt-4 text-xs text-muted-foreground">
               Synthetic hardware is included in the repository. Run{" "}
               <code className="rounded-sm bg-muted px-1.5 py-0.5">boardreadyops run examples/golden-demo/broken</code>{" "}
-              or the <code className="rounded-sm bg-muted px-1.5 py-0.5">fixed</code> fixture — no KiCad installation
-              needed.
+              or <code className="rounded-sm bg-muted px-1.5 py-0.5">boardreadyops run examples/golden-demo/fixed</code>{" "}
+              — no KiCad installation needed.
             </p>
           </div>
         </section>
