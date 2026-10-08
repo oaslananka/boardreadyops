@@ -41190,7 +41190,13 @@ var import_node_path7 = __toESM(require("node:path"), 1);
 var import_picomatch = __toESM(require_picomatch2(), 1);
 init_path();
 var ignoredDirectoryNames = /* @__PURE__ */ new Set(["node_modules", ".git", "dist", "coverage"]);
-async function collectFiles(root, directory, output) {
+var SymlinkedGlobInputError = class extends Error {
+  constructor() {
+    super("Symlinked source input rejected.");
+    this.name = "SymlinkedGlobInputError";
+  }
+};
+async function collectFiles(root, directory, output, strictSourceMatcher) {
   let entries;
   try {
     entries = await import_promises5.default.readdir(directory, { withFileTypes: true });
@@ -41202,19 +41208,24 @@ async function collectFiles(root, directory, output) {
     if (entry.name.startsWith(".")) continue;
     if (entry.isDirectory() && ignoredDirectoryNames.has(entry.name)) continue;
     const absolute = import_node_path7.default.join(directory, entry.name);
+    const relative = toPosixPath(import_node_path7.default.relative(root, absolute));
+    if (entry.isSymbolicLink()) {
+      if (strictSourceMatcher?.(relative)) throw new SymlinkedGlobInputError();
+      continue;
+    }
     if (entry.isDirectory()) {
-      await collectFiles(root, absolute, output);
+      await collectFiles(root, absolute, output, strictSourceMatcher);
       continue;
     }
     if (!entry.isFile()) continue;
-    output.push(toPosixPath(import_node_path7.default.relative(root, absolute)));
+    output.push(relative);
   }
 }
-async function globFiles(root, patterns) {
+async function globFiles(root, patterns, options = {}) {
   const absoluteRoot = import_node_path7.default.resolve(root);
   const relativeFiles = [];
-  await collectFiles(absoluteRoot, absoluteRoot, relativeFiles);
   const matches = (0, import_picomatch.default)(patterns, { dot: false });
+  await collectFiles(absoluteRoot, absoluteRoot, relativeFiles, options.rejectMatchingSymlinks ? matches : void 0);
   return relativeFiles.filter((relative) => matches(relative)).map((relative) => toPosixPath(import_node_path7.default.resolve(absoluteRoot, relative))).sort((a, b) => a.localeCompare(b));
 }
 
@@ -47676,17 +47687,16 @@ var SOURCE_PATTERNS = [
   "**/*.kicad_wks"
 ];
 async function sourceFingerprintDetail(root, customPatterns = SOURCE_PATTERNS) {
-  const files = await globFiles(root, customPatterns);
-  const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
+  const files = await globFiles(root, customPatterns, { rejectMatchingSymlinks: true });
   const hasher = (0, import_node_crypto4.createHash)("sha256");
-  for (const absolutePath of sortedFiles) {
+  for (const absolutePath of files) {
     const relPath = normalizeRelative(root, absolutePath);
     const content = await import_promises14.default.readFile(absolutePath);
     hasher.update(`${relPath}\0`, "utf8");
     hasher.update(content);
     hasher.update("\0", "utf8");
   }
-  return { fingerprint: hasher.digest("hex"), sourceCount: sortedFiles.length };
+  return { fingerprint: hasher.digest("hex"), sourceCount: files.length };
 }
 async function computeSourceFingerprint(root, customPatterns = SOURCE_PATTERNS) {
   return (await sourceFingerprintDetail(root, customPatterns)).fingerprint;
@@ -47838,10 +47848,12 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
     const current = await sourceFingerprintDetail(root);
     currentFingerprint = current.fingerprint;
     sourceCount = current.sourceCount;
-  } catch {
+  } catch (error51) {
     return {
       status: "mismatch",
-      reasons: ["Source fingerprint could not be computed because a source input is unreadable or missing."],
+      reasons: [
+        error51 instanceof SymlinkedGlobInputError ? "Source fingerprint could not be computed because a KiCad source input is a symlink." : "Source fingerprint could not be computed because a source input is unreadable or missing."
+      ],
       manifest
     };
   }
