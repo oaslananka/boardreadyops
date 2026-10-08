@@ -41211,9 +41211,14 @@ async function collectFiles(root, directory, output, strictSourceMatcher) {
     const relative = toPosixPath(import_node_path7.default.relative(root, absolute));
     if (entry.isSymbolicLink()) {
       if (strictSourceMatcher) {
-        if (strictSourceMatcher(relative) || (await import_promises5.default.stat(absolute)).isDirectory()) {
+        if (strictSourceMatcher(relative)) throw new SymlinkedGlobInputError();
+        let targetIsDirectory;
+        try {
+          targetIsDirectory = (await import_promises5.default.stat(absolute)).isDirectory();
+        } catch {
           throw new SymlinkedGlobInputError();
         }
+        if (targetIsDirectory) throw new SymlinkedGlobInputError();
       }
       continue;
     }

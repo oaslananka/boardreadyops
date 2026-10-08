@@ -40,9 +40,16 @@ async function collectFiles(
     // sources below a linked directory cannot be ruled out without following it.
     if (entry.isSymbolicLink()) {
       if (strictSourceMatcher) {
-        if (strictSourceMatcher(relative) || (await fs.stat(absolute)).isDirectory()) {
+        if (strictSourceMatcher(relative)) throw new SymlinkedGlobInputError();
+        let targetIsDirectory: boolean;
+        try {
+          targetIsDirectory = (await fs.stat(absolute)).isDirectory();
+        } catch {
+          // An unresolved/unreadable link could become a source directory between
+          // discovery and export. Keep strict provenance fail-closed and typed.
           throw new SymlinkedGlobInputError();
         }
+        if (targetIsDirectory) throw new SymlinkedGlobInputError();
       }
       continue;
     }

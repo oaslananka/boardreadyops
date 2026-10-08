@@ -92,6 +92,21 @@ describe("globFiles", () => {
     },
   );
 
+  it.skipIf(process.platform === "win32")(
+    "turns broken nonmatching links into a typed strict-source failure rather than raw ENOENT",
+    async () => {
+      const root = await fixture(["board.kicad_pcb", "notes.txt"]);
+      await fs.symlink("missing-inputs", path.join(root, "stale-design-link"), "dir");
+      await fs.symlink("notes.txt", path.join(root, "notes-alias.txt"));
+      await expect(globFiles(root, ["**/*.kicad_pcb"])).resolves.toHaveLength(1);
+      await expect(globFiles(root, ["**/*.kicad_pcb"], { rejectMatchingSymlinks: true })).rejects.toThrow(
+        "Symlinked source input rejected",
+      );
+      await fs.rm(path.join(root, "stale-design-link"));
+      await expect(globFiles(root, ["**/*.kicad_pcb"], { rejectMatchingSymlinks: true })).resolves.toHaveLength(1);
+    },
+  );
+
   it("does not follow symlinks outside the requested root", async () => {
     const root = await fixture(["inside.txt"]);
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-glob-outside-"));
