@@ -79,6 +79,10 @@ describe("Data & Retention settings administration", () => {
     expect(forms).toContain("max={3650}");
     expect(forms).toContain('name="installationId"');
     expect(forms).toContain("Release legal hold?");
+    expect(forms).toContain("requests already blocked by this hold remain blocked");
+    expect(forms).toContain("release does not restart deletion");
+    expect(forms).toContain("authorized, audited operator requeue is required and is not yet supported");
+    expect(forms).not.toContain("will stop blocking retention cleanup and matching erasure requests");
     expect(forms).toContain("Repository and user holds need an exact id");
   });
 });
