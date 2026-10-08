@@ -94,11 +94,39 @@ describe("generator output cleanup safety boundary", () => {
     await fs.writeFile(artifact, "changed");
     await expect(assertSafeGenerateOutputCleanup(output, { gitRoot: root })).rejects.toThrow("has changed");
     expect(await fs.readFile(artifact, "utf8")).toBe("changed");
+    await fs.writeFile(artifact, "X".repeat(Buffer.byteLength("manufacturing bytes")));
+    await expect(assertSafeGenerateOutputCleanup(output, { gitRoot: root })).rejects.toThrow("has changed");
 
     const second = await managedOutput(await directory());
     await fs.writeFile(path.join(second.output, "gerbers", "extra.gbr"), "not declared");
     await expect(assertSafeGenerateOutputCleanup(second.output, {})).rejects.toThrow("undeclared");
     expect(await fs.readFile(path.join(second.output, "gerbers", "extra.gbr"), "utf8")).toBe("not declared");
+  });
+
+  it("supports repeat generation when the previous output inventory is intact", async () => {
+    const root = await directory();
+    const outputDir = path.join(root, "generated");
+    const run = async () =>
+      await runGenerate(
+        { steps: [{ kind: "gerbers" }] },
+        {
+          outputDir,
+          boardFile: path.join(root, "source.kicad_pcb"),
+          runner: async (args) => {
+            const index = args.indexOf("--output");
+            const target = args[index + 1];
+            if (!target) throw new Error("Missing generator output path");
+            await fs.mkdir(target, { recursive: true });
+            await fs.writeFile(path.join(target, "F_Cu.gbr"), "manufactured content");
+            return { code: 0, stdout: "ok", stderr: "", timedOut: false };
+          },
+        },
+      );
+    const first = await run();
+    expect(first.failures).toBe(0);
+    const second = await run();
+    expect(second.failures).toBe(0);
+    expect(await fs.readFile(path.join(outputDir, "gerbers", "F_Cu.gbr"), "utf8")).toBe("manufactured content");
   });
 
   it("prevents the generator itself from invoking the runner or erasing project source", async () => {

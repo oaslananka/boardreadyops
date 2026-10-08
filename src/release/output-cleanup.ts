@@ -75,6 +75,10 @@ async function readManagedOutputManifest(directory: string): Promise<PreviousArt
 async function verifyExistingArtifactBytes(directory: string, artifacts: readonly PreviousArtifact[]): Promise<void> {
   for (const artifact of artifacts) {
     const filename = path.join(directory, artifact.path);
+    const stat = await fs.lstat(filename);
+    if (!stat.isFile() || stat.size !== artifact.bytes) {
+      throw new Error("A previously generated artifact has changed; choose a fresh --output path.");
+    }
     const hash = createHash("sha256");
     let bytes = 0;
     for await (const chunk of createReadStream(filename)) {

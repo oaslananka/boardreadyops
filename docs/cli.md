@@ -204,7 +204,6 @@ See [Vendor Profiles](vendor-profiles.md) for configuration examples.
 
 Generated output cleanup is fail-closed: the command never recursively replaces the project/source directory, Git metadata or a symlink output. A new or empty output directory is accepted; an existing nonempty directory must contain a recognizable BoardReadyOps generation manifest whose complete file inventory and file digests still match. Unmanaged or manually edited files are preserved; select a fresh `--output` directory instead of pointing the generator at a workspace or hand-edited fabrication package.
 
-
 ```bash
 boardreadyops generate .
 boardreadyops generate . --project hardware/mainboard --variant production
