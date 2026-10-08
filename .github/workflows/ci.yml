@@ -311,7 +311,15 @@ jobs:
             cat > "$RUNNER_TEMP/pg17-client/$command" <<'SH'
           #!/usr/bin/env bash
           set -euo pipefail
-          exec docker run --rm --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 "$(basename "$0")" "$@"
+          command="$(basename "$0")"
+          if [[ "$command" == "pg_restore" ]]; then
+            arguments=("$@")
+            archive="${arguments[-1]}"
+            unset 'arguments[-1]'
+            [[ -f "$archive" && ! -L "$archive" ]] || exit 2
+            exec docker run --rm -i --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 pg_restore "${arguments[@]}" < "$archive"
+          fi
+          exec docker run --rm --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 "$command" "$@"
           SH
             chmod 0755 "$RUNNER_TEMP/pg17-client/$command"
           done
