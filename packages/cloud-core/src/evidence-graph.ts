@@ -332,6 +332,16 @@ export function buildReleaseEvidenceGraph(input: ReleaseEvidenceGraphInput): Rel
   addReview(state, releaseId, input.review);
   addProduction(state, releaseId, input.productionBatches ?? []);
 
+  // Node identity is an integrity boundary: duplicated artifact/batch/approval IDs
+  // cannot be silently coalesced into whichever record the traversal sees last.
+  const nodeIds = new Set<string>();
+  for (const node of state.nodes) {
+    if (nodeIds.has(node.id)) {
+      throw new Error(`Duplicate evidence graph node identity: ${node.id}`);
+    }
+    nodeIds.add(node.id);
+  }
+
   return {
     version: 1,
     rootReleaseId: releaseId,
@@ -343,6 +353,12 @@ export function buildReleaseEvidenceGraph(input: ReleaseEvidenceGraphInput): Rel
 
 export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEvidenceTrace {
   const nodesById = new Map(graph.nodes.map((node) => [node.id, node] as const));
+  if (nodesById.size !== graph.nodes.length) {
+    throw new Error("Evidence graph contains duplicate node identities.");
+  }
+  if (!nodesById.has(graph.rootReleaseId)) {
+    throw new Error("Evidence graph root release node is missing.");
+  }
   const backwardRelationships = new Set<EvidenceGraphRelationship>([
     "approved_by",
     "derived_from",
