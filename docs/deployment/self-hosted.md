@@ -272,8 +272,12 @@ docker builder prune --all --force
 docker image prune --force
 ```
 
-After every successful build, including `dry_run`, the workflow restores the normal 3 GB BuildKit
-cache cap with `docker builder prune --all --force --max-used-space 3GB`. Repeated rehearsals still
+After every successful build, including `dry_run`, the workflow enforces the normal 3 GB BuildKit
+cache cap with `docker buildx prune --all --force --max-used-space 3GB`.
+If cache budget enforcement fails, the workflow reports a failure rather than silently allowing
+unbounded build garbage; for a real deploy, inspect the live stack because replacement may already
+have occurred. Every successful build prints an aggregate disk and BoardReadyOps image summary
+after cleanup, so gradual growth is visible on normal deploys as well as low-space preflights. Repeated rehearsals still
 build on the production host, so this keeps useful recent cache during normal operation without
 letting a low-space preflight fail while safe-to-delete cache still occupies the build floor.
 Tagged runtime images are not touched by cache GC and remain governed by the rollback retention

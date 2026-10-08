@@ -71,9 +71,9 @@ describe("cloud-deploy topology preflight", () => {
 
     expect(workflow).toContain("build_cache_max_used_space=3GB");
     expect(workflow).toContain("docker builder prune --all --force || true");
-    expect(workflow).toContain(
-      `docker builder prune --all --force --max-used-space "${buildCacheMaxUsedSpace}" || true`,
-    );
+    expect(workflow).toContain(`docker buildx prune --all --force --max-used-space "${buildCacheMaxUsedSpace}"`);
+    expect(workflow).toContain("cloud-deploy cache: unable to enforce");
+    expect(workflow).not.toContain(`--max-used-space "${buildCacheMaxUsedSpace}" || true`);
     expect(workflow).not.toContain("--filter until=168h");
 
     const lowSpaceCheck = workflow.indexOf(`if [ "${availableMib}" -lt "${requiredMib}" ]; then`);
@@ -81,7 +81,7 @@ describe("cloud-deploy topology preflight", () => {
     const checkout = workflow.indexOf(`cd "${repoDir}"`);
     const caseStart = workflow.indexOf(`case "${deployArgs}" in`);
     const caseEnd = workflow.indexOf("          esac", caseStart);
-    const finalTrim = workflow.indexOf("          trim_build_cache", caseEnd);
+    const finalTrim = workflow.indexOf("          if ! trim_build_cache; then", caseEnd);
 
     expect(lowSpaceCheck).toBeGreaterThan(0);
     expect(preflightReclaim).toBeGreaterThan(lowSpaceCheck);
@@ -89,6 +89,12 @@ describe("cloud-deploy topology preflight", () => {
     expect(caseStart).toBeGreaterThan(checkout);
     expect(caseEnd).toBeGreaterThan(caseStart);
     expect(finalTrim).toBeGreaterThan(caseEnd);
+    expect(workflow).toContain("if ! trim_build_cache; then");
+    expect(workflow).toContain("report_disk_summary\n            exit 78");
+    const finalSummary = workflow.indexOf("          report_disk_summary", finalTrim);
+    expect(finalSummary).toBeGreaterThan(finalTrim);
+    expect(workflow).not.toContain("docker system prune");
+    expect(workflow).not.toContain("docker volume prune");
   });
 
   it("retires tagged runtime images before a blocked build only after explicit operator opt-in", () => {
