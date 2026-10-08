@@ -178,15 +178,18 @@ const MAX_FIRST_PARTY_OUTPUT_DEPTH = 32;
 function canonicalGeneratedPath(value: string): boolean {
   if (!value || value.includes("\\") || path.isAbsolute(value) || path.win32.isAbsolute(value)) return false;
   if (path.posix.normalize(value) !== value) return false;
-  return value.split("/").every(
-    (part) =>
-      part !== "" &&
-      part !== "." &&
-      part !== ".." &&
-      !/[<>:"|?*\u0000-\u001f]/u.test(part) &&
-      !/[. ]$/u.test(part) &&
-      !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(part),
-  );
+  return value
+    .split("/")
+    .every(
+      (part) =>
+        part !== "" &&
+        part !== "." &&
+        part !== ".." &&
+        !/[<>:"|?*]/u.test(part) &&
+        part.split("").every((character) => character.charCodeAt(0) >= 32) &&
+        !/[. ]$/u.test(part) &&
+        !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(part),
+    );
 }
 
 async function checkFirstPartyOutputSet(
@@ -202,12 +205,12 @@ async function checkFirstPartyOutputSet(
   for (const artifact of artifacts) {
     const name = artifact.path;
     if (!canonicalGeneratedPath(name) || name === path.basename(manifestPath)) {
-      reasons.push("Non-canonical generated artifact path or manifest self-reference: " + name);
+      reasons.push(`Non-canonical generated artifact path or manifest self-reference: ${name}`);
       continue;
     }
     const portableKey = name.normalize("NFC").toLowerCase();
     if (declaredAliases.has(portableKey)) {
-      reasons.push("Cross-platform generated artifact alias: " + name);
+      reasons.push(`Cross-platform generated artifact alias: ${name}`);
       continue;
     }
     declaredAliases.add(portableKey);
@@ -220,9 +223,7 @@ async function checkFirstPartyOutputSet(
 
   const actualFiles = new Set<string>();
   const actualAliases = new Set<string>();
-  const pending: Array<{ dir: string; relative: string; depth: number }> = [
-    { dir: directory, relative: "", depth: 0 },
-  ];
+  const pending: Array<{ dir: string; relative: string; depth: number }> = [{ dir: directory, relative: "", depth: 0 }];
   let entriesVisited = 0;
 
   try {
@@ -234,34 +235,34 @@ async function checkFirstPartyOutputSet(
       for await (const entry of iterator) {
         entriesVisited++;
         if (entriesVisited > MAX_FIRST_PARTY_OUTPUT_ENTRIES) {
-          throw new Error("Output tree scan exceeds " + MAX_FIRST_PARTY_OUTPUT_ENTRIES + " entries.");
+          throw new Error(`Output tree scan exceeds ${MAX_FIRST_PARTY_OUTPUT_ENTRIES} entries.`);
         }
-        const relative = current.relative ? current.relative + "/" + entry.name : entry.name;
+        const relative = current.relative ? `${current.relative}/${entry.name}` : entry.name;
         const absolute = path.join(current.dir, entry.name);
         const metadata = await fs.lstat(absolute);
         if (metadata.isSymbolicLink()) {
-          reasons.push("Symlink in generated output: " + relative);
+          reasons.push(`Symlink in generated output: ${relative}`);
         } else if (metadata.isDirectory()) {
           if (!expectedDirectories.has(relative)) {
-            reasons.push("Undeclared generated directory: " + relative);
+            reasons.push(`Undeclared generated directory: ${relative}`);
           }
           if (current.depth >= MAX_FIRST_PARTY_OUTPUT_DEPTH) {
-            throw new Error("Output tree scan exceeds depth " + MAX_FIRST_PARTY_OUTPUT_DEPTH + ".");
+            throw new Error(`Output tree scan exceeds depth ${MAX_FIRST_PARTY_OUTPUT_DEPTH}.`);
           }
           const realDirectory = await fs.realpath(absolute);
           if (realDirectory !== path.resolve(actualRoot, relative)) {
-            throw new Error("Generated directory has a noncanonical real path: " + relative);
+            throw new Error(`Generated directory has a noncanonical real path: ${relative}`);
           }
           pending.push({ dir: absolute, relative, depth: current.depth + 1 });
         } else if (!metadata.isFile()) {
-          reasons.push("Non-file entry in generated output: " + relative);
+          reasons.push(`Non-file entry in generated output: ${relative}`);
         } else if (absolute !== manifestPath) {
           if (!canonicalGeneratedPath(relative)) {
-            reasons.push("Non-canonical generated output filename: " + relative);
+            reasons.push(`Non-canonical generated output filename: ${relative}`);
           }
           const portableKey = relative.normalize("NFC").toLowerCase();
           if (actualAliases.has(portableKey)) {
-            reasons.push("Cross-platform generated output filename alias: " + relative);
+            reasons.push(`Cross-platform generated output filename alias: ${relative}`);
           }
           actualAliases.add(portableKey);
           actualFiles.add(relative);
@@ -270,14 +271,14 @@ async function checkFirstPartyOutputSet(
     }
   } catch (error) {
     reasons.push(
-      "Generated output enumeration failed closed: " + (error instanceof Error ? error.message : String(error)),
+      `Generated output enumeration failed closed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
   for (const file of [...actualFiles].sort()) {
-    if (!declaredFiles.has(file)) reasons.push("Undeclared generated artifact: " + file);
+    if (!declaredFiles.has(file)) reasons.push(`Undeclared generated artifact: ${file}`);
   }
   for (const file of [...declaredFiles].sort()) {
-    if (!actualFiles.has(file)) reasons.push("Declared generated artifact missing from file set: " + file);
+    if (!actualFiles.has(file)) reasons.push(`Declared generated artifact missing from file set: ${file}`);
   }
   return reasons;
 }
@@ -317,7 +318,12 @@ async function loadManifest(root: string, manifestOrPath: ExportProvenanceManife
       };
     }
     const raw = await readTextFile(absManifestPath);
-    return { manifest: JSON.parse(raw), manifestDir: path.dirname(absManifestPath), realRoot, manifestPath: absManifestPath };
+    return {
+      manifest: JSON.parse(raw),
+      manifestDir: path.dirname(absManifestPath),
+      realRoot,
+      manifestPath: absManifestPath,
+    };
   } catch (error) {
     return {
       error: {

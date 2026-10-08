@@ -228,13 +228,15 @@ describe("generator self-reported source inventory", () => {
     expect(addedDirectory.reasons).toContain("Undeclared generated directory: gerbers/extra-dir");
     await fs.rmdir(path.join(result.outputDir, "gerbers", "extra-dir"));
 
-    onDisk.artifacts[0]!.path = "gerbers\\F_Cu.gbr";
+    const firstArtifact = onDisk.artifacts[0];
+    if (!firstArtifact) throw new Error("Missing generated artifact.");
+    firstArtifact.path = "gerbers\\F_Cu.gbr";
     await fs.writeFile(result.manifestPath, JSON.stringify(onDisk));
     const windows = await verifyExportProvenance(root, manifestPath);
     expect(windows.status).toBe("mismatch");
     expect(windows.reasons.some((reason) => reason.includes("Non-canonical generated artifact path"))).toBe(true);
 
-    onDisk.artifacts[0]!.path = "../outside.gbr";
+    firstArtifact.path = "../outside.gbr";
     await fs.writeFile(result.manifestPath, JSON.stringify(onDisk));
     const traversal = await verifyExportProvenance(root, manifestPath);
     expect(traversal.status).toBe("mismatch");
@@ -254,7 +256,10 @@ describe("generator self-reported source inventory", () => {
       },
     );
     const manifest = path.relative(root, result.manifestPath);
-    await fs.symlink(path.join(result.outputDir, "gerbers", "F_Cu.gbr"), path.join(result.outputDir, "gerbers", "alias.gbr"));
+    await fs.symlink(
+      path.join(result.outputDir, "gerbers", "F_Cu.gbr"),
+      path.join(result.outputDir, "gerbers", "alias.gbr"),
+    );
     const found = await verifyExportProvenance(root, manifest);
     expect(found.status).toBe("mismatch");
     expect(found.reasons).toContain("Symlink in generated output: gerbers/alias.gbr");
@@ -274,7 +279,7 @@ describe("generator self-reported source inventory", () => {
     );
     let nested = path.join(result.outputDir, "gerbers");
     for (let index = 0; index < 34; index++) {
-      nested = path.join(nested, "depth-" + index);
+      nested = path.join(nested, `depth-${index}`);
       await fs.mkdir(nested);
     }
     const found = await verifyExportProvenance(root, path.relative(root, result.manifestPath));
