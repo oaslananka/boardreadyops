@@ -359,6 +359,23 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
   if (!nodesById.has(graph.rootReleaseId)) {
     throw new Error("Evidence graph root release node is missing.");
   }
+  if (nodesById.get(graph.rootReleaseId)?.kind !== "release") {
+    throw new Error("Evidence graph root does not identify a release node.");
+  }
+  const edgesBySource = new Map<string, EvidenceGraphEdge[]>();
+  for (const edge of graph.edges) {
+    if (!nodesById.has(edge.from) || !nodesById.has(edge.to)) {
+      throw new Error("Evidence graph edge references an unknown node.");
+    }
+    const outgoing = edgesBySource.get(edge.from) ?? [];
+    outgoing.push(edge);
+    edgesBySource.set(edge.from, outgoing);
+  }
+  for (const missing of graph.missing) {
+    if (!nodesById.has(missing.from)) {
+      throw new Error("Evidence graph missing-evidence record references an unknown node.");
+    }
+  }
   const backwardRelationships = new Set<EvidenceGraphRelationship>([
     "approved_by",
     "derived_from",
@@ -371,12 +388,11 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
   const backwardIds = new Set<string>();
   const pending = [graph.rootReleaseId];
 
-  while (pending.length > 0) {
-    const current = pending.shift();
-    if (!current) break;
-
-    for (const edge of graph.edges) {
-      if (edge.from !== current || !backwardRelationships.has(edge.relationship)) continue;
+  for (let cursor = 0; cursor < pending.length; cursor++) {
+    const current = pending[cursor];
+    if (!current) continue;
+    for (const edge of edgesBySource.get(current) ?? []) {
+      if (!backwardRelationships.has(edge.relationship)) continue;
       if (backwardIds.has(edge.to)) continue;
       backwardIds.add(edge.to);
       pending.push(edge.to);
@@ -384,8 +400,8 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
   }
 
   const forwardIds = new Set(
-    graph.edges
-      .filter((edge) => edge.from === graph.rootReleaseId && edge.relationship === "produced")
+    (edgesBySource.get(graph.rootReleaseId) ?? [])
+      .filter((edge) => edge.relationship === "produced")
       .map((edge) => edge.to),
   );
 
