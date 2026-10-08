@@ -157,12 +157,7 @@ function comparePopulatedPart(
   }
 }
 
-/**
- * Reconcile two externally supplied BOM lists against explicit release/batch IDs.
- * Caller must independently authenticate input manifests, batch provenance and
- * any manufacturer approval before treating these records as shipped truth.
- */
-export function compareApprovedAndBuiltBom(input: AsBuiltComparisonInput): AsBuiltComparison {
+function validateComparisonInput(input: AsBuiltComparisonInput): void {
   const identities: readonly (readonly [string, string])[] = [
     [input.approvedRelease.id, "Approved release"],
     [input.approvedRelease.repositoryId, "Repository"],
@@ -175,12 +170,16 @@ export function compareApprovedAndBuiltBom(input: AsBuiltComparisonInput): AsBui
     throw new Error("Approved commit SHA must be 40 hexadecimal characters");
   if (!sha256.test(input.productionBatch.sourceSha256))
     throw new Error("Batch source digest must be 64 hexadecimal characters");
-  const alternates = input.documentedAlternates ?? [];
-  if (alternates.length > maximumAlternates) throw new Error("Approved alternate list exceeds the supported limit");
-  const approved = partIndex(input.approved, "Approved BOM");
-  const built = partIndex(input.built, "As-built BOM");
-  const divergences: BomDivergence[] = [];
+  if ((input.documentedAlternates?.length ?? 0) > maximumAlternates)
+    throw new Error("Approved alternate list exceeds the supported limit");
+}
 
+function collectBomDifferences(
+  approved: ReadonlyMap<string, BomPart>,
+  built: ReadonlyMap<string, BomPart>,
+  alternates: readonly DocumentedAlternate[],
+): BomDivergence[] {
+  const divergences: BomDivergence[] = [];
   const references = new Set([...approved.keys(), ...built.keys()]);
   for (const reference of [...references].sort((a, b) => a.localeCompare(b))) {
     const design = approved.get(reference);
@@ -195,6 +194,19 @@ export function compareApprovedAndBuiltBom(input: AsBuiltComparisonInput): AsBui
       comparePopulatedPart(reference, design, actual, alternates, divergences);
     }
   }
+  return divergences;
+}
+
+/**
+ * Reconcile two externally supplied BOM lists against explicit release/batch IDs.
+ * Caller must independently authenticate input manifests, batch provenance and
+ * any manufacturer approval before treating these records as shipped truth.
+ */
+export function compareApprovedAndBuiltBom(input: AsBuiltComparisonInput): AsBuiltComparison {
+  validateComparisonInput(input);
+  const approved = partIndex(input.approved, "Approved BOM");
+  const built = partIndex(input.built, "As-built BOM");
+  const divergences = collectBomDifferences(approved, built, input.documentedAlternates ?? []);
 
   return {
     releaseId: input.approvedRelease.id,
