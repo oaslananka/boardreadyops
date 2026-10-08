@@ -6,6 +6,13 @@ import { toPosixPath } from "./path.js";
 
 const ignoredDirectoryNames = new Set(["node_modules", ".git", "dist", "coverage"]);
 
+export class SymlinkedGlobInputError extends Error {
+  constructor() {
+    super("Symlinked source input rejected.");
+    this.name = "SymlinkedGlobInputError";
+  }
+}
+
 async function collectFiles(
   root: string,
   directory: string,
@@ -31,7 +38,7 @@ async function collectFiles(
     // Default globs still skip symlinks. Provenance callers can instead fail closed
     // if a matching KiCad source file would otherwise be silently omitted.
     if (entry.isSymbolicLink()) {
-      if (strictSourceMatcher?.(relative)) throw new Error("Symlinked source input rejected.");
+      if (strictSourceMatcher?.(relative)) throw new SymlinkedGlobInputError();
       continue;
     }
     if (entry.isDirectory()) {

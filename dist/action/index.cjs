@@ -72798,6 +72798,12 @@ var import_promises4 = __toESM(require("node:fs/promises"), 1);
 var import_node_path6 = __toESM(require("node:path"), 1);
 var import_picomatch = __toESM(require_picomatch2(), 1);
 var ignoredDirectoryNames = /* @__PURE__ */ new Set(["node_modules", ".git", "dist", "coverage"]);
+var SymlinkedGlobInputError = class extends Error {
+  constructor() {
+    super("Symlinked source input rejected.");
+    this.name = "SymlinkedGlobInputError";
+  }
+};
 async function collectFiles(root, directory, output, strictSourceMatcher) {
   let entries;
   try {
@@ -72812,7 +72818,7 @@ async function collectFiles(root, directory, output, strictSourceMatcher) {
     const absolute = import_node_path6.default.join(directory, entry.name);
     const relative = toPosixPath2(import_node_path6.default.relative(root, absolute));
     if (entry.isSymbolicLink()) {
-      if (strictSourceMatcher?.(relative)) throw new Error("Symlinked source input rejected.");
+      if (strictSourceMatcher?.(relative)) throw new SymlinkedGlobInputError();
       continue;
     }
     if (entry.isDirectory()) {
@@ -93779,16 +93785,15 @@ var SOURCE_PATTERNS = [
 ];
 async function sourceFingerprintDetail(root, customPatterns = SOURCE_PATTERNS) {
   const files = await globFiles(root, customPatterns, { rejectMatchingSymlinks: true });
-  const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
   const hasher = (0, import_node_crypto4.createHash)("sha256");
-  for (const absolutePath of sortedFiles) {
+  for (const absolutePath of files) {
     const relPath = normalizeRelative(root, absolutePath);
     const content = await import_promises13.default.readFile(absolutePath);
     hasher.update(`${relPath}\0`, "utf8");
     hasher.update(content);
     hasher.update("\0", "utf8");
   }
-  return { fingerprint: hasher.digest("hex"), sourceCount: sortedFiles.length };
+  return { fingerprint: hasher.digest("hex"), sourceCount: files.length };
 }
 function compareReviewedCommit(reviewedSha, recorded) {
   if (typeof recorded?.sha !== "string" || !/^[0-9a-f]{40}$/i.test(recorded.sha)) {
@@ -93941,7 +93946,7 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
     return {
       status: "mismatch",
       reasons: [
-        error52 instanceof Error && error52.message === "Symlinked source input rejected." ? "Source fingerprint could not be computed because a KiCad source input is a symlink." : "Source fingerprint could not be computed because a source input is unreadable or missing."
+        error52 instanceof SymlinkedGlobInputError ? "Source fingerprint could not be computed because a KiCad source input is a symlink." : "Source fingerprint could not be computed because a source input is unreadable or missing."
       ],
       manifest
     };

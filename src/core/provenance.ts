@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { boardReadyVersion } from "../generated/version.js";
 import { readTextFile } from "../util/fs.js";
-import { globFiles } from "../util/glob.js";
+import { globFiles, SymlinkedGlobInputError } from "../util/glob.js";
 import { isInside, normalizeRelative, toPosixPath } from "../util/path.js";
 import { checkFirstPartyOutputSet } from "./generated-output-inventory.js";
 
@@ -53,11 +53,10 @@ async function sourceFingerprintDetail(
   root: string,
   customPatterns: string[] = SOURCE_PATTERNS,
 ): Promise<{ fingerprint: string; sourceCount: number }> {
+  // globFiles already returns its result in stable lexical order.
   const files = await globFiles(root, customPatterns, { rejectMatchingSymlinks: true });
-  const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
-
   const hasher = createHash("sha256");
-  for (const absolutePath of sortedFiles) {
+  for (const absolutePath of files) {
     const relPath = normalizeRelative(root, absolutePath);
     // Missing or unreadable KiCad inputs cannot be represented as empty source bytes.
     const content = await fs.readFile(absolutePath);
@@ -66,7 +65,7 @@ async function sourceFingerprintDetail(
     hasher.update("\0", "utf8");
   }
 
-  return { fingerprint: hasher.digest("hex"), sourceCount: sortedFiles.length };
+  return { fingerprint: hasher.digest("hex"), sourceCount: files.length };
 }
 
 export async function computeSourceFingerprint(
@@ -297,7 +296,7 @@ export async function verifyExportProvenance(
     return {
       status: "mismatch",
       reasons: [
-        error instanceof Error && error.message === "Symlinked source input rejected."
+        error instanceof SymlinkedGlobInputError
           ? "Source fingerprint could not be computed because a KiCad source input is a symlink."
           : "Source fingerprint could not be computed because a source input is unreadable or missing.",
       ],
