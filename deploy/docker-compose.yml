@@ -79,7 +79,7 @@ services:
       start_period: 20s
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-boardreadyops}
@@ -95,7 +95,7 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:8-alpine
+    image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
     restart: unless-stopped
     volumes:
       - boardreadyops_redis:/data

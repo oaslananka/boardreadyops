@@ -425,7 +425,7 @@ describe("compatibility matrix", () => {
     ]);
     expect(integration?.env?.DATABASE_URL).toBe("postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test");
     expect(integration?.services?.postgres).toMatchObject({
-      image: "postgres:16-alpine",
+      image: "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
       env: {
         POSTGRES_USER: "boardreadyops",
         POSTGRES_DB: "boardreadyops_test",
