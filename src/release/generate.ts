@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import generateRecipeSchema from "../../schemas/generate-recipe.schema.json" with { type: "json" };
+import { computeSourceFingerprint } from "../core/provenance.js";
 import { boardReadyVersion } from "../generated/version.js";
 import { resolveGitExecutable } from "../util/git-resolver.js";
 import { canonicalizeJson } from "../util/json.js";
@@ -224,6 +225,7 @@ interface GenerateGitState {
 }
 
 interface GenerateManifest {
+  kind: "boardreadyops.export-provenance";
   schemaVersion: 1;
   tool: { name: "boardreadyops"; version: string };
   generatedAt: string;
@@ -231,6 +233,9 @@ interface GenerateManifest {
   recipe: { source: string; hash: string; steps: GenerateRecipeStep[] };
   kicadVersion?: string | undefined;
   git?: GenerateGitState | undefined;
+  /** Self-reported source-byte consistency only; NOT authenticated export provenance. */
+  sourceFingerprint?: string | undefined;
+  sourceSnapshot?: "stable" | "changed" | undefined;
   environment: { platform: string; nodeVersion: string };
   steps: GenerateStepOutcome[];
   artifacts: GeneratedArtifact[];
@@ -281,6 +286,27 @@ async function gitState(root: string): Promise<GenerateGitState> {
   }
 }
 
+async function sourceInputFingerprint(options: GenerateOptions): Promise<string | undefined> {
+  if (!options.gitRoot) return undefined;
+  const inputs = [options.boardFile, options.schematicFile].filter((file): file is string => typeof file === "string");
+  if (inputs.length === 0) return undefined;
+
+  try {
+    const root = await fs.realpath(options.gitRoot);
+    for (const file of inputs) {
+      const absolute = await fs.realpath(file);
+      const relative = path.relative(root, absolute);
+      if (relative === "" || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        return undefined;
+      }
+      if (!(await fs.stat(absolute)).isFile()) return undefined;
+    }
+    return await computeSourceFingerprint(options.gitRoot);
+  } catch {
+    return undefined;
+  }
+}
+
 async function ensureGenerateStepOutputDirectory(absoluteOutput: string, step: GeneratePlanStep): Promise<void> {
   const directory = step.isDirectory ? absoluteOutput : path.dirname(absoluteOutput);
   await fs.mkdir(directory, { recursive: true });
@@ -293,6 +319,7 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
     schematic: Boolean(options.schematicFile),
   };
   const plan = buildGeneratePlan(recipe, available);
+  const sourceFingerprintBefore = await sourceInputFingerprint(options);
 
   await fs.rm(outputDir, { recursive: true, force: true });
   await fs.mkdir(outputDir, { recursive: true });
@@ -333,10 +360,18 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
   artifacts.sort((left, right) => left.path.localeCompare(right.path));
   outcomes.sort((left, right) => KIND_ORDER.indexOf(left.kind) - KIND_ORDER.indexOf(right.kind));
 
+  const sourceFingerprintAfter = sourceFingerprintBefore ? await sourceInputFingerprint(options) : undefined;
+  const sourceSnapshot =
+    sourceFingerprintBefore === undefined
+      ? undefined
+      : sourceFingerprintBefore === sourceFingerprintAfter
+        ? "stable"
+        : "changed";
   const recipeHash = createHash("sha256").update(canonicalizeJson(recipe)).digest("hex");
   const git = options.gitRoot ? await gitState(options.gitRoot) : {};
 
   const manifest: GenerateManifest = {
+    kind: "boardreadyops.export-provenance",
     schemaVersion: 1,
     tool: { name: "boardreadyops", version: boardReadyVersion },
     generatedAt: options.generatedAt ?? new Date().toISOString(),
@@ -349,6 +384,8 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
     recipe: { source: options.recipeSource ?? "default", hash: recipeHash, steps: recipe.steps },
     ...(options.kicadVersion ? { kicadVersion: options.kicadVersion } : {}),
     ...(git.sha ? { git } : {}),
+    ...(sourceSnapshot ? { sourceSnapshot } : {}),
+    ...(sourceSnapshot === "stable" && sourceFingerprintBefore ? { sourceFingerprint: sourceFingerprintBefore } : {}),
     environment: { platform: process.platform, nodeVersion: process.version },
     steps: outcomes,
     artifacts,

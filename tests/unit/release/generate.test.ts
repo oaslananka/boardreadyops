@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { verifyExportProvenance } from "../../../src/core/provenance.js";
 import {
   buildGeneratePlan,
   DEFAULT_GENERATE_RECIPE,
@@ -130,6 +131,93 @@ describe("generate source invariants", () => {
     expect(source).toContain("if (step.isDirectory)");
     expect(source).toContain("else if (await fileExists(absoluteOutput))");
     expect(source).not.toContain(": (await fileExists(absoluteOutput))\n      ? [absoluteOutput]\n      : []");
+  });
+});
+
+describe("generator self-reported source inventory", () => {
+  async function projectInputs(root: string) {
+    const pcb = path.join(root, "board.kicad_pcb");
+    const sch = path.join(root, "board.kicad_sch");
+    await fs.writeFile(path.join(root, "board.kicad_pro"), "{}");
+    await fs.writeFile(pcb, "(kicad_pcb)");
+    await fs.writeFile(sch, "(kicad_sch)");
+    return { pcb, sch };
+  }
+
+  it("emits a discriminated source-fingerprint and valid byte-consistent inventory", async () => {
+    const root = await makeTempDir();
+    const { pcb, sch } = await projectInputs(root);
+    const result = await runGenerate(
+      { steps: [{ kind: "gerbers" }] },
+      {
+        outputDir: path.join(root, "build", "boardreadyops-generate"),
+        boardFile: pcb,
+        schematicFile: sch,
+        gitRoot: root,
+        runner: writingRunner(),
+      },
+    );
+    const manifest = JSON.parse(await fs.readFile(result.manifestPath, "utf8")) as {
+      kind: string;
+      sourceFingerprint?: string;
+      sourceSnapshot?: string;
+      artifacts: unknown[];
+    };
+    expect(manifest.kind).toBe("boardreadyops.export-provenance");
+    expect(manifest.sourceSnapshot).toBe("stable");
+    expect(manifest.sourceFingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.artifacts).toHaveLength(2);
+    const verified = await verifyExportProvenance(root, path.relative(root, result.manifestPath));
+    expect(verified.status).toBe("verified");
+  });
+
+  it("withholds source-fingerprint PASS when KiCad input changes mid-export", async () => {
+    const root = await makeTempDir();
+    const { pcb, sch } = await projectInputs(root);
+    const write = writingRunner();
+    const result = await runGenerate(
+      { steps: [{ kind: "gerbers" }] },
+      {
+        outputDir: path.join(root, "build", "boardreadyops-generate"),
+        boardFile: pcb,
+        schematicFile: sch,
+        gitRoot: root,
+        runner: async (args) => {
+          const exported = await write(args);
+          await fs.writeFile(pcb, "(kicad_pcb (rev 2))");
+          return exported;
+        },
+      },
+    );
+    const manifest = JSON.parse(await fs.readFile(result.manifestPath, "utf8")) as {
+      sourceSnapshot?: string;
+      sourceFingerprint?: string;
+    };
+    expect(manifest.sourceSnapshot).toBe("changed");
+    expect(manifest.sourceFingerprint).toBeUndefined();
+    expect((await verifyExportProvenance(root, path.relative(root, result.manifestPath))).status).toBe("mismatch");
+  });
+
+  it("does not claim in-repository source consistency for outside-root inputs", async () => {
+    const root = await makeTempDir();
+    const external = await makeTempDir();
+    const { pcb } = await projectInputs(external);
+    const result = await runGenerate(
+      { steps: [{ kind: "gerbers" }] },
+      {
+        outputDir: path.join(root, "build", "boardreadyops-generate"),
+        boardFile: pcb,
+        gitRoot: root,
+        runner: writingRunner(),
+      },
+    );
+    const manifest = JSON.parse(await fs.readFile(result.manifestPath, "utf8")) as {
+      sourceSnapshot?: string;
+      sourceFingerprint?: string;
+    };
+    expect(manifest.sourceFingerprint).toBeUndefined();
+    expect(manifest.sourceSnapshot).toBeUndefined();
+    expect((await verifyExportProvenance(root, path.relative(root, result.manifestPath))).status).toBe("mismatch");
   });
 });
 

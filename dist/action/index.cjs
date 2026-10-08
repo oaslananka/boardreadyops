@@ -93780,10 +93780,17 @@ function validateManifestStructure(manifest) {
     return { status: "unsupported", reasons: ["Invalid provenance manifest object."] };
   }
   const record2 = manifest;
-  if (record2.schemaVersion !== 1 || record2.tool?.name !== "boardreadyops") {
+  if (record2.schemaVersion !== 1 || record2.tool?.name !== "boardreadyops" || record2.kind !== void 0 && record2.kind !== "boardreadyops.export-provenance") {
     return {
       status: "unsupported",
       reasons: [`Unsupported or invalid provenance manifest schema version ${record2.schemaVersion}`],
+      manifest: record2
+    };
+  }
+  if (record2.sourceSnapshot !== void 0 && record2.sourceSnapshot !== "stable") {
+    return {
+      status: "mismatch",
+      reasons: ["Provenance generator reports changed or invalid source input snapshot."],
       manifest: record2
     };
   }
@@ -93877,7 +93884,7 @@ var artifactProvenanceRule = rule(
   {
     id: "release.artifact-provenance",
     title: "Exported manufacturing artifacts lack valid source provenance",
-    description: "Checks that exported Gerber and drill artifacts match the current source revision and have an authentic export provenance manifest.",
+    description: "Checks self-reported source-file fingerprints and exported Gerber/drill artifact hashes; this does not authenticate a reviewed commit or export runner.",
     rationale: "Manufacturing outputs exported from an older commit or modified after export risk fabricating obsolete hardware.",
     defaultSeverity: "high",
     appliesTo: ["pcb"],
