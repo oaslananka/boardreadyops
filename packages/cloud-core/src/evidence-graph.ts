@@ -351,7 +351,9 @@ export function buildReleaseEvidenceGraph(input: ReleaseEvidenceGraphInput): Rel
   };
 }
 
-const relationshipKinds: Readonly<Record<EvidenceGraphRelationship, readonly [EvidenceGraphNodeKind, EvidenceGraphNodeKind]>> = {
+const relationshipKinds: Readonly<
+  Record<EvidenceGraphRelationship, readonly [EvidenceGraphNodeKind, EvidenceGraphNodeKind]>
+> = {
   approved_by: ["review", "approval"],
   derived_from: ["release", "source"],
   governed_by: ["review", "policy"],

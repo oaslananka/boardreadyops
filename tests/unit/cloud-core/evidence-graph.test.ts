@@ -224,23 +224,27 @@ describe("release evidence graph", () => {
     expect(() =>
       traceReleaseEvidence({
         ...graph,
-        missing: [{
-          from: graph.rootReleaseId,
-          relationship: "approved_by",
-          expectedKind: "approval",
-          reason: "Missing approval",
-        }],
+        missing: [
+          {
+            from: graph.rootReleaseId,
+            relationship: "approved_by",
+            expectedKind: "approval",
+            reason: "Missing approval",
+          },
+        ],
       }),
     ).toThrow("Evidence graph missing-evidence relationship conflicts with node kinds.");
     expect(() =>
       traceReleaseEvidence({
         ...graph,
-        missing: [{
-          from: "review:review-roles",
-          relationship: "approved_by",
-          expectedKind: "source",
-          reason: "Missing approval",
-        }],
+        missing: [
+          {
+            from: "review:review-roles",
+            relationship: "approved_by",
+            expectedKind: "source",
+            reason: "Missing approval",
+          },
+        ],
       }),
     ).toThrow("Evidence graph missing-evidence relationship conflicts with node kinds.");
   });
