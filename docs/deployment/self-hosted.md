@@ -280,6 +280,7 @@ have occurred. Every successful build prints an aggregate disk and BoardReadyOps
 after cleanup, so gradual growth is visible on normal deploys as well as low-space preflights. Repeated rehearsals still
 build on the production host, so this keeps useful recent cache during normal operation without
 letting a low-space preflight fail while safe-to-delete cache still occupies the build floor.
+Before retiring tagged runtime images, the workflow checks the running web and worker containers and reads their actual Docker image references. Missing or unrecognized runtime identities stop cleanup without deleting any images; invalid Compose image-list formatting is not treated as an empty running set.
 Tagged runtime images are not touched by cache GC and remain governed by the rollback retention
 policy below. If the host is
 still short after safe reclaim, the default behavior remains fail-closed with exit 78. An operator
