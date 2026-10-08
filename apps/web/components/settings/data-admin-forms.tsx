@@ -210,7 +210,9 @@ export function LegalHoldReleaseButton({
               Release legal hold?
             </h2>
             <p className="text-sm text-muted-foreground">
-              “{reason}” will stop blocking retention cleanup and matching erasure requests. The release remains in the
+              Releasing “{reason}” allows future retention cleanup only if no other active hold applies. Erasure
+              requests already blocked by this hold remain blocked; release does not resume deletion. A separate
+              authorized, audited operator requeue is required and is not yet supported. The release remains in the
               audit history.
             </p>
             <ActionForm action={action} onSuccess={() => setConfirming(false)}>

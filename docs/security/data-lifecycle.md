@@ -119,6 +119,8 @@ Both uninstall requests use the persisted installation `account_login` and `acco
 
 This is an intake contract, not automatic purge. Export request intake is automatic and is intentionally not blocked by legal hold; export pack materialization/download expiry still use the existing export operator/executor workflow. The 30-day period applies to destructive erasure, which remains legal-hold aware. BoardReadyOps does not yet automatically purge every relational data class, delete non-local managed objects, or expire backup/platform copies when the deletion deadline arrives.
 
+**Legal-hold release is not erasure resumption.** Releasing a hold deactivates only that hold and records who released it. Requests already marked `blocked_by_hold` remain blocked; release does not automatically requeue them, change their deadlines, or initiate deletion. A supported requeue operation is not implemented. Before one can be introduced, it must require an explicit, audited, tenant-authorized action against a selected request, atomically recheck scope and all overlapping active holds, and retain export and reinstall-cancellation evidence. Operators must not treat release as authorization to purge.
+
 ### Tenant scope and auditability
 
 Installations are the top-level tenant boundary. Repository, run, artifact, runner,
