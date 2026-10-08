@@ -6,6 +6,7 @@ import { boardReadyVersion } from "../generated/version.js";
 import { readTextFile } from "../util/fs.js";
 import { globFiles } from "../util/glob.js";
 import { isInside, normalizeRelative, toPosixPath } from "../util/path.js";
+import { checkFirstPartyOutputSet } from "./generated-output-inventory.js";
 
 interface ProvenanceArtifact {
   path: string;
@@ -171,7 +172,7 @@ async function inspectArtifact(
 }
 
 type LoadedManifest =
-  | { manifest: unknown; manifestDir: string; realRoot: string }
+  | { manifest: unknown; manifestDir: string; realRoot: string; manifestPath?: string }
   | { error: ProvenanceVerificationResult };
 
 async function loadManifest(root: string, manifestOrPath: ExportProvenanceManifest | string): Promise<LoadedManifest> {
@@ -205,7 +206,12 @@ async function loadManifest(root: string, manifestOrPath: ExportProvenanceManife
       };
     }
     const raw = await readTextFile(absManifestPath);
-    return { manifest: JSON.parse(raw), manifestDir: path.dirname(absManifestPath), realRoot };
+    return {
+      manifest: JSON.parse(raw),
+      manifestDir: path.dirname(absManifestPath),
+      realRoot,
+      manifestPath: absManifestPath,
+    };
   } catch (error) {
     return {
       error: {
@@ -308,6 +314,15 @@ export async function verifyExportProvenance(
     if (outcome.reason) reasons.push(outcome.reason);
     if (outcome.kind === "mismatch") artifactMismatches.push(entry.path);
     if (outcome.kind === "missing") missingArtifacts.push(entry.path);
+  }
+
+  if (manifest.kind === "boardreadyops.export-provenance") {
+    if (!loaded.manifestPath) {
+      reasons.push("First-party output completeness requires an on-disk manifest.");
+    } else {
+      const validArtifacts = (Array.isArray(manifest.artifacts) ? manifest.artifacts : []).filter(isArtifactRecord);
+      reasons.push(...(await checkFirstPartyOutputSet(manifestDir, loaded.manifestPath, validArtifacts)));
+    }
   }
 
   const status: ProvenanceVerificationResult["status"] = reasons.length === 0 ? "verified" : "mismatch";
