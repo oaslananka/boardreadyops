@@ -117,6 +117,29 @@ export type ReleaseEvidenceTrace = {
   missing: readonly MissingEvidenceRelationship[];
 };
 
+const commitShaPattern = /^[0-9a-f]{40}$/u;
+const digestPattern = /^[0-9a-f]{64}$/u;
+
+function requireIntegrityDigest(value: string, subject: string): void {
+  if (!digestPattern.test(value)) throw new Error(`Invalid evidence graph SHA-256 digest for ${subject}.`);
+}
+
+function validateInputIntegrity(input: ReleaseEvidenceGraphInput): void {
+  if (!commitShaPattern.test(input.release.commitSha)) {
+    throw new Error("Invalid evidence graph release commit SHA.");
+  }
+  for (const item of input.evidence ?? []) requireIntegrityDigest(item.sha256, "evidence artifact");
+  for (const batch of input.productionBatches ?? []) requireIntegrityDigest(batch.sourceSha256, "production batch");
+  const review = input.review;
+  if (review?.evidenceDigest !== undefined) requireIntegrityDigest(review.evidenceDigest, "review");
+  for (const approval of review?.approvals ?? []) {
+    if (approval.evidenceDigest !== undefined) requireIntegrityDigest(approval.evidenceDigest, "approval");
+  }
+  for (const waiver of review?.waivers ?? []) {
+    if (waiver.evidenceDigest !== undefined) requireIntegrityDigest(waiver.evidenceDigest, "waiver");
+  }
+}
+
 function stableNodeId(kind: EvidenceGraphNodeKind, identity: string): string {
   return `${kind}:${identity}`;
 }
@@ -325,6 +348,8 @@ function addProduction(state: GraphBuildState, releaseId: string, batches: reado
 }
 
 export function buildReleaseEvidenceGraph(input: ReleaseEvidenceGraphInput): ReleaseEvidenceGraph {
+  // Valid syntax is NOT proof of the artifact or reviewed commit's authenticity.
+  validateInputIntegrity(input);
   const state: GraphBuildState = { nodes: [], edges: [], missing: [] };
   const releaseId = addReleaseAndSource(state, input.release);
 
@@ -373,6 +398,15 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
   }
   if (nodesById.get(graph.rootReleaseId)?.kind !== "release") {
     throw new Error("Evidence graph root does not identify a release node.");
+  }
+  for (const node of graph.nodes) {
+    if (node.integrity?.sha256 !== undefined) requireIntegrityDigest(node.integrity.sha256, node.kind);
+    if (node.integrity?.evidenceDigest !== undefined) {
+      requireIntegrityDigest(node.integrity.evidenceDigest, node.kind);
+    }
+    if (node.kind === "source" && !commitShaPattern.test(node.label)) {
+      throw new Error("Invalid evidence graph source commit SHA.");
+    }
   }
   const edgesBySource = new Map<string, EvidenceGraphEdge[]>();
   for (const edge of graph.edges) {
