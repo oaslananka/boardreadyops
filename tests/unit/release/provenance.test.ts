@@ -145,10 +145,10 @@ describe("release/provenance", () => {
       ],
     });
 
-    const originalRead = fs.readFile.bind(fs);
-    const unreadable = vi.spyOn(fs, "readFile").mockImplementation(async (...args) => {
+    const originalOpen = fs.open.bind(fs);
+    const unreadable = vi.spyOn(fs, "open").mockImplementation(async (...args) => {
       if (String(args[0]).endsWith("board.kicad_pcb")) throw new Error("simulated EACCES");
-      return originalRead(...args);
+      return originalOpen(...args);
     });
     try {
       await expect(computeSourceFingerprint(root)).rejects.toThrow("simulated EACCES");
@@ -163,6 +163,34 @@ describe("release/provenance", () => {
       unreadable.mockRestore();
     }
   });
+
+  it.skipIf(process.platform === "win32")(
+    "rejects a KiCad source symlink swapped in after enumeration but before file open",
+    async () => {
+      const root = await writeFixture({
+        "board.kicad_pcb": "(kicad_pcb (reviewed))",
+      });
+      const external = await fs.mkdtemp(path.join(os.tmpdir(), "brops-source-nofollow-"));
+      await fs.writeFile(path.join(external, "shadow.kicad_pcb"), "(kicad_pcb (unreviewed))");
+      const originalOpen = fs.open.bind(fs);
+      let swapped = false;
+      const race = vi.spyOn(fs, "open").mockImplementation(async (...args) => {
+        if (!swapped && String(args[0]).endsWith("board.kicad_pcb")) {
+          swapped = true;
+          await fs.rm(String(args[0]));
+          await fs.symlink(path.join(external, "shadow.kicad_pcb"), String(args[0]));
+        }
+        return originalOpen(...args);
+      });
+      try {
+        await expect(computeSourceFingerprint(root)).rejects.toThrow();
+        expect(swapped).toBe(true);
+      } finally {
+        race.mockRestore();
+        await fs.rm(external, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("verifies matching export provenance manifest and artifacts", async () => {
     const root = await writeFixture({

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { createReadStream, constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { boardReadyVersion } from "../generated/version.js";
@@ -49,6 +49,20 @@ const SOURCE_PATTERNS = [
   "**/*.kicad_wks",
 ];
 
+async function readSourceFileNoFollow(absolutePath: string): Promise<Buffer> {
+  // Linux/macOS reject a final-component symlink substituted after glob discovery.
+  // Windows has no portable O_NOFOLLOW; discovery-time symlink rejection remains in effect.
+  const flags = fsConstants.O_RDONLY | (process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW);
+  const handle = await fs.open(absolutePath, flags);
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error("KiCad source input is not a regular file.");
+    return await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+}
+
 async function sourceFingerprintDetail(
   root: string,
   customPatterns: string[] = SOURCE_PATTERNS,
@@ -59,7 +73,7 @@ async function sourceFingerprintDetail(
   for (const absolutePath of files) {
     const relPath = normalizeRelative(root, absolutePath);
     // Missing or unreadable KiCad inputs cannot be represented as empty source bytes.
-    const content = await fs.readFile(absolutePath);
+    const content = await readSourceFileNoFollow(absolutePath);
     hasher.update(`${relPath}\0`, "utf8");
     hasher.update(content);
     hasher.update("\0", "utf8");
