@@ -30,6 +30,36 @@ describe("release/provenance", () => {
     expect(emptyFp).toHaveLength(64);
   });
 
+  it("rejects an export inventory when there are no KiCad source inputs", async () => {
+    const contents = "gerber-without-source";
+    const root = await writeFixture({ "top.gtl": contents });
+    const artifacts = [
+      {
+        path: "top.gtl",
+        sha256: createHash("sha256").update(contents).digest("hex"),
+        bytes: Buffer.byteLength(contents),
+      },
+    ];
+    await expect(createExportProvenanceManifest({ root, artifacts })).rejects.toThrow(
+      "No KiCad source inputs were found",
+    );
+    // Simulate a legacy/forged self-reported manifest to test the independent verifier.
+    const manifest: ExportProvenanceManifest = {
+      schemaVersion: 1,
+      tool: { name: "boardreadyops", version: "test" },
+      generatedAt: "2026-10-08T00:00:00.000Z",
+      sourceFingerprint: await computeSourceFingerprint(root),
+      artifacts,
+    };
+
+    const result = await verifyExportProvenance(root, manifest);
+    expect(result.status).toBe("mismatch");
+    expect(result.sourceFingerprintMatch).toBeUndefined();
+    expect(result.reasons).toEqual([
+      "No KiCad source inputs were found; source-to-export consistency cannot be established.",
+    ]);
+  });
+
   it("fails closed on unreadable KiCad inputs instead of hashing invented zero-byte content", async () => {
     const root = await writeFixture({
       "board.kicad_pcb": "(kicad_pcb)",

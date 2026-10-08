@@ -110,6 +110,7 @@ describe("generated output inventory safeguards", () => {
 
   it("does not promote an in-memory first-party manifest into exact on-disk proof", async () => {
     const { root } = await outputDirectory();
+    await fs.writeFile(path.join(root, "board.kicad_pcb"), "(kicad_pcb)");
     const manifest = await createExportProvenanceManifest({
       root,
       artifacts: [{ path: "missing.gbr", sha256: "a".repeat(64), bytes: 1 }],
