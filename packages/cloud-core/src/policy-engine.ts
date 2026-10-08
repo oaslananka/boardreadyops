@@ -7,6 +7,17 @@ import type {
 
 export type PolicyLayer = "organization" | "team" | "repository" | "exception";
 
+function validatePolicyLayer(layer: PolicyLayer, policy: ReviewPolicy, inheritedTenantId: string | undefined): void {
+  // The storage loader scopes records, but domain callers must not be able to
+  // accidentally combine two tenants or mislabel the source of a policy.
+  if (!policy.tenantId || (inheritedTenantId && inheritedTenantId !== policy.tenantId)) {
+    throw new Error("Cross-tenant review policy inheritance rejected.");
+  }
+  if (layer !== "exception" && policy.scope !== layer) {
+    throw new Error("Review policy layer does not match its declared scope.");
+  }
+}
+
 /**
  * Resolves effective policy via inheritance: org -> team -> repo -> exception.
  * Later layers override earlier ones where defined.
@@ -32,6 +43,7 @@ export function resolveEffectivePolicy(input: {
   let sourceLayer: PolicyLayer | null = null;
   let provenance: EffectivePolicyProvenance | null = null;
   const warnings: string[] = [];
+  let policyTenantId: string | undefined;
 
   const sourceFor = (layer: PolicyLayer, policy: ReviewPolicy): PolicyFieldSource => ({
     layer,
@@ -41,6 +53,8 @@ export function resolveEffectivePolicy(input: {
 
   for (const { layer, policy } of layers) {
     if (!policy) continue;
+    validatePolicyLayer(layer, policy, policyTenantId);
+    policyTenantId = policy.tenantId;
     const source = sourceFor(layer, policy);
 
     if (!effective) {
