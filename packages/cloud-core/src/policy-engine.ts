@@ -32,6 +32,7 @@ export function resolveEffectivePolicy(input: {
   let sourceLayer: PolicyLayer | null = null;
   let provenance: EffectivePolicyProvenance | null = null;
   const warnings: string[] = [];
+  let policyTenantId: string | undefined;
 
   const sourceFor = (layer: PolicyLayer, policy: ReviewPolicy): PolicyFieldSource => ({
     layer,
@@ -41,6 +42,15 @@ export function resolveEffectivePolicy(input: {
 
   for (const { layer, policy } of layers) {
     if (!policy) continue;
+    // Never merge policy records from unrelated tenant scopes, even when a
+    // mistakenly assembled layer list is passed by an otherwise trusted loader.
+    if (!policy.tenantId || (policyTenantId && policyTenantId !== policy.tenantId)) {
+      throw new Error("Cross-tenant review policy inheritance rejected.");
+    }
+    if (layer !== "exception" && policy.scope !== layer) {
+      throw new Error("Review policy layer does not match its declared scope.");
+    }
+    policyTenantId = policy.tenantId;
     const source = sourceFor(layer, policy);
 
     if (!effective) {

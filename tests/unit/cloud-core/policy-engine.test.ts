@@ -43,6 +43,33 @@ describe("resolveEffectivePolicy", () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it("rejects cross-tenant policy inheritance even when both scopes and field values are valid", () => {
+    const org = policy({ scope: "organization", name: "org-a", requiredChecklist: ["safety-review"] });
+    const otherTenant = policy({
+      scope: "repository",
+      name: "repo-b",
+      tenantId: "tenant-b",
+      requiredChecklist: ["release-approved"],
+    });
+    expect(() =>
+      resolveEffectivePolicy({ organization: org, team: null, repository: otherTenant, exception: null }),
+    ).toThrow("Cross-tenant review policy inheritance rejected");
+    expect(() =>
+      resolveEffectivePolicy({ organization: null, team: null, repository: otherTenant, exception: null }),
+    ).not.toThrow();
+  });
+
+  it("rejects a record in the wrong policy layer rather than laundering its scope provenance", () => {
+    const repository = policy({ scope: "repository", name: "repo-policy" });
+    expect(() =>
+      resolveEffectivePolicy({ organization: repository, team: null, repository: null, exception: null }),
+    ).toThrow("Review policy layer does not match its declared scope");
+    const blankTenant = policy({ scope: "organization", name: "empty-tenant", tenantId: "" });
+    expect(() =>
+      resolveEffectivePolicy({ organization: blankTenant, team: null, repository: null, exception: null }),
+    ).toThrow("Cross-tenant review policy inheritance rejected");
+  });
+
   it("lets a repository-level override replace the organization default and records a warning", () => {
     const org = policy({ scope: "organization", name: "org-default", requiredChecklist: ["safety-review"] });
     const repo = policy({ scope: "repository", name: "repo-override", requiredChecklist: ["fab-checklist"] });
