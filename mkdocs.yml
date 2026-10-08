@@ -115,6 +115,7 @@ nav:
       - Hardware SBOM: sbom.md
       - Release Evidence: release/evidence-bundles.md
       - Artifact Attestation: release/artifact-attestation.md
+      - Source-to-Export Proof (Design): release/source-export-provenance-contract.md
       - Manufacturer Handoff: release/manufacturer-handoff.md
       - Release Diff: release/release-diff.md
       - Policy Engine: release/policy-engine.md
