@@ -14,11 +14,15 @@ interface ProvenanceArtifact {
 }
 
 export interface ExportProvenanceManifest {
+  /** Optional for legacy export inventories; not an authenticated generator identity. */
+  kind?: "boardreadyops.export-provenance" | undefined;
   schemaVersion: 1;
   tool: { name: "boardreadyops"; version: string };
   generatedAt: string;
   git?: { sha?: string | undefined; dirty?: boolean | undefined } | undefined;
   sourceFingerprint: string;
+  /** A self-reported snapshot claim; never a trusted execution attestation. */
+  sourceSnapshot?: "stable" | "changed" | undefined;
   artifacts: ProvenanceArtifact[];
 }
 
@@ -219,10 +223,21 @@ function validateManifestStructure(manifest: unknown): ProvenanceVerificationRes
     return { status: "unsupported", reasons: ["Invalid provenance manifest object."] };
   }
   const record = manifest as ExportProvenanceManifest;
-  if (record.schemaVersion !== 1 || record.tool?.name !== "boardreadyops") {
+  if (
+    record.schemaVersion !== 1 ||
+    record.tool?.name !== "boardreadyops" ||
+    (record.kind !== undefined && record.kind !== "boardreadyops.export-provenance")
+  ) {
     return {
       status: "unsupported",
       reasons: [`Unsupported or invalid provenance manifest schema version ${record.schemaVersion}`],
+      manifest: record,
+    };
+  }
+  if (record.sourceSnapshot !== undefined && record.sourceSnapshot !== "stable") {
+    return {
+      status: "mismatch",
+      reasons: ["Provenance generator reports changed or invalid source input snapshot."],
       manifest: record,
     };
   }

@@ -12,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks that exported Gerber and drill artifacts match the current source revision and have an authentic export provenance manifest.
+Checks self-reported source-file fingerprints and exported Gerber/drill artifact hashes; this does not authenticate a reviewed commit or export runner.
 
 ## When It Fires
 
