@@ -45602,33 +45602,8 @@ var boardEdgeClearanceRule = rule(
     if (!shouldRun(context, "manufacturing.board-edge-clearance")) return [];
     const files = await globFiles(context.root, DEFAULT_GERBER_PATTERNS);
     if (files.length === 0) return [];
-    const { entries, stackup } = await loadGerberStackup(context.root, files);
-    const layersByFilename = new Map(
-      stackup.layers.map((layer) => [
-        layer.filename.replaceAll("\\", "/"),
-        {
-          role: layer.role,
-          side: layer.side,
-          filename: layer.filename,
-          identitySource: layer.identitySource
-        }
-      ])
-    );
-    const parsedFiles = entries.map((entry) => ({
-      path: entry.filename,
-      parsed: parseGerber(entry.content ?? "", entry.filename),
-      layer: layersByFilename.get(entry.filename.replaceAll("\\", "/"))
-    }));
-    const vendorId = typeof context.config.vendor === "string" ? context.config.vendor : context.config.vendor?.profile;
-    const profile = findVendorProfile(vendorId) ?? findVendorProfile("generic-prototype");
-    const assurance = profile === void 0 ? void 0 : vendorProfileAssurance(profile);
-    const ruleConfig2 = configFor(context, "manufacturing.board-edge-clearance");
-    const configuredMin = typeof ruleConfig2["min-clearance-mm"] === "number" ? ruleConfig2["min-clearance-mm"] : void 0;
-    const profileMin = profile?.fabrication?.minBoardEdgeClearanceMm;
-    const minClearanceMm = configuredMin ?? profileMin ?? 0.2;
-    const limitSource = configuredMin !== void 0 ? "configured" : profileMin !== void 0 ? "vendor-profile" : "default";
-    const limitMayBlock = configuredMin !== void 0 || limitSource === "vendor-profile" && assurance?.mayBlock === true;
-    const configured = configuredSeverity(context, "manufacturing.board-edge-clearance", "medium");
+    const parsedFiles = await parseLayers(context.root, files);
+    const { profile, assurance, minClearanceMm, limitSource, limitMayBlock, configured } = resolveLimit(context);
     const outlineCandidates = parsedFiles.filter((item2) => item2.layer?.role === "outline");
     const outlineFile = outlineCandidates.find((item2) => item2.layer?.identitySource === "declared") ?? outlineCandidates[0];
     const outlineSegments = outlineFile?.parsed.geometry.primitives.filter(
@@ -45759,6 +45734,38 @@ var boardEdgeClearanceRule = rule(
     return output;
   }
 );
+async function parseLayers(root, files) {
+  const { entries, stackup } = await loadGerberStackup(root, files);
+  const layersByFilename = new Map(
+    stackup.layers.map((layer) => [
+      layer.filename.replaceAll("\\", "/"),
+      {
+        role: layer.role,
+        side: layer.side,
+        filename: layer.filename,
+        identitySource: layer.identitySource
+      }
+    ])
+  );
+  return entries.map((entry) => ({
+    path: entry.filename,
+    parsed: parseGerber(entry.content ?? "", entry.filename),
+    layer: layersByFilename.get(entry.filename.replaceAll("\\", "/"))
+  }));
+}
+function resolveLimit(context) {
+  const vendorId = typeof context.config.vendor === "string" ? context.config.vendor : context.config.vendor?.profile;
+  const profile = findVendorProfile(vendorId) ?? findVendorProfile("generic-prototype");
+  const assurance = profile === void 0 ? void 0 : vendorProfileAssurance(profile);
+  const ruleConfig2 = configFor(context, "manufacturing.board-edge-clearance");
+  const configuredMin = typeof ruleConfig2["min-clearance-mm"] === "number" ? ruleConfig2["min-clearance-mm"] : void 0;
+  const profileMin = profile?.fabrication?.minBoardEdgeClearanceMm;
+  const minClearanceMm = configuredMin ?? profileMin ?? 0.2;
+  const limitSource = configuredMin !== void 0 ? "configured" : profileMin !== void 0 ? "vendor-profile" : "default";
+  const limitMayBlock = configuredMin !== void 0 || limitSource === "vendor-profile" && assurance?.mayBlock === true;
+  const configured = configuredSeverity(context, "manufacturing.board-edge-clearance", "medium");
+  return { profile, assurance, minClearanceMm, limitSource, limitMayBlock, configured };
+}
 function outlineEvidenceReasons(outline, segments) {
   const reasons = [];
   if (outline.layer?.identitySource !== "declared")
