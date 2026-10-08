@@ -176,7 +176,7 @@ describe("release evidence graph", () => {
           },
         ],
       }),
-    ).toThrow("Evidence graph missing-evidence record references an unknown source node.");
+    ).toThrow("Evidence graph missing-evidence record references an unknown node.");
   });
 
   it("requires a release node at the graph's claimed root", () => {
@@ -193,6 +193,30 @@ describe("release evidence graph", () => {
     expect(() => traceReleaseEvidence({ ...valid, rootReleaseId: source.id })).toThrow(
       "Evidence graph root does not identify a release node.",
     );
+  });
+
+  it("traces hundreds of distinct evidence edges deterministically without dropping relationships", () => {
+    const artifacts = Array.from({ length: 512 }, (_, index) => ({
+      id: `evidence-${index}`,
+      kind: "report",
+      name: `build-${index}.json`,
+      sha256: index.toString(16).padStart(64, "0"),
+    }));
+    const graph = buildReleaseEvidenceGraph({
+      release: {
+        id: "run-many",
+        repositoryId: "repo-many",
+        repository: "acme/board",
+        commitSha: "a".repeat(40),
+      },
+      evidence: artifacts,
+    });
+    const trace = traceReleaseEvidence(graph);
+    expect(trace.backward).toHaveLength(513);
+    expect(trace.backward[0]?.kind).toBe("source");
+    expect(trace.backward[1]?.id).toBe("evidence:evidence-0");
+    expect(trace.backward.at(-1)?.id).toBe("evidence:evidence-511");
+    expect(trace.forward).toEqual([]);
   });
 
   it("keeps absent optional relationships explicit instead of inventing evidence", () => {
