@@ -72798,7 +72798,7 @@ var import_promises4 = __toESM(require("node:fs/promises"), 1);
 var import_node_path6 = __toESM(require("node:path"), 1);
 var import_picomatch = __toESM(require_picomatch2(), 1);
 var ignoredDirectoryNames = /* @__PURE__ */ new Set(["node_modules", ".git", "dist", "coverage"]);
-async function collectFiles(root, directory, output) {
+async function collectFiles(root, directory, output, strictSourceMatcher) {
   let entries;
   try {
     entries = await import_promises4.default.readdir(directory, { withFileTypes: true });
@@ -72810,19 +72810,24 @@ async function collectFiles(root, directory, output) {
     if (entry.name.startsWith(".")) continue;
     if (entry.isDirectory() && ignoredDirectoryNames.has(entry.name)) continue;
     const absolute = import_node_path6.default.join(directory, entry.name);
+    const relative = toPosixPath2(import_node_path6.default.relative(root, absolute));
+    if (entry.isSymbolicLink()) {
+      if (strictSourceMatcher?.(relative)) throw new Error("Symlinked source input rejected.");
+      continue;
+    }
     if (entry.isDirectory()) {
-      await collectFiles(root, absolute, output);
+      await collectFiles(root, absolute, output, strictSourceMatcher);
       continue;
     }
     if (!entry.isFile()) continue;
-    output.push(toPosixPath2(import_node_path6.default.relative(root, absolute)));
+    output.push(relative);
   }
 }
-async function globFiles(root, patterns) {
+async function globFiles(root, patterns, options = {}) {
   const absoluteRoot = import_node_path6.default.resolve(root);
   const relativeFiles = [];
-  await collectFiles(absoluteRoot, absoluteRoot, relativeFiles);
   const matches = (0, import_picomatch.default)(patterns, { dot: false });
+  await collectFiles(absoluteRoot, absoluteRoot, relativeFiles, options.rejectMatchingSymlinks ? matches : void 0);
   return relativeFiles.filter((relative) => matches(relative)).map((relative) => toPosixPath2(import_node_path6.default.resolve(absoluteRoot, relative))).sort((a, b) => a.localeCompare(b));
 }
 
@@ -93773,7 +93778,7 @@ var SOURCE_PATTERNS = [
   "**/*.kicad_wks"
 ];
 async function sourceFingerprintDetail(root, customPatterns = SOURCE_PATTERNS) {
-  const files = await globFiles(root, customPatterns);
+  const files = await globFiles(root, customPatterns, { rejectMatchingSymlinks: true });
   const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
   const hasher = (0, import_node_crypto4.createHash)("sha256");
   for (const absolutePath of sortedFiles) {
@@ -93932,10 +93937,12 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
     const current = await sourceFingerprintDetail(root);
     currentFingerprint = current.fingerprint;
     sourceCount = current.sourceCount;
-  } catch {
+  } catch (error52) {
     return {
       status: "mismatch",
-      reasons: ["Source fingerprint could not be computed because a source input is unreadable or missing."],
+      reasons: [
+        error52 instanceof Error && error52.message === "Symlinked source input rejected." ? "Source fingerprint could not be computed because a KiCad source input is a symlink." : "Source fingerprint could not be computed because a source input is unreadable or missing."
+      ],
       manifest
     };
   }

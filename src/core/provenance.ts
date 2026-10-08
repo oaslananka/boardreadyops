@@ -53,7 +53,7 @@ async function sourceFingerprintDetail(
   root: string,
   customPatterns: string[] = SOURCE_PATTERNS,
 ): Promise<{ fingerprint: string; sourceCount: number }> {
-  const files = await globFiles(root, customPatterns);
+  const files = await globFiles(root, customPatterns, { rejectMatchingSymlinks: true });
   const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
 
   const hasher = createHash("sha256");
@@ -293,10 +293,14 @@ export async function verifyExportProvenance(
     const current = await sourceFingerprintDetail(root);
     currentFingerprint = current.fingerprint;
     sourceCount = current.sourceCount;
-  } catch {
+  } catch (error) {
     return {
       status: "mismatch",
-      reasons: ["Source fingerprint could not be computed because a source input is unreadable or missing."],
+      reasons: [
+        error instanceof Error && error.message === "Symlinked source input rejected."
+          ? "Source fingerprint could not be computed because a KiCad source input is a symlink."
+          : "Source fingerprint could not be computed because a source input is unreadable or missing.",
+      ],
       manifest,
     };
   }

@@ -59,6 +59,20 @@ describe("globFiles", () => {
     await expect(globFiles(root, ["**/*.kicad_pro"])).resolves.toEqual([]);
   });
 
+  it.skipIf(process.platform === "win32")(
+    "optionally rejects matching source symlinks without changing default glob behavior",
+    async () => {
+      const root = await fixture(["board.kicad_pcb"]);
+      await fs.symlink("board.kicad_pcb", path.join(root, "copy.kicad_pcb"));
+      const listed = await globFiles(root, ["**/*.kicad_pcb"]);
+      expect(listed.map((file) => path.basename(file))).toEqual(["board.kicad_pcb"]);
+      await expect(globFiles(root, ["**/*.kicad_pcb"], { rejectMatchingSymlinks: true })).rejects.toThrow(
+        "Symlinked source input rejected",
+      );
+      await expect(globFiles(root, ["**/*.gbr"], { rejectMatchingSymlinks: true })).resolves.toEqual([]);
+    },
+  );
+
   it("does not follow symlinks outside the requested root", async () => {
     const root = await fixture(["inside.txt"]);
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-glob-outside-"));
