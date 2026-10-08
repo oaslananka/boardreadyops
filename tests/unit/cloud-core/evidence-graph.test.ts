@@ -107,8 +107,20 @@ describe("release evidence graph", () => {
       buildReleaseEvidenceGraph({
         ...base,
         productionBatches: [
-          { id: "batch-a", externalBatchId: "LOT-A", manufacturer: "Acme", manufacturedOn: "2026-10-01", sourceSha256: "3".repeat(64) },
-          { id: "batch-a", externalBatchId: "LOT-B", manufacturer: "Acme", manufacturedOn: "2026-10-02", sourceSha256: "4".repeat(64) },
+          {
+            id: "batch-a",
+            externalBatchId: "LOT-A",
+            manufacturer: "Acme",
+            manufacturedOn: "2026-10-01",
+            sourceSha256: "3".repeat(64),
+          },
+          {
+            id: "batch-a",
+            externalBatchId: "LOT-B",
+            manufacturer: "Acme",
+            manufacturedOn: "2026-10-02",
+            sourceSha256: "4".repeat(64),
+          },
         ],
       }),
     ).toThrow("Duplicate evidence graph node identity: production_batch:batch-a");
