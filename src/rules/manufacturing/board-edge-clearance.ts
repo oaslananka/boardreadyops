@@ -166,9 +166,20 @@ function evaluateCopperLayer(
   return [];
 }
 
+function profileFindingEvidence(limits: ReturnType<typeof resolveLimit>) {
+  const { profile, assurance } = limits;
+  return {
+    profileAssurance: assurance?.state ?? "none",
+    profileMayBlock: assurance?.mayBlock ?? false,
+    profileRevision: profile?.provenance.revision ?? null,
+    profileSource: profile?.provenance.source ?? null,
+    verifiedAt: profile?.provenance.verifiedAt ?? null,
+  };
+}
+
 function measuredViolationFinding(assessment: CopperAssessment, best: FeatureMeasurement, evidenceReasons: string[]) {
   const { context, copper, outlineFile, outlineReasons, geometryReasons, limits } = assessment;
-  const { profile, assurance, minClearanceMm, limitSource, configured } = limits;
+  const { minClearanceMm, limitSource, configured } = limits;
   const blocking = evidenceReasons.length === 0;
   const severity = blocking ? configured : advisorySeverity(configured);
   return finding(context, {
@@ -193,11 +204,7 @@ function measuredViolationFinding(assessment: CopperAssessment, best: FeatureMea
       featureExtentEvidence: best.extentEvidence,
       geometryConfidence: geometryReasons.length === 0 && outlineReasons.length === 0 ? "exact" : "partial",
       geometryUncertainty: [...outlineReasons, ...geometryReasons],
-      profileAssurance: assurance?.state ?? "none",
-      profileMayBlock: assurance?.mayBlock ?? false,
-      profileRevision: profile?.provenance.revision ?? null,
-      profileSource: profile?.provenance.source ?? null,
-      verifiedAt: profile?.provenance.verifiedAt ?? null,
+      ...profileFindingEvidence(limits),
       configuredSeverity: configured,
       severityCapped: severity !== configured,
       blocking,
@@ -219,7 +226,8 @@ function measuredViolationFinding(assessment: CopperAssessment, best: FeatureMea
 
 function incompleteGeometryFinding(assessment: CopperAssessment, best: FeatureMeasurement | undefined) {
   const { context, copper, outlineFile, geometryReasons, limits } = assessment;
-  const { assurance, minClearanceMm, limitSource, configured } = limits;
+  const { minClearanceMm, limitSource, configured } = limits;
+  const { profileAssurance, profileMayBlock } = profileFindingEvidence(limits);
   const severity = advisorySeverity(configured);
   return finding(context, {
     ruleId: "manufacturing.board-edge-clearance",
@@ -237,8 +245,8 @@ function incompleteGeometryFinding(assessment: CopperAssessment, best: FeatureMe
       outlineRoleEvidence: outlineFile.layer?.identitySource ?? "unknown",
       geometryConfidence: "partial",
       geometryUncertainty: geometryReasons,
-      profileAssurance: assurance?.state ?? "none",
-      profileMayBlock: assurance?.mayBlock ?? false,
+      profileAssurance,
+      profileMayBlock,
       configuredSeverity: configured,
       severityCapped: severity !== configured,
       blocking: false,
