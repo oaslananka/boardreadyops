@@ -84,6 +84,9 @@ function partIndex(parts: readonly BomPart[], label: string): Map<string, BomPar
     if (part.quantity !== undefined && (!Number.isSafeInteger(part.quantity) || part.quantity <= 0)) {
       throw new Error(`${label} has invalid quantity for ${key}`);
     }
+    if (part.dnp !== undefined && typeof part.dnp !== "boolean") {
+      throw new Error(`${label} has invalid DNP flag for ${key}`);
+    }
     indexed.set(key, part);
   }
   return indexed;
@@ -207,6 +210,8 @@ export function compareApprovedAndBuiltBom(input: AsBuiltComparisonInput): AsBui
   const approved = partIndex(input.approved, "Approved BOM");
   const built = partIndex(input.built, "As-built BOM");
   const divergences = collectBomDifferences(approved, built, input.documentedAlternates ?? []);
+  // An all-DNP design has no populated baseline to establish an as-built match.
+  const hasPopulatedApprovedPart = [...approved.values()].some((part) => part.dnp !== true);
 
   return {
     releaseId: input.approvedRelease.id,
@@ -218,7 +223,7 @@ export function compareApprovedAndBuiltBom(input: AsBuiltComparisonInput): AsBui
     batchSourceSha256: input.productionBatch.sourceSha256,
     divergences,
     status:
-      approved.size === 0 || divergences.some((entry) => entry.kind === "identity_incomplete")
+      !hasPopulatedApprovedPart || divergences.some((entry) => entry.kind === "identity_incomplete")
         ? "insufficient_identity"
         : divergences.length > 0
           ? "different_records"
