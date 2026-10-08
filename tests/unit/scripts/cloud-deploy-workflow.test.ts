@@ -71,9 +71,9 @@ describe("cloud-deploy topology preflight", () => {
 
     expect(workflow).toContain("build_cache_max_used_space=3GB");
     expect(workflow).toContain("docker builder prune --all --force || true");
-    expect(workflow).toContain(
-      `docker builder prune --all --force --max-used-space "${buildCacheMaxUsedSpace}" || true`,
-    );
+    expect(workflow).toContain(`docker buildx prune --all --force --max-used-space "${buildCacheMaxUsedSpace}"`);
+    expect(workflow).toContain("cloud-deploy cache: unable to enforce");
+    expect(workflow).not.toContain(`--max-used-space "${buildCacheMaxUsedSpace}" || true`);
     expect(workflow).not.toContain("--filter until=168h");
 
     const lowSpaceCheck = workflow.indexOf(`if [ "${availableMib}" -lt "${requiredMib}" ]; then`);
@@ -81,7 +81,7 @@ describe("cloud-deploy topology preflight", () => {
     const checkout = workflow.indexOf(`cd "${repoDir}"`);
     const caseStart = workflow.indexOf(`case "${deployArgs}" in`);
     const caseEnd = workflow.indexOf("          esac", caseStart);
-    const finalTrim = workflow.indexOf("          trim_build_cache", caseEnd);
+    const finalTrim = workflow.indexOf("          if ! trim_build_cache; then", caseEnd);
 
     expect(lowSpaceCheck).toBeGreaterThan(0);
     expect(preflightReclaim).toBeGreaterThan(lowSpaceCheck);
@@ -89,6 +89,12 @@ describe("cloud-deploy topology preflight", () => {
     expect(caseStart).toBeGreaterThan(checkout);
     expect(caseEnd).toBeGreaterThan(caseStart);
     expect(finalTrim).toBeGreaterThan(caseEnd);
+    expect(workflow).toContain("if ! trim_build_cache; then");
+    expect(workflow).toContain("report_disk_summary\n            exit 78");
+    const finalSummary = workflow.indexOf("          report_disk_summary", finalTrim);
+    expect(finalSummary).toBeGreaterThan(finalTrim);
+    expect(workflow).not.toContain("docker system prune");
+    expect(workflow).not.toContain("docker volume prune");
   });
 
   it("retires tagged runtime images before a blocked build only after explicit operator opt-in", () => {
@@ -99,17 +105,20 @@ describe("cloud-deploy topology preflight", () => {
     const requiredMib = "$" + "{required_mib}";
     const retireOptIn = "$" + "{retire_superseded_images}";
     const shellImage = "$" + "{image}";
-    const bashPid = "$" + "{BASHPID}";
 
     expect(workflow).toContain("retire_superseded_images:");
     expect(workflow).toContain("default: false");
     expect(workflow).toContain('retire_superseded_images="$2"');
     expect(workflow).toContain(`if [ "${retireOptIn}" = "1" ]; then`);
-    expect(workflow).toContain("docker compose -p boardreadyops-cloud images");
+    expect(workflow).not.toContain("docker compose -p boardreadyops-cloud images");
+    expect(workflow).toContain("cannot verify both running runtime images; nothing retired");
+    expect(workflow).toContain("container_for_service");
+    expect(workflow).toContain("{{.Config.Image}}");
+    expect(workflow).toContain("grep -vxF -f <(printf");
+    expect(workflow).not.toContain("|| : >");
     expect(workflow).toContain("grep -vxF");
     expect(workflow).toContain("tail -n +$((retain + 1))");
     expect(workflow).toContain(`docker image rm "${shellImage}"`);
-    expect(workflow).toContain(`/tmp/boardreadyops-running-images.${bashPid}`);
     expect(workflow).not.toContain("docker system prune");
     expect(workflow).not.toContain("docker volume prune");
 
@@ -138,6 +147,17 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain('preflight_rollback_images_to_keep="$3"');
     expect(workflow).toContain(`retire_superseded_runtime_images "${preflightKeep}"`);
     expect(workflow).toContain('retire_superseded_runtime_images "3"');
+    const remoteCaseEnd = workflow.lastIndexOf(
+      "          esac",
+      workflow.indexOf("          # Both rehearsal and real deploy paths"),
+    );
+    const afterBuildCacheTrim = workflow.indexOf("          if ! trim_build_cache; then", remoteCaseEnd);
+    const normalRetention = workflow.indexOf('          retire_superseded_runtime_images "3"', afterBuildCacheTrim);
+    const endOfDeploy = workflow.indexOf("          report_disk_summary", normalRetention);
+    expect(afterBuildCacheTrim).toBeGreaterThan(remoteCaseEnd);
+    expect(normalRetention).toBeGreaterThan(afterBuildCacheTrim);
+    expect(endOfDeploy).toBeGreaterThan(normalRetention);
+    expect(workflow.match(/retire_superseded_runtime_images "3"/g)).toHaveLength(1);
     expect(workflow).toContain('local retain="$1"');
     expect(workflow).toContain("1|2|3)");
     expect(workflow).not.toContain('rollback_images_to_keep: "0"');

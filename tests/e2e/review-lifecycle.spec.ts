@@ -163,7 +163,7 @@ test.describe("Review lifecycle", () => {
     // for signed-out viewers, so an unscoped locator matches twice.
     const body = page.locator("#main-content");
     await expect(body.getByRole("heading", { name: "Data & Retention" })).toBeVisible();
-    await expect(body.getByText(/Free keeps evidence for 30 days/)).toBeVisible();
+    await expect(body.getByText(/Free keeps managed artifacts for 30 days/)).toBeVisible();
     await expect(body.getByRole("link", { name: /Sign in with GitHub/i })).toBeVisible();
   });
 
