@@ -207,9 +207,9 @@ function validateComparisonInput(input: AsBuiltComparisonInput): void {
   ];
   for (const [value, label] of identities) requiredIdentity(value, label);
   if (!commitSha.test(input.approvedRelease.commitSha))
-    throw new Error("Approved commit SHA must be 40 hexadecimal characters");
+    throw new Error("Approved commit SHA must be 40 lowercase hexadecimal characters");
   if (!sha256.test(input.productionBatch.sourceSha256))
-    throw new Error("Batch source digest must be 64 hexadecimal characters");
+    throw new Error("Batch source digest must be 64 lowercase hexadecimal characters");
   if ((input.documentedAlternates?.length ?? 0) > maximumAlternates)
     throw new Error("Approved alternate list exceeds the supported limit");
 }
