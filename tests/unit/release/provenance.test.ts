@@ -363,6 +363,36 @@ describe("release/provenance", () => {
     expect(undersized.artifactMismatches).toContain("large.gtl");
   });
 
+  it("does not accept an incompatible export discriminator or a changed source snapshot", async () => {
+    const root = await writeFixture({
+      "board.kicad_pcb": "(kicad_pcb)",
+      "top.gtl": "D10*X0Y0D03*M02*",
+    });
+    const content = "D10*X0Y0D03*M02*";
+    const inventory = await createExportProvenanceManifest({
+      root,
+      artifacts: [
+        {
+          path: "top.gtl",
+          sha256: createHash("sha256").update(content).digest("hex"),
+          bytes: Buffer.byteLength(content),
+        },
+      ],
+    });
+    const otherSchema = await verifyExportProvenance(root, {
+      ...inventory,
+      kind: "not-a-boardreadyops-export",
+    } as unknown as ExportProvenanceManifest);
+    expect(otherSchema.status).toBe("unsupported");
+    const sourceChanged = await verifyExportProvenance(root, {
+      ...inventory,
+      kind: "boardreadyops.export-provenance",
+      sourceSnapshot: "changed",
+    });
+    expect(sourceChanged.status).toBe("mismatch");
+    expect(sourceChanged.reasons.join(" ")).toMatch(/changed/);
+  });
+
   it("rejects unsupported schema versions", async () => {
     const root = await writeFixture({});
     const manifest = { schemaVersion: 99, tool: { name: "boardreadyops" } } as unknown as ExportProvenanceManifest;

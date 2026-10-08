@@ -32,7 +32,7 @@ export const artifactProvenanceRule = rule(
     id: "release.artifact-provenance",
     title: "Exported manufacturing artifacts lack valid source provenance",
     description:
-      "Checks that exported Gerber and drill artifacts match the current source revision and have an authentic export provenance manifest.",
+      "Checks self-reported source-file fingerprints and exported Gerber/drill artifact hashes; this does not authenticate a reviewed commit or export runner.",
     rationale:
       "Manufacturing outputs exported from an older commit or modified after export risk fabricating obsolete hardware.",
     defaultSeverity: "high",
