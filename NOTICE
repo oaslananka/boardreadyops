@@ -265,7 +265,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `semifies@1.0.0`
   - Description: Slimmed down satisfies from semver
   - Homepage: https://github.com/holepunchto/semifies
-- `sharp@0.35.4`
+- `sharp@0.35.5`
   - Description: High performance Node.js image processing, the fastest module to resize JPEG, PNG, WebP, GIF, AVIF and TIFF images
   - Homepage: https://sharp.pixelplumbing.com
 - `text-decoder@1.2.7`
@@ -379,13 +379,13 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `qs@6.16.0`
   - Description: A querystring parser that supports nesting and arrays, with a depth limit
   - Homepage: https://github.com/ljharb/qs
-- `smol-toml@1.8.0`
+- `smol-toml@1.9.0`
   - Description: A small, fast, and correct TOML parser/serializer
   - Homepage: https://github.com/squirrelchat/smol-toml#readme
 - `source-map@0.6.1`, `source-map@0.7.6`
   - Description: Generates and consumes source maps
   - Homepage: https://github.com/mozilla/source-map
-- `source-map-js@1.2.1`
+- `source-map-js@1.2.2`
   - Description: Generates and consumes source maps
   - Homepage: https://github.com/7rulnik/source-map-js
 
@@ -885,10 +885,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@jridgewell/trace-mapping@0.3.31`
   - Description: Trace the original position through a source map
   - Homepage: https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping
-- `@modelcontextprotocol/sdk@1.30.0`
+- `@modelcontextprotocol/sdk@1.31.0`
   - Description: Model Context Protocol implementation for TypeScript
   - Homepage: https://modelcontextprotocol.io
-- `@next/env@16.3.6`
+- `@next/env@16.3.8`
   - Description: Next.js dotenv file loading
   - Homepage: https://github.com/vercel/next.js#readme
 - `@nodable/entities@2.1.0`
@@ -2011,7 +2011,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `neo-async@2.6.2`
   - Description: Neo-Async is a drop-in replacement for Async, it almost fully covers its functionality and runs faster
   - Homepage: https://github.com/suguru03/neo-async
-- `next@16.3.6`
+- `next@16.3.8`
   - Description: The React Framework
   - Homepage: https://nextjs.org
 - `next-themes@0.4.6`
@@ -2150,7 +2150,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `proper-lockfile@4.1.2`
   - Description: A inter-process and inter-machine lockfile utility that works on a local or network file system
   - Homepage: https://github.com/moxystudio/node-proper-lockfile
-- `proxy-addr@2.0.7`
+- `proxy-addr@2.0.8`
   - Description: Determine address of proxied request
   - Homepage: https://github.com/jshttp/proxy-addr#readme
 - `proxy-from-env@1.1.0`
