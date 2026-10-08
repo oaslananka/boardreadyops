@@ -211,7 +211,7 @@ export function compareApprovedAndBuiltBom(input: AsBuiltComparisonInput): AsBui
   const built = partIndex(input.built, "As-built BOM");
   const divergences = collectBomDifferences(approved, built, input.documentedAlternates ?? []);
   // An all-DNP design has no populated baseline to establish an as-built match.
-  const hasPopulatedApprovedPart = [...approved.values()].some((part) => part.dnp !== true);
+  const hasPopulatedApprovedPart = input.approved.some((part) => part.dnp !== true);
 
   return {
     releaseId: input.approvedRelease.id,
