@@ -47577,6 +47577,58 @@ async function computeSourceFingerprint(root, customPatterns = SOURCE_PATTERNS) 
   }
   return hasher.digest("hex");
 }
+function compareReviewedCommit(reviewedSha, recorded) {
+  if (typeof recorded?.sha !== "string" || !/^[0-9a-f]{40}$/i.test(recorded.sha)) {
+    return { match: false, reason: "Reviewed commit verification requested, but manifest has no valid Git SHA." };
+  }
+  if (recorded.dirty === true) {
+    return {
+      match: false,
+      reason: "Reviewed commit verification requested, but the export recorded a dirty source tree."
+    };
+  }
+  if (reviewedSha !== recorded.sha) {
+    return {
+      match: false,
+      reason: "Git SHA mismatch: current commit " + reviewedSha.slice(0, 12) + "\u2026 but manifest recorded " + recorded.sha.slice(0, 12) + "\u2026"
+    };
+  }
+  return { match: true };
+}
+function isArtifactRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record2 = value;
+  return typeof record2.path === "string" && record2.path.trim() !== "" && typeof record2.sha256 === "string" && /^[0-9a-f]{64}$/i.test(record2.sha256) && Number.isSafeInteger(record2.bytes) && (record2.bytes ?? -1) >= 0;
+}
+async function inspectArtifact(root, manifestDir, artifact) {
+  if (import_node_path36.default.isAbsolute(artifact.path) || artifact.path.includes("..")) {
+    return { kind: "mismatch", reason: `Artifact path rejected (absolute or path traversal): ${artifact.path}` };
+  }
+  const absPath = import_node_path36.default.resolve(manifestDir, artifact.path);
+  if (!isInside(root, absPath) && !isInside(manifestDir, absPath)) {
+    return { kind: "mismatch", reason: `Artifact path escaped directory bounds: ${artifact.path}` };
+  }
+  try {
+    const realPath = await import_promises13.default.realpath(absPath);
+    if (!isInside(root, realPath) && !isInside(manifestDir, realPath)) {
+      return {
+        kind: "mismatch",
+        reason: `Artifact ${artifact.path} symlink escapes the project and manifest directories.`
+      };
+    }
+    const content = await import_promises13.default.readFile(realPath);
+    const actualHash = (0, import_node_crypto4.createHash)("sha256").update(content).digest("hex");
+    if (actualHash !== artifact.sha256 || content.byteLength !== artifact.bytes) {
+      return {
+        kind: "mismatch",
+        reason: `Artifact ${artifact.path} content modified after export (hash or byte-count mismatch).`
+      };
+    }
+    return { kind: "valid" };
+  } catch {
+    return { kind: "missing", reason: `Artifact ${artifact.path} missing or unreadable.` };
+  }
+}
 async function verifyExportProvenance(root, manifestOrPath, options = {}) {
   let manifest;
   let manifestDir = root;
@@ -47590,6 +47642,13 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
     }
     manifestDir = import_node_path36.default.dirname(absManifestPath);
     try {
+      const realManifestPath = await import_promises13.default.realpath(absManifestPath);
+      if (!isInside(root, realManifestPath)) {
+        return {
+          status: "mismatch",
+          reasons: ["Provenance manifest symlink escapes the project root."]
+        };
+      }
       const raw = await readTextFile(absManifestPath);
       manifest = JSON.parse(raw);
     } catch (error51) {
@@ -47603,10 +47662,20 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
   } else {
     manifest = manifestOrPath;
   }
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return { status: "unsupported", reasons: ["Invalid provenance manifest object."] };
+  }
   if (manifest.schemaVersion !== 1 || manifest.tool?.name !== "boardreadyops") {
     return {
       status: "unsupported",
       reasons: [`Unsupported or invalid provenance manifest schema version ${manifest.schemaVersion}`],
+      manifest
+    };
+  }
+  if (typeof manifest.sourceFingerprint !== "string" || !/^[0-9a-f]{64}$/i.test(manifest.sourceFingerprint)) {
+    return {
+      status: "mismatch",
+      reasons: ["Provenance manifest has no valid source SHA-256 fingerprint."],
       manifest
     };
   }
@@ -47619,39 +47688,33 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
     );
   }
   let gitShaMatch;
-  if (options.currentGitSha && manifest.git?.sha) {
-    gitShaMatch = options.currentGitSha === manifest.git.sha;
-    if (!gitShaMatch) {
-      reasons.push(
-        `Git SHA mismatch: current commit ${options.currentGitSha.slice(0, 12)}\u2026 but manifest recorded ${manifest.git.sha.slice(0, 12)}\u2026`
-      );
-    }
+  if (options.currentGitSha) {
+    const comparison = compareReviewedCommit(options.currentGitSha, manifest.git);
+    gitShaMatch = comparison.match;
+    if (comparison.reason) reasons.push(comparison.reason);
   }
   const artifactMismatches = [];
   const missingArtifacts = [];
-  for (const artifact of manifest.artifacts ?? []) {
-    if (import_node_path36.default.isAbsolute(artifact.path) || artifact.path.includes("..")) {
-      artifactMismatches.push(artifact.path);
-      reasons.push(`Artifact path rejected (absolute or path traversal): ${artifact.path}`);
+  if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length === 0) {
+    reasons.push("Provenance manifest is missing a non-empty artifact inventory.");
+  }
+  const seenPaths = /* @__PURE__ */ new Set();
+  for (const entry of Array.isArray(manifest.artifacts) ? manifest.artifacts : []) {
+    if (!isArtifactRecord(entry)) {
+      reasons.push("Provenance artifact entry has invalid path, SHA-256, or byte count.");
       continue;
     }
-    const absPath = import_node_path36.default.resolve(manifestDir, artifact.path);
-    if (!isInside(root, absPath) && !isInside(manifestDir, absPath)) {
-      artifactMismatches.push(artifact.path);
-      reasons.push(`Artifact path escaped directory bounds: ${artifact.path}`);
+    const normalizedPath = toPosixPath(import_node_path36.default.posix.normalize(entry.path));
+    if (seenPaths.has(normalizedPath)) {
+      artifactMismatches.push(entry.path);
+      reasons.push(`Artifact path is duplicated in provenance manifest: ${entry.path}`);
       continue;
     }
-    try {
-      const content = await import_promises13.default.readFile(absPath);
-      const actualHash = (0, import_node_crypto4.createHash)("sha256").update(content).digest("hex");
-      if (actualHash !== artifact.sha256) {
-        artifactMismatches.push(artifact.path);
-        reasons.push(`Artifact ${artifact.path} content modified after export (hash mismatch).`);
-      }
-    } catch {
-      missingArtifacts.push(artifact.path);
-      reasons.push(`Artifact ${artifact.path} missing or unreadable.`);
-    }
+    seenPaths.add(normalizedPath);
+    const outcome = await inspectArtifact(root, manifestDir, entry);
+    if (outcome.reason) reasons.push(outcome.reason);
+    if (outcome.kind === "mismatch") artifactMismatches.push(entry.path);
+    if (outcome.kind === "missing") missingArtifacts.push(entry.path);
   }
   const status = reasons.length === 0 ? "verified" : "mismatch";
   return {
