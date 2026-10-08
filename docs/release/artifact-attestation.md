@@ -2,6 +2,15 @@
 
 **Issue:** [#298](https://github.com/oaslananka/boardreadyops/issues/298)
 
+> **Implementation boundary (2026-10-08):** This page documents a proposed / illustrative
+> GitHub Artifact Attestation workflow, **not** a currently enforced manufacturing
+> source-commit release gate. The current CLI can record an attestation URI as bundle
+> metadata; recording a URI does not validate its signature, issuer, reviewed commit,
+> or relation to a KiCad export. The examples below contain historical version/action
+> references and are **not copy-paste-ready release instructions**.
+> See [Source-to-Exported Artifact Proof — Design Contract](source-export-provenance-contract.md)
+> and open issue [#771](https://github.com/oaslananka/boardreadyops/issues/771).
+
 BoardReadyOps release evidence bundles can be enriched with GitHub Artifact Attestations to provide supply-chain-grade provenance for manufactured hardware.
 
 ---
@@ -38,9 +47,9 @@ Fields are populated from environment variables available in GitHub Actions:
 
 ---
 
-## Trusted Release Mode
+## Proposed Trusted Release Mode (not currently enforced)
 
-In trusted release mode, BoardReadyOps requires a provenance attestation before marking a release as fully trusted:
+A future trusted release policy should require *verified source-bound provenance* before calling manufacturing output fully trusted. The following proposed settings are **not an implemented enforcement contract**:
 
 ```yaml
 # boardreadyops.yml
@@ -49,13 +58,13 @@ release:
   require-attestation: true
 ```
 
-When `require-attestation: true` and no attestation URL is present in the evidence bundle, the release decision is `fail` with reason `missing-attestation`.
+**Target behavior only:** once that policy is implemented, missing or invalid independently verified provenance should prevent a source-bound release claim. The current release pipeline does **not** enforce `missing-attestation` as shown here.
 
-Without this setting, attestation is optional metadata and does not affect the release decision.
+Today an attestation URI is optional bundle metadata, and must not be mistaken for a verified signature or generation-from-reviewed-commit proof.
 
 ---
 
-## Example GitHub Actions Workflow
+## Illustrative GitHub Actions Workflow (not a tested release recipe)
 
 The following workflow generates Gerbers, runs BoardReadyOps, creates an evidence bundle, and attests both the bundle and the handoff zip.
 
@@ -174,10 +183,7 @@ gh attestation verify build/handoff.zip \
   --repo org/repo
 ```
 
-Verification confirms:
-- The artifact was produced by this specific repository's Actions workflow
-- The artifact has not been modified since attestation
-- The attestation was signed with a GitHub-issued OIDC token
+A **successful independent GitHub attestation verification** establishes the attested subject bytes and trusted workflow identity, when issuer/repository constraints are checked. It does **not**, by itself, prove the workflow generated Gerbers from the reviewed KiCad commit. That stronger relationship requires the same-run source/export binding described in the [design contract](source-export-provenance-contract.md). Merely placing a URL in `manifest.provenance.attestation` proves neither.
 
 ---
 
