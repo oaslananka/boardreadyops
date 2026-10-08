@@ -2,6 +2,7 @@ import type {
   EffectivePolicyProvenance,
   PolicyDryRunResult,
   PolicyFieldSource,
+  PolicySeverityGate,
   ReviewPolicy,
 } from "@boardreadyops/contracts";
 
@@ -116,11 +117,27 @@ export function dryRunPolicyImpact(input: {
   newPolicy: ReviewPolicy;
   previousPolicy: ReviewPolicy | null;
 }): PolicyDryRunResult {
+  // Higher rank means a more inclusive gate: medium blocks medium/high/error,
+  // high blocks high/error, and error blocks only error findings.
+  // This exhaustive map must be updated if the contract adds a new gate.
+  const severityRank: Record<PolicySeverityGate, number> = { error: 0, high: 1, medium: 2 };
+  const previousGate = input.previousPolicy?.severityGate;
+  const nextGate = input.newPolicy.severityGate;
   const severityTightened =
-    input.previousPolicy?.severityGate !== input.newPolicy.severityGate && Boolean(input.newPolicy.severityGate);
-  const checklistAdded =
-    input.newPolicy.requiredChecklist.length > (input.previousPolicy?.requiredChecklist.length ?? 0);
-  const blockers = (severityTightened ? 1 : 0) + (checklistAdded ? 1 : 0);
+    nextGate !== undefined && (previousGate === undefined || severityRank[nextGate] > severityRank[previousGate]);
+  const existingChecklist = new Set(input.previousPolicy?.requiredChecklist ?? []);
+  const existingRoles = new Set(input.previousPolicy?.requiredRoles ?? []);
+  const checklistAdded = input.newPolicy.requiredChecklist.some((item) => !existingChecklist.has(item));
+  const roleAdded = input.newPolicy.requiredRoles.some((role) => !existingRoles.has(role));
+  const evidencePackIntroduced = input.newPolicy.requireEvidencePack && !input.previousPolicy?.requireEvidencePack;
+  const externalReviewIntroduced =
+    input.newPolicy.requireExternalReview && !input.previousPolicy?.requireExternalReview;
+  const blockers =
+    Number(severityTightened) +
+    Number(checklistAdded) +
+    Number(roleAdded) +
+    Number(evidencePackIntroduced) +
+    Number(externalReviewIntroduced);
   return {
     affectedRepositories: input.repositoriesCount,
     affectedReviews: input.existingReviewsCount,
