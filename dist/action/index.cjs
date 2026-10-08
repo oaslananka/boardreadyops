@@ -93801,7 +93801,7 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
       reasons.push("Provenance artifact entry has invalid path, SHA-256, or byte count.");
       continue;
     }
-    const normalizedPath = toPosixPath2(import_node_path35.default.posix.normalize(entry.path));
+    const normalizedPath = import_node_path35.default.posix.normalize(toPosixPath2(entry.path));
     if (seenPaths.has(normalizedPath)) {
       artifactMismatches.push(entry.path);
       reasons.push(`Artifact path is duplicated in provenance manifest: ${entry.path}`);

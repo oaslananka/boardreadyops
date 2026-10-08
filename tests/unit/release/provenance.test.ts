@@ -242,6 +242,15 @@ describe("release/provenance", () => {
     });
     expect(duplicated.status).toBe("mismatch");
     expect(duplicated.reasons.some((reason) => reason.includes("duplicated"))).toBe(true);
+    const windowsAlias = await verifyExportProvenance(root, {
+      ...manifest,
+      artifacts: [
+        { path: "top.gtl", sha256: digest, bytes: Buffer.byteLength(content) },
+        { path: ".\\\\top.gtl", sha256: digest, bytes: Buffer.byteLength(content) },
+      ],
+    });
+    expect(windowsAlias.status).toBe("mismatch");
+    expect(windowsAlias.reasons.some((reason) => reason.includes("duplicated"))).toBe(true);
   });
 
   it("rejects artifact symlink escapes rather than trusting their declared digests", async () => {
