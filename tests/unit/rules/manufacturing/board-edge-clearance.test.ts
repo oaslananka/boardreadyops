@@ -512,6 +512,117 @@ fail-on: never
     });
   });
 
+  it("chooses the smallest of several copper measurements regardless of feature order", async () => {
+    const mixed = [
+      ...header,
+      "%TF.FileFunction,Copper,L1,Top*%",
+      "%ADD10C,0.2*%",
+      "D10*",
+      position({ x: 0.8, y: 1 }, "D02"),
+      position({ x: 0.8, y: 9 }, "D01"),
+      position({ x: 0.25, y: 1 }, "D02"),
+      position({ x: 0.25, y: 9 }, "D01"),
+      position({ x: 0.6, y: 1 }, "D02"),
+      position({ x: 0.6, y: 9 }, "D01"),
+      "M02*",
+    ].join("\n");
+    const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": mixed }, configuredLimit());
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({
+      blocking: true,
+      featureKind: "trace",
+      measuredClearanceMm: 0.15,
+    });
+  });
+
+  it("uses polygon aperture geometry when the Gerber rotation field is omitted", async () => {
+    const result = await run(
+      { "fab/outline.gko": squareOutline, "fab/top.gtl": flashWithAperture({ x: 0.3, y: 5 }, "%ADD10P,0.6X6*%") },
+      configuredLimit(0.2),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({ blocking: true, featureExtentEvidence: "polygon" });
+  });
+
+  it("detects a copper rectangle crossing a board edge between profile endpoints", async () => {
+    const result = await run(
+      { "fab/outline.gko": squareOutline, "fab/top.gtl": flashWithAperture({ x: 0, y: 5 }, "%ADD10R,0.4X0.4*%") },
+      configuredLimit(),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({
+      blocking: true,
+      featureKind: "flash",
+      measuredClearanceMm: 0,
+    });
+  });
+
+  it("catches filled copper crossing an outline with two contour intersections", async () => {
+    const crossing = regionGerber([
+      { x: -1, y: 2 },
+      { x: 1, y: 2 },
+      { x: 1, y: 4 },
+      { x: -1, y: 4 },
+    ]);
+    const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": crossing }, configuredLimit());
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({
+      blocking: true,
+      featureKind: "region",
+      measuredClearanceMm: 0,
+    });
+  });
+
+  it("honors explicit low-severity configuration without raising an advisory", async () => {
+    const config =
+      "version: 1\nrules:\n  manufacturing.board-edge-clearance:\n    enabled: true\n    severity: low\n    min-clearance-mm: 0.4\nfail-on: never\n";
+    const result = await run(
+      { "fab/outline.gko": squareOutline, "fab/top.gtl": traceGerber({ x: 0.3, y: 1 }, { x: 0.3, y: 9 }) },
+      config,
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.severity).toBe("low");
+    expect(issue?.details?.severityCapped).toBe(false);
+  });
+
+  it("keeps the fallback limit advisory without user-selected provenance", async () => {
+    const result = await run({
+      "fab/outline.gko": squareOutline,
+      "fab/top.gtl": traceGerber({ x: 0.25, y: 1 }, { x: 0.25, y: 9 }),
+    });
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({ limitSource: "default", blocking: false });
+    expect(issue?.severity).toBe("low");
+  });
+
+  it.each(["trace", "flash"] as const)("does not invent %s aperture extents with no selected tool", async (kind) => {
+    const bare = [
+      ...header,
+      "%TF.FileFunction,Copper,L1,Top*%",
+      position({ x: 0.2, y: 1 }, "D02"),
+      position({ x: 0.2, y: 9 }, kind === "trace" ? "D01" : "D03"),
+      "M02*",
+    ].join("\n");
+    const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": bare }, configuredLimit());
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({ blocking: false });
+    expect(issue?.confidence).toBe("low");
+  });
+
+  it("does not trust an outline that mixes a closed profile with an open contour", async () => {
+    const mixedOutline = squareOutline.replace(
+      "M02*",
+      [position({ x: 3, y: 3 }, "D02"), position({ x: 4, y: 4 }, "D01"), "M02*"].join("\n"),
+    );
+    const result = await run(
+      { "fab/outline.gko": mixedOutline, "fab/top.gtl": traceGerber({ x: 0.3, y: 1 }, { x: 0.3, y: 9 }) },
+      configuredLimit(),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({ blocking: false });
+    expect(issue?.severity).toBe("low");
+  });
+
   it("never turns incomplete transformed geometry into an exact blocking verdict", async () => {
     const result = await run(
       {
