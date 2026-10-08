@@ -65,7 +65,8 @@ function hasRecordedField(passport: ReleasePassport, kind: PassportEvidenceKind)
       return (
         gerbers.length > 0 &&
         drill.length > 0 &&
-        [...gerbers, ...drill].every((artifact) => artifact.bytes > 0 && sha256.test(artifact.sha256))
+        gerbers.every((artifact) => artifact.bytes > 0 && sha256.test(artifact.sha256)) &&
+        drill.every((artifact) => artifact.bytes > 0 && sha256.test(artifact.sha256))
       );
     }
     case "bom_snapshot":
@@ -74,6 +75,10 @@ function hasRecordedField(passport: ReleasePassport, kind: PassportEvidenceKind)
       return passport.artifacts.firmware.present && sha256.test(passport.artifacts.firmware.hash ?? "");
     case "evidence_manifest":
       return sha256.test(passport.evidence.manifestHash ?? "");
+    default: {
+      const unreachable: never = kind;
+      throw new Error(String(unreachable));
+    }
   }
 }
 
@@ -100,7 +105,6 @@ export function projectPassportAuditClauses(
     if (
       required.size === 0 ||
       required.size !== mapping.requiredEvidence.length ||
-      required.size > evidenceKinds.size ||
       [...required].some((kind) => !evidenceKinds.has(kind))
     ) {
       throw new Error("Audit clause has unsupported, duplicated or empty evidence requirements.");
