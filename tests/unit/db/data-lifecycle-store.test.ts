@@ -210,6 +210,57 @@ describe("data lifecycle administration", () => {
     expect(query).toHaveBeenCalledTimes(2);
   });
 
+  it("rejects malformed erasure and hold scopes before querying, including missing scoped identifiers", async () => {
+    const query = vi.fn();
+    const store = new DataLifecycleStore({ query });
+    for (const scope of ["unknown", "", "organization ", "repository "]) {
+      await expect(store.createErasure({ tenantId: "acme", requestedBy: "alice", scope })).rejects.toThrow(
+        "Invalid lifecycle scope",
+      );
+      await expect(
+        store.createLegalHold({ tenantId: "acme", createdBy: "alice", reason: "Preserve legal evidence", scope }),
+      ).rejects.toThrow("Invalid lifecycle scope");
+    }
+    for (const scope of ["repository", "user"]) {
+      for (const scopeId of [null, undefined, "", " ", " padded ", "\trepo"]) {
+        const scoped = scopeId === undefined ? {} : { scopeId };
+        await expect(store.createErasure({ tenantId: "acme", requestedBy: "alice", scope, ...scoped })).rejects.toThrow(
+          "require a canonical scope id",
+        );
+        await expect(
+          store.createLegalHold({
+            tenantId: "acme",
+            createdBy: "alice",
+            reason: "Preserve legal evidence",
+            scope,
+            ...scoped,
+          }),
+        ).rejects.toThrow("require a canonical scope id");
+        await expect(store.hasActiveHold("acme", scope, scopeId)).rejects.toThrow("require a canonical scope id");
+      }
+    }
+    for (const scopeId of ["", "repository-1", " "]) {
+      await expect(
+        store.createErasure({ tenantId: "acme", requestedBy: "alice", scope: "organization", scopeId }),
+      ).rejects.toThrow("must not have a scope id");
+      await expect(store.hasActiveHold("acme", "organization", scopeId)).rejects.toThrow("must not have a scope id");
+    }
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("preserves canonical scoped hold queries and organization-wide holds", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ hold_id: "h1" }] });
+    const store = new DataLifecycleStore({ query });
+    await expect(store.hasActiveHold("acme", "repository", "repo-1")).resolves.toBe(true);
+    await expect(store.hasActiveHold("acme", "organization")).resolves.toBe(true);
+    expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining("scope='organization' OR (scope=$2"), [
+      "acme",
+      "repository",
+      "repo-1",
+    ]);
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("tenant_id=$1"), ["acme", "organization", null]);
+  });
+
   it("lists legal holds with release metadata newest first", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [

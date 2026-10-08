@@ -53,6 +53,23 @@ export type LegalHold = {
   releasedBy: string | null;
 };
 
+/**
+ * The lifecycle store is also called outside the web UI; a malformed scope must
+ * not create a pending erasure or an unmatchable hold if route validation is bypassed.
+ */
+function validateLifecycleScope(scope: string, scopeId: string | null | undefined): void {
+  if (scope !== "organization" && scope !== "repository" && scope !== "user") {
+    throw new Error("Invalid lifecycle scope.");
+  }
+  if (scope === "organization") {
+    if (scopeId !== null && scopeId !== undefined) {
+      throw new Error("Organization lifecycle scope must not have a scope id.");
+    }
+  } else if (!scopeId?.trim() || scopeId !== scopeId.trim()) {
+    throw new Error("Repository and user lifecycle scopes require a canonical scope id.");
+  }
+}
+
 export class DataLifecycleStore {
   constructor(private readonly db: SqlQueryExecutor) {}
 
@@ -375,6 +392,7 @@ export class DataLifecycleStore {
     scopeId?: string | null;
     dryRun?: boolean;
   }): Promise<ErasureRequest> {
+    validateLifecycleScope(input.scope, input.scopeId);
     // Decide the initial status in the same SQL statement that inserts the
     // request. This avoids a separate read followed by a potentially stale
     // application-side hold decision. The erasure executor must still recheck
@@ -426,6 +444,7 @@ export class DataLifecycleStore {
     scope: string;
     scopeId?: string | null;
   }): Promise<LegalHold> {
+    validateLifecycleScope(input.scope, input.scopeId);
     if (input.reason.trim().length < 10) throw new Error("Legal hold reason must be at least 10 characters");
     const id = randomUUID();
     const r = (await this.db.query(
@@ -457,6 +476,7 @@ export class DataLifecycleStore {
   }
 
   async hasActiveHold(tenantId: string, scope: string, scopeId?: string | null): Promise<boolean> {
+    validateLifecycleScope(scope, scopeId);
     const r = (await this.db.query(
       `SELECT 1 FROM legal_holds WHERE tenant_id=$1 AND active=TRUE AND (scope='organization' OR (scope=$2 AND (scope_id=$3 OR scope_id IS NULL))) LIMIT 1`,
       [tenantId, scope, scopeId ?? null],
