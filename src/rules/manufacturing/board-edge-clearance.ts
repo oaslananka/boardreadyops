@@ -1,3 +1,4 @@
+import type { RuleContext } from "../../core/context.js";
 import { type Severity, severityRankValue } from "../../core/findings.js";
 import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import {
@@ -70,37 +71,8 @@ export const boardEdgeClearanceRule = rule(
     const files = await globFiles(context.root, DEFAULT_GERBER_PATTERNS);
     if (files.length === 0) return [];
 
-    const { entries, stackup } = await loadGerberStackup(context.root, files);
-    const layersByFilename = new Map<string, LayerEvidence>(
-      stackup.layers.map((layer) => [
-        layer.filename.replaceAll("\\", "/"),
-        {
-          role: layer.role,
-          side: layer.side,
-          filename: layer.filename,
-          identitySource: layer.identitySource,
-        },
-      ]),
-    );
-    const parsedFiles: ParsedLayer[] = entries.map((entry) => ({
-      path: entry.filename,
-      parsed: parseGerber(entry.content ?? "", entry.filename),
-      layer: layersByFilename.get(entry.filename.replaceAll("\\", "/")),
-    }));
-
-    const vendorId = typeof context.config.vendor === "string" ? context.config.vendor : context.config.vendor?.profile;
-    const profile = findVendorProfile(vendorId) ?? findVendorProfile("generic-prototype");
-    const assurance = profile === undefined ? undefined : vendorProfileAssurance(profile);
-    const ruleConfig = configFor(context, "manufacturing.board-edge-clearance");
-    const configuredMin =
-      typeof ruleConfig["min-clearance-mm"] === "number" ? ruleConfig["min-clearance-mm"] : undefined;
-    const profileMin = profile?.fabrication?.minBoardEdgeClearanceMm;
-    const minClearanceMm = configuredMin ?? profileMin ?? 0.2;
-    const limitSource =
-      configuredMin !== undefined ? "configured" : profileMin !== undefined ? "vendor-profile" : "default";
-    const limitMayBlock =
-      configuredMin !== undefined || (limitSource === "vendor-profile" && assurance?.mayBlock === true);
-    const configured = configuredSeverity(context, "manufacturing.board-edge-clearance", "medium");
+    const parsedFiles = await parseLayers(context.root, files);
+    const { profile, assurance, minClearanceMm, limitSource, limitMayBlock, configured } = resolveLimit(context);
 
     const outlineCandidates = parsedFiles.filter((item) => item.layer?.role === "outline");
     const outlineFile =
@@ -251,6 +223,42 @@ export const boardEdgeClearanceRule = rule(
     return output;
   },
 );
+
+async function parseLayers(root: string, files: string[]): Promise<ParsedLayer[]> {
+  const { entries, stackup } = await loadGerberStackup(root, files);
+  const layersByFilename = new Map<string, LayerEvidence>(
+    stackup.layers.map((layer) => [
+      layer.filename.replaceAll("\\", "/"),
+      {
+        role: layer.role,
+        side: layer.side,
+        filename: layer.filename,
+        identitySource: layer.identitySource,
+      },
+    ]),
+  );
+  return entries.map((entry) => ({
+    path: entry.filename,
+    parsed: parseGerber(entry.content ?? "", entry.filename),
+    layer: layersByFilename.get(entry.filename.replaceAll("\\", "/")),
+  }));
+}
+
+function resolveLimit(context: RuleContext) {
+  const vendorId = typeof context.config.vendor === "string" ? context.config.vendor : context.config.vendor?.profile;
+  const profile = findVendorProfile(vendorId) ?? findVendorProfile("generic-prototype");
+  const assurance = profile === undefined ? undefined : vendorProfileAssurance(profile);
+  const ruleConfig = configFor(context, "manufacturing.board-edge-clearance");
+  const configuredMin = typeof ruleConfig["min-clearance-mm"] === "number" ? ruleConfig["min-clearance-mm"] : undefined;
+  const profileMin = profile?.fabrication?.minBoardEdgeClearanceMm;
+  const minClearanceMm = configuredMin ?? profileMin ?? 0.2;
+  const limitSource =
+    configuredMin !== undefined ? "configured" : profileMin !== undefined ? "vendor-profile" : "default";
+  const limitMayBlock =
+    configuredMin !== undefined || (limitSource === "vendor-profile" && assurance?.mayBlock === true);
+  const configured = configuredSeverity(context, "manufacturing.board-edge-clearance", "medium");
+  return { profile, assurance, minClearanceMm, limitSource, limitMayBlock, configured };
+}
 
 function outlineEvidenceReasons(outline: ParsedLayer, segments: readonly GerberSegment[]): string[] {
   const reasons: string[] = [];

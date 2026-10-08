@@ -267,6 +267,60 @@ fail-on: never
     });
   });
 
+  it("does not report a clean board when copper arc interpolation is unmodelled", async () => {
+    const curvedCopper = [
+      ...header,
+      "%TF.FileFunction,Copper,L1,Top*%",
+      "%ADD10C,0.2*%",
+      "D10*",
+      position({ x: 5, y: 5 }, "D02"),
+      position({ x: 5, y: 6 }, "D01"),
+      "G02*",
+      "X100000Y600000I250000J0D01*",
+      "G01*",
+      "M02*",
+    ].join("\n");
+    const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": curvedCopper }, configuredLimit());
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.confidence).toBe("low");
+    expect(issue?.severity).toBe("low");
+    expect(issue?.details).toMatchObject({
+      blocking: false,
+      geometryConfidence: "partial",
+      severityCapped: true,
+    });
+    expect(issue?.details?.geometryUncertainty).toContain("copper:unsupported-interpolation");
+  });
+
+  it("does not trust an outline containing unsupported arc interpolation", async () => {
+    const curvedOutline = [
+      ...header,
+      "%TF.FileFunction,Profile,NP*%",
+      "%ADD10C,0.01*%",
+      "D10*",
+      position({ x: 0, y: 0 }, "D02"),
+      position({ x: 10, y: 0 }, "D01"),
+      "G03*",
+      "X1000000Y1000000I0J500000D01*",
+      "G01*",
+      position({ x: 0, y: 10 }, "D01"),
+      position({ x: 0, y: 0 }, "D01"),
+      "M02*",
+    ].join("\n");
+    const result = await run(
+      {
+        "fab/outline.gko": curvedOutline,
+        "fab/top.gtl": traceGerber({ x: 0.25, y: 1 }, { x: 0.25, y: 9 }),
+      },
+      configuredLimit(),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details?.blocking).toBe(false);
+    expect(issue?.severity).toBe("low");
+    expect(issue?.confidence).toBe("low");
+    expect(issue?.details?.geometryConfidence).not.toBe("exact");
+  });
+
   it("never turns incomplete transformed geometry into an exact blocking verdict", async () => {
     const result = await run(
       {
