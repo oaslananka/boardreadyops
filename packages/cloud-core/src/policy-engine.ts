@@ -2,6 +2,7 @@ import type {
   EffectivePolicyProvenance,
   PolicyDryRunResult,
   PolicyFieldSource,
+  PolicySeverityGate,
   ReviewPolicy,
 } from "@boardreadyops/contracts";
 
@@ -116,9 +117,10 @@ export function dryRunPolicyImpact(input: {
   newPolicy: ReviewPolicy;
   previousPolicy: ReviewPolicy | null;
 }): PolicyDryRunResult {
-  // error < high < medium: a lower threshold blocks more findings.
-  // A change from medium to error *loosens* the gate, not tightens it.
-  const severityRank = { error: 0, high: 1, medium: 2 } as const;
+  // Higher rank means a more inclusive gate: medium blocks medium/high/error,
+  // high blocks high/error, and error blocks only error findings.
+  // This exhaustive map must be updated if the contract adds a new gate.
+  const severityRank: Record<PolicySeverityGate, number> = { error: 0, high: 1, medium: 2 };
   const previousGate = input.previousPolicy?.severityGate;
   const nextGate = input.newPolicy.severityGate;
   const severityTightened =
