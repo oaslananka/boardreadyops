@@ -19,6 +19,16 @@ describe("public roadmap authority contract", () => {
     expect(roadmap).not.toContain("Epic #277");
   });
 
+  it("does not treat byte-consistent exports as verified reviewed-source provenance", () => {
+    const roadmap = readFileSync(roadmapPath, "utf8");
+    expect(roadmap).toContain("**Complete.**");
+    expect(roadmap).toContain("issues/770");
+    expect(roadmap).toContain("issues/771");
+    expect(roadmap).toContain("trusted execution attestation and acceptance remain pending");
+    expect(roadmap).not.toContain("currently blocked on the active board-edge geometry work");
+    expect(roadmap).not.toContain("design decision required");
+  });
+
   it("keeps the engineering ledger explicitly scoped to delivery while linking product sequencing", () => {
     const status = readFileSync(masterStatusPath, "utf8");
 

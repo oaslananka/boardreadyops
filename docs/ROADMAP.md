@@ -42,9 +42,9 @@ These are **product sequence** groupings, not engineering execution phases. The 
 
 Goal: make the release gate trustworthy enough to authorize real manufacturing output.
 
-- [#753](https://github.com/oaslananka/boardreadyops/issues/753) — fabrication artifact verification is substantially implemented; the remaining work is artwork-based board-edge clearance and source-to-output provenance.
-- [#770](https://github.com/oaslananka/boardreadyops/issues/770) — mask/paste and board-edge manufacturing closure; currently blocked on the active board-edge geometry work.
-- [#771](https://github.com/oaslananka/boardreadyops/issues/771) — prove exported fabrication artifacts came from the exact source under review; design decision required.
+- [#753](https://github.com/oaslananka/boardreadyops/issues/753) — fabrication artifact parsing, mask/paste and measured board-edge clearance are implemented; independently trusted source-to-export provenance is still outstanding.
+- [#770](https://github.com/oaslananka/boardreadyops/issues/770) — paste/stencil, mask and board-edge manufacturing closure. **Complete.**
+- [#771](https://github.com/oaslananka/boardreadyops/issues/771) — bind the exact approved source SHA to an independently attested, same-run KiCad export. **Open:** design is documented, self-reported manifest verification hardened; trusted execution attestation and acceptance remain pending.
 
 Exit condition: exact parsed evidence may block, heuristic evidence warns by default, and retained release evidence can be tied to the approved source revision.
 
