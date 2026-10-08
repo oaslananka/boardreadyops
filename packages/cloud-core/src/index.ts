@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 
 export * from "./archive-sanitizer.js";
+export * from "./as-built-reconciliation.js";
 export * from "./component-intelligence.js";
 export * from "./decision-engine.js";
 export * from "./delimited.js";
