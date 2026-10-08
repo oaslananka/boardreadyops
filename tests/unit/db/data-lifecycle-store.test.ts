@@ -134,6 +134,82 @@ describe("data lifecycle administration", () => {
     expect(query.mock.calls[2]?.[1]).toEqual(["repo-1", "inst-a", "42", "octocat"]);
   });
 
+  it("selects legal-hold-aware erasure status inside the atomic insert statement", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: "erasure-1",
+          tenant_id: "acme-hardware",
+          requested_by: "octocat",
+          scope: "repository",
+          scope_id: "repo-1",
+          status: "blocked_by_hold",
+          dry_run: false,
+          created_at: "2026-10-09T00:00:00.000Z",
+        },
+      ],
+    });
+    const store = new DataLifecycleStore({ query });
+    const request = await store.createErasure({
+      tenantId: "acme-hardware",
+      requestedBy: "octocat",
+      scope: "repository",
+      scopeId: "repo-1",
+      dryRun: false,
+    });
+    expect(request).toMatchObject({ status: "blocked_by_hold", dryRun: false });
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, args] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("WITH matching_hold AS (");
+    expect(sql).not.toContain("MATERIALIZED");
+    expect(sql).toContain("tenant_id=$2");
+    expect(sql).toContain("scope='organization'");
+    expect(sql).toContain("scope=$4 AND (scope_id=$5 OR scope_id IS NULL)");
+    expect(sql).toContain("WHEN EXISTS (SELECT 1 FROM matching_hold) THEN 'blocked_by_hold'");
+    expect(sql).toContain("WHEN $6 THEN 'preview'");
+    expect(sql).toContain("ELSE 'pending'");
+    expect(sql).toContain("INSERT INTO erasure_requests");
+    expect(args).toEqual([expect.any(String), "acme-hardware", "octocat", "repository", "repo-1", false]);
+  });
+
+  it("keeps preview status and refuses to record a request when the hold-aware insert fails", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "preview-1",
+            tenant_id: "acme",
+            requested_by: "octocat",
+            scope: "organization",
+            scope_id: null,
+            status: "preview",
+            dry_run: true,
+            created_at: "2026-10-09T00:00:00.000Z",
+          },
+        ],
+      })
+      .mockRejectedValueOnce(new Error("database temporarily unavailable"));
+    const store = new DataLifecycleStore({ query });
+    expect(
+      await store.createErasure({
+        tenantId: "acme",
+        requestedBy: "octocat",
+        scope: "organization",
+        dryRun: true,
+      }),
+    ).toMatchObject({ status: "preview", dryRun: true });
+    await expect(
+      store.createErasure({
+        tenantId: "acme",
+        requestedBy: "octocat",
+        scope: "organization",
+        dryRun: false,
+      }),
+    ).rejects.toThrow("database temporarily unavailable");
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
   it("lists legal holds with release metadata newest first", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [

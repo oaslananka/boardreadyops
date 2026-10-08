@@ -375,19 +375,35 @@ export class DataLifecycleStore {
     scopeId?: string | null;
     dryRun?: boolean;
   }): Promise<ErasureRequest> {
-    // Block if active legal hold exists for same scope
-    const holdCheck = (await this.db.query(
-      `SELECT id FROM legal_holds WHERE tenant_id=$1 AND active=TRUE AND (scope='organization' OR (scope=$2 AND (scope_id=$3 OR scope_id IS NULL))) LIMIT 1`,
-      [input.tenantId, input.scope, input.scopeId ?? null],
-    )) as { rows?: Array<Record<string, unknown>> };
-    const blocked = (holdCheck.rows?.length ?? 0) > 0;
-    let status = "pending";
-    if (blocked) status = "blocked_by_hold";
-    else if (input.dryRun) status = "preview";
+    // Decide the initial status in the same SQL statement that inserts the
+    // request. This avoids a separate read followed by a potentially stale
+    // application-side hold decision. The erasure executor must still recheck
+    // holds before any destructive work (including concurrent new holds).
     const id = randomUUID();
     const r = (await this.db.query(
-      `INSERT INTO erasure_requests (id, tenant_id, requested_by, scope, scope_id, status, dry_run, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`,
-      [id, input.tenantId, input.requestedBy, input.scope, input.scopeId ?? null, status, Boolean(input.dryRun)],
+      `WITH matching_hold AS (
+         SELECT 1
+           FROM legal_holds
+          WHERE tenant_id=$2
+            AND active=TRUE
+            AND (
+              scope='organization'
+              OR (scope=$4 AND (scope_id=$5 OR scope_id IS NULL))
+            )
+          LIMIT 1
+       )
+       INSERT INTO erasure_requests
+         (id, tenant_id, requested_by, scope, scope_id, status, dry_run, created_at)
+       VALUES
+         ($1, $2, $3, $4, $5,
+          CASE
+            WHEN EXISTS (SELECT 1 FROM matching_hold) THEN 'blocked_by_hold'
+            WHEN $6 THEN 'preview'
+            ELSE 'pending'
+          END,
+          $6, NOW())
+       RETURNING *`,
+      [id, input.tenantId, input.requestedBy, input.scope, input.scopeId ?? null, Boolean(input.dryRun)],
     )) as { rows?: Array<Record<string, unknown>> };
     const row = r.rows?.[0];
     if (!row) throw new Error("insert failed");
