@@ -388,6 +388,16 @@ const relationshipKinds: Readonly<
   waived_by: ["review", "waiver"],
 };
 
+function requireSourceNodeIdentity(node: EvidenceGraphNode): void {
+  if (node.kind !== "source") return;
+  if (!commitShaPattern.test(node.label)) throw new Error("Invalid evidence graph source commit SHA.");
+  // A syntactically valid replacement SHA must not silently detach the node's
+  // stable identity and source attributes from the commit it claims to describe.
+  if (node.attributes?.commitSha !== node.label || !node.id.endsWith(`:${node.label}`)) {
+    throw new Error("Evidence graph source node identity contradicts its commit.");
+  }
+}
+
 export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEvidenceTrace {
   const nodesById = new Map(graph.nodes.map((node) => [node.id, node] as const));
   if (nodesById.size !== graph.nodes.length) {
@@ -404,9 +414,7 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
     if (node.integrity?.evidenceDigest !== undefined) {
       requireIntegrityDigest(node.integrity.evidenceDigest, node.kind);
     }
-    if (node.kind === "source" && !commitShaPattern.test(node.label)) {
-      throw new Error("Invalid evidence graph source commit SHA.");
-    }
+    requireSourceNodeIdentity(node);
   }
   const edgesBySource = new Map<string, EvidenceGraphEdge[]>();
   for (const edge of graph.edges) {
@@ -421,6 +429,9 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
       throw new Error(
         `Evidence graph edge relationship "${edge.relationship}" expects ${kinds[0]} -> ${kinds[1]}, received ${from.kind} -> ${to.kind}.`,
       );
+    }
+    if (edge.relationship === "derived_from" && from.attributes?.commitSha !== to.label) {
+      throw new Error("Evidence graph release and source nodes disagree on the reviewed commit.");
     }
     const outgoing = edgesBySource.get(edge.from) ?? [];
     outgoing.push(edge);

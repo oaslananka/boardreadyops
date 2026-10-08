@@ -182,6 +182,46 @@ describe("release evidence graph", () => {
     );
   });
 
+  it("rejects well-formed but contradictory source commit labels, ids and release references", () => {
+    const graph = buildReleaseEvidenceGraph({
+      release: {
+        id: "run-source-bind",
+        repositoryId: "repo-one",
+        repository: "acme/board",
+        commitSha: "a".repeat(40),
+      },
+    });
+    const changedSourceLabel = graph.nodes.map((node) =>
+      node.kind === "source" ? { ...node, label: "b".repeat(40) } : node,
+    );
+    expect(() => traceReleaseEvidence({ ...graph, nodes: changedSourceLabel })).toThrow(
+      "Evidence graph source node identity contradicts its commit",
+    );
+
+    const changedSourceAttribute = graph.nodes.map((node) =>
+      node.kind === "source" ? { ...node, attributes: { ...node.attributes, commitSha: "b".repeat(40) } } : node,
+    );
+    expect(() => traceReleaseEvidence({ ...graph, nodes: changedSourceAttribute })).toThrow(
+      "Evidence graph source node identity contradicts its commit",
+    );
+
+    const wrongSourceId = ["source", "repo-one", "b".repeat(40)].join(":");
+    const changedSourceId = graph.nodes.map((node) => (node.kind === "source" ? { ...node, id: wrongSourceId } : node));
+    const redirectedEdges = graph.edges.map((edge) =>
+      edge.relationship === "derived_from" ? { ...edge, to: wrongSourceId } : edge,
+    );
+    expect(() => traceReleaseEvidence({ ...graph, nodes: changedSourceId, edges: redirectedEdges })).toThrow(
+      "Evidence graph source node identity contradicts its commit",
+    );
+
+    const changedReleaseCommit = graph.nodes.map((node) =>
+      node.kind === "release" ? { ...node, attributes: { ...node.attributes, commitSha: "b".repeat(40) } } : node,
+    );
+    expect(() => traceReleaseEvidence({ ...graph, nodes: changedReleaseCommit })).toThrow(
+      "Evidence graph release and source nodes disagree on the reviewed commit",
+    );
+  });
+
   it("rejects duplicate evidence or production identities instead of conflating digests", () => {
     const base = {
       release: {
