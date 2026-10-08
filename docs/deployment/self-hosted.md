@@ -281,7 +281,7 @@ after cleanup, so gradual growth is visible on normal deploys as well as low-spa
 build on the production host, so this keeps useful recent cache during normal operation without
 letting a low-space preflight fail while safe-to-delete cache still occupies the build floor.
 Before retiring tagged runtime images, the workflow checks the running web and worker containers and reads their actual Docker image references. Missing or unrecognized runtime identities stop cleanup without deleting any images; invalid Compose image-list formatting is not treated as an empty running set.
-Tagged runtime images are not touched by cache GC and remain governed by the rollback retention
+Every successful dry-run and real deploy also applies the same BoardReadyOps-only image retention policy after the 3 GB cache trim: protect the verified running web/worker image refs plus the three newest non-running rollback tags. Repeated previews therefore cannot accumulate unlimited tagged runtime images. A dry-run leaves live containers and volumes unchanged but may retire obsolete unused BoardReadyOps runtime image tags; no other Docker project is touched.\nTagged runtime images are not touched by cache GC and remain governed by the rollback retention
 policy below. If the host is
 still short after safe reclaim, the default behavior remains fail-closed with exit 78. An operator
 may explicitly enable `retire_superseded_images`; that bounded path defaults to three rollback images.

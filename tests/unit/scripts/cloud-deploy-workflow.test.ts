@@ -147,6 +147,17 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain('preflight_rollback_images_to_keep="$3"');
     expect(workflow).toContain(`retire_superseded_runtime_images "${preflightKeep}"`);
     expect(workflow).toContain('retire_superseded_runtime_images "3"');
+    const remoteCaseEnd = workflow.lastIndexOf(
+      "          esac",
+      workflow.indexOf("          # Both rehearsal and real deploy paths"),
+    );
+    const afterBuildCacheTrim = workflow.indexOf("          if ! trim_build_cache; then", remoteCaseEnd);
+    const normalRetention = workflow.indexOf('          retire_superseded_runtime_images "3"', afterBuildCacheTrim);
+    const endOfDeploy = workflow.indexOf("          report_disk_summary", normalRetention);
+    expect(afterBuildCacheTrim).toBeGreaterThan(remoteCaseEnd);
+    expect(normalRetention).toBeGreaterThan(afterBuildCacheTrim);
+    expect(endOfDeploy).toBeGreaterThan(normalRetention);
+    expect(workflow.match(/retire_superseded_runtime_images "3"/g)).toHaveLength(1);
     expect(workflow).toContain('local retain="$1"');
     expect(workflow).toContain("1|2|3)");
     expect(workflow).not.toContain('rollback_images_to_keep: "0"');
