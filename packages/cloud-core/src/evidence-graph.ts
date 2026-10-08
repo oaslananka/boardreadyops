@@ -351,6 +351,16 @@ export function buildReleaseEvidenceGraph(input: ReleaseEvidenceGraphInput): Rel
   };
 }
 
+const relationshipKinds: Readonly<Record<EvidenceGraphRelationship, readonly [EvidenceGraphNodeKind, EvidenceGraphNodeKind]>> = {
+  approved_by: ["review", "approval"],
+  derived_from: ["release", "source"],
+  governed_by: ["review", "policy"],
+  produced: ["release", "production_batch"],
+  reviewed_in: ["release", "review"],
+  supported_by: ["release", "evidence"],
+  waived_by: ["review", "waiver"],
+};
+
 export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEvidenceTrace {
   const nodesById = new Map(graph.nodes.map((node) => [node.id, node] as const));
   if (nodesById.size !== graph.nodes.length) {
@@ -364,16 +374,27 @@ export function traceReleaseEvidence(graph: ReleaseEvidenceGraph): ReleaseEviden
   }
   const edgesBySource = new Map<string, EvidenceGraphEdge[]>();
   for (const edge of graph.edges) {
-    if (!nodesById.has(edge.from) || !nodesById.has(edge.to)) {
+    const from = nodesById.get(edge.from);
+    const to = nodesById.get(edge.to);
+    if (!from || !to) {
       throw new Error("Evidence graph edge references an unknown node.");
+    }
+    const kinds = relationshipKinds[edge.relationship];
+    if (!kinds || from.kind !== kinds[0] || to.kind !== kinds[1]) {
+      throw new Error("Evidence graph edge relationship conflicts with node kinds.");
     }
     const outgoing = edgesBySource.get(edge.from) ?? [];
     outgoing.push(edge);
     edgesBySource.set(edge.from, outgoing);
   }
   for (const missing of graph.missing) {
-    if (!nodesById.has(missing.from)) {
+    const from = nodesById.get(missing.from);
+    if (!from) {
       throw new Error("Evidence graph missing-evidence record references an unknown node.");
+    }
+    const kinds = relationshipKinds[missing.relationship];
+    if (!kinds || from.kind !== kinds[0] || missing.expectedKind !== kinds[1]) {
+      throw new Error("Evidence graph missing-evidence relationship conflicts with node kinds.");
     }
   }
   const backwardRelationships = new Set<EvidenceGraphRelationship>([

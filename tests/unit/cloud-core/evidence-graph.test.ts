@@ -195,6 +195,56 @@ describe("release evidence graph", () => {
     );
   });
 
+  it("rejects role-confused relationships even when referenced nodes exist", () => {
+    const graph = buildReleaseEvidenceGraph({
+      release: {
+        id: "run-roles",
+        repositoryId: "repo-one",
+        repository: "acme/board",
+        commitSha: "a".repeat(40),
+      },
+      review: { id: "review-roles" },
+    });
+    const sourceEdge = graph.edges.find((edge) => edge.relationship === "derived_from");
+    if (!sourceEdge) throw new Error("Missing source edge");
+
+    expect(() =>
+      traceReleaseEvidence({
+        ...graph,
+        edges: [{ ...sourceEdge, relationship: "produced" }],
+      }),
+    ).toThrow("Evidence graph edge relationship conflicts with node kinds.");
+    expect(() =>
+      traceReleaseEvidence({
+        ...graph,
+        edges: [{ ...sourceEdge, from: "review:review-roles" }],
+      }),
+    ).toThrow("Evidence graph edge relationship conflicts with node kinds.");
+
+    expect(() =>
+      traceReleaseEvidence({
+        ...graph,
+        missing: [{
+          from: graph.rootReleaseId,
+          relationship: "approved_by",
+          expectedKind: "approval",
+          reason: "Missing approval",
+        }],
+      }),
+    ).toThrow("Evidence graph missing-evidence relationship conflicts with node kinds.");
+    expect(() =>
+      traceReleaseEvidence({
+        ...graph,
+        missing: [{
+          from: "review:review-roles",
+          relationship: "approved_by",
+          expectedKind: "source",
+          reason: "Missing approval",
+        }],
+      }),
+    ).toThrow("Evidence graph missing-evidence relationship conflicts with node kinds.");
+  });
+
   it("traces hundreds of distinct evidence edges deterministically without dropping relationships", () => {
     const artifacts = Array.from({ length: 512 }, (_, index) => ({
       id: `evidence-${index}`,
