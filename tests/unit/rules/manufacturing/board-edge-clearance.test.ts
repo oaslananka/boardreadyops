@@ -105,6 +105,16 @@ const squareOutline = outlineGerber([
   { x: 0, y: 10 },
 ]);
 
+async function expectUncertainCopperGerber(gerber: string) {
+  const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": gerber }, configuredLimit(0.4));
+  const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+  expect(issue?.confidence).toBe("low");
+  expect(issue?.details).toMatchObject({ blocking: false, geometryConfidence: "partial" });
+  const uncertainty = issue?.details?.geometryUncertainty;
+  expect(Array.isArray(uncertainty) ? uncertainty.length : 0).toBeGreaterThan(0);
+  return issue;
+}
+
 describe("manufacturing.board-edge-clearance", () => {
   it("blocks on an explicit limit using trace geometry and the circular aperture radius", async () => {
     const result = await run(
@@ -369,16 +379,27 @@ fail-on: never
     expect(Number(issue?.details?.measuredClearanceMm)).toBeLessThan(0.4);
   });
 
+  it("treats a declared Gerber macro aperture as uncertain instead of inventing copper clearance", async () => {
+    const copper = [
+      ...header,
+      "%TF.FileFunction,Copper,L1,Top*%",
+      "%AMDONUT*1,1,0.6,0,0*%",
+      "%ADD10DONUT,0.6*%",
+      "D10*",
+      position({ x: 0.25, y: 5 }, "D03"),
+      "M02*",
+    ].join("\n");
+    const issue = await expectUncertainCopperGerber(copper);
+    expect(String(issue?.message)).toContain("Cannot fully verify");
+  });
+
   it("keeps undefined trace/flash aperture extents advisory instead of declaring a pass", async () => {
     for (const kind of ["trace", "flash"] as const) {
       const gerber =
         kind === "trace"
           ? traceGerber({ x: 0.3, y: 2 }, { x: 0.3, y: 8 }, 0.2, { aperture: "%ADD11C,0.2*%" })
           : flashWithAperture({ x: 0.3, y: 5 }, "%ADD11C,0.2*%");
-      const result = await run({ "fab/outline.gko": squareOutline, "fab/top.gtl": gerber }, configuredLimit(0.4));
-      const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
-      expect(issue?.confidence).toBe("low");
-      expect(issue?.details).toMatchObject({ blocking: false, geometryConfidence: "partial" });
+      const issue = await expectUncertainCopperGerber(gerber);
       expect(String(issue?.message)).toContain("Cannot fully verify");
     }
   });
