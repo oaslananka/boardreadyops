@@ -93739,91 +93739,109 @@ function canonicalGeneratedPath(value) {
   if (!value || value.includes("\\") || import_node_path35.default.isAbsolute(value) || import_node_path35.default.win32.isAbsolute(value)) return false;
   if (import_node_path35.default.posix.normalize(value) !== value) return false;
   return value.split("/").every(
-    (part) => part !== "" && part !== "." && part !== ".." && !/[<>:"|?*]/u.test(part) && part.split("").every((character) => character.charCodeAt(0) >= 32) && !/[. ]$/u.test(part) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(part)
+    (part) => part !== "" && part !== "." && part !== ".." && !/[<>:"|?*]/u.test(part) && part.split("").every((character) => (character.codePointAt(0) ?? 0) >= 32) && !/[. ]$/u.test(part) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(part)
   );
 }
-async function checkFirstPartyOutputSet(directory, manifestPath, artifacts) {
-  const reasons = [];
-  const declaredFiles = /* @__PURE__ */ new Set();
-  const declaredAliases = /* @__PURE__ */ new Set();
-  const expectedDirectories = /* @__PURE__ */ new Set();
-  for (const artifact of artifacts) {
-    const name = artifact.path;
-    if (!canonicalGeneratedPath(name) || name === import_node_path35.default.basename(manifestPath)) {
-      reasons.push(`Non-canonical generated artifact path or manifest self-reference: ${name}`);
-      continue;
-    }
-    const portableKey = name.normalize("NFC").toLowerCase();
-    if (declaredAliases.has(portableKey)) {
-      reasons.push(`Cross-platform generated artifact alias: ${name}`);
-      continue;
-    }
-    declaredAliases.add(portableKey);
-    declaredFiles.add(name);
-    const parts = name.split("/");
-    for (let index = 1; index < parts.length; index++) {
-      expectedDirectories.add(parts.slice(0, index).join("/"));
+function addDeclaredOutput(state3, name, manifestName) {
+  if (!canonicalGeneratedPath(name) || name === manifestName) {
+    state3.reasons.push(`Non-canonical generated artifact path or manifest self-reference: ${name}`);
+    return;
+  }
+  const portableKey = name.normalize("NFC").toLowerCase();
+  if (state3.declaredAliases.has(portableKey)) {
+    state3.reasons.push(`Cross-platform generated artifact alias: ${name}`);
+    return;
+  }
+  state3.declaredAliases.add(portableKey);
+  state3.declaredFiles.add(name);
+  const parts = name.split("/");
+  for (let index = 1; index < parts.length; index++) {
+    state3.expectedDirectories.add(parts.slice(0, index).join("/"));
+  }
+}
+function expectedOutputState(manifestPath, artifacts) {
+  const state3 = {
+    declaredFiles: /* @__PURE__ */ new Set(),
+    declaredAliases: /* @__PURE__ */ new Set(),
+    expectedDirectories: /* @__PURE__ */ new Set(),
+    actualFiles: /* @__PURE__ */ new Set(),
+    actualAliases: /* @__PURE__ */ new Set(),
+    reasons: []
+  };
+  for (const artifact of artifacts) addDeclaredOutput(state3, artifact.path, import_node_path35.default.basename(manifestPath));
+  return state3;
+}
+function recordGeneratedFile(state3, relative) {
+  if (!canonicalGeneratedPath(relative)) {
+    state3.reasons.push(`Non-canonical generated output filename: ${relative}`);
+  }
+  const portableKey = relative.normalize("NFC").toLowerCase();
+  if (state3.actualAliases.has(portableKey)) {
+    state3.reasons.push(`Cross-platform generated output filename alias: ${relative}`);
+  }
+  state3.actualAliases.add(portableKey);
+  state3.actualFiles.add(relative);
+}
+async function visitGeneratedDirectory(state3, current, absolute, relative, root, pending) {
+  if (!state3.expectedDirectories.has(relative)) {
+    state3.reasons.push(`Undeclared generated directory: ${relative}`);
+  }
+  if (current.depth >= MAX_FIRST_PARTY_OUTPUT_DEPTH) {
+    throw new Error(`Output tree scan exceeds depth ${MAX_FIRST_PARTY_OUTPUT_DEPTH}.`);
+  }
+  const realDirectory = await import_promises12.default.realpath(absolute);
+  if (realDirectory !== import_node_path35.default.resolve(root, relative)) {
+    throw new Error(`Generated directory has a noncanonical real path: ${relative}`);
+  }
+  pending.push({ dir: absolute, relative, depth: current.depth + 1 });
+}
+async function inspectGeneratedOutputEntry(state3, current, name, root, manifestPath, pending) {
+  const relative = current.relative ? `${current.relative}/${name}` : name;
+  const absolute = import_node_path35.default.join(current.dir, name);
+  const metadata2 = await import_promises12.default.lstat(absolute);
+  if (metadata2.isSymbolicLink()) {
+    state3.reasons.push(`Symlink in generated output: ${relative}`);
+  } else if (metadata2.isDirectory()) {
+    await visitGeneratedDirectory(state3, current, absolute, relative, root, pending);
+  } else if (!metadata2.isFile()) {
+    state3.reasons.push(`Non-file entry in generated output: ${relative}`);
+  } else if (absolute !== manifestPath) {
+    recordGeneratedFile(state3, relative);
+  }
+}
+async function enumerateGeneratedFiles(state3, directory, manifestPath) {
+  const root = await import_promises12.default.realpath(directory);
+  const pending = [{ dir: directory, relative: "", depth: 0 }];
+  let visited = 0;
+  while (pending.length > 0) {
+    const current = pending.shift();
+    if (!current) break;
+    const iterator2 = await import_promises12.default.opendir(current.dir);
+    for await (const entry of iterator2) {
+      visited++;
+      if (visited > MAX_FIRST_PARTY_OUTPUT_ENTRIES) {
+        throw new Error(`Output tree scan exceeds ${MAX_FIRST_PARTY_OUTPUT_ENTRIES} entries.`);
+      }
+      await inspectGeneratedOutputEntry(state3, current, entry.name, root, manifestPath, pending);
     }
   }
-  const actualFiles = /* @__PURE__ */ new Set();
-  const actualAliases = /* @__PURE__ */ new Set();
-  const pending = [{ dir: directory, relative: "", depth: 0 }];
-  let entriesVisited = 0;
+}
+async function checkFirstPartyOutputSet(directory, manifestPath, artifacts) {
+  const state3 = expectedOutputState(manifestPath, artifacts);
   try {
-    const actualRoot = await import_promises12.default.realpath(directory);
-    while (pending.length > 0) {
-      const current = pending.shift();
-      if (!current) break;
-      const iterator2 = await import_promises12.default.opendir(current.dir);
-      for await (const entry of iterator2) {
-        entriesVisited++;
-        if (entriesVisited > MAX_FIRST_PARTY_OUTPUT_ENTRIES) {
-          throw new Error(`Output tree scan exceeds ${MAX_FIRST_PARTY_OUTPUT_ENTRIES} entries.`);
-        }
-        const relative = current.relative ? `${current.relative}/${entry.name}` : entry.name;
-        const absolute = import_node_path35.default.join(current.dir, entry.name);
-        const metadata2 = await import_promises12.default.lstat(absolute);
-        if (metadata2.isSymbolicLink()) {
-          reasons.push(`Symlink in generated output: ${relative}`);
-        } else if (metadata2.isDirectory()) {
-          if (!expectedDirectories.has(relative)) {
-            reasons.push(`Undeclared generated directory: ${relative}`);
-          }
-          if (current.depth >= MAX_FIRST_PARTY_OUTPUT_DEPTH) {
-            throw new Error(`Output tree scan exceeds depth ${MAX_FIRST_PARTY_OUTPUT_DEPTH}.`);
-          }
-          const realDirectory = await import_promises12.default.realpath(absolute);
-          if (realDirectory !== import_node_path35.default.resolve(actualRoot, relative)) {
-            throw new Error(`Generated directory has a noncanonical real path: ${relative}`);
-          }
-          pending.push({ dir: absolute, relative, depth: current.depth + 1 });
-        } else if (!metadata2.isFile()) {
-          reasons.push(`Non-file entry in generated output: ${relative}`);
-        } else if (absolute !== manifestPath) {
-          if (!canonicalGeneratedPath(relative)) {
-            reasons.push(`Non-canonical generated output filename: ${relative}`);
-          }
-          const portableKey = relative.normalize("NFC").toLowerCase();
-          if (actualAliases.has(portableKey)) {
-            reasons.push(`Cross-platform generated output filename alias: ${relative}`);
-          }
-          actualAliases.add(portableKey);
-          actualFiles.add(relative);
-        }
-      }
-    }
+    await enumerateGeneratedFiles(state3, directory, manifestPath);
   } catch (error52) {
-    reasons.push(
+    state3.reasons.push(
       `Generated output enumeration failed closed: ${error52 instanceof Error ? error52.message : String(error52)}`
     );
   }
-  for (const file2 of [...actualFiles].sort()) {
-    if (!declaredFiles.has(file2)) reasons.push(`Undeclared generated artifact: ${file2}`);
+  for (const file2 of [...state3.actualFiles].sort((a, b) => a.localeCompare(b))) {
+    if (!state3.declaredFiles.has(file2)) state3.reasons.push(`Undeclared generated artifact: ${file2}`);
   }
-  for (const file2 of [...declaredFiles].sort()) {
-    if (!actualFiles.has(file2)) reasons.push(`Declared generated artifact missing from file set: ${file2}`);
+  for (const file2 of [...state3.declaredFiles].sort((a, b) => a.localeCompare(b))) {
+    if (!state3.actualFiles.has(file2)) state3.reasons.push(`Declared generated artifact missing from file set: ${file2}`);
   }
-  return reasons;
+  return state3.reasons;
 }
 async function loadManifest(root, manifestOrPath) {
   let realRoot;

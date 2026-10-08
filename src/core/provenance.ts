@@ -205,12 +205,12 @@ function canonicalGeneratedPath(value: string): boolean {
 
 function addDeclaredOutput(state: FirstPartyScanState, name: string, manifestName: string): void {
   if (!canonicalGeneratedPath(name) || name === manifestName) {
-    state.reasons.push("Non-canonical generated artifact path or manifest self-reference: " + name);
+    state.reasons.push(`Non-canonical generated artifact path or manifest self-reference: ${name}`);
     return;
   }
   const portableKey = name.normalize("NFC").toLowerCase();
   if (state.declaredAliases.has(portableKey)) {
-    state.reasons.push("Cross-platform generated artifact alias: " + name);
+    state.reasons.push(`Cross-platform generated artifact alias: ${name}`);
     return;
   }
   state.declaredAliases.add(portableKey);
@@ -236,11 +236,11 @@ function expectedOutputState(manifestPath: string, artifacts: ProvenanceArtifact
 
 function recordGeneratedFile(state: FirstPartyScanState, relative: string): void {
   if (!canonicalGeneratedPath(relative)) {
-    state.reasons.push("Non-canonical generated output filename: " + relative);
+    state.reasons.push(`Non-canonical generated output filename: ${relative}`);
   }
   const portableKey = relative.normalize("NFC").toLowerCase();
   if (state.actualAliases.has(portableKey)) {
-    state.reasons.push("Cross-platform generated output filename alias: " + relative);
+    state.reasons.push(`Cross-platform generated output filename alias: ${relative}`);
   }
   state.actualAliases.add(portableKey);
   state.actualFiles.add(relative);
@@ -255,14 +255,14 @@ async function visitGeneratedDirectory(
   pending: OutputScanNode[],
 ): Promise<void> {
   if (!state.expectedDirectories.has(relative)) {
-    state.reasons.push("Undeclared generated directory: " + relative);
+    state.reasons.push(`Undeclared generated directory: ${relative}`);
   }
   if (current.depth >= MAX_FIRST_PARTY_OUTPUT_DEPTH) {
-    throw new Error("Output tree scan exceeds depth " + MAX_FIRST_PARTY_OUTPUT_DEPTH + ".");
+    throw new Error(`Output tree scan exceeds depth ${MAX_FIRST_PARTY_OUTPUT_DEPTH}.`);
   }
   const realDirectory = await fs.realpath(absolute);
   if (realDirectory !== path.resolve(root, relative)) {
-    throw new Error("Generated directory has a noncanonical real path: " + relative);
+    throw new Error(`Generated directory has a noncanonical real path: ${relative}`);
   }
   pending.push({ dir: absolute, relative, depth: current.depth + 1 });
 }
@@ -275,15 +275,15 @@ async function inspectGeneratedOutputEntry(
   manifestPath: string,
   pending: OutputScanNode[],
 ): Promise<void> {
-  const relative = current.relative ? current.relative + "/" + name : name;
+  const relative = current.relative ? `${current.relative}/${name}` : name;
   const absolute = path.join(current.dir, name);
   const metadata = await fs.lstat(absolute);
   if (metadata.isSymbolicLink()) {
-    state.reasons.push("Symlink in generated output: " + relative);
+    state.reasons.push(`Symlink in generated output: ${relative}`);
   } else if (metadata.isDirectory()) {
     await visitGeneratedDirectory(state, current, absolute, relative, root, pending);
   } else if (!metadata.isFile()) {
-    state.reasons.push("Non-file entry in generated output: " + relative);
+    state.reasons.push(`Non-file entry in generated output: ${relative}`);
   } else if (absolute !== manifestPath) {
     recordGeneratedFile(state, relative);
   }
@@ -304,7 +304,7 @@ async function enumerateGeneratedFiles(
     for await (const entry of iterator) {
       visited++;
       if (visited > MAX_FIRST_PARTY_OUTPUT_ENTRIES) {
-        throw new Error("Output tree scan exceeds " + MAX_FIRST_PARTY_OUTPUT_ENTRIES + " entries.");
+        throw new Error(`Output tree scan exceeds ${MAX_FIRST_PARTY_OUTPUT_ENTRIES} entries.`);
       }
       // Serial traversal intentionally bounds I/O and avoids following untrusted links.
       await inspectGeneratedOutputEntry(state, current, entry.name, root, manifestPath, pending);
@@ -322,14 +322,14 @@ async function checkFirstPartyOutputSet(
     await enumerateGeneratedFiles(state, directory, manifestPath);
   } catch (error) {
     state.reasons.push(
-      "Generated output enumeration failed closed: " + (error instanceof Error ? error.message : String(error)),
+      `Generated output enumeration failed closed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
   for (const file of [...state.actualFiles].sort((a, b) => a.localeCompare(b))) {
-    if (!state.declaredFiles.has(file)) state.reasons.push("Undeclared generated artifact: " + file);
+    if (!state.declaredFiles.has(file)) state.reasons.push(`Undeclared generated artifact: ${file}`);
   }
   for (const file of [...state.declaredFiles].sort((a, b) => a.localeCompare(b))) {
-    if (!state.actualFiles.has(file)) state.reasons.push("Declared generated artifact missing from file set: " + file);
+    if (!state.actualFiles.has(file)) state.reasons.push(`Declared generated artifact missing from file set: ${file}`);
   }
   return state.reasons;
 }
