@@ -6,16 +6,22 @@ Issue: #15
 
 Create public demonstration repositories that show BoardReadyOps producing both failing and passing hardware release readiness results.
 
-Both repositories exist and their pull requests are live. What follows records what was built and what was deliberately left out.
+The original external demo repositories and their pull requests were not available
+at verification on 2026-10-08. The reproducible, public source fixtures below
+remain the current demonstration authority; rebuilding externally hosted PR demos
+requires separate provisioning, action pinning and live-check acceptance.
 
-## Demo repository set
+## Available demo set
 
-| Repository | Live proof | Purpose | Expected result |
-| --- | --- | --- | --- |
-| [`oaslananka/boardreadyops-demo-pass`](https://github.com/oaslananka/boardreadyops-demo-pass) | [PR #1](https://github.com/oaslananka/boardreadyops-demo-pass/pull/1) (`fix/board-outline-and-bom`) | Broken baseline repaired: closed outline, unique designators, sourced and compliant BOM. | **Expected pass** |
-| [`oaslananka/boardreadyops-demo-fail`](https://github.com/oaslananka/boardreadyops-demo-fail) | [PR #1](https://github.com/oaslananka/boardreadyops-demo-fail/pull/1) (`chore/layout-tweak`) | Clean baseline broken by a change that reads as routine housekeeping. | **Expected fail** |
+| Fixture | Source | Expected result |
+| --- | --- | --- |
+| Broken board | [examples/golden-demo/broken](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/broken) | **Expected fail** — five findings |
+| Fixed board | [examples/golden-demo/fixed](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed) | **Expected pass** — no findings |
 
-Both repositories carry the `examples/golden-demo` corpus, published under MIT so that a reader can copy the board, the config, or the workflow into their own project without a licence question. That is deliberately more permissive than BoardReadyOps itself: a demo nobody may reuse teaches nothing. They pin the published Action to a commit SHA, and produce the sticky PR comment, workflow annotations, and downloadable JSON, SARIF, and Markdown artifacts. Each also ships `readiness-runner.yml`, so installing the GitHub App on them lights up the hosted review with no further setup. The repository-local `examples/scenarios/` corpus continues to provide prototype-ready and production-ready progression without creating a third public repository that would duplicate maintenance.
+The synthetic fixtures are checked by `tests/unit/examples/golden-demo.test.ts`
+and can be run without KiCad CLI. A real GitHub pull request demo is a separate
+product acceptance gate; source fixtures alone do not prove Check Run, PR comment
+or workflow artifact publication.
 
 ## Required scenarios
 
