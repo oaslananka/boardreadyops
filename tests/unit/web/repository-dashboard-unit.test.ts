@@ -95,6 +95,44 @@ describe("repository dashboard and viewer loader branches", () => {
     });
   });
 
+  it("shows a completed readiness probe after its result revision becomes current", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "repo-1",
+          owner: "acme",
+          name: "gateway",
+          private: false,
+          installation_id: "inst-1",
+          github_installation_id: "12345",
+          account_login: "acme",
+          setup_revision: "4",
+          setup_preset: "prototype",
+          setup_workflow_status: "ready",
+          setup_config_status: "ready",
+          setup_probe_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          setup_probe_status: "completed",
+          setup_probe_workflow_run_id: "37716606237",
+          setup_probe_expires_at: "2026-10-08T02:25:58.000Z",
+        },
+      ],
+    });
+
+    const session = { login: "alice", installationIds: [12345] };
+    const result = await loadViewerRepositories(session, { DATABASE_URL: TEST_DB_URL });
+    expect(result[0]?.repositories[0]).toMatchObject({
+      setupRevision: 4,
+      setupProbeStatus: "completed",
+      setupProbeWorkflowRunId: "37716606237",
+    });
+    const sql = String(mockQuery.mock.lastCall?.[0] ?? "");
+    expect(sql).toContain("probe.setup_revision_id = repositories.current_setup_revision_id");
+    expect(sql).toContain("probe.result_revision_id = repositories.current_setup_revision_id");
+    expect(sql).toContain("probe.status = 'completed'");
+    expect(sql).toContain("probe.installation_id = repositories.installation_id");
+    expect(sql).toContain("probe.repository_id = repositories.id");
+  });
+
   it("summarizes only repository facts already present in the viewer groups", () => {
     const summary = summarizeViewerRepositories([
       {

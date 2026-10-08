@@ -116,7 +116,13 @@ const repositorySummaryQuery = `
           from repository_setup_probes as probe
          where probe.installation_id = repositories.installation_id
            and probe.repository_id = repositories.id
-           and probe.setup_revision_id = repositories.current_setup_revision_id
+           and (
+             probe.setup_revision_id = repositories.current_setup_revision_id
+             or (
+               probe.status = 'completed'
+               and probe.result_revision_id = repositories.current_setup_revision_id
+             )
+           )
          order by probe.created_at desc, probe.id desc
          limit 1
       ) as setup_probe on true
