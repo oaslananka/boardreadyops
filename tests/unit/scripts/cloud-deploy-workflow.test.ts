@@ -72,8 +72,10 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain("build_cache_max_used_space=3GB");
     expect(workflow).toContain("docker builder prune --all --force || true");
     expect(workflow).toContain(
-      `docker builder prune --all --force --max-used-space "${buildCacheMaxUsedSpace}" || true`,
+      `docker builder prune --all --force --max-used-space "${buildCacheMaxUsedSpace}"`,
     );
+    expect(workflow).toContain("cloud-deploy cache: unable to enforce");
+    expect(workflow).not.toContain(`--max-used-space "${buildCacheMaxUsedSpace}" || true`);
     expect(workflow).not.toContain("--filter until=168h");
 
     const lowSpaceCheck = workflow.indexOf(`if [ "${availableMib}" -lt "${requiredMib}" ]; then`);
@@ -89,6 +91,10 @@ describe("cloud-deploy topology preflight", () => {
     expect(caseStart).toBeGreaterThan(checkout);
     expect(caseEnd).toBeGreaterThan(caseStart);
     expect(finalTrim).toBeGreaterThan(caseEnd);
+    const finalSummary = workflow.indexOf("          report_disk_summary", finalTrim);
+    expect(finalSummary).toBeGreaterThan(finalTrim);
+    expect(workflow).not.toContain("docker system prune");
+    expect(workflow).not.toContain("docker volume prune");
   });
 
   it("retires tagged runtime images before a blocked build only after explicit operator opt-in", () => {

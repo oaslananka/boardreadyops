@@ -210,7 +210,10 @@ jobs:
             docker builder prune --all --force || true
           }
           trim_build_cache() {
-            docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true
+            if ! docker builder prune --all --force --max-used-space "${build_cache_max_used_space}"; then
+              printf 'cloud-deploy cache: unable to enforce %s cache budget; investigate host capacity after deploy\n' "${build_cache_max_used_space}" >&2
+              return 1
+            fi
           }
           report_disk_summary() {
             local runtime_image_ids
@@ -356,6 +359,10 @@ jobs:
           printf 'cloud-deploy cache: capping BuildKit cache at %s\n' "${build_cache_max_used_space}"
           trim_build_cache
           printf 'cloud-deploy cache: %s MiB free after cache cap\n' "$(free_mib "${docker_root}")"
+          # Report bounded aggregate usage after every rehearsal or real deployment,
+          # not only when a preflight is already out of space. No other Docker
+          # projects, rollback volumes, or private per-container metadata are altered.
+          report_disk_summary
           REMOTE_DEPLOY
 
       - name: Verify production browser security headers
