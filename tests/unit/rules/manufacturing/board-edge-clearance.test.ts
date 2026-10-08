@@ -468,6 +468,50 @@ fail-on: never
     });
   });
 
+  it.each([
+    ["undocumented outline units", "outline"],
+    ["undocumented copper units", "copper"],
+    ["undocumented outline coordinates", "outline-format"],
+    ["undocumented copper coordinates", "copper-format"],
+  ])("keeps %s advisory despite measurable geometry", async (_case, missingEvidence) => {
+    let outline = squareOutline;
+    let copper = traceGerber({ x: 0.25, y: 1 }, { x: 0.25, y: 9 });
+    if (missingEvidence === "outline") outline = outline.replace("%MOMM*%", "");
+    if (missingEvidence === "copper") copper = copper.replace("%MOMM*%", "");
+    if (missingEvidence === "outline-format") outline = outline.replace("%FSLAX35Y35*%", "");
+    if (missingEvidence === "copper-format") copper = copper.replace("%FSLAX35Y35*%", "");
+    const result = await run({ "fab/outline.gko": outline, "fab/top.gtl": copper }, configuredLimit());
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details?.blocking).toBe(false);
+    expect(issue?.confidence).toBe("low");
+  });
+
+  it("detects board perimeter covered by a polygonal copper flash", async () => {
+    const result = await run(
+      { "fab/outline.gko": squareOutline, "fab/top.gtl": flashWithAperture({ x: 5, y: 5 }, "%ADD10P,30X4X45*%") },
+      configuredLimit(0.2),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({
+      blocking: true,
+      featureKind: "flash",
+      measuredClearanceMm: 0,
+    });
+  });
+
+  it("detects a board perimeter coincident with rectangular copper edges", async () => {
+    const result = await run(
+      { "fab/outline.gko": squareOutline, "fab/top.gtl": flashWithAperture({ x: 5, y: 5 }, "%ADD10R,10X10*%") },
+      configuredLimit(0.2),
+    );
+    const issue = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
+    expect(issue?.details).toMatchObject({
+      blocking: true,
+      featureKind: "flash",
+      measuredClearanceMm: 0,
+    });
+  });
+
   it("never turns incomplete transformed geometry into an exact blocking verdict", async () => {
     const result = await run(
       {
