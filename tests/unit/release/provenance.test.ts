@@ -96,6 +96,39 @@ describe("release/provenance", () => {
     },
   );
 
+  it.skipIf(process.platform === "win32")(
+    "does not validate a partial source snapshot when additional KiCad files hide under a linked directory",
+    async () => {
+      const root = await writeFixture({
+        "board.kicad_pcb": "(kicad_pcb)",
+        "top.gtl": "fab-bytes",
+      });
+      const artifact = {
+        path: "top.gtl",
+        sha256: createHash("sha256").update("fab-bytes").digest("hex"),
+        bytes: Buffer.byteLength("fab-bytes"),
+      };
+      const manifest = await createExportProvenanceManifest({ root, artifacts: [artifact] });
+      const external = await fs.mkdtemp(path.join(os.tmpdir(), "brops-linked-design-directory-"));
+      try {
+        await fs.writeFile(path.join(external, "hidden.kicad_pcb"), "(kicad_pcb (unreviewed))");
+        await fs.symlink(external, path.join(root, "other-designs"), "dir");
+        await expect(computeSourceFingerprint(root)).rejects.toThrow("Symlinked source input rejected");
+        await expect(createExportProvenanceManifest({ root, artifacts: [artifact] })).rejects.toThrow(
+          "Symlinked source input rejected",
+        );
+        const result = await verifyExportProvenance(root, manifest);
+        expect(result.status).toBe("mismatch");
+        expect(result.sourceFingerprintMatch).toBeUndefined();
+        expect(result.reasons).toContain(
+          "Source fingerprint could not be computed because a KiCad source input is a symlink.",
+        );
+      } finally {
+        await fs.rm(external, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("fails closed on unreadable KiCad inputs instead of hashing invented zero-byte content", async () => {
     const root = await writeFixture({
       "board.kicad_pcb": "(kicad_pcb)",

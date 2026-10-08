@@ -41206,11 +41206,15 @@ async function collectFiles(root, directory, output, strictSourceMatcher) {
   }
   for (const entry of entries) {
     if (entry.name.startsWith(".")) continue;
-    if (entry.isDirectory() && ignoredDirectoryNames.has(entry.name)) continue;
+    if ((entry.isDirectory() || entry.isSymbolicLink()) && ignoredDirectoryNames.has(entry.name)) continue;
     const absolute = import_node_path7.default.join(directory, entry.name);
     const relative = toPosixPath(import_node_path7.default.relative(root, absolute));
     if (entry.isSymbolicLink()) {
-      if (strictSourceMatcher?.(relative)) throw new SymlinkedGlobInputError();
+      if (strictSourceMatcher) {
+        if (strictSourceMatcher(relative) || (await import_promises5.default.stat(absolute)).isDirectory()) {
+          throw new SymlinkedGlobInputError();
+        }
+      }
       continue;
     }
     if (entry.isDirectory()) {
