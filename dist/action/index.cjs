@@ -91716,7 +91716,8 @@ var boardEdgeClearanceRule = rule(
     const files = await globFiles(context5.root, DEFAULT_GERBER_PATTERNS);
     if (files.length === 0) return [];
     const parsedFiles = await parseLayers(context5.root, files);
-    const { profile, assurance, minClearanceMm, limitSource, limitMayBlock, configured } = resolveLimit(context5);
+    const limits = resolveLimit(context5);
+    const { profile, assurance, minClearanceMm, limitSource, configured } = limits;
     const outlineCandidates = parsedFiles.filter((item) => item.layer?.role === "outline");
     const outlineFile = outlineCandidates.find((item) => item.layer?.identitySource === "declared") ?? outlineCandidates[0];
     const outlineSegments = outlineFile?.parsed.geometry.primitives.filter(
@@ -91752,101 +91753,103 @@ var boardEdgeClearanceRule = rule(
     }
     const outlineReasons = outlineEvidenceReasons(outlineFile, outlineSegments);
     const copperFiles = parsedFiles.filter((item) => item.layer?.role === "copper");
-    const output = [];
-    for (const copper of copperFiles) {
-      const { measurements, extentUncertainty } = measureCopperFeatures(copper.parsed, outlineSegments);
-      const best = minimumMeasurement(measurements);
-      const geometryReasons = [
-        ...copper.parsed.geometry.uncertainty.map((reason) => `copper:${reason}`),
-        ...extentUncertainty
-      ];
-      const evidenceReasons = [
-        ...outlineReasons,
-        ...copperEvidenceReasons(copper),
-        ...geometryReasons,
-        ...limitMayBlock ? [] : [limitBlockingReason(limitSource, assurance?.state ?? "none")]
-      ];
-      const blockingEvidence = evidenceReasons.length === 0;
-      if (best !== void 0 && best.clearanceMm < minClearanceMm) {
-        const blocking = blockingEvidence;
-        const severity = blocking ? configured : advisorySeverity(configured);
-        output.push(
-          finding(context5, {
-            ruleId: "manufacturing.board-edge-clearance",
-            severity,
-            confidence: blocking ? "definite" : "low",
-            message: blocking ? `Copper feature on ${copper.path} is ${formatMm(best.clearanceMm)}mm from the board edge, below the required ${minClearanceMm}mm.` : `Measured copper feature on ${copper.path} at ${formatMm(best.clearanceMm)}mm from the board edge, below the ${minClearanceMm}mm limit, but the evidence is advisory.`,
-            path: copper.path,
-            kind: "pcb",
-            details: {
-              measuredClearanceMm: roundedMm(best.clearanceMm),
-              minClearanceMm,
-              limitSource,
-              layerRole: "copper",
-              layerRoleEvidence: copper.layer?.identitySource ?? "unknown",
-              outlineRoleEvidence: outlineFile.layer?.identitySource ?? "unknown",
-              featureKind: best.kind,
-              featureLocation: best.location,
-              apertureCode: best.apertureCode ?? null,
-              featureExtentEvidence: best.extentEvidence,
-              geometryConfidence: geometryReasons.length === 0 && outlineReasons.length === 0 ? "exact" : "partial",
-              geometryUncertainty: [...outlineReasons, ...geometryReasons],
-              profileAssurance: assurance?.state ?? "none",
-              profileMayBlock: assurance?.mayBlock ?? false,
-              profileRevision: profile?.provenance.revision ?? null,
-              profileSource: profile?.provenance.source ?? null,
-              verifiedAt: profile?.provenance.verifiedAt ?? null,
-              configuredSeverity: configured,
-              severityCapped: severity !== configured,
-              blocking,
-              blockingRationale: blocking ? "Declared layer roles, declared coordinate evidence, complete modelled geometry, and the selected limit all support a blocking measurement." : evidenceReasons.join(" ")
-            },
-            fix: {
-              description: `Pull copper features back at least ${minClearanceMm}mm from the board outline on ${copper.path}.`,
-              steps: [
-                "Open PCB Editor in KiCad.",
-                `Inspect copper fills, pads, and tracks near Edge.Cuts on layer ${copper.path}.`,
-                `Set copper clearance to Edge.Cuts to at least ${minClearanceMm}mm in Board Setup > Design Rules.`,
-                "Re-fill copper zones and re-export Gerber files."
-              ]
-            }
-          })
-        );
-        continue;
-      }
-      if (geometryReasons.length > 0) {
-        const severity = advisorySeverity(configured);
-        output.push(
-          finding(context5, {
-            ruleId: "manufacturing.board-edge-clearance",
-            severity,
-            confidence: "low",
-            message: `Cannot fully verify board edge clearance for ${copper.path} because some copper geometry is incomplete or has an unmodelled extent.`,
-            path: copper.path,
-            kind: "pcb",
-            details: {
-              measuredClearanceMm: best === void 0 ? null : roundedMm(best.clearanceMm),
-              minClearanceMm,
-              limitSource,
-              layerRole: "copper",
-              layerRoleEvidence: copper.layer?.identitySource ?? "unknown",
-              outlineRoleEvidence: outlineFile.layer?.identitySource ?? "unknown",
-              geometryConfidence: "partial",
-              geometryUncertainty: geometryReasons,
-              profileAssurance: assurance?.state ?? "none",
-              profileMayBlock: assurance?.mayBlock ?? false,
-              configuredSeverity: configured,
-              severityCapped: severity !== configured,
-              blocking: false,
-              blockingRationale: "Incomplete or unmodelled copper geometry cannot establish an exact production verdict even when measured primitives are clear."
-            }
-          })
-        );
-      }
-    }
-    return output;
+    return copperFiles.flatMap(
+      (copper) => evaluateCopperLayer(context5, copper, outlineFile, outlineSegments, outlineReasons, limits)
+    );
   }
 );
+function evaluateCopperLayer(context5, copper, outlineFile, outlineSegments, outlineReasons, limits) {
+  const { profile, assurance, minClearanceMm, limitSource, limitMayBlock, configured } = limits;
+  const { measurements, extentUncertainty } = measureCopperFeatures(copper.parsed, outlineSegments);
+  const best = minimumMeasurement(measurements);
+  const geometryReasons = [
+    ...copper.parsed.geometry.uncertainty.map((reason) => `copper:${reason}`),
+    ...extentUncertainty
+  ];
+  const evidenceReasons = [
+    ...outlineReasons,
+    ...copperEvidenceReasons(copper),
+    ...geometryReasons,
+    ...limitMayBlock ? [] : [limitBlockingReason(limitSource, assurance?.state ?? "none")]
+  ];
+  const blockingEvidence = evidenceReasons.length === 0;
+  if (best !== void 0 && best.clearanceMm < minClearanceMm) {
+    const blocking = blockingEvidence;
+    const severity = blocking ? configured : advisorySeverity(configured);
+    return [
+      finding(context5, {
+        ruleId: "manufacturing.board-edge-clearance",
+        severity,
+        confidence: blocking ? "definite" : "low",
+        message: blocking ? `Copper feature on ${copper.path} is ${formatMm(best.clearanceMm)}mm from the board edge, below the required ${minClearanceMm}mm.` : `Measured copper feature on ${copper.path} at ${formatMm(best.clearanceMm)}mm from the board edge, below the ${minClearanceMm}mm limit, but the evidence is advisory.`,
+        path: copper.path,
+        kind: "pcb",
+        details: {
+          measuredClearanceMm: roundedMm(best.clearanceMm),
+          minClearanceMm,
+          limitSource,
+          layerRole: "copper",
+          layerRoleEvidence: copper.layer?.identitySource ?? "unknown",
+          outlineRoleEvidence: outlineFile.layer?.identitySource ?? "unknown",
+          featureKind: best.kind,
+          featureLocation: best.location,
+          apertureCode: best.apertureCode ?? null,
+          featureExtentEvidence: best.extentEvidence,
+          geometryConfidence: geometryReasons.length === 0 && outlineReasons.length === 0 ? "exact" : "partial",
+          geometryUncertainty: [...outlineReasons, ...geometryReasons],
+          profileAssurance: assurance?.state ?? "none",
+          profileMayBlock: assurance?.mayBlock ?? false,
+          profileRevision: profile?.provenance.revision ?? null,
+          profileSource: profile?.provenance.source ?? null,
+          verifiedAt: profile?.provenance.verifiedAt ?? null,
+          configuredSeverity: configured,
+          severityCapped: severity !== configured,
+          blocking,
+          blockingRationale: blocking ? "Declared layer roles, declared coordinate evidence, complete modelled geometry, and the selected limit all support a blocking measurement." : evidenceReasons.join(" ")
+        },
+        fix: {
+          description: `Pull copper features back at least ${minClearanceMm}mm from the board outline on ${copper.path}.`,
+          steps: [
+            "Open PCB Editor in KiCad.",
+            `Inspect copper fills, pads, and tracks near Edge.Cuts on layer ${copper.path}.`,
+            `Set copper clearance to Edge.Cuts to at least ${minClearanceMm}mm in Board Setup > Design Rules.`,
+            "Re-fill copper zones and re-export Gerber files."
+          ]
+        }
+      })
+    ];
+  }
+  if (geometryReasons.length > 0) {
+    const severity = advisorySeverity(configured);
+    return [
+      finding(context5, {
+        ruleId: "manufacturing.board-edge-clearance",
+        severity,
+        confidence: "low",
+        message: `Cannot fully verify board edge clearance for ${copper.path} because some copper geometry is incomplete or has an unmodelled extent.`,
+        path: copper.path,
+        kind: "pcb",
+        details: {
+          measuredClearanceMm: best === void 0 ? null : roundedMm(best.clearanceMm),
+          minClearanceMm,
+          limitSource,
+          layerRole: "copper",
+          layerRoleEvidence: copper.layer?.identitySource ?? "unknown",
+          outlineRoleEvidence: outlineFile.layer?.identitySource ?? "unknown",
+          geometryConfidence: "partial",
+          geometryUncertainty: geometryReasons,
+          profileAssurance: assurance?.state ?? "none",
+          profileMayBlock: assurance?.mayBlock ?? false,
+          configuredSeverity: configured,
+          severityCapped: severity !== configured,
+          blocking: false,
+          blockingRationale: "Incomplete or unmodelled copper geometry cannot establish an exact production verdict even when measured primitives are clear."
+        }
+      })
+    ];
+  }
+  return [];
+}
 async function parseLayers(root, files) {
   const { entries, stackup } = await loadGerberStackup(root, files);
   const layersByFilename = new Map(
