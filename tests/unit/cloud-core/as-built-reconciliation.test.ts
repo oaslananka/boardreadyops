@@ -49,6 +49,24 @@ describe("as-built BOM reconciliation foundation", () => {
     expect(missingBaseline.divergences[0]?.kind).toBe("additional_part");
   });
 
+  it("does not classify an all-DNP design as proven matching production records", () => {
+    const absent = compareApprovedAndBuiltBom({ ...baseline, approved: [jp1], built: [] });
+    expect(absent.status).toBe("insufficient_identity");
+    expect(absent.divergences).toEqual([]);
+
+    const markedDnp = compareApprovedAndBuiltBom({ ...baseline, approved: [jp1], built: [jp1] });
+    expect(markedDnp.status).toBe("insufficient_identity");
+    expect(markedDnp.divergences).toEqual([]);
+
+    const populatedUnexpectedly = compareApprovedAndBuiltBom({
+      ...baseline,
+      approved: [jp1],
+      built: [{ ...jp1, dnp: false }],
+    });
+    expect(populatedUnexpectedly.status).toBe("insufficient_identity");
+    expect(populatedUnexpectedly.divergences.map((entry) => entry.kind)).toEqual(["unexpected_assembly"]);
+  });
+
   it("distinguishes a listed alternate from documented proof of approval", () => {
     const replacement = { ...u1, mpn: "XYZ-2", manufacturer: "OtherFab" };
     const report = compareApprovedAndBuiltBom({
@@ -146,6 +164,21 @@ describe("as-built BOM reconciliation foundation", () => {
     expect(() => compareApprovedAndBuiltBom({ ...baseline, built: [{ ...u1, reference: " " }] })).toThrow(
       "BOM reference must be a bounded nonempty identity",
     );
+  });
+
+  it("rejects nonboolean DNP fields rather than interpreting malformed data as populated", () => {
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        built: [{ ...u1, dnp: "false" as unknown as boolean }, r1],
+      }),
+    ).toThrow("As-built BOM has invalid DNP flag for U1");
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        approved: [{ ...jp1, dnp: "true" as unknown as boolean }, u1],
+      }),
+    ).toThrow("Approved BOM has invalid DNP flag for JP1");
   });
 
   it("rejects invalid quantities and unbound release/batch digests", () => {
