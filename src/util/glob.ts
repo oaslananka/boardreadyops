@@ -31,14 +31,26 @@ async function collectFiles(
     // fast-glob's previous `dot: false` contract excluded hidden paths. Preserve that behavior
     // while also pruning the build/dependency directories BoardReadyOps has always ignored.
     if (entry.name.startsWith(".")) continue;
-    if (entry.isDirectory() && ignoredDirectoryNames.has(entry.name)) continue;
+    if ((entry.isDirectory() || entry.isSymbolicLink()) && ignoredDirectoryNames.has(entry.name)) continue;
 
     const absolute = path.join(directory, entry.name);
     const relative = toPosixPath(path.relative(root, absolute));
-    // Default globs still skip symlinks. Provenance callers can instead fail closed
-    // if a matching KiCad source file would otherwise be silently omitted.
+    // Default globs still skip symlinks. Provenance callers fail closed on
+    // matching source-file symlinks AND visible symlinked directories: hidden
+    // sources below a linked directory cannot be ruled out without following it.
     if (entry.isSymbolicLink()) {
-      if (strictSourceMatcher?.(relative)) throw new SymlinkedGlobInputError();
+      if (strictSourceMatcher) {
+        if (strictSourceMatcher(relative)) throw new SymlinkedGlobInputError();
+        let targetIsDirectory: boolean;
+        try {
+          targetIsDirectory = (await fs.stat(absolute)).isDirectory();
+        } catch {
+          // An unresolved/unreadable link could become a source directory between
+          // discovery and export. Keep strict provenance fail-closed and typed.
+          throw new SymlinkedGlobInputError();
+        }
+        if (targetIsDirectory) throw new SymlinkedGlobInputError();
+      }
       continue;
     }
     if (entry.isDirectory()) {

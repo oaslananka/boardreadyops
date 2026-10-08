@@ -72814,11 +72814,20 @@ async function collectFiles(root, directory, output, strictSourceMatcher) {
   }
   for (const entry of entries) {
     if (entry.name.startsWith(".")) continue;
-    if (entry.isDirectory() && ignoredDirectoryNames.has(entry.name)) continue;
+    if ((entry.isDirectory() || entry.isSymbolicLink()) && ignoredDirectoryNames.has(entry.name)) continue;
     const absolute = import_node_path6.default.join(directory, entry.name);
     const relative = toPosixPath2(import_node_path6.default.relative(root, absolute));
     if (entry.isSymbolicLink()) {
-      if (strictSourceMatcher?.(relative)) throw new SymlinkedGlobInputError();
+      if (strictSourceMatcher) {
+        if (strictSourceMatcher(relative)) throw new SymlinkedGlobInputError();
+        let targetIsDirectory;
+        try {
+          targetIsDirectory = (await import_promises4.default.stat(absolute)).isDirectory();
+        } catch {
+          throw new SymlinkedGlobInputError();
+        }
+        if (targetIsDirectory) throw new SymlinkedGlobInputError();
+      }
       continue;
     }
     if (entry.isDirectory()) {

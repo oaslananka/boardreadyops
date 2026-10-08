@@ -73,6 +73,40 @@ describe("globFiles", () => {
     },
   );
 
+  it.skipIf(process.platform === "win32")(
+    "rejects hidden KiCad sources under symlinked directories only in strict mode",
+    async () => {
+      const root = await fixture(["board.kicad_pcb"]);
+      const external = await fixture(["unreviewed.kicad_pcb"]);
+      await fs.symlink(external, path.join(root, "linked-sources"), "dir");
+      await fs.symlink(external, path.join(root, "node_modules"), "dir");
+
+      const defaultFiles = await globFiles(root, ["**/*.kicad_pcb"]);
+      expect(defaultFiles.map((file) => path.basename(file))).toEqual(["board.kicad_pcb"]);
+      await expect(globFiles(root, ["**/*.kicad_pcb"], { rejectMatchingSymlinks: true })).rejects.toThrow(
+        "Symlinked source input rejected",
+      );
+      // Dependency/build paths are ignored irrespective of whether they are real directories or symlinks.
+      await fs.rm(path.join(root, "linked-sources"));
+      await expect(globFiles(root, ["**/*.kicad_pcb"], { rejectMatchingSymlinks: true })).resolves.toHaveLength(1);
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "turns broken nonmatching links into a typed strict-source failure rather than raw ENOENT",
+    async () => {
+      const root = await fixture(["board.kicad_pcb", "notes.txt"]);
+      await fs.symlink("missing-inputs", path.join(root, "stale-design-link"), "dir");
+      await fs.symlink("notes.txt", path.join(root, "notes-alias.txt"));
+      await expect(globFiles(root, ["**/*.kicad_pcb"])).resolves.toHaveLength(1);
+      await expect(globFiles(root, ["**/*.kicad_pcb"], { rejectMatchingSymlinks: true })).rejects.toThrow(
+        "Symlinked source input rejected",
+      );
+      await fs.rm(path.join(root, "stale-design-link"));
+      await expect(globFiles(root, ["**/*.kicad_pcb"], { rejectMatchingSymlinks: true })).resolves.toHaveLength(1);
+    },
+  );
+
   it("does not follow symlinks outside the requested root", async () => {
     const root = await fixture(["inside.txt"]);
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-glob-outside-"));
