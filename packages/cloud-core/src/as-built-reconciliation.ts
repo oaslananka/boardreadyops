@@ -57,8 +57,10 @@ export type AsBuiltComparison = {
 
 const maximumParts = 5_000;
 const maximumAlternates = 5_000;
-const sha256 = /^[a-f0-9]{64}$/iu;
-const commitSha = /^[a-f0-9]{40}$/iu;
+// Use one canonical identity representation across batch, release and graph
+// records. A different case must not become a distinct lookup/attestation key.
+const sha256 = /^[a-f0-9]{64}$/u;
+const commitSha = /^[a-f0-9]{40}$/u;
 
 function invalidBoundedText(value: unknown): boolean {
   return typeof value !== "string" || value.length > 256 || value.includes("\0");
