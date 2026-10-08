@@ -236,7 +236,7 @@ jobs:
   test-int:
     needs: risk-profile
     if: needs.risk-profile.outputs.needs_integration == 'true'
-    name: ci / test-int (KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }})
+    name: ci / test-int (KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }}, PG ${{ matrix.postgres-version }})
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -245,7 +245,7 @@ jobs:
       DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test
     services:
       postgres:
-        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+        image: ${{ matrix.postgres-image }}
         env:
           POSTGRES_USER: boardreadyops
           POSTGRES_DB: boardreadyops_test
@@ -264,9 +264,18 @@ jobs:
           - kicad-version: "10.0"
             kicad-ppa-series: "10.0"
             node-version: 22
+            postgres-version: "16"
+            postgres-image: "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
           - kicad-version: "10.0"
             kicad-ppa-series: "10.0"
             node-version: 24
+            postgres-version: "16"
+            postgres-image: "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
+          - kicad-version: "10.0"
+            kicad-ppa-series: "10.0"
+            node-version: 24
+            postgres-version: "17"
+            postgres-image: "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -289,8 +298,31 @@ jobs:
             echo "::error::Expected KiCad ${{ matrix.kicad-version }}.*, got ${version}"
             exit 1
           fi
-      - name: Install PostgreSQL client
+      - name: Install PostgreSQL 16 client
+        if: matrix.postgres-version == '16'
         run: sudo apt-get install --yes postgresql-client
+      - name: Prepare PostgreSQL 17 client wrappers
+        if: matrix.postgres-version == '17'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pg17-client"
+          for command in pg_dump pg_restore; do
+            cat > "$RUNNER_TEMP/pg17-client/$command" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          command="$(basename "$0")"
+          if [[ "$command" == "pg_restore" ]]; then
+            arguments=("$@")
+            archive="${arguments[-1]}"
+            unset 'arguments[-1]'
+            [[ -f "$archive" && ! -L "$archive" ]] || exit 2
+            exec docker run --rm -i --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 pg_restore "${arguments[@]}" < "$archive"
+          fi
+          exec docker run --rm --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 "$command" "$@"
+          SH
+            chmod 0755 "$RUNNER_TEMP/pg17-client/$command"
+          done
       - run: corepack pnpm run deps:install-ci
       - name: Apply cloud migrations
         run: pnpm --filter @boardreadyops/db db:migrate
@@ -308,7 +340,13 @@ jobs:
           fi
       - name: Run integration tests with JUnit report
         id: tests
-        run: pnpm run test:int --reporter=junit --outputFile=junit.xml
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.postgres-version }}" == "17" ]]; then
+            export PATH="$RUNNER_TEMP/pg17-client:$PATH"
+          fi
+          pnpm run test:int --reporter=default --reporter=junit --outputFile.junit=junit.xml
         continue-on-error: true
       - name: Upload test results to Mergify CI Insights
         if: ${{ always() && steps.mergify-token.outputs.enabled == 'true' }}
@@ -318,7 +356,7 @@ jobs:
           action: junit-process
           report_path: junit.xml
           token: ${{ secrets.MERGIFY_TOKEN }}
-          job_name: ci / test-int (KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }})
+          job_name: ci / test-int (KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }}, PG ${{ matrix.postgres-version }})
           test_step_outcome: ${{ steps.tests.outcome }}
       - name: Enforce test result
         if: ${{ always() && steps.tests.outcome != 'success' }}
