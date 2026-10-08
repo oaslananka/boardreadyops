@@ -34,6 +34,35 @@ import { viewerInstallations } from "../../../apps/web/lib/viewer-installations.
 
 const TEST_DB_URL = "postgres://test_user:test_secret@test_db_host:5432/test_db";
 
+function viewerRepositoryRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "repo-1",
+    owner: "acme",
+    name: "gateway",
+    private: true,
+    installation_id: "inst-1",
+    github_installation_id: "12345",
+    account_login: "acme-corp",
+    run_id: "run-100",
+    status: "completed",
+    decision: "pass",
+    started_at: "2026-08-20T10:00:00.000Z",
+    open_findings: "2",
+    watched_boards: "1",
+    open_supply_findings: "0",
+    setup_revision: "3",
+    setup_preset: "production",
+    setup_workflow_status: "ready",
+    setup_config_status: "ready",
+    setup_observed_sha: "a".repeat(40),
+    setup_probe_id: "22222222-2222-4222-8222-222222222222",
+    setup_probe_status: "dispatched",
+    setup_probe_workflow_run_id: "987654321",
+    setup_probe_expires_at: "2026-10-02T02:00:00.000Z",
+    ...overrides,
+  };
+}
+
 describe("repository dashboard and viewer loader branches", () => {
   it("returns empty groups when session is undefined or has no installations", async () => {
     expect(await loadViewerRepositories(undefined)).toEqual([]);
@@ -47,33 +76,7 @@ describe("repository dashboard and viewer loader branches", () => {
 
   it("parses database rows into repository groups when DATABASE_URL is present", async () => {
     mockQuery.mockResolvedValueOnce({
-      rows: [
-        {
-          id: "repo-1",
-          owner: "acme",
-          name: "gateway",
-          private: true,
-          installation_id: "inst-1",
-          github_installation_id: "12345",
-          account_login: "acme-corp",
-          run_id: "run-100",
-          status: "completed",
-          decision: "pass",
-          started_at: "2026-08-20T10:00:00.000Z",
-          open_findings: "2",
-          watched_boards: "1",
-          open_supply_findings: "0",
-          setup_revision: "3",
-          setup_preset: "production",
-          setup_workflow_status: "ready",
-          setup_config_status: "ready",
-          setup_observed_sha: "a".repeat(40),
-          setup_probe_id: "22222222-2222-4222-8222-222222222222",
-          setup_probe_status: "dispatched",
-          setup_probe_workflow_run_id: "987654321",
-          setup_probe_expires_at: "2026-10-02T02:00:00.000Z",
-        },
-      ],
+      rows: [viewerRepositoryRow()],
     });
 
     const session = { login: "alice", installationIds: [123] };
@@ -98,23 +101,16 @@ describe("repository dashboard and viewer loader branches", () => {
   it("shows a completed readiness probe after its result revision becomes current", async () => {
     mockQuery.mockResolvedValueOnce({
       rows: [
-        {
-          id: "repo-1",
-          owner: "acme",
-          name: "gateway",
+        viewerRepositoryRow({
           private: false,
-          installation_id: "inst-1",
-          github_installation_id: "12345",
           account_login: "acme",
           setup_revision: "4",
           setup_preset: "prototype",
-          setup_workflow_status: "ready",
-          setup_config_status: "ready",
           setup_probe_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           setup_probe_status: "completed",
           setup_probe_workflow_run_id: "37716606237",
           setup_probe_expires_at: "2026-10-08T02:25:58.000Z",
-        },
+        }),
       ],
     });
 
