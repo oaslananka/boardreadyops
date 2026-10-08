@@ -60,10 +60,17 @@ const maximumAlternates = 5_000;
 const sha256 = /^[a-f0-9]{64}$/iu;
 const commitSha = /^[a-f0-9]{40}$/iu;
 
+function invalidBoundedText(value: unknown): boolean {
+  return typeof value !== "string" || value.length > 256 || value.includes("\0");
+}
+
 function requiredIdentity(value: string, label: string): string {
-  const normalized = value.trim();
-  if (!normalized || normalized.length > 256) throw new Error(`${label} must be a bounded nonempty identity`);
-  return normalized;
+  // Share raw length/type/null-byte checks with optional BOM fields: trimming
+  // must not turn an oversized alternate into a supposedly valid identity.
+  if (invalidBoundedText(value) || !value.trim()) {
+    throw new Error(`${label} must be a bounded nonempty identity`);
+  }
+  return value.trim();
 }
 
 function partIdentity(value: string | undefined): string | undefined {
@@ -73,6 +80,12 @@ function partIdentity(value: string | undefined): string | undefined {
 
 function normalizedReference(value: string): string {
   return requiredIdentity(value, "BOM reference").toLocaleUpperCase("en-US");
+}
+
+function validatePartField(value: string | undefined, label: string): void {
+  if (value !== undefined && invalidBoundedText(value)) {
+    throw new Error(`${label} must be a bounded text field`);
+  }
 }
 
 function partIndex(parts: readonly BomPart[], label: string): Map<string, BomPart> {
@@ -87,29 +100,51 @@ function partIndex(parts: readonly BomPart[], label: string): Map<string, BomPar
     if (part.dnp !== undefined && typeof part.dnp !== "boolean") {
       throw new Error(`${label} has invalid DNP flag for ${key}`);
     }
+    for (const field of ["mpn", "manufacturer", "footprint"] as const) {
+      validatePartField(part[field], `${label} ${key} ${field}`);
+    }
     indexed.set(key, part);
   }
   return indexed;
 }
 
-function listedCandidatePolicy(
-  primary: BomPart,
-  actual: BomPart,
-  alternates: readonly DocumentedAlternate[],
-): string | undefined {
+type AlternateIndex = ReadonlyMap<string, { count: number; policyId: string }>;
+
+function requiredPartIdentity(value: string, label: string): string {
+  return requiredIdentity(value, label).toLocaleUpperCase("en-US");
+}
+
+function alternateKey(primaryMpn: string, alternateMpn: string, manufacturer?: string): string {
+  return JSON.stringify([primaryMpn, alternateMpn, manufacturer ?? null]);
+}
+
+function indexDocumentedAlternates(alternates: readonly DocumentedAlternate[]): AlternateIndex {
+  const indexed = new Map<string, { count: number; policyId: string }>();
+  for (const alternate of alternates) {
+    const primaryMpn = requiredPartIdentity(alternate.primaryMpn, "Alternate primary MPN");
+    const alternateMpn = requiredPartIdentity(alternate.alternateMpn, "Alternate MPN");
+    const alternateManufacturer =
+      alternate.alternateManufacturer === undefined
+        ? undefined
+        : requiredPartIdentity(alternate.alternateManufacturer, "Alternate manufacturer");
+    const policyId = requiredIdentity(alternate.policyId, "Alternate policy");
+    const key = alternateKey(primaryMpn, alternateMpn, alternateManufacturer);
+    const previous = indexed.get(key);
+    indexed.set(key, { count: (previous?.count ?? 0) + 1, policyId });
+  }
+  return indexed;
+}
+
+function listedCandidatePolicy(primary: BomPart, actual: BomPart, alternates: AlternateIndex): string | undefined {
   const from = partIdentity(primary.mpn);
   const to = partIdentity(actual.mpn);
   if (!from || !to) return undefined;
-  const matching = alternates.filter(
-    (alternate) =>
-      partIdentity(alternate.primaryMpn) === from &&
-      partIdentity(alternate.alternateMpn) === to &&
-      (!alternate.alternateManufacturer ||
-        partIdentity(alternate.alternateManufacturer) === partIdentity(actual.manufacturer)),
-  );
-  // An ambiguous policy mapping is not a single authorized substitution.
-  if (matching.length !== 1) return undefined;
-  return requiredIdentity(matching[0]?.policyId ?? "", "Alternate policy");
+  const general = alternates.get(alternateKey(from, to));
+  const manufacturer = partIdentity(actual.manufacturer);
+  const specific = manufacturer ? alternates.get(alternateKey(from, to, manufacturer)) : undefined;
+  // Both a general and manufacturer-specific entry (or duplicates) are ambiguous.
+  const matches = (general?.count ?? 0) + (specific?.count ?? 0);
+  return matches === 1 ? (specific?.policyId ?? general?.policyId) : undefined;
 }
 
 function addDifference(
@@ -133,7 +168,7 @@ function comparePopulatedPart(
   reference: string,
   approved: BomPart,
   built: BomPart,
-  alternates: readonly DocumentedAlternate[],
+  alternates: AlternateIndex,
   divergences: BomDivergence[],
 ): void {
   const approvedMpn = partIdentity(approved.mpn);
@@ -180,7 +215,7 @@ function validateComparisonInput(input: AsBuiltComparisonInput): void {
 function collectBomDifferences(
   approved: ReadonlyMap<string, BomPart>,
   built: ReadonlyMap<string, BomPart>,
-  alternates: readonly DocumentedAlternate[],
+  alternates: AlternateIndex,
 ): BomDivergence[] {
   const divergences: BomDivergence[] = [];
   const references = new Set([...approved.keys(), ...built.keys()]);
@@ -209,7 +244,10 @@ export function compareApprovedAndBuiltBom(input: AsBuiltComparisonInput): AsBui
   validateComparisonInput(input);
   const approved = partIndex(input.approved, "Approved BOM");
   const built = partIndex(input.built, "As-built BOM");
-  const divergences = collectBomDifferences(approved, built, input.documentedAlternates ?? []);
+  // Validate all alternate records, even ones not selected for this batch, and
+  // index candidates once instead of scanning the list for every substitution.
+  const alternatives = indexDocumentedAlternates(input.documentedAlternates ?? []);
+  const divergences = collectBomDifferences(approved, built, alternatives);
   // An all-DNP design has no populated baseline to establish an as-built match.
   const hasPopulatedApprovedPart = input.approved.some((part) => part.dnp !== true);
 

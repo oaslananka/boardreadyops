@@ -110,6 +110,102 @@ describe("as-built BOM reconciliation foundation", () => {
     expect(other.divergences[0]?.candidatePolicyId).toBeUndefined();
   });
 
+  it("rejects malformed alternate records even if no built part selects them", () => {
+    const invalid = { primaryMpn: "ABSENT", alternateMpn: "OTHER", policyId: "" };
+    expect(() => compareApprovedAndBuiltBom({ ...baseline, documentedAlternates: [invalid] })).toThrow(
+      "Alternate policy must be a bounded nonempty identity",
+    );
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        documentedAlternates: [{ ...invalid, policyId: "policy-A", alternateManufacturer: " " }],
+      }),
+    ).toThrow("Alternate manufacturer must be a bounded nonempty identity");
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        documentedAlternates: [{ ...invalid, policyId: "policy-A", primaryMpn: "X".repeat(257) }],
+      }),
+    ).toThrow("Alternate primary MPN must be a bounded nonempty identity");
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        documentedAlternates: [{ ...invalid, policyId: "policy-A", primaryMpn: [" ".repeat(260), "ABC-1"].join("") }],
+      }),
+    ).toThrow("Alternate primary MPN must be a bounded nonempty identity");
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        documentedAlternates: [{ ...invalid, policyId: "policy-A", alternateMpn: 42 as unknown as string }],
+      }),
+    ).toThrow("Alternate MPN must be a bounded nonempty identity");
+  });
+
+  it("rejects malformed part text even when the parts would otherwise match", () => {
+    for (const [field, value] of [
+      ["mpn", "Z".repeat(257)],
+      ["manufacturer", "bad\0name"],
+      ["footprint", 42],
+    ] as const) {
+      expect(() =>
+        compareApprovedAndBuiltBom({
+          ...baseline,
+          built: [{ ...u1, [field]: value }, r1],
+        }),
+      ).toThrow("must be a bounded text field");
+    }
+  });
+
+  it("does not promote overlapping generic and manufacturer-specific alternates into one candidate", () => {
+    const replacement = { ...u1, mpn: "XYZ-2", manufacturer: "OtherFab" };
+    const generic = { primaryMpn: "ABC-1", alternateMpn: "XYZ-2", policyId: "any-maker" };
+    const scoped = { ...generic, alternateManufacturer: "OtherFab", policyId: "that-maker" };
+    const ambiguous = compareApprovedAndBuiltBom({
+      ...baseline,
+      built: [replacement, r1],
+      documentedAlternates: [generic, scoped],
+    });
+    expect(ambiguous.divergences[0]?.candidatePolicyId).toBeUndefined();
+    const unambiguous = compareApprovedAndBuiltBom({
+      ...baseline,
+      built: [replacement, r1],
+      documentedAlternates: [scoped],
+    });
+    expect(unambiguous.divergences[0]?.candidatePolicyId).toBe("that-maker");
+  });
+
+  it("indexes documented alternates across multiple substitutions without changing their record status", () => {
+    const count = 250;
+    const approvedLots: BomPart[] = Array.from({ length: count }, (_, i) => ({
+      reference: `U${i + 1}`,
+      mpn: `A-${i}`,
+      manufacturer: "Primary",
+      quantity: 1,
+    }));
+    const builtLots: BomPart[] = approvedLots.map((part, i) => ({
+      ...part,
+      mpn: `B-${i}`,
+      manufacturer: "Second",
+    }));
+    const documentedAlternates = approvedLots.map((_part, i) => ({
+      primaryMpn: `A-${i}`,
+      alternateMpn: `B-${i}`,
+      alternateManufacturer: "second",
+      policyId: `policy-${i}`,
+    }));
+    const report = compareApprovedAndBuiltBom({
+      ...baseline,
+      approved: approvedLots,
+      built: builtLots,
+      documentedAlternates,
+    });
+    expect(report.status).toBe("different_records");
+    expect(report.divergences).toHaveLength(count);
+    expect(report.divergences.every((entry) => entry.kind === "part_substitution" && entry.candidatePolicyId)).toBe(
+      true,
+    );
+  });
+
   it("surfaces missing, added and assembled-DNP references without pretending that they match", () => {
     const report = compareApprovedAndBuiltBom({
       ...baseline,
