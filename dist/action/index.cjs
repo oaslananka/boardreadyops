@@ -44894,7 +44894,7 @@ var require_graceful_fs = __commonJS({
     function patch(fs29) {
       polyfills(fs29);
       fs29.gracefulify = patch;
-      fs29.createReadStream = createReadStream3;
+      fs29.createReadStream = createReadStream4;
       fs29.createWriteStream = createWriteStream2;
       var fs$readFile = fs29.readFile;
       fs29.readFile = readFile2;
@@ -45104,7 +45104,7 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function createReadStream3(path53, options) {
+      function createReadStream4(path53, options) {
         return new fs29.ReadStream(path53, options);
       }
       function createWriteStream2(path53, options) {
@@ -93651,6 +93651,7 @@ var import_node_path36 = __toESM(require("node:path"), 1);
 
 // src/core/provenance.ts
 var import_node_crypto4 = require("node:crypto");
+var import_node_fs2 = require("node:fs");
 var import_promises12 = __toESM(require("node:fs/promises"), 1);
 var import_node_path35 = __toESM(require("node:path"), 1);
 var SOURCE_PATTERNS = [
@@ -93697,7 +93698,7 @@ function isArtifactRecord(value) {
   const record2 = value;
   return typeof record2.path === "string" && record2.path.trim() !== "" && typeof record2.sha256 === "string" && /^[0-9a-f]{64}$/i.test(record2.sha256) && Number.isSafeInteger(record2.bytes) && (record2.bytes ?? -1) >= 0;
 }
-async function inspectArtifact(root, manifestDir, artifact) {
+async function inspectArtifact(root, realRoot, manifestDir, artifact) {
   if (import_node_path35.default.isAbsolute(artifact.path) || artifact.path.includes("..")) {
     return { kind: "mismatch", reason: `Artifact path rejected (absolute or path traversal): ${artifact.path}` };
   }
@@ -93707,15 +93708,21 @@ async function inspectArtifact(root, manifestDir, artifact) {
   }
   try {
     const realPath = await import_promises12.default.realpath(absPath);
-    if (!isInside(root, realPath) && !isInside(manifestDir, realPath)) {
+    if (!isInside(realRoot, realPath)) {
       return {
         kind: "mismatch",
         reason: `Artifact ${artifact.path} symlink escapes the project and manifest directories.`
       };
     }
-    const content = await import_promises12.default.readFile(realPath);
-    const actualHash = (0, import_node_crypto4.createHash)("sha256").update(content).digest("hex");
-    if (actualHash !== artifact.sha256 || content.byteLength !== artifact.bytes) {
+    const hash2 = (0, import_node_crypto4.createHash)("sha256");
+    let streamedBytes = 0;
+    for await (const chunk of (0, import_node_fs2.createReadStream)(realPath)) {
+      hash2.update(chunk);
+      streamedBytes += chunk.byteLength;
+    }
+    const actualHash = hash2.digest("hex");
+    const fileStat = await import_promises12.default.stat(realPath);
+    if (actualHash !== artifact.sha256 || streamedBytes !== artifact.bytes || fileStat.size !== artifact.bytes) {
       return {
         kind: "mismatch",
         reason: `Artifact ${artifact.path} content modified after export (hash or byte-count mismatch).`
@@ -93726,56 +93733,76 @@ async function inspectArtifact(root, manifestDir, artifact) {
     return { kind: "missing", reason: `Artifact ${artifact.path} missing or unreadable.` };
   }
 }
-async function verifyExportProvenance(root, manifestOrPath, options = {}) {
-  let manifest;
-  let manifestDir = root;
-  if (typeof manifestOrPath === "string") {
-    const absManifestPath = import_node_path35.default.resolve(root, manifestOrPath);
-    if (!isInside(root, absManifestPath)) {
-      return {
+async function loadManifest(root, manifestOrPath) {
+  let realRoot;
+  try {
+    realRoot = await import_promises12.default.realpath(root);
+  } catch {
+    return { error: { status: "missing", reasons: ["Project root is missing or unreadable."] } };
+  }
+  if (typeof manifestOrPath !== "string") {
+    return { manifest: manifestOrPath, manifestDir: root, realRoot };
+  }
+  const absManifestPath = import_node_path35.default.resolve(root, manifestOrPath);
+  if (!isInside(root, absManifestPath)) {
+    return {
+      error: {
         status: "mismatch",
         reasons: [`Path traversal rejected for manifest path: ${manifestOrPath}`]
-      };
-    }
-    manifestDir = import_node_path35.default.dirname(absManifestPath);
-    try {
-      const realManifestPath = await import_promises12.default.realpath(absManifestPath);
-      if (!isInside(root, realManifestPath)) {
-        return {
+      }
+    };
+  }
+  try {
+    const realManifestPath = await import_promises12.default.realpath(absManifestPath);
+    if (!isInside(realRoot, realManifestPath)) {
+      return {
+        error: {
           status: "mismatch",
           reasons: ["Provenance manifest symlink escapes the project root."]
-        };
-      }
-      const raw = await readTextFile(absManifestPath);
-      manifest = JSON.parse(raw);
-    } catch (error52) {
-      return {
+        }
+      };
+    }
+    const raw = await readTextFile(absManifestPath);
+    return { manifest: JSON.parse(raw), manifestDir: import_node_path35.default.dirname(absManifestPath), realRoot };
+  } catch (error52) {
+    return {
+      error: {
         status: "missing",
         reasons: [
           `Provenance manifest unreadable or malformed: ${error52 instanceof Error ? error52.message : String(error52)}`
         ]
-      };
-    }
-  } else {
-    manifest = manifestOrPath;
+      }
+    };
   }
+}
+function validateManifestStructure(manifest) {
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
     return { status: "unsupported", reasons: ["Invalid provenance manifest object."] };
   }
-  if (manifest.schemaVersion !== 1 || manifest.tool?.name !== "boardreadyops") {
+  const record2 = manifest;
+  if (record2.schemaVersion !== 1 || record2.tool?.name !== "boardreadyops") {
     return {
       status: "unsupported",
-      reasons: [`Unsupported or invalid provenance manifest schema version ${manifest.schemaVersion}`],
-      manifest
+      reasons: [`Unsupported or invalid provenance manifest schema version ${record2.schemaVersion}`],
+      manifest: record2
     };
   }
-  if (typeof manifest.sourceFingerprint !== "string" || !/^[0-9a-f]{64}$/i.test(manifest.sourceFingerprint)) {
+  if (typeof record2.sourceFingerprint !== "string" || !/^[0-9a-f]{64}$/i.test(record2.sourceFingerprint)) {
     return {
       status: "mismatch",
       reasons: ["Provenance manifest has no valid source SHA-256 fingerprint."],
-      manifest
+      manifest: record2
     };
   }
+  return void 0;
+}
+async function verifyExportProvenance(root, manifestOrPath, options = {}) {
+  const loaded = await loadManifest(root, manifestOrPath);
+  if ("error" in loaded) return loaded.error;
+  const invalid = validateManifestStructure(loaded.manifest);
+  if (invalid) return invalid;
+  const manifest = loaded.manifest;
+  const { manifestDir, realRoot } = loaded;
   const reasons = [];
   const currentFingerprint = await computeSourceFingerprint(root);
   const sourceFingerprintMatch = currentFingerprint === manifest.sourceFingerprint;
@@ -93808,7 +93835,7 @@ async function verifyExportProvenance(root, manifestOrPath, options = {}) {
       continue;
     }
     seenPaths.add(normalizedPath);
-    const outcome = await inspectArtifact(root, manifestDir, entry);
+    const outcome = await inspectArtifact(root, realRoot, manifestDir, entry);
     if (outcome.reason) reasons.push(outcome.reason);
     if (outcome.kind === "mismatch") artifactMismatches.push(entry.path);
     if (outcome.kind === "missing") missingArtifacts.push(entry.path);
@@ -94243,7 +94270,7 @@ function registerBuiltInRules() {
 
 // src/rules/fabrication-snapshot.ts
 var import_node_crypto5 = __toESM(require("node:crypto"), 1);
-var import_node_fs2 = require("node:fs");
+var import_node_fs3 = require("node:fs");
 var import_node_path41 = __toESM(require("node:path"), 1);
 var manufacturingPatterns = {
   gerber: ["**/*.gbr", "**/*.gbrjob"],
@@ -94336,7 +94363,7 @@ async function outputFromFiles(root, kind, files) {
 }
 async function hashFile(file2) {
   const hash2 = import_node_crypto5.default.createHash("sha256");
-  for await (const chunk of (0, import_node_fs2.createReadStream)(file2)) {
+  for await (const chunk of (0, import_node_fs3.createReadStream)(file2)) {
     hash2.update(chunk);
   }
   return hash2.digest("hex");
@@ -133648,7 +133675,7 @@ var Batch = class {
 };
 
 // node_modules/@azure/storage-blob/dist/esm/utils/utils.js
-var import_node_fs3 = __toESM(require("node:fs"), 1);
+var import_node_fs4 = __toESM(require("node:fs"), 1);
 var import_node_util3 = __toESM(require("node:util"), 1);
 async function streamToBuffer(stream4, buffer2, offset, end, encoding) {
   let pos = 0;
@@ -133687,7 +133714,7 @@ async function streamToBuffer(stream4, buffer2, offset, end, encoding) {
 }
 async function readStreamToLocalFile(rs, file2) {
   return new Promise((resolve2, reject) => {
-    const ws = import_node_fs3.default.createWriteStream(file2);
+    const ws = import_node_fs4.default.createWriteStream(file2);
     rs.on("error", (err) => {
       reject(err);
     });
@@ -133698,8 +133725,8 @@ async function readStreamToLocalFile(rs, file2) {
     rs.pipe(ws);
   });
 }
-var fsStat = import_node_util3.default.promisify(import_node_fs3.default.stat);
-var fsCreateReadStream = import_node_fs3.default.createReadStream;
+var fsStat = import_node_util3.default.promisify(import_node_fs4.default.stat);
+var fsCreateReadStream = import_node_fs4.default.createReadStream;
 
 // node_modules/@azure/storage-blob/dist/esm/Clients.js
 var BlobClient = class _BlobClient extends StorageClient2 {

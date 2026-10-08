@@ -305,6 +305,64 @@ describe("release/provenance", () => {
     }
   });
 
+  it.skipIf(process.platform === "win32")(
+    "accepts an in-root manifest through a canonicalized source-root alias",
+    async () => {
+      const root = await writeFixture({
+        "board.kicad_pcb": "(kicad_pcb)",
+        "top.gtl": "D10*X0Y0D03*M02*",
+      });
+      const content = "D10*X0Y0D03*M02*";
+      const manifest = await createExportProvenanceManifest({
+        root,
+        artifacts: [
+          {
+            path: "top.gtl",
+            sha256: createHash("sha256").update(content).digest("hex"),
+            bytes: Buffer.byteLength(content),
+          },
+        ],
+      });
+      await fs.writeFile(path.join(root, "manifest.json"), JSON.stringify(manifest));
+      const aliasDir = await fs.mkdtemp(path.join(os.tmpdir(), "brops-verified-root-alias-"));
+      try {
+        const alias = path.join(aliasDir, "root-alias");
+        await fs.symlink(root, alias, "dir");
+        const verified = await verifyExportProvenance(alias, "manifest.json");
+        expect(verified.status).toBe("verified");
+        expect(verified.reasons).toEqual([]);
+      } finally {
+        await fs.rm(aliasDir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("verifies a multi-megabyte artifact by streamed digest and exact length", async () => {
+    const root = await writeFixture({ "board.kicad_pcb": "(kicad_pcb)" });
+    const bytes = Buffer.alloc(2 * 1024 * 1024 + 17, 0x41);
+    await fs.writeFile(path.join(root, "large.gtl"), bytes);
+    const manifest = await createExportProvenanceManifest({
+      root,
+      artifacts: [
+        {
+          path: "large.gtl",
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+          bytes: bytes.length,
+        },
+      ],
+    });
+    const verified = await verifyExportProvenance(root, manifest);
+    expect(verified.status).toBe("verified");
+    const undersized = await verifyExportProvenance(root, {
+      ...manifest,
+      artifacts: [
+        { path: "large.gtl", sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length - 1 },
+      ],
+    });
+    expect(undersized.status).toBe("mismatch");
+    expect(undersized.artifactMismatches).toContain("large.gtl");
+  });
+
   it("rejects unsupported schema versions", async () => {
     const root = await writeFixture({});
     const manifest = { schemaVersion: 99, tool: { name: "boardreadyops" } } as unknown as ExportProvenanceManifest;

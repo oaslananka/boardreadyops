@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { boardReadyVersion } from "../generated/version.js";
@@ -126,6 +127,7 @@ function isArtifactRecord(value: unknown): value is ProvenanceArtifact {
 
 async function inspectArtifact(
   root: string,
+  realRoot: string,
   manifestDir: string,
   artifact: ProvenanceArtifact,
 ): Promise<{ kind: "valid" | "mismatch" | "missing"; reason?: string }> {
@@ -138,15 +140,21 @@ async function inspectArtifact(
   }
   try {
     const realPath = await fs.realpath(absPath);
-    if (!isInside(root, realPath) && !isInside(manifestDir, realPath)) {
+    if (!isInside(realRoot, realPath)) {
       return {
         kind: "mismatch",
         reason: `Artifact ${artifact.path} symlink escapes the project and manifest directories.`,
       };
     }
-    const content = await fs.readFile(realPath);
-    const actualHash = createHash("sha256").update(content).digest("hex");
-    if (actualHash !== artifact.sha256 || content.byteLength !== artifact.bytes) {
+    const hash = createHash("sha256");
+    let streamedBytes = 0;
+    for await (const chunk of createReadStream(realPath)) {
+      hash.update(chunk);
+      streamedBytes += chunk.byteLength;
+    }
+    const actualHash = hash.digest("hex");
+    const fileStat = await fs.stat(realPath);
+    if (actualHash !== artifact.sha256 || streamedBytes !== artifact.bytes || fileStat.size !== artifact.bytes) {
       return {
         kind: "mismatch",
         reason: `Artifact ${artifact.path} content modified after export (hash or byte-count mismatch).`,
@@ -156,6 +164,76 @@ async function inspectArtifact(
   } catch {
     return { kind: "missing", reason: `Artifact ${artifact.path} missing or unreadable.` };
   }
+}
+
+type LoadedManifest =
+  | { manifest: unknown; manifestDir: string; realRoot: string }
+  | { error: ProvenanceVerificationResult };
+
+async function loadManifest(root: string, manifestOrPath: ExportProvenanceManifest | string): Promise<LoadedManifest> {
+  let realRoot: string;
+  try {
+    realRoot = await fs.realpath(root);
+  } catch {
+    return { error: { status: "missing", reasons: ["Project root is missing or unreadable."] } };
+  }
+
+  if (typeof manifestOrPath !== "string") {
+    return { manifest: manifestOrPath, manifestDir: root, realRoot };
+  }
+  const absManifestPath = path.resolve(root, manifestOrPath);
+  if (!isInside(root, absManifestPath)) {
+    return {
+      error: {
+        status: "mismatch",
+        reasons: [`Path traversal rejected for manifest path: ${manifestOrPath}`],
+      },
+    };
+  }
+  try {
+    const realManifestPath = await fs.realpath(absManifestPath);
+    if (!isInside(realRoot, realManifestPath)) {
+      return {
+        error: {
+          status: "mismatch",
+          reasons: ["Provenance manifest symlink escapes the project root."],
+        },
+      };
+    }
+    const raw = await readTextFile(absManifestPath);
+    return { manifest: JSON.parse(raw), manifestDir: path.dirname(absManifestPath), realRoot };
+  } catch (error) {
+    return {
+      error: {
+        status: "missing",
+        reasons: [
+          `Provenance manifest unreadable or malformed: ${error instanceof Error ? error.message : String(error)}`,
+        ],
+      },
+    };
+  }
+}
+
+function validateManifestStructure(manifest: unknown): ProvenanceVerificationResult | undefined {
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return { status: "unsupported", reasons: ["Invalid provenance manifest object."] };
+  }
+  const record = manifest as ExportProvenanceManifest;
+  if (record.schemaVersion !== 1 || record.tool?.name !== "boardreadyops") {
+    return {
+      status: "unsupported",
+      reasons: [`Unsupported or invalid provenance manifest schema version ${record.schemaVersion}`],
+      manifest: record,
+    };
+  }
+  if (typeof record.sourceFingerprint !== "string" || !/^[0-9a-f]{64}$/i.test(record.sourceFingerprint)) {
+    return {
+      status: "mismatch",
+      reasons: ["Provenance manifest has no valid source SHA-256 fingerprint."],
+      manifest: record,
+    };
+  }
+  return undefined;
 }
 
 /**
@@ -168,59 +246,12 @@ export async function verifyExportProvenance(
   manifestOrPath: ExportProvenanceManifest | string,
   options: { currentGitSha?: string | undefined } = {},
 ): Promise<ProvenanceVerificationResult> {
-  let manifest: ExportProvenanceManifest;
-  let manifestDir = root;
-
-  if (typeof manifestOrPath === "string") {
-    const absManifestPath = path.resolve(root, manifestOrPath);
-    if (!isInside(root, absManifestPath)) {
-      return {
-        status: "mismatch",
-        reasons: [`Path traversal rejected for manifest path: ${manifestOrPath}`],
-      };
-    }
-    manifestDir = path.dirname(absManifestPath);
-    try {
-      const realManifestPath = await fs.realpath(absManifestPath);
-      if (!isInside(root, realManifestPath)) {
-        return {
-          status: "mismatch",
-          reasons: ["Provenance manifest symlink escapes the project root."],
-        };
-      }
-      const raw = await readTextFile(absManifestPath);
-      manifest = JSON.parse(raw) as ExportProvenanceManifest;
-    } catch (error) {
-      return {
-        status: "missing",
-        reasons: [
-          `Provenance manifest unreadable or malformed: ${error instanceof Error ? error.message : String(error)}`,
-        ],
-      };
-    }
-  } else {
-    manifest = manifestOrPath;
-  }
-
-  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
-    return { status: "unsupported", reasons: ["Invalid provenance manifest object."] };
-  }
-
-  if (manifest.schemaVersion !== 1 || manifest.tool?.name !== "boardreadyops") {
-    return {
-      status: "unsupported",
-      reasons: [`Unsupported or invalid provenance manifest schema version ${manifest.schemaVersion}`],
-      manifest,
-    };
-  }
-
-  if (typeof manifest.sourceFingerprint !== "string" || !/^[0-9a-f]{64}$/i.test(manifest.sourceFingerprint)) {
-    return {
-      status: "mismatch",
-      reasons: ["Provenance manifest has no valid source SHA-256 fingerprint."],
-      manifest,
-    };
-  }
+  const loaded = await loadManifest(root, manifestOrPath);
+  if ("error" in loaded) return loaded.error;
+  const invalid = validateManifestStructure(loaded.manifest);
+  if (invalid) return invalid;
+  const manifest = loaded.manifest as ExportProvenanceManifest;
+  const { manifestDir, realRoot } = loaded;
 
   const reasons: string[] = [];
   const currentFingerprint = await computeSourceFingerprint(root);
@@ -258,7 +289,7 @@ export async function verifyExportProvenance(
     }
     seenPaths.add(normalizedPath);
 
-    const outcome = await inspectArtifact(root, manifestDir, entry);
+    const outcome = await inspectArtifact(root, realRoot, manifestDir, entry);
     if (outcome.reason) reasons.push(outcome.reason);
     if (outcome.kind === "mismatch") artifactMismatches.push(entry.path);
     if (outcome.kind === "missing") missingArtifacts.push(entry.path);
