@@ -357,7 +357,10 @@ jobs:
           # amount of reusable BuildKit state after every successful build so a sequence of
           # dry-runs cannot refill a small host between disk preflights.
           printf 'cloud-deploy cache: capping BuildKit cache at %s\n' "${build_cache_max_used_space}"
-          trim_build_cache
+          if ! trim_build_cache; then
+            report_disk_summary
+            exit 78
+          fi
           printf 'cloud-deploy cache: %s MiB free after cache cap\n' "$(free_mib "${docker_root}")"
           # Report bounded aggregate usage after every rehearsal or real deployment,
           # not only when a preflight is already out of space. No other Docker
