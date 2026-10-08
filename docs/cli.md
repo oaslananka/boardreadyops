@@ -202,6 +202,8 @@ See [Vendor Profiles](vendor-profiles.md) for configuration examples.
 
 `boardreadyops generate [path]` runs `kicad-cli` to produce first-party manufacturing outputs and writes them, with a checksum manifest, to a predictable directory (`build/boardreadyops-generate` by default). Each enabled step exports one output kind: `gerbers` and `drill` from the board, `bom` and `schematic-pdf` from the schematic, and `positions` (CPL, CSV) and `board-pdf` from the board. Steps whose source file is missing are reported as skipped rather than failing the run.
 
+Generated output cleanup is fail-closed: the command never recursively replaces the project/source directory, Git metadata or a symlink output. A new or empty output directory is accepted; an existing nonempty directory must contain a recognizable BoardReadyOps generation manifest whose complete file inventory and file digests still match. Unmanaged or manually edited files are preserved; select a fresh `--output` directory instead of pointing the generator at a workspace or hand-edited fabrication package.
+
 ```bash
 boardreadyops generate .
 boardreadyops generate . --project hardware/mainboard --variant production

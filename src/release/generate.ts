@@ -9,6 +9,7 @@ import { resolveGitExecutable } from "../util/git-resolver.js";
 import { canonicalizeJson } from "../util/json.js";
 import { runProcess } from "../util/process.js";
 import { redactControlCharacters } from "../util/strings.js";
+import { assertSafeGenerateOutputCleanup } from "./output-cleanup.js";
 
 type GenerateOutputKind = "gerbers" | "drill" | "bom" | "positions" | "schematic-pdf" | "board-pdf";
 type GenerateSource = "pcb" | "sch";
@@ -321,6 +322,7 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
   const plan = buildGeneratePlan(recipe, available);
   const sourceFingerprintBefore = await sourceInputFingerprint(options);
 
+  await assertSafeGenerateOutputCleanup(outputDir, options);
   await fs.rm(outputDir, { recursive: true, force: true });
   await fs.mkdir(outputDir, { recursive: true });
 
