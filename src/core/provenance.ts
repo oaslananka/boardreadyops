@@ -2,11 +2,11 @@ import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { checkFirstPartyOutputSet } from "./generated-output-inventory.js";
 import { boardReadyVersion } from "../generated/version.js";
 import { readTextFile } from "../util/fs.js";
 import { globFiles } from "../util/glob.js";
 import { isInside, normalizeRelative, toPosixPath } from "../util/path.js";
+import { checkFirstPartyOutputSet } from "./generated-output-inventory.js";
 
 interface ProvenanceArtifact {
   path: string;
