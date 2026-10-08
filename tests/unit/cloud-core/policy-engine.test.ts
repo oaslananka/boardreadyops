@@ -201,6 +201,62 @@ describe("dryRunPolicyImpact", () => {
     expect(result.blockersIntroduced).toBe(2);
   });
 
+  it("does not mistake loosening a severity threshold for a tightened gate", () => {
+    const previous = policy({ scope: "organization", name: "current", severityGate: "medium" });
+    const loosened = policy({ scope: "organization", name: "next", severityGate: "error" });
+    const tightened = policy({ scope: "organization", name: "next", severityGate: "high" });
+    const input = { existingReviewsCount: 3, repositoriesCount: 2, previousPolicy: previous };
+    expect(dryRunPolicyImpact({ ...input, newPolicy: loosened }).blockersIntroduced).toBe(0);
+    expect(dryRunPolicyImpact({ ...input, newPolicy: tightened }).blockersIntroduced).toBe(0);
+    expect(
+      dryRunPolicyImpact({
+        ...input,
+        previousPolicy: loosened,
+        newPolicy: tightened,
+      }).blockersIntroduced,
+    ).toBe(1);
+  });
+
+  it("detects checklist substitutions even when counts stay equal", () => {
+    const previous = policy({
+      scope: "organization",
+      name: "current",
+      requiredChecklist: ["layout-reviewed", "fab-reviewed"],
+    });
+    const changed = policy({
+      scope: "organization",
+      name: "next",
+      requiredChecklist: ["layout-reviewed", "security-reviewed"],
+    });
+    const result = dryRunPolicyImpact({
+      existingReviewsCount: 7,
+      repositoriesCount: 2,
+      previousPolicy: previous,
+      newPolicy: changed,
+    });
+    expect(result.blockersIntroduced).toBe(1);
+    expect(result.warnings).toEqual(["New policy may block existing open reviews"]);
+  });
+
+  it("reports newly imposed reviewer roles, mandatory packs and external review", () => {
+    const previous = policy({ scope: "organization", name: "current", requiredRoles: ["hw"] });
+    const next = policy({
+      scope: "organization",
+      name: "next",
+      requiredRoles: ["hw", "safety"],
+      requireEvidencePack: true,
+      requireExternalReview: true,
+    });
+    const result = dryRunPolicyImpact({
+      existingReviewsCount: 4,
+      repositoriesCount: 1,
+      previousPolicy: previous,
+      newPolicy: next,
+    });
+    expect(result.blockersIntroduced).toBe(3);
+    expect(result.warnings).toEqual(["New policy may block existing open reviews"]);
+  });
+
   it("treats a first-ever policy (no previous policy) as introducing a fresh checklist blocker", () => {
     const newPolicy = policy({ scope: "organization", name: "first", requiredChecklist: ["a"] });
 

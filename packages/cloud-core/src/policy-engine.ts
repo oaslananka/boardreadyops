@@ -116,11 +116,26 @@ export function dryRunPolicyImpact(input: {
   newPolicy: ReviewPolicy;
   previousPolicy: ReviewPolicy | null;
 }): PolicyDryRunResult {
+  // error < high < medium: a lower threshold blocks more findings.
+  // A change from medium to error *loosens* the gate, not tightens it.
+  const severityRank = { error: 0, high: 1, medium: 2 } as const;
+  const previousGate = input.previousPolicy?.severityGate;
+  const nextGate = input.newPolicy.severityGate;
   const severityTightened =
-    input.previousPolicy?.severityGate !== input.newPolicy.severityGate && Boolean(input.newPolicy.severityGate);
-  const checklistAdded =
-    input.newPolicy.requiredChecklist.length > (input.previousPolicy?.requiredChecklist.length ?? 0);
-  const blockers = (severityTightened ? 1 : 0) + (checklistAdded ? 1 : 0);
+    nextGate !== undefined && (previousGate === undefined || severityRank[nextGate] > severityRank[previousGate]);
+  const existingChecklist = new Set(input.previousPolicy?.requiredChecklist ?? []);
+  const existingRoles = new Set(input.previousPolicy?.requiredRoles ?? []);
+  const checklistAdded = input.newPolicy.requiredChecklist.some((item) => !existingChecklist.has(item));
+  const roleAdded = input.newPolicy.requiredRoles.some((role) => !existingRoles.has(role));
+  const evidencePackIntroduced = input.newPolicy.requireEvidencePack && !input.previousPolicy?.requireEvidencePack;
+  const externalReviewIntroduced =
+    input.newPolicy.requireExternalReview && !input.previousPolicy?.requireExternalReview;
+  const blockers =
+    Number(severityTightened) +
+    Number(checklistAdded) +
+    Number(roleAdded) +
+    Number(evidencePackIntroduced) +
+    Number(externalReviewIntroduced);
   return {
     affectedRepositories: input.repositoriesCount,
     affectedReviews: input.existingReviewsCount,
