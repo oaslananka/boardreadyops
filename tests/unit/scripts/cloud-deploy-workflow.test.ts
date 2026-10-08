@@ -105,17 +105,20 @@ describe("cloud-deploy topology preflight", () => {
     const requiredMib = "$" + "{required_mib}";
     const retireOptIn = "$" + "{retire_superseded_images}";
     const shellImage = "$" + "{image}";
-    const bashPid = "$" + "{BASHPID}";
 
     expect(workflow).toContain("retire_superseded_images:");
     expect(workflow).toContain("default: false");
     expect(workflow).toContain('retire_superseded_images="$2"');
     expect(workflow).toContain(`if [ "${retireOptIn}" = "1" ]; then`);
-    expect(workflow).toContain("docker compose -p boardreadyops-cloud images");
+    expect(workflow).not.toContain("docker compose -p boardreadyops-cloud images");
+    expect(workflow).toContain("cannot verify both running runtime images; nothing retired");
+    expect(workflow).toContain("container_for_service");
+    expect(workflow).toContain("{{.Config.Image}}");
+    expect(workflow).toContain("grep -vxF -f <(printf");
+    expect(workflow).not.toContain("|| : >");
     expect(workflow).toContain("grep -vxF");
     expect(workflow).toContain("tail -n +$((retain + 1))");
     expect(workflow).toContain(`docker image rm "${shellImage}"`);
-    expect(workflow).toContain(`/tmp/boardreadyops-running-images.${bashPid}`);
     expect(workflow).not.toContain("docker system prune");
     expect(workflow).not.toContain("docker volume prune");
 
