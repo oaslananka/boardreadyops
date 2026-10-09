@@ -29,7 +29,7 @@ BoardReadyOps checks KiCad projects, can generate manufacturing artifacts, and p
 
 - **Does NOT replace KiCad DRC/ERC**: Uses native `kicad-cli` DRC/ERC checks alongside BOM lifecycle, footprint consistency, pinmap contracts, and vendor preflights.
 - **Does NOT have to replace KiBot**: Works standalone or alongside KiBot/artifact automation tools, adding governance, PR hardware diff, optionally signed evidence manifests, and handoff packages.
-- **Local-first source handling**: CLI and target-repository GitHub Actions runs process KiCad source in your own environment. Hosted features can retain run metadata, normalized findings, and links; review the documented data-handling and execution boundaries before enabling them.
+- **Local-first source handling**: CLI commands and target-repository GitHub Actions workflows process KiCad source in your own environment. Hosted features can retain run metadata, normalized findings, and links; review the documented data-handling and execution boundaries before enabling them.
 
 ```
 Generate → Validate → Decide → Package → Optional Attestation → Review → Handoff
