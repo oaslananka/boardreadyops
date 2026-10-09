@@ -1,5 +1,5 @@
-import { pathToFileURL } from "node:url";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 export function validateRequiredCiRoute({ check, classifierResult, needsWork, buildResult }) {
   if (classifierResult !== "success") {
@@ -26,7 +26,9 @@ function main() {
     buildResult: check === "ci / verify-dist" ? process.env.BUILD_RESULT : undefined,
   });
   if (verdict === "not-applicable") {
-    process.stdout.write(`::notice::${check}: heavy validation not applicable to this changed-file risk profile; required routing executed successfully.\n`);
+    process.stdout.write(
+      `::notice::${check}: heavy validation not applicable to this changed-file risk profile; required routing executed successfully.\n`,
+    );
   } else {
     process.stdout.write(`${check}: executing required validation for this change.\n`);
   }
