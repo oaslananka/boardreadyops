@@ -427,12 +427,29 @@ async function readResultRequest(request: Request, dependencies: ResultRouteDepe
     };
   }
 
+  const declaredSize = request.headers.get("content-length");
+  if (declaredSize !== null && Number.isFinite(Number(declaredSize)) && Number(declaredSize) > maximumResultBodyBytes) {
+    return {
+      response: Response.json(
+        { ok: false, error: "runner result payload is too large" },
+        {
+          status: 413,
+          headers: { "cache-control": "private, no-store" },
+        },
+      ),
+    };
+  }
   let bodyText: string;
   try {
     bodyText = (await readBoundedRequestBody(request, maximumResultBodyBytes)).toString("utf8");
   } catch (error) {
     if (!(error instanceof RequestBodyTooLargeError)) throw error;
-    return { response: Response.json({ ok: false, error: "runner result payload is too large" }, { status: 413 }) };
+    return {
+      response: Response.json(
+        { ok: false, error: "runner result payload is too large" },
+        { status: 413, headers: { "cache-control": "private, no-store" } },
+      ),
+    };
   }
   const configuredKey = configuredSecretValue({ valueName: resultKeyEnvName, fileName: resultKeyFileEnvName });
   const authenticated =

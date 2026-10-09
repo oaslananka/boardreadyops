@@ -16,6 +16,8 @@ import { resolveCloudPersistenceConfiguration } from "../../../../../lib/cloud-r
 
 export const runtime = "nodejs";
 
+const maximumStripeWebhookBytes = 1024 * 1024;
+
 type StripeWebhookEvent = { id: string; type: string; created?: number; data?: { object?: unknown } };
 
 async function projectCheckoutSessionCompleted(
@@ -140,9 +142,23 @@ async function projectEntitlement(store: BillingStore, event: StripeWebhookEvent
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const signatureHeader = request.headers.get("stripe-signature");
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    return Response.json(
+      { ok: false, error: "Webhook secret not configured" },
+      { status: 503, headers: { "cache-control": "private, no-store" } },
+    );
+  }
+  if (!signatureHeader) {
+    return Response.json(
+      { ok: false, error: "Invalid signature" },
+      { status: 400, headers: { "cache-control": "private, no-store" } },
+    );
+  }
   let rawBody: string;
   try {
-    rawBody = (await readBoundedRequestBody(request, 1024 * 1024)).toString("utf8");
+    rawBody = (await readBoundedRequestBody(request, maximumStripeWebhookBytes)).toString("utf8");
   } catch (error) {
     if (!(error instanceof RequestBodyTooLargeError)) throw error;
     return Response.json(
@@ -151,15 +167,6 @@ export async function POST(request: Request): Promise<Response> {
         status: 413,
         headers: { "cache-control": "private, no-store" },
       },
-    );
-  }
-  const signatureHeader = request.headers.get("stripe-signature");
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    // Without secret, we cannot verify; return 503 so Stripe retries, but still acknowledge unknown events as 2xx per spec
-    return Response.json(
-      { ok: false, error: "Webhook secret not configured" },
-      { status: 503, headers: { "cache-control": "private, no-store" } },
     );
   }
   const verified = verifyStripeWebhook({
