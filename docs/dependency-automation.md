@@ -2,21 +2,21 @@
 
 BoardReadyOps uses Renovate as the single source of truth for routine version-update pull requests.
 
-## Execution
+## Execution and canonical owner
 
-- `.github/workflows/renovate.yml` validates `renovate.json` on pull requests and changes to `main`. Validation runs the official Renovate image by immutable tagged digest, with the repository mounted read-only and container networking disabled, so validation cannot drift through dynamically resolved `pnpm dlx` transitives.
-- The workflow `renovate-version` input is the self-hosted runtime version source of truth. A `custom.regex` manager tracks the validator image tag and digest, and both self-hosted Renovate dependencies are grouped into a `manual-review` exception PR instead of entering the automatic path.
-- The pinned Renovate runner executes at 06:17 Europe/Istanbul on weekdays and can also be started manually.
-- The runner is explicitly scoped to `oaslananka/boardreadyops`; repository autodiscovery and onboarding are disabled.
-- The workflow uses the `GH_AUTH_TOKEN` repository secret. That credential must belong to a dedicated automation identity with the minimum repository permissions required to create branches, pull requests, labels, and issues.
-- Post-upgrade command execution is restricted through `RENOVATE_ALLOWED_COMMANDS` to the exact `corepack pnpm run renovate:post-upgrade` entry point. That repository-controlled script creates an isolated temporary pnpm store for the dependency install, native rebuild, `NOTICE` refresh, and committed `dist/` rebuild, then removes the store. This prevents shared-runner pnpm store metadata from breaking `pnpm licenses list` while keeping Renovate unable to execute arbitrary post-upgrade commands.
-- Renovate itself never runs on a pull-request event, so untrusted pull-request code cannot obtain the automation token.
+- **Mend-hosted Renovate GitHub App is the only dependency updater** for BoardReadyOps, matching the owner's other repositories. Its [Dependency Dashboard #978](https://github.com/oaslananka/boardreadyops/issues/978) is canonical. The former self-hosted dashboard [#196](https://github.com/oaslananka/boardreadyops/issues/196) is historical and may be closed **after this cutover is merged** and no older self-hosted workflow runs remain active.
+- `.github/workflows/renovate.yml` now only validates `renovate.json` when relevant configuration changes; it has **no schedule, manual update dispatch, privileged runner or GH_AUTH_TOKEN access**. The pinned local validator image remains a reproducible, read-only config check.
+- Mend's hosted Community plan cannot execute arbitrary repository `postUpgradeTasks`. `renovate.json` therefore does not request unsupported command execution. A two-job repository-owned `renovate-generated` workflow regenerates committed `NOTICE` and `dist` on Mend PRs without giving write credentials to the dependency build.
+- The **first** workflow runs on PRs authored by `renovate[bot]` from a same-repo `renovate/` branch, using a read-only `GITHUB_TOKEN`, checkout without persisted credentials, a frozen install with scripts ignored, and the existing tested generation entry point. It publishes a one-day artifact containing only `NOTICE`, both CLI/Action bundles and a SHA-256 manifest bound to the PR head.
+- The **second job** checks out the trusted base-branch generation verifier and runs no PR-controlled code: it checks a live open PR's bot identity, repository, `main` base, exact head SHA, and artifact hashes before copying **only three allowlisted output files**. A separate last step uses the preexisting `GH_AUTH_TOKEN` to push back to the original Renovate branch with an optimistic SHA lease. Using this existing credential for a branch update triggers the standard PR checks; no token enters the generation job. If the token is missing, access changes, or the branch advances, the step fails closed. Restrict its account permissions to BoardReadyOps branch/PR writes and rotate if compromised.
+- Branch policy and Mergify still require required checks, resolved reviews, and an intentional maintainer enqueue. Failed generation or provenance validation must **not** be masked by CI skip/continue-on-error or by weakening `verify:dist`/NOTICE correctness checks.
+- **Acceptance:** review that the Mend App retains access to BoardReadyOps, no self-hosted writer runs remain scheduled, and the old dashboard no longer updates. Prove at least one non-major hosted Renovate PR is updated by `renovate-generated-apply`, passes the regenerated artifact / notice checks on its *new head SHA*, and can be queued under existing protection. Do not auto-approve major updates or launch bulk dashboard PRs to manufacture a test.
 
 ## Policy layers
 
 `renovate.json` is self-contained. It directly carries the conservative baseline that BoardReadyOps previously inherited from `github>oaslananka/.github:renovate-config`: the Europe/Istanbul timezone, seven-day routine release quarantine, strict internal age filtering, two new PRs per hour, five concurrent PRs, digest pinning, weekly lockfile maintenance, semantic commits, Dependency Dashboard, and explicit approval for major upgrades.
 
-This local fallback became authoritative after the scheduled run on October 2, 2026 failed to resolve the shared preset. Keeping the baseline in the repository prevents dependency maintenance from depending on a second repository or on broader token scope. BoardReadyOps-specific schedule, managed package managers, generated `NOTICE`/`dist/` refresh, protected package groups, vulnerability-PR policy, and merge routing remain local as before. Generated output, dependency trees, and test fixtures remain excluded from discovery.
+This repository-local baseline replaced an unavailable shared preset after the October 2, 2026 validation failure. It remains authoritative for Mend-hosted package policy without requiring cross-repository token access. The schedule, package managers, protected groups, vulnerability-PR policy and merge routing remain local. Generated files are refreshed by the isolated, repository-owned GitHub Actions flow described above. Generated output, dependency trees, and test fixtures remain excluded from discovery.
 
 ## Automatic path
 
@@ -32,12 +32,14 @@ GitHub Actions and container references remain digest-pinned. Security vulnerabi
 
 ## Pull-request creation
 
-Routine minimum-age waiting is enforced by Renovate's strict internal checks before branch creation. BoardReadyOps CI begins on `pull_request`, not on bare Renovate branches, so the repository does not use `prCreation: not-pending`; otherwise a dependency branch can wait for checks that cannot start until the pull request exists.
+Routine minimum-age waiting is enforced by Renovate's strict internal checks before branch creation. BoardReadyOps CI and generated-file build begin on `pull_request`, not on bare Renovate branches; `prCreation: not-pending` could deadlock before those checks exist, so it remains disabled.
 
 ## Files
 
 - `renovate.json` controls project-specific Renovate behavior.
-- `.github/workflows/renovate.yml` validates and runs the pinned self-hosted Renovate release.
+- `.github/workflows/renovate.yml` validates the policy only; Mend hosts the sole dependency updater.
+- `.github/workflows/renovate-generated.yml` generates allowlisted artifacts without write permissions.
+- `scripts/renovate-generated-artifacts.mjs` is the fail-closed artifact and PR authorization contract.
 - `.mergify.yml` provides pull-request classification plus a manual-only `main` merge queue; the GitHub `main` ruleset remains the merge authority.
 - `tests/unit/scripts/security-automation-config.test.ts` prevents accidental weakening of the automation contract.
 - Version-update PR configuration must not be duplicated in another dependency updater.
@@ -65,5 +67,5 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 4. Confirm `manual-review` is present on protected updates and absent from an eligible low-risk update.
 5. Confirm the PR receives the repository's required Ruleset checks and that review conversations are resolved.
 6. After the PR is intentionally approved for merge, enqueue it with `@mergifyio queue main` (or the Mergify queue control). Do not enable Mergify auto-merge/auto-queue; an open green PR should remain open until a maintainer explicitly queues it.
-7. Run the Renovate workflow manually after first installation or credential rotation and confirm the Dependency Dashboard can be updated.
-8. Rotate `GH_AUTH_TOKEN` immediately if its owner or permissions change unexpectedly.
+7. Confirm Mend-hosted Renovate updates canonical dashboard #978; the repository workflow is validation-only and must never run a second Renovate writer.
+8. Rotate `GH_AUTH_TOKEN` immediately if its owner or permissions change unexpectedly and verify restricted regenerated-file branch updates still work.

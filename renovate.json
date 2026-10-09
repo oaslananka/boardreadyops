@@ -25,11 +25,6 @@
   "rangeStrategy": "replace",
   "rebaseWhen": "conflicted",
   "postUpdateOptions": ["pnpmDedupe"],
-  "postUpgradeTasks": {
-    "commands": ["corepack pnpm run renovate:post-upgrade"],
-    "fileFilters": ["NOTICE", "dist/**"],
-    "executionMode": "branch"
-  },
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["before 6am on monday"],
