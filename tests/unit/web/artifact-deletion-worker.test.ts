@@ -36,6 +36,7 @@ const job: ClaimedArtifactDeletion = {
 
 function store(): ArtifactDeletionStore {
   return {
+    authorizeOrDeferDeletion: vi.fn(async () => "authorized" as const),
     claimDeletions: vi.fn(),
     completeDeletion: vi.fn(async () => "completed" as const),
     failDeletion: vi.fn(async () => "retry" as const),
@@ -56,6 +57,37 @@ afterEach(async () => {
 });
 
 describe("artifact deletion worker", () => {
+  it("does not delete a claimed object when a legal hold arrived after enqueue", async () => {
+    const deletionStore = store();
+    vi.mocked(deletionStore.authorizeOrDeferDeletion).mockResolvedValue("held");
+    const deleteLocalObject = vi.fn(async () => "deleted" as const);
+    await expect(
+      processArtifactDeletion(job, {
+        workerId: "worker-1",
+        storageRoot: "/data",
+        store: deletionStore,
+        deleteLocalObject,
+      }),
+    ).resolves.toMatchObject({ status: "held" });
+    expect(deleteLocalObject).not.toHaveBeenCalled();
+    expect(deletionStore.completeDeletion).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete an object after its worker lease is lost", async () => {
+    const deletionStore = store();
+    vi.mocked(deletionStore.authorizeOrDeferDeletion).mockResolvedValue("stale");
+    const deleteLocalObject = vi.fn(async () => "deleted" as const);
+    await expect(
+      processArtifactDeletion(job, {
+        workerId: "worker-1",
+        storageRoot: "/data",
+        store: deletionStore,
+        deleteLocalObject,
+      }),
+    ).resolves.toMatchObject({ status: "stale" });
+    expect(deleteLocalObject).not.toHaveBeenCalled();
+  });
+
   it("deletes a regular object inside the configured root", async () => {
     const root = await storageRoot();
     await mkdir(path.join(root, "run-1"));

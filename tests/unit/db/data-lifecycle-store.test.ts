@@ -2,6 +2,25 @@ import { describe, expect, it, vi } from "vitest";
 import { DataLifecycleStore } from "../../../packages/db/src/data-lifecycle-store.js";
 
 describe("data lifecycle administration", () => {
+  it("resumes blocked erasure only when the last matching legal hold is released", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ released: true, resumed_count: 1 }] });
+    const store = new DataLifecycleStore({ query });
+    await expect(store.releaseLegalHold("tenant-a", "hold-a", "octocat")).resolves.toBe(true);
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain("status='blocked_by_hold'");
+    expect(sql).toContain("legal_holds.id <> $1");
+    expect(sql).toContain("EXISTS (SELECT 1 FROM released)");
+    expect(sql).toContain("CASE WHEN dry_run THEN 'preview' ELSE 'pending' END");
+    expect(query.mock.calls[0]?.[1]).toEqual(["hold-a", "tenant-a", "octocat"]);
+  });
+
+  it("does not resume erasure when no legal hold was released", async () => {
+    const store = new DataLifecycleStore({
+      query: vi.fn().mockResolvedValue({ rows: [{ released: false, resumed_count: 0 }] }),
+    });
+    await expect(store.releaseLegalHold("tenant-a", "missing", "octocat")).resolves.toBe(false);
+  });
+
   it("upserts a bounded tenant retention policy and returns the persisted row", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [

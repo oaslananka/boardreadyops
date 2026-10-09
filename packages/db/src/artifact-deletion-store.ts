@@ -20,6 +20,11 @@ export type ArtifactDeletionMetrics = {
 };
 
 export type ArtifactDeletionStore = {
+  /** Fail closed on a new legal hold after the deletion job was queued or claimed. */
+  authorizeOrDeferDeletion(input: {
+    deletionJobId: string;
+    workerId: string;
+  }): Promise<"authorized" | "held" | "stale">;
   claimDeletions(input: { workerId: string; limit?: number }): Promise<ClaimedArtifactDeletion[]>;
   completeDeletion(input: {
     deletionJobId: string;
@@ -126,6 +131,43 @@ export function createSqlArtifactDeletionStore(
   const retryBaseSeconds = positiveInteger(options.retryBaseSeconds, 15, "retryBaseSeconds");
 
   return {
+    async authorizeOrDeferDeletion(input) {
+      if (!workerIdPattern.test(input.workerId)) throw new Error("invalid artifact deletion worker id");
+      const result = await executor.query(
+        `with claimed as materialized (
+           select artifact_deletion_jobs.id, installations.account_login
+             from artifact_deletion_jobs
+             join installations on installations.id = artifact_deletion_jobs.installation_id
+            where artifact_deletion_jobs.id = $1
+              and artifact_deletion_jobs.status = 'leased'
+              and artifact_deletion_jobs.lease_owner = $2
+              and artifact_deletion_jobs.lease_expires_at > $3::timestamptz
+            for update of artifact_deletion_jobs
+         ), matching_hold as materialized (
+           select 1 from legal_holds
+           join claimed on lower(legal_holds.tenant_id) = lower(claimed.account_login)
+           where legal_holds.active = true
+           limit 1
+         ), deferred as (
+           update artifact_deletion_jobs
+              set status = 'available', available_at = $3::timestamptz + interval '30 minutes',
+                  lease_owner = null, lease_expires_at = null,
+                  attempt_count = greatest(0, attempt_count - 1),
+                  last_error_class = 'legal_hold', last_error_message = 'Deletion deferred by active legal hold.'
+            where id in (select id from claimed) and exists (select 1 from matching_hold)
+            returning id
+         )
+         select case
+           when exists (select 1 from deferred) then 'held'
+           when exists (select 1 from claimed) and not exists (select 1 from matching_hold) then 'authorized'
+           else 'stale'
+         end as outcome`,
+        [input.deletionJobId, input.workerId, now().toISOString()],
+      );
+      const outcome = text(rows(result)[0], "outcome");
+      if (outcome === "authorized" || outcome === "held") return outcome;
+      return "stale";
+    },
     async claimDeletions(input) {
       if (!workerIdPattern.test(input.workerId)) throw new Error("invalid artifact deletion worker id");
       const claimedAt = now();

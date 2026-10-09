@@ -137,7 +137,7 @@ export type ArtifactDeletionWorkerDependencies = {
 export type ArtifactDeletionWorkerResult = {
   deletionJobId: string;
   artifactId: string;
-  status: "completed" | "dead_letter" | "retry" | "stale";
+  status: "completed" | "dead_letter" | "retry" | "stale" | "held";
   outcome?: ArtifactObjectDeletionOutcome;
 };
 
@@ -146,6 +146,13 @@ export async function processArtifactDeletion(
   dependencies: ArtifactDeletionWorkerDependencies,
 ): Promise<ArtifactDeletionWorkerResult> {
   const base = { deletionJobId: job.deletionJobId, artifactId: job.artifactId };
+  // Retention eligibility was checked at enqueue, but a legal hold can arrive later.
+  // A stale lease or new hold must never progress to a filesystem delete.
+  const authorization = await dependencies.store.authorizeOrDeferDeletion({
+    deletionJobId: job.deletionJobId,
+    workerId: dependencies.workerId,
+  });
+  if (authorization !== "authorized") return { ...base, status: authorization };
   if (job.storageDriver !== "local") {
     const status = await dependencies.store.failDeletion({
       deletionJobId: job.deletionJobId,

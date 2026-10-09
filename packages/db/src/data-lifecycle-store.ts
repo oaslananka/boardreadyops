@@ -469,10 +469,33 @@ export class DataLifecycleStore {
 
   async releaseLegalHold(tenantId: string, holdId: string, releasedBy: string): Promise<boolean> {
     const r = (await this.db.query(
-      `UPDATE legal_holds SET active=FALSE, released_at=NOW(), released_by=$3 WHERE id=$1 AND tenant_id=$2 AND active=TRUE`,
+      `WITH released AS (
+         UPDATE legal_holds SET active=FALSE, released_at=NOW(), released_by=$3
+          WHERE id=$1 AND tenant_id=$2 AND active=TRUE
+          RETURNING tenant_id
+       ), resumed AS (
+         UPDATE erasure_requests
+            SET status = CASE WHEN dry_run THEN 'preview' ELSE 'pending' END
+          WHERE tenant_id=$2
+            AND status='blocked_by_hold'
+            AND EXISTS (SELECT 1 FROM released)
+            AND NOT EXISTS (
+              SELECT 1 FROM legal_holds
+               WHERE legal_holds.tenant_id=erasure_requests.tenant_id
+                 AND legal_holds.active=TRUE AND legal_holds.id <> $1
+                 AND (
+                   legal_holds.scope='organization'
+                   OR (legal_holds.scope=erasure_requests.scope
+                       AND (legal_holds.scope_id=erasure_requests.scope_id OR legal_holds.scope_id IS NULL))
+                 )
+            )
+          RETURNING id
+       )
+       SELECT EXISTS (SELECT 1 FROM released) AS released,
+              (SELECT count(*) FROM resumed)::integer AS resumed_count`,
       [holdId, tenantId, releasedBy],
-    )) as { rowCount?: number };
-    return (r.rowCount ?? 0) > 0;
+    )) as { rows?: Array<{ released: boolean }> };
+    return r.rows?.[0]?.released === true;
   }
 
   async hasActiveHold(tenantId: string, scope: string, scopeId?: string | null): Promise<boolean> {
