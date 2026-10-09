@@ -1,4 +1,4 @@
-# Fresh GitHub App install-to-first-useful-finding validation
+# Time to First Useful Finding (TTFUF): Fresh-install validation protocol
 
 Issue: [#446](https://github.com/oaslananka/boardreadyops/issues/446)
 
@@ -30,7 +30,7 @@ Record the repository's public-safe identifier, UTC start timestamp, source comm
 | Privacy and safety | No repository source/board contents in hosted telemetry; callback is OIDC-bound, source stays in target Actions |
 | Failure classification | Explicit status for missing workflow, Actions disabled, mismatched permissions, setup error, or empty/pass-only result |
 
-Initial acceptance target in [#446](https://github.com/oaslananka/boardreadyops/issues/446): **under 10 minutes**, with a later optimization goal **under 5 minutes**. The stricter metric in [product metrics](../gtm/product-metrics-and-telemetry.md) is a future exit gate, not current measured performance. Preserve actual failed attempts; do not report only the fastest successful run.
+The phased TTFUF targets are **under 10 minutes for initial #446 acceptance** and **under 5 minutes for the subsequent optimization/exit gate**. Neither threshold has been validated on fresh installations. The stricter metric in [product metrics](../gtm/product-metrics-and-telemetry.md) is a future exit gate, not current measured performance. Preserve actual failed attempts; do not report only the fastest successful run.
 
 ## Completion boundary
 
