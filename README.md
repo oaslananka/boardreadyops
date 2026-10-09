@@ -4,7 +4,7 @@
 
 **The trust layer between KiCad commits and manufacturing release.**
 
-Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains what changed in every PR, why it matters for fabrication, and binds every release to auditable, cryptographically verifiable evidence.
+Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains what changed in every PR, why it matters for fabrication, and packages auditable release evidence. Manifests can be signed and verified when a signing key is configured.
 
 [![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
 [![Security](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml)
@@ -25,14 +25,14 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 
 </div>
 
-BoardReadyOps turns a KiCad project into a verified, signed, manufacturer-ready release package. It generates manufacturing artifacts, validates release readiness, packages evidence, and produces a clear release decision — running locally as a CLI and in CI as a GitHub Action, with JSON, SARIF, Markdown, HTML, JUnit, and workflow annotation output.
+BoardReadyOps checks KiCad projects, can generate manufacturing artifacts, and packages findings and checksums into a release evidence bundle. Signing is optional; checksums and self-reported source fingerprints do not independently prove that the exported Gerber/Excellon files came from the reviewed commit. See the [source-to-export provenance contract](docs/release/source-export-provenance-contract.md) and [issue #771](https://github.com/oaslananka/boardreadyops/issues/771). The CLI and GitHub Action support JSON, SARIF, Markdown, HTML, JUnit, and workflow annotation output.
 
 - **Does NOT replace KiCad DRC/ERC**: Uses native `kicad-cli` DRC/ERC checks alongside BOM lifecycle, footprint consistency, pinmap contracts, and vendor preflights.
-- **Does NOT have to replace KiBot**: Works standalone or alongside KiBot/artifact automation tools, adding governance, PR hardware diff, signed evidence manifests, and handoff packages.
-- **100% Local-First & Zero-Trust**: Designs and IP stay in your private workspace or GitHub runner. No schematics or source files are sent to external cloud servers.
+- **Does NOT have to replace KiBot**: Works standalone or alongside KiBot/artifact automation tools, adding governance, PR hardware diff, optionally signed evidence manifests, and handoff packages.
+- **Local-first source handling**: CLI commands and target-repository GitHub Actions workflows process KiCad source in your own environment. Hosted features can retain run metadata, normalized findings, and links; review the documented data-handling and execution boundaries before enabling them.
 
 ```
-Generate → Validate → Decide → Package → Attest → Review → Handoff
+Generate → Validate → Decide → Package → Optional Attestation → Review → Handoff
 ```
 
 ## Installation
