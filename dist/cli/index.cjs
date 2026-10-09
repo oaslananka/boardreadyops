@@ -47695,12 +47695,23 @@ var SOURCE_PATTERNS = [
   "**/*.kicad_dru",
   "**/*.kicad_wks"
 ];
+async function readSourceFileNoFollow(absolutePath) {
+  const flags = import_node_fs2.constants.O_RDONLY | (process.platform === "win32" ? 0 : import_node_fs2.constants.O_NOFOLLOW);
+  const handle = await import_promises14.default.open(absolutePath, flags);
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error("KiCad source input is not a regular file.");
+    return await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+}
 async function sourceFingerprintDetail(root, customPatterns = SOURCE_PATTERNS) {
   const files = await globFiles(root, customPatterns, { rejectMatchingSymlinks: true });
   const hasher = (0, import_node_crypto4.createHash)("sha256");
   for (const absolutePath of files) {
     const relPath = normalizeRelative(root, absolutePath);
-    const content = await import_promises14.default.readFile(absolutePath);
+    const content = await readSourceFileNoFollow(absolutePath);
     hasher.update(`${relPath}\0`, "utf8");
     hasher.update(content);
     hasher.update("\0", "utf8");
