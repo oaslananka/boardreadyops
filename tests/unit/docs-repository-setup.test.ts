@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { declaredPermissionRecord } from "../../packages/cloud-core/src/github-capabilities.js";
 
 const docs = [
   new URL("../../docs/deployment/github-actions-execution.md", import.meta.url),
@@ -9,6 +10,21 @@ const docs = [
 ];
 
 describe("repository setup documentation", () => {
+  it("matches the authoritative scoped setup-PR permission model (#446)", async () => {
+    const record = declaredPermissionRecord();
+    expect(record.contents).toBe("write");
+    expect(record.workflows).toBe("write");
+    expect(record.pull_requests).toBe("write");
+
+    const content = await readFile(new URL("../../docs/product/zero-config-onboarding.md", import.meta.url), "utf8");
+    expect(content).toContain("`contents: write` and `workflows: write`");
+    expect(content).toContain("the App never writes to the default branch");
+    expect(content).toContain("copy-ready manual instructions");
+    expect(content).toContain("first actionable finding");
+    expect(content).toContain("under 10 minutes");
+    expect(content).not.toContain("least-privilege alternative to granting the GitHub App Contents write");
+    expect(content).not.toContain("Do not grant the App Contents write");
+  });
   it("distinguishes immediate permission reduction from approval-gated expansion", async () => {
     const content = await readFile(new URL("../../docs/security/github-app-permissions.md", import.meta.url), "utf8");
     const normalized = content.replace(/\s+/g, " ").toLowerCase();
