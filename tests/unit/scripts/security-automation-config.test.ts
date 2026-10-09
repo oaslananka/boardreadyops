@@ -396,6 +396,7 @@ describe("dependency and security automation configuration", () => {
       "hono",
       "ip-address",
       "js-yaml",
+      "json-with-bigint",
       "linkify-it",
       "markdown-it",
       "mysql2",

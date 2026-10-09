@@ -24,6 +24,27 @@ describe("dependency security overrides", () => {
     expect(lockfile).not.toContain("esbuild@0.27.7");
   });
 
+  it("keeps the Action JSON BigInt parser on the bounded-regex security fix", async () => {
+    const workspace = yaml.load(await readFile("pnpm-workspace.yaml", "utf8")) as WorkspacePolicy;
+    const lockfile = await readFile("pnpm-lock.yaml", "utf8");
+    const actionBundle = await readFile("dist/action/index.cjs", "utf8");
+
+    const resolved = workspace.overrides?.["json-with-bigint"];
+    expect(resolved).toMatch(/^\d+\.\d+\.\d+$/u);
+    const version = (resolved ?? "0.0.0").split(".").map(Number);
+    const major = version[0] ?? 0;
+    const minor = version[1] ?? 0;
+    const patch = version[2] ?? 0;
+    expect(major > 3 || (major === 3 && (minor > 5 || (minor === 5 && patch >= 12)))).toBe(true);
+    expect(lockfile).toContain(`json-with-bigint@${resolved}:`);
+    expect(lockfile).not.toContain("json-with-bigint@3.5.8");
+    // The library's 3.5.12 bounded quoted-string alternative replaces the
+    // older exponential-backtracking pattern in the committed Action bundle.
+    expect(actionBundle).toContain("var serializeBigInts = (text) => {");
+    expect(actionBundle).toContain("var stringsOrLargeNumbers =");
+    expect(actionBundle).not.toContain('(?:\\\\.|[^"])*');
+  });
+
   it("keeps full OSV scans on patched dependency security floors", async () => {
     const workspace = yaml.load(await readFile("pnpm-workspace.yaml", "utf8")) as WorkspacePolicy;
     const lockfile = await readFile("pnpm-lock.yaml", "utf8");

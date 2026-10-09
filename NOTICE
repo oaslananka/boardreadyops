@@ -1891,7 +1891,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `json-schema-traverse@1.0.0`
   - Description: Traverse JSON Schema passing each schema object to callback
   - Homepage: https://github.com/epoberezkin/json-schema-traverse#readme
-- `json-with-bigint@3.5.8`
+- `json-with-bigint@3.5.12`
   - Description: JS library that allows you to easily serialize and deserialize data with BigInt values
   - Homepage: https://github.com/Ivan-Korolenko/json-with-bigint#readme
 - `json5@2.2.3`
