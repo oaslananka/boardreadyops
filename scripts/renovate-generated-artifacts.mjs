@@ -12,28 +12,42 @@ const MAX_BYTES = Object.freeze({
 const SHA_RE = /^[a-f0-9]{40}$/u;
 const BRANCH_RE = /^renovate\/[a-zA-Z0-9._/-]{1,220}$/u;
 
+function isTrustedRenovateContext(pr, livePr, repository) {
+  return (
+    pr?.user?.login === "renovate[bot]" &&
+    livePr?.user?.login === "renovate[bot]" &&
+    pr?.base?.ref === "main" &&
+    livePr?.base?.ref === "main" &&
+    livePr?.state === "open" &&
+    pr?.head?.repo?.full_name === repository &&
+    livePr?.head?.repo?.full_name === repository
+  );
+}
+
+function isUnchangedBotHead(pr, livePr) {
+  const sha = pr?.head?.sha;
+  const branch = pr?.head?.ref;
+  return (
+    SHA_RE.test(sha ?? "") &&
+    livePr?.head?.sha === sha &&
+    typeof branch === "string" &&
+    BRANCH_RE.test(branch) &&
+    !branch.includes("..") &&
+    livePr?.head?.ref === branch &&
+    Number.isSafeInteger(pr?.number) &&
+    pr.number > 0 &&
+    livePr.number === pr.number
+  );
+}
+
 export function authorizeRenovatePullRequest(event, livePr, repository) {
   const pr = event?.pull_request;
-  // The target is a single repository; never trust repository names derived from PR metadata.
-  if (typeof repository !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(repository)) {
-    return null;
-  }
+  if (typeof repository !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(repository)) return null;
   if (event?.repository?.full_name !== repository || !pr || !livePr) return null;
-
-  // Both the immutable event and current GitHub API must name the hosted Mend App.
-  if (pr.user?.login !== "renovate[bot]" || livePr.user?.login !== "renovate[bot]") return null;
-  if (pr.base?.ref !== "main" || livePr.base?.ref !== "main" || livePr.state !== "open") return null;
-  if (pr.head?.repo?.full_name !== repository || livePr.head?.repo?.full_name !== repository) return null;
-
-  // A forced push or a head update makes an old artifact unusable.
-  if (!SHA_RE.test(pr.head?.sha ?? "") || livePr.head?.sha !== pr.head.sha) return null;
-  const branch = pr.head?.ref;
-  if (typeof branch !== "string" || !BRANCH_RE.test(branch) || branch.includes("..")) return null;
-  if (livePr.head?.ref !== branch) return null;
-
-  // Prevent a stale event from redirecting the write to a different PR.
-  if (!Number.isSafeInteger(pr.number) || pr.number <= 0 || livePr.number !== pr.number) return null;
-  return { sha: pr.head.sha, branch, number: pr.number };
+  // An already-modified or replaced Renovate branch is never eligible for this run.
+  if (!isTrustedRenovateContext(pr, livePr, repository)) return null;
+  if (!isUnchangedBotHead(pr, livePr)) return null;
+  return { sha: pr.head.sha, branch: pr.head.ref, number: pr.number };
 }
 
 function sha256(buffer) {

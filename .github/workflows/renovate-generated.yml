@@ -111,7 +111,7 @@ jobs:
             exit 0
           fi
           BOT_LOGIN="$(gh api user --jq .login)"
-          git -c user.name="${BOT_LOGIN}" -c user.email="${BOT_LOGIN}@users.noreply.github.com" \
+          git -c core.hooksPath=/dev/null -c user.name="${BOT_LOGIN}" -c user.email="${BOT_LOGIN}@users.noreply.github.com" \
             commit -m "build(deps): regenerate NOTICE and dist for Renovate"
           gh auth setup-git
           git push --force-with-lease="refs/heads/${APPROVED_BRANCH}:${APPROVED_SHA}" \
