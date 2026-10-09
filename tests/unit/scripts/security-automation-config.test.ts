@@ -107,19 +107,18 @@ describe("dependency and security automation configuration", () => {
     ] as const;
     for (const [id, flag] of jobs) {
       const job = ci.jobs[id];
-      if (!job || !job.steps[0] || !job.steps[1]) {
-        throw new Error(`Missing required CI routing/checkout steps in ${id}`);
-      }
+      if (!job) throw new Error(`Missing required CI job ${id}`);
       const [checkout, route, ...expensiveSteps] = job.steps;
+      if (!checkout || !route) throw new Error(`Missing required CI routing/checkout steps in ${id}`);
       expect(job.name).toBe(`ci / ${id}`);
-      expect(job.if).toBe("${{ !cancelled() }}");
+      expect(job.if).toBe("$" + "{{ !cancelled() }}");
       expect(checkout.uses).toBe("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
       expect(checkout.if).toBeUndefined();
       expect(route).toMatchObject({
         name: "Verify required CI route",
         run: "node scripts/required-ci-route.mjs",
       });
-      expect(route.env?.CLASSIFIER_RESULT).toBe("${{ needs.risk-profile.result }}");
+      expect(route.env?.CLASSIFIER_RESULT).toBe("$" + "{{ needs.risk-profile.result }}");
       expect(route.env?.NEEDS_WORK).toBe(`\${{ needs.risk-profile.outputs.${flag} }}`);
       for (const step of expensiveSteps) {
         expect(step.if, `${id}: ${step.name ?? "unnamed"} must respect risk classification`).toContain(
@@ -127,7 +126,7 @@ describe("dependency and security automation configuration", () => {
         );
       }
     }
-    expect(ci.jobs["verify-dist"]?.steps[1]?.env?.BUILD_RESULT).toBe("${{ needs.build.result }}");
+    expect(ci.jobs["verify-dist"]?.steps[1]?.env?.BUILD_RESULT).toBe("$" + "{{ needs.build.result }}");
   });
   it("emits one stable aggregate security gate for every pull request", async () => {
     const workflow = await repositoryFile(".github/workflows/security.yml");
