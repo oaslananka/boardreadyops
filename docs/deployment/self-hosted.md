@@ -36,7 +36,7 @@ Keep the live Caddy bind mount under `/opt/boardreadyops-cloud`; do not bind it 
 
 ## Host requirements
 
-The repository Compose file bounds all six service stdout/stderr JSON log streams
+The repository Compose file bounds all service stdout/stderr JSON log streams
 to **3 files of 10 MB each per container** using Docker's built-in `json-file`
 rotation. It does not modify the host's Docker daemon configuration, application
 data volumes, PostgreSQL WAL, or retained manufacturing artifacts. Docker only
