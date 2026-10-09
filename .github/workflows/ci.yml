@@ -118,16 +118,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
       - name: Verify required CI route
         env:
           REQUIRED_CHECK: "ci / typecheck"
           CLASSIFIER_RESULT: ${{ needs.risk-profile.result }}
           NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_typecheck }}
         run: node scripts/required-ci-route.mjs
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        if: ${{ needs.risk-profile.outputs.needs_typecheck == 'true' }}
-        with:
-          persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         if: ${{ needs.risk-profile.outputs.needs_typecheck == 'true' }}
         with:
@@ -150,16 +149,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
       - name: Verify required CI route
         env:
           REQUIRED_CHECK: "ci / test-unit"
           CLASSIFIER_RESULT: ${{ needs.risk-profile.result }}
           NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_unit }}
         run: node scripts/required-ci-route.mjs
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' }}
-        with:
-          persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         if: ${{ needs.risk-profile.outputs.needs_unit == 'true' }}
         with:
@@ -637,16 +635,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
       - name: Verify required CI route
         env:
           REQUIRED_CHECK: "ci / build"
           CLASSIFIER_RESULT: ${{ needs.risk-profile.result }}
           NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_build }}
         run: node scripts/required-ci-route.mjs
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
-        with:
-          persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
         with:
@@ -702,6 +699,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
       - name: Verify required CI route
         env:
           REQUIRED_CHECK: "ci / verify-dist"
@@ -709,10 +709,6 @@ jobs:
           NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_dist }}
           BUILD_RESULT: ${{ needs.build.result }}
         run: node scripts/required-ci-route.mjs
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        if: ${{ needs.risk-profile.outputs.needs_dist == 'true' }}
-        with:
-          persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         if: ${{ needs.risk-profile.outputs.needs_dist == 'true' }}
         with:
@@ -735,16 +731,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
       - name: Verify required CI route
         env:
           REQUIRED_CHECK: "ci / coverage-gate"
           CLASSIFIER_RESULT: ${{ needs.risk-profile.result }}
           NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_coverage }}
         run: node scripts/required-ci-route.mjs
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' }}
-        with:
-          persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' }}
         with:
