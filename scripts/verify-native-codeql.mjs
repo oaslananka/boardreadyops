@@ -8,7 +8,7 @@ export function nativeCodeqlDecision(checkRuns, headSha) {
   const native = checkRuns
     .filter((check) => check.name === "CodeQL" && check.app?.slug === CODEQL_APP && check.head_sha === headSha)
     .sort((a, b) => b.id - a.id)[0];
-  if (!native || native.status !== "completed") return { state: "pending" };
+  if (native?.status !== "completed") return { state: "pending" };
   return native.conclusion === "success"
     ? { state: "success" }
     : { state: "failure", conclusion: native.conclusion ?? "missing", url: native.html_url };
