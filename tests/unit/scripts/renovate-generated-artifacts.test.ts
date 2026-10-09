@@ -96,11 +96,14 @@ describe("Mend Renovate generated-file privilege separation", () => {
     await expect(verifyAndApplyGeneratedFiles(output, target, sha)).rejects.toThrow(/hash mismatch/i);
   });
 
-  it("rejects an artifact symlink and never changes a source file outside the allowlist", async () => {
-    const { source, output, target, dir } = await fixture();
-    await exportGeneratedFiles(source, output, sha);
-    await rm(path.join(output, "NOTICE"));
-    await symlink(path.join(dir, "source", "NOTICE"), path.join(output, "NOTICE"));
-    await expect(verifyAndApplyGeneratedFiles(output, target, sha)).rejects.toThrow(/Symlink/);
-  });
+  it.skipIf(process.platform === "win32")(
+    "rejects an artifact symlink and never changes a source file outside the allowlist",
+    async () => {
+      const { source, output, target, dir } = await fixture();
+      await exportGeneratedFiles(source, output, sha);
+      await rm(path.join(output, "NOTICE"));
+      await symlink(path.join(dir, "source", "NOTICE"), path.join(output, "NOTICE"));
+      await expect(verifyAndApplyGeneratedFiles(output, target, sha)).rejects.toThrow(/Symlink/);
+    },
+  );
 });

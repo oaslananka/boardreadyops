@@ -45,8 +45,10 @@ function sha256(buffer) {
 }
 
 async function readOrdinaryFile(root, name, maxBytes) {
-  const rootResolved = path.resolve(root);
-  let current = rootResolved;
+  // macOS /var -> /private/var and some Windows working directories are aliases.
+  // Canonicalize the trusted root before checking that artifact realpaths stay inside.
+  const rootResolved = await realpath(path.resolve(root));
+  let current = path.resolve(root);
   for (const segment of name.split("/")) {
     current = path.join(current, segment);
     const stat = await lstat(current);
