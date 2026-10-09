@@ -5,9 +5,16 @@
 # intentionally disabled: a maintainer must explicitly enqueue a PR with
 # @mergifyio queue main (or the equivalent Mergify queue control).
 
+# In-place serial checks preserve the GitHub main ruleset requirement that
+# every PR must be up to date before merge; no ruleset bypass is needed.
+merge_queue:
+  mode: serial
+  max_parallel_checks: 1
+
 queue_rules:
   - name: main
     merge_method: squash
+    batch_size: 1
     queue_conditions:
       - base = main
       - -draft
