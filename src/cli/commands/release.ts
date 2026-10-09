@@ -27,6 +27,7 @@ import {
   type PrepareValidationStage,
   releasePrepareExitCode,
 } from "../../release/prepare.js";
+import { assertSafeReleaseOutputCleanup } from "../../release/release-output-cleanup.js";
 import {
   loadTrustStore,
   signReleaseBundle,
@@ -423,6 +424,7 @@ export async function releaseHandoffCommand(
   }
 
   const plan = planHandoffPackage(outputs, summary);
+  await assertSafeReleaseOutputCleanup(root, outputDir, "handoff");
   await fs.rm(outputDir, { recursive: true, force: true });
   await fs.mkdir(outputDir, { recursive: true });
 
