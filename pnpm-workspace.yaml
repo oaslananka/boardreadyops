@@ -51,6 +51,8 @@ allowBuilds:
   vue-demi: false
 
 overrides:
+  # Bound JSON.parse fallback matching to the upstream ReDoS fix (#1036).
+  json-with-bigint: 3.5.12
   'archiver>readdir-glob': 3.0.0
   browserslist@<=4.28.6: 4.28.7
   '@prisma/config>deepmerge-ts': 8.0.0
