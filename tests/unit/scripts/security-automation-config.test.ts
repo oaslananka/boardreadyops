@@ -143,6 +143,15 @@ describe("dependency and security automation configuration", () => {
 
     expect(workflow).toContain("name: security / gate");
     expect(workflow).toContain("node scripts/security-gate.mjs");
+    // A successful CodeQL analysis can still create failing native PR alert checks.
+    // Fail closed through the existing required aggregate gate; no new check name.
+    expect(workflow).toMatch(
+      /codeql:[\s\S]*checks: read[\s\S]*name: Verify native CodeQL pull request alert decision/u,
+    );
+    expect(workflow).toContain("run: node scripts/verify-native-codeql.mjs");
+    expect(workflow).toContain("CODEQL_PR_HEAD_SHA: $" + "{{ github.event.pull_request.head.sha }}");
+    expect(workflow).toContain("if: github.event_name == 'pull_request'");
+
     expect(workflow).toContain("pnpm install --frozen-lockfile --ignore-scripts");
     expect(workflow).not.toContain("pnpm install --frozen-lockfile\n");
     expect(workflow).toContain("if: always()");

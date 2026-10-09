@@ -159,6 +159,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      checks: read
       security-events: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -177,6 +178,14 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm run build
       - uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
+      # CodeQL SARIF upload can succeed even when GitHub rejects PR code-scanning alerts.
+      # Propagate the first-party CodeQL result into the already-required security / gate.
+      - name: Verify native CodeQL pull request alert decision
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODEQL_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/verify-native-codeql.mjs
 
   semgrep:
     needs: policy
