@@ -6,6 +6,7 @@ import { checkFirstPartyOutputSet } from "../core/generated-output-inventory.js"
 import { isInside, resolveExistingPathAlias } from "../util/path.js";
 
 type OutputKind = "evidence" | "handoff";
+const maximumReleaseArtifacts = 4096;
 
 function isExpectedArtifact(
   value: unknown,
@@ -29,6 +30,7 @@ export async function assertSafeReleaseOutputCleanup(
 ): Promise<void> {
   const output = path.resolve(outputDirectory);
   const realRoot = await resolveExistingPathAlias(path.resolve(root));
+  // resolveExistingPathAlias resolves the nearest existing parent, including for fresh output paths.
   const realOutput = await resolveExistingPathAlias(output);
   if (
     isInside(realOutput, realRoot) ||
@@ -69,7 +71,7 @@ export async function assertSafeReleaseOutputCleanup(
     record.schemaVersion !== (kind === "evidence" ? 2 : 1) ||
     tool?.name !== "boardreadyops" ||
     !Array.isArray(artifacts) ||
-    artifacts.length > 4096 ||
+    artifacts.length > maximumReleaseArtifacts ||
     !artifacts.every(isExpectedArtifact)
   ) {
     throw new Error("Existing release output has an unrecognized manifest; choose a fresh --output path.");
@@ -103,7 +105,10 @@ export async function assertSafeReleaseOutputCleanup(
     throw new Error("Existing release output contains unsafe or undeclared files; choose a fresh --output path.");
   }
   for (const entry of fileEntries) {
-    const filename = path.join(output, entry.path as string);
+    const filename = path.resolve(output, entry.path as string);
+    if (filename === output || !isInside(output, filename)) {
+      throw new Error("Release artifact escaped output directory; choose a safe --output path.");
+    }
     const hash = createHash("sha256");
     let bytes = 0;
     for await (const chunk of createReadStream(filename)) {

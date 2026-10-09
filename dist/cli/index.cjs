@@ -32408,7 +32408,7 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
   }
   const tool = record2?.tool;
   const artifacts = record2?.[kind === "evidence" ? "artifacts" : "files"];
-  if (record2.schemaVersion !== (kind === "evidence" ? 2 : 1) || tool?.name !== "boardreadyops" || !Array.isArray(artifacts) || artifacts.length > 4096 || !artifacts.every(isExpectedArtifact)) {
+  if (record2.schemaVersion !== (kind === "evidence" ? 2 : 1) || tool?.name !== "boardreadyops" || !Array.isArray(artifacts) || artifacts.length > maximumReleaseArtifacts || !artifacts.every(isExpectedArtifact)) {
     throw new Error("Existing release output has an unrecognized manifest; choose a fresh --output path.");
   }
   const fileEntries = artifacts.map(
@@ -32438,7 +32438,10 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
     throw new Error("Existing release output contains unsafe or undeclared files; choose a fresh --output path.");
   }
   for (const entry of fileEntries) {
-    const filename = import_node_path65.default.join(output, entry.path);
+    const filename = import_node_path65.default.resolve(output, entry.path);
+    if (filename === output || !isInside(output, filename)) {
+      throw new Error("Release artifact escaped output directory; choose a safe --output path.");
+    }
     const hash2 = (0, import_node_crypto10.createHash)("sha256");
     let bytes = 0;
     for await (const chunk of (0, import_node_fs8.createReadStream)(filename)) {
@@ -32450,7 +32453,7 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
     }
   }
 }
-var import_node_crypto10, import_node_fs8, import_promises23, import_node_path65;
+var import_node_crypto10, import_node_fs8, import_promises23, import_node_path65, maximumReleaseArtifacts;
 var init_release_output_cleanup = __esm({
   "src/release/release-output-cleanup.ts"() {
     "use strict";
@@ -32460,6 +32463,7 @@ var init_release_output_cleanup = __esm({
     import_node_path65 = __toESM(require("node:path"), 1);
     init_generated_output_inventory();
     init_path();
+    maximumReleaseArtifacts = 4096;
   }
 });
 
