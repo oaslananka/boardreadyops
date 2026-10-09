@@ -15,6 +15,7 @@ import { boardReadyVersion } from "../generated/version.js";
 import { formatJson } from "../report/json.js";
 import { formatMarkdown } from "../report/markdown.js";
 import { normalizeRelative } from "../util/path.js";
+import { assertSafeReleaseOutputCleanup } from "./release-output-cleanup.js";
 
 interface ReleaseEvidenceArtifact {
   path: string;
@@ -110,6 +111,7 @@ export async function writeReleaseEvidenceBundle(
   options: ReleaseEvidenceWriteOptions,
 ): Promise<ReleaseEvidenceWriteResult> {
   const outputDir = path.resolve(root, options.outputDir);
+  await assertSafeReleaseOutputCleanup(root, outputDir, "evidence");
   await fs.rm(outputDir, { recursive: true, force: true });
   await fs.mkdir(path.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
   await fs.mkdir(path.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
