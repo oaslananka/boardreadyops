@@ -92,6 +92,7 @@ describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => 
           },
         ],
       },
+      { rows: [] },
       markedProcessed,
     );
 
@@ -111,7 +112,7 @@ describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => 
       entitlement: "linked",
       tenantId: "octo-org",
     });
-    expect(query).toHaveBeenCalledTimes(3);
+    expect(query).toHaveBeenCalledTimes(4);
     const [linkSql] = query.mock.calls[1] as [string, unknown[]];
     expect(linkSql).toContain("INSERT INTO billing_customers");
   });
@@ -204,7 +205,7 @@ describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => 
   });
 
   it("defers projection when the subscription's Stripe customer has not been linked to a tenant yet", async () => {
-    const query = postgresMode(recordedEventRow, { rows: [{ tenant_id: null, applied: false }] }, markedProcessed);
+    const query = postgresMode(recordedEventRow, { rows: [{ tenant_id: null, applied: false }] });
 
     const response = await webhookPost(
       signedRequest(stripeEvent("evt_sub_unlinked_1", "customer.subscription.updated", subscriptionObject())),
@@ -213,11 +214,11 @@ describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      processed: true,
+      processed: false,
       entitlement: "deferred",
       reason: "customer_not_linked",
     });
-    expect(query).toHaveBeenCalledTimes(3);
+    expect(query).toHaveBeenCalledTimes(2);
   });
 
   it("applies a grace period on invoice.payment_failed", async () => {
@@ -246,7 +247,7 @@ describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => 
   });
 
   it("does not apply a grace period when the invoice's customer is unlinked", async () => {
-    const query = postgresMode(recordedEventRow, { rows: [] }, markedProcessed);
+    const query = postgresMode(recordedEventRow, { rows: [] });
 
     const response = await webhookPost(
       signedRequest(stripeEvent("evt_invoice_failed_2", "invoice.payment_failed", { customer: "cus_unlinked" })),
@@ -255,11 +256,11 @@ describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      processed: true,
+      processed: false,
       entitlement: "deferred",
       reason: "customer_not_linked",
     });
-    expect(query).toHaveBeenCalledTimes(3);
+    expect(query).toHaveBeenCalledTimes(2);
   });
 
   it("clears the grace period on invoice.paid", async () => {
@@ -286,8 +287,60 @@ describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => 
     expect(clearSql).toContain("grace_ends_at=NULL");
   });
 
+  it("replays a deferred subscription once checkout establishes customer ownership", async () => {
+    const pending = stripeEvent("evt_early_sub", "customer.subscription.created", subscriptionObject());
+    const checkout = stripeEvent("evt_late_checkout", "checkout.session.completed", {
+      customer: "cus_123",
+      client_reference_id: "octo-org",
+    });
+    const query = postgresMode(
+      recordedEventRow,
+      { rows: [{ tenant_id: null, applied: false }] },
+      recordedEventRow,
+      {
+        rows: [
+          {
+            id: "customer",
+            tenant_id: "octo-org",
+            stripe_customer_id: "cus_123",
+            tier: "free",
+            status: "incomplete",
+            trial_ends_at: null,
+            grace_ends_at: null,
+            current_period_end: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      },
+      { rows: [{ payload: pending }] },
+      { rows: [{ tenant_id: "octo-org", applied: true }] },
+      markedProcessed,
+      markedProcessed,
+    );
+    const first = await webhookPost(signedRequest(pending));
+    await expect(first.json()).resolves.toMatchObject({ entitlement: "deferred", processed: false });
+    const second = await webhookPost(signedRequest(checkout));
+    await expect(second.json()).resolves.toMatchObject({ entitlement: "linked", replayed: 1, processed: true });
+    expect(query).toHaveBeenCalledTimes(8);
+    expect(String(query.mock.calls[4]?.[0])).toContain("processed_at is null");
+  });
+
+  it("retries a previously recorded but unprocessed Stripe delivery", async () => {
+    const pending = stripeEvent("evt_retry", "customer.subscription.created", subscriptionObject());
+    const query = postgresMode(
+      { rows: [] },
+      { rows: [{ payload: pending }] },
+      { rows: [{ tenant_id: "octo-org", applied: true }] },
+      markedProcessed,
+    );
+    const response = await webhookPost(signedRequest(pending));
+    await expect(response.json()).resolves.toMatchObject({ processed: true, entitlement: "applied" });
+    expect(query).toHaveBeenCalledTimes(4);
+  });
+
   it("stays idempotent on a redelivered event id regardless of event type", async () => {
-    const query = postgresMode({ rows: [] }); // ON CONFLICT DO NOTHING -> no row -> duplicate
+    const query = postgresMode({ rows: [] }, { rows: [] }); // recorded but already processed
 
     const response = await webhookPost(
       signedRequest(stripeEvent("evt_sub_created_1", "customer.subscription.created", subscriptionObject())),
@@ -295,6 +348,6 @@ describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => 
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, duplicate: true });
-    expect(query).toHaveBeenCalledTimes(1); // no projection or markEventProcessed call for a duplicate
+    expect(query).toHaveBeenCalledTimes(2); // recorded-event lookup, no projection on processed duplicate
   });
 });

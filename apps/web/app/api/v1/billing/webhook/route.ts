@@ -17,6 +17,13 @@ export const runtime = "nodejs";
 
 type StripeWebhookEvent = { id: string; type: string; created?: number; data?: { object?: unknown } };
 
+function storedStripeEvent(value: unknown): StripeWebhookEvent | undefined {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const event = value as Record<string, unknown>;
+  if (typeof event.id !== "string" || !event.id || typeof event.type !== "string" || !event.type) return undefined;
+  return value as StripeWebhookEvent;
+}
+
 async function projectCheckoutSessionCompleted(
   store: BillingStore,
   payload: unknown,
@@ -24,7 +31,16 @@ async function projectCheckoutSessionCompleted(
   const parsed = parseStripeCheckoutSessionCompleted(payload);
   if (!parsed) return { entitlement: "ignored", reason: "unrecognized_checkout_session_payload" };
   await store.linkStripeCustomer(parsed);
-  return { entitlement: "linked", tenantId: parsed.tenantId };
+  let replayed = 0;
+  for (const payload of await store.pendingStripeCustomerEvents(parsed.stripeCustomerId)) {
+    const pending = storedStripeEvent(payload);
+    if (!pending) continue;
+    const projection = await projectEntitlement(store, pending);
+    if (projection.entitlement === "deferred") continue;
+    await store.markEventProcessed(pending.id);
+    replayed++;
+  }
+  return { entitlement: "linked", tenantId: parsed.tenantId, ...(replayed ? { replayed } : {}) };
 }
 
 /** Resolves the tier + billing interval a subscription event maps to, or why it can't. */
@@ -74,8 +90,9 @@ async function projectSubscriptionEvent(
     trialEndsAt: parsed.trialEndsAt ?? null,
     eventCreatedAt,
   });
-  return result.applied
-    ? { entitlement: "applied", tenantId: result.tenantId, tier: resolved.tier }
+  if (result.applied) return { entitlement: "applied", tenantId: result.tenantId, tier: resolved.tier };
+  return result.tenantId
+    ? { entitlement: "ignored", reason: "stale_subscription_event" }
     : { entitlement: "deferred", reason: "customer_not_linked" };
 }
 
@@ -191,11 +208,15 @@ export async function POST(request: Request): Promise<Response> {
     const store = new BillingStore(executor);
     const { inserted } = await store.recordEvent({ stripeEventId: event.id, type: event.type, payload: event });
     if (!inserted) {
-      // Duplicate replay, idempotent success
-      return Response.json(
-        { ok: true, duplicate: true },
-        { status: 200, headers: { "cache-control": "private, no-store" } },
-      );
+      // A prior attempt may have recorded the event before projection failed.
+      const pending = storedStripeEvent(await store.pendingStripeEvent(event.id));
+      if (!pending) {
+        return Response.json(
+          { ok: true, duplicate: true },
+          { status: 200, headers: { "cache-control": "private, no-store" } },
+        );
+      }
+      event = pending;
     }
 
     if (
@@ -211,10 +232,11 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const projection = await projectEntitlement(store, event);
-    await store.markEventProcessed(event.id);
+    const deferred = projection.entitlement === "deferred";
+    if (!deferred) await store.markEventProcessed(event.id);
 
     return Response.json(
-      { ok: true, processed: true, ...projection },
+      { ok: true, processed: !deferred, ...projection },
       { status: 200, headers: { "cache-control": "private, no-store" } },
     );
   } finally {
