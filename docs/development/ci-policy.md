@@ -18,6 +18,17 @@ The effective `main-standard` ruleset requires exactly these nine contexts:
 - `SonarCloud Code Analysis`
 - `security / gate`
 
+On same-repository pull requests that execute CodeQL, the `security / codeql` job now
+also verifies the **native GitHub Advanced Security `CodeQL` check-run** for the exact
+pull-request head SHA. GitHub may report a failed code-scanning alert check even
+when the CodeQL analysis and SARIF upload completed successfully. A failed,
+missing, cancelled, or still-pending native result therefore fails the CodeQL
+job, which the existing required `security / gate` already depends upon. This
+uses read-only `checks` permission and a bounded wait, with no separate required
+check or duplicate scanner. The policy still skips CodeQL for documentation-only
+changes and fork pull requests, whose untrusted code cannot publish SARIF using
+the repository token; the existing post-merge scan remains authoritative there.
+
 Every repository-owned required CI job executes on each PR. For a low-risk changed-file
 classification, its first step checks that classification succeeded and explicitly
 records that the heavyweight test is not applicable. It must never be job-skipped:
