@@ -8,7 +8,7 @@ export function validateRequiredCiRoute({ check, classifierResult, needsWork, bu
   if (needsWork !== "true" && needsWork !== "false") {
     throw new Error(`${check}: invalid risk-profile decision (${needsWork || "missing"})`);
   }
-  if (needsWork === "true" && buildResult !== undefined && buildResult !== "success") {
+  if (needsWork === "true" && check === "ci / verify-dist" && buildResult !== "success") {
     throw new Error(`${check}: upstream build must succeed (${buildResult || "missing"})`);
   }
   return needsWork === "true" ? "required" : "not-applicable";
