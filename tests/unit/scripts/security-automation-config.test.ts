@@ -87,6 +87,47 @@ describe("dependency and security automation configuration", () => {
       "- name: Assert compliance checks did not mutate the checkout\n        run: git diff --exit-code",
     );
   });
+  it("executes each protected CI job and gates all expensive steps on verified risk routing", async () => {
+    const ci = yaml.load(await repositoryFile(".github/workflows/ci.yml")) as {
+      jobs: Record<
+        string,
+        {
+          name: string;
+          if?: string;
+          steps: Array<{ name?: string; uses?: string; if?: string; env?: Record<string, string>; run?: string }>;
+        }
+      >;
+    };
+    const jobs = [
+      ["typecheck", "needs_typecheck"],
+      ["test-unit", "needs_unit"],
+      ["build", "needs_build"],
+      ["verify-dist", "needs_dist"],
+      ["coverage-gate", "needs_coverage"],
+    ] as const;
+    for (const [id, flag] of jobs) {
+      const job = ci.jobs[id];
+      if (!job) throw new Error(`Missing required CI job ${id}`);
+      const [checkout, route, ...expensiveSteps] = job.steps;
+      if (!checkout || !route) throw new Error(`Missing required CI routing/checkout steps in ${id}`);
+      expect(job.name).toBe(`ci / ${id}`);
+      expect(job.if).toBe("$" + "{{ !cancelled() }}");
+      expect(checkout.uses).toBe("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
+      expect(checkout.if).toBeUndefined();
+      expect(route).toMatchObject({
+        name: "Verify required CI route",
+        run: "node scripts/required-ci-route.mjs",
+      });
+      expect(route.env?.CLASSIFIER_RESULT).toBe("$" + "{{ needs.risk-profile.result }}");
+      expect(route.env?.NEEDS_WORK).toBe(`\${{ needs.risk-profile.outputs.${flag} }}`);
+      for (const step of expensiveSteps) {
+        expect(step.if, `${id}: ${step.name ?? "unnamed"} must respect risk classification`).toContain(
+          `needs.risk-profile.outputs.${flag} == 'true'`,
+        );
+      }
+    }
+    expect(ci.jobs["verify-dist"]?.steps[1]?.env?.BUILD_RESULT).toBe("$" + "{{ needs.build.result }}");
+  });
   it("emits one stable aggregate security gate for every pull request", async () => {
     const workflow = await repositoryFile(".github/workflows/security.yml");
     const ruleset = JSON.parse(await repositoryFile(".github/rulesets/main.json")) as {
@@ -138,7 +179,7 @@ describe("dependency and security automation configuration", () => {
     expect(binaryPublisher).toContain('"--clobber"');
     expect(ci).toContain("Upload bounded coverage evidence");
     expect(ci).toContain(
-      "if: $" + "{{ failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}",
+      "needs.risk-profile.outputs.needs_coverage == 'true' && (failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main'))",
     );
     expect(ci.match(/retention-days: 7/gu) ?? []).toHaveLength(4);
     expect(benchmark).toContain("retention-days: 7");
