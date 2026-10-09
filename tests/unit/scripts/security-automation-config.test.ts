@@ -464,9 +464,11 @@ describe("dependency and security automation configuration", () => {
 
     expect(workflow).toContain("schedule:");
     expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow).toContain("group: renovate-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'canonical' }}");
+    expect(workflow).toContain(
+      "group: renovate-$" + "{{ github.repository }}-$" + "{{ github.event_name == 'pull_request' && github.event.pull_request.number || 'canonical' }}",
+    );
     expect(workflow).toContain("cancel-in-progress: false");
-    expect(workflow).not.toContain("group: renovate-${{ github.event_name }}-${{ github.ref }}");
+    expect(workflow).not.toContain("group: renovate-$" + "{{ github.event_name }}-$" + "{{ github.ref }}");
 
     expect(workflow).toContain("renovatebot/github-action@3064367f740a1a91cca218698a63902689cce200");
     expect(workflow).not.toContain("RENOVATE_VERSION:");
