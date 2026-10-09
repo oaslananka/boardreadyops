@@ -16,7 +16,9 @@ describe("plugin permission evaluation", () => {
   });
 
   it("defaults to no permission grants and normalizes requested capabilities", () => {
-    expect(evaluatePluginPermissions({ specifier: "plugin-pkg", name: "plugin", requested: undefined, config: undefined })).toEqual({
+    expect(
+      evaluatePluginPermissions({ specifier: "plugin-pkg", name: "plugin", requested: undefined, config: undefined }),
+    ).toEqual({
       requested: [],
       allowed: [],
       denied: [],
