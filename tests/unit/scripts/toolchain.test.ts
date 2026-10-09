@@ -114,7 +114,7 @@ function healthyProbe(overrides: Partial<ToolchainProbe> = {}): ToolchainProbe {
     architecture: "x64",
     nodeVersion: "24.19.0",
     corepackVersion: "0.34.6",
-    pnpmVersion: "11.8.0",
+    pnpmVersion: "11.11.0",
     pythonVersion: "3.13.5",
     mkdocsVersion: "1.6.1",
     preCommitVersion: "4.6.0",
@@ -159,6 +159,9 @@ describe("reproducible contributor toolchain", () => {
     expect(config.schemaVersion).toBe(1);
     expect(await repositoryFile(".nvmrc")).toBe(`${config.node.preferred}\n`);
     expect(packageJson.packageManager).toMatch(new RegExp(`^pnpm@${config.pnpm.version.replaceAll(".", "\\.")}`));
+    expect(packageJson.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+\+sha512\.[0-9a-f]{128}$/u);
+    const [pnpmMajor = 0, pnpmMinor = 0] = config.pnpm.version.split(".").map(Number);
+    expect(pnpmMajor > 11 || (pnpmMajor === 11 && pnpmMinor >= 11)).toBe(true);
     expect(packageJson.engines.node).toBe(config.node.engines);
     expect(packageJson.devDependencies.puppeteer).toBe(config.browser.puppeteerVersion);
     expect(config.browser.ubuntuRuntimePackages).toEqual([
