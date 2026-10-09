@@ -277,6 +277,33 @@ describe("as-built BOM reconciliation foundation", () => {
     ).toThrow("Approved BOM has invalid DNP flag for JP1");
   });
 
+  it("rejects noncanonical uppercase SHA identities before comparing records", () => {
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        approvedRelease: { ...baseline.approvedRelease, commitSha: "A".repeat(40) },
+      }),
+    ).toThrow("Approved commit SHA must be 40 lowercase hexadecimal characters");
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        productionBatch: { ...baseline.productionBatch, sourceSha256: "B".repeat(64) },
+      }),
+    ).toThrow("Batch source digest must be 64 lowercase hexadecimal characters");
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        approvedRelease: { ...baseline.approvedRelease, commitSha: ["a".repeat(39), "A"].join("") },
+      }),
+    ).toThrow("Approved commit SHA must be 40 lowercase hexadecimal characters");
+    expect(() =>
+      compareApprovedAndBuiltBom({
+        ...baseline,
+        productionBatch: { ...baseline.productionBatch, sourceSha256: ["b".repeat(63), "B"].join("") },
+      }),
+    ).toThrow("Batch source digest must be 64 lowercase hexadecimal characters");
+  });
+
   it("rejects invalid quantities and unbound release/batch digests", () => {
     expect(() =>
       compareApprovedAndBuiltBom({

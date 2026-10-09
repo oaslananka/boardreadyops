@@ -57,8 +57,10 @@ export type AsBuiltComparison = {
 
 const maximumParts = 5_000;
 const maximumAlternates = 5_000;
-const sha256 = /^[a-f0-9]{64}$/iu;
-const commitSha = /^[a-f0-9]{40}$/iu;
+// Use one canonical identity representation across batch, release and graph
+// records. A different case must not become a distinct lookup/attestation key.
+const sha256 = /^[a-f0-9]{64}$/u;
+const commitSha = /^[a-f0-9]{40}$/u;
 
 function invalidBoundedText(value: unknown): boolean {
   return typeof value !== "string" || value.length > 256 || value.includes("\0");
@@ -205,9 +207,9 @@ function validateComparisonInput(input: AsBuiltComparisonInput): void {
   ];
   for (const [value, label] of identities) requiredIdentity(value, label);
   if (!commitSha.test(input.approvedRelease.commitSha))
-    throw new Error("Approved commit SHA must be 40 hexadecimal characters");
+    throw new Error("Approved commit SHA must be 40 lowercase hexadecimal characters");
   if (!sha256.test(input.productionBatch.sourceSha256))
-    throw new Error("Batch source digest must be 64 hexadecimal characters");
+    throw new Error("Batch source digest must be 64 lowercase hexadecimal characters");
   if ((input.documentedAlternates?.length ?? 0) > maximumAlternates)
     throw new Error("Approved alternate list exceeds the supported limit");
 }
