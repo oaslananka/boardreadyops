@@ -14,30 +14,26 @@ const BRANCH_RE = /^renovate\/[a-zA-Z0-9._/-]{1,220}$/u;
 
 export function authorizeRenovatePullRequest(event, livePr, repository) {
   const pr = event?.pull_request;
-  if (
-    event?.repository?.full_name !== repository ||
-    typeof repository !== "string" ||
-    !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(repository) ||
-    !pr ||
-    !livePr ||
-    pr.user?.login !== "renovate[bot]" ||
-    livePr.user?.login !== "renovate[bot]" ||
-    pr.base?.ref !== "main" ||
-    livePr.base?.ref !== "main" ||
-    pr.head?.repo?.full_name !== repository ||
-    livePr.head?.repo?.full_name !== repository ||
-    !SHA_RE.test(pr.head?.sha ?? "") ||
-    livePr.head?.sha !== pr.head.sha ||
-    !BRANCH_RE.test(pr.head?.ref ?? "") ||
-    pr.head.ref.includes("..") ||
-    livePr.head?.ref !== pr.head.ref ||
-    livePr.state !== "open" ||
-    !Number.isSafeInteger(pr.number) ||
-    pr.number <= 0 ||
-    livePr.number !== pr.number
-  )
+  // The target is a single repository; never trust repository names derived from PR metadata.
+  if (typeof repository !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(repository)) {
     return null;
-  return { sha: pr.head.sha, branch: pr.head.ref, number: pr.number };
+  }
+  if (event?.repository?.full_name !== repository || !pr || !livePr) return null;
+
+  // Both the immutable event and current GitHub API must name the hosted Mend App.
+  if (pr.user?.login !== "renovate[bot]" || livePr.user?.login !== "renovate[bot]") return null;
+  if (pr.base?.ref !== "main" || livePr.base?.ref !== "main" || livePr.state !== "open") return null;
+  if (pr.head?.repo?.full_name !== repository || livePr.head?.repo?.full_name !== repository) return null;
+
+  // A forced push or a head update makes an old artifact unusable.
+  if (!SHA_RE.test(pr.head?.sha ?? "") || livePr.head?.sha !== pr.head.sha) return null;
+  const branch = pr.head?.ref;
+  if (typeof branch !== "string" || !BRANCH_RE.test(branch) || branch.includes("..")) return null;
+  if (livePr.head?.ref !== branch) return null;
+
+  // Prevent a stale event from redirecting the write to a different PR.
+  if (!Number.isSafeInteger(pr.number) || pr.number <= 0 || livePr.number !== pr.number) return null;
+  return { sha: pr.head.sha, branch, number: pr.number };
 }
 
 function sha256(buffer) {
