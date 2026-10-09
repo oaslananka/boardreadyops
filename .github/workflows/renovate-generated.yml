@@ -1,0 +1,118 @@
+name: renovate-generated
+
+# Untrusted dependency PR code is built with read-only credentials.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate-artifacts-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    if: >-
+      github.event.pull_request.user.login == 'renovate[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'renovate/') &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24.21.0"
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack pnpm run renovate:post-upgrade
+      - name: Export strictly allowlisted generated artifacts
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+          OUTPUT_DIRECTORY: ${{ runner.temp }}/renovate-generated
+        run: node scripts/renovate-generated-artifacts.mjs create
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: boardreadyops-renovate-generated
+          path: ${{ runner.temp }}/renovate-generated/
+          if-no-files-found: error
+          retention-days: 1
+
+  apply:
+    needs: generate
+    if: >-
+      github.event.pull_request.user.login == 'renovate[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'renovate/') &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          path: trusted
+      - name: Confirm bot PR still has same immutable head
+        id: approved
+        working-directory: trusted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "${RUNNER_TEMP}/renovate-pr.json"
+          node scripts/renovate-generated-artifacts.mjs authorize
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        if: steps.approved.outputs.approved == 'true'
+        with:
+          name: boardreadyops-renovate-generated
+          path: ${{ runner.temp }}/renovate-generated
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        if: steps.approved.outputs.approved == 'true'
+        with:
+          ref: ${{ steps.approved.outputs.sha }}
+          persist-credentials: false
+          path: target
+      - name: Verify immutable manifest and allowlisted artifact hashes
+        if: steps.approved.outputs.approved == 'true'
+        working-directory: trusted
+        env:
+          SOURCE_SHA: ${{ steps.approved.outputs.sha }}
+          OUTPUT_DIRECTORY: ${{ runner.temp }}/renovate-generated
+          TARGET_DIRECTORY: ${{ github.workspace }}/target
+        run: node scripts/renovate-generated-artifacts.mjs apply
+      - name: Push only generated changes to unchanged Mend branch
+        if: steps.approved.outputs.approved == 'true'
+        working-directory: target
+        env:
+          GH_TOKEN: ${{ secrets.GH_AUTH_TOKEN }}
+          APPROVED_BRANCH: ${{ steps.approved.outputs.branch }}
+          APPROVED_SHA: ${{ steps.approved.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::Dedicated GH_AUTH_TOKEN for generated updates is missing."
+            exit 1
+          fi
+          git add -- NOTICE dist/action/index.cjs dist/cli/index.cjs
+          if git diff --cached --quiet; then
+            echo "NOTICE and dist already match; no write needed."
+            exit 0
+          fi
+          BOT_LOGIN="$(gh api user --jq .login)"
+          git -c user.name="${BOT_LOGIN}" -c user.email="${BOT_LOGIN}@users.noreply.github.com" \
+            commit -m "build(deps): regenerate NOTICE and dist for Renovate"
+          gh auth setup-git
+          git push --force-with-lease="refs/heads/${APPROVED_BRANCH}:${APPROVED_SHA}" \
+            origin "HEAD:refs/heads/${APPROVED_BRANCH}"

@@ -161,7 +161,7 @@ describe("dependency and security automation configuration", () => {
       dependencies?: Record<string, string>;
     };
     const renovateWorkflow = yaml.load(await repositoryFile(".github/workflows/renovate.yml")) as {
-      jobs?: { renovate?: { env?: Record<string, string> } };
+      jobs?: { renovate?: { env?: Record<string, string> }; validate?: object };
     };
 
     expect(webPackageJson.dependencies?.["@octokit/auth-app"]).toBe("8.2.0");
@@ -213,12 +213,9 @@ describe("dependency and security automation configuration", () => {
     });
     expect(packageJson.scripts?.["deps:install-renovate"]).toBeUndefined();
     expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe("node scripts/renovate-post-upgrade.mjs");
-    expect(renovateWorkflow.jobs?.renovate?.env?.CI).toBe("true");
-    expect(renovate.postUpgradeTasks).toEqual({
-      commands: ["corepack pnpm run renovate:post-upgrade"],
-      fileFilters: ["NOTICE", "dist/**"],
-      executionMode: "branch",
-    });
+    expect(renovateWorkflow.jobs?.validate).toBeDefined();
+    expect(renovateWorkflow.jobs?.renovate).toBeUndefined();
+    expect(renovate.postUpgradeTasks).toBeUndefined();
     expect(renovate.ignorePaths).toEqual(
       expect.arrayContaining(["**/.next/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**"]),
     );
@@ -459,22 +456,28 @@ describe("dependency and security automation configuration", () => {
     expect(actionDockerfile).toContain("GitHub Docker actions require the default root user");
   });
 
-  it("runs a pinned Renovate release only on schedule or manual dispatch", async () => {
-    const workflow = await repositoryFile(".github/workflows/renovate.yml");
-
-    expect(workflow).toContain("schedule:");
-    expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow).toContain("renovatebot/github-action@3064367f740a1a91cca218698a63902689cce200");
-    expect(workflow).not.toContain("RENOVATE_VERSION:");
-    expect(workflow).toContain("renovate-version: 44.97.2");
-    expect(workflow).not.toContain("43.272.4");
-    expect(workflow).toContain("pnpm run renovate:validate");
-    expect(workflow).not.toContain("npx ");
-    expect(workflow).toContain("RENOVATE_REPOSITORIES: '[\"oaslananka/boardreadyops\"]'");
-    expect(workflow).toContain("RENOVATE_ALLOWED_COMMANDS: '[\"^corepack pnpm run renovate:post-upgrade$\"]'");
-    expect(workflow).toMatch(/pull_request:[\s\S]*- package\.json/u);
-    expect(workflow).toContain("token: $" + "{{ secrets.GH_AUTH_TOKEN }}");
-    expect(workflow).not.toContain("pull_request_target");
+  it("uses only the Mend-hosted Renovate App as a dependency update writer", async () => {
+    const validation = await repositoryFile(".github/workflows/renovate.yml");
+    const generator = await repositoryFile(".github/workflows/renovate-generated.yml");
+    expect(validation).toContain("pnpm run renovate:validate");
+    expect(validation).not.toContain("renovatebot/github-action@");
+    expect(validation).not.toContain("workflow_dispatch:");
+    expect(validation).not.toContain("schedule:");
+    expect(validation).not.toContain("GH_AUTH_TOKEN");
+    expect(validation).not.toContain("pull_request_target");
+    expect(generator).toContain("github.event.pull_request.user.login == 'renovate[bot]'");
+    expect(generator).toContain("persist-credentials: false");
+    expect(generator).toContain("corepack pnpm run renovate:post-upgrade");
+    expect(generator).toContain("contents: read");
+    expect(generator).not.toContain("workflow_dispatch:");
+    expect(generator).toContain("needs: generate");
+    expect(generator).toContain("scripts/renovate-generated-artifacts.mjs authorize");
+    expect(generator).toContain("scripts/renovate-generated-artifacts.mjs apply");
+    expect(generator).toContain("secrets.GH_AUTH_TOKEN");
+    expect(generator).toContain("force-with-lease");
+    expect(generator).not.toContain("pull_request_target");
+    expect(generator).not.toContain("workflow_run:");
+    expect(generator).not.toContain("contents: write");
   });
 
   it("runs pinned Semgrep rules in the actual Husky pre-commit chain and CI", async () => {
