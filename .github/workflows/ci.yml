@@ -112,41 +112,67 @@ jobs:
 
   typecheck:
     needs: risk-profile
-    if: needs.risk-profile.outputs.needs_typecheck == 'true'
+    # This required context must never be a GitHub-skipped job.
+    if: ${{ !cancelled() }}
     name: ci / typecheck
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - name: Verify required CI route
+        env:
+          REQUIRED_CHECK: "ci / typecheck"
+          CLASSIFIER_RESULT: ${{ needs.risk-profile.result }}
+          NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_typecheck }}
+        run: node scripts/required-ci-route.mjs
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        if: ${{ needs.risk-profile.outputs.needs_typecheck == 'true' }}
         with:
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        if: ${{ needs.risk-profile.outputs.needs_typecheck == 'true' }}
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
+        if: ${{ needs.risk-profile.outputs.needs_typecheck == 'true' }}
       - run: node scripts/toolchain.mjs corepack-install
+        if: ${{ needs.risk-profile.outputs.needs_typecheck == 'true' }}
       - run: corepack pnpm run deps:install-ci
+        if: ${{ needs.risk-profile.outputs.needs_typecheck == 'true' }}
       - run: pnpm run typecheck
+        if: ${{ needs.risk-profile.outputs.needs_typecheck == 'true' }}
 
   test-unit:
     needs: risk-profile
-    if: needs.risk-profile.outputs.needs_unit == 'true'
+    # This required context must never be a GitHub-skipped job.
+    if: ${{ !cancelled() }}
     name: ci / test-unit
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - name: Verify required CI route
+        env:
+          REQUIRED_CHECK: "ci / test-unit"
+          CLASSIFIER_RESULT: ${{ needs.risk-profile.result }}
+          NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_unit }}
+        run: node scripts/required-ci-route.mjs
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' }}
         with:
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' }}
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
+        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' }}
       - run: node scripts/toolchain.mjs corepack-install
+        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' }}
       - run: corepack pnpm run deps:install-ci
+        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' }}
       - name: Detect Mergify CI Insights credential
+        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' }}
         id: mergify-token
         shell: bash
         env:
@@ -159,11 +185,12 @@ jobs:
             echo "::notice::Mergify CI Insights upload is disabled because MERGIFY_TOKEN is not configured."
           fi
       - name: Run unit tests with JUnit report
+        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' }}
         id: tests
         run: pnpm run test:unit --reporter=default --reporter=junit --outputFile.junit=junit.xml
         continue-on-error: true
       - name: Upload test results to Mergify CI Insights
-        if: ${{ always() && steps.mergify-token.outputs.enabled == 'true' }}
+        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' && (always() && steps.mergify-token.outputs.enabled == 'true') }}
         uses: Mergifyio/gha-mergify-ci@f16859b8b4496abe98768bed352d5d9c969a2793
         continue-on-error: true
         with:
@@ -173,7 +200,7 @@ jobs:
           job_name: ci / test-unit
           test_step_outcome: ${{ steps.tests.outcome }}
       - name: Enforce test result
-        if: ${{ always() && steps.tests.outcome != 'success' }}
+        if: ${{ needs.risk-profile.outputs.needs_unit == 'true' && (always() && steps.tests.outcome != 'success') }}
         run: exit 1
 
   test-unit-matrix:
@@ -604,25 +631,40 @@ jobs:
 
   build:
     needs: risk-profile
-    if: needs.risk-profile.outputs.needs_build == 'true'
+    # This required context must never be a GitHub-skipped job.
+    if: ${{ !cancelled() }}
     name: ci / build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - name: Verify required CI route
+        env:
+          REQUIRED_CHECK: "ci / build"
+          CLASSIFIER_RESULT: ${{ needs.risk-profile.result }}
+          NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_build }}
+        run: node scripts/required-ci-route.mjs
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
         with:
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
       - run: node scripts/toolchain.mjs corepack-install
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
       - run: corepack pnpm run deps:install-ci
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
       - run: pnpm run build
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
       - name: Build cloud application
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
         run: pnpm run cloud:build
       - name: Upload Codecov bundle analysis
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
         continue-on-error: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -654,58 +696,85 @@ jobs:
     needs:
       - risk-profile
       - build
-    if: needs.risk-profile.outputs.needs_dist == 'true'
+    # This required context must never be a GitHub-skipped job.
+    if: ${{ !cancelled() }}
     name: ci / verify-dist
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - name: Verify required CI route
+        env:
+          REQUIRED_CHECK: "ci / verify-dist"
+          CLASSIFIER_RESULT: ${{ needs.risk-profile.result }}
+          NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_dist }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: node scripts/required-ci-route.mjs
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        if: ${{ needs.risk-profile.outputs.needs_dist == 'true' }}
         with:
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        if: ${{ needs.risk-profile.outputs.needs_dist == 'true' }}
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
+        if: ${{ needs.risk-profile.outputs.needs_dist == 'true' }}
       - run: node scripts/toolchain.mjs corepack-install
+        if: ${{ needs.risk-profile.outputs.needs_dist == 'true' }}
       - run: corepack pnpm run deps:install-ci
+        if: ${{ needs.risk-profile.outputs.needs_dist == 'true' }}
       - run: pnpm run verify:dist
+        if: ${{ needs.risk-profile.outputs.needs_dist == 'true' }}
 
   coverage-gate:
     needs: risk-profile
-    if: needs.risk-profile.outputs.needs_coverage == 'true'
+    # This required context must never be a GitHub-skipped job.
+    if: ${{ !cancelled() }}
     name: ci / coverage-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
+      - name: Verify required CI route
+        env:
+          REQUIRED_CHECK: "ci / coverage-gate"
+          CLASSIFIER_RESULT: ${{ needs.risk-profile.result }}
+          NEEDS_WORK: ${{ needs.risk-profile.outputs.needs_coverage }}
+        run: node scripts/required-ci-route.mjs
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' }}
         with:
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' }}
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' }}
       - run: node scripts/toolchain.mjs corepack-install
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' }}
       - run: corepack pnpm run deps:install-ci
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' }}
       - run: pnpm run coverage:ci
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' }}
       - name: Upload bounded coverage evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: ${{ failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' && (failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
         with:
           name: coverage-report
           path: coverage/
           if-no-files-found: warn
           retention-days: 7
       - name: Validate Codecov configuration
-        if: ${{ !cancelled() }}
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' && (!cancelled()) }}
         run: >-
           curl --fail-with-body --silent --show-error
           --retry 3 --retry-all-errors
           --data-binary @codecov.yml
           https://codecov.io/validate
       - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' && (!cancelled()) }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           disable_search: true
@@ -715,7 +784,7 @@ jobs:
           name: boardreadyops-core-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' && (!cancelled()) }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           disable_search: true
@@ -726,7 +795,7 @@ jobs:
           report_type: test_results
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload cloud coverage to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' && (!cancelled()) }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           disable_search: true
@@ -736,7 +805,7 @@ jobs:
           name: boardreadyops-cloud-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload cloud test results to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ needs.risk-profile.outputs.needs_coverage == 'true' && (!cancelled()) }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           disable_search: true

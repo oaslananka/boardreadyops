@@ -6,7 +6,7 @@ The `ci` workflow always starts with `ci / risk-profile`. That job lists changed
 
 ## Required merge gate
 
-The branch protection helper only requires the stable, high-signal checks that should exist on every pull request:
+The effective `main-standard` ruleset requires exactly these nine contexts:
 
 - `ci / risk-profile`
 - `ci / lint`
@@ -14,15 +14,22 @@ The branch protection helper only requires the stable, high-signal checks that s
 - `ci / test-unit`
 - `ci / build`
 - `ci / verify-dist`
-- `ci / security`
+- `ci / coverage-gate`
+- `SonarCloud Code Analysis`
+- `security / gate`
 
-Conditional jobs may be skipped when they are not relevant. GitHub treats skipped required jobs as acceptable branch-protection states, while workflow-level path skips can leave checks pending.
+Every repository-owned required CI job executes on each PR. For a low-risk changed-file
+classification, its first step checks that classification succeeded and explicitly
+records that the heavyweight test is not applicable. It must never be job-skipped:
+GitHub accepts `skipped` jobs as passing required checks, which hides whether the
+policy was actually evaluated. Invalid/missing classifier output is a failure.
+All heavyweight validation still runs when the relevant risk-profile flag is true.
 
 ## Pull request routing
 
 | Change type | CI behavior |
 | --- | --- |
-| Documentation only | Lint and docs build run; unit, coverage, mutation, package and security gates are skipped. |
+| Documentation only | Lint and docs build run. Required unit, typecheck, build, dist and coverage checks execute their lightweight applicability verification without expensive suites; non-required mutation, package and specialist security jobs are skipped. |
 | Runtime or CLI code | Lint, typecheck, unit tests, build, dist verification and security gates run. |
 | KiCad parser/model or rule code | Coverage and mutation gates also run. |
 | Dependency, workflow or path-sensitive changes | The full OS/Node unit matrix and cross-platform path checks run. |
@@ -31,7 +38,7 @@ Conditional jobs may be skipped when they are not relevant. GitHub treats skippe
 
 ## Heavy checks
 
-Full mutation testing is no longer the default for every pull request. It runs when parser, rule, or core mutation-sensitive code changes, on main pushes, and in the `mutation-nightly` workflow. This keeps feedback fast for low-risk pull requests while keeping a regular full mutation signal.
+Full mutation testing is no longer the default for every pull request. The `ci / mutation` job runs on explicit workflow dispatch for mutation-sensitive changes; scheduled `mutation-nightly` provides the regular broader signal. This keeps feedback fast for low-risk pull requests while keeping a regular full mutation signal.
 
 ## Updating the policy
 
