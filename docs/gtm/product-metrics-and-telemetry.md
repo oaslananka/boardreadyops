@@ -44,7 +44,7 @@ Before expanding paid marketing or making commercial scalability investments, th
 
 | Validation Gate | Target Threshold | Current State (Aug 2026) | Verification Method |
 | :--- | :--- | :--- | :--- |
-| **Time to First Useful Finding (TTFUF)** | **< 5 minutes** | Available (~2 mins via `check . --fail-on never`) | Golden demo & user onboarding testing. |
+| **Time to First Useful Finding (TTFUF)** | **< 5 minutes** | **Not externally validated:** local `check` duration is not the installation-to-first-actionable-finding interval. | Fresh-install end-to-end evidence, measured using the [onboarding validation protocol](../product/fresh-install-validation.md). |
 | **Actionable Finding Ratio** | **> 70%** | Available (Core rule corpus is deterministic) | Rule precision benchmarks against fixture zoo. |
 | **False-Positive / Waiver Rate** | **< 20%** | Available | Ratio of waivers to total findings in benchmark suites. |
 | **PR Hardware Impact Exact Binding** | **100% Deterministic** | Available (Verified on PR base/head SHAs) | `tests/unit/action/hardware-impact.test.ts`. |
