@@ -1,6 +1,6 @@
 # Release Process
 
-Release Please manages routine version bumps and release PRs. Manual stable releases are allowed only from a clean, verified `main` branch. Publishing uses npm provenance, GitHub OIDC, and npm Trusted Publishing. Configure npmjs.com trusted publisher settings for repository `oaslananka/boardreadyops`, workflow `publish-npm.yml`, and allowed action `npm publish`; the workflow intentionally avoids long-lived publish credentials.
+Release Please manages routine version bumps and reviewable release PRs. GitHub Release creation requires an explicit owner-initiated Publish Release workflow run on verified `main`. Publishing uses npm provenance, GitHub OIDC, and npm Trusted Publishing. Configure npmjs.com trusted publisher settings for repository `oaslananka/boardreadyops`, workflow `publish-npm.yml`, and allowed action `npm publish`; the workflow intentionally avoids long-lived publish credentials.
 
 Release Please reads `release-please-config.json` and
 `.release-please-manifest.json`. The manifest package uses standard semver tags
@@ -14,6 +14,25 @@ input docs, plugin SDK API docs, and the release history page before building
 MkDocs. `corepack pnpm run gc` reruns the same generated-doc steps and fails if
 `docs/reference/plugin-sdk/`, `docs/release/history.md`, or other generated docs
 are stale.
+
+## Daily preparation and one-click publication
+
+The `release-please` workflow **prepares** and refreshes a reviewable version PR daily
+at **06:37 Europe/Istanbul** (03:37 UTC). It can also be run manually for
+preparation. It does **not** publish GitHub Releases, create version tags,
+or start npm publication, and merging other PRs into `main` does not trigger
+release preparation on every push.
+
+Once the release PR has passed all protected checks and has been intentionally
+merged into `main`, the repository owner publishes the release via
+**GitHub → Actions → Publish Release → Run workflow (main)**. That single
+input-free manual invocation creates the version tag/GitHub Release using
+Release Please in release-only mode and dispatches the existing
+`publish-npm.yml` OIDC/trusted-publishing workflow with the resulting
+immutable tag. Binary and container release workflows continue to respond
+to the full semver tag as before. A click when no reviewed release is ready
+fails closed without dispatching npm publication. Publishing does not
+implicitly bypass a held release PR or any required gate.
 
 ## Local Pre-Release Gate
 
@@ -49,9 +68,9 @@ gh api repos/oaslananka/boardreadyops/rulesets --jq '.[] | select(.name == "main
 git diff .github/rulesets/main.json
 ```
 
-## Tag And GitHub Release
+## Manual tag and GitHub Release recovery (exception only)
 
-For a stable release:
+If the reviewed workflow path is unavailable and an exceptional manual recovery has been separately authorized, verify all release gates before creating a tag. Do not use this as the normal one-click path:
 
 ```bash
 git status --short
@@ -71,7 +90,7 @@ workflow fix, manually run `binary-build` from `main` with the `release-tag`
 input set to that tag. The workflow checks out the tag before building, so the
 tag must contain the binary build scripts.
 
-`publish-npm` has one canonical publish trigger: `workflow_dispatch`. Release automation dispatches it explicitly with the immutable release tag, and maintainers use the same entry point for controlled backfills or recovery. This avoids relying on follow-on `release` events caused by a workflow's repository `GITHUB_TOKEN`.
+`publish-npm` has one canonical publish trigger: `workflow_dispatch`. The owner-invoked `Publish Release` workflow dispatches it explicitly with the immutable release tag, and maintainers use the same entry point for controlled backfills or recovery. This avoids relying on follow-on `release` events caused by a workflow's repository `GITHUB_TOKEN`.
 
 The publish job runs on a GitHub-hosted runner with `id-token: write`, upgrades to a Trusted Publishing-capable npm CLI, and fails closed if npm token/basic-auth environment variables or `.npmrc` credentials are present. The workflow definition must be dispatched from `refs/heads/main`; release automation and manual recovery both pin `--ref main`, while the checked-out package remains the immutable release tag supplied through `tag`. The npm package trusted publisher must be configured for repository `oaslananka/boardreadyops`, workflow filename `publish-npm.yml`, and allowed action `npm publish`. The workflow does not use `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or an `_authToken` entry for normal stable or prerelease publishing.
 
