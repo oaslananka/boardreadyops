@@ -36,6 +36,17 @@ Keep the live Caddy bind mount under `/opt/boardreadyops-cloud`; do not bind it 
 
 ## Host requirements
 
+The repository Compose file bounds all six service stdout/stderr JSON log streams
+to **3 files of 10 MB each per container** using Docker's built-in `json-file`
+rotation. It does not modify the host's Docker daemon configuration, application
+data volumes, PostgreSQL WAL, or retained manufacturing artifacts. Docker only
+applies container logging options to **newly created/recreated containers**;
+merging these settings does not rotate existing production logs or authorize a
+restart. During an independently approved deployment, verify effective settings
+with `docker inspect <container> --format '{{json .HostConfig.LogConfig}}'`
+and monitor host disk/inode use. Do **not** truncate Docker-managed log files
+directly; preserve any incident evidence required by retention policy.
+
 Docker Engine and Docker Compose are the host runtime requirements. Host Node.js is not required for the Compose build path: the production web image performs its Node.js build inside Docker. The web and control-plane worker processes have independent healthchecks, and PostgreSQL and Redis healthchecks are defined in `deploy/docker-compose.yml`.
 
 ## Production maintenance service
