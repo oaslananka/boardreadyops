@@ -290,17 +290,17 @@ jobs:
             kicad-ppa-series: "10.0"
             node-version: 22
             postgres-version: "16"
-            postgres-image: "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
+            postgres-image: "public.ecr.aws/docker/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
           - kicad-version: "10.0"
             kicad-ppa-series: "10.0"
             node-version: 24
             postgres-version: "16"
-            postgres-image: "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
+            postgres-image: "public.ecr.aws/docker/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
           - kicad-version: "10.0"
             kicad-ppa-series: "10.0"
             node-version: 24
             postgres-version: "17"
-            postgres-image: "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+            postgres-image: "public.ecr.aws/docker/library/postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -342,9 +342,9 @@ jobs:
             archive="${arguments[-1]}"
             unset 'arguments[-1]'
             [[ -f "$archive" && ! -L "$archive" ]] || exit 2
-            exec docker run --rm -i --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 pg_restore "${arguments[@]}" < "$archive"
+            exec docker run --rm -i --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE public.ecr.aws/docker/library/postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 pg_restore "${arguments[@]}" < "$archive"
           fi
-          exec docker run --rm --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 "$command" "$@"
+          exec docker run --rm --network host --env PGHOST --env PGPORT --env PGUSER --env PGPASSWORD --env PGSSLMODE public.ecr.aws/docker/library/postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 "$command" "$@"
           SH
             chmod 0755 "$RUNNER_TEMP/pg17-client/$command"
           done

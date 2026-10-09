@@ -420,21 +420,24 @@ describe("compatibility matrix", () => {
         "kicad-ppa-series": "10.0",
         "node-version": 22,
         "postgres-version": "16",
-        "postgres-image": "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "postgres-image":
+          "public.ecr.aws/docker/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
       },
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
         "node-version": 24,
         "postgres-version": "16",
-        "postgres-image": "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "postgres-image":
+          "public.ecr.aws/docker/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
       },
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
         "node-version": 24,
         "postgres-version": "17",
-        "postgres-image": "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+        "postgres-image":
+          "public.ecr.aws/docker/library/postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
       },
     ]);
     expect(integration?.env?.DATABASE_URL).toBe("postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test");
@@ -455,7 +458,7 @@ describe("compatibility matrix", () => {
     expect(pg17Setup?.run).toContain('pg_restore "$' + '{arguments[@]}" < "$archive"');
     expect(pg17Setup?.run).toContain('[[ -f "$archive" && ! -L "$archive" ]]');
     expect(pg17Setup?.run).toContain(
-      "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+      "public.ecr.aws/docker/library/postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
     );
     expect(integrationRuns).toContain("--reporter=default --reporter=junit");
     expect(integrationRuns).toContain("pnpm --filter @boardreadyops/db db:migrate");
