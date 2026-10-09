@@ -22,16 +22,18 @@ const stableRequiredChecks =
 describe("Mergify integration contract", () => {
   it("uses a manual-only Mergify queue without auto-merge", () => {
     const config = yaml.load(mergify) as {
+      merge_queue?: { mode: string; max_parallel_checks: number };
       queue_rules?: Array<{
         name: string;
         merge_method?: string;
+        batch_size?: number;
         queue_conditions?: string[];
       }>;
       merge_protections_settings?: Record<string, unknown>;
       pull_request_rules?: Array<{ actions?: Record<string, unknown> }>;
     };
 
-    expect(config).not.toHaveProperty("merge_queue");
+    expect(config.merge_queue).toEqual({ mode: "serial", max_parallel_checks: 1 });
     expect(config).not.toHaveProperty("scopes");
     expect(config.merge_protections_settings).toBeUndefined();
     expect(mergify).not.toContain("auto_merge_conditions");
@@ -42,6 +44,7 @@ describe("Mergify integration contract", () => {
       {
         name: "main",
         merge_method: "squash",
+        batch_size: 1,
         queue_conditions: ["base = main", "-draft"],
       },
     ]);
