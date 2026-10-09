@@ -23,8 +23,8 @@ describe("reviewed one-click release publication", () => {
     expect(workflow).toContain("REPOSITORY: $" + "{{ github.repository }}");
     expect(workflow).toContain("REF: $" + "{{ github.ref }}");
     expect(workflow).toContain("ACTOR: $" + "{{ github.actor }}");
-    expect(workflow).toContain('[ "${ACTOR}" != "oaslananka" ]');
-    expect(workflow).toContain('[ "${CREATED}" != "true" ]');
+    expect(workflow).toContain(['[ "', "$", '{ACTOR}" != "oaslananka" ]'].join(""));
+    expect(workflow).toContain(['[ "', "$", '{CREATED}" != "true" ]'].join(""));
     expect(workflow).toContain("No reviewed stable release PR was ready to publish");
   });
 
