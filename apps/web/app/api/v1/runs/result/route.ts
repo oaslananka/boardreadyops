@@ -6,6 +6,7 @@ import { createSqlBoardBomStore } from "@boardreadyops/db/board-bom-store";
 import { createSqlFirmwareSnapshotStore } from "@boardreadyops/db/firmware-snapshot-store";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { RequestBodyTooLargeError, readBoundedRequestBody } from "../../../../../lib/bounded-request-body.js";
 import { verifyGitHubActionsOidcToken } from "../../../../../lib/github-actions-oidc.js";
 import {
   createGitHubAppCheckRunClient,
@@ -426,16 +427,11 @@ async function readResultRequest(request: Request, dependencies: ResultRouteDepe
     };
   }
 
-  const contentLength = request.headers.get("content-length");
-  if (contentLength !== null) {
-    const declaredBytes = Number(contentLength);
-    if (Number.isFinite(declaredBytes) && declaredBytes > maximumResultBodyBytes) {
-      return { response: Response.json({ ok: false, error: "runner result payload is too large" }, { status: 413 }) };
-    }
-  }
-
-  const bodyText = await request.text();
-  if (Buffer.byteLength(bodyText, "utf8") > maximumResultBodyBytes) {
+  let bodyText: string;
+  try {
+    bodyText = (await readBoundedRequestBody(request, maximumResultBodyBytes)).toString("utf8");
+  } catch (error) {
+    if (!(error instanceof RequestBodyTooLargeError)) throw error;
     return { response: Response.json({ ok: false, error: "runner result payload is too large" }, { status: 413 }) };
   }
   const configuredKey = configuredSecretValue({ valueName: resultKeyEnvName, fileName: resultKeyFileEnvName });
