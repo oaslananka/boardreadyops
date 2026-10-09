@@ -13,7 +13,7 @@ The target-repository GitHub Actions decision intentionally requires two committ
 boardreadyops.yml
 ```
 
-This is not zero-file onboarding: both files must exist in the target repository's reviewed default branch before analysis can run. The current GitHub App **does request `contents: write` and `workflows: write`** for optional setup pull requests; these grants do not authorize default-branch writes. The App creates or updates only allowlisted files on a **new branch**, then opens a pull request subject to the customer's reviews and branch protection. Without the required write grants, the owner can copy the same generated files into their own pull request. The canonical permission list and degradation paths are in [GitHub App permissions](../security/github-app-permissions.md) and `githubAppPermissionProfile`.
+This is not zero-file onboarding: both files must exist in the target repository's reviewed default branch before analysis can run. The current GitHub App **does request `contents: write`, `workflows: write`, and `pull_requests: write`** for optional setup pull requests; these grants do not authorize default-branch writes. The App creates or updates only allowlisted files on a **new branch**, then opens a pull request subject to the customer's reviews and branch protection. Without the required write grants, the owner can copy the same generated files into their own pull request. The canonical permission list and degradation paths are in [GitHub App permissions](../security/github-app-permissions.md) and `githubAppPermissionProfile`.
 
 
 ## GitHub App setup URL handoff
@@ -55,7 +55,7 @@ These records contain stable identifiers, preset and contract versions, setup st
 
 ## Safe defaults
 
-- The App requests `contents: write` and `workflows: write` for **optional reviewed setup pull requests**; use the exact configuration/workflow path allowlist and never write directly to the default branch. When these grants are absent, fail closed on automated setup and show copy-ready manual instructions.
+- The App requests `contents: write`, `workflows: write`, and `pull_requests: write` for **optional reviewed setup pull requests**; use the exact configuration/workflow path allowlist and never write directly to the default branch. When these grants are absent, fail closed on automated setup and show copy-ready manual instructions.
 - Do not store a BoardReadyOps callback API key in target repositories.
 - Do not dispatch draft or fork pull requests in the initial hosted profile.
 - Keep source, logs, and workflow artifacts in the target repository.
@@ -67,7 +67,7 @@ These records contain stable identifiers, preset and contract versions, setup st
 
 The existing UI, configuration generator, app capability profile, OIDC setup probe, and telemetry helpers are **implementation evidence**, not measured activation. Do not mark a fresh installation validated solely because the public App registration advertises the expected grants: older installations may not have accepted newly requested permissions ([GitHub permission update semantics](https://docs.github.com/en/apps/using-github-apps/approving-updated-permissions-for-a-github-app)). Each repository's actual installation grants must be resolved server-side before offering an automated setup action.
 
-For a controlled fresh-repository validation, record the independently verifiable timestamps for first installation/selection, merge of the reviewed setup PR, setup probe completion, first accepted run, Check Run publication, and **first actionable finding**. Calculate time to first useful finding from the first installation time to the first useful finding, not to the initial queue event or to an empty/pass-only run. The initial target is under 10 minutes; under 5 minutes is a subsequent optimization goal. Report elapsed time, status of each step and any missing permission or workflow error without recording board source, raw GitHub tokens, private paths or artifact bytes. Use distinct fresh repository/installation identities; do not reuse a configured demo repository as fresh-install evidence.
+For a controlled fresh-repository validation, record the independently verifiable timestamps for first installation/selection, merge of the reviewed setup PR, setup probe completion, first accepted run, Check Run publication, and **first actionable finding**. Measure time to first useful finding from the initial installation/selection timestamp to the first actionable finding; a queued run or empty/pass-only result is not sufficient. The initial target is under 10 minutes; under 5 minutes is a subsequent optimization goal. Report elapsed time, status of each step and any missing permission or workflow error without recording board source, raw GitHub tokens, private paths or artifact bytes. Use distinct fresh repository/installation identities; do not reuse a configured demo repository as fresh-install evidence.
 
 The existing `packages/cloud-core/src/telemetry.ts` contains a helper and event definitions but is not itself proof of an end-to-end deployment measurement. This issue requires real, timed validation against supported App/workflow execution before it can be closed.
 

@@ -17,7 +17,7 @@ describe("repository setup documentation", () => {
     expect(record.pull_requests).toBe("write");
 
     const content = await readFile(new URL("../../docs/product/zero-config-onboarding.md", import.meta.url), "utf8");
-    expect(content).toContain("`contents: write` and `workflows: write`");
+    expect(content).toContain("`contents: write`, `workflows: write`, and `pull_requests: write`");
     expect(content).toContain("the App never writes to the default branch");
     expect(content).toContain("copy-ready manual instructions");
     expect(content).toContain("first actionable finding");
