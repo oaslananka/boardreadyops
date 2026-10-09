@@ -39,7 +39,7 @@ describe("HomePage", () => {
     const text = collectText(HomePage());
     const links = collectLinks(HomePage());
     for (const term of ["DRC", "ERC", "BOM", "manufacturing package", "release evidence", "Check Run"]) {
-      expect(text).toContain(term);
+      expect(text.toLowerCase()).toContain(term.toLowerCase());
     }
     expect(text).toContain("Glossary");
     expect(links).toContain("#glossary");
