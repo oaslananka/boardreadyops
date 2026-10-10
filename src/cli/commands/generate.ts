@@ -24,6 +24,7 @@ export interface GenerateCliOptions {
   output?: string | undefined;
   kicadCli?: string | undefined;
   format?: string | undefined;
+  reviewedSourceSha?: string | undefined;
 }
 
 export async function generateCommand(
@@ -73,6 +74,7 @@ export async function generateCommand(
     recipeSource: options.recipe ? normalizePathInput(options.recipe) : "default",
     ...(cli.version ? { kicadVersion: cli.version } : {}),
     gitRoot: root,
+    ...(options.reviewedSourceSha !== undefined ? { reviewedSourceSha: options.reviewedSourceSha } : {}),
   });
 
   if (options.format === "json") {

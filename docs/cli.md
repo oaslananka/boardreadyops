@@ -211,6 +211,29 @@ boardreadyops generate . --recipe generate-recipe.json --output build/release-ou
 boardreadyops generate . --format json
 ```
 
+For a separately approved and explicitly SHA-pinned target-repository run,
+`--reviewed-source-sha <full-lowercase-git-sha>` enables the strict clean
+source, tracked KiCad inputs and Gerber/drill fresh-output checks. It is an
+opt-in library/CLI prerequisite, not proof of a signed GitHub execution:
+
+```bash
+boardreadyops generate . --project hardware/mainboard --recipe path/to/manufacturing-recipe.json \
+  --output build/boardreadyops-attested --reviewed-source-sha 0123456789abcdef0123456789abcdef01234567
+boardreadyops export-checksums . --manifest build/boardreadyops-attested/manifest.json \
+  --reviewed-source-sha 0123456789abcdef0123456789abcdef01234567
+```
+
+The checksum command rechecks actual board source/manifest/output bytes and
+prints an **unsigned** sha256sum-formatted subject inventory. An owner-reviewed
+protected target GitHub Actions job must sign those subjects with
+`actions/attest` and retain the actual artifact bytes in the target repo.
+`boardreadyops verify-export-attestation` then independently verifies the
+GitHub/Sigstore attestation against explicitly authorized repository ID, source
+SHA/ref, workflow, event, run ID and attempt. See the
+[opt-in attested manufacturing workflow](release/attested-manufacturing-export.md)
+for exact setup, trust limitations and negative tests.
+
+
 The command exits `2` for usage or configuration problems (no project, unreadable or schema-invalid recipe), `3` when `kicad-cli` is not available, and `1` when at least one export step fails. `manifest.json` records the tool version, project, recipe (including a SHA-256 hash of the recipe's canonicalized contents), the detected `kicad-cli` version, git commit/dirty state when run inside a git checkout, the OS platform and Node.js version, per-step status, and the SHA-256 digest and size of every generated artifact.
 
 `--recipe <path>` accepts a JSON recipe validated against `boardreadyops schema generate`. The recipe selects which outputs to produce, lets a step be disabled with `"enabled": false`, and can override the output directory or a step's relative output path.
