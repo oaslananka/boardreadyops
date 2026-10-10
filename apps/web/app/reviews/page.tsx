@@ -98,10 +98,9 @@ function ReviewPublishingGuidance() {
   return (
     <Panel id="publish-review" title="Publish a Review" tone="section">
       <p className="text-sm text-muted-foreground">
-        Runs record executions; Reviews require a separate, explicitly published source-bound review revision. Run
-        findings can be triaged before publishing, but do not automatically create a Review. From your local project
-        checkout, use <code>boardreadyops review publish</code> with an authorized API token. This analyzes the
-        checked-out source and records a new run/review; verify its head commit and evidence before requesting approval.
+        Runs report findings; Reviews are separate, explicitly published records. Triage the source, then use{" "}
+        <code>boardreadyops review publish</code> from an authorized local checkout. It creates a new run/review; verify
+        its exact head commit and evidence before approval.
       </p>
     </Panel>
   );

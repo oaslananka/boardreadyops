@@ -35,8 +35,8 @@ describe("ReviewsListPage", () => {
     const markup = await render();
 
     expect(markup).toContain('id="publish-review"');
-    expect(markup).toContain("Reviews require a separate, explicitly published source-bound review revision");
-    expect(markup).toContain("verify its head commit and evidence");
+    expect(markup).toContain("Reviews are separate, explicitly published records");
+    expect(markup).toContain("verify its exact head commit and evidence");
     expect(markup).toContain("boardreadyops review publish");
   });
 
