@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { policyCommand } from "../../../src/cli/commands/policy.js";
 import * as attestation from "../../../src/release/export-attestation.js";
@@ -71,7 +72,7 @@ describe("policy command", () => {
     expect(code).toBe(0);
     expect(verify).toHaveBeenCalledWith(
       expect.objectContaining({
-        root,
+        root: await fs.realpath(root),
         manifestPath: trustedOptions.manifest,
         expected: expect.objectContaining({
           repository: "customer/fabrication",
