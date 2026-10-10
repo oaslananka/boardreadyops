@@ -53,6 +53,8 @@ function rewriteDefaultCommand(argv: string[]): string[] {
     "vendor",
     "sbom",
     "generate",
+    "export-checksums",
+    "verify-export-attestation",
     "init",
     "baseline",
     "runner",

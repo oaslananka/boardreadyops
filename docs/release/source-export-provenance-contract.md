@@ -159,3 +159,26 @@ or release/GA approval. A positive library result must not directly change
 a release policy or a tenant-facing badge. The actual identity authority,
 protected runner/workflow, provider availability and independent customer
 acceptance remain open under #771 and #154.
+
+
+## Opt-in target-runner export and signature path (not GA-commissioned)
+
+The [reviewed manufacturing export runbook](attested-manufacturing-export.md)
+now documents a separately packaged composite Action and a target-repository
+`workflow_dispatch` **template** under `examples/github/workflows/`. The
+caller pins the immutable BoardReadyOps action commit; its protected,
+GitHub-hosted target job checks out the exact `github.sha`, runs real KiCad 10
+Gerber and Excellon generation with the opt-in `reviewedSourceSha` guard,
+recomputes a manifest-plus-every-output checksum set and invokes SHA-pinned
+`actions/attest` inside the **target** repository using that job's OIDC.
+The associated CLI supports independent credentialed `gh attestation verify`
+against explicit owner-authorized repository/run/attempt expectations.
+
+This is an executable **integration contract** with local real KiCad validation,
+not evidence that a customer has installed the template, signed an export, or
+passed multi-installation acceptance. The template deliberately requires the
+owner to replace a future immutable BoardReadyOps commit SHA and project path;
+it must not be run against mutable refs. Private/internal native signing is
+Enterprise Cloud-gated; other private targets remain unverified. No GA trust
+level, release gate or production policy is changed by the mere existence of
+these components; #771 and #154 remain open.
