@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { BillingMode } from "../../lib/billing-mode.js";
 import { Badge } from "../ui/badge.js";
@@ -28,6 +29,8 @@ interface PlanDefinition {
   cadence: string;
   tagline: string;
   features: string[];
+  /** Roadmap only. These must never be shown with the included-benefit checkmark. */
+  plannedFeatures?: string[];
 }
 
 const PLANS: PlanDefinition[] = [
@@ -52,11 +55,11 @@ const PLANS: PlanDefinition[] = [
     tagline: "For independent engineers and hardware duos.",
     features: [
       "Everything in Community",
-      "Private Multi-CAD hosted ZIP uploads (planned; not available yet)",
       "Interactive visual layer canvas",
       "Cross-revision Gerber diffing",
       "5GB storage included",
     ],
+    plannedFeatures: ["Private Multi-CAD hosted ZIP upload"],
   },
   {
     key: "business",
@@ -151,6 +154,18 @@ export function PlanComparisonCard({
 
   return (
     <div className="plan-comparison-container flex flex-col gap-4">
+      <div role="note" className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
+        <strong>Hosted ZIP uploads are not available on any plan.</strong> Upgrading to a paid tier does not enable
+        hosted manufacturing-package upload. Use the{" "}
+        <Link href="/setup" className="underline underline-offset-2">
+          GitHub App
+        </Link>{" "}
+        or the{" "}
+        <Link href="/projects/new" className="underline underline-offset-2">
+          local CLI workflow
+        </Link>{" "}
+        for supported source checks today.
+      </div>
       {hasStripeCustomer && selfServeEnabled && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted p-3">
           <div>
@@ -212,6 +227,16 @@ export function PlanComparisonCard({
                   </li>
                 ))}
               </ul>
+              {plan.plannedFeatures ? (
+                <div className="rounded-md border border-border p-2 text-xs text-muted-foreground">
+                  <strong className="text-foreground">Planned — not included with this plan</strong>
+                  <ul className="mt-1 list-disc pl-4">
+                    {plan.plannedFeatures.map((feature) => (
+                      <li key={feature}>{feature}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               <div>
                 {isCurrent && (

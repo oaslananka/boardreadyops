@@ -76,6 +76,72 @@ export default async function ComponentIntelligencePage({ searchParams }: Readon
       const limits = planLimits(planTierOf(installation.planTier));
       const token = secret ? issueSettingsFormToken(session, installation.id, secret, now) : "";
 
+      const credentialForm = (
+        <form action="/api/v1/settings/component-intelligence" method="post" className="mt-3 flex flex-col gap-3">
+          <input type="hidden" name="installation_id" value={installation.id} />
+          <input type="hidden" name="form_token" value={token} />
+
+          <div>
+            <label htmlFor={`client-id-${installation.id}`} className="text-sm font-medium text-foreground">
+              Nexar client ID
+            </label>
+            <Input
+              id={`client-id-${installation.id}`}
+              name="client_id"
+              type="text"
+              autoComplete="off"
+              maxLength={512}
+              required
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <label htmlFor={`client-secret-${installation.id}`} className="text-sm font-medium text-foreground">
+              Nexar client secret
+            </label>
+            {/* Never rendered back: the stored value is write-only from this page. */}
+            <Input
+              id={`client-secret-${installation.id}`}
+              name="client_secret"
+              type="password"
+              autoComplete="new-password"
+              maxLength={512}
+              required
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <label htmlFor={`scope-${installation.id}`} className="text-sm font-medium text-foreground">
+              OAuth scope (optional)
+            </label>
+            <Input
+              id={`scope-${installation.id}`}
+              name="scope"
+              type="text"
+              autoComplete="off"
+              maxLength={512}
+              placeholder="supply.domain"
+              className="mt-1"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button type="submit" name="action" value="save" disabled={!cipherConfigured}>
+              {installation.hasComponentCredential ? "Replace credential" : "Save credential"}
+            </Button>
+            {/* formNoValidate: removal does not need the credential fields, and the
+                      browser would otherwise block the submit on their required attribute. */}
+            {installation.hasComponentCredential ? (
+              <Button type="submit" name="action" value="remove" variant="secondary" formNoValidate>
+                Remove
+              </Button>
+            ) : undefined}
+          </div>
+        </form>
+      );
+
       return (
         <Panel key={installation.id} title={installation.accountLogin}>
           <DefinitionGrid>
@@ -89,8 +155,13 @@ export default async function ComponentIntelligencePage({ searchParams }: Readon
           {!limits.supplyWatch ? (
             <div className="mt-3">
               <Alert tone="info" title="Supply watch is not on this plan">
-                Supply watch is not included on the {customerPlanLabel(installation.planTier)} plan. You can store a
-                credential now; boards will start being checked when the plan includes it.
+                Supply watch is not included on the {customerPlanLabel(installation.planTier)} plan. You do not need to
+                provide Nexar credentials now: this plan does not run supply lookups. You may optionally prepare
+                credentials for a future eligible plan.{" "}
+                <Link href="/settings/billing" className="underline underline-offset-2">
+                  Compare plan features
+                </Link>
+                .
               </Alert>
             </div>
           ) : undefined}
@@ -107,69 +178,20 @@ export default async function ComponentIntelligencePage({ searchParams }: Readon
             </div>
           ) : undefined}
 
-          <form action="/api/v1/settings/component-intelligence" method="post" className="mt-3 flex flex-col gap-3">
-            <input type="hidden" name="installation_id" value={installation.id} />
-            <input type="hidden" name="form_token" value={token} />
-
-            <div>
-              <label htmlFor={`client-id-${installation.id}`} className="text-sm font-medium text-foreground">
-                Nexar client ID
-              </label>
-              <Input
-                id={`client-id-${installation.id}`}
-                name="client_id"
-                type="text"
-                autoComplete="off"
-                maxLength={512}
-                required
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={`client-secret-${installation.id}`} className="text-sm font-medium text-foreground">
-                Nexar client secret
-              </label>
-              {/* Never rendered back: the stored value is write-only from this page. */}
-              <Input
-                id={`client-secret-${installation.id}`}
-                name="client_secret"
-                type="password"
-                autoComplete="new-password"
-                maxLength={512}
-                required
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <label htmlFor={`scope-${installation.id}`} className="text-sm font-medium text-foreground">
-                OAuth scope (optional)
-              </label>
-              <Input
-                id={`scope-${installation.id}`}
-                name="scope"
-                type="text"
-                autoComplete="off"
-                maxLength={512}
-                placeholder="supply.domain"
-                className="mt-1"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button type="submit" name="action" value="save" disabled={!cipherConfigured}>
-                {installation.hasComponentCredential ? "Replace credential" : "Save credential"}
-              </Button>
-              {/* formNoValidate: removal does not need the credential fields, and the
-                        browser would otherwise block the submit on their required attribute. */}
-              {installation.hasComponentCredential ? (
-                <Button type="submit" name="action" value="remove" variant="secondary" formNoValidate>
-                  Remove
-                </Button>
-              ) : undefined}
-            </div>
-          </form>
+          {!limits.supplyWatch ? (
+            <details className="mt-3 rounded-md border border-border p-3">
+              <summary className="cursor-pointer font-medium text-foreground">
+                Optional: prepare provider credentials in advance
+              </summary>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Preparing credentials does not activate supply watch or change your subscription. Avoid entering a
+                secret unless you intend to prepare ahead.
+              </p>
+              {credentialForm}
+            </details>
+          ) : (
+            credentialForm
+          )}
         </Panel>
       );
     });
