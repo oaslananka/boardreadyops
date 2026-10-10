@@ -150,7 +150,13 @@ export default async function MyWorkPage() {
             >
               {assignedFindings.length === 0 ? (
                 <EmptyState title="No assigned findings">
-                  <p>You have no open assigned findings.</p>
+                  <p>
+                    You have no findings assigned through a published Review. Repository readiness runs can still
+                    contain issues that have not been assigned to anyone.
+                  </p>
+                  <Link href="/runs" className="mt-2 inline-block text-primary underline underline-offset-2">
+                    Browse all readiness runs →
+                  </Link>
                 </EmptyState>
               ) : (
                 <div className="flex flex-col gap-3">
@@ -191,7 +197,13 @@ export default async function MyWorkPage() {
             >
               {awaitingReviews.length === 0 ? (
                 <EmptyState title="No pending reviews">
-                  <p>You are all caught up on review requests.</p>
+                  <p>
+                    No published Reviews are awaiting your decision. This does not mean every repository is
+                    release-ready.
+                  </p>
+                  <Link href="/runs" className="mt-2 inline-block text-primary underline underline-offset-2">
+                    View readiness runs →
+                  </Link>
                 </EmptyState>
               ) : (
                 <div className="flex flex-col gap-3">

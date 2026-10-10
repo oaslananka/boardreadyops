@@ -76,6 +76,19 @@ describe("MyWorkPage", () => {
     expect(markup).toContain('href="/reviews/rev_real_1?tab=findings"');
   });
 
+  it("distinguishes a zero assigned-review queue from zero release-readiness issues", async () => {
+    loadViewerReviews.mockResolvedValue({ state: "ok", next: undefined, reviews: [] });
+    loadViewerWorkQueue.mockResolvedValue({ assignedFindings: [] });
+
+    const markup = await render();
+    expect(markup).toContain("No assigned findings");
+    expect(markup).toContain("Repository readiness runs can still contain issues");
+    expect(markup).toContain("does not mean every repository is");
+    expect(markup).toContain('href="/runs"');
+    expect(markup).toContain("Browse all readiness runs");
+    expect(markup).toContain("View readiness runs");
+  });
+
   it("asks an unrecognised viewer to sign in rather than showing an empty queue", async () => {
     loadViewerReviews.mockResolvedValue({ state: "signed-out" });
     const markup = await render();

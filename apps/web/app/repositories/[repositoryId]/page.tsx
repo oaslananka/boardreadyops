@@ -178,8 +178,12 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
               )}
             </Definition>
             <Definition label="Open findings">{repository.latestRunId ? repository.openFindings : "—"}</Definition>
-            <Definition label="Boards watched">{repository.watchedBoards}</Definition>
+            <Definition label="Supply-tracked boards">{repository.watchedBoards}</Definition>
           </DefinitionGrid>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Supply-tracked boards are registered for component monitoring. This number does not count successful
+            readiness runs; view the recent runs below to inspect release checks.
+          </p>
           {/*
             "How do I stop watching this repository?" had no answer anywhere in the product. It
             is GitHub's to answer — the App's repository access is what connects it, and
