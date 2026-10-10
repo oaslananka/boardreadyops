@@ -107,7 +107,9 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(steps[attestIndex]?.with).toEqual({
       "subject-checksums": "$" + "{{ steps.export.outputs.subject-checksums }}",
     });
-    expect(steps[exportIndex]?.uses).toMatch(/@REPLACE_WITH_REVIEWED_40_CHAR_COMMIT_SHA$/u);
+    expect(steps[exportIndex]?.uses).toMatch(
+      /^oaslananka\/boardreadyops\/\.github\/actions\/manufacturing-attested-export@[a-f0-9]{40}$/u,
+    );
     expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"))).toBe(true);
   });
 

@@ -1,6 +1,7 @@
 # COPY into the target repository as .github/workflows/boardreadyops-manufacturing-attested.yml.
-# Replace the explicit BoardReadyOps Action SHA placeholder with a reviewed
-# immutable commit containing the export action, and set the project path.
+# The initial full pin below references the reviewed implementation PR head.
+# Before customer commissioning, replace it with the approved protected-merge
+# commit SHA containing the export action; also set the target project path.
 # Commit the workflow + build/boardreadyops-attested/ ignore rule on a protected
 # branch BEFORE invoking workflow_dispatch. Never trigger on pull_request.
 name: BoardReadyOps reviewed fabrication attestation
@@ -40,9 +41,9 @@ jobs:
           [[ "$(kicad-cli version)" == 10.0.* ]]
       - name: Generate reviewed Gerber/Excellon bytes and subject inventory
         id: export
-        # Deliberately non-runnable until the owner pins the reviewed source
-        # commit containing this Action. No mutable main/tag allowed.
-        uses: oaslananka/boardreadyops/.github/actions/manufacturing-attested-export@REPLACE_WITH_REVIEWED_40_CHAR_COMMIT_SHA
+        # Immutable implementation PR-head SHA shown for review. Customer must
+        # replace with the independently approved protected-merge SHA.
+        uses: oaslananka/boardreadyops/.github/actions/manufacturing-attested-export@31e40e19065591491aa5e0380957a66b48632999
         with:
           reviewed-source-sha: ${{ github.sha }}
           project: hardware/board.kicad_pro # REPLACE with a real tracked project
