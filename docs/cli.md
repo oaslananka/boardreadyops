@@ -357,3 +357,22 @@ boardreadyops baseline clear [path] [--config <path>]
 ```
 
 `capture` writes the current finding fingerprints. `diff` reports added, removed, and unchanged findings. `prune` removes entries that no longer match the current run. Each subcommand accepts an optional repository path and the same `--config <path>` lookup used by `run`, so non-default config files resolve the matching baseline file.
+
+
+### Opt-in signed source-bound strict policy
+
+The optional `boardreadyops.yml` rule
+`policy.rules: [{ id: signed-export, type: require-source-bound-export }]`
+connects the `verify-export-attestation` signed-subject prerequisite with
+the regular `boardreadyops policy` advisory or enforced decision.
+Pass `--manifest`, `--repository`, `--repository-id`,
+`--reviewed-source-sha`, `--source-ref`, `--workflow`, `--event`,
+`--run-id`, `--run-attempt`, and optionally `--bundle` directly to
+`boardreadyops policy`. These expected identities must come from an
+independently authorized GitHub installation/run record. The output's
+`sourceBound.status` is one of `source-bound-verified`,
+`byte-consistent-only` or `unverified`. Missing or unverified strong
+provenance fails **only when the rule is opted in**; `policy.enforce: true`
+makes a failing `policy` command exit 1. This does not automatically
+authorize production, GA trust badges or a release. Full instructions:
+[Source-bound opt-in policy](release/policy-engine.md).

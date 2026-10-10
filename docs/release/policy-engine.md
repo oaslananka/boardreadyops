@@ -77,3 +77,67 @@ This provenance describes the policy that is effective **now** for the review.
 Policy mutations are separately recorded in the tenant-scoped, append-only `review_policy_audit_events` history. Create, update, and delete mutations write their audit event in the same PostgreSQL statement as the policy change, including the authenticated GitHub actor plus before/after policy snapshots where applicable. The history remains available after a policy is deleted and can be read for an owned policy through `GET /api/v1/policies/:id/audit`.
 
 Historical **per-run effective-policy snapshots** are still separate work. The mutation audit proves how governance configuration changed over time; it does not by itself prove which effective policy a past release run evaluated. Do not treat the current-policy view as immutable historical run evidence until run-scoped policy snapshots are persisted.
+
+
+## Opt-in source-bound manufacturing export policy (#771)
+
+After reviewing the **target repository's** reviewed source, protected workflow and
+signer/run identity independently, a project may opt in to an **enforced** source
+provenance prerequisite (this does not change the product's default policy):
+
+```yaml
+# boardreadyops.yml (reviewed separately from generated fabrication files)
+version: 1
+policy:
+  enforce: true
+  rules:
+    - id: signed-fabrication-from-reviewed-source
+      type: require-source-bound-export
+```
+
+Use the `boardreadyops policy` command as an explicit CI gate on an exact
+approved target checkout containing the downloaded original fabrication
+output tree. Supply the expectations obtained from the **independently
+authorized GitHub run record**, not values copied from an upload or the
+unsigned manifest. You can pass `--bundle <file>` for separately downloaded
+offline Sigstore verification.
+
+```bash
+boardreadyops policy . --format json \
+  --manifest build/boardreadyops-attested/manifest.json \
+  --repository OWNER/REPO --repository-id 123456 \
+  --reviewed-source-sha 0123456789abcdef0123456789abcdef01234567 \
+  --source-ref refs/heads/main \
+  --workflow .github/workflows/boardreadyops-manufacturing-attested.yml \
+  --event workflow_dispatch --run-id 123456789 --run-attempt 1
+```
+
+The policy output contains both the ordinary findings policy decision and a
+**source-bound trust classification**:
+
+- `source-bound-verified`: GitHub/Sigstore signature successfully checked
+  against an authorized numeric repository ID, source revision/ref, signer
+  workflow, run attempt, OIDC issuer, GitHub-hosted environment, and the
+  complete manifest plus *actual* Gerber/Excellon subject hashes. The
+  verifiable source SHA, run URL and subject count are present in JSON/text.
+- `byte-consistent-only`: the self-reported manifest matches actual local
+  bytes, **without** an accepted independent signer/run identity. This is
+  useful inspection evidence, but **fails** the strong-source rule.
+- `unverified`: evidence is missing, inaccessible, changed or inconsistent.
+  This also **fails** the strong-source rule.
+
+With `policy.enforce: true`, a failed rule causes `boardreadyops policy`
+to exit **1**, including missing/invalid/unsupported signed proof. Without
+`enforce`, it remains advisory. `--simulate` retains its preexisting
+nonblocking preview semantics and must never serve as a release gate.
+
+The special strong-source rule is **not inferred** from
+`release.artifact-provenance`, an attestation URL or a `verified` manifest
+flag: these are not cryptographic proof. The low-level `run` command with
+this strict rule and no signed proof also reports a failed policy. Existing
+`release pack`, production workflows, dashboard status, customer-level
+tenancy acceptance, default releases and GA controls are **not automatically
+enabled** by this CLI option; the approved CI workflow must call the policy
+gate explicitly before any authorized handoff or release step. Two genuinely
+independent private GitHub App installations and the end-to-end #154
+acceptance are still required before customer-facing GA state is enabled.

@@ -190,8 +190,18 @@ export function registerAllCommands(
   );
 
   addCommonOptions(program.command("policy").argument("[path]", "directory to scan"))
-    .description("evaluate the configured release policy")
+    .description("evaluate release policy, including opt-in signed source-to-export trust")
     .option("--simulate", "evaluate and report the policy without affecting the exit code")
+    .option("--manifest <path>", "manufacturing export manifest relative to checked-out root")
+    .option("--repository <owner/name>", "independently authorized target repository")
+    .option("--repository-id <id>", "numeric immutable target repository ID")
+    .option("--reviewed-source-sha <sha>", "independently approved exact source commit")
+    .option("--source-ref <ref>", "expected GitHub source ref")
+    .option("--workflow <path>", "trusted .github/workflows/...yml signer path")
+    .option("--event <event>", "authorized GitHub event")
+    .option("--run-id <id>", "authorized GitHub Actions run ID")
+    .option("--run-attempt <number>", "exact attempt to reject replay")
+    .option("--bundle <path>", "offline Sigstore bundle from the authorized provider")
     .action(async (pathInput: string | undefined, options: PolicyCommandOptions) => {
       process.exitCode = await policyCommand(pathInput, options, streams);
     });
