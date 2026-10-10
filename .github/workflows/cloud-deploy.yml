@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Rehearse the deploy (build, migrate-check, canary, health-check) without touching the live containers.
+        description: Build only on the production host; no container replacement, migrations, canary, or health check. Checkout/images/cache may change.
         required: false
         default: true
         type: boolean
