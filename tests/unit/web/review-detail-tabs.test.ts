@@ -39,6 +39,20 @@ describe("Review Detail Tabs", () => {
     expect(header).toContain("Request changes");
   });
 
+  it("shows authorized persisted Review revision run links, but no invented fixture source run", () => {
+    const persisted = renderToStaticMarkup(
+      createElement(ReviewView, {
+        initialReview: { ...review, headRunId: "head-run-42", baseRunId: "base-run-41" },
+      }),
+    );
+    expect(persisted).toContain('href="/runs/head-run-42"');
+    expect(persisted).toContain('href="/runs/base-run-41"');
+    expect(persisted).toContain('aria-label="Review source runs"');
+
+    const fixture = renderToStaticMarkup(createElement(ReviewView, { initialReview: review }));
+    expect(fixture).not.toContain('aria-label="Review source runs"');
+  });
+
   it("renders ReviewView with accessible tablist and workspace semantics", () => {
     const view = renderToStaticMarkup(createElement(ReviewView, { initialReview: review }));
     expect(view).toContain('aria-label="Review workspace"');

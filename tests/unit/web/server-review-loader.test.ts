@@ -211,6 +211,8 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
     const review = await loadServerReview(reviewId, authorizedSession);
     expect(review).toBeDefined();
     expect(review?.id).toBe(reviewId);
+    expect(review?.headRunId).toBe("run-hw-105");
+    expect(review?.baseRunId).toBeUndefined();
     expect(review?.decision).toBe("approved");
     expect(review?.currentRevisionId).toBe("rev_db_v1");
     expect(review?.findings).toHaveLength(1);
