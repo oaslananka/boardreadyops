@@ -407,7 +407,8 @@ export function reviewPublishCommand(run: Pick<RunDetail, "repository" | "pullRe
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(run.repository)) return undefined;
   const pr = run.pullRequestNumber;
   if (pr !== undefined && (!Number.isSafeInteger(pr) || pr <= 0)) return undefined;
-  return `boardreadyops review publish . --repo ${run.repository}${pr === undefined ? "" : ` --pr ${pr}`}`;
+  const command = `boardreadyops review publish . --repo ${run.repository}`;
+  return pr === undefined ? command : `${command} --pr ${pr}`;
 }
 
 function ReviewLifecyclePanel({ run }: Readonly<{ run: RunDetail }>) {
