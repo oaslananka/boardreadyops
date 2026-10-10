@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
 import { ChangesTab } from "../../../apps/web/components/review/changes-tab.js";
 import { ChecklistApprovalsTab } from "../../../apps/web/components/review/checklist-approvals-tab.js";
 import { EvidenceTab } from "../../../apps/web/components/review/evidence-tab.js";
-import { OverviewTab } from "../../../apps/web/components/review/overview-tab.js";
+import { OverviewTab, ReviewRevisionEvidence } from "../../../apps/web/components/review/overview-tab.js";
 import { ReviewHeader } from "../../../apps/web/components/review/review-header.js";
 import { ReviewView } from "../../../apps/web/components/review/review-view.js";
 import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
@@ -68,6 +68,69 @@ describe("Review Detail Tabs", () => {
     );
     expect(view).toContain('<span class="sr-only">, ');
     expect(view).toContain(" blocking</span>");
+  });
+
+  it("shows an exact source comparison only for linked evidence runs, never board-level signoff", () => {
+    const linked = renderToStaticMarkup(
+      createElement(ReviewRevisionEvidence, {
+        review: {
+          ...review,
+          baseCommitSha: "a".repeat(40),
+          headCommitSha: "b".repeat(40),
+          baseRunId: "base-run/41",
+          headRunId: "head-run/42",
+        },
+      }),
+    );
+    expect(linked).toContain('href="/runs/base-run%2F41"');
+    expect(linked).toContain('href="/runs/head-run%2F42"');
+    expect(linked).toContain("a".repeat(40));
+    expect(linked).toContain("b".repeat(40));
+    expect(linked).toContain("repository-scoped");
+    expect(linked).toContain("neither a Run link nor this comparison proves which individual boards were approved");
+
+    const notLinked = renderToStaticMarkup(
+      createElement(ReviewRevisionEvidence, {
+        review: { ...review, baseRunId: undefined, headRunId: undefined, baseCommitSha: "0".repeat(40) },
+      }),
+    );
+    expect(notLinked).toContain("Not recorded");
+    expect(notLinked).toContain("No linked base Run");
+    expect(notLinked).toContain("No linked head Run");
+    expect(notLinked).not.toContain('href="/runs/');
+  });
+
+  it("never treats an approved review as signed manufacturing authorization", () => {
+    const approved = {
+      ...review,
+      decision: "approved" as const,
+      evidenceState: "current" as const,
+      findings: review.findings.map((finding) => ({ ...finding, disposition: "fixed" as const })),
+      checklist: review.checklist.map((item) => ({ ...item, completed: true })),
+      approvals: [
+        {
+          id: "approved-for-current-evidence",
+          approverId: "reviewer@example.test",
+          status: "approved" as const,
+          evidenceDigest: review.evidenceDigest,
+          createdAt: "2026-10-11T00:00:00Z",
+        },
+      ],
+    };
+    const completedMarkup = renderToStaticMarkup(createElement(OverviewTab, { review: approved }));
+    expect(completedMarkup).toContain("Review Checks Met");
+    expect(completedMarkup).toContain("Release Not Verified");
+    expect(completedMarkup).toContain("not a verified manufacturing export");
+    expect(completedMarkup).not.toContain("Ready for Fabrication");
+    const stale = renderToStaticMarkup(
+      createElement(OverviewTab, { review: { ...approved, evidenceState: "stale" as const } }),
+    );
+    expect(stale).toContain("Review Checks Incomplete");
+    expect(stale).not.toContain("Review Checks Met");
+    const requested = renderToStaticMarkup(
+      createElement(OverviewTab, { review: { ...approved, decision: "changes_requested" as const } }),
+    );
+    expect(requested).toContain("Changes Requested — Review Blocked");
   });
 
   it("renders OverviewTab with readiness gate status and metadata", () => {

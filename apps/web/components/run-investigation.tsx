@@ -273,16 +273,27 @@ function githubRepositoryBaseUrl(run: RunDetail): string {
 }
 
 function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
-  if (run.boards.length === 0) return null;
+  if (run.boards.length === 0) {
+    return (
+      <Panel id="boards" title="Board BOM evidence">
+        <p className="text-sm text-muted-foreground">
+          No per-board BOM snapshots were captured for this run. This does not establish that the repository has no
+          boards. Use the run findings and execution evidence to inspect the source revision.
+        </p>
+      </Panel>
+    );
+  }
   const totalComponents = run.boards.reduce((sum, board) => sum + board.componentCount, 0);
   return (
     <Panel
       id="boards"
-      title="Boards in this run"
-      description={`Components captured per board, kept as the record of what ${
-        run.boards.length === 1 ? "this board" : "these boards"
-      } shipped with.`}
+      title="Board BOM evidence"
+      description="Per-board component snapshots captured during this run, not proof of shipment or fabrication approval."
     >
+      <p className="mb-3 text-xs text-muted-foreground">
+        These board IDs identify recorded BOM snapshots only. Findings and Review decisions are not automatically
+        assigned per board. The source commit for this run is <code>{run.commitSha}</code>.
+      </p>
       <ul className="flex flex-col gap-3">
         {run.boards.map((board) => (
           <li key={board.boardId} className="rounded-md border border-border bg-card p-3">
@@ -292,9 +303,24 @@ function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
                 <StatusBadge value="warning" label={`${board.riskyLifecycleCount} at lifecycle risk`} />
               ) : null}
             </div>
-            <p className="mt-1 text-xs">
-              <code>{board.project}</code>
+            <p className="mt-1 break-all text-xs">
+              Project: <code>{board.project}</code>
             </p>
+            <p className="mt-1 break-all text-xs text-muted-foreground">
+              Board record: <code>{board.boardId}</code>
+            </p>
+            {githubFindingSourceUrl(run.repository, run.commitSha, board.project) ? (
+              <p className="mt-1 text-xs">
+                <a
+                  href={githubFindingSourceUrl(run.repository, run.commitSha, board.project)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline underline-offset-2"
+                >
+                  View project at this exact commit ↗
+                </a>
+              </p>
+            ) : null}
             <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
               <div>
                 <dt className="text-xs uppercase text-muted-foreground">Components</dt>

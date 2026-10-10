@@ -450,6 +450,53 @@ describe("run investigation accessibility", () => {
     expect(markup).not.toContain("Update the source design file");
   });
 
+  it("distinguishes captured per-board BOMs from multi-board manufacturing release", () => {
+    const run = sampleRun();
+    run.boards.push({
+      boardId: "board-sensor-2",
+      displayName: "sensor",
+      project: "hardware/sensor/sensor.kicad_pro",
+      componentCount: 2,
+      identifiedComponentCount: 1,
+      unidentifiedComponentCount: 1,
+      riskyLifecycleCount: 0,
+      capturedAt: "2026-07-10T16:06:00.000Z",
+    });
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("Board BOM evidence");
+    expect(markup).toContain("Board record");
+    expect(markup).toContain("board-sensor-2");
+    expect(markup).toContain(
+      'href="https://github.com/oaslananka/boardreadyops/blob/0123456789abcdef0123456789abcdef01234567/hardware/sensor/sensor.kicad_pro"',
+    );
+    expect(markup).toContain("not proof of shipment or fabrication approval");
+    expect(markup).toContain("Review decisions are not automatically assigned per board");
+    expect(markup).not.toContain("these boards shipped with");
+  });
+
+  it("does not invent board identity or a source link without an actual BOM snapshot", () => {
+    const run = sampleRun();
+    run.boards = [];
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("No per-board BOM snapshots were captured");
+    expect(markup).toContain("does not establish that the repository has no boards");
+    expect(markup).not.toContain("Board record:");
+    run.boards = [
+      {
+        boardId: "not-safe-path",
+        displayName: "unresolved",
+        project: "../secrets/private.kicad_pro",
+        componentCount: 0,
+        identifiedComponentCount: 0,
+        unidentifiedComponentCount: 0,
+        riskyLifecycleCount: 0,
+        capturedAt: "2026-07-10T16:05:00.000Z",
+      },
+    ];
+    const unsafe = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(unsafe).not.toContain("View project at this exact commit");
+  });
+
   it("renders stable investigation flow snapshots", () => {
     expect({
       summary: viewMarkup("summary"),
