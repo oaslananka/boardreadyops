@@ -3,10 +3,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import generateRecipeSchema from "../../schemas/generate-recipe.schema.json" with { type: "json" };
-import { computeSourceFingerprint } from "../core/provenance.js";
+import { computeSourceFingerprint, verifyExportProvenance } from "../core/provenance.js";
 import { boardReadyVersion } from "../generated/version.js";
 import { resolveGitExecutable } from "../util/git-resolver.js";
+import { globFiles } from "../util/glob.js";
 import { canonicalizeJson } from "../util/json.js";
+import { isInside, resolveExistingPathAlias, toPosixPath } from "../util/path.js";
 import { runProcess } from "../util/process.js";
 import { redactControlCharacters } from "../util/strings.js";
 import { assertSafeGenerateOutputCleanup } from "./output-cleanup.js";
@@ -194,6 +196,12 @@ export interface GenerateOptions {
   kicadVersion?: string | undefined;
   /** Directory to read git provenance from; typically the project root. */
   gitRoot?: string | undefined;
+  /**
+   * Optional fail-closed, local source checkout precondition for a future
+   * target-repository attested exporter. This is NOT a trusted attestation;
+   * the caller must independently authenticate the reviewed source SHA.
+   */
+  reviewedSourceSha?: string | undefined;
 }
 
 interface GenerateStepOutcome {
@@ -287,6 +295,86 @@ async function gitState(root: string): Promise<GenerateGitState> {
   }
 }
 
+const reviewedShaPattern = /^[0-9a-f]{40}$/u;
+// Keep this aligned with SOURCE_PATTERNS in core/provenance.ts: each source
+// fingerprint input must actually be tracked by the reviewed Git commit.
+const reviewedSourcePatterns = [
+  "**/*.kicad_pcb",
+  "**/*.kicad_sch",
+  "**/*.kicad_pro",
+  "**/*.kicad_jobset",
+  "**/*.kicad_dru",
+  "**/*.kicad_wks",
+];
+
+async function assertReviewedSource(options: GenerateOptions): Promise<void> {
+  const expected = options.reviewedSourceSha;
+  if (expected === undefined) return;
+  if (!reviewedShaPattern.test(expected) || !options.gitRoot) {
+    throw new Error("Reviewed export requires a full lowercase source SHA and explicit Git root.");
+  }
+
+  const root = await fs.realpath(options.gitRoot);
+  const executable = resolveGitExecutable();
+  const env = gitDiscoveryEnv();
+  const [top, head, status] = await Promise.all([
+    runProcess(executable, ["rev-parse", "--show-toplevel"], { cwd: root, env, timeoutMs: 10_000 }),
+    runProcess(executable, ["rev-parse", "--verify", "HEAD^{commit}"], { cwd: root, env, timeoutMs: 10_000 }),
+    runProcess(executable, ["status", "--porcelain=v1", "--untracked-files=all"], {
+      cwd: root,
+      env,
+      timeoutMs: 10_000,
+    }),
+  ]);
+  if (top.code !== 0 || head.code !== 0 || status.code !== 0 || top.timedOut || head.timedOut || status.timedOut) {
+    throw new Error("Reviewed export could not verify its Git checkout and working-tree state.");
+  }
+  if (path.resolve(top.stdout.trim()) !== root) {
+    throw new Error("Reviewed export Git root must match the checkout top-level directory.");
+  }
+  if (head.stdout.trim() !== expected) {
+    throw new Error("Reviewed export source commit does not match the pinned SHA.");
+  }
+  if (status.stdout.trim() !== "") {
+    throw new Error("Reviewed export requires a clean Git checkout, including untracked files.");
+  }
+
+  // Git status alone does not cover ignored/untracked source files. Ensure
+  // every KiCad input in the source fingerprint belongs to the pinned commit.
+  const sourcePaths = (await globFiles(root, reviewedSourcePatterns, { rejectMatchingSymlinks: true })).map(
+    (absolute) => toPosixPath(path.relative(root, absolute)),
+  );
+  if (sourcePaths.length === 0 || sourcePaths.length > 4096) {
+    throw new Error("Reviewed export has no KiCad inputs or exceeds the source inventory limit.");
+  }
+  const tracked = await runProcess(executable, ["ls-files", "--cached", "-z", "--", ...sourcePaths], {
+    cwd: root,
+    env,
+    timeoutMs: 10_000,
+    maxStdoutBytes: 1024 * 1024,
+  });
+  if (tracked.code !== 0 || tracked.timedOut) {
+    throw new Error("Reviewed export could not verify its Git-tracked KiCad source inventory.");
+  }
+  const trackedPaths = new Set(tracked.stdout.split("\0").filter(Boolean));
+  if (sourcePaths.some((sourcePath) => !trackedPaths.has(sourcePath))) {
+    throw new Error("Reviewed export includes a KiCad source input not tracked by the pinned commit.");
+  }
+}
+
+async function assertFreshReviewedOutput(outputDir: string): Promise<void> {
+  let stat: Awaited<ReturnType<typeof fs.lstat>>;
+  try {
+    stat = await fs.lstat(outputDir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+  if (!stat.isDirectory() || (await fs.readdir(outputDir)).length !== 0) {
+    throw new Error("Reviewed export requires a new or empty generated-output directory.");
+  }
+}
+
 async function sourceInputFingerprint(options: GenerateOptions): Promise<string | undefined> {
   if (!options.gitRoot) return undefined;
   const inputs = [options.boardFile, options.schematicFile].filter((file): file is string => typeof file === "string");
@@ -320,9 +408,27 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
     schematic: Boolean(options.schematicFile),
   };
   const plan = buildGeneratePlan(recipe, available);
+  if (options.reviewedSourceSha !== undefined) {
+    // A missing board/drill set cannot be elevated to source-bound fabrication proof.
+    if (!options.boardFile || !["gerbers", "drill"].every((kind) => plan.steps.some((step) => step.kind === kind))) {
+      throw new Error("Reviewed manufacturing export requires both Gerber and drill steps.");
+    }
+    await assertReviewedSource(options);
+    // The existing local verifier deliberately rejects a manifest outside
+    // the source root; enforce that boundary *before* creating any files.
+    const canonicalRoot = await fs.realpath(options.gitRoot!);
+    const canonicalOutput = await resolveExistingPathAlias(outputDir);
+    if (canonicalOutput === canonicalRoot || !isInside(canonicalRoot, canonicalOutput)) {
+      throw new Error("Reviewed export output must be an in-root, separate generated directory.");
+    }
+  }
   const sourceFingerprintBefore = await sourceInputFingerprint(options);
+  if (options.reviewedSourceSha !== undefined && !sourceFingerprintBefore) {
+    throw new Error("Reviewed manufacturing export requires in-root, readable KiCad source inputs.");
+  }
 
   await assertSafeGenerateOutputCleanup(outputDir, options);
+  if (options.reviewedSourceSha !== undefined) await assertFreshReviewedOutput(outputDir);
   await fs.rm(outputDir, { recursive: true, force: true });
   await fs.mkdir(outputDir, { recursive: true });
 
@@ -370,6 +476,25 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
         ? "stable"
         : "changed";
   const recipeHash = createHash("sha256").update(canonicalizeJson(recipe)).digest("hex");
+  if (options.reviewedSourceSha !== undefined) {
+    const missingManufacturingOutput = ["gerbers", "drill"].some(
+      (kind) =>
+        !outcomes.some(
+          (outcome) => outcome.kind === kind && outcome.status === "generated" && (outcome.files ?? 0) > 0,
+        ),
+    );
+    if (
+      sourceSnapshot !== "stable" ||
+      outcomes.some((outcome) => outcome.status === "failed") ||
+      missingManufacturingOutput ||
+      artifacts.length === 0
+    ) {
+      throw new Error(
+        "Reviewed manufacturing export requires successful Gerber/drill generation from an unchanged source snapshot.",
+      );
+    }
+    await assertReviewedSource(options);
+  }
   const git = options.gitRoot ? await gitState(options.gitRoot) : {};
 
   const manifest: GenerateManifest = {
@@ -394,6 +519,15 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
   };
   const manifestPath = path.join(outputDir, "manifest.json");
   await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  if (options.reviewedSourceSha !== undefined) {
+    const verification = await verifyExportProvenance(options.gitRoot!, manifestPath, {
+      currentGitSha: options.reviewedSourceSha,
+    });
+    if (verification.status !== "verified" || verification.gitShaMatch !== true) {
+      throw new Error("Reviewed manufacturing export failed local source and output byte-consistency checks.");
+    }
+  }
 
   return {
     outputDir,
