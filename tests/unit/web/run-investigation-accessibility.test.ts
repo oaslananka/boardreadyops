@@ -430,6 +430,26 @@ describe("run investigation accessibility", () => {
     expect(markup).not.toContain("Rerun required to verify");
   });
 
+  it("renders a board-revision correction for changelog diagnostics when no PCB revision exists", () => {
+    const run = sampleRun();
+    run.findings = [
+      {
+        id: "missing-board-revision",
+        ruleId: "release.changelog-present",
+        severity: "medium",
+        message: "CHANGELOG.md cannot be matched because no board revision is set.",
+        path: ".",
+        kind: "manifest",
+        waivedAt: undefined,
+      },
+    ];
+    const markup = renderToStaticMarkup(createElement(FindingsView, { run, searchParameters: {} }));
+    expect(markup).toContain("Set the PCB title-block revision first");
+    expect(markup).toContain("CHANGELOG.md");
+    expect(markup).toContain("Repository-level finding");
+    expect(markup).not.toContain("Update the source design file");
+  });
+
   it("renders stable investigation flow snapshots", () => {
     expect({
       summary: viewMarkup("summary"),

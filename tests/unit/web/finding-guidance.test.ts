@@ -15,9 +15,32 @@ describe("finding remediation guidance", () => {
     ["bom.missing-mpn", "sourcing", "manufacturer part number"],
     ["release.changelog-present", "release", "CHANGELOG.md"],
     ["manufacturing.outputs-present", "manufacturability", "current source revision"],
+    ["manufacturing.fab-notes", "manufacturability", "fab/README.md"],
+    ["manufacturing.drill-coverage", "manufacturability", "Excellon"],
+    ["manufacturing.package-completeness", "manufacturability", "drill report/map"],
+    ["release.revision-set", "release", "PCB title-block revision"],
+    ["release.tag-matches-revision", "release", "Git release tag"],
+    ["release.version-format", "release", "version pattern"],
+    ["release.artifact-provenance", "release", "self-reported hashes"],
+    ["bom.unknown-lifecycle", "sourcing", "attributable component data source"],
   ])("provides actionable, scoped instructions for %s", (ruleId, domain, phrase) => {
     expect(findingDomainFromRule(ruleId)).toBe(domain);
     expect(findingGuidance(ruleId)).toContain(phrase);
+  });
+
+  it("uses the rule's actual missing-revision diagnostic instead of suggesting a changelog-only fix", () => {
+    const advice = findingGuidance(
+      "release.changelog-present",
+      "CHANGELOG.md cannot be matched because no board revision is set.",
+    );
+    expect(advice).toContain("PCB title-block revision first");
+    expect(advice).toContain("CHANGELOG.md");
+    expect(findingGuidance("release.changelog-present", "CHANGELOG.md is missing.")).toContain(
+      "Add or update CHANGELOG.md",
+    );
+    expect(findingGuidance("release.changelog-present", "CHANGELOG.md does not contain release entry 2.0.")).toContain(
+      "Add or update CHANGELOG.md",
+    );
   });
 
   it("never tells a release documentation error to edit a CAD design file", () => {
