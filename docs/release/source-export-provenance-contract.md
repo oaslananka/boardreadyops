@@ -47,6 +47,21 @@ Teams often upload manufacturing packages exported on their workstation. They mu
 
 An unsigned export manifest supplied alongside its Gerbers is an untrusted assertion even if the checksum list agrees. A local signed bundle establishes integrity only relative to an independently trusted public key; it is not automatically equivalent to a trusted review-run identity.
 
+## Real KiCad byte-inventory integration evidence (not signed provenance)
+
+`tests/integration/manufacturing-real-kicad-provenance.test.ts` runs actual KiCad
+10.0.x `kicad-cli` Gerber and Excellon export against a temporary, locally
+committed fixture. It checks the manifest against actual hashes and exercises
+wrong reviewed SHA, tampered Gerber bytes, a missing drill output, unlisted
+artwork and changed KiCad source. The existing KiCad 10 CI integration matrix
+runs this regression; local runs may skip when KiCad 10.0.x is absent.
+**A locally created Git commit and self-reported manifest are not an attestation.**
+This test establishes only byte consistency and negative-case coverage. It does
+not satisfy the separate signed, independently verified exact-commit/source/
+workflow/run-attempt requirements of #771 or the two distinct installations
+of #154. No new source-bound “verified” UI or release PASS is authorized by
+this integration check.
+
 ## Required acceptance before changing the release gate
 
 - Valid unchanged source re-exported later must not be flagged stale based on time alone.
