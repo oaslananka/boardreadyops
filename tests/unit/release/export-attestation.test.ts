@@ -95,9 +95,8 @@ function verifiedResult(f: Fixture, overrides: Record<string, unknown> = {}) {
       "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review",
     runnerEnvironment: "github-hosted",
     buildTrigger: "push",
-    subjectAlternativeName: {
-      value: "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review",
-    },
+    subjectAlternativeName:
+      "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review",
     ...(overrides.cert as Record<string, unknown> | undefined),
   };
   return {
@@ -157,6 +156,33 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
         "json",
       ]),
     );
+  });
+
+  it("accepts the legacy structured SAN only when its value matches the trusted workflow", async () => {
+    const f = await fixture();
+    succeed(
+      verifiedResult(f, {
+        cert: {
+          subjectAlternativeName: {
+            value:
+              "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review",
+          },
+        },
+      }),
+    );
+    expect((await verify(f)).status).toBe("eligible");
+  });
+
+  it.each([
+    "https://github.com/customer/fabrication/.github/workflows/other.yml@refs/heads/review",
+    "",
+    1,
+    ["https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review"],
+    { value: "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/other" },
+  ])("rejects a mismatched or unsupported certificate SAN shape: %j", async (san) => {
+    const f = await fixture();
+    succeed(verifiedResult(f, { cert: { subjectAlternativeName: san } }));
+    expect((await verify(f)).status).toBe("rejected");
   });
 
   it.each([

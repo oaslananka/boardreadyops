@@ -52861,8 +52861,10 @@ function matchesVerifiedResult(value, e, inventory) {
   const statement = recordAt(verification, "statement");
   const subjects = statement?.subject;
   const workflowUri = `https://github.com/${e.repository}/${e.workflowPath}@${e.sourceRef}`;
+  const san = cert?.subjectAlternativeName;
+  const signerSAN = typeof san === "string" ? san : recordAt(cert, "subjectAlternativeName")?.value;
   const runUri = `https://github.com/${e.repository}/actions/runs/${e.runId}/attempts/${e.runAttempt}`;
-  if (cert?.issuer !== oidcIssuer || cert.sourceRepositoryURI !== `https://github.com/${e.repository}` || cert.sourceRepositoryIdentifier !== e.repositoryId || cert.sourceRepositoryDigest !== e.reviewedSha || cert.sourceRepositoryRef !== e.sourceRef || cert.runInvocationURI !== runUri || cert.buildSignerURI !== workflowUri || cert.buildSignerDigest !== e.reviewedSha || cert.runnerEnvironment !== "github-hosted" || cert.buildTrigger !== e.event || recordAt(cert, "subjectAlternativeName")?.value !== workflowUri || statement?.predicateType !== slsaPredicate || !Array.isArray(subjects) || subjects.length !== inventory.names.size)
+  if (cert?.issuer !== oidcIssuer || cert.sourceRepositoryURI !== `https://github.com/${e.repository}` || cert.sourceRepositoryIdentifier !== e.repositoryId || cert.sourceRepositoryDigest !== e.reviewedSha || cert.sourceRepositoryRef !== e.sourceRef || cert.runInvocationURI !== runUri || cert.buildSignerURI !== workflowUri || cert.buildSignerDigest !== e.reviewedSha || cert.runnerEnvironment !== "github-hosted" || cert.buildTrigger !== e.event || signerSAN !== workflowUri || statement?.predicateType !== slsaPredicate || !Array.isArray(subjects) || subjects.length !== inventory.names.size)
     return false;
   const remaining = new Map(inventory.names);
   for (const subject of subjects) {
