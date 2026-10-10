@@ -205,6 +205,28 @@ export class BillingStore {
     );
   }
 
+  async pendingStripeEvent(stripeEventId: string): Promise<unknown | undefined> {
+    const result = (await this.db.query(
+      "select payload from billing_events where stripe_event_id=$1 and provider='stripe' and processed_at is null limit 1",
+      [stripeEventId],
+    )) as { rows?: Array<{ payload: unknown }> };
+    return result.rows?.[0]?.payload;
+  }
+
+  async pendingStripeCustomerEvents(stripeCustomerId: string): Promise<unknown[]> {
+    const result = (await this.db.query(
+      `select payload from billing_events
+       where provider='stripe' and processed_at is null
+         and type in ('customer.subscription.created', 'customer.subscription.updated',
+                      'customer.subscription.deleted', 'invoice.payment_failed', 'invoice.paid')
+         and payload #>> '{data,object,customer}' = $1
+       order by created_at asc, id asc
+       limit 100`,
+      [stripeCustomerId],
+    )) as { rows?: Array<{ payload: unknown }> };
+    return (result.rows ?? []).map((row) => row.payload);
+  }
+
   async recordEvent(input: {
     stripeEventId: string;
     type: string;
