@@ -265,7 +265,7 @@ type RepositoryRun = {
   findingCount: number;
 };
 
-export type RecordedBoardEvidence = {
+type RecordedBoardEvidence = {
   id: string;
   projectPath: string;
   displayName: string;
