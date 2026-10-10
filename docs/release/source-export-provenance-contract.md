@@ -1,6 +1,6 @@
 # Source-to-Exported Manufacturing Artifact Proof — Design Contract
 
-**Status (2026-10-08): design proposal for [#771](https://github.com/oaslananka/boardreadyops/issues/771). NOT implemented or GA-accepted.** This page specifies a trust boundary; it does not make any current release blocking check stronger. Coordinate [#756](https://github.com/oaslananka/boardreadyops/issues/756) (approved versus produced output) and [#753](https://github.com/oaslananka/boardreadyops/issues/753) (internal artifact validation).
+**Status (2026-10-10): [#771](https://github.com/oaslananka/boardreadyops/issues/771) remains OPEN. Local source preflight and opt-in attestation verification helpers exist, but the trusted target-runner flow, real signed attestation and GA acceptance are NOT implemented.** This page specifies a trust boundary; it does not make any current release blocking check stronger. Coordinate [#756](https://github.com/oaslananka/boardreadyops/issues/756) (approved versus produced output) and [#753](https://github.com/oaslananka/boardreadyops/issues/753) (internal artifact validation).
 
 ## The user question
 
@@ -10,7 +10,7 @@ A structurally valid Gerber set can be months older than the KiCad board in the 
 
 The user-facing outcome must not say “provenance verified” unless the *source commit, generation execution and output bytes* are all bound by a trusted execution identity. Missing or unsupported evidence must be **clearly advisory**, not a falsely exact PASS or a fabricated blocking stale-export allegation.
 
-## Current surfaces and gaps (audited at `dfde5490`)
+## Historical starting surfaces and gaps (audited at `dfde5490`)
 
 - `src/release/generate.ts` writes a `GenerateManifest` (schema version 1) with optional `git.sha`, `recipe.hash`, KiCad version, and generated artifact hashes. It does **not** record the `sourceFingerprint` expected by `src/core/provenance.ts`.
 - `src/core/provenance.ts:verifyExportProvenance` verifies a source fingerprint and hashes listed artifacts but compares a Git SHA **only when the caller supplies** `currentGitSha`.
@@ -106,3 +106,56 @@ actual outputs with independently checked runner provenance can do so.
 **Phase 3 — customer-facing release decision:** tenant-scoped policy choice and clear UI trust levels, audit trail and evidence navigation; strict block only when the approved strong policy applies. Document source-bound gate eligibility and manual-upload downgrade.
 
 This design does not assert implementation, signed manufacturing attestations, or general availability. Track actual completion through issue #771 and exact-head CI evidence.
+
+## Phase 2 library prerequisite: verify the attested export subject set
+
+The opt-in `src/release/export-attestation.ts` library now provides two **non-release**
+primitives. `prepareExportAttestationChecksums` rechecks a clean, pinned export
+manifest and writes no files; its returned SHA-256 checksums text covers
+`manifest.json` **and every Gerber, drill, and other generated output** with
+root-relative subject names. An authorized target-repository job may write
+that text to a separate checksums file **outside the generated-output tree**
+and pass it to the officially supported `actions/attest` `subject-checksums`
+input. The action supports at most 1,024 subjects, enforced by the helper.
+
+`verifyReviewedExportAttestation` takes independently authorized expected
+**repository name and numeric ID, reviewed commit SHA, source ref, workflow
+path, triggering event, run ID and run attempt**. It first verifies actual
+KiCad source bytes and the complete generated output inventory. It then
+runs `gh attestation verify` with the exact repository, signer workflow,
+signer/source commit digests, source ref, GitHub OIDC issuer, GitHub-hosted
+runner requirement and the manifest's actual bytes. It accepts a result as
+an **eligible piece of proof** only when the cryptographically verified
+certificate also binds the expected repository ID, workflow, source commit,
+ref, event, run/attempt, and the signed statement includes **exactly** the
+manifest and every actual output hash, with no duplicates or extra subjects.
+
+The expected identity values **must** come from an independently authorized
+target-repository installation/run record and a reviewed workflow. They must
+never be copied from the unsigned export manifest, untrusted workflow output,
+a browser request, or an incoming callback. Verification of an arbitrary
+attestation or a URL is not an authority check. The signed subject list
+cannot substitute for a safe generator job: it must follow the opt-in
+`reviewedSourceSha` preflight and recheck a clean and immutable source before
+signing. A mutable checkout, other-repository workflow, PR synthetic merge,
+untrusted fork, self-hosted job, or reused run attempt is not accepted as the
+trusted path merely because a signature exists.
+
+**Important availability limit (checked 2026-10-10):** GitHub's native
+`actions/attest` supports public repositories on standard current plans,
+but **private/internal repositories require GitHub Enterprise Cloud**.
+That is not a general-purpose private-customer fallback. An alternate
+independently authenticated signing/verifier transport for non-Enterprise
+private targets is **not implemented**; do not promise or automatically
+enable a source-bound gate there. Official references:
+[GitHub attestation requirements](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations),
+[actions/attest](https://github.com/actions/attest), and
+[GitHub CLI verification policy](https://cli.github.com/manual/gh_attestation_verify).
+
+**Current status:** these are library and adversarial-test prerequisites,
+not a deployed target-repository job, actual signed export attestation,
+two-installation acceptance, supported end-user strong verification state,
+or release/GA approval. A positive library result must not directly change
+a release policy or a tenant-facing badge. The actual identity authority,
+protected runner/workflow, provider availability and independent customer
+acceptance remain open under #771 and #154.
