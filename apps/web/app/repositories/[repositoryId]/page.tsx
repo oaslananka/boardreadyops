@@ -72,7 +72,7 @@ const runColumns: readonly DataColumn<RunRow>[] = [
   },
 ];
 
-function boardEvidenceColumns(repositoryName: string): readonly DataColumn<BoardRow>[] {
+function boardEvidenceColumns(repositoryId: string, repositoryName: string): readonly DataColumn<BoardRow>[] {
   return [
     {
       id: "board",
@@ -80,7 +80,12 @@ function boardEvidenceColumns(repositoryName: string): readonly DataColumn<Board
       rowHeader: true,
       cell: (board) => (
         <span className="flex flex-col gap-1">
-          <span className="font-medium">{board.displayName}</span>
+          <Link
+            href={`/repositories/${encodeURIComponent(repositoryId)}/boards/${encodeURIComponent(board.id)}`}
+            className="font-medium text-primary underline underline-offset-2"
+          >
+            {board.displayName}
+          </Link>
           <code className="break-all text-xs text-muted-foreground">{board.projectPath}</code>
           {board.archived ? <StatusBadge value="neutral" label="Archived board record" /> : null}
         </span>
@@ -280,7 +285,7 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
           ) : (
             <DataTable
               caption="Latest recorded BOM snapshot for each observed board"
-              columns={boardEvidenceColumns(`${repository.owner}/${repository.name}`)}
+              columns={boardEvidenceColumns(repository.id, `${repository.owner}/${repository.name}`)}
               rows={boards}
               rowKey={(board) => board.id}
               empty={null}

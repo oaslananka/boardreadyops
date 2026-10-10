@@ -25,6 +25,7 @@ vi.mock("../../../packages/db/src/pg-executor.ts", () => ({
 }));
 
 import {
+  loadRepositoryBoardHistory,
   loadRepositoryDetail,
   loadViewerRepositories,
   summarizeViewerRepositories,
@@ -289,6 +290,93 @@ describe("repository dashboard and viewer loader branches", () => {
     expect(boardCall?.[0]).toContain("release_runs.repository_id = boards.repository_id");
     expect(boardCall?.[0]).toContain("order by snapshot.captured_at desc, snapshot.id desc");
     expect(boardCall?.[0]).toContain("limit 50");
+  });
+
+  it("loads a bounded capture timeline only after checking the viewer's repository access", async () => {
+    mockQuery.mockClear();
+    const session = { login: "alice", installationIds: [12345] };
+    const captures = Array.from({ length: 22 }, (_, index) => ({
+      board_id: "board-main",
+      display_name: "Mainboard",
+      project_path: "hardware/main/main.kicad_pro",
+      archived_at: null,
+      snapshot_id: `snapshot-${index}`,
+      run_id: `run-${index}`,
+      snapshot_commit_sha: "a".repeat(40),
+      run_commit_sha: index === 1 ? "b".repeat(40) : "a".repeat(40),
+      component_count: index + 1,
+      captured_at: new Date(Date.UTC(2026, 9, 10, 22, 0, 0) - index * 60000),
+      run_status: "completed",
+      run_decision: "pass",
+    }));
+    mockQuery
+      .mockResolvedValueOnce({ rows: [viewerRepositoryRow({ id: "repo-1" })] })
+      .mockResolvedValueOnce({ rows: captures.slice(0, 21) });
+    const timeline = await loadRepositoryBoardHistory("repo-1", "board-main", session, {
+      DATABASE_URL: TEST_DB_URL,
+    });
+    expect(timeline?.repository.id).toBe("repo-1");
+    expect(timeline?.board.projectPath).toBe("hardware/main/main.kicad_pro");
+    expect(timeline?.captures).toHaveLength(20);
+    expect(timeline?.hasOlderCaptures).toBe(true);
+    expect(timeline?.captures[0]).toMatchObject({ id: "snapshot-0", runId: "run-0" });
+    expect(timeline?.captures[1]).toMatchObject({
+      snapshotCommitSha: "a".repeat(40),
+      runCommitSha: "b".repeat(40),
+    });
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+    const [sql, params] = mockQuery.mock.calls[1] ?? [];
+    expect(params).toEqual(["repo-1", "board-main", 21]);
+    expect(sql).toContain("where boards.repository_id = $1 and boards.id = $2");
+    expect(sql).toContain("release_runs.repository_id = boards.repository_id");
+    expect(sql).toContain("order by snapshot.captured_at desc, snapshot.id desc");
+  });
+
+  it("cannot query board captures without repository authorization", async () => {
+    mockQuery.mockClear();
+    const noSession = await loadRepositoryBoardHistory("repo-1", "board-main", undefined, {
+      DATABASE_URL: TEST_DB_URL,
+    });
+    expect(noSession).toBeUndefined();
+    expect(mockQuery).not.toHaveBeenCalled();
+
+    mockQuery.mockResolvedValueOnce({ rows: [viewerRepositoryRow()] });
+    const foreign = await loadRepositoryBoardHistory(
+      "repo-foreign",
+      "board-main",
+      { login: "alice", installationIds: [12345] },
+      { DATABASE_URL: TEST_DB_URL },
+    );
+    expect(foreign).toBeUndefined();
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns no board history for a missing board, and an observed board can lack snapshots", async () => {
+    const session = { login: "alice", installationIds: [12345] };
+    mockQuery.mockResolvedValueOnce({ rows: [viewerRepositoryRow()] }).mockResolvedValueOnce({ rows: [] });
+    expect(
+      await loadRepositoryBoardHistory("repo-1", "does-not-exist", session, {
+        DATABASE_URL: TEST_DB_URL,
+      }),
+    ).toBeUndefined();
+
+    mockQuery.mockResolvedValueOnce({ rows: [viewerRepositoryRow()] }).mockResolvedValueOnce({
+      rows: [
+        {
+          board_id: "board-empty",
+          project_path: "hardware/empty.kicad_pro",
+          display_name: "Empty board",
+          archived_at: new Date(),
+          snapshot_id: null,
+        },
+      ],
+    });
+    const empty = await loadRepositoryBoardHistory("repo-1", "board-empty", session, {
+      DATABASE_URL: TEST_DB_URL,
+    });
+    expect(empty?.board.archived).toBe(true);
+    expect(empty?.captures).toEqual([]);
+    expect(empty?.hasOlderCaptures).toBe(false);
   });
 
   it("loads viewer installations from database rows", async () => {

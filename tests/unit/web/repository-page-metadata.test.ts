@@ -106,6 +106,8 @@ describe("Repository page metadata", () => {
     const html = renderToStaticMarkup(await RepositoryPage({ params: Promise.resolve({ repositoryId: "repo-1" }) }));
     expect(html).toContain("Recorded boards and BOM history");
     expect(html).toContain("Mainboard");
+    expect(html).toContain('href="/repositories/repo-1/boards/board-a"');
+    expect(html).toContain('href="/repositories/repo-1/boards/board-b"');
     expect(html).toContain("hardware/mainboard/mainboard.kicad_pro");
     expect(html).toContain("Sensor");
     expect(html).toContain("No BOM snapshot recorded");
