@@ -474,3 +474,116 @@ export async function loadRepositoryDetail(
     await executor.close();
   }
 }
+
+/** A bounded, strictly repository-scoped history of recorded BOM captures for one board. */
+export type BoardBomCapture = {
+  id: string;
+  runId: string;
+  snapshotCommitSha: string;
+  runCommitSha: string;
+  componentCount: number;
+  capturedAt: string;
+  runStatus: string;
+  runDecision: string | undefined;
+};
+
+type RepositoryBoardHistory = {
+  repository: RepositorySummary;
+  board: { id: string; displayName: string; projectPath: string; archived: boolean };
+  captures: readonly BoardBomCapture[];
+  hasOlderCaptures: boolean;
+};
+
+const boardCapturePageSize = 20;
+
+/**
+ * A board id is a locator, not permission. Check session installation membership
+ * against the repository before looking up board rows. A missing board or a board
+ * in another tenant yields the same undefined result.
+ */
+export async function loadRepositoryBoardHistory(
+  repositoryId: string,
+  boardId: string,
+  session: UserSession | undefined,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Promise<RepositoryBoardHistory | undefined> {
+  const connectionString = environment.DATABASE_URL;
+  if (!connectionString || !session?.installationIds.length) return undefined;
+
+  const groups = await loadViewerRepositories(session, environment);
+  const repository = groups.flatMap((group) => group.repositories).find((entry) => entry.id === repositoryId);
+  if (!repository) return undefined;
+
+  const { createPgQueryExecutor } = await import("@boardreadyops/db/pg-executor");
+  const executor = createPgQueryExecutor({ connectionString, max: 1 });
+  try {
+    const result = await executor.query(
+      `select boards.id as board_id, boards.display_name, boards.project_path, boards.archived_at,
+              history.id as snapshot_id, history.run_id, history.snapshot_commit_sha, history.run_commit_sha,
+              history.component_count, history.captured_at, history.run_status, history.run_decision
+         from boards
+         left join lateral (
+           select snapshot.id, snapshot.run_id, snapshot.commit_sha as snapshot_commit_sha,
+                  release_runs.commit_sha as run_commit_sha, snapshot.component_count,
+                  snapshot.captured_at, release_runs.status as run_status, release_runs.decision as run_decision
+             from board_bom_snapshots as snapshot
+             join release_runs on release_runs.id = snapshot.run_id
+                              and release_runs.repository_id = boards.repository_id
+            where snapshot.board_id = boards.id
+            order by snapshot.captured_at desc, snapshot.id desc
+            limit $3
+         ) as history on true
+        where boards.repository_id = $1 and boards.id = $2
+        order by history.captured_at desc nulls last, history.id desc`,
+      [repositoryId, boardId, boardCapturePageSize + 1],
+    );
+    const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
+    const first = rows[0];
+    const persistedId = first ? text(first, "board_id") : undefined;
+    const projectPath = first ? text(first, "project_path") : undefined;
+    if (!first || !persistedId || !projectPath) return undefined;
+    const captures = rows.flatMap((row): BoardBomCapture[] => {
+      const id = text(row, "snapshot_id");
+      const runId = text(row, "run_id");
+      const snapshotCommitSha = text(row, "snapshot_commit_sha");
+      const runCommitSha = text(row, "run_commit_sha");
+      const capturedAt = text(row, "captured_at");
+      const componentCount = row.component_count;
+      if (
+        !id ||
+        !runId ||
+        !snapshotCommitSha ||
+        !runCommitSha ||
+        !capturedAt ||
+        !Number.isSafeInteger(componentCount) ||
+        Number(componentCount) < 0
+      )
+        return [];
+      return [
+        {
+          id,
+          runId,
+          snapshotCommitSha,
+          runCommitSha,
+          componentCount: Number(componentCount),
+          capturedAt,
+          runStatus: text(row, "run_status") ?? "unknown",
+          runDecision: text(row, "run_decision"),
+        },
+      ];
+    });
+    return {
+      repository,
+      board: {
+        id: persistedId,
+        displayName: text(first, "display_name") ?? projectPath,
+        projectPath,
+        archived: first.archived_at != null,
+      },
+      captures: captures.slice(0, boardCapturePageSize),
+      hasOlderCaptures: captures.length > boardCapturePageSize,
+    };
+  } finally {
+    await executor.close();
+  }
+}

@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { loadRepositoryDetail, loadViewerRepositories } from "../../apps/web/lib/repository-dashboard.js";
+import {
+  loadRepositoryBoardHistory,
+  loadRepositoryDetail,
+  loadViewerRepositories,
+} from "../../apps/web/lib/repository-dashboard.js";
 import type { UserSession } from "../../apps/web/lib/user-session.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
@@ -163,6 +167,53 @@ describeDatabase("repository dashboard", () => {
     const sensor = detail?.boards.find((board) => board.id === boardSensor);
     expect(sensor?.archived).toBe(true);
     expect(sensor?.latestBom).toBeUndefined();
+  });
+
+  it("reads one board's actual capture timeline, never the repository's other boards", async () => {
+    const main = await loadRepositoryBoardHistory(
+      mineRepository,
+      boardMain,
+      session([mineGithubInstallation]),
+      environment,
+    );
+    expect(main?.board.id).toBe(boardMain);
+    expect(main?.captures.map((capture) => capture.runId)).toEqual([runTwo, runOne]);
+    expect(main?.captures.map((capture) => capture.componentCount)).toEqual([9, 6]);
+    expect(main?.hasOlderCaptures).toBe(false);
+    expect(main?.captures.every((capture) => capture.snapshotCommitSha === capture.runCommitSha)).toBe(true);
+    const empty = await loadRepositoryBoardHistory(
+      mineRepository,
+      boardSensor,
+      session([mineGithubInstallation]),
+      environment,
+    );
+    expect(empty?.board.archived).toBe(true);
+    expect(empty?.captures).toEqual([]);
+    expect(empty?.hasOlderCaptures).toBe(false);
+  });
+
+  it("denies a foreign-tenant board or guessed board identifier without disclosing its existence", async () => {
+    const foreign = await loadRepositoryBoardHistory(
+      mineRepository,
+      boardForeign,
+      session([mineGithubInstallation]),
+      environment,
+    );
+    const missing = await loadRepositoryBoardHistory(
+      mineRepository,
+      "9e000000-0000-4000-8000-0000000000ff",
+      session([mineGithubInstallation]),
+      environment,
+    );
+    const inaccessible = await loadRepositoryBoardHistory(
+      theirsRepository,
+      boardForeign,
+      session([mineGithubInstallation]),
+      environment,
+    );
+    expect(foreign).toBeUndefined();
+    expect(missing).toBeUndefined();
+    expect(inaccessible).toBeUndefined();
   });
 
   it("answers the same for another tenant's repository as for one that does not exist", async () => {
