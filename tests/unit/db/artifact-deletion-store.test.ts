@@ -8,6 +8,35 @@ function executor(query = vi.fn()) {
 }
 
 describe("artifact deletion store", () => {
+  it("fails closed when an active hold appears after a lease is claimed", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ outcome: "held" }] });
+    const store = createSqlArtifactDeletionStore(executor(query), { now: () => now });
+    await expect(store.authorizeOrDeferDeletion({ deletionJobId: "job-1", workerId: "worker-1" })).resolves.toBe(
+      "held",
+    );
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain("from legal_holds");
+    expect(sql).toContain("legal_holds.tenant_id = claimed.account_login");
+    expect(sql).toContain("for update of artifact_deletion_jobs");
+    expect(sql).toContain("artifact_deletion_jobs.lease_expires_at > $3::timestamptz");
+    expect(sql).toContain("attempt_count = greatest(0, attempt_count - 1)");
+    expect(query.mock.calls[0]?.[1]).toEqual(["job-1", "worker-1", now.toISOString()]);
+  });
+
+  it("rejects stale workers and allows only the current held-free lease", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ outcome: "stale" }] })
+      .mockResolvedValueOnce({ rows: [{ outcome: "authorized" }] });
+    const store = createSqlArtifactDeletionStore(executor(query), { now: () => now });
+    await expect(store.authorizeOrDeferDeletion({ deletionJobId: "job-1", workerId: "worker-1" })).resolves.toBe(
+      "stale",
+    );
+    await expect(store.authorizeOrDeferDeletion({ deletionJobId: "job-1", workerId: "worker-1" })).resolves.toBe(
+      "authorized",
+    );
+  });
+
   it("claims bounded tenant-scoped deletion jobs", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [
