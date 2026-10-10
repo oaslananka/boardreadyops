@@ -232,7 +232,8 @@
                   "require-required-outputs",
                   "forbid-rules",
                   "forbid-expired-waivers",
-                  "forbid-stale-waivers"
+                  "forbid-stale-waivers",
+                  "require-source-bound-export"
                 ]
               },
               "severity": {

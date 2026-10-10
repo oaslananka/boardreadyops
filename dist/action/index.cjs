@@ -71127,7 +71127,8 @@ var config_schema_default = {
                   "require-required-outputs",
                   "forbid-rules",
                   "forbid-expired-waivers",
-                  "forbid-stale-waivers"
+                  "forbid-stale-waivers",
+                  "require-source-bound-export"
                 ]
               },
               severity: {
@@ -95255,7 +95256,8 @@ function evaluatePolicy(policy, input) {
   return {
     status: rules.some((rule2) => rule2.status === "fail") ? "fail" : "pass",
     enforced: policy.enforce ?? false,
-    rules
+    rules,
+    ...input.sourceBound ? { sourceBound: input.sourceBound } : {}
   };
 }
 function evaluateRule(rule2, input) {
@@ -95274,6 +95276,8 @@ function checkRule(rule2, input) {
       return checkReadinessStatus(rule2.status ?? ["ready"], input.readiness);
     case "require-required-outputs":
       return checkRequiredOutputs(input.readiness);
+    case "require-source-bound-export":
+      return checkSourceBoundExport(input.sourceBound);
     case "forbid-rules":
       return checkForbidRules(rule2.rules ?? [], input.ruleIds);
     case "forbid-expired-waivers":
@@ -95281,6 +95285,18 @@ function checkRule(rule2, input) {
     case "forbid-stale-waivers":
       return checkStaleWaivers(input.staleWaivers ?? 0);
   }
+}
+function checkSourceBoundExport(evidence) {
+  if (evidence?.status === "source-bound-verified" && evidence.sourceSha && evidence.runInvocationURI && Number.isSafeInteger(evidence.subjects) && (evidence.subjects ?? 0) > 0) {
+    return {
+      ok: true,
+      message: `Source-bound verified: ${evidence.subjects} signed subject(s), reviewed SHA ${evidence.sourceSha}, ${evidence.runInvocationURI}.`
+    };
+  }
+  return {
+    ok: false,
+    message: evidence?.status === "byte-consistent-only" ? "Byte-consistent only; an independently verified signed source-to-export proof is required." : "Source-bound proof is unverified or unavailable; strict policy fails closed."
+  };
 }
 function checkExpiredWaivers(expired) {
   return {

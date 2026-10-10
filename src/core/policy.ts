@@ -2,6 +2,15 @@ import type { PolicyConfig, PolicyRuleConfig } from "./config.js";
 import { type FindingSummary, type Severity, severityRankValue } from "./findings.js";
 import type { ReadinessScore } from "./readiness.js";
 
+/** User-facing provenance classification; cryptographic elevation is performed at the CLI boundary. */
+export interface SourceBoundPolicyEvidence {
+  status: "source-bound-verified" | "byte-consistent-only" | "unverified";
+  reason: string;
+  sourceSha?: string | undefined;
+  runInvocationURI?: string | undefined;
+  subjects?: number | undefined;
+}
+
 interface PolicyRuleResult {
   id: string;
   type: PolicyRuleConfig["type"];
@@ -13,6 +22,7 @@ export interface PolicyEvaluation {
   status: "pass" | "fail";
   enforced: boolean;
   rules: PolicyRuleResult[];
+  sourceBound?: SourceBoundPolicyEvidence | undefined;
 }
 
 export interface PolicyInput {
@@ -21,6 +31,7 @@ export interface PolicyInput {
   readiness?: ReadinessScore | undefined;
   expiredWaivers?: number | undefined;
   staleWaivers?: number | undefined;
+  sourceBound?: SourceBoundPolicyEvidence | undefined;
 }
 
 export function evaluatePolicy(policy: PolicyConfig, input: PolicyInput): PolicyEvaluation {
@@ -29,6 +40,7 @@ export function evaluatePolicy(policy: PolicyConfig, input: PolicyInput): Policy
     status: rules.some((rule) => rule.status === "fail") ? "fail" : "pass",
     enforced: policy.enforce ?? false,
     rules,
+    ...(input.sourceBound ? { sourceBound: input.sourceBound } : {}),
   };
 }
 
@@ -49,6 +61,8 @@ function checkRule(rule: PolicyRuleConfig, input: PolicyInput): { ok: boolean; m
       return checkReadinessStatus(rule.status ?? ["ready"], input.readiness);
     case "require-required-outputs":
       return checkRequiredOutputs(input.readiness);
+    case "require-source-bound-export":
+      return checkSourceBoundExport(input.sourceBound);
     case "forbid-rules":
       return checkForbidRules(rule.rules ?? [], input.ruleIds);
     case "forbid-expired-waivers":
@@ -56,6 +70,28 @@ function checkRule(rule: PolicyRuleConfig, input: PolicyInput): { ok: boolean; m
     case "forbid-stale-waivers":
       return checkStaleWaivers(input.staleWaivers ?? 0);
   }
+}
+
+function checkSourceBoundExport(evidence: SourceBoundPolicyEvidence | undefined): { ok: boolean; message: string } {
+  if (
+    evidence?.status === "source-bound-verified" &&
+    evidence.sourceSha &&
+    evidence.runInvocationURI &&
+    Number.isSafeInteger(evidence.subjects) &&
+    (evidence.subjects ?? 0) > 0
+  ) {
+    return {
+      ok: true,
+      message: `Source-bound verified: ${evidence.subjects} signed subject(s), reviewed SHA ${evidence.sourceSha}, ${evidence.runInvocationURI}.`,
+    };
+  }
+  return {
+    ok: false,
+    message:
+      evidence?.status === "byte-consistent-only"
+        ? "Byte-consistent only; an independently verified signed source-to-export proof is required."
+        : "Source-bound proof is unverified or unavailable; strict policy fails closed.",
+  };
 }
 
 function checkExpiredWaivers(expired: number): { ok: boolean; message: string } {
@@ -147,6 +183,14 @@ function checkForbidRules(forbidden: string[], ruleIds: string[]): { ok: boolean
 export function formatPolicyText(evaluation: PolicyEvaluation): string {
   const lines: string[] = [];
   lines.push(`Policy: ${evaluation.status.toUpperCase()}${evaluation.enforced ? " (enforced)" : " (advisory)"}`);
+  if (evaluation.sourceBound) {
+    const label = {
+      "source-bound-verified": "SOURCE-BOUND VERIFIED",
+      "byte-consistent-only": "BYTE-CONSISTENT ONLY",
+      unverified: "UNVERIFIED",
+    }[evaluation.sourceBound.status];
+    lines.push(`Source export trust: ${label} (GA and release authorization remain separate)`);
+  }
   for (const rule of evaluation.rules) {
     lines.push(`  ${rule.status === "pass" ? "PASS" : "FAIL"} ${rule.id}: ${rule.message}`);
   }

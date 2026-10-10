@@ -39066,7 +39066,8 @@ var config_schema_default = {
                   "require-required-outputs",
                   "forbid-rules",
                   "forbid-expired-waivers",
-                  "forbid-stale-waivers"
+                  "forbid-stale-waivers",
+                  "require-source-bound-export"
                 ]
               },
               severity: {
@@ -49455,7 +49456,8 @@ function evaluatePolicy(policy, input) {
   return {
     status: rules.some((rule2) => rule2.status === "fail") ? "fail" : "pass",
     enforced: policy.enforce ?? false,
-    rules
+    rules,
+    ...input.sourceBound ? { sourceBound: input.sourceBound } : {}
   };
 }
 function evaluateRule(rule2, input) {
@@ -49474,6 +49476,8 @@ function checkRule(rule2, input) {
       return checkReadinessStatus(rule2.status ?? ["ready"], input.readiness);
     case "require-required-outputs":
       return checkRequiredOutputs(input.readiness);
+    case "require-source-bound-export":
+      return checkSourceBoundExport(input.sourceBound);
     case "forbid-rules":
       return checkForbidRules(rule2.rules ?? [], input.ruleIds);
     case "forbid-expired-waivers":
@@ -49481,6 +49485,18 @@ function checkRule(rule2, input) {
     case "forbid-stale-waivers":
       return checkStaleWaivers(input.staleWaivers ?? 0);
   }
+}
+function checkSourceBoundExport(evidence) {
+  if (evidence?.status === "source-bound-verified" && evidence.sourceSha && evidence.runInvocationURI && Number.isSafeInteger(evidence.subjects) && (evidence.subjects ?? 0) > 0) {
+    return {
+      ok: true,
+      message: `Source-bound verified: ${evidence.subjects} signed subject(s), reviewed SHA ${evidence.sourceSha}, ${evidence.runInvocationURI}.`
+    };
+  }
+  return {
+    ok: false,
+    message: evidence?.status === "byte-consistent-only" ? "Byte-consistent only; an independently verified signed source-to-export proof is required." : "Source-bound proof is unverified or unavailable; strict policy fails closed."
+  };
 }
 function checkExpiredWaivers(expired) {
   return {
@@ -49542,6 +49558,14 @@ function checkForbidRules(forbidden, ruleIds) {
 function formatPolicyText(evaluation) {
   const lines = [];
   lines.push(`Policy: ${evaluation.status.toUpperCase()}${evaluation.enforced ? " (enforced)" : " (advisory)"}`);
+  if (evaluation.sourceBound) {
+    const label = {
+      "source-bound-verified": "SOURCE-BOUND VERIFIED",
+      "byte-consistent-only": "BYTE-CONSISTENT ONLY",
+      unverified: "UNVERIFIED"
+    }[evaluation.sourceBound.status];
+    lines.push(`Source export trust: ${label} (GA and release authorization remain separate)`);
+  }
   for (const rule2 of evaluation.rules) {
     lines.push(`  ${rule2.status === "pass" ? "PASS" : "FAIL"} ${rule2.id}: ${rule2.message}`);
   }
@@ -55037,10 +55061,74 @@ function shellToken(value) {
 // src/cli/commands/policy.ts
 var import_node_path66 = __toESM(require("node:path"), 1);
 init_path();
+async function sourceBoundEvidence(root, options) {
+  const manifest = options.manifest;
+  if (!manifest) return { status: "unverified", reason: "No manufacturing export manifest supplied." };
+  if (options.repository && options.repositoryId && options.reviewedSourceSha && options.sourceRef && options.workflow && options.event && options.runId && options.runAttempt) {
+    try {
+      const { repository, repositoryId, reviewedSourceSha, sourceRef, workflow, event, runId, runAttempt } = options;
+      const verified = await verifyReviewedExportAttestation({
+        root,
+        manifestPath: manifest,
+        expected: {
+          repository,
+          repositoryId,
+          reviewedSha: reviewedSourceSha,
+          sourceRef,
+          workflowPath: workflow,
+          event,
+          runId,
+          runAttempt: Number(runAttempt)
+        },
+        ...options.bundle ? { bundlePath: options.bundle } : {}
+      });
+      if (verified.status === "eligible" && verified.sourceSha && verified.runInvocationURI && verified.subjects) {
+        return {
+          status: "source-bound-verified",
+          reason: verified.reason,
+          sourceSha: verified.sourceSha,
+          runInvocationURI: verified.runInvocationURI,
+          subjects: verified.subjects
+        };
+      }
+    } catch {
+    }
+  }
+  try {
+    const local = await verifyExportProvenance(root, manifest, {
+      ...options.reviewedSourceSha ? { currentGitSha: options.reviewedSourceSha } : {}
+    });
+    if (local.status === "verified") {
+      return {
+        status: "byte-consistent-only",
+        reason: "Local output bytes match their self-reported manifest; signed execution not authenticated."
+      };
+    }
+  } catch {
+  }
+  return { status: "unverified", reason: "No independently verified source-to-export evidence is available." };
+}
 async function policyCommand(pathInput, options, streams) {
   const root = await canonicalRoot(import_node_path66.default.resolve(normalizePathInput(pathInput ?? ".")));
   const result = await runPipeline(pipelineInputFromCli(root, options, false));
-  const policy = result.policy;
+  let policy = result.policy;
+  if (policy?.rules.some((rule2) => rule2.type === "require-source-bound-export")) {
+    const loaded = await loadConfig(root, options.config);
+    if (loaded.errors.length > 0 || !loaded.config.policy) {
+      streams.stderr.write("Strict source-bound policy configuration could not be loaded.\n");
+      return 2;
+    }
+    const sourceBound = await sourceBoundEvidence(root, options);
+    const input = {
+      summary: result.summary,
+      ruleIds: [...new Set(result.findings.map((finding2) => finding2.ruleId))],
+      readiness: result.readiness,
+      expiredWaivers: result.waivers?.expired.length ?? 0,
+      staleWaivers: result.waivers?.active.filter((waiver) => waiver.stale).length ?? 0,
+      sourceBound
+    };
+    policy = evaluatePolicy(loaded.config.policy, input);
+  }
   if (!policy) {
     if (options.format === "json") {
       streams.stdout.write(`${JSON.stringify({ status: "skipped", reason: "no policy configured" }, null, 2)}
@@ -60687,7 +60775,7 @@ function registerAllCommands(program2, streams) {
   registerHandoffCommand(
     handoff.command("create").argument("[path]", "directory to scan for manufacturing outputs").description("create a vendor-specific manufacturer handoff package and zip archive")
   );
-  addCommonOptions(program2.command("policy").argument("[path]", "directory to scan")).description("evaluate the configured release policy").option("--simulate", "evaluate and report the policy without affecting the exit code").action(async (pathInput, options) => {
+  addCommonOptions(program2.command("policy").argument("[path]", "directory to scan")).description("evaluate release policy, including opt-in signed source-to-export trust").option("--simulate", "evaluate and report the policy without affecting the exit code").option("--manifest <path>", "manufacturing export manifest relative to checked-out root").option("--repository <owner/name>", "independently authorized target repository").option("--repository-id <id>", "numeric immutable target repository ID").option("--reviewed-source-sha <sha>", "independently approved exact source commit").option("--source-ref <ref>", "expected GitHub source ref").option("--workflow <path>", "trusted .github/workflows/...yml signer path").option("--event <event>", "authorized GitHub event").option("--run-id <id>", "authorized GitHub Actions run ID").option("--run-attempt <number>", "exact attempt to reject replay").option("--bundle <path>", "offline Sigstore bundle from the authorized provider").action(async (pathInput, options) => {
     process.exitCode = await policyCommand(pathInput, options, streams);
   });
   const vendor = program2.command("vendor").description("inspect manufacturing vendor profiles");

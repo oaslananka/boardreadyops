@@ -182,3 +182,17 @@ it must not be run against mutable refs. Private/internal native signing is
 Enterprise Cloud-gated; other private targets remain unverified. No GA trust
 level, release gate or production policy is changed by the mere existence of
 these components; #771 and #154 remain open.
+
+
+## Phase 3 bounded CLI policy prerequisite (not GA)
+
+The opt-in `policy.rules[].type: require-source-bound-export` now connects
+the independently verified signed export primitive to the **explicit**
+`boardreadyops policy` command and its advisory/enforced exit code.
+The signed subject certificate and actual artifact bytes must match the
+separately authorized repository/run identity; an unsigned manifest alone
+can only be `byte-consistent-only`, never `source-bound-verified`.
+This does not automatically change release pack, production deployment,
+dashboard trust badges or customer GA acceptance. See
+[policy-engine](policy-engine.md) for the exact CLI invocation and the
+separate #154 two-private-installation requirement.
