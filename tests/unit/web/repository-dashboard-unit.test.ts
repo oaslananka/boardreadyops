@@ -223,6 +223,30 @@ describe("repository dashboard and viewer loader branches", () => {
             suppressed_until: "2026-08-27T11:00:00.000Z",
           },
         ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            board_id: "board-main",
+            display_name: "Main",
+            project_path: "boards/main.kicad_pro",
+            archived_at: null,
+            snapshot_commit_sha: "a".repeat(40),
+            snapshot_run_id: "run-1",
+            snapshot_component_count: 4,
+            snapshot_captured_at: "2026-08-20T10:00:00.000Z",
+          },
+          {
+            board_id: "board-sensor",
+            display_name: "Sensor",
+            project_path: "boards/sensor.kicad_pro",
+            archived_at: "2026-08-20T12:00:00.000Z",
+            snapshot_commit_sha: null,
+            snapshot_run_id: null,
+            snapshot_component_count: null,
+            snapshot_captured_at: null,
+          },
+        ],
       });
 
     const session = { login: "alice", installationIds: [123] };
@@ -239,6 +263,32 @@ describe("repository dashboard and viewer loader branches", () => {
     expect(detail?.supplyFindings[0]?.suppressionReason).toBe("Approved alternate is already qualified");
     expect(detail?.supplyFindings[0]?.suppressedBy).toBe("alice");
     expect(detail?.supplyFindings[0]?.suppressedUntil).toBe("2026-08-27T11:00:00.000Z");
+    expect(detail?.boards).toEqual([
+      {
+        id: "board-main",
+        displayName: "Main",
+        projectPath: "boards/main.kicad_pro",
+        archived: false,
+        latestBom: {
+          commitSha: "a".repeat(40),
+          runId: "run-1",
+          componentCount: 4,
+          capturedAt: "2026-08-20T10:00:00.000Z",
+        },
+      },
+      {
+        id: "board-sensor",
+        displayName: "Sensor",
+        projectPath: "boards/sensor.kicad_pro",
+        archived: true,
+      },
+    ]);
+    const boardCall = mockQuery.mock.calls.at(-1);
+    expect(boardCall?.[1]).toEqual(["repo-1"]);
+    expect(boardCall?.[0]).toContain("where boards.repository_id = $1");
+    expect(boardCall?.[0]).toContain("release_runs.repository_id = boards.repository_id");
+    expect(boardCall?.[0]).toContain("order by snapshot.captured_at desc, snapshot.id desc");
+    expect(boardCall?.[0]).toContain("limit 50");
   });
 
   it("loads viewer installations from database rows", async () => {

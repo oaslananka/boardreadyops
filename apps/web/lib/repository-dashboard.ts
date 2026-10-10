@@ -265,9 +265,24 @@ type RepositoryRun = {
   findingCount: number;
 };
 
+type RecordedBoardEvidence = {
+  id: string;
+  projectPath: string;
+  displayName: string;
+  archived: boolean;
+  /** Latest persisted BOM snapshot for this board, not evidence of release approval. */
+  latestBom?: {
+    commitSha: string;
+    runId: string;
+    componentCount: number;
+    capturedAt: string;
+  };
+};
+
 export type RepositoryDetail = {
   repository: RepositorySummary;
   runs: RepositoryRun[];
+  boards: RecordedBoardEvidence[];
   supplyFindings: {
     id: string;
     boardPath: string;
@@ -360,6 +375,35 @@ export async function loadRepositoryDetail(
       [repositoryId],
     );
 
+    // A board is identified by (repository_id, project_path), not by repository name.
+    // The latest BOM evidence is selected only if its run belongs to this same repository.
+    // The repository itself was authorized through loadViewerRepositories before these queries.
+    const boardsResult = await executor.query(
+      `select boards.id as board_id,
+              boards.project_path,
+              boards.display_name,
+              boards.archived_at,
+              latest.commit_sha as snapshot_commit_sha,
+              latest.run_id as snapshot_run_id,
+              latest.component_count as snapshot_component_count,
+              latest.captured_at as snapshot_captured_at
+         from boards
+         left join lateral (
+           select snapshot.commit_sha, snapshot.run_id, snapshot.component_count, snapshot.captured_at
+             from board_bom_snapshots as snapshot
+             join release_runs on release_runs.id = snapshot.run_id
+                              and release_runs.repository_id = boards.repository_id
+            where snapshot.board_id = boards.id
+            order by snapshot.captured_at desc, snapshot.id desc
+            limit 1
+         ) as latest on true
+        where boards.repository_id = $1
+        order by boards.last_seen_at desc, boards.id desc
+        limit 50`,
+      [repositoryId],
+    );
+
+    const boardRows = (boardsResult as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
     const runRows = (runsResult as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
     const supplyRows = (supplyResult as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
 
@@ -379,6 +423,26 @@ export async function loadRepositoryDetail(
             pullRequestNumber: typeof pullRequestNumber === "number" ? pullRequestNumber : undefined,
             startedAt: text(row, "started_at"),
             findingCount: count(row, "finding_count"),
+          },
+        ];
+      }),
+      boards: boardRows.flatMap((row): RecordedBoardEvidence[] => {
+        const id = text(row, "board_id");
+        const projectPath = text(row, "project_path");
+        if (!id || !projectPath) return [];
+        const commitSha = text(row, "snapshot_commit_sha");
+        const runId = text(row, "snapshot_run_id");
+        const capturedAt = text(row, "snapshot_captured_at");
+        const componentCount = row.snapshot_component_count;
+        return [
+          {
+            id,
+            projectPath,
+            displayName: text(row, "display_name") ?? projectPath,
+            archived: row.archived_at != null,
+            ...(commitSha && runId && capturedAt && Number.isSafeInteger(componentCount) && Number(componentCount) >= 0
+              ? { latestBom: { commitSha, runId, capturedAt, componentCount: Number(componentCount) } }
+              : {}),
           },
         ];
       }),
