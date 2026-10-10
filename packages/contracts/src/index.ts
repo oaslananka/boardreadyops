@@ -330,6 +330,21 @@ const releaseRunResultBaseSchema = z
     findings: z.array(findingSchema).max(500).default([]),
     artifacts: z.array(releaseRunArtifactSchema).max(100).default([]),
     metrics: releaseRunMetricsSchema.default({}),
+    // Optional producer-observed versions; older v1 results have no such metadata.
+    toolVersions: z
+      .object({
+        kicad: z
+          .string()
+          .regex(/^[0-9][0-9A-Za-z.+_-]{0,63}$/u)
+          .optional(),
+        boardReadyOps: z
+          .string()
+          .regex(/^[0-9][0-9A-Za-z.+_-]{0,63}$/u)
+          .optional(),
+      })
+      .strict()
+      .refine((value) => Object.keys(value).length > 0, "tool versions cannot be empty")
+      .optional(),
     reportLinks: z.array(releaseRunReportLinkSchema).max(20).default([]),
     readiness: releaseRunReadinessSchema.optional(),
     waivers: releaseRunWaiversSchema.optional(),

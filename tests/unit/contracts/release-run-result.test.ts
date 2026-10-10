@@ -57,6 +57,28 @@ describe("release run result contract", () => {
     });
   });
 
+  it("accepts actual bounded tool versions without changing legacy v1 payloads", () => {
+    const base = { version: 1, status: "completed", decision: "pass", findings: [] };
+    expect(releaseRunResultSchema.parse(base)).not.toHaveProperty("toolVersions");
+    expect(
+      releaseRunResultSchema.parse({
+        ...base,
+        toolVersions: { kicad: "10.0.6", boardReadyOps: "1.24.1" },
+      }).toolVersions,
+    ).toEqual({ kicad: "10.0.6", boardReadyOps: "1.24.1" });
+
+    for (const toolVersions of [
+      {},
+      { kicad: "not-reported" },
+      { kicad: "10.0.6\nspoofed" },
+      { kicad: "1".repeat(65) },
+      { boardReadyOps: " unknown " },
+      { kicad: "10.0.6", forged: "1.2.3" },
+    ]) {
+      expect(releaseRunResultSchema.safeParse({ ...base, toolVersions }).success).toBe(false);
+    }
+  });
+
   it("accepts bounded artifact metadata, metrics, and HTTPS report links", () => {
     const result = releaseRunResultSchema.parse({
       version: 1,

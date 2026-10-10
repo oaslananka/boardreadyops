@@ -264,6 +264,7 @@ function normalizedResultForDigest(result: ReleaseRunResult): Record<string, unk
     normalized.metrics = Object.fromEntries(Object.entries(result.metrics).sort(([a], [b]) => a.localeCompare(b)));
   }
   if (result.reportLinks.length > 0) normalized.reportLinks = [...result.reportLinks].sort(byCanonicalJson);
+  if (result.toolVersions) normalized.toolVersions = result.toolVersions;
   if (result.hardwareImpact) normalized.hardwareImpact = result.hardwareImpact;
 
   return normalized;
@@ -704,7 +705,7 @@ async function persistRunnerResult(
               transition.run_changed,
               transition.attempt_changed
        from classified
-       left join lateral boardreadyops_apply_runner_result_state(
+       left join lateral boardreadyops_apply_runner_result_with_versions(
          classified.id,
          classified.persistence_outcome = 'accepted',
          classified.status,
@@ -716,7 +717,9 @@ async function persistRunnerResult(
          $4,
          $5::timestamptz,
          $7,
-         $13
+         $13,
+         $19,
+         $20
        ) as transition
          on true
      ),
@@ -1079,6 +1082,8 @@ async function persistRunnerResult(
       githubCheckConclusion,
       decisionAuditMetadataJson,
       artifactStorageDriver(dependencies),
+      result.toolVersions?.kicad ?? null,
+      result.toolVersions?.boardReadyOps ?? null,
     ],
   );
   const row = rows(updateResult)[0];
