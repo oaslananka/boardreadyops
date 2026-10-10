@@ -8,6 +8,7 @@ import {
   AuditView,
   FindingsView,
   RunPageFrame,
+  reviewPublishCommand,
   SummaryView,
 } from "../../../apps/web/components/run-investigation.js";
 import type { RunDetail } from "../../../apps/web/lib/run-dashboard.js";
@@ -277,6 +278,45 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("does not expand the operator audit export");
   });
 
+  it("provides an explicit source-bound path from Run findings to a separately published Review", () => {
+    const run = sampleRun();
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("Run → Triage → Review");
+    expect(markup).toContain('href="/runs/run-accessible/findings"');
+    expect(markup).toContain("0123456789abcdef0123456789abcdef01234567");
+    expect(markup).toContain("git rev-parse HEAD");
+    expect(markup).toContain("boardreadyops review publish . --repo oaslananka/boardreadyops --pr 221");
+    expect(markup).toContain("creates a separate run/review record");
+    expect(markup).not.toContain("Open review for this run");
+    expect(markup).not.toContain("Approve review");
+  });
+
+  it("links only an explicitly associated published review without suggesting re-publication", () => {
+    const run = { ...sampleRun(), reviewId: "review-42" };
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain('href="/reviews/review-42"');
+    expect(markup).toContain("Open review for this run");
+    expect(markup).not.toContain("boardreadyops review publish");
+  });
+
+  it("generates no command from untrusted repository identities or invalid PR numbers", () => {
+    expect(reviewPublishCommand({ repository: "org/board", pullRequestNumber: undefined })).toBe(
+      "boardreadyops review publish . --repo org/board",
+    );
+    expect(reviewPublishCommand({ repository: "org/board", pullRequestNumber: 42 })).toBe(
+      "boardreadyops review publish . --repo org/board --pr 42",
+    );
+    expect(reviewPublishCommand({ repository: "org/board;echo unsafe", pullRequestNumber: 42 })).toBeUndefined();
+    expect(reviewPublishCommand({ repository: "org/board\nunsafe", pullRequestNumber: 42 })).toBeUndefined();
+    expect(reviewPublishCommand({ repository: "org/board", pullRequestNumber: -1 })).toBeUndefined();
+    expect(reviewPublishCommand({ repository: "org/board", pullRequestNumber: 1.5 })).toBeUndefined();
+    const markup = renderToStaticMarkup(
+      createElement(SummaryView, { run: { ...sampleRun(), repository: "org/board;echo unsafe" } }),
+    );
+    expect(markup).toContain("Use");
+    expect(markup).not.toContain("boardreadyops review publish . --repo org/board;");
+  });
+
   it("renders release-linked production evidence without claiming causality", () => {
     const markup = renderToStaticMarkup(createElement(SummaryView, { run: sampleRun() }));
 
@@ -341,9 +381,9 @@ describe("run investigation accessibility", () => {
     const run = sampleRun();
     const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
 
-    expect(markup).toContain("Run → Review → Release");
+    expect(markup).toContain("Run → Triage → Review");
     expect(markup).toContain('href="/reviews#publish-review"');
-    expect(markup).toContain("How to publish a review");
+    expect(markup).toContain("Review publishing requirements");
   });
 
   it("links a reviewed run directly to its hardware review", () => {
@@ -352,7 +392,7 @@ describe("run investigation accessibility", () => {
     const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
 
     expect(markup).toContain('href="/reviews/review-123"');
-    expect(markup).toContain("Open hardware review");
+    expect(markup).toContain("Open review for this run");
     expect(markup).not.toContain('href="/reviews#publish-review"');
   });
 

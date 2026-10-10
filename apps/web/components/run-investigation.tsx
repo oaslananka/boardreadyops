@@ -398,30 +398,88 @@ function CategoryBreakdownPanel({ run }: Readonly<{ run: RunDetail }>) {
   );
 }
 
+/**
+ * Only offer a copyable shell command when the repository identity is a simple
+ * owner/name. The persisted repository name is display data, not trusted shell
+ * source. No --head override: the CLI must inspect the user's local checkout.
+ */
+export function reviewPublishCommand(run: Pick<RunDetail, "repository" | "pullRequestNumber">): string | undefined {
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(run.repository)) return undefined;
+  const pr = run.pullRequestNumber;
+  if (pr !== undefined && (!Number.isSafeInteger(pr) || pr <= 0)) return undefined;
+  return `boardreadyops review publish . --repo ${run.repository}${pr === undefined ? "" : ` --pr ${pr}`}`;
+}
+
 function ReviewLifecyclePanel({ run }: Readonly<{ run: RunDetail }>) {
+  const publishCommand = reviewPublishCommand(run);
   return (
     <Panel
       id="review-lifecycle"
-      title="Run → Review → Release"
-      description="A Run is execution evidence, a Review is an explicit decision context, and a Release is a separate publish action."
+      title="Run → Triage → Review"
+      description="Execution evidence and an explicit review decision are different records."
       tone="section"
     >
-      <p className="text-sm text-muted-foreground">
-        Normal readiness and GitHub Action runs stay in Runs. They do not automatically become Reviews. A Review exists
-        only after review evidence is explicitly published, and neither a Run nor a Review publishes a release by
-        itself.
-      </p>
-      <div className="mt-3 flex flex-wrap gap-3 text-sm">
-        {run.reviewId ? (
-          <Link href={`/reviews/${run.reviewId}`} className="text-primary underline underline-offset-2">
-            Open hardware review
+      {run.reviewId ? (
+        <div className="flex flex-col gap-2 text-sm">
+          <p>
+            A published Review references this run. Review decisions and approvals belong to that Review, not to the
+            readiness result alone.
+          </p>
+          <Link
+            href={`/reviews/${encodeURIComponent(run.reviewId)}`}
+            className="text-primary underline underline-offset-2"
+          >
+            Open review for this run →
           </Link>
-        ) : (
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 text-sm">
+          <p className="text-muted-foreground">
+            No Review is published for this exact run. A failing run can have actionable findings while My Work and
+            Reviews remain empty; nothing is automatically approved or sent to manufacturing.
+          </p>
+          <ol className="list-decimal space-y-3 pl-5">
+            <li>
+              <Link
+                href={`/runs/${encodeURIComponent(run.id)}/findings`}
+                className="text-primary underline underline-offset-2"
+              >
+                Inspect this run’s findings
+              </Link>
+              <span className="text-muted-foreground">
+                {" "}
+                on source commit <code>{run.commitSha}</code>
+                {run.pullRequestNumber !== undefined ? ` (PR #${run.pullRequestNumber})` : ""}.
+              </span>
+            </li>
+            <li>
+              Fix the source locally, push a new commit, and re-run readiness. Confirm <code>git rev-parse HEAD</code>{" "}
+              matches the exact commit you intend to review; an older run cannot prove a newer fix.
+            </li>
+            <li>
+              Publish Review evidence <strong>explicitly</strong> from the checked-out project using the configured CLI
+              and authorized <code>BOARDREADYOPS_TOKEN</code>.
+              {publishCommand ? (
+                <div className="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-2">
+                  <code className="whitespace-pre text-xs">{publishCommand}</code>
+                </div>
+              ) : (
+                <p className="mt-1 text-muted-foreground">
+                  Use <code>boardreadyops review publish</code> with your authorized repository identity.
+                </p>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Publishing analyzes the local source and creates a separate run/review record. It does not convert or
+                approve this GitHub Actions run; the published head SHA and evidence must be checked again in Review. A
+                multi-board repository may need a specific project configuration.
+              </p>
+            </li>
+          </ol>
           <Link href="/reviews#publish-review" className="text-primary underline underline-offset-2">
-            How to publish a review
+            Review publishing requirements →
           </Link>
-        )}
-      </div>
+        </div>
+      )}
     </Panel>
   );
 }
