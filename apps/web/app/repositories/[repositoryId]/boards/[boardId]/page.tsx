@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { type DataColumn, DataTable } from "../../../../../components/ui/data-table.js";
 import { AppShell, EmptyState, Panel, StatusBadge } from "../../../../../components/ui.js";
 import { ViewerNav } from "../../../../../components/viewer-nav.js";
@@ -60,26 +61,32 @@ export function boardCaptureColumns(
         const sourceUrl = sourceBoundToRun
           ? githubFindingSourceUrl(repositoryName, capture.snapshotCommitSha, projectPath)
           : undefined;
+        let sourceAction: ReactNode;
+        if (!sourceBoundToRun) {
+          sourceAction = (
+            <span className="text-xs text-muted-foreground">
+              Captured source differs from recorded Run commit; inspect the original Run before relying on this
+              evidence.
+            </span>
+          );
+        } else if (sourceUrl) {
+          sourceAction = (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary underline underline-offset-2"
+            >
+              Open project at this commit ↗
+            </a>
+          );
+        } else {
+          sourceAction = <span className="text-xs text-muted-foreground">Source path cannot be linked safely</span>;
+        }
         return (
           <span className="flex flex-col gap-1">
             <code className="break-all text-xs">{capture.snapshotCommitSha}</code>
-            {!sourceBoundToRun ? (
-              <span className="text-xs text-muted-foreground">
-                Captured source differs from recorded Run commit; inspect the original Run before relying on this
-                evidence.
-              </span>
-            ) : sourceUrl ? (
-              <a
-                href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-primary underline underline-offset-2"
-              >
-                Open project at this commit ↗
-              </a>
-            ) : (
-              <span className="text-xs text-muted-foreground">Source path cannot be linked safely</span>
-            )}
+            {sourceAction}
           </span>
         );
       },
