@@ -239,6 +239,10 @@ describe("dependency and security automation configuration", () => {
     );
     expect(renovate.schedule).toEqual(["after 5am and before 8am every weekday"]);
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
+    // Bulk lockfile refreshes skip per-transitive minimumReleaseAge and generated
+    // a native-CodeQL-blocked Action bundle (#1039). Keep targeted updates active.
+    expect(renovate.lockFileMaintenance).toEqual({ enabled: false });
+    expect(renovate.vulnerabilityAlerts).toMatchObject({ enabled: true, schedule: [] });
     expect(renovate.customManagers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
