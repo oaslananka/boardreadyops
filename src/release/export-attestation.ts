@@ -162,6 +162,11 @@ function matchesVerifiedResult(value: unknown, e: TrustedExportExpectation, inve
   const statement = recordAt(verification, "statement");
   const subjects = statement?.subject;
   const workflowUri = `https://github.com/${e.repository}/${e.workflowPath}@${e.sourceRef}`;
+  // gh attestation verify 2.102 exposes the certified SAN as a string.
+  // Older parsed verifier results may wrap it in { value }; both must
+  // match the independently trusted signer workflow URI exactly.
+  const san = cert?.subjectAlternativeName;
+  const signerSAN = typeof san === "string" ? san : recordAt(cert, "subjectAlternativeName")?.value;
   const runUri = `https://github.com/${e.repository}/actions/runs/${e.runId}/attempts/${e.runAttempt}`;
   if (
     cert?.issuer !== oidcIssuer ||
@@ -174,7 +179,7 @@ function matchesVerifiedResult(value: unknown, e: TrustedExportExpectation, inve
     cert.buildSignerDigest !== e.reviewedSha ||
     cert.runnerEnvironment !== "github-hosted" ||
     cert.buildTrigger !== e.event ||
-    recordAt(cert, "subjectAlternativeName")?.value !== workflowUri ||
+    signerSAN !== workflowUri ||
     statement?.predicateType !== slsaPredicate ||
     !Array.isArray(subjects) ||
     subjects.length !== inventory.names.size
