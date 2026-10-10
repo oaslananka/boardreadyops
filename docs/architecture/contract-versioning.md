@@ -19,6 +19,21 @@ This document defines the strict versioning, compatibility, and deprecation poli
 
 ---
 
+### Signed GitHub Actions tool-version observations (v1 additive)
+
+The OIDC-authenticated run result may include optional `toolVersions.kicad` and
+`toolVersions.boardReadyOps` (bounded strings). The target runner captures the
+installed `kicad-cli version` and obtains BoardReadyOps' version from its valid
+generated JSON report; a version is omitted when unobserved. This field is
+authenticated as part of the exact run/attempt/source callback and persisted only
+after the guarded result transition accepts it, including in the terminal result
+digest. It does **not** attest the installed tool binaries independently or prove
+manufacturing source-bound signatures.
+
+Older v1 callbacks remain valid with no tool versions, and their digest input is
+unchanged. The dashboard must show missing values as unreported rather than
+infer versions from the workflow template, release tag or other runs.
+
 ## 2. Semantic Versioning & Schema Lifecycle
 
 BoardReadyOps adheres to Semantic Versioning (SemVer 2.0.0) across all binary and library releases.

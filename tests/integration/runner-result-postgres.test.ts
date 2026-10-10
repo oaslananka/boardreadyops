@@ -450,16 +450,17 @@ describeDatabase("runner result PostgreSQL integration", () => {
 
   it("persists the versioned result atomically and accepts exact replay", async () => {
     if (!executor) throw new Error("DATABASE_URL is required");
-    const accepted = await handleResultRequest(callbackRequest(), dependencies);
+    const reportedVersions = { kicad: "10.0.6", boardReadyOps: "1.24.1" };
+    const accepted = await handleResultRequest(callbackRequest({ toolVersions: reportedVersions }), dependencies);
     expect(accepted.status).toBe(202);
     await expect(accepted.json()).resolves.toMatchObject({ ok: true, status: "accepted", runId });
 
-    const replayed = await handleResultRequest(callbackRequest(), dependencies);
+    const replayed = await handleResultRequest(callbackRequest({ toolVersions: reportedVersions }), dependencies);
     expect(replayed.status).toBe(200);
     await expect(replayed.json()).resolves.toMatchObject({ ok: true, status: "replayed", runId });
 
     const conflicting = await handleResultRequest(
-      callbackRequest({ status: "failed", decision: "error", findings: [] }),
+      callbackRequest({ status: "failed", decision: "error", findings: [], toolVersions: { kicad: "10.0.7" } }),
       dependencies,
     );
     expect(conflicting.status).toBe(409);
@@ -472,7 +473,8 @@ describeDatabase("runner result PostgreSQL integration", () => {
 
     const runRows = rows(
       await executor.query(
-        `select status, version::int as version, decision, completed_at, duration_ms, terminal_result_digest
+        `select status, version::int as version, decision, completed_at, duration_ms, terminal_result_digest,
+               kicad_version, board_ready_ops_version
        from release_runs where id = $1`,
         [runId],
       ),
@@ -485,6 +487,8 @@ describeDatabase("runner result PostgreSQL integration", () => {
         completed_at: new Date(completedAt),
         duration_ms: 1250,
         terminal_result_digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        kicad_version: "10.0.6",
+        board_ready_ops_version: "1.24.1",
       }),
     ]);
 

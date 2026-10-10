@@ -52,6 +52,8 @@ describe("Setup and Waiver PR plan generation", () => {
     expect(output.content).toContain("/api/v1/runs/github-actions-result?run_id=");
     expect(output.content).toContain("Verify exact target commit");
     expect(output.content).toContain("Expected KiCad 10.0.*");
+    expect(output.content).toContain("KICAD_VERSION:");
+    expect(output.content).toContain("toolVersions");
     expect(output.content).toContain("private-repository");
     expect(output.content).toContain("safe_mode_reasons requires safe_mode=true");
     expect(output.content).toContain('if [ "$RESULT_URL" != "$expected_url" ]; then');

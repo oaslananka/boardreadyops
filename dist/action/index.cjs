@@ -98464,6 +98464,11 @@ var releaseRunResultBaseSchema = external_exports.object({
   findings: external_exports.array(findingSchema).max(500).default([]),
   artifacts: external_exports.array(releaseRunArtifactSchema).max(100).default([]),
   metrics: releaseRunMetricsSchema.default({}),
+  // Optional producer-observed versions; older v1 results have no such metadata.
+  toolVersions: external_exports.object({
+    kicad: external_exports.string().regex(/^[0-9][0-9A-Za-z.+_-]{0,63}$/u).optional(),
+    boardReadyOps: external_exports.string().regex(/^[0-9][0-9A-Za-z.+_-]{0,63}$/u).optional()
+  }).strict().refine((value) => Object.keys(value).length > 0, "tool versions cannot be empty").optional(),
   reportLinks: external_exports.array(releaseRunReportLinkSchema).max(20).default([]),
   readiness: releaseRunReadinessSchema.optional(),
   waivers: releaseRunWaiversSchema.optional(),

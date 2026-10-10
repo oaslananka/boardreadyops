@@ -137,6 +137,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0084_repository_retention_policies.sql",
       "0085_review_policy_audit_events.sql",
       "0086_github_app_uninstall_export.sql",
+      "0087_signed_runner_tool_versions.sql",
     ]);
   });
 

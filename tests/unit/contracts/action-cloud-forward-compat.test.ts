@@ -58,6 +58,7 @@ describe("Action->Cloud contract: POST /api/v1/runs/github-actions-result (readi
       reportLinks: [
         { label: "GitHub Actions run", url: "https://github.com/octo-org/hardware-board/actions/runs/123" },
       ],
+      toolVersions: { kicad: "10.0.6", boardReadyOps: "1.24.1" },
     });
     expect(result.success).toBe(true);
   });
