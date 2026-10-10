@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import * as yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
 import { generateSetupPrPlan, generateWaiverPrPlan } from "../../../packages/cloud-core/src/repository-setup.js";
@@ -33,6 +34,34 @@ describe("Setup and Waiver PR plan generation", () => {
     expect(validateConfig(parsedConfig)).toEqual([]);
   });
 
+  it("generates an exact byte-for-byte hardened canonical workflow, including OIDC and safe-mode guards", async () => {
+    const configuredOrigin = "https://cloud.example";
+    const plan = generateSetupPrPlan({ presetId: "open-source", cloudOrigin: configuredOrigin });
+    const output = plan.files.find((file) => file.path === ".github/workflows/readiness-runner.yml");
+    if (!output) throw new Error("Expected installed target workflow");
+    const canonical = await readFile(
+      new URL("../../../.github/workflows/readiness-runner.yml", import.meta.url),
+      "utf8",
+    );
+    const cloudOriginExpression = "$" + "{{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}";
+    expect(output.content).toBe(canonical.replaceAll(cloudOriginExpression, configuredOrigin));
+    const document = yaml.load(output.content) as { jobs: Record<string, unknown> };
+    expect(Object.keys(document.jobs)).toEqual(["readiness", "setup-probe"]);
+    expect(output.content).toContain("execution_attempt_id must be a lowercase UUID");
+    expect(output.content).toContain("result_url must target the BoardReadyOps GitHub Actions callback");
+    expect(output.content).toContain("/api/v1/runs/github-actions-result?run_id=");
+    expect(output.content).toContain("Verify exact target commit");
+    expect(output.content).toContain("Expected KiCad 10.0.*");
+    expect(output.content).toContain("private-repository");
+    expect(output.content).toContain("safe_mode_reasons requires safe_mode=true");
+    expect(output.content).toContain('if [ "$RESULT_URL" != "$expected_url" ]; then');
+    expect(output.content).toContain("BOARDREADYOPS_CLOUD_ORIGIN must be an HTTPS origin");
+    expect(output.content).toContain("x-boardreadyops-safe-mode-reasons");
+    expect(output.content).toContain("id-token: write");
+    expect(output.content).toContain("persist-credentials: false");
+    expect(output.content).not.toContain("contents: write");
+  });
+
   it("generates a self-contained setup probe workflow pinned to the trusted cloud origin", () => {
     const plan = generateSetupPrPlan({
       presetId: "open-source",
@@ -47,9 +76,11 @@ describe("Setup and Waiver PR plan generation", () => {
     const probe = jobs["setup-probe"];
     expect(probe?.if).toBe(expression("{{ inputs.setup_probe_id != '' }}"));
     expect(probe?.permissions).toEqual({ contents: "read", "id-token": "write" });
-    const setupProbeVariable = "${" + "SETUP_PROBE_ID}";
+    const setupProbeVariable = "$" + "{SETUP_PROBE_ID}";
+    const shellOrigin = "$" + "{CLOUD_ORIGIN}";
+    expect(workflowFile.content).toContain("CLOUD_ORIGIN: https://cloud.example");
     expect(workflowFile.content).toContain(
-      `expected_url="https://cloud.example/api/v1/setup-probes/result?probe_id=${setupProbeVariable}"`,
+      `expected_url="${shellOrigin}/api/v1/setup-probes/result?probe_id=${setupProbeVariable}"`,
     );
     expect(workflowFile.content).not.toContain("vars.BOARDREADYOPS_CLOUD_ORIGIN");
     expect(workflowFile.content).not.toContain("contents: write");
