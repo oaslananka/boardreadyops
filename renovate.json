@@ -26,10 +26,7 @@
   "rebaseWhen": "conflicted",
   "postUpdateOptions": ["pnpmDedupe"],
   "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": ["before 6am on monday"],
-    "automerge": false,
-    "addLabels": ["lockfile-maintenance"]
+    "enabled": false
   },
   "packageRules": [
     {

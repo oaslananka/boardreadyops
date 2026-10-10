@@ -14,7 +14,22 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 
 ## Policy layers
 
-`renovate.json` is self-contained. It directly carries the conservative baseline that BoardReadyOps previously inherited from `github>oaslananka/.github:renovate-config`: the Europe/Istanbul timezone, seven-day routine release quarantine, strict internal age filtering, two new PRs per hour, five concurrent PRs, digest pinning, weekly lockfile maintenance, semantic commits, Dependency Dashboard, and explicit approval for major upgrades.
+`renovate.json` is self-contained. It directly carries the conservative baseline that BoardReadyOps previously inherited from `github>oaslananka/.github:renovate-config`: the Europe/Istanbul timezone, seven-day routine release quarantine, strict internal age filtering, two new PRs per hour, five concurrent PRs, digest pinning, targeted dependency updates, semantic commits, Dependency Dashboard, and explicit approval for major upgrades.
+
+**Lockfile maintenance is paused; routine Renovate is not.** The October 10 hosted
+lockfile-maintenance PR #1039 refreshed 243 package/version identities while removing
+217, introduced `is-unsafe@2.0.2` in the standalone Action bundle, and failed two
+native CodeQL High alerts. Its `security / gate` correctly rejected the update.
+Renovate's full lockfile refresh also cannot enforce `minimumReleaseAge` for each
+transitive version; disabling only `lockFileMaintenance` prevents recurring bulk PRs
+that bypass the repository's seven-day release quarantine. Targeted patch/minor
+updates, the Dependency Dashboard, advisory/vulnerability PRs, and all CI gates
+remain enabled. Transitive-only refreshes now require a separately reviewed,
+bounded dependency update with the existing locked reproducibility, provenance,
+NOTICE, CodeQL and multi-OS acceptance checks; this is a deliberate coverage
+tradeoff, not proof that all transitive packages are current. Re-enable scheduled
+maintenance only after the Action bundle's upstream alert sources can pass native
+CodeQL without suppressions or runtime regressions.
 
 This repository-local baseline replaced an unavailable shared preset after the October 2, 2026 validation failure. It remains authoritative for Mend-hosted package policy without requiring cross-repository token access. The schedule, package managers, protected groups, vulnerability-PR policy and merge routing remain local. Generated files are refreshed by the isolated, repository-owned GitHub Actions flow described above. Generated output, dependency trees, and test fixtures remain excluded from discovery.
 
