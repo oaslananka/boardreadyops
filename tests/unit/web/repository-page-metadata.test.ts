@@ -89,6 +89,7 @@ describe("Repository page metadata", () => {
           archived: false,
           latestBom: {
             commitSha: "a".repeat(40),
+            runCommitSha: "a".repeat(40),
             runId: "run-a",
             componentCount: 14,
             capturedAt: "2026-10-11T00:00:00Z",
@@ -121,6 +122,49 @@ describe("Repository page metadata", () => {
     expect(html).not.toContain("Ready for Fabrication");
   });
 
+  it("does not treat a mismatching snapshot and Run commit as source-bound evidence", async () => {
+    vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
+      status: "authenticated",
+      session: { login: "acme", installationIds: [12345] },
+    } as unknown as viewerAuth.ViewerAuthorizationResult);
+    vi.spyOn(repositoryDashboard, "loadRepositoryDetail").mockResolvedValue({
+      repository: {
+        id: "repo-1",
+        owner: "acme",
+        name: "gateway",
+        private: true,
+        githubInstallationId: 12345,
+        latestRunId: "run-source",
+        watchedBoards: 0,
+        openFindings: 0,
+      },
+      runs: [],
+      supplyFindings: [],
+      boards: [
+        {
+          id: "board-a",
+          displayName: "Mainboard",
+          projectPath: "hardware/mainboard/mainboard.kicad_pro",
+          archived: false,
+          latestBom: {
+            commitSha: "a".repeat(40),
+            runCommitSha: "b".repeat(40),
+            runId: "run-source",
+            componentCount: 3,
+            capturedAt: "2026-10-11T00:00:00Z",
+          },
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof repositoryDashboard.loadRepositoryDetail>>);
+
+    const html = renderToStaticMarkup(await RepositoryPage({ params: Promise.resolve({ repositoryId: "repo-1" }) }));
+    expect(html).toContain("Captured source differs from recorded Run commit");
+    expect(html).toContain('href="/runs/run-source"');
+    expect(html).toContain('href="/repositories/repo-1/boards/board-a"');
+    expect(html).not.toContain("Open project at this commit");
+    expect(html).not.toContain("https://github.com/acme/gateway/blob/");
+  });
+
   it("does not offer a source link for an unsafe persisted project path", async () => {
     vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
       status: "authenticated",
@@ -147,6 +191,7 @@ describe("Repository page metadata", () => {
           archived: false,
           latestBom: {
             commitSha: "b".repeat(40),
+            runCommitSha: "b".repeat(40),
             runId: "run-b",
             componentCount: 1,
             capturedAt: "2026-10-11T00:00:00Z",

@@ -109,7 +109,10 @@ function boardEvidenceColumns(repositoryId: string, repositoryName: string): rea
       cell: (board) => {
         const snapshot = board.latestBom;
         if (!snapshot) return <span className="text-muted-foreground">Not recorded</span>;
-        const sourceUrl = githubFindingSourceUrl(repositoryName, snapshot.commitSha, board.projectPath);
+        const matchesRun = snapshot.commitSha === snapshot.runCommitSha;
+        const sourceUrl = matchesRun
+          ? githubFindingSourceUrl(repositoryName, snapshot.commitSha, board.projectPath)
+          : undefined;
         return (
           <span className="flex flex-col gap-1 text-sm">
             <code className="break-all text-xs">{snapshot.commitSha}</code>
@@ -119,6 +122,11 @@ function boardEvidenceColumns(repositoryId: string, repositoryName: string): rea
             >
               Open snapshot Run
             </Link>
+            {!matchesRun ? (
+              <span className="text-xs text-muted-foreground">
+                Captured source differs from recorded Run commit; verify this snapshot in its Run before relying on it.
+              </span>
+            ) : null}
             {sourceUrl ? (
               <a
                 href={sourceUrl}

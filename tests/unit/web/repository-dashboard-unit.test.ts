@@ -233,6 +233,7 @@ describe("repository dashboard and viewer loader branches", () => {
             project_path: "boards/main.kicad_pro",
             archived_at: null,
             snapshot_commit_sha: "a".repeat(40),
+            snapshot_run_commit_sha: "a".repeat(40),
             snapshot_run_id: "run-1",
             snapshot_component_count: 4,
             snapshot_captured_at: "2026-08-20T10:00:00.000Z",
@@ -272,6 +273,7 @@ describe("repository dashboard and viewer loader branches", () => {
         archived: false,
         latestBom: {
           commitSha: "a".repeat(40),
+          runCommitSha: "a".repeat(40),
           runId: "run-1",
           componentCount: 4,
           capturedAt: "2026-08-20T10:00:00.000Z",
@@ -288,6 +290,7 @@ describe("repository dashboard and viewer loader branches", () => {
     expect(boardCall?.[1]).toEqual(["repo-1"]);
     expect(boardCall?.[0]).toContain("where boards.repository_id = $1");
     expect(boardCall?.[0]).toContain("release_runs.repository_id = boards.repository_id");
+    expect(boardCall?.[0]).toContain("release_runs.commit_sha as run_commit_sha");
     expect(boardCall?.[0]).toContain("order by snapshot.captured_at desc, snapshot.id desc");
     expect(boardCall?.[0]).toContain("limit 50");
   });
