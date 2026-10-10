@@ -42,7 +42,14 @@ describe("real KiCad manufacturing output inventory (no trusted attestation)", (
       const boardFile = path.join(root, "safe-basic.kicad_pcb");
       const result = await runGenerate(
         { schemaVersion: 1, steps: [{ kind: "gerbers" }, { kind: "drill" }] },
-        { outputDir, boardFile, gitRoot: root, kicadVersion: cli.version, runner: createKicadCliRunner(cli.path) },
+        {
+          outputDir,
+          boardFile,
+          gitRoot: root,
+          reviewedSourceSha: sha,
+          kicadVersion: cli.version,
+          runner: createKicadCliRunner(cli.path),
+        },
       );
       expect(result.failures).toBe(0);
       expect(result.steps.map((step) => step.kind)).toEqual(["gerbers", "drill"]);

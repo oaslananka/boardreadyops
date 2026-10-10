@@ -62,6 +62,31 @@ workflow/run-attempt requirements of #771 or the two distinct installations
 of #154. No new source-bound “verified” UI or release PASS is authorized by
 this integration check.
 
+## Reviewed-commit local export guard (pre-attestation prerequisite)
+
+The `runGenerate` library accepts an opt-in `reviewedSourceSha` (a full
+lowercase 40-character SHA) for trusted-runner development. Before deleting
+anything or invoking KiCad, it requires the **explicit root to be the actual
+Git checkout top level**, its HEAD to equal the pinned SHA, a clean worktree
+(including untracked files), both Gerber and drill steps, source files inside
+the root and an empty output directory. It rechecks the source snapshot,
+Git state, step outcomes and actual file inventory after generation. All
+fingerprinted KiCad source files must be tracked by that Git commit, including
+files that Git would otherwise silently ignore. A dirty, stale, incomplete,
+or byte-inconsistent run throws rather than emitting a
+successful result. For this first implementation, output must be a separate,
+Git-ignored directory **inside** the checkout because the local verifier
+requires an in-root manifest. An external output directory is rejected before
+writing, not silently promoted or moved across the trust boundary.
+
+**Security limit:** `reviewedSourceSha` is supplied by the caller. A local Git
+assertion alone cannot authenticate the installation, issuer, GitHub workflow,
+run attempt or code that performed the export; it cannot create a signed
+attestation. The guard does **not** enable a user-facing source-bound verified
+state, alter manual/offline workflows or lift any strict production HOLD.
+Only a separately verified GitHub/Sigstore attestation over the manifest AND
+actual outputs with independently checked runner provenance can do so.
+
 ## Required acceptance before changing the release gate
 
 - Valid unchanged source re-exported later must not be flagged stale based on time alone.

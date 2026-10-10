@@ -53843,6 +53843,9 @@ function resolveGitExecutable(options = {}) {
   );
 }
 
+// src/release/generate.ts
+init_path();
+
 // src/release/output-cleanup.ts
 var import_node_crypto7 = require("node:crypto");
 var import_node_fs7 = require("node:fs");
@@ -54090,6 +54093,77 @@ async function gitState(root) {
     return {};
   }
 }
+var reviewedShaPattern = /^[0-9a-f]{40}$/u;
+var reviewedSourcePatterns = [
+  "**/*.kicad_pcb",
+  "**/*.kicad_sch",
+  "**/*.kicad_pro",
+  "**/*.kicad_jobset",
+  "**/*.kicad_dru",
+  "**/*.kicad_wks"
+];
+async function assertReviewedSource(options) {
+  const expected = options.reviewedSourceSha;
+  if (expected === void 0) return;
+  if (!reviewedShaPattern.test(expected) || !options.gitRoot) {
+    throw new Error("Reviewed export requires a full lowercase source SHA and explicit Git root.");
+  }
+  const root = await import_promises21.default.realpath(options.gitRoot);
+  const executable = resolveGitExecutable();
+  const env = gitDiscoveryEnv();
+  const [top, head, status] = await Promise.all([
+    runProcess(executable, ["rev-parse", "--show-toplevel"], { cwd: root, env, timeoutMs: 1e4 }),
+    runProcess(executable, ["rev-parse", "--verify", "HEAD^{commit}"], { cwd: root, env, timeoutMs: 1e4 }),
+    runProcess(executable, ["status", "--porcelain=v1", "--untracked-files=all"], {
+      cwd: root,
+      env,
+      timeoutMs: 1e4
+    })
+  ]);
+  if (top.code !== 0 || head.code !== 0 || status.code !== 0 || top.timedOut || head.timedOut || status.timedOut) {
+    throw new Error("Reviewed export could not verify its Git checkout and working-tree state.");
+  }
+  if (import_node_path60.default.resolve(top.stdout.trim()) !== root) {
+    throw new Error("Reviewed export Git root must match the checkout top-level directory.");
+  }
+  if (head.stdout.trim() !== expected) {
+    throw new Error("Reviewed export source commit does not match the pinned SHA.");
+  }
+  if (status.stdout.trim() !== "") {
+    throw new Error("Reviewed export requires a clean Git checkout, including untracked files.");
+  }
+  const sourcePaths = (await globFiles(root, reviewedSourcePatterns, { rejectMatchingSymlinks: true })).map(
+    (absolute) => toPosixPath(import_node_path60.default.relative(root, absolute))
+  );
+  if (sourcePaths.length === 0 || sourcePaths.length > 4096) {
+    throw new Error("Reviewed export has no KiCad inputs or exceeds the source inventory limit.");
+  }
+  const tracked = await runProcess(executable, ["ls-files", "--cached", "-z", "--", ...sourcePaths], {
+    cwd: root,
+    env,
+    timeoutMs: 1e4,
+    maxStdoutBytes: 1024 * 1024
+  });
+  if (tracked.code !== 0 || tracked.timedOut) {
+    throw new Error("Reviewed export could not verify its Git-tracked KiCad source inventory.");
+  }
+  const trackedPaths = new Set(tracked.stdout.split("\0").filter(Boolean));
+  if (sourcePaths.some((sourcePath2) => !trackedPaths.has(sourcePath2))) {
+    throw new Error("Reviewed export includes a KiCad source input not tracked by the pinned commit.");
+  }
+}
+async function assertFreshReviewedOutput(outputDir) {
+  let stat3;
+  try {
+    stat3 = await import_promises21.default.lstat(outputDir);
+  } catch (error51) {
+    if (error51.code === "ENOENT") return;
+    throw error51;
+  }
+  if (!stat3.isDirectory() || (await import_promises21.default.readdir(outputDir)).length !== 0) {
+    throw new Error("Reviewed export requires a new or empty generated-output directory.");
+  }
+}
 async function sourceInputFingerprint(options) {
   if (!options.gitRoot) return void 0;
   const inputs = [options.boardFile, options.schematicFile].filter((file2) => typeof file2 === "string");
@@ -54120,8 +54194,23 @@ async function runGenerate(recipe, options) {
     schematic: Boolean(options.schematicFile)
   };
   const plan = buildGeneratePlan(recipe, available);
+  if (options.reviewedSourceSha !== void 0) {
+    if (!options.boardFile || !["gerbers", "drill"].every((kind) => plan.steps.some((step) => step.kind === kind))) {
+      throw new Error("Reviewed manufacturing export requires both Gerber and drill steps.");
+    }
+    await assertReviewedSource(options);
+    const canonicalRoot2 = await import_promises21.default.realpath(options.gitRoot);
+    const canonicalOutput = await resolveExistingPathAlias(outputDir);
+    if (canonicalOutput === canonicalRoot2 || !isInside(canonicalRoot2, canonicalOutput)) {
+      throw new Error("Reviewed export output must be an in-root, separate generated directory.");
+    }
+  }
   const sourceFingerprintBefore = await sourceInputFingerprint(options);
+  if (options.reviewedSourceSha !== void 0 && !sourceFingerprintBefore) {
+    throw new Error("Reviewed manufacturing export requires in-root, readable KiCad source inputs.");
+  }
   await assertSafeGenerateOutputCleanup(outputDir, options);
+  if (options.reviewedSourceSha !== void 0) await assertFreshReviewedOutput(outputDir);
   await import_promises21.default.rm(outputDir, { recursive: true, force: true });
   await import_promises21.default.mkdir(outputDir, { recursive: true });
   const outcomes = plan.skipped.map((entry) => ({
@@ -54159,6 +54248,19 @@ ${result.stderr}`).trim() || `${step.kind} export failed`
   const sourceFingerprintAfter = sourceFingerprintBefore ? await sourceInputFingerprint(options) : void 0;
   const sourceSnapshot = sourceFingerprintBefore === void 0 ? void 0 : sourceFingerprintBefore === sourceFingerprintAfter ? "stable" : "changed";
   const recipeHash = (0, import_node_crypto8.createHash)("sha256").update(canonicalizeJson(recipe)).digest("hex");
+  if (options.reviewedSourceSha !== void 0) {
+    const missingManufacturingOutput = ["gerbers", "drill"].some(
+      (kind) => !outcomes.some(
+        (outcome) => outcome.kind === kind && outcome.status === "generated" && (outcome.files ?? 0) > 0
+      )
+    );
+    if (sourceSnapshot !== "stable" || outcomes.some((outcome) => outcome.status === "failed") || missingManufacturingOutput || artifacts.length === 0) {
+      throw new Error(
+        "Reviewed manufacturing export requires successful Gerber/drill generation from an unchanged source snapshot."
+      );
+    }
+    await assertReviewedSource(options);
+  }
   const git = options.gitRoot ? await gitState(options.gitRoot) : {};
   const manifest = {
     kind: "boardreadyops.export-provenance",
@@ -54183,6 +54285,14 @@ ${result.stderr}`).trim() || `${step.kind} export failed`
   const manifestPath = import_node_path60.default.join(outputDir, "manifest.json");
   await import_promises21.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
+  if (options.reviewedSourceSha !== void 0) {
+    const verification = await verifyExportProvenance(options.gitRoot, manifestPath, {
+      currentGitSha: options.reviewedSourceSha
+    });
+    if (verification.status !== "verified" || verification.gitShaMatch !== true) {
+      throw new Error("Reviewed manufacturing export failed local source and output byte-consistency checks.");
+    }
+  }
   return {
     outputDir,
     manifestPath,
