@@ -67,7 +67,7 @@ function OperationalSummarySection({ summary }: Readonly<{ summary: DashboardRep
             ["Repositories with findings", summary.repositoriesWithOpenFindings],
             ["Supply alerts", summary.supplyAlerts],
             ["No run yet", summary.repositoriesWithoutRuns],
-            ["Boards watched", summary.watchedBoards],
+            ["Supply-tracked boards", summary.watchedBoards],
           ] as const
         ).map(([label, value]) => (
           <div key={label}>
@@ -76,11 +76,21 @@ function OperationalSummarySection({ summary }: Readonly<{ summary: DashboardRep
           </div>
         ))}
       </dl>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Supply-tracked boards counts registered component-monitoring records, not GitHub readiness runs. A zero does not
+        mean your connected repositories have stopped being checked.
+      </p>
     </section>
   );
 }
 
-function FindingsAttentionBanner({ summary }: Readonly<{ summary: DashboardRepositorySummary }>) {
+function FindingsAttentionBanner({
+  summary,
+  groups,
+}: Readonly<{ summary: DashboardRepositorySummary; groups: RepositoryGroup[] }>) {
+  const affected = groups
+    .flatMap((group) => group.repositories)
+    .find((repository) => repository.latestRunId && repository.openFindings > 0);
   return (
     <output className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning-surface px-5 py-4">
       <div>
@@ -93,7 +103,22 @@ function FindingsAttentionBanner({ summary }: Readonly<{ summary: DashboardRepos
       </div>
       <div className="flex items-center gap-2 text-sm">
         <span className="rounded-full bg-warning/20 px-2 py-0.5 text-xs font-bold text-warning">Next action</span>
-        <span className="text-muted-foreground">Inspect findings below and resolve blocking design violations.</span>
+        {affected?.latestRunId ? (
+          <Link
+            href={`/runs/${affected.latestRunId}/findings`}
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            Review {affected.openFindings} findings in {affected.owner}/{affected.name} →
+          </Link>
+        ) : summary.supplyAlerts > 0 ? (
+          <Link href="/parts" className="font-medium text-foreground underline underline-offset-2">
+            Review supply alerts →
+          </Link>
+        ) : (
+          <Link href="/runs" className="font-medium text-foreground underline underline-offset-2">
+            Browse readiness runs →
+          </Link>
+        )}
       </div>
     </output>
   );
@@ -120,9 +145,12 @@ function SetupInProgressBanner({ summary }: Readonly<{ summary: DashboardReposit
   );
 }
 
-function AttentionBanner({ summary }: Readonly<{ summary: DashboardRepositorySummary }>) {
+function AttentionBanner({
+  summary,
+  groups,
+}: Readonly<{ summary: DashboardRepositorySummary; groups: RepositoryGroup[] }>) {
   if (summary.repositoriesWithOpenFindings > 0 || summary.supplyAlerts > 0) {
-    return <FindingsAttentionBanner summary={summary} />;
+    return <FindingsAttentionBanner summary={summary} groups={groups} />;
   }
   if (summary.repositoriesWithoutRuns > 0) {
     return <SetupInProgressBanner summary={summary} />;
@@ -154,8 +182,14 @@ const repositoryColumns: readonly DataColumn<RepositoryRow>[] = [
     cell: (repository) =>
       repository.latestRunId ? (
         <div className="flex items-center gap-2">
-          <StatusBadge value={repository.latestRunDecision ?? repository.latestRunStatus} />
-          <span className="text-meta text-muted-foreground">{when(repository.latestRunAt)}</span>
+          <Link
+            href={`/runs/${repository.latestRunId}`}
+            className="inline-flex items-center gap-2 underline-offset-2 hover:underline"
+            aria-label={`Open latest run for ${repository.owner}/${repository.name}`}
+          >
+            <StatusBadge value={repository.latestRunDecision ?? repository.latestRunStatus} />
+            <span className="text-meta text-muted-foreground">{when(repository.latestRunAt)}</span>
+          </Link>
         </div>
       ) : (
         <span className="text-meta text-muted-foreground">
@@ -170,13 +204,22 @@ const repositoryColumns: readonly DataColumn<RepositoryRow>[] = [
     id: "findings",
     header: "Findings",
     align: "end",
-    cell: (repository) => (
-      <span className="tabular-nums">{repository.latestRunId ? repository.openFindings : "—"}</span>
-    ),
+    cell: (repository) =>
+      repository.latestRunId && repository.openFindings > 0 ? (
+        <Link
+          href={`/runs/${repository.latestRunId}/findings`}
+          className="font-medium tabular-nums text-primary underline underline-offset-2"
+          aria-label={`Review ${repository.openFindings} findings in ${repository.owner}/${repository.name}`}
+        >
+          {repository.openFindings}
+        </Link>
+      ) : (
+        <span className="tabular-nums">{repository.latestRunId ? repository.openFindings : "—"}</span>
+      ),
   },
   {
     id: "boards",
-    header: "Boards watched",
+    header: "Supply-tracked boards",
     align: "end",
     cell: (repository) => <span className="tabular-nums">{repository.watchedBoards}</span>,
   },
@@ -221,7 +264,7 @@ function DashboardBody({
   return (
     <div className="flex flex-col gap-5">
       <OperationalSummarySection summary={summary} />
-      <AttentionBanner summary={summary} />
+      <AttentionBanner summary={summary} groups={groups} />
       <RepositorySections groups={groups} />
     </div>
   );
