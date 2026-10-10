@@ -267,7 +267,8 @@ function PartsEmptyState({
         },
         {
           id: "ingest",
-          label: "Ingest a manufacturing package or BOM file to populate parts automatically",
+          label:
+            "Generate a BOM snapshot through a connected repository or local CLI; hosted ZIP upload is not available yet",
           status: "upcoming",
         },
       ]}

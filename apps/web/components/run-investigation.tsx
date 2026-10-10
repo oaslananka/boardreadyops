@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { findingDomainFromRule, findingGuidance, githubFindingSourceUrl } from "../lib/finding-guidance.js";
 import { releaseRepositoryDispatchAvailability } from "../lib/release-rollout.js";
 import type { RunDashboardFilters, RunDetail } from "../lib/run-dashboard.js";
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
@@ -921,8 +922,16 @@ function findingGroupValue(finding: FindingDetail, group: FindingGroup): string 
 export function FindingList({
   findings,
   repositoryId,
+  repository,
+  commitSha,
   group = "none",
-}: Readonly<{ findings: FindingDetail[]; repositoryId: string; group?: FindingGroup }>) {
+}: Readonly<{
+  findings: FindingDetail[];
+  repositoryId: string;
+  repository?: string;
+  commitSha?: string;
+  group?: FindingGroup;
+}>) {
   if (findings.length === 0) {
     return (
       <EmptyState title="No matching findings">
@@ -934,7 +943,13 @@ export function FindingList({
     return (
       <ul className="flex flex-col gap-2">
         {findings.map((finding) => (
-          <FindingRow key={finding.id} finding={finding} repositoryId={repositoryId} />
+          <FindingRow
+            key={finding.id}
+            finding={finding}
+            repositoryId={repositoryId}
+            repository={repository}
+            commitSha={commitSha}
+          />
         ))}
       </ul>
     );
@@ -956,7 +971,13 @@ export function FindingList({
           </header>
           <ul className="mt-2 flex flex-col gap-2">
             {entries.map((finding) => (
-              <FindingRow key={finding.id} finding={finding} repositoryId={repositoryId} />
+              <FindingRow
+                key={finding.id}
+                finding={finding}
+                repositoryId={repositoryId}
+                repository={repository}
+                commitSha={commitSha}
+              />
             ))}
           </ul>
         </section>
@@ -1042,7 +1063,13 @@ export function FindingsView({
         {run.findingsPage.total} matching finding{run.findingsPage.total === 1 ? "" : "s"}
       </p>
       <div className="mt-3">
-        <FindingList findings={run.findings} repositoryId={run.repositoryId} group={group} />
+        <FindingList
+          findings={run.findings}
+          repositoryId={run.repositoryId}
+          repository={run.repository}
+          commitSha={run.commitSha}
+          group={group}
+        />
       </div>
       <div className="mt-4">
         <Pagination
@@ -1057,7 +1084,19 @@ export function FindingsView({
   );
 }
 
-function FindingRow({ finding, repositoryId }: Readonly<{ finding: FindingDetail; repositoryId: string }>) {
+function FindingRow({
+  finding,
+  repositoryId,
+  repository,
+  commitSha,
+}: Readonly<{
+  finding: FindingDetail;
+  repositoryId: string;
+  repository: string | undefined;
+  commitSha: string | undefined;
+}>) {
+  const sourceUrl = githubFindingSourceUrl(repository ?? "", commitSha ?? "", finding.path);
+  const domain = findingDomainFromRule(finding.ruleId);
   return (
     <li className="rounded-md border border-border bg-card p-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -1067,46 +1106,65 @@ function FindingRow({ finding, repositoryId }: Readonly<{ finding: FindingDetail
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge value={finding.waivedAt ? "waived" : "active"} />
-          <FindingWaiverButton
-            repositoryId={repositoryId}
-            ruleId={finding.ruleId}
-            alreadyWaived={finding.waivedAt !== undefined}
-          />
+          <details className="text-xs text-muted-foreground">
+            <summary className="cursor-pointer underline underline-offset-2">Request exception</summary>
+            <p className="my-2 max-w-xs">
+              An exception records an engineering decision; it does not fix the underlying issue.
+            </p>
+            <FindingWaiverButton
+              repositoryId={repositoryId}
+              ruleId={finding.ruleId}
+              alreadyWaived={finding.waivedAt !== undefined}
+            />
+          </details>
         </div>
       </header>
       <p className="mt-1 text-sm text-foreground">{finding.message}</p>
       <dl className="mt-2 grid grid-cols-3 gap-3">
         <div>
           <dt className="text-xs uppercase text-muted-foreground">Path</dt>
-          <dd className="text-sm text-foreground">{finding.path ? <code>{finding.path}</code> : "Not reported"}</dd>
+          <dd className="break-all text-sm text-foreground">
+            {sourceUrl ? (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                <code>{finding.path}</code> ↗
+              </a>
+            ) : finding.path && finding.path !== "." ? (
+              <code>{finding.path}</code>
+            ) : (
+              "Repository-level finding"
+            )}
+          </dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">Kind</dt>
-          <dd className="text-sm text-foreground">{finding.kind ? humanize(finding.kind) : "Not reported"}</dd>
+          <dt className="text-xs uppercase text-muted-foreground">Check</dt>
+          <dd className="text-sm text-foreground">
+            {finding.kind
+              ? humanize(finding.kind)
+              : domain === "unclassified"
+                ? "Check type not provided"
+                : `${categoryLabel(domain)} (rule ID)`}
+          </dd>
         </div>
         <div>
           <dt className="text-xs uppercase text-muted-foreground">Waived</dt>
           <dd className="text-sm text-foreground">{formatRunDate(finding.waivedAt)}</dd>
         </div>
       </dl>
-      <div className="mt-2 text-xs text-muted-foreground">
-        <p>
-          <strong className="text-foreground">Corrective action:</strong> Update the source design file
-          {finding.path ? (
-            <>
-              {" ("}
-              <code>{finding.path}</code>
-              {")"}
-            </>
-          ) : (
-            ""
-          )}{" "}
-          in your CAD tool to resolve {finding.ruleId}.
+      <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-sm">
+        <p className="font-semibold text-foreground">How to resolve</p>
+        <p className="mt-1 text-foreground">{findingGuidance(finding.ruleId)}</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Suggested from the rule ID, not a verified repair. Check the original diagnostic before editing.
         </p>
         <p className="mt-1">
           <small>
-            To verify the fix, push the updated commit — or use <strong>Re-run readiness</strong> at the top of this
-            page to re-check the current commit without leaving BoardReadyOps.
+            Commit the correction, then verify readiness against the new commit. Re-running this unchanged SHA only
+            repeats the existing check; it does not prove a source fix.
           </small>
         </p>
       </div>

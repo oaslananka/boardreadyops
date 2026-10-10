@@ -134,7 +134,7 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
           </div>
           {result.state === "ok" ? (
             <Button asChild>
-              <Link href="/projects/new">Ingest a package</Link>
+              <Link href="/projects/new">Add a project source</Link>
             </Button>
           ) : null}
         </header>
@@ -156,7 +156,10 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
                 rowKey={(project) => project.id}
                 empty={
                   <EmptyState title="No projects in this workspace yet">
-                    <p>Add one below, then link a repository or ingest a manufacturing package.</p>
+                    <p>
+                      Create a project, then connect its GitHub repository. Direct hosted ZIP upload is not yet
+                      available.
+                    </p>
                   </EmptyState>
                 }
               />

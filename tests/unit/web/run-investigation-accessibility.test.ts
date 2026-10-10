@@ -380,12 +380,13 @@ describe("run investigation accessibility", () => {
     expect(artifacts).toContain("Download signed copy");
   });
 
-  it("provides clear corrective action and an in-product way to verify the fix", () => {
+  it("provides rule-aware, correctly scoped help without suggesting the same commit proves a source fix", () => {
     const markup = viewMarkup("findings");
-    expect(markup).toContain("Corrective action");
-    // The note used to send the reader to GitHub to push a commit, which was the only way to
-    // re-check anything. It now points at the re-run control on the same page.
-    expect(markup).toContain("Re-run readiness");
+    expect(markup).toContain("How to resolve");
+    expect(markup).toContain("manufacturer part number");
+    expect(markup).toContain("against the new commit");
+    expect(markup).toContain("Request exception");
+    expect(markup).not.toContain("Update the source design file");
     expect(markup).not.toContain("Rerun required to verify");
   });
 

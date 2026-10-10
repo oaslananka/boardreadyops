@@ -52,7 +52,7 @@ const PLANS: PlanDefinition[] = [
     tagline: "For independent engineers and hardware duos.",
     features: [
       "Everything in Community",
-      "Private Multi-CAD package uploads",
+      "Private Multi-CAD hosted ZIP uploads (planned; not available yet)",
       "Interactive visual layer canvas",
       "Cross-revision Gerber diffing",
       "5GB storage included",
