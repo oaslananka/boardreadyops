@@ -66,6 +66,15 @@ describe("PlanComparisonCard", () => {
     expect(text).toContain("$450");
   });
 
+  it("labels unavailable hosted package upload honestly instead of promising it as a working paid benefit", async () => {
+    await act(async () => {
+      root.render(createElement(ToastProvider, null, createElement(PlanComparisonCard, { currentTier: "community" })));
+    });
+    const text = container.querySelector(".plan-comparison-container")?.textContent;
+    expect(text).toContain("Private Multi-CAD hosted ZIP uploads (planned; not available yet)");
+    expect(text).not.toContain("Private Multi-CAD package uploads");
+  });
+
   it("indicates current active plan and shows upgrade buttons for higher tiers", async () => {
     await act(async () => {
       root.render(
