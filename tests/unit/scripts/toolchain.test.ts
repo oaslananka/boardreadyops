@@ -221,7 +221,7 @@ describe("reproducible contributor toolchain", () => {
     expect(preCommit).toContain("corepack pnpm run toolchain:bootstrap");
     expect(prePush).toMatch(/^set -e\n/u);
     expect(prePush).toContain("corepack pnpm run typecheck");
-    expect(prePush).toContain("corepack pnpm run test:unit");
+    expect(prePush).toContain("corepack pnpm exec vitest run tests/unit --maxWorkers=2");
     expect(prePush).toContain("corepack pnpm run verify:dist");
     expect(prePush).toContain("node scripts/toolchain.mjs run pre-commit run --hook-stage pre-push --all-files");
     expect(prePush).toContain("corepack pnpm run toolchain:bootstrap");
@@ -243,7 +243,7 @@ describe("reproducible contributor toolchain", () => {
 echo "corepack $*" >> "${trace}"
 case "$*" in
   "pnpm run typecheck") exit 0 ;;
-  "pnpm run test:unit") exit 42 ;;
+  "pnpm exec vitest run tests/unit --maxWorkers=2") exit 42 ;;
   "pnpm run verify:dist") exit 0 ;;
   *) exit 97 ;;
 esac
@@ -268,7 +268,7 @@ exit 0
       const calls = (await readFile(trace, "utf8")).trim().split("\n");
 
       expect(result.status).toBe(42);
-      expect(calls).toEqual(["corepack pnpm run typecheck", "corepack pnpm run test:unit"]);
+      expect(calls).toEqual(["corepack pnpm run typecheck", "corepack pnpm exec vitest run tests/unit --maxWorkers=2"]);
     } finally {
       await rm(temporaryRoot, { recursive: true, force: true });
     }
