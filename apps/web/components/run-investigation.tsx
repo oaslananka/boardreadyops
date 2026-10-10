@@ -1216,7 +1216,7 @@ function FindingRow({
       </dl>
       <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-sm">
         <p className="font-semibold text-foreground">How to resolve</p>
-        <p className="mt-1 text-foreground">{findingGuidance(finding.ruleId)}</p>
+        <p className="mt-1 text-foreground">{findingGuidance(finding.ruleId, finding.message)}</p>
         <p className="mt-2 text-xs text-muted-foreground">
           Suggested from the rule ID, not a verified repair. Check the original diagnostic before editing.
         </p>

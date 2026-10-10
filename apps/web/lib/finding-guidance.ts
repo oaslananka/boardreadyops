@@ -48,9 +48,30 @@ const ruleSteps: Readonly<Record<string, string>> = {
     "Supply a verifiable manufacturer part number for the affected populated BOM entry; regenerate the BOM and rerun the check.",
   "manufacturing.outputs-present":
     "Generate the required fabrication outputs from the current source revision and verify the output manifest before rerunning readiness.",
+  "manufacturing.fab-notes":
+    "Add project fabrication notes at fab/README.md, manufacturing/notes.md, or docs/fab-notes.md; include them with the current board outputs and rerun the check.",
+  "manufacturing.drill-coverage":
+    "Compare the PCB drill diameters against the tool table in the generated Excellon drill file. Regenerate drill outputs from the reviewed PCB revision and verify each required tool size before rerunning.",
+  "manufacturing.package-completeness":
+    "Inspect the missing output categories in this finding. Supply the required Gerbers, drill files, drill report/map, BOM and placement files; production mode also requires fabrication and assembly notes and board PDF documentation. Verify the package against the same source revision.",
+  "release.revision-set":
+    "Set the PCB title-block revision to the intended release version, conforming to the configured tag pattern. Commit the board change and rerun release validation.",
+  "release.tag-matches-revision":
+    "Compare the Git release tag with the PCB title-block revision. Align the tag and the reviewed board revision before publishing; rerun release validation on the intended commit.",
+  "release.version-format":
+    "Review the configured release version pattern and the schematic and PCB title-block revisions. Correct inconsistent revisions and rerun the release checks.",
+  "release.artifact-provenance":
+    "Re-export Gerber and drill outputs from the intended reviewed source revision, then check the package manifest hashes. Matching self-reported hashes alone do not prove signed, source-bound provenance.",
+  "bom.unknown-lifecycle":
+    "Find a current lifecycle statement from an attributable component data source for the affected part. Update the BOM or authorized provider data; do not treat missing lifecycle evidence as active.",
 };
 
-export function findingGuidance(ruleId: string): string {
+export function findingGuidance(ruleId: string, message?: string): string {
+  // The actual rule emits this diagnostic when the BOARD revision is missing.
+  // A changelog edit cannot repair it; source-authoritative board metadata must change first.
+  if (ruleId === "release.changelog-present" && message?.includes("no board revision is set")) {
+    return "Set the PCB title-block revision first, then record the matching revision in CHANGELOG.md. Commit both changes and rerun the release checks.";
+  }
   const exact = ruleSteps[ruleId];
   if (exact) return exact;
   const domain = findingDomainFromRule(ruleId);
