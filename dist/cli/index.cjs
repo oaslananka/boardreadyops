@@ -55066,18 +55066,19 @@ async function sourceBoundEvidence(root, options) {
   if (!manifest) return { status: "unverified", reason: "No manufacturing export manifest supplied." };
   if (options.repository && options.repositoryId && options.reviewedSourceSha && options.sourceRef && options.workflow && options.event && options.runId && options.runAttempt) {
     try {
+      const { repository, repositoryId, reviewedSourceSha, sourceRef, workflow, event, runId, runAttempt } = options;
       const verified = await verifyReviewedExportAttestation({
         root,
         manifestPath: manifest,
         expected: {
-          repository: options.repository,
-          repositoryId: options.repositoryId,
-          reviewedSha: options.reviewedSourceSha,
-          sourceRef: options.sourceRef,
-          workflowPath: options.workflow,
-          event: options.event,
-          runId: options.runId,
-          runAttempt: Number(options.runAttempt)
+          repository,
+          repositoryId,
+          reviewedSha: reviewedSourceSha,
+          sourceRef,
+          workflowPath: workflow,
+          event,
+          runId,
+          runAttempt: Number(runAttempt)
         },
         ...options.bundle ? { bundlePath: options.bundle } : {}
       });
