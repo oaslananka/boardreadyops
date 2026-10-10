@@ -161,12 +161,35 @@ describeDatabase("repository dashboard", () => {
     const main = detail?.boards.find((board) => board.id === boardMain);
     expect(main?.latestBom).toMatchObject({
       commitSha: "b".repeat(40),
+      runCommitSha: "b".repeat(40),
       runId: runTwo,
       componentCount: 9,
     });
     const sensor = detail?.boards.find((board) => board.id === boardSensor);
     expect(sensor?.archived).toBe(true);
     expect(sensor?.latestBom).toBeUndefined();
+  });
+
+  it("does not conflate persisted snapshot SHA with its associated Run's independent SHA", async () => {
+    const snapshotId = "9e000000-0000-4000-8000-000000000052";
+    await database().query("update board_bom_snapshots set commit_sha = $2 where id = $1", [
+      snapshotId,
+      "c".repeat(40),
+    ]);
+    try {
+      const detail = await loadRepositoryDetail(mineRepository, session([mineGithubInstallation]), environment);
+      const main = detail?.boards.find((board) => board.id === boardMain);
+      expect(main?.latestBom).toMatchObject({
+        commitSha: "c".repeat(40),
+        runCommitSha: "b".repeat(40),
+        runId: runTwo,
+      });
+    } finally {
+      await database().query("update board_bom_snapshots set commit_sha = $2 where id = $1", [
+        snapshotId,
+        "b".repeat(40),
+      ]);
+    }
   });
 
   it("reads one board's actual capture timeline, never the repository's other boards", async () => {

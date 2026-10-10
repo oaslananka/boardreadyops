@@ -273,6 +273,8 @@ type RecordedBoardEvidence = {
   /** Latest persisted BOM snapshot for this board, not evidence of release approval. */
   latestBom?: {
     commitSha: string;
+    /** Independently recorded source SHA of the Run that owns this snapshot. */
+    runCommitSha: string;
     runId: string;
     componentCount: number;
     capturedAt: string;
@@ -384,12 +386,14 @@ export async function loadRepositoryDetail(
               boards.display_name,
               boards.archived_at,
               latest.commit_sha as snapshot_commit_sha,
+              latest.run_commit_sha as snapshot_run_commit_sha,
               latest.run_id as snapshot_run_id,
               latest.component_count as snapshot_component_count,
               latest.captured_at as snapshot_captured_at
          from boards
          left join lateral (
-           select snapshot.commit_sha, snapshot.run_id, snapshot.component_count, snapshot.captured_at
+           select snapshot.commit_sha, release_runs.commit_sha as run_commit_sha,
+                  snapshot.run_id, snapshot.component_count, snapshot.captured_at
              from board_bom_snapshots as snapshot
              join release_runs on release_runs.id = snapshot.run_id
                               and release_runs.repository_id = boards.repository_id
@@ -441,7 +445,15 @@ export async function loadRepositoryDetail(
             displayName: text(row, "display_name") ?? projectPath,
             archived: row.archived_at != null,
             ...(commitSha && runId && capturedAt && Number.isSafeInteger(componentCount) && Number(componentCount) >= 0
-              ? { latestBom: { commitSha, runId, capturedAt, componentCount: Number(componentCount) } }
+              ? {
+                  latestBom: {
+                    commitSha,
+                    runCommitSha: text(row, "snapshot_run_commit_sha") ?? "",
+                    runId,
+                    capturedAt,
+                    componentCount: Number(componentCount),
+                  },
+                }
               : {}),
           },
         ];
