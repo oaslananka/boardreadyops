@@ -67,6 +67,7 @@ export function boardCaptureColumns(
             <span className="text-xs text-muted-foreground">
               Captured source differs from recorded Run commit; inspect the original Run before relying on this
               evidence.
+              <code className="mt-1 block break-all">Recorded Run commit: {capture.runCommitSha}</code>
             </span>
           );
         } else if (sourceUrl) {
@@ -158,6 +159,19 @@ export default async function BoardHistoryPage({ params }: Readonly<PageProps>) 
             manufacturing readiness, or a signed source-bound fabrication export. Runs can cover more than one board.
             Captured order is not necessarily the order of source commits.
           </p>
+        </Panel>
+
+        <Panel
+          title="Continue to published Reviews"
+          description="Reviews are separately published records for repository changes, not approvals for individual BOM captures."
+        >
+          <p className="text-sm text-muted-foreground">
+            First inspect the recorded Run and its source revision above. Then browse published Reviews separately; a
+            BOM capture alone does not establish a Review decision or manufacturing authorization.
+          </p>
+          <Link href="/reviews" className="mt-3 inline-block text-sm text-primary underline underline-offset-2">
+            Browse published Reviews →
+          </Link>
         </Panel>
       </main>
     </AppShell>

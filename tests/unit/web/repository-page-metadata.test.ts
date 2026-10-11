@@ -159,6 +159,7 @@ describe("Repository page metadata", () => {
 
     const html = renderToStaticMarkup(await RepositoryPage({ params: Promise.resolve({ repositoryId: "repo-1" }) }));
     expect(html).toContain("Captured source differs from recorded Run commit");
+    expect(html).toContain(`Recorded Run commit: ${"b".repeat(40)}`);
     expect(html).toContain('href="/runs/run-source"');
     expect(html).toContain('href="/repositories/repo-1/boards/board-a"');
     expect(html).not.toContain("Open project at this commit");

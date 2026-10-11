@@ -70,7 +70,11 @@ describe("board capture timeline route", () => {
     expect(result).toContain("20 recorded components");
     expect(result).toContain("19 recorded components");
     expect(result).toContain("Captured source differs from recorded Run commit");
+    expect(result).toContain(`Recorded Run commit: ${"c".repeat(40)}`);
     expect(result).not.toContain(`href="https://github.com/acme/pcb-projects/blob/${"a".repeat(40)}`);
+    expect(result).toContain('href="/reviews"');
+    expect(result).toContain("Reviews are separately published records");
+    expect(result).toContain("a BOM capture alone does not establish a Review decision");
     expect(result).toContain("Older snapshots exist beyond these 20 captures");
     expect(result).toContain("not a verified component diff");
     expect(result).not.toContain("Ready for Fabrication");
