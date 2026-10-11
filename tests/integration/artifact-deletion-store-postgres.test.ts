@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { processArtifactDeletion } from "../../apps/web/lib/artifact-deletion-worker.js";
 import { createSqlArtifactDeletionStore } from "../../packages/db/src/artifact-deletion-store.js";
 import { DataLifecycleStore } from "../../packages/db/src/data-lifecycle-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
@@ -170,6 +174,87 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       await lifecycle.releaseLegalHold(otherTenant, unrelated.id, "authorized-operator");
       await requireExecutor().query("delete from legal_holds where tenant_id = $1", [otherTenant]);
       await requireExecutor().query("delete from legal_holds where tenant_id = $1", [`artifact-delete-${label}`]);
+    }
+  });
+
+  it("KNOWN-RISK: a committed hold after authorization does not prevent synthetic unlink", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL connection required");
+    const label = `race-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const artifactId = randomUUID();
+    const jobId = await insertJob(tenant, artifactId);
+    const now = new Date(Date.now() + 1_000);
+    const store = createSqlArtifactDeletionStore(requireExecutor(), { now: () => now });
+    const claimed = await store.claimDeletions({ workerId: "hold-race-worker", limit: 1 });
+    expect(claimed).toHaveLength(1);
+    const claimedJob = claimed[0];
+    if (!claimedJob) throw new Error("Expected a claimed synthetic deletion job.");
+    expect(claimedJob.deletionJobId).toBe(jobId);
+
+    const otherSession = createPgQueryExecutor({ connectionString, max: 1 });
+    const lifecycle = new DataLifecycleStore(otherSession);
+    const tenantId = `artifact-delete-${label}`;
+    const root = await mkdtemp(path.join(tmpdir(), "boardreadyops-hold-race-"));
+    const objectPath = path.join(root, tenant.runId, `${artifactId}.bin`);
+    await mkdir(path.dirname(objectPath), { recursive: true });
+    await writeFile(objectPath, "SYNTHETIC TEST DATA ONLY");
+    let holdId: string | undefined;
+    let reached!: () => void;
+    let resume!: () => void;
+    const atUnlink = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const canUnlink = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+
+    const deletion = processArtifactDeletion(claimedJob, {
+      workerId: "hold-race-worker",
+      store,
+      storageRoot: root,
+      deleteLocalObject: async () => {
+        // Current store query already completed; no DB lock spans this callback.
+        reached();
+        await canUnlink;
+        await unlink(objectPath);
+        return "deleted";
+      },
+    });
+    try {
+      await atUnlink;
+      const deletionPid = rows(await requireExecutor().query("select pg_backend_pid() as pid"))[0]?.pid;
+      const holdPid = rows(await otherSession.query("select pg_backend_pid() as pid"))[0]?.pid;
+      expect(deletionPid).not.toBe(holdPid);
+
+      const hold = await lifecycle.createLegalHold({
+        tenantId,
+        createdBy: "synthetic-audit-operator",
+        reason: "Preserve the synthetic file while deletion is in flight.",
+        scope: "organization",
+      });
+      holdId = hold.id;
+      // Observe the hold commit from another PostgreSQL pool.
+      expect(
+        rows(
+          await requireExecutor().query("select id from legal_holds where id=$1 and tenant_id=$2 and active=true", [
+            hold.id,
+            tenantId,
+          ]),
+        ),
+      ).toHaveLength(1);
+
+      resume();
+      // A CHARACTERIZATION OF THE DEFECT, never a safety assertion.
+      // Invert/remove once serialization of holds with unlink is implemented.
+      expect(await deletion).toMatchObject({ status: "completed", outcome: "deleted" });
+      await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      resume();
+      await deletion.catch(() => {});
+      if (holdId) await lifecycle.releaseLegalHold(tenantId, holdId, "synthetic-audit-operator");
+      await otherSession.query("delete from legal_holds where tenant_id=$1", [tenantId]);
+      await otherSession.close();
+      await rm(root, { recursive: true, force: true });
     }
   });
 
