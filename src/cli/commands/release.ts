@@ -7,6 +7,7 @@ import { canonicalRoot, runPipeline } from "../../core/pipeline.js";
 import { resolveLocale, t } from "../../i18n/t.js";
 import { detectKicadCli } from "../../kicad/cli.js";
 import { runJobset } from "../../kicad/jobset.js";
+import { type AuditClauseMapping, exportPassportAuditClausesJson } from "../../release/clause-evidence.js";
 import { diffReleases, formatReleaseDiffText, type ReleaseSnapshot } from "../../release/diff.js";
 import {
   formatReleaseCertificateText,
@@ -21,6 +22,7 @@ import {
   planHandoffPackage,
   renderHandoffReadme,
 } from "../../release/handoff.js";
+import type { ReleasePassport } from "../../release/passport.js";
 import {
   buildReleasePrepareSummary,
   type PrepareGenerationStage,
@@ -73,6 +75,51 @@ export interface ReleaseHandoffOptions {
   output?: string;
   format?: "text" | "json";
   zip?: boolean;
+}
+
+export interface ReleaseAuditClausesOptions {
+  mappings: string;
+}
+
+/**
+ * Export only reviewer-mapped passport field presence. No normative clause catalogue
+ * or issuer/source-to-output attestation is invented by this command.
+ */
+export async function releaseAuditClausesCommand(
+  passportFile: string,
+  options: ReleaseAuditClausesOptions,
+  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
+): Promise<number> {
+  const maxInputBytes = 1024 * 1024;
+  async function readJsonFile(file: string): Promise<unknown> {
+    const source = path.resolve(normalizePathInput(file));
+    const stat = await fs.stat(source);
+    if (!stat.isFile() || stat.size > maxInputBytes) {
+      throw new Error("Audit clause input must be a regular JSON file no larger than 1 MiB.");
+    }
+    return JSON.parse(await fs.readFile(source, "utf8")) as unknown;
+  }
+  try {
+    const passport = await readJsonFile(passportFile);
+    const mappings = await readJsonFile(options.mappings);
+    if (
+      typeof passport !== "object" ||
+      passport === null ||
+      Array.isArray(passport) ||
+      !Array.isArray(mappings) ||
+      !mappings.every((item) => typeof item === "object" && item !== null && !Array.isArray(item))
+    ) {
+      throw new Error("Audit clause inputs must be a passport object and an array of mapping objects.");
+    }
+    const output = exportPassportAuditClausesJson(passport as ReleasePassport, mappings as AuditClauseMapping[]);
+    streams.stdout.write(output);
+    return 0;
+  } catch {
+    streams.stderr.write(
+      "Audit clause export failed: invalid or unreadable passport/mapping, invalid self-digest, or unsupported clause requirements.\n",
+    );
+    return 2;
+  }
 }
 
 export interface ReleaseDiffOptions extends CommonCliOptions {

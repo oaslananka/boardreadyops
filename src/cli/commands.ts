@@ -23,6 +23,7 @@ import {
   type ReleasePrepareOptions,
   type ReleaseSignOptions,
   type ReleaseVerifyOptions,
+  releaseAuditClausesCommand,
   releaseDiffCommand,
   releaseHandoffCommand,
   releasePackCommand,
@@ -160,6 +161,14 @@ export function registerAllCommands(
     .option("--html <path>", "write an HTML release diff dashboard to a file")
     .action(async (previous: string, pathInput: string | undefined, options: ReleaseDiffOptions) => {
       process.exitCode = await releaseDiffCommand(previous, pathInput, options, streams);
+    });
+  release
+    .command("audit-clauses")
+    .description("export self-reported Release Passport fields by reviewer-supplied clause, not compliance")
+    .argument("<passport>", "Release Passport JSON file")
+    .requiredOption("--mappings <path>", "reviewer-provided clause mapping JSON array")
+    .action(async (passportPath: string, options: { mappings: string }) => {
+      process.exitCode = await releaseAuditClausesCommand(passportPath, options, streams);
     });
   release
     .command("sign")

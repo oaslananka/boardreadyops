@@ -135,6 +135,12 @@ For key rotation and revocation, pass `--trust-store <path>` instead of `--publi
 
 ## Release preparation
 
+`boardreadyops release audit-clauses <passport.json> --mappings <reviewed-clauses.json>`
+exports a deterministic offline, JSON-only **self-reported record-presence** report
+grouped by reviewer-supplied ISO 13485, IATF 16949, AS9100 or DO-254 clause IDs.
+It never determines compliance or authenticates the passport's issuer or the
+fabricated outputs. See [clause evidence projection](release/clause-evidence-projection.md).
+
 `boardreadyops release prepare [path]` runs a single end-to-end preparation workflow: it generates first-party manufacturing outputs (when `kicad-cli` is available), validates the project with the full pipeline, and records a release decision. Results are written to `release-prepare.json` under the output directory (`build/boardreadyops-release` by default), and the command exits `0` for a `pass` decision and `1` for a `fail`.
 
 ```bash

@@ -31618,13 +31618,13 @@ function calculateEvidenceDigest(params) {
     }))
   };
   const canonical = canonicalJsonStringify(composite);
-  return (0, import_node_crypto10.createHash)("sha256").update(canonical, "utf8").digest("hex");
+  return (0, import_node_crypto11.createHash)("sha256").update(canonical, "utf8").digest("hex");
 }
-var import_node_crypto10, evidenceItemSchema, ledgerDecisionRecordSchema, ledgerApprovalRecordSchema, ledgerChecklistRecordSchema, evidenceLedgerDocumentSchema, ledgerVerificationResultSchema;
+var import_node_crypto11, evidenceItemSchema, ledgerDecisionRecordSchema, ledgerApprovalRecordSchema, ledgerChecklistRecordSchema, evidenceLedgerDocumentSchema, ledgerVerificationResultSchema;
 var init_evidence_ledger = __esm({
   "packages/contracts/src/evidence-ledger.ts"() {
     "use strict";
-    import_node_crypto10 = require("node:crypto");
+    import_node_crypto11 = require("node:crypto");
     init_zod();
     init_review();
     evidenceItemSchema = external_exports.object({
@@ -32447,7 +32447,7 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
     if (filename === output || !isInside(output, filename)) {
       throw new Error("Release artifact escaped output directory; choose a safe --output path.");
     }
-    const hash2 = (0, import_node_crypto11.createHash)("sha256");
+    const hash2 = (0, import_node_crypto12.createHash)("sha256");
     let bytes = 0;
     for await (const chunk of (0, import_node_fs9.createReadStream)(filename)) {
       hash2.update(chunk);
@@ -32458,11 +32458,11 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
     }
   }
 }
-var import_node_crypto11, import_node_fs9, import_promises25, import_node_path67, maximumReleaseArtifacts;
+var import_node_crypto12, import_node_fs9, import_promises25, import_node_path67, maximumReleaseArtifacts;
 var init_release_output_cleanup = __esm({
   "src/release/release-output-cleanup.ts"() {
     "use strict";
-    import_node_crypto11 = require("node:crypto");
+    import_node_crypto12 = require("node:crypto");
     import_node_fs9 = require("node:fs");
     import_promises25 = __toESM(require("node:fs/promises"), 1);
     import_node_path67 = __toESM(require("node:path"), 1);
@@ -32740,7 +32740,7 @@ function artifactKind(file2) {
 }
 async function fileDigest2(file2) {
   const content = await import_promises26.default.readFile(file2);
-  return { sha256: (0, import_node_crypto12.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
+  return { sha256: (0, import_node_crypto13.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
 }
 function cleanObject(value) {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== void 0));
@@ -32786,7 +32786,7 @@ async function resolveFileHash(item2, baseDir) {
   for (const candidate of candidatePaths) {
     try {
       const fileContent = await import_promises26.default.readFile(candidate);
-      return (0, import_node_crypto12.createHash)("sha256").update(fileContent).digest("hex");
+      return (0, import_node_crypto13.createHash)("sha256").update(fileContent).digest("hex");
     } catch {
     }
   }
@@ -32845,11 +32845,11 @@ async function verifyReviewEvidenceOffline(ledgerFilePath, artifactsRootDir) {
     errors
   };
 }
-var import_node_crypto12, import_promises26, import_node_path68, FABRICATION_DIRS, MANUFACTURING_EXTENSIONS, BUNDLE_LAYOUT;
+var import_node_crypto13, import_promises26, import_node_path68, FABRICATION_DIRS, MANUFACTURING_EXTENSIONS, BUNDLE_LAYOUT;
 var init_evidence = __esm({
   "src/release/evidence.ts"() {
     "use strict";
-    import_node_crypto12 = require("node:crypto");
+    import_node_crypto13 = require("node:crypto");
     import_promises26 = __toESM(require("node:fs/promises"), 1);
     import_node_path68 = __toESM(require("node:path"), 1);
     init_src();
@@ -53320,14 +53320,14 @@ async function commitFixPlan(root, plan) {
   if (add.code !== 0) {
     throw new Error(add.stderr.trim() || add.error || "git add failed");
   }
-  const commit = await runProcess("git", ["commit", "--only", "-m", "fix: apply boardreadyops fixes", "--", ...paths], {
+  const commit2 = await runProcess("git", ["commit", "--only", "-m", "fix: apply boardreadyops fixes", "--", ...paths], {
     cwd: root,
     timeoutMs: 3e4,
     maxStdoutBytes: 128 * 1024,
     maxStderrBytes: 128 * 1024
   });
-  if (commit.code !== 0) {
-    throw new Error(commit.stderr.trim() || commit.error || "git commit failed");
+  if (commit2.code !== 0) {
+    throw new Error(commit2.stderr.trim() || commit2.error || "git commit failed");
   }
 }
 function formatFixPlan(plan) {
@@ -55162,6 +55162,129 @@ var import_node_path70 = __toESM(require("node:path"), 1);
 var import_node_util3 = require("node:util");
 init_t();
 
+// src/release/passport.ts
+var import_node_crypto10 = require("node:crypto");
+init_version();
+function computePassportDigest(passport) {
+  const canonical = canonicalizeJson(passport);
+  return (0, import_node_crypto10.createHash)("sha256").update(canonical, "utf8").digest("hex");
+}
+function verifyPassportDigest(passport) {
+  const errors = [];
+  const errorCodes = [];
+  if (passport.schemaVersion !== 1 || passport.type !== "release-passport") {
+    errors.push("passport schema version or type mismatch");
+    errorCodes.push("SCHEMA_MISMATCH");
+  }
+  const { verification, ...body } = passport;
+  const recomputed = computePassportDigest(body);
+  if (recomputed !== verification.passportDigest) {
+    errors.push(
+      `passport digest mismatch: recomputed ${recomputed.slice(0, 12)}\u2026 but passport declares ${verification.passportDigest.slice(0, 12)}\u2026`
+    );
+    errorCodes.push("DIGEST_MISMATCH");
+  }
+  return { ok: errors.length === 0, errors, errorCodes };
+}
+
+// src/release/clause-evidence.ts
+var standards = /* @__PURE__ */ new Set(["ISO 13485", "IATF 16949", "AS9100", "DO-254"]);
+var evidenceKinds = /* @__PURE__ */ new Set([
+  "reviewed_revision",
+  "policy_evaluation",
+  "release_decision",
+  "review_approval",
+  "risk_waiver",
+  "fabrication_outputs",
+  "bom_snapshot",
+  "firmware_snapshot",
+  "evidence_manifest"
+]);
+var sha256 = /^[0-9a-f]{64}$/iu;
+var commit = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu;
+function hasRecordedField(passport, kind) {
+  switch (kind) {
+    case "reviewed_revision":
+      return passport.release.git?.dirty === false && commit.test(passport.release.git.sha ?? "");
+    case "policy_evaluation":
+      return sha256.test(passport.policy.rulesetHash) && passport.policy.ruleCount > 0 && (passport.policy.policyStatus === "pass" || passport.policy.policyStatus === "fail");
+    case "release_decision":
+      return passport.decision.status === "pass" || passport.decision.status === "fail";
+    case "review_approval":
+      return passport.approvals.some((approval) => approval.status === "approved");
+    case "risk_waiver":
+      return passport.waivers.length > 0;
+    case "fabrication_outputs": {
+      const { gerbers, drill } = passport.artifacts.hardware;
+      return gerbers.length > 0 && drill.length > 0 && gerbers.every((artifact) => artifact.bytes > 0 && sha256.test(artifact.sha256)) && drill.every((artifact) => artifact.bytes > 0 && sha256.test(artifact.sha256));
+    }
+    case "bom_snapshot":
+      return passport.artifacts.bom.present && sha256.test(passport.artifacts.bom.hash ?? "");
+    case "firmware_snapshot":
+      return passport.artifacts.firmware.present && sha256.test(passport.artifacts.firmware.hash ?? "");
+    case "evidence_manifest":
+      return sha256.test(passport.evidence.manifestHash ?? "");
+    default: {
+      const unreachable = kind;
+      throw new Error(String(unreachable));
+    }
+  }
+}
+function projectPassportAuditClauses(passport, mappings2) {
+  if (!verifyPassportDigest(passport).ok) throw new Error("Release passport digest check failed.");
+  if (mappings2.length > 200) throw new Error("Audit mapping exceeds the clause budget.");
+  const seen = /* @__PURE__ */ new Set();
+  return mappings2.map((mapping) => {
+    if (!standards.has(mapping.standard) || !/^[a-z0-9][a-z0-9._/-]{0,79}$/iu.test(mapping.clause)) {
+      throw new Error("Audit mapping has invalid standard or clause identity.");
+    }
+    const key = [mapping.standard, mapping.clause.toUpperCase()].join(":");
+    if (seen.has(key)) throw new Error("Duplicate audit clause mapping.");
+    seen.add(key);
+    const required2 = new Set(mapping.requiredEvidence);
+    if (required2.size === 0 || required2.size !== mapping.requiredEvidence.length || [...required2].some((kind) => !evidenceKinds.has(kind))) {
+      throw new Error("Audit clause has unsupported, duplicated or empty evidence requirements.");
+    }
+    const recordedEvidence = mapping.requiredEvidence.filter((kind) => hasRecordedField(passport, kind));
+    const missingEvidence = mapping.requiredEvidence.filter((kind) => !hasRecordedField(passport, kind));
+    return {
+      standard: mapping.standard,
+      clause: mapping.clause,
+      recordedEvidence,
+      missingEvidence,
+      recordCoverage: missingEvidence.length === 0 ? "recorded" : recordedEvidence.length === 0 ? "absent" : "partial"
+    };
+  });
+}
+function exportPassportAuditClausesJson(passport, mappings2) {
+  const clauses = projectPassportAuditClauses(passport, mappings2);
+  const sourceClaim = passport.release.git?.dirty === false && commit.test(passport.release.git.sha ?? "") ? passport.release.git.sha : void 0;
+  const report = {
+    format: "boardreadyops-audit-clause-records",
+    schemaVersion: 1,
+    provenance: "self-reported-passport",
+    disclaimer: "Recorded passport fields are not independently authenticated or evidence of compliance, certification, audit success or manufacturing release acceptance. Clause identities and requirements are supplied by the reviewer.",
+    release: {
+      id: passport.release.id,
+      passportDigest: passport.verification.passportDigest,
+      ...sourceClaim ? { sourceCommitClaim: sourceClaim } : {}
+    },
+    clauses: [...clauses].sort((a, b) => {
+      const aKey = [a.standard, a.clause];
+      const bKey = [b.standard, b.clause];
+      for (let index = 0; index < aKey.length; index++) {
+        const first = aKey[index] ?? "";
+        const second = bKey[index] ?? "";
+        if (first < second) return -1;
+        if (first > second) return 1;
+      }
+      return 0;
+    })
+  };
+  return `${canonicalizeJson(report)}
+`;
+}
+
 // src/core/diff/fabrication.ts
 function diffFabrication(previous, current, previousFindings, currentFindings, options = {}) {
   return {
@@ -55553,7 +55676,7 @@ function releasePrepareExitCode(summary) {
 init_release_output_cleanup();
 
 // src/release/signing.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 var import_promises27 = __toESM(require("node:fs/promises"), 1);
 var import_node_path69 = __toESM(require("node:path"), 1);
 var SIGNATURE_FILE = "manifest.sig";
@@ -55565,12 +55688,12 @@ function signManifestBytes(bytes, privateKeyPem, signedAt) {
       `release signing requires an Ed25519 private key, received ${privateKey.asymmetricKeyType ?? "unknown"}`
     );
   }
-  const signature = (0, import_node_crypto13.sign)(null, bytes, privateKey);
-  const publicKey = (0, import_node_crypto13.createPublicKey)(privateKey).export({ type: "spki", format: "pem" }).toString();
+  const signature = (0, import_node_crypto14.sign)(null, bytes, privateKey);
+  const publicKey = (0, import_node_crypto14.createPublicKey)(privateKey).export({ type: "spki", format: "pem" }).toString();
   return {
     schemaVersion: 1,
     algorithm: "ed25519",
-    manifestDigest: (0, import_node_crypto13.createHash)("sha256").update(bytes).digest("hex"),
+    manifestDigest: (0, import_node_crypto14.createHash)("sha256").update(bytes).digest("hex"),
     signature: signature.toString("base64"),
     publicKey,
     signedAt
@@ -55586,7 +55709,7 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
       errorCodes: ["UNSUPPORTED_ALGORITHM"]
     };
   }
-  const digest2 = (0, import_node_crypto13.createHash)("sha256").update(bytes).digest("hex");
+  const digest2 = (0, import_node_crypto14.createHash)("sha256").update(bytes).digest("hex");
   if (signature.manifestDigest && signature.manifestDigest !== digest2) {
     errors.push("manifest digest in signature does not match manifest contents");
     errorCodes.push("DIGEST_MISMATCH");
@@ -55599,7 +55722,7 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   }
   let valid = false;
   try {
-    valid = (0, import_node_crypto13.verify)(null, bytes, publicKey, Buffer.from(signature.signature, "base64"));
+    valid = (0, import_node_crypto14.verify)(null, bytes, publicKey, Buffer.from(signature.signature, "base64"));
   } catch {
     valid = false;
   }
@@ -55662,12 +55785,12 @@ async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
   return { present: true, ...verifyManifestSignature(read.bytes, read.signature, trustedPublicKeyPem) };
 }
 function loadKey(pem, kind) {
-  return kind === "private" ? (0, import_node_crypto13.createPrivateKey)(pem) : (0, import_node_crypto13.createPublicKey)(pem);
+  return kind === "private" ? (0, import_node_crypto14.createPrivateKey)(pem) : (0, import_node_crypto14.createPublicKey)(pem);
 }
 function publicKeysMatch(publicKey, trustedPublicKeyPem) {
   let trusted;
   try {
-    trusted = (0, import_node_crypto13.createPublicKey)(trustedPublicKeyPem);
+    trusted = (0, import_node_crypto14.createPublicKey)(trustedPublicKeyPem);
   } catch {
     return false;
   }
@@ -55685,7 +55808,7 @@ function verifyManifestSignatureAgainstTrustStore(bytes, signature, trustStore, 
   }
   let embeddedPublicKey;
   try {
-    embeddedPublicKey = (0, import_node_crypto13.createPublicKey)(signature.publicKey);
+    embeddedPublicKey = (0, import_node_crypto14.createPublicKey)(signature.publicKey);
   } catch {
     return { ok: false, errors: ["signature public key could not be parsed"], errorCodes: ["INVALID_PUBLIC_KEY"] };
   }
@@ -55849,6 +55972,32 @@ function createZipBuffer(entries, date5 = /* @__PURE__ */ new Date()) {
 
 // src/cli/commands/release.ts
 var execFileAsync = (0, import_node_util3.promisify)(import_node_child_process3.execFile);
+async function releaseAuditClausesCommand(passportFile, options, streams) {
+  const maxInputBytes = 1024 * 1024;
+  async function readJsonFile(file2) {
+    const source = import_node_path70.default.resolve(normalizePathInput(file2));
+    const stat3 = await import_promises28.default.stat(source);
+    if (!stat3.isFile() || stat3.size > maxInputBytes) {
+      throw new Error("Audit clause input must be a regular JSON file no larger than 1 MiB.");
+    }
+    return JSON.parse(await import_promises28.default.readFile(source, "utf8"));
+  }
+  try {
+    const passport = await readJsonFile(passportFile);
+    const mappings2 = await readJsonFile(options.mappings);
+    if (typeof passport !== "object" || passport === null || Array.isArray(passport) || !Array.isArray(mappings2) || !mappings2.every((item2) => typeof item2 === "object" && item2 !== null && !Array.isArray(item2))) {
+      throw new Error("Audit clause inputs must be a passport object and an array of mapping objects.");
+    }
+    const output = exportPassportAuditClausesJson(passport, mappings2);
+    streams.stdout.write(output);
+    return 0;
+  } catch {
+    streams.stderr.write(
+      "Audit clause export failed: invalid or unreadable passport/mapping, invalid self-digest, or unsupported clause requirements.\n"
+    );
+    return 2;
+  }
+}
 async function releasePackCommand(pathInput, options, streams) {
   const root = await canonicalRoot(import_node_path70.default.resolve(normalizePathInput(pathInput ?? ".")));
   const git = await gitState2(root);
@@ -56272,7 +56421,7 @@ async function gitState2(root) {
 
 // src/cli/commands/review.ts
 var import_node_child_process4 = require("node:child_process");
-var import_node_crypto17 = require("node:crypto");
+var import_node_crypto18 = require("node:crypto");
 var import_node_path71 = __toESM(require("node:path"), 1);
 
 // packages/cloud-core/src/archive-sanitizer.ts
@@ -56287,7 +56436,7 @@ init_src();
 var maximumCsvBytes = 2 * 1024 * 1024;
 
 // packages/cloud-core/src/review-diff.ts
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 function ordinalCompare(a, b) {
   if (a === b) return 0;
   return a < b ? -1 : 1;
@@ -56305,11 +56454,11 @@ function computeEvidenceDigest(input) {
     findings: sortedFingerprints,
     artifacts: sortedArtifacts
   });
-  return (0, import_node_crypto14.createHash)("sha256").update(canonicalPayload).digest("hex");
+  return (0, import_node_crypto15.createHash)("sha256").update(canonicalPayload).digest("hex");
 }
 
 // packages/cloud-core/src/runner-request-signature.ts
-var import_node_crypto15 = require("node:crypto");
+var import_node_crypto16 = require("node:crypto");
 var canonicalPrefix = "boardreadyops-runner-request-v1";
 var canonicalBaseUrl = "https://boardreadyops.invalid";
 var lowercaseUuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -56352,7 +56501,7 @@ function assertNonce(value) {
   return value;
 }
 function runnerRequestBodyDigest(body) {
-  return (0, import_node_crypto15.createHash)("sha256").update(body).digest("hex");
+  return (0, import_node_crypto16.createHash)("sha256").update(body).digest("hex");
 }
 function normalizeRunnerRequestPath(path79) {
   if (!path79.startsWith("/") || path79.startsWith("//") || path79.includes("#") || path79.includes("\\")) {
@@ -56413,7 +56562,7 @@ function canonicalRunnerRequest(input) {
   return fields.join("\n");
 }
 function signRunnerRequest(input) {
-  return (0, import_node_crypto15.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
+  return (0, import_node_crypto16.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
 }
 
 // packages/cloud-core/src/xml-sanitizer.ts
@@ -56447,7 +56596,7 @@ function mapFindingsForCloud(findings) {
 init_version();
 
 // src/kicad/snapshots.ts
-var import_node_crypto16 = require("node:crypto");
+var import_node_crypto17 = require("node:crypto");
 init_src();
 async function renderSchematicFile(file2, findings) {
   try {
@@ -56459,7 +56608,7 @@ async function renderSchematicFile(file2, findings) {
       Array.from(parsed.netLabels)
     );
     const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-    const sha256 = (0, import_node_crypto16.createHash)("sha256").update(svg).digest("hex");
+    const sha2562 = (0, import_node_crypto17.createHash)("sha256").update(svg).digest("hex");
     return {
       id: `snap_sch_${sheetName}`,
       name: `schematic_${sheetName}.svg`,
@@ -56469,7 +56618,7 @@ async function renderSchematicFile(file2, findings) {
       width: 1200,
       height: 800,
       content: svg,
-      sha256,
+      sha256: sha2562,
       anchors: linkedAnchors
     };
   } catch {
@@ -56487,7 +56636,7 @@ async function renderPcbFile(file2, findings) {
         parsed.footprints.map((fp) => ({ reference: fp.reference, footprint: fp.footprint, at: fp.at }))
       );
       const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-      const sha256 = (0, import_node_crypto16.createHash)("sha256").update(svg).digest("hex");
+      const sha2562 = (0, import_node_crypto17.createHash)("sha256").update(svg).digest("hex");
       artifacts.push({
         id: `snap_pcb_${layer.replaceAll(".", "_")}`,
         name: `pcb_${layer.replaceAll(".", "_")}.svg`,
@@ -56497,7 +56646,7 @@ async function renderPcbFile(file2, findings) {
         width: 1e3,
         height: 800,
         content: svg,
-        sha256,
+        sha256: sha2562,
         anchors: linkedAnchors
       });
     }
@@ -56607,8 +56756,8 @@ async function reviewPublishCommand(target, options, streams) {
     failOn: "never"
   });
   const findings = mapFindingsForCloud(result.findings);
-  const rulePackDigest = (0, import_node_crypto17.createHash)("sha256").update("boardreadyops-v1").digest("hex");
-  const configDigest = (0, import_node_crypto17.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
+  const rulePackDigest = (0, import_node_crypto18.createHash)("sha256").update("boardreadyops-v1").digest("hex");
+  const configDigest = (0, import_node_crypto18.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
   const evidenceDigest = computeEvidenceDigest({
     toolVersion: boardReadyVersion,
     rulePackDigest,
@@ -56819,13 +56968,13 @@ var import_node_path77 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-enrollment-admin.ts
 var import_node_child_process5 = require("node:child_process");
-var import_node_crypto19 = require("node:crypto");
+var import_node_crypto20 = require("node:crypto");
 var import_promises29 = require("node:fs/promises");
 var import_node_os4 = __toESM(require("node:os"), 1);
 var import_node_path72 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-registration-enrollment-store.ts
-var import_node_crypto18 = require("node:crypto");
+var import_node_crypto19 = require("node:crypto");
 var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
 var repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
@@ -56853,7 +57002,7 @@ function isoColumn(row, key) {
   return Number.isNaN(parsed.valueOf()) ? void 0 : parsed.toISOString();
 }
 function digest(value) {
-  return (0, import_node_crypto18.createHash)("sha256").update(value, "utf8").digest("hex");
+  return (0, import_node_crypto19.createHash)("sha256").update(value, "utf8").digest("hex");
 }
 function positiveInteger3(value, fallback, name, maximum) {
   const selected = value ?? fallback;
@@ -56887,8 +57036,8 @@ function validActorId(value) {
 }
 function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
   const now = options.now ?? (() => /* @__PURE__ */ new Date());
-  const id = options.id ?? import_node_crypto18.randomUUID;
-  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto18.randomBytes)(32).toString("base64url"));
+  const id = options.id ?? import_node_crypto19.randomUUID;
+  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto19.randomBytes)(32).toString("base64url"));
   const enrollmentTtlSeconds = positiveInteger3(options.enrollmentTtlSeconds, 15 * 60, "enrollmentTtlSeconds", 60 * 60);
   return {
     async issueEnrollment(input) {
@@ -57018,7 +57167,7 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
 var maximumPsqlOutputBytes = 1024 * 1024;
 var defaultDependencies = {
   query: executePsqlQuery,
-  token: () => (0, import_node_crypto19.randomBytes)(32).toString("base64url")
+  token: () => (0, import_node_crypto20.randomBytes)(32).toString("base64url")
 };
 async function issueRunnerEnrollment(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
@@ -57363,14 +57512,14 @@ async function assertPrivateFile(filePath, label) {
 init_version();
 
 // src/runner/identity.ts
-var import_node_crypto21 = require("node:crypto");
+var import_node_crypto22 = require("node:crypto");
 var import_promises31 = require("node:fs/promises");
 var import_node_os5 = __toESM(require("node:os"), 1);
 var import_node_path73 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/client.ts
-var import_node_crypto20 = require("node:crypto");
+var import_node_crypto21 = require("node:crypto");
 var import_promises30 = require("node:fs/promises");
 init_src();
 var responseBodyLimitBytes = 1024 * 1024;
@@ -57411,7 +57560,7 @@ var RunnerControlPlaneClient = class {
     this.privateKey = options.privateKey;
     this.fetchImpl = options.fetch ?? fetch;
     this.now = options.now ?? (() => /* @__PURE__ */ new Date());
-    this.nonce = options.nonce ?? (() => (0, import_node_crypto20.randomBytes)(24).toString("base64url"));
+    this.nonce = options.nonce ?? (() => (0, import_node_crypto21.randomBytes)(24).toString("base64url"));
     this.requestTimeoutMs = positiveInteger4(options.requestTimeoutMs ?? 3e4, "requestTimeoutMs");
   }
   async claim(input) {
@@ -57556,7 +57705,7 @@ async function activateRunner(input) {
   }
 }
 async function loadRunnerPrivateKey(filePath) {
-  return (0, import_node_crypto20.createPrivateKey)(await (0, import_promises30.readFile)(filePath, "utf8"));
+  return (0, import_node_crypto21.createPrivateKey)(await (0, import_promises30.readFile)(filePath, "utf8"));
 }
 function normalizeControlPlaneUrl(value) {
   let url2;
@@ -57640,7 +57789,7 @@ async function activateRunnerIdentity(options) {
   const privateKeyFile = import_node_path73.default.join(identityDirectory, privateKeyName);
   const publicKeyFile = import_node_path73.default.join(identityDirectory, publicKeyName);
   await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
-  const generated = (0, import_node_crypto21.generateKeyPairSync)("ed25519");
+  const generated = (0, import_node_crypto22.generateKeyPairSync)("ed25519");
   const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
   const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
   const activated = await activateRunner({
@@ -58360,7 +58509,7 @@ var RunnerShutdownError = class extends Error {
 };
 
 // src/cli/runner-pipeline.ts
-var import_node_crypto22 = require("node:crypto");
+var import_node_crypto23 = require("node:crypto");
 var import_promises34 = require("node:fs/promises");
 var import_node_path76 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
@@ -58434,7 +58583,7 @@ async function runnerArtifact(filePath, kind, name, role) {
     role,
     filePath,
     bytes: content.byteLength,
-    sha256: (0, import_node_crypto22.createHash)("sha256").update(content).digest("hex")
+    sha256: (0, import_node_crypto23.createHash)("sha256").update(content).digest("hex")
   };
 }
 function runnerReportFromResult(report) {
@@ -60766,6 +60915,9 @@ function registerAllCommands(program2, streams) {
     release.command("diff").argument("<previous>", "previous release report JSON or evidence bundle directory").argument("[path]", "directory to scan")
   ).option("--output <path>", "write the release diff JSON to a file").option("--html <path>", "write an HTML release diff dashboard to a file").action(async (previous, pathInput, options) => {
     process.exitCode = await releaseDiffCommand(previous, pathInput, options, streams);
+  });
+  release.command("audit-clauses").description("export self-reported Release Passport fields by reviewer-supplied clause, not compliance").argument("<passport>", "Release Passport JSON file").requiredOption("--mappings <path>", "reviewer-provided clause mapping JSON array").action(async (passportPath, options) => {
+    process.exitCode = await releaseAuditClausesCommand(passportPath, options, streams);
   });
   release.command("sign").argument("[bundle]", "release evidence bundle directory").option("--key <path>", "Ed25519 private key PEM used to sign the manifest").action(async (bundleInput, options) => {
     process.exitCode = await releaseSignCommand(bundleInput, options, streams);
