@@ -2,6 +2,27 @@ import { describe, expect, it, vi } from "vitest";
 import { DataLifecycleStore } from "../../../packages/db/src/data-lifecycle-store.js";
 
 describe("data lifecycle administration", () => {
+  it("releases only the selected tenant hold without requeuing blocked erasure requests", async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rowCount: 1 }).mockResolvedValueOnce({ rowCount: 0 });
+    const store = new DataLifecycleStore({ query });
+
+    await expect(store.releaseLegalHold("tenant-a", "hold-a", "authorized-operator")).resolves.toBe(true);
+    await expect(store.releaseLegalHold("tenant-b", "hold-a", "other-tenant-operator")).resolves.toBe(false);
+
+    expect(query).toHaveBeenCalledTimes(2);
+    for (const [sql] of query.mock.calls) {
+      const statement = String(sql);
+      expect(statement).toMatch(/UPDATE legal_holds SET active=FALSE/iu);
+      expect(statement).toContain("id=$1 AND tenant_id=$2 AND active=TRUE");
+      // Hold release is NOT authorization to resume or execute any erasure.
+      // A separate, audited and explicitly authorized selected-request action
+      // must be designed before blocked requests may transition to pending.
+      expect(statement).not.toMatch(/erasure_requests|status\s*=\s*'pending'|blocked_by_hold/iu);
+    }
+    expect(query).toHaveBeenNthCalledWith(1, expect.any(String), ["hold-a", "tenant-a", "authorized-operator"]);
+    expect(query).toHaveBeenNthCalledWith(2, expect.any(String), ["hold-a", "tenant-b", "other-tenant-operator"]);
+  });
+
   it("upserts a bounded tenant retention policy and returns the persisted row", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [
