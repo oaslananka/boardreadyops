@@ -73,9 +73,18 @@ describe("sync-release-readme", () => {
   });
 
   it("rejects drift and malformed versions rather than inferring public releases", () => {
-    expect(() => verifyPublicReleaseFiles(sourceFiles, "1.69.0")).toThrow(
-      /public release reference drift.*release:readme/su,
-    );
+    for (const version of ["1.68.3", "1.69.0", "1.69.1-rc.1"]) {
+      const candidate = syncPublicReleaseFiles(sourceFiles, version);
+      const original = candidate["README.md"] ?? "";
+      expect(original).toContain(`boardreadyops@${version}`);
+      const stale = {
+        ...candidate,
+        "README.md": original.replace(`boardreadyops@${version}`, "boardreadyops@0.0.0"),
+      };
+      expect(() => verifyPublicReleaseFiles(stale, version)).toThrow(
+        /public release reference drift.*release:readme/su,
+      );
+    }
     expect(() => syncReleaseReadme(sourceFiles["README.md"] ?? "", "latest")).toThrow(/invalid release version/u);
     expect(() => syncPublicReleaseFiles(sourceFiles, "latest")).toThrow(/invalid release version/u);
     expect(() => syncReleaseReadme("# Missing marker\n\n## Runtime Support", "1.69.0")).toThrow(
