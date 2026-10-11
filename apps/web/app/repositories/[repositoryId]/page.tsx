@@ -125,6 +125,7 @@ function boardEvidenceColumns(repositoryId: string, repositoryName: string): rea
             {!matchesRun ? (
               <span className="text-xs text-muted-foreground">
                 Captured source differs from recorded Run commit; verify this snapshot in its Run before relying on it.
+                <code className="mt-1 block break-all">Recorded Run commit: {snapshot.runCommitSha}</code>
               </span>
             ) : null}
             {sourceUrl ? (
