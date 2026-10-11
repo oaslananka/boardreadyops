@@ -64,10 +64,12 @@ export function boardCaptureColumns(
         let sourceAction: ReactNode;
         if (!sourceBoundToRun) {
           sourceAction = (
-            <span className="text-xs text-muted-foreground">
-              Captured source differs from recorded Run commit; inspect the original Run before relying on this
-              evidence.
-              <code className="mt-1 block break-all">Recorded Run commit: {capture.runCommitSha}</code>
+            <span className="flex flex-col gap-1 text-xs text-muted-foreground">
+              <span>
+                Captured source differs from recorded Run commit; inspect the original Run before relying on this
+                evidence.
+              </span>
+              <code className="break-all">Recorded Run commit: {capture.runCommitSha}</code>
             </span>
           );
         } else if (sourceUrl) {
