@@ -6,14 +6,13 @@ explicitly blocked by a tracked follow-up issue.
 
 ## Current Supersession (2026-06-19)
 
-This page records the original BOARD audit target below. The current public
-channel state is superseded by `boardreadyops@1.68.3` and GitHub Release
-`v1.68.3`: npm clean-consumer install, Linux x64 release binary
-checksum/runtime smoke, release asset publication, Homebrew formula checksum
-data, and anonymous GHCR `v1`/`latest` manifest access are verified in
-[Release Channel Verification](channel-verification.md). Keep the historical
-rows below for traceability; do not use their `v1.0.2` channel limitations as
-the current release state.
+This page records historical audit evidence below. The repository-prepared
+package version is `boardreadyops@1.68.3`; it may not be published.
+Consult [npm](https://www.npmjs.com/package/boardreadyops) and
+[GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) for
+actual public availability, and [Release Channel Verification](channel-verification.md)
+for dated acceptance evidence. Do not treat the historical `v1.0.2` results as
+the current release status.
 
 ## Audit Target
 

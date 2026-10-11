@@ -12,20 +12,13 @@ if (versions.some((version) => version !== packageJson.version)) {
   );
 }
 
-// Check that any explicit version pin in the README matches the package version.
-// Lines of the form `boardreadyops@X.Y.Z` or `npm i -g boardreadyops` followed by
-// a version statement are checked. Soft: README may reference older stable pins for
-// installation examples, so only the explicit "current public npm package" statement
-// is enforced (reduces false positives on pinned Action examples).
+// Source-package version is not a claim that npm or GitHub has published it.
 const readme = await readFile("README.md", "utf8");
-const readmeVersionMatch = /The current public npm package is `boardreadyops@([\d.]+)`/.exec(readme);
-if (readmeVersionMatch) {
-  const readmeVersion = readmeVersionMatch[1];
-  if (readmeVersion !== packageJson.version) {
-    throw new Error(
-      `README version pin mismatch: README says ${readmeVersion} but package.json is ${packageJson.version}. Update the "current public npm package" line in README.md.`,
-    );
-  }
+const preparedVersion = /\*\*Repository-prepared version:\*\* `boardreadyops@([^`]+)`/u.exec(readme)?.[1];
+if (!preparedVersion || preparedVersion !== packageJson.version) {
+  throw new Error(
+    `README source package version mismatch: expected boardreadyops@${packageJson.version} but found ${preparedVersion || "missing"}`,
+  );
 }
 
 if (!process.env.ALLOW_MAJOR_RELEASE && isMajorRelease(packageJson.version)) {

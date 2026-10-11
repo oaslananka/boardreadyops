@@ -8,22 +8,24 @@ boardreadyops --help
 boardreadyops doctor
 ```
 
-The current public npm package is `boardreadyops@1.68.3`. It declares Node.js 22.14+
-and 24 support, provides `boardreadyops doctor --format json`, accepts HTML and
-JUnit report outputs in `boardreadyops.yml`, and ships the current docs,
-schemas, and Action metadata.
-
-For one-off use from a clean consumer directory:
+**Repository-prepared version:** `boardreadyops@1.68.3` reflects this checkout's
+source candidate, **not proof of npm publication**. Confirm the current public
+version at [npm](https://www.npmjs.com/package/boardreadyops). For a one-off
+install of the latest published version:
 
 ```bash
-npx -y boardreadyops@1.68.3 --help
+npx -y boardreadyops@latest --help
 ```
+
+For release-critical CI, resolve and pin the exact version you verified
+instead of relying on a moving `latest` tag.
 
 ## Binary Installers
 
-The shell and PowerShell installers require a GitHub Release that contains the
-platform binary asset and `SHA256SUMS`. The `v1.68.3` release contains the Linux,
-macOS, and Windows binary matrix plus checksums.
+The shell and PowerShell installers require an actual
+[GitHub Release](https://github.com/oaslananka/boardreadyops/releases) with
+platform binary assets and matching `SHA256SUMS`. A version prepared in a
+release PR may not exist yet.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/oaslananka/boardreadyops/main/install.sh | sh
@@ -33,15 +35,15 @@ curl -fsSL https://raw.githubusercontent.com/oaslananka/boardreadyops/main/insta
 irm https://raw.githubusercontent.com/oaslananka/boardreadyops/main/install.ps1 | iex
 ```
 
-Pin a specific release during validation with `BOARDREADYOPS_VERSION`, for
-example `BOARDREADYOPS_VERSION=1.68.3`. The Homebrew formula is populated with the `v1.68.3` macOS and Linux
-checksums from `SHA256SUMS`; publishing a tap remains a maintainer follow-up.
+To pin a published release, set `BOARDREADYOPS_VERSION` to the version
+confirmed on GitHub Releases. Never infer published assets from the repository's
+prepared package version.
 
 ## Homebrew
 
-`Formula/boardreadyops.rb` is ready to copy into a tap once the tap repository
-and maintainer process are chosen. It points at `v1.68.3` release binaries and
-uses the macOS/Linux checksums recorded in that release's `SHA256SUMS`.
+`Formula/boardreadyops.rb` is a separately maintained formula and may lag
+both source and published releases. Verify its embedded version and checksums
+against the selected published tag before using or copying it into a tap.
 
 ## Verification Status
 

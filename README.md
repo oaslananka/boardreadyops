@@ -41,13 +41,14 @@ Generate → Validate → Decide → Package → Optional Attestation → Review
 npm i -g boardreadyops
 ```
 
-The current public npm package is `boardreadyops@1.68.3`. It is verified on
-Node.js 22.14+ and 24, includes the current CLI bundle, schemas, docs, Action
-metadata, and matches the public `v1.68.3` tag archive.
-Binary release assets should be verified against `v1.68.3`, which publishes the
-current Linux, macOS, and Windows binary matrix, `SHA256SUMS`, and SBOM release
-assets. See [release channel verification](docs/release/channel-verification.md)
-for the tested artifact list and remaining channel follow-ups.
+**Repository-prepared version:** `boardreadyops@1.68.3`. This is the package version
+in this source revision, **not evidence that it has been published**.
+Check [npm](https://www.npmjs.com/package/boardreadyops) and
+[GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) for the
+latest publicly available version. Verify the selected release's binaries,
+`SHA256SUMS`, SBOM, and runtime compatibility before installation. See
+[release channel verification](docs/release/channel-verification.md)
+for historical verified snapshots and outstanding follow-ups.
 
 ## Runtime Support
 
