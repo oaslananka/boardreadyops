@@ -20,6 +20,14 @@ export type ArtifactDeletionMetrics = {
 };
 
 export type ArtifactDeletionStore = {
+  /**
+   * Check a live lease and defer a newly held tenant before unlink.
+   * This is a pre-unlink defense, NOT cross-transaction hold/unlink exclusion.
+   */
+  authorizeOrDeferDeletion(input: {
+    deletionJobId: string;
+    workerId: string;
+  }): Promise<"authorized" | "held" | "stale">;
   claimDeletions(input: { workerId: string; limit?: number }): Promise<ClaimedArtifactDeletion[]>;
   completeDeletion(input: {
     deletionJobId: string;
@@ -126,6 +134,48 @@ export function createSqlArtifactDeletionStore(
   const retryBaseSeconds = positiveInteger(options.retryBaseSeconds, 15, "retryBaseSeconds");
 
   return {
+    async authorizeOrDeferDeletion(input) {
+      if (!workerIdPattern.test(input.workerId)) throw new Error("invalid artifact deletion worker id");
+      // The job's current lease is the authority: stale workers must never unlink.
+      // A hold created AFTER this transaction but BEFORE filesystem unlink is
+      // still a separate race requiring coordinated transactions/locking.
+      const result = await executor.query(
+        `with claimed as materialized (
+           select jobs.id, installations.account_login
+             from artifact_deletion_jobs as jobs
+             join installations on installations.id = jobs.installation_id
+            where jobs.id = $1
+              and jobs.status = 'leased'
+              and jobs.lease_owner = $2
+              and jobs.lease_expires_at > $3::timestamptz
+            for update of jobs
+         ), matching_hold as materialized (
+           select 1 from legal_holds
+           join claimed on legal_holds.tenant_id = claimed.account_login
+           where legal_holds.active = true
+           limit 1
+         ), deferred as (
+           update artifact_deletion_jobs
+              set status = 'available',
+                  available_at = $3::timestamptz + interval '30 minutes',
+                  lease_owner = null, lease_expires_at = null,
+                  attempt_count = greatest(0, attempt_count - 1),
+                  last_error_class = 'legal_hold',
+                  last_error_message = 'Deletion deferred by active legal hold.'
+            where id in (select id from claimed) and exists (select 1 from matching_hold)
+            returning id
+         )
+         select case
+           when exists (select 1 from deferred) then 'held'
+           when exists (select 1 from claimed) and not exists (select 1 from matching_hold) then 'authorized'
+           else 'stale'
+         end as outcome`,
+        [input.deletionJobId, input.workerId, now().toISOString()],
+      );
+      const outcome = text(rows(result)[0], "outcome");
+      return outcome === "authorized" || outcome === "held" ? outcome : "stale";
+    },
+
     async claimDeletions(input) {
       if (!workerIdPattern.test(input.workerId)) throw new Error("invalid artifact deletion worker id");
       const claimedAt = now();

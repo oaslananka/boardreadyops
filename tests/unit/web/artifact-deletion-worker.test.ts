@@ -36,6 +36,7 @@ const job: ClaimedArtifactDeletion = {
 
 function store(): ArtifactDeletionStore {
   return {
+    authorizeOrDeferDeletion: vi.fn(async () => "authorized" as const),
     claimDeletions: vi.fn(),
     completeDeletion: vi.fn(async () => "completed" as const),
     failDeletion: vi.fn(async () => "retry" as const),
@@ -56,6 +57,48 @@ afterEach(async () => {
 });
 
 describe("artifact deletion worker", () => {
+  it.each(["held", "stale"] as const)("never unlinks when a post-claim check returns %s", async (authorization) => {
+    const deletionStore = store();
+    vi.mocked(deletionStore.authorizeOrDeferDeletion).mockResolvedValue(authorization);
+    const deleteLocalObject = vi.fn(async () => "deleted" as const);
+    await expect(
+      processArtifactDeletion(job, {
+        workerId: "worker-1",
+        storageRoot: "/data",
+        store: deletionStore,
+        deleteLocalObject,
+      }),
+    ).resolves.toMatchObject({ status: authorization });
+    expect(deletionStore.authorizeOrDeferDeletion).toHaveBeenCalledWith({
+      deletionJobId: job.deletionJobId,
+      workerId: "worker-1",
+    });
+    expect(deleteLocalObject).not.toHaveBeenCalled();
+    expect(deletionStore.completeDeletion).not.toHaveBeenCalled();
+    expect(deletionStore.failDeletion).not.toHaveBeenCalled();
+  });
+
+  it("retries an authorization-query failure without unlinking", async () => {
+    const deletionStore = store();
+    vi.mocked(deletionStore.authorizeOrDeferDeletion).mockRejectedValue(new Error("postgres temporary outage"));
+    const deleteLocalObject = vi.fn(async () => "deleted" as const);
+    await expect(
+      processArtifactDeletion(job, {
+        workerId: "worker-1",
+        storageRoot: "/data",
+        store: deletionStore,
+        deleteLocalObject,
+      }),
+    ).resolves.toMatchObject({ status: "retry" });
+    expect(deleteLocalObject).not.toHaveBeenCalled();
+    expect(deletionStore.failDeletion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorMessage: "Artifact object deletion did not reach a terminal state.",
+        retryable: true,
+      }),
+    );
+  });
+
   it("deletes a regular object inside the configured root", async () => {
     const root = await storageRoot();
     await mkdir(path.join(root, "run-1"));

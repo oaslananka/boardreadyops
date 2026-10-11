@@ -8,6 +8,53 @@ function executor(query = vi.fn()) {
 }
 
 describe("artifact deletion store", () => {
+  it("defers a currently leased deletion on a new tenant legal hold without exhausting retry attempts", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ outcome: "held" }] });
+    const deletionStore = createSqlArtifactDeletionStore(executor(query), { now: () => now });
+    await expect(
+      deletionStore.authorizeOrDeferDeletion({
+        deletionJobId: "job-1",
+        workerId: "worker-1",
+      }),
+    ).resolves.toBe("held");
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain("join installations on installations.id = jobs.installation_id");
+    expect(sql).toContain("legal_holds.tenant_id = claimed.account_login");
+    expect(sql).toContain("legal_holds.active = true");
+    expect(sql).toContain("for update of jobs");
+    expect(sql).toContain("jobs.lease_expires_at > $3::timestamptz");
+    expect(sql).toContain("attempt_count = greatest(0, attempt_count - 1)");
+    expect(sql).toContain("interval '30 minutes'");
+    expect(query.mock.calls[0]?.[1]).toEqual(["job-1", "worker-1", now.toISOString()]);
+  });
+
+  it("rejects stale leases and invalid worker identities without claiming authorization", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ outcome: "stale" }] })
+      .mockResolvedValueOnce({ rows: [{ outcome: "authorized" }] });
+    const deletionStore = createSqlArtifactDeletionStore(executor(query), { now: () => now });
+    await expect(
+      deletionStore.authorizeOrDeferDeletion({
+        deletionJobId: "job-1",
+        workerId: "worker-1",
+      }),
+    ).resolves.toBe("stale");
+    await expect(
+      deletionStore.authorizeOrDeferDeletion({
+        deletionJobId: "job-1",
+        workerId: "worker-1",
+      }),
+    ).resolves.toBe("authorized");
+    await expect(
+      deletionStore.authorizeOrDeferDeletion({
+        deletionJobId: "job-1",
+        workerId: "bad worker",
+      }),
+    ).rejects.toThrow("invalid artifact deletion worker id");
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
   it("claims bounded tenant-scoped deletion jobs", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [
