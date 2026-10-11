@@ -123,7 +123,7 @@ export function projectPassportAuditClauses(
   });
 }
 
-export type AuditClauseExport = {
+type AuditClauseExport = {
   format: "boardreadyops-audit-clause-records";
   schemaVersion: 1;
   provenance: "self-reported-passport";
