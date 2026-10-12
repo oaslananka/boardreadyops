@@ -6,7 +6,7 @@
     "supportedMajors": [22, 24]
   },
   "pnpm": {
-    "version": "11.8.0"
+    "version": "11.11.0"
   },
   "python": {
     "preferred": "3.13",

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { planGitHubAppLifecycleActions } from "../../packages/cloud-core/src/durable-lifecycle-planner.js";
 import type { GitHubAppLifecycleAction } from "../../packages/cloud-core/src/lifecycle.js";
@@ -305,6 +305,58 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
       { request_id: reunsuspendContext.deliveryId, count: 1 },
     ]);
   });
+
+  it.each(["Organization", "User"] as const)(
+    "blocks %s uninstall erasure when a scoped hold differs only by GitHub login casing",
+    async (accountType) => {
+      const externalId = randomBytes(6).readUIntBE(0, 6) + 1;
+      const tenant = `uninstall-case-${randomUUID()}`;
+      const legalHoldId = randomUUID();
+      const installed = { id: externalId, accountLogin: tenant, accountType };
+      const lifecycle = store();
+
+      try {
+        await planGitHubAppLifecycleActions([{ type: "installation.upsert", installation: installed }], lifecycle, {
+          deliveryId: randomUUID(),
+          eventType: "installation",
+          eventAction: "created",
+        });
+        await database().query(
+          `insert into legal_holds (id, tenant_id, created_by, reason, scope, scope_id, active)
+         values ($1, $2, 'integration', 'Case-insensitive uninstall retention hold', $3, $4, true)`,
+          [
+            legalHoldId,
+            tenant.toUpperCase(),
+            accountType === "User" ? "user" : "organization",
+            accountType === "User" ? tenant.toUpperCase() : null,
+          ],
+        );
+        await planGitHubAppLifecycleActions([{ type: "installation.deleted", installation: installed }], lifecycle, {
+          deliveryId: randomUUID(),
+          eventType: "installation",
+          eventAction: "deleted",
+        });
+        expect(
+          rows(
+            await database().query(
+              "select status, legal_hold_id from erasure_requests where tenant_id=$1 and requested_by='github_app_uninstall'",
+              [tenant],
+            ),
+          ),
+        ).toEqual([{ status: "blocked_by_hold", legal_hold_id: legalHoldId }]);
+      } finally {
+        await database().query(
+          "delete from erasure_requests where tenant_id=$1 and requested_by='github_app_uninstall'",
+          [tenant],
+        );
+        await database().query("delete from data_exports where tenant_id=$1 and requested_by='github_app_uninstall'", [
+          tenant,
+        ]);
+        await database().query("delete from legal_holds where id=$1", [legalHoldId]);
+        await database().query("delete from installations where github_installation_id=$1", [externalId]);
+      }
+    },
+  );
 
   it("records repository removal and installation deletion under the same tenant", async () => {
     const lifecycle = store();

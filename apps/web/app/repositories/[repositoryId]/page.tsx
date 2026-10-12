@@ -7,6 +7,7 @@ import { type DataColumn, DataTable } from "../../../components/ui/data-table.js
 import { AppShell, Definition, DefinitionGrid, EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
 import { ViewerNav } from "../../../components/viewer-nav.js";
 import { customerStatusLabel } from "../../../lib/customer-nomenclature.js";
+import { githubFindingSourceUrl } from "../../../lib/finding-guidance.js";
 import { releaseRepositoryDispatchAvailability } from "../../../lib/release-rollout.js";
 import { loadRepositoryDetail, type RepositoryDetail } from "../../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
@@ -37,6 +38,7 @@ function when(value: string | undefined): string {
 }
 
 type RunRow = RepositoryDetail["runs"][number];
+type BoardRow = RepositoryDetail["boards"][number];
 type SupplyRow = RepositoryDetail["supplyFindings"][number];
 
 const runColumns: readonly DataColumn<RunRow>[] = [
@@ -69,6 +71,82 @@ const runColumns: readonly DataColumn<RunRow>[] = [
     cell: (run) => <span className="text-muted-foreground">{when(run.startedAt)}</span>,
   },
 ];
+
+function boardEvidenceColumns(repositoryId: string, repositoryName: string): readonly DataColumn<BoardRow>[] {
+  return [
+    {
+      id: "board",
+      header: "Recorded board",
+      rowHeader: true,
+      cell: (board) => (
+        <span className="flex flex-col gap-1">
+          <Link
+            href={`/repositories/${encodeURIComponent(repositoryId)}/boards/${encodeURIComponent(board.id)}`}
+            className="font-medium text-primary underline underline-offset-2"
+          >
+            {board.displayName}
+          </Link>
+          <code className="break-all text-xs text-muted-foreground">{board.projectPath}</code>
+          {board.archived ? <StatusBadge value="neutral" label="Archived board record" /> : null}
+        </span>
+      ),
+    },
+    {
+      id: "bom",
+      header: "Latest BOM snapshot",
+      cell: (board) =>
+        board.latestBom ? (
+          <span>
+            {board.latestBom.componentCount} recorded components · {when(board.latestBom.capturedAt)}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">No BOM snapshot recorded</span>
+        ),
+    },
+    {
+      id: "evidence",
+      header: "Recorded source evidence",
+      cell: (board) => {
+        const snapshot = board.latestBom;
+        if (!snapshot) return <span className="text-muted-foreground">Not recorded</span>;
+        const matchesRun = snapshot.commitSha === snapshot.runCommitSha;
+        const sourceUrl = matchesRun
+          ? githubFindingSourceUrl(repositoryName, snapshot.commitSha, board.projectPath)
+          : undefined;
+        return (
+          <span className="flex flex-col gap-1 text-sm">
+            <code className="break-all text-xs">{snapshot.commitSha}</code>
+            <Link
+              href={`/runs/${encodeURIComponent(snapshot.runId)}`}
+              className="text-primary underline underline-offset-2"
+            >
+              Open snapshot Run
+            </Link>
+            {!matchesRun ? (
+              <span className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <span>
+                  Captured source differs from recorded Run commit; verify this snapshot in its Run before relying on
+                  it.
+                </span>
+                <code className="break-all">Recorded Run commit: {snapshot.runCommitSha}</code>
+              </span>
+            ) : null}
+            {sourceUrl ? (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                Open project at this commit ↗
+              </a>
+            ) : null}
+          </span>
+        );
+      },
+    },
+  ];
+}
 
 function supplyColumns(repositoryId: string): readonly DataColumn<SupplyRow>[] {
   return [
@@ -145,7 +223,7 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
   // the narrowing obvious to a reader, and to any analyser that does not model Next's helpers.
   if (!detail) return notFound();
 
-  const { repository, runs, supplyFindings } = detail;
+  const { repository, runs, boards, supplyFindings } = detail;
   const dispatch = releaseRepositoryDispatchAvailability(`${repository.owner}/${repository.name}`);
 
   return (
@@ -178,8 +256,12 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
               )}
             </Definition>
             <Definition label="Open findings">{repository.latestRunId ? repository.openFindings : "—"}</Definition>
-            <Definition label="Boards watched">{repository.watchedBoards}</Definition>
+            <Definition label="Supply-tracked boards">{repository.watchedBoards}</Definition>
           </DefinitionGrid>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Supply-tracked boards are registered for component monitoring. This number does not count successful
+            readiness runs; view the recent runs below to inspect release checks.
+          </p>
           {/*
             "How do I stop watching this repository?" had no answer anywhere in the product. It
             is GitHub's to answer — the App's repository access is what connects it, and
@@ -198,6 +280,32 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
               manage the installation
             </a>
             . Runs and evidence already recorded stay here.
+          </p>
+        </Panel>
+
+        <Panel
+          title="Recorded boards and BOM history"
+          description="Up to 50 observed board records, distinguished by their project paths. This is source-run BOM history, not a board-level Review approval or signed manufacturing export."
+        >
+          {boards.length === 0 ? (
+            <EmptyState title="No board records captured">
+              <p>
+                Readiness runs can exist without imported per-board BOM snapshots. This does not prove that the
+                repository has no hardware boards; inspect run findings for the actual project sources.
+              </p>
+            </EmptyState>
+          ) : (
+            <DataTable
+              caption="Latest recorded BOM snapshot for each observed board"
+              columns={boardEvidenceColumns(repository.id, `${repository.owner}/${repository.name}`)}
+              rows={boards}
+              rowKey={(board) => board.id}
+              empty={null}
+            />
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            These records are not automatically linked to Review decisions. A newer revision or signed source-bound
+            package requires its own evidence; an older BOM snapshot is not current manufacturing authorization.
           </p>
         </Panel>
 

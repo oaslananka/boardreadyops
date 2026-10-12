@@ -1,0 +1,86 @@
+name: BoardReadyOps reviewed manufacturing export
+description: >-
+  Opt-in clean-SHA KiCad 10 Gerber/Excellon export and checksum preparation.
+  Produces unsigned subjects only; caller must attest in its own repository.
+inputs:
+  reviewed-source-sha:
+    description: Authenticated target-repository Git SHA (must equal github.sha)
+    required: true
+  project:
+    description: Exact reviewed .kicad_pro project path
+    required: true
+outputs:
+  subject-checksums:
+    description: Absolute runner-temporary checksum file path for actions/attest
+    value: ${{ steps.export.outputs.subject-checksums }}
+  export-directory:
+    description: Root-relative directory containing generated Gerbers, drill files and manifest
+    value: ${{ steps.export.outputs.export-directory }}
+  manifest:
+    description: Root-relative export-provenance manifest
+    value: ${{ steps.export.outputs.manifest }}
+runs:
+  using: composite
+  steps:
+    - name: Generate from reviewed source and prepare all signing subjects
+      id: export
+      shell: bash
+      env:
+        BOARDREADYOPS_ACTION_DIR: ${{ github.action_path }}
+        BOARDREADYOPS_REVIEWED_SHA: ${{ inputs.reviewed-source-sha }}
+        BOARDREADYOPS_PROJECT: ${{ inputs.project }}
+        BOARDREADYOPS_REF_PROTECTED: ${{ github.ref_protected }}
+        BOARDREADYOPS_IS_FORK: ${{ github.event.repository.fork }}
+        BOARDREADYOPS_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+      run: |
+        set -euo pipefail
+        umask 077
+
+        # Github supplies these immutable per-job identity values. Do not accept
+        # caller-provided repository, workflow, run or attempt identity instead.
+        [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]
+        [[ "${BOARDREADYOPS_REF_PROTECTED}" == "true" ]]
+        [[ "${BOARDREADYOPS_IS_FORK}" == "false" ]]
+        [[ "${BOARDREADYOPS_RUNNER_ENVIRONMENT}" == "github-hosted" ]]
+        [[ "${RUNNER_OS}" == "Linux" ]]
+        [[ "${BOARDREADYOPS_REVIEWED_SHA}" =~ ^[0-9a-f]{40}$ ]]
+        [[ "${BOARDREADYOPS_REVIEWED_SHA}" == "${GITHUB_SHA}" ]]
+        [[ "${GITHUB_REF}" == refs/heads/* ]]
+        [[ -n "${BOARDREADYOPS_PROJECT}" ]]
+        [[ "${BOARDREADYOPS_PROJECT}" == *.kicad_pro ]]
+
+        # This Action is SHA-pinned in the *calling* target-repository workflow.
+        # It has no access to source outside that exact checkout.
+        cd "${GITHUB_WORKSPACE}"
+        [[ "$(git rev-parse --show-toplevel)" == "${GITHUB_WORKSPACE}" ]]
+        [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
+        [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+        [[ "$(kicad-cli version)" == 10.0.* ]]
+
+        # Outputs must be in a Git-ignored directory: the reviewed-source guard
+        # refuses a dirty checkout even if generation succeeds.
+        if ! git check-ignore --quiet -- build/boardreadyops-attested/manifest.json; then
+          echo "::error::Ignore build/boardreadyops-attested/ in the target repository before signing."
+          exit 1
+        fi
+
+        cli="${BOARDREADYOPS_ACTION_DIR}/../../../dist/cli/index.cjs"
+        [[ -f "${cli}" ]]
+        node "${cli}" generate "${GITHUB_WORKSPACE}" \
+          --project "${BOARDREADYOPS_PROJECT}" \
+          --recipe "${BOARDREADYOPS_ACTION_DIR}/manufacturing-recipe.json" \
+          --output build/boardreadyops-attested \
+          --reviewed-source-sha "${GITHUB_SHA}"
+
+        # The checksum file is OUTSIDE the signed output tree and is itself
+        # just the subject-list input to actions/attest, never an attestation.
+        checksum_file="$(mktemp "${RUNNER_TEMP}/boardreadyops-subjects-XXXXXXXX.txt")"
+        node "${cli}" export-checksums "${GITHUB_WORKSPACE}" \
+          --manifest build/boardreadyops-attested/manifest.json \
+          --reviewed-source-sha "${GITHUB_SHA}" > "${checksum_file}"
+        [[ -s "${checksum_file}" ]]
+        {
+          echo "subject-checksums=${checksum_file}"
+          echo "export-directory=build/boardreadyops-attested"
+          echo "manifest=build/boardreadyops-attested/manifest.json"
+        } >> "${GITHUB_OUTPUT}"

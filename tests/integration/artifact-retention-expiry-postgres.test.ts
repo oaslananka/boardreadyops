@@ -21,7 +21,7 @@ function githubId(): number {
 
 async function cleanup(): Promise<void> {
   if (!executor) return;
-  await executor.query("delete from legal_holds where tenant_id like $1", [`${testPrefix}%`]);
+  await executor.query("delete from legal_holds where lower(tenant_id) like lower($1)", [`${testPrefix}%`]);
   await executor.query("delete from retention_policies where tenant_id like $1", [`${testPrefix}%`]);
   await executor.query("delete from installations where account_login like $1", [`${testPrefix}%`]);
 }
@@ -30,8 +30,11 @@ type FixtureInput = {
   tier: "free" | "team" | "business";
   ageDays: number;
   policyDays?: number;
+  policyDifferentCase?: boolean;
+  legacyShortPolicyDays?: number;
   retentionUntil?: string;
   legalHold?: boolean;
+  holdDifferentCase?: boolean;
 };
 
 async function createArtifactFixture(input: FixtureInput): Promise<string> {
@@ -67,7 +70,14 @@ async function createArtifactFixture(input: FixtureInput): Promise<string> {
     await database().query(
       `insert into retention_policies (id, tenant_id, tier, retention_days)
        values ($1, $2, $3, $4)`,
-      [randomUUID(), tenantId, input.tier, input.policyDays],
+      [randomUUID(), input.policyDifferentCase ? tenantId.toUpperCase() : tenantId, input.tier, input.policyDays],
+    );
+  }
+  if (input.legacyShortPolicyDays !== undefined) {
+    await database().query(
+      `insert into retention_policies (id, tenant_id, tier, retention_days)
+       values ($1, $2, $3, $4)`,
+      [randomUUID(), tenantId, input.tier, input.legacyShortPolicyDays],
     );
   }
 
@@ -75,7 +85,7 @@ async function createArtifactFixture(input: FixtureInput): Promise<string> {
     await database().query(
       `insert into legal_holds (id, tenant_id, created_by, reason, scope)
        values ($1, $2, 'test', 'Retention expiry integration hold', 'organization')`,
-      [randomUUID(), tenantId],
+      [randomUUID(), input.holdDifferentCase ? tenantId.toUpperCase() : tenantId],
     );
   }
   return artifactId;
@@ -166,6 +176,28 @@ describeDatabase("artifact retention expiry", () => {
       createArtifactFixture({ suffix: "free-old", tier: "free", ageDays: 31 }),
       createArtifactFixture({ suffix: "free-recent", tier: "free", ageDays: 29 }),
       createArtifactFixture({ suffix: "team-old", tier: "team", ageDays: 366 }),
+      createArtifactFixture({
+        suffix: "free-policy-case-retain",
+        tier: "free",
+        ageDays: 90,
+        policyDays: 365,
+        policyDifferentCase: true,
+      }),
+      createArtifactFixture({
+        suffix: "free-policy-case-expire",
+        tier: "free",
+        ageDays: 90,
+        policyDays: 31,
+        policyDifferentCase: true,
+      }),
+      createArtifactFixture({
+        suffix: "free-conflicting-policy",
+        tier: "free",
+        ageDays: 90,
+        policyDays: 365,
+        policyDifferentCase: true,
+        legacyShortPolicyDays: 14,
+      }),
       createArtifactFixture({ suffix: "team-recent", tier: "team", ageDays: 100 }),
       createArtifactFixture({ suffix: "business-unbounded", tier: "business", ageDays: 800 }),
       createArtifactFixture({ suffix: "business-policy", tier: "business", ageDays: 11, policyDays: 10 }),
@@ -183,6 +215,13 @@ describeDatabase("artifact retention expiry", () => {
       }),
       createArtifactFixture({ suffix: "free-held", tier: "free", ageDays: 90, legalHold: true }),
       createArtifactFixture({
+        suffix: "free-held-case",
+        tier: "free",
+        ageDays: 90,
+        legalHold: true,
+        holdDifferentCase: true,
+      }),
+      createArtifactFixture({
         suffix: "business-persisted-held",
         tier: "business",
         ageDays: 1,
@@ -193,21 +232,21 @@ describeDatabase("artifact retention expiry", () => {
 
     const store = createSqlRetentionMaintenanceStore(database(), { now: () => now, defaultBatchSize: 100 });
     await expect(store.expireArtifactRetention({ storageDriver: "local" })).resolves.toEqual({
-      revokedArtifacts: 4,
-      deletionJobsQueued: 4,
+      revokedArtifacts: 5,
+      deletionJobsQueued: 5,
       sharedObjectsRetained: 0,
     });
 
     const result = await database().query("select count(*)::int as count from artifacts where id = any($1::text[])", [
       artifactIds,
     ]);
-    expect(result).toMatchObject({ rows: [{ count: artifactIds.length - 4 }] });
+    expect(result).toMatchObject({ rows: [{ count: artifactIds.length - 5 }] });
 
     const deletionJobs = await database().query(
       "select count(*)::int as count from artifact_deletion_jobs where artifact_id = any($1::text[])",
       [artifactIds],
     );
-    expect(deletionJobs).toMatchObject({ rows: [{ count: 4 }] });
+    expect(deletionJobs).toMatchObject({ rows: [{ count: 5 }] });
 
     await expect(store.expireArtifactRetention({ storageDriver: "local" })).resolves.toEqual({
       revokedArtifacts: 0,

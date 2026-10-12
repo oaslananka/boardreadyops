@@ -19,12 +19,16 @@ release binaries, the GitHub Action, or container images.
 
 ## Consumer verification
 
-Users should prefer pinned versions and verify binary assets through checksums.
+Users should prefer pinned, **published** versions and verify binary assets through checksums.
 
 ```bash
-curl -fsSLO https://github.com/oaslananka/boardreadyops/releases/download/v1.68.3/SHA256SUMS
+curl -fsSLO https://github.com/oaslananka/boardreadyops/releases/latest/download/SHA256SUMS
 sha256sum -c SHA256SUMS
 ```
+
+Download matching binaries from the **same published GitHub Release** before
+running the checksum command. The `latest` URL discovers the current
+public release; pin the resolved tag in release-critical automation.
 
 For npm usage, pin a version in CI instead of using an unbounded global install
 for release-critical workflows.

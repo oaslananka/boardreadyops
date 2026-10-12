@@ -1,5 +1,14 @@
+# Bound per-container JSON logs independently of the host Docker daemon defaults.
+# Applies only when containers are recreated during an explicitly authorized deploy.
+x-boardreadyops-log-policy: &boardreadyops-log-policy
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   caddy:
+    logging: *boardreadyops-log-policy
     image: caddy:2-alpine
     restart: unless-stopped
     environment:
@@ -16,6 +25,7 @@ services:
         condition: service_healthy
 
   migrate:
+    logging: *boardreadyops-log-policy
     image: boardreadyops-web-runtime:${BOARDREADYOPS_IMAGE_TAG:-latest}
     build:
       context: ..
@@ -35,6 +45,7 @@ services:
         condition: service_healthy
 
   web:
+    logging: *boardreadyops-log-policy
     image: boardreadyops-web-runtime:${BOARDREADYOPS_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
@@ -56,6 +67,7 @@ services:
         condition: service_healthy
 
   worker:
+    logging: *boardreadyops-log-policy
     image: boardreadyops-web-runtime:${BOARDREADYOPS_IMAGE_TAG:-latest}
     restart: unless-stopped
     command: ["node", "worker.mjs"]
@@ -79,6 +91,7 @@ services:
       start_period: 20s
 
   postgres:
+    logging: *boardreadyops-log-policy
     image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     restart: unless-stopped
     environment:
@@ -95,6 +108,7 @@ services:
       start_period: 10s
 
   redis:
+    logging: *boardreadyops-log-policy
     image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
     restart: unless-stopped
     volumes:

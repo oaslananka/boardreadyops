@@ -30,28 +30,19 @@ const PUBLIC_SURFACE_PATHS = [
 
 export function syncReleaseReadme(readme, version) {
   assertReleaseVersion(version);
-
-  let next = readme;
-  next = replaceExactlyOnce(
-    next,
-    new RegExp(`The current public npm package is \`boardreadyops@${VERSION_PATTERN}\``),
-    `The current public npm package is \`boardreadyops@${version}\``,
-    "current npm package",
+  return replaceExactlyOnce(
+    readme,
+    /(?:The current public npm package is|\*\*Repository-prepared version:\*\*)[\s\S]*?(?=\n\n## Runtime Support)/u,
+    `**Repository-prepared version:** \`boardreadyops@${version}\`. This is the package version
+in this source revision, **not evidence that it has been published**.
+Check [npm](https://www.npmjs.com/package/boardreadyops) and
+[GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) for the
+latest publicly available version. Verify the selected release's binaries,
+\`SHA256SUMS\`, SBOM, and runtime compatibility before installation. See
+[release channel verification](docs/release/channel-verification.md)
+for historical verified snapshots and outstanding follow-ups.`,
+    "repository-prepared version",
   );
-  next = replaceExactlyOnce(
-    next,
-    new RegExp(`matches the public \`v${VERSION_PATTERN}\` tag archive`),
-    `matches the public \`v${version}\` tag archive`,
-    "public tag archive",
-  );
-  next = replaceExactlyOnce(
-    next,
-    new RegExp(`Binary release assets should be verified against \`v${VERSION_PATTERN}\``),
-    `Binary release assets should be verified against \`v${version}\``,
-    "binary release tag",
-  );
-
-  return next;
 }
 
 export function syncPublicReleaseFiles(files, version) {
@@ -127,85 +118,137 @@ function syncPublicReleaseFile(path, content, version) {
     case "README.md":
       return syncReleaseReadme(content, version);
     case "docs/install.md":
-      return replaceReleaseTokens(content, version);
+      return syncInstallDocs(content, version);
     case "docs/action.md":
       return replaceExactlyOnce(
         content,
-        new RegExp(`(The public\\s+)\`v${VERSION_PATTERN}\` tag`),
-        (_match, prefix) => `${prefix}\`v${version}\` tag`,
-        "Action public release tag",
+        /This example pins the reviewed release commit shown above\.[\s\S]*?(?=\n\n## Inputs)|This example pins a reviewed, immutable Action commit\.[\s\S]*?(?=\n\n## Inputs)/u,
+        `This example pins a reviewed, immutable Action commit. Find the latest
+**published** version in [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases);
+the version prepared in a release pull request may not be available yet. The
+floating \`v1\` alias moves with stable releases.`,
+        "Action published-release guidance",
       );
     case "docs/security/release-integrity.md":
       return replaceExactlyOnce(
         content,
-        new RegExp(`/releases/download/v${VERSION_PATTERN}/SHA256SUMS`),
-        `/releases/download/v${version}/SHA256SUMS`,
-        "release integrity checksum URL",
+        /curl -fsSLO https:\/\/github\.com\/oaslananka\/boardreadyops\/releases\/(?:download\/v[\d.]+|latest\/download)\/SHA256SUMS/u,
+        "curl -fsSLO https://github.com/oaslananka/boardreadyops/releases/latest/download/SHA256SUMS",
+        "latest published checksum URL",
       );
     case "docs/repo-maturity-report.md":
       return replaceExactlyOnce(
         content,
-        new RegExp(`Latest release \`v${VERSION_PATTERN}\` has binary assets`),
-        `Latest release \`v${version}\` has binary assets`,
+        /\| GitHub Releases \| Passed \|[^\n]* \|/u,
+        "| GitHub Releases | Passed | Check [published GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) for actual binary assets, `SHA256SUMS` and SBOM; a prepared source version is not publication evidence. |",
         "maturity release status",
       );
     case "docs/release/reference-synchronization.md":
     case "docs/release/copy-paste-audit.md":
-      return replaceSupersessionTokens(content, version);
+      return replaceExactlyOnce(
+        content,
+        /## Current Supersession \(2026-06-19\)[\s\S]*?(?=\n\n## Audit Target)/u,
+        `## Current Supersession (2026-06-19)
+
+This page records historical audit evidence below. The repository-prepared
+package version is \`boardreadyops@${version}\`; it may not be published.
+Consult [npm](https://www.npmjs.com/package/boardreadyops) and
+[GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) for
+actual public availability, and [Release Channel Verification](channel-verification.md)
+for dated acceptance evidence. Do not treat the historical \`v1.0.2\` results as
+the current release status.`,
+        "historical audit supersession",
+      );
     case "docs/release/channel-verification.md":
-      return replaceChannelTokens(content, version);
+      return replaceExactlyOnce(
+        content,
+        /(?:> \*\*Current status:\*\*|> \*\*Source candidate:\*\*)[\s\S]*?(?=\n\n## Verified Public Snapshot)/u,
+        `> **Source candidate:** \`boardreadyops@${version}\` (\`v${version}\`) is prepared
+> in this repository revision, **not necessarily published**. Check
+> [npm](https://www.npmjs.com/package/boardreadyops) and
+> [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases)
+> for the latest actual release. Verify tag, floating aliases, checksums, SBOM,
+> and image digests independently before recording public acceptance.
+
+## Current Release Contract
+
+| Surface | Current contract |
+| --- | --- |
+| Prepared source candidate | \`v${version}\` (not publication evidence) |
+| Public release | Check [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) |
+| npm package | Check the registry's actual \`latest\` dist-tag |
+| Binary assets | Confirm platform binaries, \`SHA256SUMS\`, and \`sbom.cyclonedx.json\` on the published tag |
+| Root Action | Pin a reviewed release commit SHA for reproducibility; \`v1\` can move |
+| Container Action | Pin the same reviewed release commit SHA and verify image digest |
+| Container aliases | Confirm actual published \`v1\`/\`latest\` digests independently |
+| Homebrew formula | \`Formula/boardreadyops.rb\` is independently versioned; check the formula's tag and checksums before use |
+
+Run the deterministic repository freshness check on every change:
+
+\`\`\`bash
+corepack pnpm run verify:public-surface
+\`\`\`
+
+For a live public-channel audit **after publication**, run:
+
+\`\`\`bash
+BOARDREADY_VERIFY_PUBLIC_CHANNELS=1 corepack pnpm run verify:release-channels
+\`\`\``,
+        "candidate and actual public release distinction",
+      );
     default:
       throw new Error(`unsupported public release surface: ${path}`);
   }
 }
 
-function replaceReleaseTokens(input, version) {
-  return input
-    .replace(new RegExp(`boardreadyops@${VERSION_PATTERN}`, "g"), `boardreadyops@${version}`)
-    .replace(new RegExp(`\`v${VERSION_PATTERN}\``, "g"), `\`v${version}\``)
-    .replace(new RegExp(`BOARDREADYOPS_VERSION=${VERSION_PATTERN}`, "g"), `BOARDREADYOPS_VERSION=${version}`);
-}
+function syncInstallDocs(content, version) {
+  let next = replaceExactlyOnce(
+    content,
+    /(?:The current public npm package is|\*\*Repository-prepared version:\*\*)[\s\S]*?(?=\n\n## Binary Installers)/u,
+    `**Repository-prepared version:** \`boardreadyops@${version}\` reflects this checkout's
+source candidate, **not proof of npm publication**. Confirm the current public
+version at [npm](https://www.npmjs.com/package/boardreadyops). For a one-off
+install of the latest published version:
 
-function replaceSupersessionTokens(input, version) {
-  const boundary = /^## Audit Target$/m.exec(input);
-  if (!boundary) {
-    throw new Error("public release historical boundary not found");
-  }
-  let current = input.slice(0, boundary.index);
-  const historical = input.slice(boundary.index);
-  current = current.replace(new RegExp(`boardreadyops@${VERSION_PATTERN}`, "g"), `boardreadyops@${version}`);
-  current = current.replace(
-    new RegExp(`(GitHub Release)(\\s+)\`v${VERSION_PATTERN}\``),
-    (_match, prefix, whitespace) => `${prefix}${whitespace}\`v${version}\``,
-  );
-  return `${current}${historical}`;
-}
+\`\`\`bash
+npx -y boardreadyops@latest --help
+\`\`\`
 
-function replaceChannelTokens(input, version) {
-  const boundary = /^## (?:Verified Public Snapshot|Historical Audit Target)/m.exec(input);
-  if (!boundary) {
-    throw new Error("public release historical boundary not found");
-  }
-  let current = input.slice(0, boundary.index);
-  const historical = input.slice(boundary.index);
-  current = current.replace(new RegExp(`boardreadyops@${VERSION_PATTERN}`, "g"), `boardreadyops@${version}`);
-  current = current.replace(
-    new RegExp(`the \`v${VERSION_PATTERN}\` GitHub Release`),
-    `the \`v${version}\` GitHub Release`,
+For release-critical CI, resolve and pin the exact version you verified
+instead of relying on a moving \`latest\` tag.`,
+    "npm prepared-versus-published install guidance",
   );
-  current = current.replace(
-    new RegExp(`\\| Public release \\| \`v${VERSION_PATTERN}\` \\|`),
-    `| Public release | \`v${version}\` |`,
+
+  next = replaceExactlyOnce(
+    next,
+    /## Binary Installers[\s\S]*?(?=\n\n## Verification Status)/u,
+    `## Binary Installers
+
+The shell and PowerShell installers require an actual
+[GitHub Release](https://github.com/oaslananka/boardreadyops/releases) with
+platform binary assets and matching \`SHA256SUMS\`. A version prepared in a
+release PR may not exist yet.
+
+\`\`\`bash
+curl -fsSL https://raw.githubusercontent.com/oaslananka/boardreadyops/main/install.sh | sh
+\`\`\`
+
+\`\`\`powershell
+irm https://raw.githubusercontent.com/oaslananka/boardreadyops/main/install.ps1 | iex
+\`\`\`
+
+To pin a published release, set \`BOARDREADYOPS_VERSION\` to the version
+confirmed on GitHub Releases. Never infer published assets from the repository's
+prepared package version.
+
+## Homebrew
+
+\`Formula/boardreadyops.rb\` is a separately maintained formula and may lag
+both source and published releases. Verify its embedded version and checksums
+against the selected published tag before using or copying it into a tap.`,
+    "binary installer and Homebrew publication guidance",
   );
-  current = current.replace(
-    new RegExp(`GHCR \`v${VERSION_PATTERN}\`/\`v1\`/\`latest\``, "g"),
-    `GHCR \`v${version}\`/\`v1\`/\`latest\``,
-  );
-  current = current.replace(
-    new RegExp(`\\| Container aliases \\| \`v${VERSION_PATTERN}\`, \`v1\`, and \`latest\` \\|`),
-    `| Container aliases | \`v${version}\`, \`v1\`, and \`latest\` |`,
-  );
-  return `${current}${historical}`;
+  return next;
 }
 
 function assertReleaseVersion(version) {

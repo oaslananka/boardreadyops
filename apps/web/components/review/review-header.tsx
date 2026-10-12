@@ -14,6 +14,8 @@ export interface ReviewHeaderProps {
   status: ReviewStatus;
   decision: ReviewDecision;
   currentRevisionSequence: number;
+  headRunId?: string | undefined;
+  baseRunId?: string | undefined;
   baseCommitSha: string;
   headCommitSha: string;
   evidenceDigest: string;
@@ -36,6 +38,8 @@ export function ReviewHeader({
   status,
   decision,
   currentRevisionSequence,
+  headRunId,
+  baseRunId,
   baseCommitSha,
   headCommitSha,
   evidenceDigest,
@@ -80,6 +84,21 @@ export function ReviewHeader({
       </div>
 
       <div className="flex flex-col items-start gap-3 sm:items-end">
+        {headRunId ? (
+          <nav aria-label="Review source runs" className="flex flex-wrap gap-3 text-sm">
+            {baseRunId ? (
+              <Link
+                href={`/runs/${encodeURIComponent(baseRunId)}`}
+                className="text-primary underline underline-offset-2"
+              >
+                Base run
+              </Link>
+            ) : null}
+            <Link href={`/runs/${encodeURIComponent(headRunId)}`} className="text-primary underline underline-offset-2">
+              Review head run →
+            </Link>
+          </nav>
+        ) : null}
         <div className="flex items-center gap-2">
           <Button variant={isApproved ? "secondary" : "default"} onClick={() => onApprove?.()}>
             {isApproved ? "✓ Approved" : "Approve review"}

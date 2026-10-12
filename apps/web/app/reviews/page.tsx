@@ -98,8 +98,9 @@ function ReviewPublishingGuidance() {
   return (
     <Panel id="publish-review" title="Publish a Review" tone="section">
       <p className="text-sm text-muted-foreground">
-        Runs are execution history and evidence; Reviews are explicit decision records. Publish review evidence from a
-        configured Action path or CLI with <code>boardreadyops review publish</code>.
+        Runs report findings; Reviews are separate, explicitly published records. Triage the source, then use{" "}
+        <code>boardreadyops review publish</code> from an authorized local checkout. It creates a new run/review; verify
+        its exact head commit and evidence before approval.
       </p>
     </Panel>
   );

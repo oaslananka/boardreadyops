@@ -1,4 +1,5 @@
 import type { PolicyFieldSource } from "@boardreadyops/contracts";
+import Link from "next/link";
 import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoReview } from "../../lib/demo-data.js";
 import { Button } from "../ui/button.js";
@@ -29,29 +30,29 @@ function canvasSummary(review: DemoReview): string {
 
 type ReadinessTone = "danger" | "success" | "warning";
 
-function getReadinessTone(decision: string, isReadyForFab: boolean): ReadinessTone {
+function getReadinessTone(decision: string, reviewChecksMet: boolean): ReadinessTone {
   if (decision === "changes_requested") return "danger";
-  return isReadyForFab ? "success" : "warning";
+  return reviewChecksMet ? "success" : "warning";
 }
 
-function getReadinessTitle(decision: string, isReadyForFab: boolean): string {
-  if (decision === "changes_requested") return "Changes Requested — Fabrication Blocked";
-  return isReadyForFab ? "Ready for Fabrication" : "Fabrication Gate Blocked";
+function getReadinessTitle(decision: string, reviewChecksMet: boolean): string {
+  if (decision === "changes_requested") return "Changes Requested — Review Blocked";
+  return reviewChecksMet ? "Review Checks Met — Release Not Verified" : "Review Checks Incomplete";
 }
 
 function getReadinessDescription(
   decision: string,
-  isReadyForFab: boolean,
+  reviewChecksMet: boolean,
   blockingCount: number,
   pendingChecklistCount: number,
 ): string {
   if (decision === "changes_requested") {
-    return "A sign-off authority has requested changes. Hardware revision must be updated and approved.";
+    return "Changes have been requested on this Review. A new revision and explicit review decision are needed.";
   }
-  if (isReadyForFab) {
-    return "All checklist items complete, no blocking findings, and evidence digest approved.";
+  if (reviewChecksMet) {
+    return "The Review checklist, recorded blockers, and an approval matching this evidence digest meet the Review checks. This is not a verified manufacturing export, source-bound release, or fabrication authorization.";
   }
-  return `${blockingCount} blocking finding(s), ${pendingChecklistCount} checklist item(s) pending.`;
+  return `${blockingCount} recorded blocking finding(s), ${pendingChecklistCount} checklist item(s) pending. No manufacturing authorization follows from this Review status.`;
 }
 
 const readinessBandClass: Record<"danger" | "success" | "warning", string> = {
@@ -80,6 +81,65 @@ function policyValueWithSource(value: string, source: PolicyFieldSource | null) 
   );
 }
 
+/**
+ * Current Review revisions bind to repository-wide evidence runs, not to a specific
+ * board in a multi-board repository. Source commit strings alone are not attestation.
+ */
+export function ReviewRevisionEvidence({ review }: Readonly<{ review: DemoReview }>) {
+  const baseSha = /^0+$/u.test(review.baseCommitSha) ? undefined : review.baseCommitSha;
+  return (
+    <Panel
+      title="Revision evidence trail"
+      description="Compare the recorded source revisions and open their evidence runs when linked."
+      tone="inset"
+    >
+      <dl className="grid gap-4 sm:grid-cols-2">
+        <div className="min-w-0">
+          <dt className="text-xs font-semibold uppercase text-muted-foreground">Base revision</dt>
+          <dd className="mt-1 break-all text-sm">
+            <code>{baseSha ?? "Not recorded"}</code>
+          </dd>
+          <dd className="mt-1 text-sm">
+            {review.baseRunId ? (
+              <Link
+                href={`/runs/${encodeURIComponent(review.baseRunId)}`}
+                className="text-primary underline underline-offset-2"
+              >
+                Inspect linked base Run
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">No linked base Run for this Review revision</span>
+            )}
+          </dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-xs font-semibold uppercase text-muted-foreground">Head revision</dt>
+          <dd className="mt-1 break-all text-sm">
+            <code>{review.headCommitSha}</code>
+          </dd>
+          <dd className="mt-1 text-sm">
+            {review.headRunId ? (
+              <Link
+                href={`/runs/${encodeURIComponent(review.headRunId)}`}
+                className="text-primary underline underline-offset-2"
+              >
+                Inspect linked head Run
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">No linked head Run available for this Review</span>
+            )}
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-3 text-xs text-muted-foreground">
+        These are the source commits recorded on this Review revision. A linked Run is execution evidence, not
+        independent proof of a signed source-bound manufacturing package. The Review is repository-scoped: neither a Run
+        link nor this comparison proves which individual boards were approved.
+      </p>
+    </Panel>
+  );
+}
+
 export function OverviewTab({
   review,
   onOpenChanges,
@@ -99,18 +159,19 @@ export function OverviewTab({
     (a) => a.status === "approved" && a.evidenceDigest === review.evidenceDigest,
   );
 
-  const isReadyForFab =
+  const reviewChecksMet =
     review.decision === "approved" &&
+    review.evidenceState === "current" &&
     blockingFindings.length === 0 &&
     completedChecklist.length === review.checklist.length &&
     validApprovals.length > 0;
 
-  const readinessTone = getReadinessTone(review.decision, isReadyForFab);
-  const readinessTitle = getReadinessTitle(review.decision, isReadyForFab);
+  const readinessTone = getReadinessTone(review.decision, reviewChecksMet);
+  const readinessTitle = getReadinessTitle(review.decision, reviewChecksMet);
   const pendingChecklistCount = review.checklist.length - completedChecklist.length;
   const readinessDescription = getReadinessDescription(
     review.decision,
-    isReadyForFab,
+    reviewChecksMet,
     blockingFindings.length,
     pendingChecklistCount,
   );
@@ -161,6 +222,8 @@ export function OverviewTab({
           </span>
         </div>
       </section>
+
+      <ReviewRevisionEvidence review={review} />
 
       {review.effectivePolicy ? (
         <Panel

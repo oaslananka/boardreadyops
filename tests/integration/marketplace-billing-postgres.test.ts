@@ -307,7 +307,7 @@ describeDatabase("GitHub Marketplace billing PostgreSQL integration", () => {
     await database().query(
       `INSERT INTO legal_holds (id, tenant_id, created_by, reason, scope, active)
        VALUES ($1,$2,'integration','Marketplace rename cancellation hold','organization',TRUE)`,
-      [renameLegalHoldId, tenantId],
+      [renameLegalHoldId, tenantId.toUpperCase()],
     );
 
     const cancelledAfterRename = await store.processMarketplaceEvent({
@@ -505,8 +505,8 @@ describeDatabase("GitHub Marketplace billing PostgreSQL integration", () => {
     );
     await database().query(
       `INSERT INTO legal_holds (id, tenant_id, created_by, reason, scope, scope_id, active)
-       VALUES ($1,$2,'integration','Personal Marketplace cancellation legal hold','user',$2,TRUE)`,
-      [userLegalHoldId, userCurrentTenantId],
+       VALUES ($1,$2,'integration','Personal Marketplace cancellation legal hold','user',$3,TRUE)`,
+      [userLegalHoldId, userCurrentTenantId, userCurrentTenantId.toUpperCase()],
     );
 
     const cancelled = await new BillingStore(database()).processMarketplaceEvent({

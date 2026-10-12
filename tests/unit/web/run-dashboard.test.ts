@@ -647,7 +647,9 @@ describe("run dashboard data", () => {
     expect(query.mock.calls[7]?.[1]).toEqual(["run-123", "%release%", "primary", "release-archive", 10, 0]);
     expect(artifactSql).not.toContain("storage_path");
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
-    expect(categoryBreakdownSql).toContain("group by coalesce(category, 'unclassified')");
+    expect(categoryBreakdownSql).toContain("when rule_id like 'erc.%' or rule_id like 'drc.%'");
+    expect(categoryBreakdownSql).toContain("when rule_id like 'release.%' then 'release'");
+    expect(categoryBreakdownSql).toContain("group by 1");
     expect(query.mock.calls[8]?.[1]).toEqual(["run-123"]);
     expect(query).toHaveBeenCalledTimes(12);
   });

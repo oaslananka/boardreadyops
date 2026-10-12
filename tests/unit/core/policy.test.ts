@@ -220,6 +220,39 @@ describe("policy engine", () => {
     expect(evaluatePolicy(policy, { summary: summary(), ruleIds: [] }).status).toBe("pass");
   });
 
+  it("requires actual independently verified source-bound export proof when configured", () => {
+    const rule: PolicyConfig = {
+      enforce: true,
+      rules: [{ id: "signed-fabrication", type: "require-source-bound-export" }],
+    };
+    const missing = evaluatePolicy(rule, input());
+    expect(missing.status).toBe("fail");
+    expect(missing.enforced).toBe(true);
+    const local = evaluatePolicy(
+      rule,
+      input({ sourceBound: { status: "byte-consistent-only", reason: "unsigned local manifest" } }),
+    );
+    expect(local.status).toBe("fail");
+    expect(local.rules[0]?.message).toContain("Byte-consistent only");
+    const invalid = evaluatePolicy(
+      rule,
+      input({ sourceBound: { status: "source-bound-verified", reason: "incomplete", sourceSha: "a".repeat(40) } }),
+    );
+    expect(invalid.status).toBe("fail");
+    const evidence = {
+      status: "source-bound-verified" as const,
+      reason: "verified cryptographically",
+      sourceSha: "a".repeat(40),
+      runInvocationURI: "https://github.com/customer/board/actions/runs/123/attempts/1",
+      subjects: 27,
+    };
+    const valid = evaluatePolicy(rule, input({ sourceBound: evidence }));
+    expect(valid.status).toBe("pass");
+    expect(valid.sourceBound).toEqual(evidence);
+    expect(formatPolicyText(valid)).toContain("SOURCE-BOUND VERIFIED");
+    expect(valid.rules[0]?.message).toContain("27 signed subject");
+  });
+
   it("treats an empty policy as a pass", () => {
     expect(evaluatePolicy({ rules: [] }, input()).status).toBe("pass");
     expect(evaluatePolicy({}, input()).enforced).toBe(false);
@@ -259,6 +292,9 @@ describe("policy engine", () => {
       }),
     ).toEqual([]);
 
+    expect(
+      validateConfig({ version: 1, policy: { rules: [{ id: "signed", type: "require-source-bound-export" }] } }),
+    ).toEqual([]);
     expect(validateConfig({ version: 1, policy: { rules: [{ id: "bad", type: "not-a-type" }] } }).join("\n")).toContain(
       "must be equal to one of the allowed values",
     );

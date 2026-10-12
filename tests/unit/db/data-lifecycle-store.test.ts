@@ -2,6 +2,69 @@ import { describe, expect, it, vi } from "vitest";
 import { DataLifecycleStore } from "../../../packages/db/src/data-lifecycle-store.js";
 
 describe("data lifecycle administration", () => {
+  it("uses case-insensitive GitHub tenant identity for legal hold visibility and erasure admission", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "erasure-1",
+            tenant_id: "mixed-case",
+            requested_by: "authorized-operator",
+            scope: "organization",
+            scope_id: null,
+            status: "blocked_by_hold",
+            dry_run: false,
+            created_at: "2026-10-12T00:00:00.000Z",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ held: true }] });
+    const lifecycle = new DataLifecycleStore({ query });
+
+    await expect(lifecycle.listLegalHolds("mixed-case")).resolves.toEqual([]);
+    await expect(
+      lifecycle.createErasure({
+        tenantId: "mixed-case",
+        requestedBy: "authorized-operator",
+        scope: "organization",
+      }),
+    ).resolves.toMatchObject({ status: "blocked_by_hold" });
+    await expect(lifecycle.hasActiveHold("mixed-case", "repository", "repo-1")).resolves.toBe(true);
+
+    expect(String(query.mock.calls[0]?.[0])).toContain("lower(tenant_id)=lower($1)");
+    expect(String(query.mock.calls[1]?.[0])).toContain("lower(tenant_id)=lower($2)");
+    expect(String(query.mock.calls[2]?.[0])).toContain("lower(tenant_id)=lower($1)");
+    const erasureSql = String(query.mock.calls[1]?.[0]);
+    const holdSql = String(query.mock.calls[2]?.[0]);
+    expect(erasureSql).toContain("($4='user' AND lower(scope_id)=lower($5))");
+    expect(holdSql).toContain("($2='user' AND lower(scope_id)=lower($3))");
+    expect(erasureSql).toContain("scope_id=$5");
+    expect(holdSql).toContain("scope_id=$3");
+  });
+
+  it("releases only the selected tenant hold without requeuing blocked erasure requests", async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rowCount: 1 }).mockResolvedValueOnce({ rowCount: 0 });
+    const store = new DataLifecycleStore({ query });
+
+    await expect(store.releaseLegalHold("tenant-a", "hold-a", "authorized-operator")).resolves.toBe(true);
+    await expect(store.releaseLegalHold("tenant-b", "hold-a", "other-tenant-operator")).resolves.toBe(false);
+
+    expect(query).toHaveBeenCalledTimes(2);
+    for (const [sql] of query.mock.calls) {
+      const statement = String(sql);
+      expect(statement).toMatch(/UPDATE legal_holds SET active=FALSE/iu);
+      expect(statement).toContain("id=$1 AND lower(tenant_id)=lower($2) AND active=TRUE");
+      // Hold release is NOT authorization to resume or execute any erasure.
+      // A separate, audited and explicitly authorized selected-request action
+      // must be designed before blocked requests may transition to pending.
+      expect(statement).not.toMatch(/erasure_requests|status\s*=\s*'pending'|blocked_by_hold/iu);
+    }
+    expect(query).toHaveBeenNthCalledWith(1, expect.any(String), ["hold-a", "tenant-a", "authorized-operator"]);
+    expect(query).toHaveBeenNthCalledWith(2, expect.any(String), ["hold-a", "tenant-b", "other-tenant-operator"]);
+  });
+
   it("upserts a bounded tenant retention policy and returns the persisted row", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [
@@ -46,6 +109,8 @@ describe("data lifecycle administration", () => {
     ]);
     const tenantSql = String(query.mock.calls[0]?.[0]);
     expect(tenantSql).toContain("lower(installations.account_login) = lower($2)");
+    expect(tenantSql).toContain("lower(tenant_id) = lower($2)");
+    expect(tenantSql).toContain("COALESCE((SELECT tenant_id FROM existing_policy), $2)");
     expect(tenantSql).toContain("'retention.policy.updated'");
     expect(tenantSql).toContain("INSERT INTO audit_events");
   });
@@ -162,9 +227,11 @@ describe("data lifecycle administration", () => {
     const [sql, args] = query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("WITH matching_hold AS (");
     expect(sql).not.toContain("MATERIALIZED");
-    expect(sql).toContain("tenant_id=$2");
+    expect(sql).toContain("lower(tenant_id)=lower($2)");
     expect(sql).toContain("scope='organization'");
-    expect(sql).toContain("scope=$4 AND (scope_id=$5 OR scope_id IS NULL)");
+    expect(sql).toContain(
+      "scope=$4 AND (scope_id=$5 OR ($4='user' AND lower(scope_id)=lower($5)) OR scope_id IS NULL)",
+    );
     expect(sql).toContain("WHEN EXISTS (SELECT 1 FROM matching_hold) THEN 'blocked_by_hold'");
     expect(sql).toContain("WHEN $6 THEN 'preview'");
     expect(sql).toContain("ELSE 'pending'");
@@ -258,7 +325,11 @@ describe("data lifecycle administration", () => {
       "repository",
       "repo-1",
     ]);
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("tenant_id=$1"), ["acme", "organization", null]);
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("lower(tenant_id)=lower($1)"), [
+      "acme",
+      "organization",
+      null,
+    ]);
   });
 
   it("lists legal holds with release metadata newest first", async () => {

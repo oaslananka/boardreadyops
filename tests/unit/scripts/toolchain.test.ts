@@ -114,7 +114,7 @@ function healthyProbe(overrides: Partial<ToolchainProbe> = {}): ToolchainProbe {
     architecture: "x64",
     nodeVersion: "24.19.0",
     corepackVersion: "0.34.6",
-    pnpmVersion: "11.8.0",
+    pnpmVersion: "11.11.0",
     pythonVersion: "3.13.5",
     mkdocsVersion: "1.6.1",
     preCommitVersion: "4.6.0",
@@ -159,6 +159,9 @@ describe("reproducible contributor toolchain", () => {
     expect(config.schemaVersion).toBe(1);
     expect(await repositoryFile(".nvmrc")).toBe(`${config.node.preferred}\n`);
     expect(packageJson.packageManager).toMatch(new RegExp(`^pnpm@${config.pnpm.version.replaceAll(".", "\\.")}`));
+    expect(packageJson.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+\+sha512\.[0-9a-f]{128}$/u);
+    const [pnpmMajor = 0, pnpmMinor = 0] = config.pnpm.version.split(".").map(Number);
+    expect(pnpmMajor > 11 || (pnpmMajor === 11 && pnpmMinor >= 11)).toBe(true);
     expect(packageJson.engines.node).toBe(config.node.engines);
     expect(packageJson.devDependencies.puppeteer).toBe(config.browser.puppeteerVersion);
     expect(config.browser.ubuntuRuntimePackages).toEqual([
@@ -218,7 +221,7 @@ describe("reproducible contributor toolchain", () => {
     expect(preCommit).toContain("corepack pnpm run toolchain:bootstrap");
     expect(prePush).toMatch(/^set -e\n/u);
     expect(prePush).toContain("corepack pnpm run typecheck");
-    expect(prePush).toContain("corepack pnpm run test:unit");
+    expect(prePush).toContain("corepack pnpm exec vitest run tests/unit --maxWorkers=2");
     expect(prePush).toContain("corepack pnpm run verify:dist");
     expect(prePush).toContain("node scripts/toolchain.mjs run pre-commit run --hook-stage pre-push --all-files");
     expect(prePush).toContain("corepack pnpm run toolchain:bootstrap");
@@ -240,7 +243,7 @@ describe("reproducible contributor toolchain", () => {
 echo "corepack $*" >> "${trace}"
 case "$*" in
   "pnpm run typecheck") exit 0 ;;
-  "pnpm run test:unit") exit 42 ;;
+  "pnpm exec vitest run tests/unit --maxWorkers=2") exit 42 ;;
   "pnpm run verify:dist") exit 0 ;;
   *) exit 97 ;;
 esac
@@ -265,7 +268,7 @@ exit 0
       const calls = (await readFile(trace, "utf8")).trim().split("\n");
 
       expect(result.status).toBe(42);
-      expect(calls).toEqual(["corepack pnpm run typecheck", "corepack pnpm run test:unit"]);
+      expect(calls).toEqual(["corepack pnpm run typecheck", "corepack pnpm exec vitest run tests/unit --maxWorkers=2"]);
     } finally {
       await rm(temporaryRoot, { recursive: true, force: true });
     }

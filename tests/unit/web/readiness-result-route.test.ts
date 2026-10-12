@@ -569,7 +569,7 @@ describe("readiness result route authentication and publication", () => {
     expect(sql).toContain("inserted_artifacts as");
     expect(sql).toContain("execution_attempt_id, content_type");
     expect(sql).toContain("updated_attempt as");
-    expect(sql).toContain("boardreadyops_apply_runner_result_state");
+    expect(sql).toContain("boardreadyops_apply_runner_result_with_versions");
     expect(sql).toContain("classified.version");
     expect(sql).toContain("classified.attempt_version");
     expect(sql).toContain("classified.persistence_outcome = 'accepted'");
@@ -660,6 +660,40 @@ describe("readiness result route authentication and publication", () => {
     expect(publicationSql).toContain("update release_run_results");
     expect(publicationParams[5]).toBe("runner.result.publication_succeeded");
     expect(publicationParams.slice(0, 5)).toEqual(["run-123", "2026-07-10T18:00:00.000Z", false, false, null]);
+  });
+
+  it("binds optional signed tool versions to the guarded transition and terminal digest", async () => {
+    const body = JSON.stringify({
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      toolVersions: { kicad: "10.0.6", boardReadyOps: "1.24.1" },
+    });
+    query.mockResolvedValue({ rows: [{ id: "run-123", persistence_outcome: "accepted" }] });
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+    expect(response.status).toBe(202);
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("boardreadyops_apply_runner_result_with_versions");
+    expect(sql).toContain("$19");
+    expect(sql).toContain("$20");
+    expect(params[18]).toBe("10.0.6");
+    expect(params[19]).toBe("1.24.1");
+    const signedDigest = params[12];
+    const payload = JSON.parse(params[11] as string);
+    expect(payload.toolVersions).toEqual({ kicad: "10.0.6", boardReadyOps: "1.24.1" });
+
+    query.mockReset();
+    query.mockResolvedValue({ rows: [{ id: "run-123", persistence_outcome: "accepted" }] });
+    const legacy = await handleResultRequest(
+      resultRequest({ body: JSON.stringify({ status: "completed", decision: "pass", findings: [] }) }),
+      dependencies,
+    );
+    expect(legacy.status).toBe(202);
+    const legacyParams = query.mock.calls[0]?.[1] as unknown[];
+    expect(legacyParams[18]).toBeNull();
+    expect(legacyParams[19]).toBeNull();
+    expect(legacyParams[12]).not.toBe(signedDigest);
+    expect(JSON.parse(legacyParams[11] as string)).not.toHaveProperty("toolVersions");
   });
 
   it("marks unsupported artifact storage drivers for terminal deletion handling", async () => {

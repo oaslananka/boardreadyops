@@ -109,6 +109,7 @@ type PolicyRuleType =
   | "min-readiness-score"
   | "require-readiness-status"
   | "require-required-outputs"
+  | "require-source-bound-export"
   | "forbid-rules"
   | "forbid-expired-waivers"
   | "forbid-stale-waivers";

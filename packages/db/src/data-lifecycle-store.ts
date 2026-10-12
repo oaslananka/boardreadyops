@@ -74,7 +74,11 @@ export class DataLifecycleStore {
   constructor(private readonly db: SqlQueryExecutor) {}
 
   async getRetentionPolicy(tenantId: string): Promise<RetentionPolicy | null> {
-    const r = (await this.db.query(`SELECT * FROM retention_policies WHERE tenant_id=$1 LIMIT 1`, [tenantId])) as {
+    const r = (await this.db.query(
+      `SELECT * FROM retention_policies WHERE lower(tenant_id)=lower($1)
+       ORDER BY retention_days DESC NULLS LAST, updated_at DESC, tenant_id ASC LIMIT 1`,
+      [tenantId],
+    )) as {
       rows?: Array<Record<string, unknown>>;
     };
     const row = r.rows?.[0];
@@ -113,17 +117,20 @@ export class DataLifecycleStore {
            FROM installations
           WHERE installations.id = $6
             AND lower(installations.account_login) = lower($2)
-       ), previous_policy AS MATERIALIZED (
-         SELECT retention_policies.retention_days,
-                retention_policies.source_retention_hours
+       ), existing_policy AS MATERIALIZED (
+         SELECT tenant_id, retention_days, source_retention_hours
            FROM retention_policies
-          WHERE retention_policies.tenant_id = $2
+          WHERE lower(tenant_id) = lower($2)
             AND EXISTS (SELECT 1 FROM selected_installation)
+          ORDER BY retention_days DESC NULLS LAST, updated_at DESC, tenant_id ASC
+          LIMIT 1
+       ), previous_policy AS MATERIALIZED (
+         SELECT retention_days, source_retention_hours FROM existing_policy
        ), upserted AS (
          INSERT INTO retention_policies (
            id, tenant_id, tier, retention_days, source_retention_hours, created_at, updated_at
          )
-         SELECT $1, $2, $3, $4, $5, NOW(), NOW()
+         SELECT $1, COALESCE((SELECT tenant_id FROM existing_policy), $2), $3, $4, $5, NOW(), NOW()
            FROM selected_installation
          ON CONFLICT (tenant_id) DO UPDATE
            SET tier = EXCLUDED.tier,
@@ -322,9 +329,10 @@ export class DataLifecycleStore {
   }
 
   async listLegalHolds(tenantId: string): Promise<LegalHold[]> {
-    const r = (await this.db.query(`SELECT * FROM legal_holds WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 100`, [
-      tenantId,
-    ])) as { rows?: Array<Record<string, unknown>> };
+    const r = (await this.db.query(
+      `SELECT * FROM legal_holds WHERE lower(tenant_id)=lower($1) ORDER BY created_at DESC LIMIT 100`,
+      [tenantId],
+    )) as { rows?: Array<Record<string, unknown>> };
     return (r.rows ?? []).map((row) => ({
       id: String(row.id),
       tenantId: String(row.tenant_id),
@@ -402,11 +410,11 @@ export class DataLifecycleStore {
       `WITH matching_hold AS (
          SELECT 1
            FROM legal_holds
-          WHERE tenant_id=$2
+          WHERE lower(tenant_id)=lower($2)
             AND active=TRUE
             AND (
               scope='organization'
-              OR (scope=$4 AND (scope_id=$5 OR scope_id IS NULL))
+              OR (scope=$4 AND (scope_id=$5 OR ($4='user' AND lower(scope_id)=lower($5)) OR scope_id IS NULL))
             )
           LIMIT 1
        )
@@ -469,7 +477,7 @@ export class DataLifecycleStore {
 
   async releaseLegalHold(tenantId: string, holdId: string, releasedBy: string): Promise<boolean> {
     const r = (await this.db.query(
-      `UPDATE legal_holds SET active=FALSE, released_at=NOW(), released_by=$3 WHERE id=$1 AND tenant_id=$2 AND active=TRUE`,
+      `UPDATE legal_holds SET active=FALSE, released_at=NOW(), released_by=$3 WHERE id=$1 AND lower(tenant_id)=lower($2) AND active=TRUE`,
       [holdId, tenantId, releasedBy],
     )) as { rowCount?: number };
     return (r.rowCount ?? 0) > 0;
@@ -478,7 +486,7 @@ export class DataLifecycleStore {
   async hasActiveHold(tenantId: string, scope: string, scopeId?: string | null): Promise<boolean> {
     validateLifecycleScope(scope, scopeId);
     const r = (await this.db.query(
-      `SELECT 1 FROM legal_holds WHERE tenant_id=$1 AND active=TRUE AND (scope='organization' OR (scope=$2 AND (scope_id=$3 OR scope_id IS NULL))) LIMIT 1`,
+      `SELECT 1 FROM legal_holds WHERE lower(tenant_id)=lower($1) AND active=TRUE AND (scope='organization' OR (scope=$2 AND (scope_id=$3 OR ($2='user' AND lower(scope_id)=lower($3)) OR scope_id IS NULL))) LIMIT 1`,
       [tenantId, scope, scopeId ?? null],
     )) as { rows?: unknown[] };
     return (r.rows?.length ?? 0) > 0;

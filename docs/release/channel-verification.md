@@ -5,22 +5,25 @@ BoardReadyOps consumption channels. The current contract is version-derived and
 kept synchronized by `release:readme`; timestamped verification snapshots are
 immutable evidence and are not rewritten by release bumps.
 
-> **Current status:** The latest public release is `boardreadyops@1.68.3` on npm
-> and the `v1.68.3` GitHub Release. The exact release tag and floating `v1` tag
-> point to the same reviewed release commit. Stable GHCR aliases are expected to
-> resolve to the same multi-architecture image index.
+> **Source candidate:** `boardreadyops@1.68.3` (`v1.68.3`) is prepared
+> in this repository revision, **not necessarily published**. Check
+> [npm](https://www.npmjs.com/package/boardreadyops) and
+> [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases)
+> for the latest actual release. Verify tag, floating aliases, checksums, SBOM,
+> and image digests independently before recording public acceptance.
 
 ## Current Release Contract
 
 | Surface | Current contract |
 | --- | --- |
-| Public release | `v1.68.3` |
-| npm package | `boardreadyops@1.68.3` (`latest`) |
-| Binary assets | Linux x64/arm64, macOS x64/arm64, Windows x64, `SHA256SUMS`, and `sbom.cyclonedx.json` |
-| Root Action | Pin a reviewed release commit SHA for reproducibility; `v1` is a moving convenience alias |
-| Container Action | Pin the same reviewed release commit SHA; its image aliases are release-managed |
-| Container aliases | `v1.68.3`, `v1`, and `latest` |
-| Homebrew formula | Repository formula must use the exact release version and `SHA256SUMS` values; external tap publication is a separate maintainer concern |
+| Prepared source candidate | `v1.68.3` (not publication evidence) |
+| Public release | Check [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) |
+| npm package | Check the registry's actual `latest` dist-tag |
+| Binary assets | Confirm platform binaries, `SHA256SUMS`, and `sbom.cyclonedx.json` on the published tag |
+| Root Action | Pin a reviewed release commit SHA for reproducibility; `v1` can move |
+| Container Action | Pin the same reviewed release commit SHA and verify image digest |
+| Container aliases | Confirm actual published `v1`/`latest` digests independently |
+| Homebrew formula | `Formula/boardreadyops.rb` is independently versioned; check the formula's tag and checksums before use |
 
 Run the deterministic repository freshness check on every change:
 
@@ -28,7 +31,7 @@ Run the deterministic repository freshness check on every change:
 corepack pnpm run verify:public-surface
 ```
 
-For a live public-channel audit after publication, run:
+For a live public-channel audit **after publication**, run:
 
 ```bash
 BOARDREADY_VERIFY_PUBLIC_CHANNELS=1 corepack pnpm run verify:release-channels

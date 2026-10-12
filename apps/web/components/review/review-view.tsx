@@ -589,6 +589,8 @@ export function ReviewView({
         status={review.status}
         decision={review.decision}
         currentRevisionSequence={review.currentRevisionSequence}
+        headRunId={review.headRunId}
+        baseRunId={review.baseRunId}
         baseCommitSha={review.baseCommitSha}
         headCommitSha={review.headCommitSha}
         evidenceDigest={review.evidenceDigest}

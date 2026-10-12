@@ -116,7 +116,8 @@ describe("main branch governance ruleset", () => {
   it("keeps GitHub rules authoritative while Mergify only merges explicitly queued PRs", async () => {
     const mergifySource = await repositoryFile(".mergify.yml");
     const mergify = (await import("js-yaml")).load(mergifySource) as {
-      queue_rules?: Array<{ name: string; merge_method?: string; queue_conditions?: string[] }>;
+      merge_queue?: { mode: string; max_parallel_checks: number };
+      queue_rules?: Array<{ name: string; merge_method?: string; batch_size?: number; queue_conditions?: string[] }>;
       merge_protections_settings?: Record<string, unknown>;
       scopes?: unknown;
     };
@@ -125,13 +126,14 @@ describe("main branch governance ruleset", () => {
       bypass_actors: Array<{ actor_id: number; actor_type: string; bypass_mode: string }>;
     };
 
-    expect(mergify).not.toHaveProperty("merge_queue");
+    expect(mergify.merge_queue).toEqual({ mode: "serial", max_parallel_checks: 1 });
     expect(mergify.scopes).toBeUndefined();
     expect(mergify.merge_protections_settings).toBeUndefined();
     expect(mergify.queue_rules).toEqual([
       {
         name: "main",
         merge_method: "squash",
+        batch_size: 1,
         queue_conditions: ["base = main", "-draft"],
       },
     ]);

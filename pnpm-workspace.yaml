@@ -51,9 +51,11 @@ allowBuilds:
   vue-demi: false
 
 overrides:
+  # Bound JSON.parse fallback matching to the upstream ReDoS fix (#1036).
+  json-with-bigint: 3.5.12
   'archiver>readdir-glob': 3.0.0
-  browserslist@<=4.28.6: 4.28.7
-  '@prisma/config>deepmerge-ts': 8.0.0
+  browserslist@<=4.28.6: 4.28.9
+  '@prisma/config>deepmerge-ts': 8.0.2
   'pa11y>puppeteer': 25.8.0
   'fontless>esbuild': 0.28.2
   '@hono/node-server@<2.0.12': 2.0.12
@@ -75,11 +77,11 @@ overrides:
   '@babel/core@>=7.0.0 <7.29.1': '>=7.29.1'
   'brace-expansion@>=5 <5.0.12': 5.0.12
   'fast-uri@>=3 <3.1.8': 3.1.8
-  'hono@<4.13.7': 4.13.7
-  'markdown-it@<14.3.1': 14.3.1
+  'hono@<4.13.7': 4.13.13
+  'markdown-it@<14.3.1': 14.3.2
   'next@<16.3.8': 16.3.8
   'smol-toml@<1.9.0': 1.9.0
-  'ip-address@<10.7.1': 10.7.1
+  'ip-address@<10.7.1': 10.7.3
   'nanoid@<3.3.17': 3.3.18
   js-yaml@>=4 <4.3.2: 4.3.2
   linkify-it@>=5 <5.0.2: 5.0.2

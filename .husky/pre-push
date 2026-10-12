@@ -1,7 +1,14 @@
 set -e
 
+# Git exports repository-local overrides into hooks. Nested Git fixtures
+# (including `git init` in unit tests) must discover their own repositories,
+# not mutate the parent checkout's Git metadata.
+for name in $(git rev-parse --local-env-vars); do
+  unset "$name"
+done
+
 corepack pnpm run typecheck
-corepack pnpm run test:unit
+corepack pnpm exec vitest run tests/unit --maxWorkers=2
 corepack pnpm run verify:dist
 
 if ! node scripts/toolchain.mjs run pre-commit --version >/dev/null 2>&1; then

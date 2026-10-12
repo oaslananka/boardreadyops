@@ -72,6 +72,20 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("POST /api/v1/billing/webhook -- input size", () => {
+  it("rejects a streamed oversized payload before signature verification and database access", async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = webhookSecret;
+    const request = new Request("https://boardreadyops.com/api/v1/billing/webhook", {
+      method: "POST",
+      body: "x".repeat(1024 * 1024 + 1),
+      headers: { "stripe-signature": "invalid" },
+    });
+    const response = await webhookPost(request);
+    expect(response.status).toBe(413);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+});
+
 describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => {
   it("links a Stripe customer id to a tenant on checkout.session.completed", async () => {
     const query = postgresMode(

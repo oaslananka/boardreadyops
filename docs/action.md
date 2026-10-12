@@ -18,11 +18,10 @@ jobs:
           config: boardreadyops.yml
 ```
 
-This example pins the reviewed release commit shown above. The public
-`v1.68.3` tag is the current published release, and its `action.yml` input
-contract was verified against current main before this reference was updated.
-Use the immutable SHA when reproducibility matters; the floating `v1` alias
-moves with stable releases.
+This example pins a reviewed, immutable Action commit. Find the latest
+**published** version in [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases);
+the version prepared in a release pull request may not be available yet. The
+floating `v1` alias moves with stable releases.
 
 ## Inputs
 

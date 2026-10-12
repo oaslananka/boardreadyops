@@ -1,0 +1,62 @@
+name: Publish Release
+
+# Deliberate one-click publication after a reviewed release PR has been merged.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish-release:
+    name: Publish Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: read
+    steps:
+      - name: Assert authorized manual main invocation
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          if [ "${EVENT_NAME}" != "workflow_dispatch" ] || [ "${REPOSITORY}" != "oaslananka/boardreadyops" ] || [ "${REF}" != "refs/heads/main" ] || [ "${ACTOR}" != "oaslananka" ]; then
+            echo "::error::Publish Release requires a manual run by the repository owner on main."
+            exit 1
+          fi
+      - name: Create version tag and GitHub Release for the reviewed release PR
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-pull-request: true
+          skip-github-release: false
+      - name: Require an actual release and immutable stable tag
+        env:
+          CREATED: ${{ steps.release.outputs.release_created }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ "${CREATED}" != "true" ] || [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::No reviewed stable release PR was ready to publish (or tag output was invalid). No npm publication was dispatched."
+            exit 1
+          fi
+      - name: Dispatch existing npm Trusted Publishing workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh workflow run publish-npm.yml --repo "${REPOSITORY}" --ref main -f tag="${RELEASE_TAG}" -f prerelease=false -f update_floating_tags=true

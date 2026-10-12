@@ -510,6 +510,8 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       decision: row.decision,
       currentRevisionId: revision.id,
       currentRevisionSequence: revision.sequence,
+      headRunId: revision.head_run_id,
+      ...(revision.base_run_id ? { baseRunId: revision.base_run_id } : {}),
       baseCommitSha: baseCommit,
       headCommitSha: revision.head_commit_sha,
       evidenceDigest: revision.evidence_digest,

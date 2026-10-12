@@ -171,7 +171,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `bare-url@2.4.3`
   - Description: WHATWG URL implementation for JavaScript
   - Homepage: https://github.com/holepunchto/bare-url
-- `baseline-browser-mapping@2.11.19`
+- `baseline-browser-mapping@2.11.27`
   - Description: A library for obtaining browser versions with their maximum supported Baseline feature set and Widely Available status.
   - Homepage: https://github.com/web-platform-dx/baseline-browser-mapping#readme
 - `before-after-hook@4.0.0`
@@ -346,7 +346,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@xtuc/ieee754@1.2.0`
   - Description: Read/write IEEE754 floating point numbers from/to a Buffer or array-like object
   - Homepage: https://github.com/feross/ieee754#readme
-- `deepmerge-ts@8.0.0`
+- `deepmerge-ts@8.0.2`
   - Description: Deeply merge 2 or more objects respecting type information.
   - Homepage: https://github.com/RebeccaStevens/deepmerge-ts#readme
 - `devtools-protocol@0.0.1666840`, `devtools-protocol@0.0.1687809`
@@ -459,7 +459,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `delaunator@5.1.0`
   - Description: An incredibly fast JavaScript library for Delaunay triangulation of 2D points
   - Homepage: https://github.com/mapbox/delaunator#readme
-- `electron-to-chromium@1.5.414`
+- `electron-to-chromium@1.5.444`
   - Description: Provides a list of electron-to-chromium version mappings
   - Homepage: https://github.com/Kilian/electron-to-chromium#readme
 - `foreground-child@3.3.1`
@@ -683,7 +683,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/helpers@7.29.7`
   - Description: Collection of helper functions used by Babel transforms.
   - Homepage: https://babel.dev/docs/en/next/babel-helpers
-- `@babel/parser@7.29.7`, `@babel/parser@7.29.8`
+- `@babel/parser@7.29.8`
   - Description: A JavaScript parser
   - Homepage: https://babel.dev/docs/en/next/babel-parser
 - `@babel/plugin-proposal-decorators@7.29.0`
@@ -719,7 +719,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/traverse@7.29.7`
   - Description: The Babel Traverse module maintains the overall tree state, and is responsible for replacing, removing, and adding nodes
   - Homepage: https://babel.dev/docs/en/next/babel-traverse
-- `@babel/types@7.29.7`, `@babel/types@7.29.8`
+- `@babel/types@7.29.8`
   - Description: Babel Types is a Lodash-esque utility library for AST nodes
   - Homepage: https://babel.dev/docs/en/next/babel-types
 - `@bcoe/v8-coverage@1.0.2`
@@ -1431,7 +1431,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `brace-expansion@5.0.12`
   - Description: Brace expansion as known from sh/bash
   - Homepage: https://github.com/juliangruber/brace-expansion#readme
-- `browserslist@4.28.7`
+- `browserslist@4.28.9`
   - Description: Share target browsers between different front-end tools, like Autoprefixer, Stylelint and babel-env-preset
   - Homepage: https://github.com/browserslist/browserslist#readme
 - `buffer@6.0.3`
@@ -1511,7 +1511,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `content-disposition@1.1.0`
   - Description: Create and parse Content-Disposition header
   - Homepage: https://github.com/jshttp/content-disposition#readme
-- `content-type@1.0.5`, `content-type@2.0.0`, `content-type@2.1.0`
+- `content-type@1.0.5`, `content-type@2.1.0`
   - Description: Create and parse HTTP Content-Type header
   - Homepage: https://github.com/jshttp/content-type#readme
 - `conventional-commits-parser@7.1.2`
@@ -1781,7 +1781,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `hasown@2.0.3`
   - Description: A robust, ES3 compatible, "has own property" predicate.
   - Homepage: https://github.com/inspect-js/hasOwn#readme
-- `hono@4.13.7`
+- `hono@4.13.13`
   - Description: Web framework built on Web Standards
   - Homepage: https://hono.dev
 - `hoopy@0.1.4`
@@ -1817,7 +1817,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `import-fresh@3.3.1`
   - Description: Import a module while bypassing the cache
   - Homepage: https://github.com/sindresorhus/import-fresh#readme
-- `ip-address@10.7.1`
+- `ip-address@10.7.3`
   - Description: A library for parsing IPv4 and IPv6 IP addresses in node and the browser.
   - Homepage: https://github.com/beaugunderson/ip-address#readme
 - `ipaddr.js@1.9.1`
@@ -1891,7 +1891,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `json-schema-traverse@1.0.0`
   - Description: Traverse JSON Schema passing each schema object to callback
   - Homepage: https://github.com/epoberezkin/json-schema-traverse#readme
-- `json-with-bigint@3.5.8`
+- `json-with-bigint@3.5.12`
   - Description: JS library that allows you to easily serialize and deserialize data with BigInt values
   - Homepage: https://github.com/Ivan-Korolenko/json-with-bigint#readme
 - `json5@2.2.3`
@@ -1948,7 +1948,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `make-dir@4.0.0`
   - Description: Make a directory and its parents if needed - Think `mkdir -p`
   - Homepage: https://github.com/sindresorhus/make-dir#readme
-- `markdown-it@14.3.1`
+- `markdown-it@14.3.2`
   - Description: Markdown-it - modern pluggable markdown parser.
   - Homepage: https://github.com/markdown-it/markdown-it#readme
 - `math-intrinsics@1.1.0`
@@ -2019,7 +2019,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `node-fetch@2.7.0`
   - Description: A light-weight module that brings window.fetch to node.js
   - Homepage: https://github.com/bitinn/node-fetch
-- `node-releases@2.0.53`
+- `node-releases@2.0.57`
   - Description: Node.js releases data
   - Homepage: https://github.com/chicoxyzzy/node-releases#readme
 - `normalize-path@3.0.0`
@@ -2427,7 +2427,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `unzip-stream@0.3.4`
   - Description: Process zip files using streaming API
   - Homepage: https://github.com/mhr3/unzip-stream#readme
-- `update-browserslist-db@1.2.3`
+- `update-browserslist-db@1.3.3`
   - Description: CLI tool to update caniuse-lite to refresh target browsers from Browserslist config
   - Homepage: https://github.com/browserslist/update-db#readme
 - `use-callback-ref@1.3.3`

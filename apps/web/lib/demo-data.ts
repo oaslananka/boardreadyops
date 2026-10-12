@@ -88,6 +88,9 @@ export interface DemoReview {
   decision: ReviewDecision;
   currentRevisionId: string;
   currentRevisionSequence: number;
+  /** Persisted revision evidence runs; omitted from bundled demo fixtures. */
+  headRunId?: string | undefined;
+  baseRunId?: string | undefined;
   baseCommitSha: string;
   headCommitSha: string;
   evidenceDigest: string;

@@ -9,7 +9,18 @@ BoardReadyOps releases are expected to be repeatable, documented, and auditable.
 - GitHub Action: pinned commit/tag usage through `action.yml` and committed dist.
 - Container image: full runtime image with KiCad CLI when published.
 
-## Release preparation
+## Release preparation and publication
+
+The `release-please` workflow is a daily preparation-only job (06:37 Europe/Istanbul)
+and can also be run manually to refresh the version PR. It cannot publish a GitHub
+Release or tag. Review the release PR, wait for successful required and supplemental
+checks, and intentionally merge it before manually running the input-free
+**Actions → Publish Release → Run workflow (main)**. This owner-only workflow
+creates the immutable tag and release, then dispatches existing `publish-npm`
+Trusted Publishing. No `main` push, schedule, or release PR merge launches
+publication automatically. A held release PR must not be merged or published.
+
+## Pre-release validation
 
 Before creating or publishing a release, validate the same gates used by release automation:
 

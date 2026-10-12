@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { loadRepositoryDetail, loadViewerRepositories } from "../../apps/web/lib/repository-dashboard.js";
+import {
+  loadRepositoryBoardHistory,
+  loadRepositoryDetail,
+  loadViewerRepositories,
+} from "../../apps/web/lib/repository-dashboard.js";
 import type { UserSession } from "../../apps/web/lib/user-session.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
@@ -16,6 +20,9 @@ const theirsRepository = "9e000000-0000-4000-8000-000000000012";
 const emptyRepository = "9e000000-0000-4000-8000-000000000013";
 const runOne = "9e000000-0000-4000-8000-000000000021";
 const runTwo = "9e000000-0000-4000-8000-000000000022";
+const boardMain = "9e000000-0000-4000-8000-000000000041";
+const boardSensor = "9e000000-0000-4000-8000-000000000042";
+const boardForeign = "9e000000-0000-4000-8000-000000000043";
 const mineGithubInstallation = 49_101;
 const theirsGithubInstallation = 49_102;
 
@@ -67,6 +74,20 @@ beforeAll(async () => {
     [runOne, runTwo],
   );
   await database().query("update findings set waived_at = now() where rule_id = 'waived.rule'");
+  await database().query(
+    `insert into boards (id, repository_id, project_path, display_name, archived_at)
+     values ($1, $2, 'hardware/main/main.kicad_pro', 'Main', null),
+            ($3, $2, 'hardware/sensor/sensor.kicad_pro', 'Sensor', now()),
+            ($4, $5, 'hardware/foreign/foreign.kicad_pro', 'Foreign', null)`,
+    [boardMain, mineRepository, boardSensor, boardForeign, theirsRepository],
+  );
+  await database().query(
+    `insert into board_bom_snapshots
+      (id, board_id, run_id, commit_sha, component_count, captured_at)
+     values ('9e000000-0000-4000-8000-000000000051', $1, $2, $3, 6, now() - interval '2 hours'),
+            ('9e000000-0000-4000-8000-000000000052', $1, $4, $5, 9, now() - interval '1 hour')`,
+    [boardMain, runOne, "a".repeat(40), runTwo, "b".repeat(40)],
+  );
 });
 
 afterAll(async () => {
@@ -126,6 +147,96 @@ describeDatabase("repository dashboard", () => {
 
     expect(detail?.runs.map((run) => run.decision)).toEqual(["fail", "pass"]);
     expect(detail?.runs[0]?.findingCount).toBe(1);
+  });
+
+  it("keeps per-board evidence repository-scoped and chooses each board's latest real source run", async () => {
+    const detail = await loadRepositoryDetail(mineRepository, session([mineGithubInstallation]), environment);
+
+    expect(detail?.boards).toHaveLength(2);
+    expect(detail?.boards.map((board) => board.projectPath).sort()).toEqual([
+      "hardware/main/main.kicad_pro",
+      "hardware/sensor/sensor.kicad_pro",
+    ]);
+    expect(detail?.boards.some((board) => board.displayName === "Foreign")).toBe(false);
+    const main = detail?.boards.find((board) => board.id === boardMain);
+    expect(main?.latestBom).toMatchObject({
+      commitSha: "b".repeat(40),
+      runCommitSha: "b".repeat(40),
+      runId: runTwo,
+      componentCount: 9,
+    });
+    const sensor = detail?.boards.find((board) => board.id === boardSensor);
+    expect(sensor?.archived).toBe(true);
+    expect(sensor?.latestBom).toBeUndefined();
+  });
+
+  it("does not conflate persisted snapshot SHA with its associated Run's independent SHA", async () => {
+    const snapshotId = "9e000000-0000-4000-8000-000000000052";
+    await database().query("update board_bom_snapshots set commit_sha = $2 where id = $1", [
+      snapshotId,
+      "c".repeat(40),
+    ]);
+    try {
+      const detail = await loadRepositoryDetail(mineRepository, session([mineGithubInstallation]), environment);
+      const main = detail?.boards.find((board) => board.id === boardMain);
+      expect(main?.latestBom).toMatchObject({
+        commitSha: "c".repeat(40),
+        runCommitSha: "b".repeat(40),
+        runId: runTwo,
+      });
+    } finally {
+      await database().query("update board_bom_snapshots set commit_sha = $2 where id = $1", [
+        snapshotId,
+        "b".repeat(40),
+      ]);
+    }
+  });
+
+  it("reads one board's actual capture timeline, never the repository's other boards", async () => {
+    const main = await loadRepositoryBoardHistory(
+      mineRepository,
+      boardMain,
+      session([mineGithubInstallation]),
+      environment,
+    );
+    expect(main?.board.id).toBe(boardMain);
+    expect(main?.captures.map((capture) => capture.runId)).toEqual([runTwo, runOne]);
+    expect(main?.captures.map((capture) => capture.componentCount)).toEqual([9, 6]);
+    expect(main?.hasOlderCaptures).toBe(false);
+    expect(main?.captures.every((capture) => capture.snapshotCommitSha === capture.runCommitSha)).toBe(true);
+    const empty = await loadRepositoryBoardHistory(
+      mineRepository,
+      boardSensor,
+      session([mineGithubInstallation]),
+      environment,
+    );
+    expect(empty?.board.archived).toBe(true);
+    expect(empty?.captures).toEqual([]);
+    expect(empty?.hasOlderCaptures).toBe(false);
+  });
+
+  it("denies a foreign-tenant board or guessed board identifier without disclosing its existence", async () => {
+    const foreign = await loadRepositoryBoardHistory(
+      mineRepository,
+      boardForeign,
+      session([mineGithubInstallation]),
+      environment,
+    );
+    const missing = await loadRepositoryBoardHistory(
+      mineRepository,
+      "9e000000-0000-4000-8000-0000000000ff",
+      session([mineGithubInstallation]),
+      environment,
+    );
+    const inaccessible = await loadRepositoryBoardHistory(
+      theirsRepository,
+      boardForeign,
+      session([mineGithubInstallation]),
+      environment,
+    );
+    expect(foreign).toBeUndefined();
+    expect(missing).toBeUndefined();
+    expect(inaccessible).toBeUndefined();
   });
 
   it("answers the same for another tenant's repository as for one that does not exist", async () => {

@@ -66,6 +66,26 @@ describe("PlanComparisonCard", () => {
     expect(text).toContain("$450");
   });
 
+  it("distinguishes planned hosted ZIP upload from paid features before checkout", async () => {
+    await act(async () => {
+      root.render(createElement(ToastProvider, null, createElement(PlanComparisonCard, { currentTier: "community" })));
+    });
+    const text = container.querySelector(".plan-comparison-container")?.textContent;
+    expect(text).toContain("Hosted ZIP uploads are not available on any plan");
+    expect(text).toContain("Upgrading to a paid tier does not enable hosted manufacturing-package upload");
+    expect(text).toContain("Planned — not included with this plan");
+    const cards = container.querySelectorAll(".plan-tier-card");
+    const team = Array.from(cards).find((card) => card.textContent?.includes("Team"));
+    const plannedItem = Array.from(team?.querySelectorAll("li") ?? []).find((item) =>
+      item.textContent?.includes("Private Multi-CAD hosted ZIP upload"),
+    );
+    expect(plannedItem).toBeDefined();
+    expect(plannedItem?.querySelector("svg.text-success")).toBeNull();
+    expect(team?.querySelectorAll("ul.flex > li")).toHaveLength(4);
+    expect(container.querySelector('a[href="/setup"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/projects/new"]')).not.toBeNull();
+  });
+
   it("indicates current active plan and shows upgrade buttons for higher tiers", async () => {
     await act(async () => {
       root.render(

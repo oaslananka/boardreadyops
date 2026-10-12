@@ -24,6 +24,27 @@ describe("dependency security overrides", () => {
     expect(lockfile).not.toContain("esbuild@0.27.7");
   });
 
+  it("keeps the Action JSON BigInt parser on the bounded-regex security fix", async () => {
+    const workspace = yaml.load(await readFile("pnpm-workspace.yaml", "utf8")) as WorkspacePolicy;
+    const lockfile = await readFile("pnpm-lock.yaml", "utf8");
+    const actionBundle = await readFile("dist/action/index.cjs", "utf8");
+
+    const resolved = workspace.overrides?.["json-with-bigint"];
+    expect(resolved).toMatch(/^\d+\.\d+\.\d+$/u);
+    const version = (resolved ?? "0.0.0").split(".").map(Number);
+    const major = version[0] ?? 0;
+    const minor = version[1] ?? 0;
+    const patch = version[2] ?? 0;
+    expect(major > 3 || (major === 3 && (minor > 5 || (minor === 5 && patch >= 12)))).toBe(true);
+    expect(lockfile).toContain(`json-with-bigint@${resolved}:`);
+    expect(lockfile).not.toContain("json-with-bigint@3.5.8");
+    // The library's 3.5.12 bounded quoted-string alternative replaces the
+    // older exponential-backtracking pattern in the committed Action bundle.
+    expect(actionBundle).toContain("var serializeBigInts = (text) => {");
+    expect(actionBundle).toContain("var stringsOrLargeNumbers =");
+    expect(actionBundle).not.toContain('(?:\\\\.|[^"])*');
+  });
+
   it("keeps full OSV scans on patched dependency security floors", async () => {
     const workspace = yaml.load(await readFile("pnpm-workspace.yaml", "utf8")) as WorkspacePolicy;
     const lockfile = await readFile("pnpm-lock.yaml", "utf8");
@@ -31,7 +52,11 @@ describe("dependency security overrides", () => {
 
     expect(workspace.overrides?.["brace-expansion@>=5 <5.0.12"]).toBe("5.0.12");
     expect(workspace.overrides?.["fast-uri@>=3 <3.1.8"]).toBe("3.1.8");
-    expect(workspace.overrides?.["ip-address@<10.7.1"]).toBe("10.7.1");
+    const patchedIpAddress = workspace.overrides?.["ip-address@<10.7.1"];
+    expect(patchedIpAddress).toMatch(/^\d+\.\d+\.\d+$/u);
+    const [major = 0, minor = 0, patch = 0] = (patchedIpAddress ?? "0.0.0").split(".").map(Number);
+    expect(major > 10 || (major === 10 && (minor > 7 || (minor === 7 && patch >= 1)))).toBe(true);
+    expect(lockfile).toContain(`ip-address@${patchedIpAddress}:`);
     expect(workspace.overrides?.["undici@>=8.0.0 <8.11.0"]).toBe("8.11.0");
     expect(workspace.overrides?.["qs@>=6.11.1 <6.16.0"]).toBe("6.16.0");
     expect(workspace.minimumReleaseAgeExclude).toEqual(

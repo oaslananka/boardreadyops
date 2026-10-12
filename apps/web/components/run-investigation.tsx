@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { findingDomainFromRule, findingGuidance, githubFindingSourceUrl } from "../lib/finding-guidance.js";
 import { releaseRepositoryDispatchAvailability } from "../lib/release-rollout.js";
 import type { RunDashboardFilters, RunDetail } from "../lib/run-dashboard.js";
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
@@ -272,16 +273,27 @@ function githubRepositoryBaseUrl(run: RunDetail): string {
 }
 
 function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
-  if (run.boards.length === 0) return null;
+  if (run.boards.length === 0) {
+    return (
+      <Panel id="boards" title="Board BOM evidence">
+        <p className="text-sm text-muted-foreground">
+          No per-board BOM snapshots were captured for this run. This does not establish that the repository has no
+          boards. Use the run findings and execution evidence to inspect the source revision.
+        </p>
+      </Panel>
+    );
+  }
   const totalComponents = run.boards.reduce((sum, board) => sum + board.componentCount, 0);
   return (
     <Panel
       id="boards"
-      title="Boards in this run"
-      description={`Components captured per board, kept as the record of what ${
-        run.boards.length === 1 ? "this board" : "these boards"
-      } shipped with.`}
+      title="Board BOM evidence"
+      description="Per-board component snapshots captured during this run, not proof of shipment or fabrication approval."
     >
+      <p className="mb-3 text-xs text-muted-foreground">
+        These board IDs identify recorded BOM snapshots only. Findings and Review decisions are not automatically
+        assigned per board. The source commit for this run is <code>{run.commitSha}</code>.
+      </p>
       <ul className="flex flex-col gap-3">
         {run.boards.map((board) => (
           <li key={board.boardId} className="rounded-md border border-border bg-card p-3">
@@ -291,9 +303,24 @@ function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
                 <StatusBadge value="warning" label={`${board.riskyLifecycleCount} at lifecycle risk`} />
               ) : null}
             </div>
-            <p className="mt-1 text-xs">
-              <code>{board.project}</code>
+            <p className="mt-1 break-all text-xs">
+              Project: <code>{board.project}</code>
             </p>
+            <p className="mt-1 break-all text-xs text-muted-foreground">
+              Board record: <code>{board.boardId}</code>
+            </p>
+            {githubFindingSourceUrl(run.repository, run.commitSha, board.project) ? (
+              <p className="mt-1 text-xs">
+                <a
+                  href={githubFindingSourceUrl(run.repository, run.commitSha, board.project)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline underline-offset-2"
+                >
+                  View project at this exact commit ↗
+                </a>
+              </p>
+            ) : null}
             <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
               <div>
                 <dt className="text-xs uppercase text-muted-foreground">Components</dt>
@@ -397,30 +424,89 @@ function CategoryBreakdownPanel({ run }: Readonly<{ run: RunDetail }>) {
   );
 }
 
+/**
+ * Only offer a copyable shell command when the repository identity is a simple
+ * owner/name. The persisted repository name is display data, not trusted shell
+ * source. No --head override: the CLI must inspect the user's local checkout.
+ */
+export function reviewPublishCommand(run: Pick<RunDetail, "repository" | "pullRequestNumber">): string | undefined {
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(run.repository)) return undefined;
+  const pr = run.pullRequestNumber;
+  if (pr !== undefined && (!Number.isSafeInteger(pr) || pr <= 0)) return undefined;
+  const command = `boardreadyops review publish . --repo ${run.repository}`;
+  return pr === undefined ? command : `${command} --pr ${pr}`;
+}
+
 function ReviewLifecyclePanel({ run }: Readonly<{ run: RunDetail }>) {
+  const publishCommand = reviewPublishCommand(run);
   return (
     <Panel
       id="review-lifecycle"
-      title="Run → Review → Release"
-      description="A Run is execution evidence, a Review is an explicit decision context, and a Release is a separate publish action."
+      title="Run → Triage → Review"
+      description="Execution evidence and an explicit review decision are different records."
       tone="section"
     >
-      <p className="text-sm text-muted-foreground">
-        Normal readiness and GitHub Action runs stay in Runs. They do not automatically become Reviews. A Review exists
-        only after review evidence is explicitly published, and neither a Run nor a Review publishes a release by
-        itself.
-      </p>
-      <div className="mt-3 flex flex-wrap gap-3 text-sm">
-        {run.reviewId ? (
-          <Link href={`/reviews/${run.reviewId}`} className="text-primary underline underline-offset-2">
-            Open hardware review
+      {run.reviewId ? (
+        <div className="flex flex-col gap-2 text-sm">
+          <p>
+            A published Review references this run. Review decisions and approvals belong to that Review, not to the
+            readiness result alone.
+          </p>
+          <Link
+            href={`/reviews/${encodeURIComponent(run.reviewId)}`}
+            className="text-primary underline underline-offset-2"
+          >
+            Open review for this run →
           </Link>
-        ) : (
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 text-sm">
+          <p className="text-muted-foreground">
+            No Review is published for this exact run. A failing run can have actionable findings while My Work and
+            Reviews remain empty; nothing is automatically approved or sent to manufacturing.
+          </p>
+          <ol className="list-decimal space-y-3 pl-5">
+            <li>
+              <Link
+                href={`/runs/${encodeURIComponent(run.id)}/findings`}
+                className="text-primary underline underline-offset-2"
+              >
+                Inspect this run’s findings
+              </Link>
+              <span className="text-muted-foreground">
+                {" "}
+                on source commit <code>{run.commitSha}</code>
+                {run.pullRequestNumber !== undefined ? ` (PR #${run.pullRequestNumber})` : ""}.
+              </span>
+            </li>
+            <li>
+              Fix the source locally, push a new commit, and re-run readiness. Confirm <code>git rev-parse HEAD</code>{" "}
+              matches the exact commit you intend to review; an older run cannot prove a newer fix.
+            </li>
+            <li>
+              Publish Review evidence <strong>explicitly</strong> from the checked-out project using the configured CLI
+              and authorized <code>BOARDREADYOPS_TOKEN</code>.
+              {publishCommand ? (
+                <div className="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-2">
+                  <code className="whitespace-pre text-xs">{publishCommand}</code>
+                </div>
+              ) : (
+                <p className="mt-1 text-muted-foreground">
+                  Use <code>boardreadyops review publish</code> with your authorized repository identity.
+                </p>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Publishing analyzes the local source and creates a separate run/review record. It does not convert or
+                approve this GitHub Actions run; the published head SHA and evidence must be checked again in Review. A
+                multi-board repository may need a specific project configuration.
+              </p>
+            </li>
+          </ol>
           <Link href="/reviews#publish-review" className="text-primary underline underline-offset-2">
-            How to publish a review
+            Review publishing requirements →
           </Link>
-        )}
-      </div>
+        </div>
+      )}
     </Panel>
   );
 }
@@ -921,8 +1007,16 @@ function findingGroupValue(finding: FindingDetail, group: FindingGroup): string 
 export function FindingList({
   findings,
   repositoryId,
+  repository,
+  commitSha,
   group = "none",
-}: Readonly<{ findings: FindingDetail[]; repositoryId: string; group?: FindingGroup }>) {
+}: Readonly<{
+  findings: FindingDetail[];
+  repositoryId: string;
+  repository?: string;
+  commitSha?: string;
+  group?: FindingGroup;
+}>) {
   if (findings.length === 0) {
     return (
       <EmptyState title="No matching findings">
@@ -934,7 +1028,13 @@ export function FindingList({
     return (
       <ul className="flex flex-col gap-2">
         {findings.map((finding) => (
-          <FindingRow key={finding.id} finding={finding} repositoryId={repositoryId} />
+          <FindingRow
+            key={finding.id}
+            finding={finding}
+            repositoryId={repositoryId}
+            repository={repository}
+            commitSha={commitSha}
+          />
         ))}
       </ul>
     );
@@ -956,7 +1056,13 @@ export function FindingList({
           </header>
           <ul className="mt-2 flex flex-col gap-2">
             {entries.map((finding) => (
-              <FindingRow key={finding.id} finding={finding} repositoryId={repositoryId} />
+              <FindingRow
+                key={finding.id}
+                finding={finding}
+                repositoryId={repositoryId}
+                repository={repository}
+                commitSha={commitSha}
+              />
             ))}
           </ul>
         </section>
@@ -1042,7 +1148,13 @@ export function FindingsView({
         {run.findingsPage.total} matching finding{run.findingsPage.total === 1 ? "" : "s"}
       </p>
       <div className="mt-3">
-        <FindingList findings={run.findings} repositoryId={run.repositoryId} group={group} />
+        <FindingList
+          findings={run.findings}
+          repositoryId={run.repositoryId}
+          repository={run.repository}
+          commitSha={run.commitSha}
+          group={group}
+        />
       </div>
       <div className="mt-4">
         <Pagination
@@ -1057,7 +1169,19 @@ export function FindingsView({
   );
 }
 
-function FindingRow({ finding, repositoryId }: Readonly<{ finding: FindingDetail; repositoryId: string }>) {
+function FindingRow({
+  finding,
+  repositoryId,
+  repository,
+  commitSha,
+}: Readonly<{
+  finding: FindingDetail;
+  repositoryId: string;
+  repository: string | undefined;
+  commitSha: string | undefined;
+}>) {
+  const sourceUrl = githubFindingSourceUrl(repository ?? "", commitSha ?? "", finding.path);
+  const domain = findingDomainFromRule(finding.ruleId);
   return (
     <li className="rounded-md border border-border bg-card p-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -1067,46 +1191,65 @@ function FindingRow({ finding, repositoryId }: Readonly<{ finding: FindingDetail
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge value={finding.waivedAt ? "waived" : "active"} />
-          <FindingWaiverButton
-            repositoryId={repositoryId}
-            ruleId={finding.ruleId}
-            alreadyWaived={finding.waivedAt !== undefined}
-          />
+          <details className="text-xs text-muted-foreground">
+            <summary className="cursor-pointer underline underline-offset-2">Request exception</summary>
+            <p className="my-2 max-w-xs">
+              An exception records an engineering decision; it does not fix the underlying issue.
+            </p>
+            <FindingWaiverButton
+              repositoryId={repositoryId}
+              ruleId={finding.ruleId}
+              alreadyWaived={finding.waivedAt !== undefined}
+            />
+          </details>
         </div>
       </header>
       <p className="mt-1 text-sm text-foreground">{finding.message}</p>
       <dl className="mt-2 grid grid-cols-3 gap-3">
         <div>
           <dt className="text-xs uppercase text-muted-foreground">Path</dt>
-          <dd className="text-sm text-foreground">{finding.path ? <code>{finding.path}</code> : "Not reported"}</dd>
+          <dd className="break-all text-sm text-foreground">
+            {sourceUrl ? (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                <code>{finding.path}</code> ↗
+              </a>
+            ) : finding.path && finding.path !== "." ? (
+              <code>{finding.path}</code>
+            ) : (
+              "Repository-level finding"
+            )}
+          </dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">Kind</dt>
-          <dd className="text-sm text-foreground">{finding.kind ? humanize(finding.kind) : "Not reported"}</dd>
+          <dt className="text-xs uppercase text-muted-foreground">Check</dt>
+          <dd className="text-sm text-foreground">
+            {finding.kind
+              ? humanize(finding.kind)
+              : domain === "unclassified"
+                ? "Check type not provided"
+                : `${categoryLabel(domain)} (rule ID)`}
+          </dd>
         </div>
         <div>
           <dt className="text-xs uppercase text-muted-foreground">Waived</dt>
           <dd className="text-sm text-foreground">{formatRunDate(finding.waivedAt)}</dd>
         </div>
       </dl>
-      <div className="mt-2 text-xs text-muted-foreground">
-        <p>
-          <strong className="text-foreground">Corrective action:</strong> Update the source design file
-          {finding.path ? (
-            <>
-              {" ("}
-              <code>{finding.path}</code>
-              {")"}
-            </>
-          ) : (
-            ""
-          )}{" "}
-          in your CAD tool to resolve {finding.ruleId}.
+      <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-sm">
+        <p className="font-semibold text-foreground">How to resolve</p>
+        <p className="mt-1 text-foreground">{findingGuidance(finding.ruleId, finding.message)}</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Suggested from the rule ID, not a verified repair. Check the original diagnostic before editing.
         </p>
         <p className="mt-1">
           <small>
-            To verify the fix, push the updated commit — or use <strong>Re-run readiness</strong> at the top of this
-            page to re-check the current commit without leaving BoardReadyOps.
+            Commit the correction, then verify readiness against the new commit. Re-running this unchanged SHA only
+            repeats the existing check; it does not prove a source fix.
           </small>
         </p>
       </div>

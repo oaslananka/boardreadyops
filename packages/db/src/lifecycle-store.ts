@@ -360,13 +360,15 @@ export function createSqlGitHubAppMetadataStore(
          ), matching_hold as (
            select legal_holds.id
              from legal_holds
-             join erasure_scope on erasure_scope.tenant_id = legal_holds.tenant_id
+             join erasure_scope on lower(erasure_scope.tenant_id) = lower(legal_holds.tenant_id)
             where legal_holds.active = true
               and (
                 legal_holds.scope = 'organization'
                 or (
                   legal_holds.scope = erasure_scope.scope
-                  and (legal_holds.scope_id = erasure_scope.scope_id or legal_holds.scope_id is null)
+                  and (legal_holds.scope_id = erasure_scope.scope_id
+                       or (erasure_scope.scope = 'user' and lower(legal_holds.scope_id) = lower(erasure_scope.scope_id))
+                       or legal_holds.scope_id is null)
                 )
               )
             order by legal_holds.created_at desc, legal_holds.id desc

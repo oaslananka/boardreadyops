@@ -946,6 +946,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                     "min-readiness-score",
                     "require-readiness-status",
                     "require-required-outputs",
+                    "require-source-bound-export",
                   ],
                 },
               },

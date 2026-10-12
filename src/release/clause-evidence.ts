@@ -1,3 +1,4 @@
+import { canonicalizeJson } from "../util/json.js";
 import type { ReleasePassport } from "./passport.js";
 import { verifyPassportDigest } from "./passport.js";
 
@@ -120,4 +121,57 @@ export function projectPassportAuditClauses(
       recordCoverage: missingEvidence.length === 0 ? "recorded" : recordedEvidence.length === 0 ? "absent" : "partial",
     };
   });
+}
+
+type AuditClauseExport = {
+  format: "boardreadyops-audit-clause-records";
+  schemaVersion: 1;
+  provenance: "self-reported-passport";
+  disclaimer: string;
+  release: {
+    id: string;
+    passportDigest: string;
+    /** An unverified source claim, never proof of reviewed export provenance. */
+    sourceCommitClaim?: string | undefined;
+  };
+  clauses: readonly AuditClauseProjection[];
+};
+
+/**
+ * Deterministic, offline JSON projection from a self-consistent Release Passport.
+ * A passport's own digest is NOT a verified signer, reviewed SHA, or clause acceptance.
+ */
+export function exportPassportAuditClausesJson(
+  passport: ReleasePassport,
+  mappings: readonly AuditClauseMapping[],
+): string {
+  const clauses = projectPassportAuditClauses(passport, mappings);
+  const sourceClaim =
+    passport.release.git?.dirty === false && commit.test(passport.release.git.sha ?? "")
+      ? passport.release.git.sha
+      : undefined;
+  const report: AuditClauseExport = {
+    format: "boardreadyops-audit-clause-records",
+    schemaVersion: 1,
+    provenance: "self-reported-passport",
+    disclaimer:
+      "Recorded passport fields are not independently authenticated or evidence of compliance, certification, audit success or manufacturing release acceptance. Clause identities and requirements are supplied by the reviewer.",
+    release: {
+      id: passport.release.id,
+      passportDigest: passport.verification.passportDigest,
+      ...(sourceClaim ? { sourceCommitClaim: sourceClaim } : {}),
+    },
+    clauses: [...clauses].sort((a, b) => {
+      const aKey = [a.standard, a.clause];
+      const bKey = [b.standard, b.clause];
+      for (let index = 0; index < aKey.length; index++) {
+        const first = aKey[index] ?? "";
+        const second = bKey[index] ?? "";
+        if (first < second) return -1;
+        if (first > second) return 1;
+      }
+      return 0;
+    }),
+  };
+  return `${canonicalizeJson(report)}\n`;
 }

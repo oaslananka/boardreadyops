@@ -143,6 +143,7 @@ jobs:
           fi
 
       - name: Install KiCad 10
+        id: kicad
         run: |
           sudo add-apt-repository --yes ppa:kicad/kicad-10.0-releases
           sudo apt-get update -qq
@@ -155,6 +156,11 @@ jobs:
               exit 1
               ;;
           esac
+          if [ "${#version}" -gt 64 ] || ! [[ "$version" =~ ^10\.0\.[0-9]+([.+-][0-9A-Za-z.+-]+)?$ ]]; then
+            echo "KiCad version is not safely reportable" >&2
+            exit 1
+          fi
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
 
       - name: Run BoardReadyOps
         id: readiness
@@ -187,6 +193,7 @@ jobs:
           HEAD_SHA: ${{ inputs.head_sha }}
           RESULT_URL: ${{ inputs.result_url }}
           READINESS_OUTCOME: ${{ steps.readiness.outcome }}
+          KICAD_VERSION: ${{ steps.kicad.outputs.version }}
           SAFE_MODE: ${{ inputs.safe_mode }}
           SAFE_MODE_REASONS: ${{ inputs.safe_mode_reasons }}
         with:
@@ -208,11 +215,23 @@ jobs:
               report = undefined;
             }
 
+            const observedVersion = (value) =>
+              typeof value === "string" && /^[0-9][0-9A-Za-z.+_-]{0,63}$/.test(value)
+                ? value
+                : undefined;
             const reportAvailable =
               report?.schemaVersion === 1 &&
               typeof report.summary === "object" &&
               report.summary !== null &&
               Array.isArray(report.findings);
+            const toolVersions = {
+              ...(observedVersion(process.env.KICAD_VERSION)
+                ? { kicad: observedVersion(process.env.KICAD_VERSION) }
+                : {}),
+              ...(reportAvailable && report?.tool?.name === "boardreadyops" && observedVersion(report.tool.version)
+                ? { boardReadyOps: report.tool.version }
+                : {}),
+            };
             const policyFailed = reportAvailable && report.summary.failed === true;
             const operationalFailure = !reportAvailable || (readinessOutcome !== "success" && !policyFailed);
             const hardwareImpact =
@@ -304,6 +323,7 @@ jobs:
                 findings_info: finiteMetric(summary.info),
               },
               reportLinks,
+              ...(Object.keys(toolVersions).length > 0 ? { toolVersions } : {}),
               ...(hardwareImpact ? { hardwareImpact } : {}),
               ...(boms.length > 0 ? { boms } : {}),
             };

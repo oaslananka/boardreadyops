@@ -135,6 +135,12 @@ For key rotation and revocation, pass `--trust-store <path>` instead of `--publi
 
 ## Release preparation
 
+`boardreadyops release audit-clauses <passport.json> --mappings <reviewed-clauses.json>`
+exports a deterministic offline, JSON-only **self-reported record-presence** report
+grouped by reviewer-supplied ISO 13485, IATF 16949, AS9100 or DO-254 clause IDs.
+It never determines compliance or authenticates the passport's issuer or the
+fabricated outputs. See [clause evidence projection](release/clause-evidence-projection.md).
+
 `boardreadyops release prepare [path]` runs a single end-to-end preparation workflow: it generates first-party manufacturing outputs (when `kicad-cli` is available), validates the project with the full pipeline, and records a release decision. Results are written to `release-prepare.json` under the output directory (`build/boardreadyops-release` by default), and the command exits `0` for a `pass` decision and `1` for a `fail`.
 
 ```bash
@@ -210,6 +216,29 @@ boardreadyops generate . --project hardware/mainboard --variant production
 boardreadyops generate . --recipe generate-recipe.json --output build/release-outputs
 boardreadyops generate . --format json
 ```
+
+For a separately approved and explicitly SHA-pinned target-repository run,
+`--reviewed-source-sha <full-lowercase-git-sha>` enables the strict clean
+source, tracked KiCad inputs and Gerber/drill fresh-output checks. It is an
+opt-in library/CLI prerequisite, not proof of a signed GitHub execution:
+
+```bash
+boardreadyops generate . --project hardware/mainboard --recipe path/to/manufacturing-recipe.json \
+  --output build/boardreadyops-attested --reviewed-source-sha 0123456789abcdef0123456789abcdef01234567
+boardreadyops export-checksums . --manifest build/boardreadyops-attested/manifest.json \
+  --reviewed-source-sha 0123456789abcdef0123456789abcdef01234567
+```
+
+The checksum command rechecks actual board source/manifest/output bytes and
+prints an **unsigned** sha256sum-formatted subject inventory. An owner-reviewed
+protected target GitHub Actions job must sign those subjects with
+`actions/attest` and retain the actual artifact bytes in the target repo.
+`boardreadyops verify-export-attestation` then independently verifies the
+GitHub/Sigstore attestation against explicitly authorized repository ID, source
+SHA/ref, workflow, event, run ID and attempt. See the
+[opt-in attested manufacturing workflow](release/attested-manufacturing-export.md)
+for exact setup, trust limitations and negative tests.
+
 
 The command exits `2` for usage or configuration problems (no project, unreadable or schema-invalid recipe), `3` when `kicad-cli` is not available, and `1` when at least one export step fails. `manifest.json` records the tool version, project, recipe (including a SHA-256 hash of the recipe's canonicalized contents), the detected `kicad-cli` version, git commit/dirty state when run inside a git checkout, the OS platform and Node.js version, per-step status, and the SHA-256 digest and size of every generated artifact.
 
@@ -334,3 +363,22 @@ boardreadyops baseline clear [path] [--config <path>]
 ```
 
 `capture` writes the current finding fingerprints. `diff` reports added, removed, and unchanged findings. `prune` removes entries that no longer match the current run. Each subcommand accepts an optional repository path and the same `--config <path>` lookup used by `run`, so non-default config files resolve the matching baseline file.
+
+
+### Opt-in signed source-bound strict policy
+
+The optional `boardreadyops.yml` rule
+`policy.rules: [{ id: signed-export, type: require-source-bound-export }]`
+connects the `verify-export-attestation` signed-subject prerequisite with
+the regular `boardreadyops policy` advisory or enforced decision.
+Pass `--manifest`, `--repository`, `--repository-id`,
+`--reviewed-source-sha`, `--source-ref`, `--workflow`, `--event`,
+`--run-id`, `--run-attempt`, and optionally `--bundle` directly to
+`boardreadyops policy`. These expected identities must come from an
+independently authorized GitHub installation/run record. The output's
+`sourceBound.status` is one of `source-bound-verified`,
+`byte-consistent-only` or `unverified`. Missing or unverified strong
+provenance fails **only when the rule is opted in**; `policy.enforce: true`
+makes a failing `policy` command exit 1. This does not automatically
+authorize production, GA trust badges or a release. Full instructions:
+[Source-bound opt-in policy](release/policy-engine.md).

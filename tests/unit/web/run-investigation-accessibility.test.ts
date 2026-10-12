@@ -8,6 +8,7 @@ import {
   AuditView,
   FindingsView,
   RunPageFrame,
+  reviewPublishCommand,
   SummaryView,
 } from "../../../apps/web/components/run-investigation.js";
 import type { RunDetail } from "../../../apps/web/lib/run-dashboard.js";
@@ -277,6 +278,45 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("does not expand the operator audit export");
   });
 
+  it("provides an explicit source-bound path from Run findings to a separately published Review", () => {
+    const run = sampleRun();
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("Run → Triage → Review");
+    expect(markup).toContain('href="/runs/run-accessible/findings"');
+    expect(markup).toContain("0123456789abcdef0123456789abcdef01234567");
+    expect(markup).toContain("git rev-parse HEAD");
+    expect(markup).toContain("boardreadyops review publish . --repo oaslananka/boardreadyops --pr 221");
+    expect(markup).toContain("creates a separate run/review record");
+    expect(markup).not.toContain("Open review for this run");
+    expect(markup).not.toContain("Approve review");
+  });
+
+  it("links only an explicitly associated published review without suggesting re-publication", () => {
+    const run = { ...sampleRun(), reviewId: "review-42" };
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain('href="/reviews/review-42"');
+    expect(markup).toContain("Open review for this run");
+    expect(markup).not.toContain("boardreadyops review publish");
+  });
+
+  it("generates no command from untrusted repository identities or invalid PR numbers", () => {
+    expect(reviewPublishCommand({ repository: "org/board", pullRequestNumber: undefined })).toBe(
+      "boardreadyops review publish . --repo org/board",
+    );
+    expect(reviewPublishCommand({ repository: "org/board", pullRequestNumber: 42 })).toBe(
+      "boardreadyops review publish . --repo org/board --pr 42",
+    );
+    expect(reviewPublishCommand({ repository: "org/board;echo unsafe", pullRequestNumber: 42 })).toBeUndefined();
+    expect(reviewPublishCommand({ repository: "org/board\nunsafe", pullRequestNumber: 42 })).toBeUndefined();
+    expect(reviewPublishCommand({ repository: "org/board", pullRequestNumber: -1 })).toBeUndefined();
+    expect(reviewPublishCommand({ repository: "org/board", pullRequestNumber: 1.5 })).toBeUndefined();
+    const markup = renderToStaticMarkup(
+      createElement(SummaryView, { run: { ...sampleRun(), repository: "org/board;echo unsafe" } }),
+    );
+    expect(markup).toContain("Use");
+    expect(markup).not.toContain("boardreadyops review publish . --repo org/board;");
+  });
+
   it("renders release-linked production evidence without claiming causality", () => {
     const markup = renderToStaticMarkup(createElement(SummaryView, { run: sampleRun() }));
 
@@ -341,9 +381,9 @@ describe("run investigation accessibility", () => {
     const run = sampleRun();
     const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
 
-    expect(markup).toContain("Run → Review → Release");
+    expect(markup).toContain("Run → Triage → Review");
     expect(markup).toContain('href="/reviews#publish-review"');
-    expect(markup).toContain("How to publish a review");
+    expect(markup).toContain("Review publishing requirements");
   });
 
   it("links a reviewed run directly to its hardware review", () => {
@@ -352,7 +392,7 @@ describe("run investigation accessibility", () => {
     const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
 
     expect(markup).toContain('href="/reviews/review-123"');
-    expect(markup).toContain("Open hardware review");
+    expect(markup).toContain("Open review for this run");
     expect(markup).not.toContain('href="/reviews#publish-review"');
   });
 
@@ -380,13 +420,81 @@ describe("run investigation accessibility", () => {
     expect(artifacts).toContain("Download signed copy");
   });
 
-  it("provides clear corrective action and an in-product way to verify the fix", () => {
+  it("provides rule-aware, correctly scoped help without suggesting the same commit proves a source fix", () => {
     const markup = viewMarkup("findings");
-    expect(markup).toContain("Corrective action");
-    // The note used to send the reader to GitHub to push a commit, which was the only way to
-    // re-check anything. It now points at the re-run control on the same page.
-    expect(markup).toContain("Re-run readiness");
+    expect(markup).toContain("How to resolve");
+    expect(markup).toContain("manufacturer part number");
+    expect(markup).toContain("against the new commit");
+    expect(markup).toContain("Request exception");
+    expect(markup).not.toContain("Update the source design file");
     expect(markup).not.toContain("Rerun required to verify");
+  });
+
+  it("renders a board-revision correction for changelog diagnostics when no PCB revision exists", () => {
+    const run = sampleRun();
+    run.findings = [
+      {
+        id: "missing-board-revision",
+        ruleId: "release.changelog-present",
+        severity: "medium",
+        message: "CHANGELOG.md cannot be matched because no board revision is set.",
+        path: ".",
+        kind: "manifest",
+        waivedAt: undefined,
+      },
+    ];
+    const markup = renderToStaticMarkup(createElement(FindingsView, { run, searchParameters: {} }));
+    expect(markup).toContain("Set the PCB title-block revision first");
+    expect(markup).toContain("CHANGELOG.md");
+    expect(markup).toContain("Repository-level finding");
+    expect(markup).not.toContain("Update the source design file");
+  });
+
+  it("distinguishes captured per-board BOMs from multi-board manufacturing release", () => {
+    const run = sampleRun();
+    run.boards.push({
+      boardId: "board-sensor-2",
+      displayName: "sensor",
+      project: "hardware/sensor/sensor.kicad_pro",
+      componentCount: 2,
+      identifiedComponentCount: 1,
+      unidentifiedComponentCount: 1,
+      riskyLifecycleCount: 0,
+      capturedAt: "2026-07-10T16:06:00.000Z",
+    });
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("Board BOM evidence");
+    expect(markup).toContain("Board record");
+    expect(markup).toContain("board-sensor-2");
+    expect(markup).toContain(
+      'href="https://github.com/oaslananka/boardreadyops/blob/0123456789abcdef0123456789abcdef01234567/hardware/sensor/sensor.kicad_pro"',
+    );
+    expect(markup).toContain("not proof of shipment or fabrication approval");
+    expect(markup).toContain("Review decisions are not automatically assigned per board");
+    expect(markup).not.toContain("these boards shipped with");
+  });
+
+  it("does not invent board identity or a source link without an actual BOM snapshot", () => {
+    const run = sampleRun();
+    run.boards = [];
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("No per-board BOM snapshots were captured");
+    expect(markup).toContain("does not establish that the repository has no boards");
+    expect(markup).not.toContain("Board record:");
+    run.boards = [
+      {
+        boardId: "not-safe-path",
+        displayName: "unresolved",
+        project: "../secrets/private.kicad_pro",
+        componentCount: 0,
+        identifiedComponentCount: 0,
+        unidentifiedComponentCount: 0,
+        riskyLifecycleCount: 0,
+        capturedAt: "2026-07-10T16:05:00.000Z",
+      },
+    ];
+    const unsafe = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(unsafe).not.toContain("View project at this exact commit");
   });
 
   it("renders stable investigation flow snapshots", () => {

@@ -16,19 +16,17 @@ maintainer is onboarded.
 
 ### Required status checks
 
-The committed ruleset requires these stable contexts on `main`:
+The effective `main-standard` ruleset requires nine checks: `ci / risk-profile`,
+`ci / lint`, `ci / typecheck`, `ci / test-unit`, `ci / build`,
+`ci / verify-dist`, `ci / coverage-gate`, `SonarCloud Code Analysis`,
+and `security / gate`.
 
-- `ci / risk-profile`
-- `ci / lint`
-- `ci / typecheck`
-- `ci / test-unit`
-- `ci / build`
-- `ci / verify-dist`
-- `security / gate`
-
-Conditional matrix, integration, accessibility, coverage, mutation, and
-specialist scanner jobs continue to run according to the risk profile, but their
-individual names are not branch-protection contracts.
+Required repository-owned CI jobs must execute their risk-profile routing
+verification even when an expensive suite is legitimately not applicable.
+Risk classification failures, missing decisions and applicable test failures
+must fail closed; a GitHub job-level `skipped` conclusion is not evidence
+that a required validation ran. Non-required matrix, integration,
+accessibility, mutation and specialist checks remain risk-conditioned.
 
 ## Release checks
 

@@ -815,7 +815,15 @@ export async function lookupRunDashboard(
     // the score cards answer "what does this run look like overall", the table answers
     // "show me the filtered detail". lower(severity) equivalences mirror findingOrder() below.
     executor.query(
-      `select coalesce(category, 'unclassified') as category,
+      `select coalesce(nullif(category, 'unclassified'),
+                case
+                  when rule_id like 'erc.%' or rule_id like 'drc.%'
+                    or rule_id like 'firmware.%' or rule_id like 'pinmap.%' then 'electrical'
+                  when rule_id like 'release.%' then 'release'
+                  when rule_id like 'bom.%' then 'sourcing'
+                  when rule_id like 'manufacturing.%' or rule_id like 'design.%' then 'manufacturability'
+                  else 'unclassified'
+                end) as category,
               count(*)::int as total,
               count(*) filter (where lower(severity) in ('critical', 'error'))::int as critical,
               count(*) filter (where lower(severity) = 'high')::int as high,
@@ -824,8 +832,8 @@ export async function lookupRunDashboard(
               count(*) filter (where lower(severity) = 'info')::int as info
          from findings
         where run_id = $1
-        group by coalesce(category, 'unclassified')
-        order by coalesce(category, 'unclassified')`,
+        group by 1
+        order by 1`,
       [runId],
     ),
     executor.query(

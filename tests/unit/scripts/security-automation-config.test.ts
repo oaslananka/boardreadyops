@@ -87,6 +87,47 @@ describe("dependency and security automation configuration", () => {
       "- name: Assert compliance checks did not mutate the checkout\n        run: git diff --exit-code",
     );
   });
+  it("executes each protected CI job and gates all expensive steps on verified risk routing", async () => {
+    const ci = yaml.load(await repositoryFile(".github/workflows/ci.yml")) as {
+      jobs: Record<
+        string,
+        {
+          name: string;
+          if?: string;
+          steps: Array<{ name?: string; uses?: string; if?: string; env?: Record<string, string>; run?: string }>;
+        }
+      >;
+    };
+    const jobs = [
+      ["typecheck", "needs_typecheck"],
+      ["test-unit", "needs_unit"],
+      ["build", "needs_build"],
+      ["verify-dist", "needs_dist"],
+      ["coverage-gate", "needs_coverage"],
+    ] as const;
+    for (const [id, flag] of jobs) {
+      const job = ci.jobs[id];
+      if (!job) throw new Error(`Missing required CI job ${id}`);
+      const [checkout, route, ...expensiveSteps] = job.steps;
+      if (!checkout || !route) throw new Error(`Missing required CI routing/checkout steps in ${id}`);
+      expect(job.name).toBe(`ci / ${id}`);
+      expect(job.if).toBe("$" + "{{ !cancelled() }}");
+      expect(checkout.uses).toBe("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
+      expect(checkout.if).toBeUndefined();
+      expect(route).toMatchObject({
+        name: "Verify required CI route",
+        run: "node scripts/required-ci-route.mjs",
+      });
+      expect(route.env?.CLASSIFIER_RESULT).toBe("$" + "{{ needs.risk-profile.result }}");
+      expect(route.env?.NEEDS_WORK).toBe(`\${{ needs.risk-profile.outputs.${flag} }}`);
+      for (const step of expensiveSteps) {
+        expect(step.if, `${id}: ${step.name ?? "unnamed"} must respect risk classification`).toContain(
+          `needs.risk-profile.outputs.${flag} == 'true'`,
+        );
+      }
+    }
+    expect(ci.jobs["verify-dist"]?.steps[1]?.env?.BUILD_RESULT).toBe("$" + "{{ needs.build.result }}");
+  });
   it("emits one stable aggregate security gate for every pull request", async () => {
     const workflow = await repositoryFile(".github/workflows/security.yml");
     const ruleset = JSON.parse(await repositoryFile(".github/rulesets/main.json")) as {
@@ -102,6 +143,15 @@ describe("dependency and security automation configuration", () => {
 
     expect(workflow).toContain("name: security / gate");
     expect(workflow).toContain("node scripts/security-gate.mjs");
+    // A successful CodeQL analysis can still create failing native PR alert checks.
+    // Fail closed through the existing required aggregate gate; no new check name.
+    expect(workflow).toMatch(
+      /codeql:[\s\S]*checks: read[\s\S]*name: Verify native CodeQL pull request alert decision/u,
+    );
+    expect(workflow).toContain("run: node scripts/verify-native-codeql.mjs");
+    expect(workflow).toContain("CODEQL_PR_HEAD_SHA: $" + "{{ github.event.pull_request.head.sha }}");
+    expect(workflow).toContain("if: github.event_name == 'pull_request'");
+
     expect(workflow).toContain("pnpm install --frozen-lockfile --ignore-scripts");
     expect(workflow).not.toContain("pnpm install --frozen-lockfile\n");
     expect(workflow).toContain("if: always()");
@@ -138,7 +188,7 @@ describe("dependency and security automation configuration", () => {
     expect(binaryPublisher).toContain('"--clobber"');
     expect(ci).toContain("Upload bounded coverage evidence");
     expect(ci).toContain(
-      "if: $" + "{{ failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}",
+      "needs.risk-profile.outputs.needs_coverage == 'true' && (failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main'))",
     );
     expect(ci.match(/retention-days: 7/gu) ?? []).toHaveLength(4);
     expect(benchmark).toContain("retention-days: 7");
@@ -161,7 +211,7 @@ describe("dependency and security automation configuration", () => {
       dependencies?: Record<string, string>;
     };
     const renovateWorkflow = yaml.load(await repositoryFile(".github/workflows/renovate.yml")) as {
-      jobs?: { renovate?: { env?: Record<string, string> } };
+      jobs?: { renovate?: { env?: Record<string, string> }; validate?: object };
     };
 
     expect(webPackageJson.dependencies?.["@octokit/auth-app"]).toBe("8.2.0");
@@ -189,6 +239,10 @@ describe("dependency and security automation configuration", () => {
     );
     expect(renovate.schedule).toEqual(["after 5am and before 8am every weekday"]);
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
+    // Bulk lockfile refreshes skip per-transitive minimumReleaseAge and generated
+    // a native-CodeQL-blocked Action bundle (#1039). Keep targeted updates active.
+    expect(renovate.lockFileMaintenance).toEqual({ enabled: false });
+    expect(renovate.vulnerabilityAlerts).toMatchObject({ enabled: true, schedule: [] });
     expect(renovate.customManagers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -211,20 +265,62 @@ describe("dependency and security automation configuration", () => {
       currentValue: "44.97.2",
       currentDigest: "sha256:b9b32d70f395ec78b9c2a29633079ce4d249049e51018ad3f086417dadf96b86",
     });
+    const ubuntuManager = (
+      renovate.customManagers as Array<{
+        description?: string;
+        managerFilePatterns?: string[];
+        matchStrings?: string[];
+        autoReplaceStringTemplate?: string;
+      }>
+    ).find(
+      ({ description }) =>
+        description ===
+        "Track the Ubuntu container action image by version and immutable digest without tag@digest syntax.",
+    );
+    expect(ubuntuManager?.managerFilePatterns).toEqual(["/^apps\\/container\\/Dockerfile$/"]);
+    const actionDockerfilePin = await repositoryFile("apps/container/Dockerfile");
+    const ubuntuMatch = new RegExp(ubuntuManager?.matchStrings?.[0] ?? "(?!)", "u").exec(actionDockerfilePin);
+    expect(ubuntuMatch?.groups).toMatchObject({
+      currentValue: "26.04",
+      currentDigest: "sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7",
+    });
+    expect(ubuntuManager?.autoReplaceStringTemplate).toBe(
+      "# renovate: datasource=docker depName=ubuntu currentValue={{{newValue}}}\nFROM ubuntu@{{{newDigest}}}",
+    );
+    expect(
+      (
+        ubuntuManager?.autoReplaceStringTemplate
+          ?.replace("{{{newValue}}}", "26.04")
+          .replace("{{{newDigest}}}", `sha256:${"a".repeat(64)}`) ?? ""
+      ).split("\n"),
+    ).toEqual([
+      "# renovate: datasource=docker depName=ubuntu currentValue=26.04",
+      `FROM ubuntu@sha256:${"a".repeat(64)}`,
+    ]);
     expect(packageJson.scripts?.["deps:install-renovate"]).toBeUndefined();
     expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe("node scripts/renovate-post-upgrade.mjs");
-    expect(renovateWorkflow.jobs?.renovate?.env?.CI).toBe("true");
-    expect(renovate.postUpgradeTasks).toEqual({
-      commands: ["corepack pnpm run renovate:post-upgrade"],
-      fileFilters: ["NOTICE", "dist/**"],
-      executionMode: "branch",
-    });
+    expect(renovateWorkflow.jobs?.validate).toBeDefined();
+    expect(renovateWorkflow.jobs?.renovate).toBeUndefined();
+    expect(renovate.postUpgradeTasks).toBeUndefined();
     expect(renovate.ignorePaths).toEqual(
       expect.arrayContaining(["**/.next/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**"]),
     );
 
     const rules = (renovate.packageRules ?? []) as RenovateRule[];
     const byDescription = (description: string) => rules.find((rule) => rule.description === description);
+    expect(
+      byDescription("Prevent duplicate native Dockerfile updates for the digest-only Ubuntu container action image."),
+    ).toMatchObject({
+      matchManagers: ["dockerfile"],
+      matchFileNames: ["apps/container/Dockerfile"],
+      enabled: false,
+    });
+    expect(byDescription("Manually review the Ubuntu container action image custom digest updates.")).toMatchObject({
+      matchManagers: ["custom.regex"],
+      matchFileNames: ["apps/container/Dockerfile"],
+      automerge: false,
+      addLabels: ["supply-chain", "manual-review"],
+    });
 
     expect(
       byDescription(
@@ -358,6 +454,7 @@ describe("dependency and security automation configuration", () => {
       "hono",
       "ip-address",
       "js-yaml",
+      "json-with-bigint",
       "linkify-it",
       "markdown-it",
       "mysql2",
@@ -459,22 +556,28 @@ describe("dependency and security automation configuration", () => {
     expect(actionDockerfile).toContain("GitHub Docker actions require the default root user");
   });
 
-  it("runs a pinned Renovate release only on schedule or manual dispatch", async () => {
-    const workflow = await repositoryFile(".github/workflows/renovate.yml");
-
-    expect(workflow).toContain("schedule:");
-    expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow).toContain("renovatebot/github-action@3064367f740a1a91cca218698a63902689cce200");
-    expect(workflow).not.toContain("RENOVATE_VERSION:");
-    expect(workflow).toContain("renovate-version: 44.97.2");
-    expect(workflow).not.toContain("43.272.4");
-    expect(workflow).toContain("pnpm run renovate:validate");
-    expect(workflow).not.toContain("npx ");
-    expect(workflow).toContain("RENOVATE_REPOSITORIES: '[\"oaslananka/boardreadyops\"]'");
-    expect(workflow).toContain("RENOVATE_ALLOWED_COMMANDS: '[\"^corepack pnpm run renovate:post-upgrade$\"]'");
-    expect(workflow).toMatch(/pull_request:[\s\S]*- package\.json/u);
-    expect(workflow).toContain("token: $" + "{{ secrets.GH_AUTH_TOKEN }}");
-    expect(workflow).not.toContain("pull_request_target");
+  it("uses only the Mend-hosted Renovate App as a dependency update writer", async () => {
+    const validation = await repositoryFile(".github/workflows/renovate.yml");
+    const generator = await repositoryFile(".github/workflows/renovate-generated.yml");
+    expect(validation).toContain("pnpm run renovate:validate");
+    expect(validation).not.toContain("renovatebot/github-action@");
+    expect(validation).not.toContain("workflow_dispatch:");
+    expect(validation).not.toContain("schedule:");
+    expect(validation).not.toContain("GH_AUTH_TOKEN");
+    expect(validation).not.toContain("pull_request_target");
+    expect(generator).toContain("github.event.pull_request.user.login == 'renovate[bot]'");
+    expect(generator).toContain("persist-credentials: false");
+    expect(generator).toContain("corepack pnpm run renovate:post-upgrade");
+    expect(generator).toContain("contents: read");
+    expect(generator).not.toContain("workflow_dispatch:");
+    expect(generator).toContain("needs: generate");
+    expect(generator).toContain("scripts/renovate-generated-artifacts.mjs authorize");
+    expect(generator).toContain("scripts/renovate-generated-artifacts.mjs apply");
+    expect(generator).toContain("secrets.GH_AUTH_TOKEN");
+    expect(generator).toContain("force-with-lease");
+    expect(generator).not.toContain("pull_request_target");
+    expect(generator).not.toContain("workflow_run:");
+    expect(generator).not.toContain("contents: write");
   });
 
   it("runs pinned Semgrep rules in the actual Husky pre-commit chain and CI", async () => {

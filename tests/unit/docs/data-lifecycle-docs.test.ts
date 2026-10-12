@@ -22,6 +22,8 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("ARTIFACT_STORAGE_DRIVER=local");
     expect(lifecycle).toContain("Replacement and age-based retention");
     expect(lifecycle).toContain("Age-based managed-artifact retention");
+    expect(lifecycle).toContain("best-effort post-claim check");
+    expect(lifecycle).toContain("**not** a transactional guarantee");
     expect(lifecycle).toContain("bounded destructive expiry");
     expect(lifecycle).toContain("queue physical deletion exactly once");
     expect(lifecycle).toContain("stale BoardReadyOps signed download URLs fail closed");

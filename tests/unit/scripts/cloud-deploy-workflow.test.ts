@@ -166,6 +166,22 @@ describe("cloud-deploy topology preflight", () => {
     expect(documentation).toContain("may explicitly reduce that preflight keep-set to one");
   });
 
+  it("describes dry-run as a host-side build only, without claiming migration or health validation", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+
+    expect(workflow).toContain(
+      "description: Build only on the production host; no container replacement, migrations, canary, or health check. Checkout/images/cache may change.",
+    );
+    expect(workflow).toContain("inputs.dry_run && 'build migrate web worker'");
+    expect(workflow).toContain("run_deploy build migrate web worker");
+    expect(workflow).toContain("          git reset --hard origin/main");
+    expect(workflow).toContain('          retire_superseded_runtime_images "3"');
+    expect(workflow).toContain("          if ! trim_build_cache; then");
+    expect(documentation).toContain("no canary or automatic rollback");
+    expect(documentation).toContain("without touching the running containers");
+  });
+
   it("verifies the browser security baseline after a real deploy but not during dry-run", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
 

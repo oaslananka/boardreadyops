@@ -137,7 +137,7 @@ export type ArtifactDeletionWorkerDependencies = {
 export type ArtifactDeletionWorkerResult = {
   deletionJobId: string;
   artifactId: string;
-  status: "completed" | "dead_letter" | "retry" | "stale";
+  status: "completed" | "dead_letter" | "retry" | "stale" | "held";
   outcome?: ArtifactObjectDeletionOutcome;
 };
 
@@ -171,6 +171,15 @@ export async function processArtifactDeletion(
   }
 
   try {
+    // Recheck after claiming, immediately before attempting filesystem deletion.
+    // This narrows the enqueue-to-unlink gap but does not eliminate holds added
+    // concurrently after the check; no implicit erasure requeue is performed.
+    const authorization = await dependencies.store.authorizeOrDeferDeletion({
+      deletionJobId: job.deletionJobId,
+      workerId: dependencies.workerId,
+    });
+    if (authorization !== "authorized") return { ...base, status: authorization };
+
     const outcome = await (dependencies.deleteLocalObject ?? deleteLocalArtifactObject)(
       dependencies.storageRoot,
       job.storagePath,
