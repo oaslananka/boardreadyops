@@ -164,7 +164,11 @@ export class BillingStore {
       ),
       updated_customer AS (
         UPDATE billing_customers
-        SET tier = $5, status = $13, trial_ends_at = $14::timestamptz, current_period_end = $10::timestamptz, updated_at = NOW()
+        SET tier = $5,
+            status = CASE WHEN last_invoice_event_created_at IS NULL
+                           OR last_invoice_event_created_at < $12::timestamptz
+                          THEN $13 ELSE status END,
+            trial_ends_at = $14::timestamptz, current_period_end = $10::timestamptz, updated_at = NOW()
         WHERE tenant_id IN (SELECT tenant_id FROM upserted_subscription)
         RETURNING tenant_id
       ),
@@ -205,26 +209,38 @@ export class BillingStore {
     );
   }
 
-  async pendingStripeEvent(stripeEventId: string): Promise<unknown | undefined> {
-    const result = (await this.db.query(
-      "select payload from billing_events where stripe_event_id=$1 and provider='stripe' and processed_at is null limit 1",
-      [stripeEventId],
-    )) as { rows?: Array<{ payload: unknown }> };
-    return result.rows?.[0]?.payload;
+  /** Customer linkage wakes pre-checkout events without processing them inline. */
+  async wakePendingStripeCustomerEvents(stripeCustomerId: string): Promise<void> {
+    await this.db.query(
+      `UPDATE billing_events SET available_at=NOW()
+       WHERE provider='stripe' AND processed_at IS NULL AND dead_letter_at IS NULL
+         AND payload #>> '{data,object,customer}' = $1`,
+      [stripeCustomerId],
+    );
   }
 
-  async pendingStripeCustomerEvents(stripeCustomerId: string): Promise<unknown[]> {
+  /** Applied in the worker transaction, after a per-customer advisory lock. */
+  async applyStripeInvoiceEvent(input: {
+    tenantId: string;
+    eventCreatedAt: string;
+    outcome: "paid" | "failed";
+  }): Promise<boolean> {
+    const paid = input.outcome === "paid";
+    const graceEnds = new Date(Date.now() + 14 * 86_400_000).toISOString();
     const result = (await this.db.query(
-      `select payload from billing_events
-       where provider='stripe' and processed_at is null
-         and type in ('customer.subscription.created', 'customer.subscription.updated',
-                      'customer.subscription.deleted', 'invoice.payment_failed', 'invoice.paid')
-         and payload #>> '{data,object,customer}' = $1
-       order by created_at asc, id asc
-       limit 100`,
-      [stripeCustomerId],
-    )) as { rows?: Array<{ payload: unknown }> };
-    return (result.rows ?? []).map((row) => row.payload);
+      `UPDATE billing_customers
+       SET status = CASE
+             WHEN $3::boolean AND status='past_due' THEN 'active'
+             WHEN NOT $3::boolean THEN 'past_due'
+             ELSE status END,
+           grace_ends_at = CASE WHEN $3::boolean THEN NULL ELSE $4::timestamptz END,
+           last_invoice_event_created_at=$2::timestamptz, updated_at=NOW()
+       WHERE tenant_id=$1 AND
+         (last_invoice_event_created_at IS NULL OR last_invoice_event_created_at < $2::timestamptz)
+       RETURNING id`,
+      [input.tenantId, input.eventCreatedAt, paid, graceEnds],
+    )) as { rows?: Array<{ id: string }> };
+    return (result.rows?.length ?? 0) > 0;
   }
 
   async recordEvent(input: {
