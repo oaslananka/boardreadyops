@@ -90,6 +90,14 @@ describe("runner lease trust snapshot", () => {
     await expect(store.claimJob(input)).rejects.toThrow("runner claim did not return a valid trust snapshot");
   });
 
+  it.each([
+    ["lease ID", { lease_id: "e8448871-1276-42a7-af9a-458a7df00f67" }],
+    ["execution attempt ID", { execution_attempt_id: "e8448871-1276-42a7-af9a-458a7df00f67" }],
+  ])("rejects mismatched returned %s before disclosing a runner lease", async (_name, override) => {
+    const { store } = storeFor(claimRow(override));
+    await expect(store.claimJob(input)).rejects.toThrow("runner claim did not return a complete lease record");
+  });
+
   it("rejects an unsafe runner version before querying PostgreSQL", async () => {
     const query = vi.fn();
     const store = createSqlRunnerLeaseStore({ query }, { now: () => now });

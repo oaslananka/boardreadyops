@@ -326,9 +326,9 @@ export function createSqlRunnerLeaseStore(
       const privateRepository = booleanColumn(row, "repository_private");
       const safeMode = trustSnapshot(row);
       if (
-        !returnedLeaseId ||
+        returnedLeaseId !== leaseId ||
         !runId ||
-        !executionAttemptId ||
+        executionAttemptId !== attemptId ||
         !leaseExpiresAt ||
         !maximumLeaseExpiresAt ||
         !owner ||
