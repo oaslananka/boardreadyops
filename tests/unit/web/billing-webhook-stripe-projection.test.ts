@@ -206,6 +206,24 @@ describe("transactional Stripe projection units", () => {
     expect(String(query.mock.calls[1]?.[0])).toContain("last_invoice_event_created_at");
   });
 
+  it("flags opposite invoice outcomes with the same Stripe timestamp for provider reconciliation", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ tenant_id: "tenant_1" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ same_second: true, last_invoice_event_outcome: "failed" }] });
+    const result = await projectEntitlement(
+      new BillingStore({ query }),
+      event("evt_ambiguous_paid", "invoice.paid", { customer: "cus_synthetic" }),
+    );
+    expect(result).toMatchObject({
+      entitlement: "conflict",
+      reason: "ambiguous_invoice_order",
+      tenantId: "tenant_1",
+    });
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
   it("leaves unlinked invoice events pending for later checkout", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
     const result = await projectEntitlement(

@@ -40,7 +40,7 @@ async function enqueue(name: string, type: string, object: Record<string, unknow
 async function row(id: string) {
   return rows(
     await database().query(
-      "SELECT processed_at, dead_letter_at, available_at, attempts FROM billing_events WHERE stripe_event_id=$1",
+      "SELECT processed_at, dead_letter_at, available_at, attempts, last_error_class FROM billing_events WHERE stripe_event_id=$1",
       [id],
     ),
   )[0];
@@ -185,6 +185,39 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     expect(latest[0]?.status).toBe("past_due");
     expect((await row(failed))?.processed_at).not.toBeNull();
     expect((await row(older))?.processed_at).not.toBeNull();
+  });
+
+  it("quarantines same-second paid after failed instead of silently acknowledging a conflicting state", async () => {
+    const failed = await enqueue("equal_time_failed", "invoice.payment_failed", { customer }, 1_700_001_000);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    const paid = await enqueue("equal_time_paid", "invoice.paid", { customer }, 1_700_001_000);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(paid))?.processed_at).toBeNull();
+    expect((await row(paid))?.last_error_class).toBe("ambiguous_invoice_order");
+    expect((await row(paid))?.dead_letter_at).not.toBeNull();
+    const customerRows = rows(
+      await database().query("SELECT status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1", [
+        tenant,
+      ]),
+    );
+    expect(customerRows[0]).toMatchObject({ status: "past_due", last_invoice_event_outcome: "failed" });
+    expect((await row(failed))?.processed_at).not.toBeNull();
+  });
+
+  it("quarantines same-second failed after paid without revoking paid status", async () => {
+    const paid = await enqueue("equal_time_paid_first", "invoice.paid", { customer }, 1_700_001_100);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    const failed = await enqueue("equal_time_failed_second", "invoice.payment_failed", { customer }, 1_700_001_100);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(failed))?.processed_at).toBeNull();
+    expect((await row(failed))?.last_error_class).toBe("ambiguous_invoice_order");
+    const customerRows = rows(
+      await database().query("SELECT status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1", [
+        tenant,
+      ]),
+    );
+    expect(customerRows[0]).toMatchObject({ status: "active", last_invoice_event_outcome: "paid" });
+    expect((await row(paid))?.processed_at).not.toBeNull();
   });
 
   it("rolls back a failed transaction then retries without marking processed", async () => {

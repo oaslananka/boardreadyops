@@ -97,6 +97,15 @@ export async function processStripeEntitlementPass(
           );
           return "dead_letter";
         }
+        if (projection.entitlement === "conflict") {
+          // Never convert ambiguous same-second invoice outcomes into a
+          // successful entitlement acknowledgement. Await provider-state review.
+          await transaction.query(
+            "UPDATE billing_events SET dead_letter_at=NOW(), last_error_class='ambiguous_invoice_order' WHERE id=$1",
+            [record.id],
+          );
+          return "dead_letter";
+        }
         if (projection.entitlement === "deferred") {
           await transaction.query(
             `UPDATE billing_events SET available_at=NOW() + INTERVAL '60 seconds'

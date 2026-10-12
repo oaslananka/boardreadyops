@@ -31,11 +31,14 @@ Operational guarantees and limits:
 - Subscription updates guard against an older Stripe event timestamp.
   Invoice paid/failed updates have a separate customer-level monotonic guard;
   an earlier subscription must not undo a later invoice status.
-- Stripe timestamps have **second** precision. Conflicting statuses with equal
-  timestamps and multi-subscription cross-event precedence cannot be resolved
-  conclusively from event arrival order alone. Treat these as a customer
-  reconciliation risk requiring explicit provider-state comparison before
-  production billing acceptance.
+- Stripe timestamps have **second** precision. A second, opposite invoice
+  outcome at the same event timestamp is quarantined with
+  `ambiguous_invoice_order`, never silently acknowledged as processed.
+  The earlier outcome may still be wrong: reconcile the live provider state
+  before granting, revoking, or restoring an entitlement. Same-second
+  subscription changes and multi-subscription precedence still require
+  independently verified provider-state comparison before production billing
+  acceptance.
 - Unmapped subscription prices remain pending, not silently acknowledged as
   applied. Fix the mapping first; monitor the pending queue for accumulation.
 - A successful transaction is an internal atomicity guarantee, **not** proof

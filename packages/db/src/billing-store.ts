@@ -219,12 +219,17 @@ export class BillingStore {
     );
   }
 
-  /** Applied in the worker transaction, after a per-customer advisory lock. */
+  /**
+   * A Stripe invoice timestamp has only second precision. Do not silently
+   * acknowledge opposite outcomes in the same second: they require provider
+   * reconciliation, not an arrival-order decision about paid entitlements.
+   * Caller owns the customer advisory lock and the surrounding transaction.
+   */
   async applyStripeInvoiceEvent(input: {
     tenantId: string;
     eventCreatedAt: string;
     outcome: "paid" | "failed";
-  }): Promise<boolean> {
+  }): Promise<"applied" | "stale" | "conflict" | "missing_customer"> {
     const paid = input.outcome === "paid";
     const graceEnds = new Date(Date.now() + 14 * 86_400_000).toISOString();
     const result = (await this.db.query(
@@ -234,13 +239,25 @@ export class BillingStore {
              WHEN NOT $3::boolean THEN 'past_due'
              ELSE status END,
            grace_ends_at = CASE WHEN $3::boolean THEN NULL ELSE $4::timestamptz END,
-           last_invoice_event_created_at=$2::timestamptz, updated_at=NOW()
+           last_invoice_event_created_at=$2::timestamptz,
+           last_invoice_event_outcome=$5::text, updated_at=NOW()
        WHERE tenant_id=$1 AND
          (last_invoice_event_created_at IS NULL OR last_invoice_event_created_at < $2::timestamptz)
        RETURNING id`,
-      [input.tenantId, input.eventCreatedAt, paid, graceEnds],
+      [input.tenantId, input.eventCreatedAt, paid, graceEnds, input.outcome],
     )) as { rows?: Array<{ id: string }> };
-    return (result.rows?.length ?? 0) > 0;
+    if ((result.rows?.length ?? 0) > 0) return "applied";
+
+    const current = (await this.db.query(
+      `SELECT last_invoice_event_created_at = $2::timestamptz AS same_second,
+              last_invoice_event_outcome
+       FROM billing_customers WHERE tenant_id=$1`,
+      [input.tenantId, input.eventCreatedAt],
+    )) as { rows?: Array<{ same_second: boolean | null; last_invoice_event_outcome: string | null }> };
+    const existing = current.rows?.[0];
+    if (!existing) return "missing_customer";
+    if (existing.same_second && existing.last_invoice_event_outcome !== input.outcome) return "conflict";
+    return "stale";
   }
 
   async recordEvent(input: {

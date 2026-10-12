@@ -95,10 +95,17 @@ async function projectInvoiceEvent(
   if (!parsed) return { entitlement: "ignored", reason: "unrecognized_invoice_payload" };
   const tenantId = await store.resolveTenantIdByStripeCustomerId(parsed.stripeCustomerId);
   if (!tenantId) return { entitlement: "deferred", reason: "customer_not_linked" };
-  const applied = await store.applyStripeInvoiceEvent({ tenantId, eventCreatedAt, outcome });
-  return applied
-    ? { entitlement: outcome === "paid" ? "grace_cleared" : "grace_applied", tenantId }
-    : { entitlement: "ignored", reason: "stale_invoice_event", tenantId };
+  const outcomeResult = await store.applyStripeInvoiceEvent({ tenantId, eventCreatedAt, outcome });
+  if (outcomeResult === "applied") {
+    return { entitlement: outcome === "paid" ? "grace_cleared" : "grace_applied", tenantId };
+  }
+  if (outcomeResult === "conflict") {
+    return { entitlement: "conflict", reason: "ambiguous_invoice_order", tenantId };
+  }
+  if (outcomeResult === "missing_customer") {
+    return { entitlement: "deferred", reason: "customer_not_found", tenantId };
+  }
+  return { entitlement: "ignored", reason: "stale_invoice_event", tenantId };
 }
 
 /**
