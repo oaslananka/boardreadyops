@@ -346,7 +346,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@xtuc/ieee754@1.2.0`
   - Description: Read/write IEEE754 floating point numbers from/to a Buffer or array-like object
   - Homepage: https://github.com/feross/ieee754#readme
-- `deepmerge-ts@8.0.0`
+- `deepmerge-ts@8.0.2`
   - Description: Deeply merge 2 or more objects respecting type information.
   - Homepage: https://github.com/RebeccaStevens/deepmerge-ts#readme
 - `devtools-protocol@0.0.1666840`, `devtools-protocol@0.0.1687809`
