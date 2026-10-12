@@ -109,6 +109,8 @@ describe("data lifecycle administration", () => {
     ]);
     const tenantSql = String(query.mock.calls[0]?.[0]);
     expect(tenantSql).toContain("lower(installations.account_login) = lower($2)");
+    expect(tenantSql).toContain("lower(tenant_id) = lower($2)");
+    expect(tenantSql).toContain("COALESCE((SELECT tenant_id FROM existing_policy), $2)");
     expect(tenantSql).toContain("'retention.policy.updated'");
     expect(tenantSql).toContain("INSERT INTO audit_events");
   });
