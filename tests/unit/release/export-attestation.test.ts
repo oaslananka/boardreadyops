@@ -13,6 +13,23 @@ import { runProcess } from "../../../src/util/process.js";
 
 vi.mock("../../../src/util/process.js", () => ({ runProcess: vi.fn() }));
 
+// Simulate a filesystem mutation *after* the real inventory verifier has
+// completed, without monkey-patching platform-dependent fs.open bindings.
+let afterInventoryVerification: (() => Promise<void>) | undefined;
+vi.mock("../../../src/core/provenance.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../../src/core/provenance.js")>();
+  return {
+    ...original,
+    verifyExportProvenance: async (...args: Parameters<typeof original.verifyExportProvenance>) => {
+      const result = await original.verifyExportProvenance(...args);
+      if (afterInventoryVerification && result.status === "verified") {
+        await afterInventoryVerification();
+      }
+      return result;
+    },
+  };
+});
+
 const mockedRun = vi.mocked(runProcess);
 const roots: string[] = [];
 const sha = "a".repeat(40);
@@ -28,6 +45,7 @@ const expectation: TrustedExportExpectation = {
 };
 
 afterEach(async () => {
+  afterInventoryVerification = undefined;
   vi.resetAllMocks();
   for (const root of roots.splice(0)) await fs.rm(root, { recursive: true, force: true });
 });
@@ -259,25 +277,19 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
       const forged = path.join(outside, "same-bytes.gtl");
       await fs.writeFile(forged, "real gerber bytes");
 
-      // Trigger the swap immediately before the final subject open. A path-based
-      // createReadStream() would follow this symlink and hash matching bytes.
-      const open = fs.open.bind(fs);
+      // The original inventory verification succeeds first, then a same-byte
+      // symlink is substituted before the attestation signing inventory hashes.
       let swapped = false;
-      const spy = vi.spyOn(fs, "open").mockImplementation(async (file, flags, mode) => {
-        if (!swapped && file === target) {
-          await fs.rm(target);
-          await fs.symlink(forged, target);
-          swapped = true;
-        }
-        return open(file, flags, mode);
-      });
-      try {
-        expect((await verify(f)).status).toBe("rejected");
-        expect(swapped).toBe(true);
-        expect(mockedRun).not.toHaveBeenCalled();
-      } finally {
-        spy.mockRestore();
-      }
+      afterInventoryVerification = async () => {
+        await fs.rm(target);
+        await fs.symlink(forged, target);
+        swapped = true;
+        afterInventoryVerification = undefined;
+      };
+      const result = await verify(f);
+      expect(swapped).toBe(true);
+      expect(result.status).toBe("rejected");
+      expect(mockedRun).not.toHaveBeenCalled();
     },
   );
 
