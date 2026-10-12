@@ -228,9 +228,7 @@ export async function readGitHubPullRequestContext(input: {
   // A missing/deleted PR source must not silently become trusted same-repo
   // execution during a user-requested rerun or release preview.
   const pullRequestFromFork =
-    headRepository?.fork === true ||
-    !headRepositoryName ||
-    headRepositoryName.toLowerCase() !== `${input.owner}/${input.repo}`.toLowerCase();
+    headRepository?.fork === true || headRepositoryName?.toLowerCase() !== `${input.owner}/${input.repo}`.toLowerCase();
   return { headCommitSha, headRef, baseCommitSha, pullRequestDraft, pullRequestFromFork };
 }
 

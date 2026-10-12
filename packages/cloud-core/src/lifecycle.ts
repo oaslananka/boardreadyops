@@ -324,9 +324,7 @@ function pullRequestIsFromFork(repository: GitHubRepositoryRef, pullRequest: Rec
   // A missing or deleted head repository is NOT proof that the PR belongs to
   // the base repository. Preserve restricted execution until origin is known.
   return (
-    pullRequestHeadRepositoryIsFork(pullRequest) ||
-    !headRepository ||
-    headRepository.toLowerCase() !== repository.fullName.toLowerCase()
+    pullRequestHeadRepositoryIsFork(pullRequest) || headRepository?.toLowerCase() !== repository.fullName.toLowerCase()
   );
 }
 
