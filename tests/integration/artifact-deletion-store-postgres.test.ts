@@ -807,6 +807,64 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     ]);
   });
 
+  it("quarantines an ambiguous unlink after synthetic removal and blocks subsequent holds and reclaim", async () => {
+    const label = `unlink-ambiguous-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const tenantId = `artifact-delete-${label}`;
+    const artifactId = randomUUID();
+    const deletionJobId = await insertJob(tenant, artifactId);
+    let at = new Date(Date.now() + 1_000);
+    const deletionStore = createSqlArtifactDeletionStore(requireExecutor(), {
+      now: () => at,
+      retryBaseSeconds: 1,
+    });
+    const [job] = await deletionStore.claimDeletions({ workerId: "uncertain-unlink-worker", limit: 1 });
+    expect(job?.deletionJobId).toBe(deletionJobId);
+    if (!job) throw new Error("Expected claimed test deletion.");
+
+    const root = await mkdtemp(path.join(tmpdir(), "boardreadyops-uncertain-unlink-"));
+    const objectPath = path.join(root, job.storagePath);
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    try {
+      await mkdir(path.dirname(objectPath), { recursive: true });
+      await writeFile(objectPath, "SYNTHETIC DATA ONLY");
+      const result = await processArtifactDeletion(job, {
+        workerId: "uncertain-unlink-worker",
+        storageRoot: root,
+        store: deletionStore,
+        deleteLocalObject: async () => {
+          // The physical effect occurred but the caller observed a rejection.
+          await unlink(objectPath);
+          throw new Error("ambiguous error after irreversible unlink");
+        },
+      });
+      expect(result.status).toBe("retry");
+      await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(
+        rows(
+          await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id = $1", [
+            deletionJobId,
+          ]),
+        ),
+      ).toEqual([{ settled_at: null }]);
+      await expect(
+        lifecycle.createLegalHold({
+          tenantId,
+          createdBy: "operator",
+          reason: "Reject a false hold admission after ambiguous unlink",
+          scope: "organization",
+        }),
+      ).rejects.toBeInstanceOf(LegalHoldAdmissionConflictError);
+      at = new Date(at.valueOf() + 5_000);
+      await expect(deletionStore.claimDeletions({ workerId: "other-worker", limit: 1 })).resolves.toEqual([]);
+    } finally {
+      // All objects and rows are disposable test fixtures; no production data.
+      await requireExecutor().query("delete from artifact_unlink_fences where deletion_job_id = $1", [deletionJobId]);
+      await requireExecutor().query("delete from artifact_deletion_jobs where id = $1", [deletionJobId]);
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("retries transient failures and dead-letters permanent failures with audit proof", async () => {
     const tenant = await fixture(`failure-${randomUUID().slice(0, 8)}`);
     const artifactId = randomUUID();

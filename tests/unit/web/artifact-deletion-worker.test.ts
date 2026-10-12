@@ -359,20 +359,52 @@ describe("artifact deletion worker", () => {
     expect(result.status).toBe("stale");
   });
 
-  it("settles a failed physical attempt only after a committed failure transition", async () => {
+  it("settles a proven pre-unlink failure only after a committed failure transition", async () => {
+    const deletionStore = store();
+    const root = await storageRoot();
+    const result = await processArtifactDeletion(
+      { ...job, storagePath: "../unsafe.bin" },
+      { workerId: "worker-1", storageRoot: root, store: deletionStore },
+    );
+    expect(result.status).toBe("retry");
+    expect(deletionStore.settlePhysicalDeletion).toHaveBeenCalledWith(
+      expect.objectContaining({ deletionJobId: "job-1", workerId: "worker-1", outcome: "failed" }),
+    );
+  });
+
+  it("quarantines an ambiguous unlink rejection even after synthetic file removal", async () => {
+    const deletionStore = store();
+    const root = await storageRoot();
+    const objectPath = path.join(root, job.storagePath);
+    await mkdir(path.dirname(objectPath), { recursive: true });
+    await writeFile(objectPath, "SYNTHETIC DATA ONLY");
+    const result = await processArtifactDeletion(job, {
+      workerId: "worker-1",
+      storageRoot: root,
+      store: deletionStore,
+      deleteLocalObject: async () => {
+        await unlink(objectPath);
+        throw filesystemError("EIO");
+      },
+    });
+    expect(result.status).toBe("retry");
+    await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(deletionStore.failDeletion).toHaveBeenCalledOnce();
+    expect(deletionStore.settlePhysicalDeletion).not.toHaveBeenCalled();
+  });
+
+  it("does not trust a caller-supplied pre-unlink claim after an irreversible unlink", async () => {
     const deletionStore = store();
     const result = await processArtifactDeletion(job, {
       workerId: "worker-1",
       storageRoot: "/data",
       store: deletionStore,
       deleteLocalObject: async () => {
-        throw new ArtifactObjectDeletionError("synthetic error", { retryable: true });
+        throw new ArtifactObjectDeletionError("untrusted injection", { retryable: true, beforeUnlink: true });
       },
     });
     expect(result.status).toBe("retry");
-    expect(deletionStore.settlePhysicalDeletion).toHaveBeenCalledWith(
-      expect.objectContaining({ deletionJobId: "job-1", workerId: "worker-1", outcome: "failed" }),
-    );
+    expect(deletionStore.settlePhysicalDeletion).not.toHaveBeenCalled();
   });
 
   it("retries a local deletion when the storage root is not configured", async () => {

@@ -18,6 +18,11 @@ rollout, external object deletion or a compliance signoff.
   or failure transition commits, only the owning worker/token may call
   `boardreadyops_settle_artifact_unlink`. A matching audited DB outcome is
   required; no guessed or time-based auto-expiry is permitted.
+- A rejected filesystem Promise does not prove that the object survived: unlink
+  may already have occurred. Keep the fence unresolved even after a durable
+  failure transition unless trusted pre-unlink validation proves no unlink was
+  attempted. Uncertain results require evidence-backed operator reconciliation,
+  not an automatic retry or fence settlement.
 - Renaming or deleting an installation during an unresolved unlink fence is
   rejected to preserve tenant-key identity.
 

@@ -17,11 +17,13 @@ const nodeArtifactFilesystem: LocalArtifactFilesystem = { lstat, realpath, unlin
 
 export class ArtifactObjectDeletionError extends Error {
   readonly retryable: boolean;
+  readonly beforeUnlink: boolean;
 
-  constructor(message: string, options: { retryable: boolean; cause?: unknown }) {
+  constructor(message: string, options: { retryable: boolean; beforeUnlink?: boolean; cause?: unknown }) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = "ArtifactObjectDeletionError";
     this.retryable = options.retryable;
+    this.beforeUnlink = options.beforeUnlink ?? false;
   }
 }
 
@@ -40,7 +42,11 @@ async function resolveStorageRoot(storageRoot: string, filesystem: LocalArtifact
   try {
     return await filesystem.realpath(path.resolve(storageRoot));
   } catch (error) {
-    throw new ArtifactObjectDeletionError("artifact storage root is unavailable", { retryable: true, cause: error });
+    throw new ArtifactObjectDeletionError("artifact storage root is unavailable", {
+      retryable: true,
+      beforeUnlink: true,
+      cause: error,
+    });
   }
 }
 
@@ -52,7 +58,11 @@ async function resolveArtifactParent(
     return await filesystem.realpath(path.dirname(lexicalPath));
   } catch (error) {
     if (errorCode(error) === "ENOENT") return undefined;
-    throw new ArtifactObjectDeletionError("artifact object parent is unavailable", { retryable: true, cause: error });
+    throw new ArtifactObjectDeletionError("artifact object parent is unavailable", {
+      retryable: true,
+      beforeUnlink: true,
+      cause: error,
+    });
   }
 }
 
@@ -61,7 +71,11 @@ async function readArtifactStat(lexicalPath: string, filesystem: LocalArtifactFi
     return await filesystem.lstat(lexicalPath);
   } catch (error) {
     if (errorCode(error) === "ENOENT") return undefined;
-    throw new ArtifactObjectDeletionError("artifact object metadata is unavailable", { retryable: true, cause: error });
+    throw new ArtifactObjectDeletionError("artifact object metadata is unavailable", {
+      retryable: true,
+      beforeUnlink: true,
+      cause: error,
+    });
   }
 }
 
@@ -73,13 +87,17 @@ async function resolveArtifactObject(
     return await filesystem.realpath(lexicalPath);
   } catch (error) {
     if (errorCode(error) === "ENOENT") return undefined;
-    throw new ArtifactObjectDeletionError("artifact object path cannot be resolved", { retryable: true, cause: error });
+    throw new ArtifactObjectDeletionError("artifact object path cannot be resolved", {
+      retryable: true,
+      beforeUnlink: true,
+      cause: error,
+    });
   }
 }
 
 function assertInsideStorageRoot(root: string, candidate: string, message: string): void {
   if (!isInside(root, candidate)) {
-    throw new ArtifactObjectDeletionError(message, { retryable: false });
+    throw new ArtifactObjectDeletionError(message, { retryable: false, beforeUnlink: true });
   }
 }
 
@@ -105,6 +123,7 @@ export async function deleteLocalArtifactObject(
   if (!lexicalPath) {
     throw new ArtifactObjectDeletionError("artifact object path is outside the configured storage root", {
       retryable: false,
+      beforeUnlink: true,
     });
   }
 
@@ -116,7 +135,10 @@ export async function deleteLocalArtifactObject(
   const fileStat = await readArtifactStat(lexicalPath, filesystem);
   if (!fileStat) return "missing";
   if (fileStat.isDirectory()) {
-    throw new ArtifactObjectDeletionError("artifact deletion target is not a file", { retryable: false });
+    throw new ArtifactObjectDeletionError("artifact deletion target is not a file", {
+      retryable: false,
+      beforeUnlink: true,
+    });
   }
 
   if (!fileStat.isSymbolicLink()) {
@@ -188,7 +210,12 @@ export async function processArtifactDeletion(
       dependencies.storageRoot,
       job.storagePath,
     ).catch((error: unknown) => {
-      physicalOutcome = "failed";
+      // A rejected unlink Promise is NOT proof that the filesystem did not
+      // remove the object. Settle only a trusted pre-unlink rejection; any
+      // ambiguous post-attempt failure retains its durable fence.
+      if (!dependencies.deleteLocalObject && error instanceof ArtifactObjectDeletionError && error.beforeUnlink) {
+        physicalOutcome = "failed";
+      }
       throw error;
     });
     physicalOutcome = outcome;
