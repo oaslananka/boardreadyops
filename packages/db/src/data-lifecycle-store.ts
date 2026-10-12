@@ -74,7 +74,11 @@ export class DataLifecycleStore {
   constructor(private readonly db: SqlQueryExecutor) {}
 
   async getRetentionPolicy(tenantId: string): Promise<RetentionPolicy | null> {
-    const r = (await this.db.query(`SELECT * FROM retention_policies WHERE tenant_id=$1 LIMIT 1`, [tenantId])) as {
+    const r = (await this.db.query(
+      `SELECT * FROM retention_policies WHERE lower(tenant_id)=lower($1)
+       ORDER BY retention_days DESC NULLS LAST, updated_at DESC, tenant_id ASC LIMIT 1`,
+      [tenantId],
+    )) as {
       rows?: Array<Record<string, unknown>>;
     };
     const row = r.rows?.[0];
@@ -113,17 +117,20 @@ export class DataLifecycleStore {
            FROM installations
           WHERE installations.id = $6
             AND lower(installations.account_login) = lower($2)
-       ), previous_policy AS MATERIALIZED (
-         SELECT retention_policies.retention_days,
-                retention_policies.source_retention_hours
+       ), existing_policy AS MATERIALIZED (
+         SELECT tenant_id, retention_days, source_retention_hours
            FROM retention_policies
-          WHERE retention_policies.tenant_id = $2
+          WHERE lower(tenant_id) = lower($2)
             AND EXISTS (SELECT 1 FROM selected_installation)
+          ORDER BY retention_days DESC NULLS LAST, updated_at DESC, tenant_id ASC
+          LIMIT 1
+       ), previous_policy AS MATERIALIZED (
+         SELECT retention_days, source_retention_hours FROM existing_policy
        ), upserted AS (
          INSERT INTO retention_policies (
            id, tenant_id, tier, retention_days, source_retention_hours, created_at, updated_at
          )
-         SELECT $1, $2, $3, $4, $5, NOW(), NOW()
+         SELECT $1, COALESCE((SELECT tenant_id FROM existing_policy), $2), $3, $4, $5, NOW(), NOW()
            FROM selected_installation
          ON CONFLICT (tenant_id) DO UPDATE
            SET tier = EXCLUDED.tier,

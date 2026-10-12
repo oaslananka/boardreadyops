@@ -68,7 +68,13 @@ try {
        join release_runs on release_runs.id = artifacts.run_id
        join repositories on repositories.id = release_runs.repository_id
        join installations on installations.id = repositories.installation_id
-       left join retention_policies on retention_policies.tenant_id = installations.account_login
+       left join lateral (
+         select policy.tenant_id, policy.retention_days
+         from retention_policies as policy
+         where lower(policy.tenant_id) = lower(installations.account_login)
+         order by policy.retention_days desc nulls last, policy.updated_at desc, policy.tenant_id asc
+         limit 1
+       ) as retention_policies on true
        where (
          artifacts.retention_until <= $1::timestamptz
          or (

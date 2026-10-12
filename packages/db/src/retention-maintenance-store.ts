@@ -113,7 +113,14 @@ const artifactRetentionCandidateCtes = `candidate_path_pool as materialized (
   join installations on installations.id = repositories.installation_id
   left join repository_retention_policies
     on repository_retention_policies.repository_id = repositories.id
-  left join retention_policies on retention_policies.tenant_id = installations.account_login
+  left join lateral (
+    select policy.tenant_id, policy.retention_days, policy.source_retention_hours
+    from retention_policies as policy
+    where lower(policy.tenant_id) = lower(installations.account_login)
+    -- A legacy duplicate case-only policy must never make retention shorter.
+    order by policy.retention_days desc nulls last, policy.updated_at desc, policy.tenant_id asc
+    limit 1
+  ) as retention_policies on true
   where ${artifactRetentionEligibleSql}
   group by artifacts.storage_path
   order by min(coalesce(artifacts.retention_until, artifacts.uploaded_at)) asc,
@@ -139,7 +146,14 @@ const artifactRetentionCandidateCtes = `candidate_path_pool as materialized (
   join installations on installations.id = repositories.installation_id
   left join repository_retention_policies
     on repository_retention_policies.repository_id = repositories.id
-  left join retention_policies on retention_policies.tenant_id = installations.account_login
+  left join lateral (
+    select policy.tenant_id, policy.retention_days, policy.source_retention_hours
+    from retention_policies as policy
+    where lower(policy.tenant_id) = lower(installations.account_login)
+    -- A legacy duplicate case-only policy must never make retention shorter.
+    order by policy.retention_days desc nulls last, policy.updated_at desc, policy.tenant_id asc
+    limit 1
+  ) as retention_policies on true
   order by artifacts.storage_path asc, artifacts.id asc
   for update of artifacts
 ), candidate_ids as materialized (

@@ -8,6 +8,8 @@ describe("retention maintenance store", () => {
   it("keeps the read-only retention preview aligned with case-insensitive hold admission", () => {
     const script = readFileSync(new URL("../../../scripts/preview-retention-purge.mjs", import.meta.url), "utf8");
     expect(script).toContain("lower(legal_holds.tenant_id) = lower(installations.account_login)");
+    expect(script).toContain("lower(policy.tenant_id) = lower(installations.account_login)");
+    expect(script).toContain("order by policy.retention_days desc nulls last");
     expect(script).toContain("and legal_holds.active = true");
     expect(script).not.toContain("delete from artifacts");
   });
@@ -142,7 +144,11 @@ describe("retention maintenance store", () => {
     expect(sql).toContain("join repositories");
     expect(sql).toContain("join installations");
     expect(sql).toContain("left join repository_retention_policies");
-    expect(sql).toContain("left join retention_policies");
+    expect(sql).toContain("left join lateral");
+    expect(sql).toContain("lower(policy.tenant_id) = lower(installations.account_login)");
+    expect(sql).toContain("order by policy.retention_days desc nulls last");
+    expect(sql.match(/left join lateral/g)).toHaveLength(2);
+    expect(sql).toContain("as retention_policies on true");
     expect(sql).toContain("artifacts.retention_until <= $1::timestamptz");
     expect(sql).toContain("artifacts.retention_until is null");
     expect(sql).toContain("from legal_holds");
