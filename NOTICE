@@ -171,7 +171,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `bare-url@2.4.3`
   - Description: WHATWG URL implementation for JavaScript
   - Homepage: https://github.com/holepunchto/bare-url
-- `baseline-browser-mapping@2.11.19`
+- `baseline-browser-mapping@2.11.27`
   - Description: A library for obtaining browser versions with their maximum supported Baseline feature set and Widely Available status.
   - Homepage: https://github.com/web-platform-dx/baseline-browser-mapping#readme
 - `before-after-hook@4.0.0`
@@ -459,7 +459,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `delaunator@5.1.0`
   - Description: An incredibly fast JavaScript library for Delaunay triangulation of 2D points
   - Homepage: https://github.com/mapbox/delaunator#readme
-- `electron-to-chromium@1.5.414`
+- `electron-to-chromium@1.5.444`
   - Description: Provides a list of electron-to-chromium version mappings
   - Homepage: https://github.com/Kilian/electron-to-chromium#readme
 - `foreground-child@3.3.1`
@@ -1431,7 +1431,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `brace-expansion@5.0.12`
   - Description: Brace expansion as known from sh/bash
   - Homepage: https://github.com/juliangruber/brace-expansion#readme
-- `browserslist@4.28.7`
+- `browserslist@4.28.9`
   - Description: Share target browsers between different front-end tools, like Autoprefixer, Stylelint and babel-env-preset
   - Homepage: https://github.com/browserslist/browserslist#readme
 - `buffer@6.0.3`
@@ -2019,7 +2019,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `node-fetch@2.7.0`
   - Description: A light-weight module that brings window.fetch to node.js
   - Homepage: https://github.com/bitinn/node-fetch
-- `node-releases@2.0.53`
+- `node-releases@2.0.57`
   - Description: Node.js releases data
   - Homepage: https://github.com/chicoxyzzy/node-releases#readme
 - `normalize-path@3.0.0`
@@ -2427,7 +2427,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `unzip-stream@0.3.4`
   - Description: Process zip files using streaming API
   - Homepage: https://github.com/mhr3/unzip-stream#readme
-- `update-browserslist-db@1.2.3`
+- `update-browserslist-db@1.3.3`
   - Description: CLI tool to update caniuse-lite to refresh target browsers from Browserslist config
   - Homepage: https://github.com/browserslist/update-db#readme
 - `use-callback-ref@1.3.3`
