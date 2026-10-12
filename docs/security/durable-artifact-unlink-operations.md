@@ -25,6 +25,9 @@ rollout, external object deletion or a compliance signoff.
   not an automatic retry or fence settlement.
 - Renaming or deleting an installation during an unresolved unlink fence is
   rejected to preserve tenant-key identity.
+- Direct deletion or ownership/path mutation of a fenced deletion job, including
+  repository and release-run cascading deletion or table truncation, is rejected.
+  Unresolved fences must retain their backing job and audit context.
 
 ## Rollout, rollback and operator recovery
 

@@ -527,6 +527,50 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     }
   });
 
+  it("preserves unresolved fences across repository/run cascades and direct job mutations", async () => {
+    const tenant = await fixture(`fence-ownership-${randomUUID().slice(0, 8)}`);
+    const jobId = await insertJob(tenant, randomUUID());
+    const token = randomUUID();
+    const workerId = "fence-ownership-worker";
+    const store = createSqlArtifactDeletionStore(requireExecutor(), { now: () => new Date(Date.now() + 1_000) });
+    expect((await store.claimDeletions({ workerId, limit: 1 }))[0]?.deletionJobId).toBe(jobId);
+    await expect(store.beginPhysicalDeletion({ deletionJobId: jobId, workerId, fenceToken: token })).resolves.toBe(
+      "authorized",
+    );
+    for (const [sql, params] of [
+      ["delete from artifact_deletion_jobs where id = $1", [jobId]],
+      ["delete from release_runs where id = $1", [tenant.runId]],
+      ["delete from repositories where id = $1", [tenant.repositoryId]],
+      ["update artifact_deletion_jobs set storage_path = $2 where id = $1", [jobId, "changed.bin"]],
+    ] as const) {
+      await expect(requireExecutor().query(sql, [...params])).rejects.toMatchObject({ code: "B4401" });
+    }
+    await expect(requireExecutor().query("truncate artifact_deletion_jobs cascade")).rejects.toMatchObject({
+      code: "B4401",
+    });
+    expect(rows(await requireExecutor().query("select id from artifact_deletion_jobs where id=$1", [jobId]))).toEqual([
+      { id: jobId },
+    ]);
+    expect(
+      rows(
+        await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+          jobId,
+        ]),
+      ),
+    ).toEqual([{ settled_at: null }]);
+    await expect(store.completeDeletion({ deletionJobId: jobId, workerId, outcome: "missing" })).resolves.toBe(
+      "completed",
+    );
+    await expect(
+      store.settlePhysicalDeletion({ deletionJobId: jobId, workerId, fenceToken: token, outcome: "missing" }),
+    ).resolves.toBe("settled");
+    await expect(
+      requireExecutor().query("delete from artifact_deletion_jobs where id=$1", [jobId]),
+    ).resolves.toMatchObject({
+      rowCount: 1,
+    });
+  });
+
   it("keeps the durable fence after a client disconnect and simulated crash before audit completion", async () => {
     if (!connectionString) throw new Error("Disposable PostgreSQL required");
     const label = `crash-${randomUUID().slice(0, 8)}`;

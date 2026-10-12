@@ -106,6 +106,63 @@ create trigger boardreadyops_installation_unlink_guard
 before update of account_login or delete on public.installations
 for each row execute function boardreadyops_guard_installation_while_unlinking();
 
+-- Fences must never lose their backing job through direct SQL mutations or
+-- repository/run FK cascades. PostgreSQL invokes row DELETE triggers for
+-- cascading referential actions; the job row is locked during admission, so a
+-- concurrent cascade cannot race past a committed reservation.
+create or replace function boardreadyops_guard_deletion_job_ownership()
+returns trigger language plpgsql security invoker
+set search_path = pg_catalog, public
+as $$
+begin
+  if exists (
+    select 1 from public.artifact_unlink_fences
+    where deletion_job_id = old.id and settled_at is null
+  ) then
+    if tg_op = 'DELETE' then
+      raise exception 'unresolved physical deletion fence prevents job removal'
+        using errcode = 'B4401';
+    end if;
+    if row(new.artifact_id, new.installation_id, new.repository_id,
+           new.release_run_id, new.storage_driver, new.storage_path)
+       is distinct from
+       row(old.artifact_id, old.installation_id, old.repository_id,
+           old.release_run_id, old.storage_driver, old.storage_path) then
+      raise exception 'unresolved physical deletion fence prevents job ownership change'
+        using errcode = 'B4401';
+    end if;
+  end if;
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists boardreadyops_deletion_job_fence_guard on public.artifact_deletion_jobs;
+create trigger boardreadyops_deletion_job_fence_guard
+before delete or update of artifact_id, installation_id, repository_id,
+  release_run_id, storage_driver, storage_path on public.artifact_deletion_jobs
+for each row execute function boardreadyops_guard_deletion_job_ownership();
+
+-- TRUNCATE skips row triggers, including referential-action cascades that
+-- truncate this table, so preserve unsettled job/fence pairs explicitly.
+create or replace function boardreadyops_guard_deletion_job_truncate()
+returns trigger language plpgsql security invoker
+set search_path = pg_catalog, public
+as $$
+begin
+  if exists (select 1 from public.artifact_unlink_fences where settled_at is null) then
+    raise exception 'unresolved physical deletion fences prevent job truncate'
+      using errcode = 'B4401';
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists boardreadyops_deletion_job_truncate_guard on public.artifact_deletion_jobs;
+create trigger boardreadyops_deletion_job_truncate_guard
+before truncate on public.artifact_deletion_jobs
+for each statement execute function boardreadyops_guard_deletion_job_truncate();
+
 -- Physical deletion obtains a durable reservation in the SAME transaction as
 -- checking hold and lease. No pooled PG client is pinned across filesystem I/O.
 create or replace function boardreadyops_begin_artifact_unlink(
