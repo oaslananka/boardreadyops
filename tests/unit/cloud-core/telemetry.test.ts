@@ -71,11 +71,59 @@ describe("TTFUF telemetry emitter", () => {
     expect(parsed.net).toBeUndefined();
   });
 
+  it("refuses object-valued or contradictory runtime telemetry fields", () => {
+    const lines: string[] = [];
+    emitTelemetryEvent(
+      {
+        event: "first_useful_finding_produced",
+        installationId: 1,
+        repositoryId: 2,
+        ruleCategory: { privateDesignPath: "/private/board" },
+        severity: "high",
+        timeToFindingSeconds: -3,
+      } as unknown as Parameters<typeof emitTelemetryEvent>[0],
+      (line) => lines.push(line),
+    );
+    expect(lines).toEqual([]);
+  });
+
   it("calculates TTFUF in whole seconds correctly", () => {
     const installedAt = new Date("2026-09-08T08:00:00.000Z");
     const foundAt = new Date("2026-09-08T08:02:15.500Z");
     const seconds = calculateTtfufSeconds(installedAt, foundAt);
     expect(seconds).toBe(135);
+  });
+
+  it("marks missing, invalid and reversed external timestamps incomplete rather than recording false zero", () => {
+    const installedAt = new Date("2026-10-13T08:00:00.000Z");
+    expect(calculateTtfufSeconds(installedAt)).toBeUndefined();
+    expect(calculateTtfufSeconds(installedAt, new Date("invalid"))).toBeUndefined();
+    expect(calculateTtfufSeconds(new Date("invalid"), installedAt)).toBeUndefined();
+    expect(calculateTtfufSeconds(installedAt, new Date("2026-10-13T07:59:59.000Z"))).toBeUndefined();
+    expect(calculateTtfufSeconds(installedAt, new Date("2026-10-13T08:00:00.999Z"))).toBe(0);
+  });
+
+  it("does not forward unexpected customer fields from runtime event payloads", () => {
+    const lines: string[] = [];
+    emitTelemetryEvent(
+      {
+        event: "first_useful_finding_produced",
+        installationId: 1,
+        repositoryId: 2,
+        ruleCategory: "manufacturing",
+        severity: "high",
+        timeToFindingSeconds: 79,
+        path: "/private/design.kicad_pcb",
+        source: { secret: "never-log" },
+      } as Parameters<typeof emitTelemetryEvent>[0],
+      (line) => lines.push(line),
+    );
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0] ?? "{}");
+    expect(parsed).toMatchObject({ event: "first_useful_finding_produced", timeToFindingSeconds: 79 });
+    expect(parsed.path).toBeUndefined();
+    expect(parsed.source).toBeUndefined();
+    expect(lines[0]).not.toContain("never-log");
   });
 
   it("identifies TTFUF-relevant events", () => {
