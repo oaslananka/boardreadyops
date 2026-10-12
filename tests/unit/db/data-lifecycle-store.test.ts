@@ -36,6 +36,12 @@ describe("data lifecycle administration", () => {
     expect(String(query.mock.calls[0]?.[0])).toContain("lower(tenant_id)=lower($1)");
     expect(String(query.mock.calls[1]?.[0])).toContain("lower(tenant_id)=lower($2)");
     expect(String(query.mock.calls[2]?.[0])).toContain("lower(tenant_id)=lower($1)");
+    const erasureSql = String(query.mock.calls[1]?.[0]);
+    const holdSql = String(query.mock.calls[2]?.[0]);
+    expect(erasureSql).toContain("($4='user' AND lower(scope_id)=lower($5))");
+    expect(holdSql).toContain("($2='user' AND lower(scope_id)=lower($3))");
+    expect(erasureSql).toContain("scope_id=$5");
+    expect(holdSql).toContain("scope_id=$3");
   });
 
   it("releases only the selected tenant hold without requeuing blocked erasure requests", async () => {
@@ -221,7 +227,9 @@ describe("data lifecycle administration", () => {
     expect(sql).not.toContain("MATERIALIZED");
     expect(sql).toContain("lower(tenant_id)=lower($2)");
     expect(sql).toContain("scope='organization'");
-    expect(sql).toContain("scope=$4 AND (scope_id=$5 OR scope_id IS NULL)");
+    expect(sql).toContain(
+      "scope=$4 AND (scope_id=$5 OR ($4='user' AND lower(scope_id)=lower($5)) OR scope_id IS NULL)",
+    );
     expect(sql).toContain("WHEN EXISTS (SELECT 1 FROM matching_hold) THEN 'blocked_by_hold'");
     expect(sql).toContain("WHEN $6 THEN 'preview'");
     expect(sql).toContain("ELSE 'pending'");

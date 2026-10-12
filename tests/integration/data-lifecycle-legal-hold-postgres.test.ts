@@ -36,6 +36,56 @@ afterAll(async () => {
 });
 
 describeDatabase("legal-hold release must not authorize erasure (PostgreSQL)", () => {
+  it("matches GitHub user-login hold scope case-insensitively, not repository scope or another tenant", async () => {
+    const store = new DataLifecycleStore(requireExecutor());
+    const tenant = `case-user-${randomUUID()}`;
+    const otherTenant = `case-other-${randomUUID()}`;
+    tenants.push(tenant, otherTenant);
+    const userHold = await store.createLegalHold({
+      tenantId: tenant,
+      createdBy: "integration",
+      reason: "Preserve personal GitHub account history",
+      scope: "user",
+      scopeId: tenant.toUpperCase(),
+    });
+    const repositoryHold = await store.createLegalHold({
+      tenantId: tenant,
+      createdBy: "integration",
+      reason: "Preserve exact repository scope only",
+      scope: "repository",
+      scopeId: "BoardABC",
+    });
+    expect(userHold.active).toBe(true);
+    expect(repositoryHold.active).toBe(true);
+
+    await expect(store.hasActiveHold(tenant, "user", tenant)).resolves.toBe(true);
+    await expect(store.hasActiveHold(otherTenant, "user", tenant)).resolves.toBe(false);
+    await expect(store.hasActiveHold(tenant, "repository", "boardabc")).resolves.toBe(false);
+    const held = await store.createErasure({
+      tenantId: tenant,
+      requestedBy: "integration",
+      scope: "user",
+      scopeId: tenant,
+    });
+    const unrelated = await store.createErasure({
+      tenantId: otherTenant,
+      requestedBy: "integration",
+      scope: "user",
+      scopeId: otherTenant,
+    });
+    const differentRepository = await store.createErasure({
+      tenantId: tenant,
+      requestedBy: "integration",
+      scope: "repository",
+      scopeId: "boardabc",
+    });
+    expect([held.status, unrelated.status, differentRepository.status]).toEqual([
+      "blocked_by_hold",
+      "pending",
+      "pending",
+    ]);
+  });
+
   it("keeps a blocked real and dry-run erasure blocked after the final overlapping hold is released", async () => {
     const store = new DataLifecycleStore(requireExecutor());
     const tenantA = `legal-hold-a-${randomUUID()}`;
