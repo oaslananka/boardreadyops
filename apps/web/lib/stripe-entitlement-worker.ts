@@ -53,6 +53,9 @@ export async function processStripeEntitlementPass(
         if (
           !event ||
           event.id !== record.stripe_event_id ||
+          // Verify the immutable inbox metadata agrees with the persisted event body.
+          // A mismatch must not select a different entitlement transition.
+          event.type !== record.type ||
           typeof event.created !== "number" ||
           !Number.isSafeInteger(event.created) ||
           event.created <= 0

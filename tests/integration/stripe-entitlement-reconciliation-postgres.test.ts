@@ -244,6 +244,38 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     expect((await row(failure))?.processed_at).not.toBeNull();
   });
 
+  it("quarantines an event with a mismatched stored type before mutating a customer", async () => {
+    const invalid = `evt_type_mismatch_${suffix}`;
+    ids.push(invalid);
+    const before = rows(
+      await database().query("SELECT status, tier FROM billing_customers WHERE tenant_id=$1", [tenant]),
+    );
+    await database().query(
+      `INSERT INTO billing_events(id,stripe_event_id,type,payload)
+       VALUES ($1,$2,'invoice.paid',$3::jsonb)`,
+      [
+        randomUUID(),
+        invalid,
+        JSON.stringify({
+          id: invalid,
+          // A bad inbox record could otherwise execute a payment-failure transition.
+          type: "invoice.payment_failed",
+          created: 1_700_001_400,
+          data: { object: { customer } },
+        }),
+      ],
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    const quarantined = await row(invalid);
+    expect(quarantined?.processed_at).toBeNull();
+    expect(quarantined?.dead_letter_at).not.toBeNull();
+    expect(quarantined?.last_error_class).toBe("invalid_stored_event");
+    const after = rows(
+      await database().query("SELECT status, tier FROM billing_customers WHERE tenant_id=$1", [tenant]),
+    );
+    expect(after).toEqual(before);
+  });
+
   it("quarantines a corrupt persisted event without mutating entitlements", async () => {
     const invalid = `evt_corrupt_${suffix}`;
     ids.push(invalid);
