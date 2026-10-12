@@ -52887,7 +52887,9 @@ async function prepareExportAttestationChecksums(options) {
   return (await prepareInventory(options.root, options.manifestPath, options.reviewedSha)).checksums;
 }
 function validExpectation(e) {
-  return repoPattern.test(e.repository) && /^\d+$/u.test(e.repositoryId) && shaPattern.test(e.reviewedSha) && /^refs\/(heads|tags|pull)\/[^\r\n]+$/u.test(e.sourceRef) && /^\.github\/workflows\/[a-zA-Z0-9_.-]+\.ya?ml$/u.test(e.workflowPath) && /^[a-z_]+$/u.test(e.event) && /^[1-9]\d*$/u.test(e.runId) && Number.isSafeInteger(e.runAttempt) && e.runAttempt > 0;
+  return repoPattern.test(e.repository) && /^\d+$/u.test(e.repositoryId) && shaPattern.test(e.reviewedSha) && // Only a protected-branch workflow_dispatch is a supported export signer.
+  // A signed push/tag/PR run cannot fulfill the target-repository contract.
+  /^refs\/heads\/[^\r\n]+$/u.test(e.sourceRef) && /^\.github\/workflows\/[a-zA-Z0-9_.-]+\.ya?ml$/u.test(e.workflowPath) && e.event === "workflow_dispatch" && /^[1-9]\d*$/u.test(e.runId) && Number.isSafeInteger(e.runAttempt) && e.runAttempt > 0;
 }
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
