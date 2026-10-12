@@ -64,11 +64,21 @@ async function fileSha256(absolute: string): Promise<string> {
   // The local inventory was validated earlier, but a file could be replaced
   // before it is hashed for signing. Bind the read to a regular file descriptor
   // and reject a final-component symlink substituted after validation.
+  const before = await fs.lstat(absolute);
+  if (!before.isFile()) throw new Error("Attestation subject is not a regular file.");
   const flags = fsConstants.O_RDONLY | (process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW);
   const handle = await fs.open(absolute, flags);
   try {
     const info = await handle.stat();
-    if (!info.isFile()) throw new Error("Attestation subject is not a regular file.");
+    const after = await fs.lstat(absolute);
+    if (
+      !info.isFile() ||
+      !after.isFile() ||
+      (process.platform !== "win32" &&
+        (info.dev !== before.dev || info.ino !== before.ino || after.dev !== info.dev || after.ino !== info.ino))
+    ) {
+      throw new Error("Attestation subject changed identity during hashing preparation.");
+    }
     const hash = createHash("sha256");
     for await (const chunk of handle.createReadStream({ autoClose: false })) hash.update(chunk);
     return hash.digest("hex");

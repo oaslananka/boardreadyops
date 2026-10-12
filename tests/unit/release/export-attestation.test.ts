@@ -252,6 +252,7 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     "rejects an artifact swapped for an identical-byte symlink after inventory validation",
     async () => {
       const f = await fixture();
+      succeed(verifiedResult(f));
       const target = path.join(f.root, "build", "reviewed", "gerbers", "board.gtl");
       const outside = await fs.mkdtemp(path.join(os.tmpdir(), "brops-attestation-outside-"));
       roots.push(outside);

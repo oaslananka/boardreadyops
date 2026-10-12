@@ -52830,11 +52830,16 @@ function allowedSubjectName(name) {
   return name.length > 0 && !name.includes("\\") && !/[\r\n\0]/u.test(name) && !name.startsWith("/") && name.split("/").every((piece) => piece !== "" && piece !== "." && piece !== "..");
 }
 async function fileSha256(absolute) {
+  const before = await import_promises19.default.lstat(absolute);
+  if (!before.isFile()) throw new Error("Attestation subject is not a regular file.");
   const flags = import_node_fs6.constants.O_RDONLY | (process.platform === "win32" ? 0 : import_node_fs6.constants.O_NOFOLLOW);
   const handle = await import_promises19.default.open(absolute, flags);
   try {
     const info = await handle.stat();
-    if (!info.isFile()) throw new Error("Attestation subject is not a regular file.");
+    const after = await import_promises19.default.lstat(absolute);
+    if (!info.isFile() || !after.isFile() || process.platform !== "win32" && (info.dev !== before.dev || info.ino !== before.ino || after.dev !== info.dev || after.ino !== info.ino)) {
+      throw new Error("Attestation subject changed identity during hashing preparation.");
+    }
     const hash2 = (0, import_node_crypto7.createHash)("sha256");
     for await (const chunk of handle.createReadStream({ autoClose: false })) hash2.update(chunk);
     return hash2.digest("hex");
