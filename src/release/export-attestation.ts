@@ -60,10 +60,20 @@ function allowedSubjectName(name: string): boolean {
   );
 }
 
+async function assertCanonicalSubjectPath(absolute: string): Promise<void> {
+  // O_NOFOLLOW protects only the final component; a parent directory can
+  // become a symlink after the first-party inventory was checked. Reject
+  // any such alias before and after descriptor-bound hashing.
+  if (path.resolve(await fs.realpath(absolute)) !== path.resolve(absolute)) {
+    throw new Error("Attestation subject path is no longer canonical.");
+  }
+}
+
 async function fileSha256(absolute: string): Promise<string> {
   // The local inventory was validated earlier, but a file could be replaced
   // before it is hashed for signing. Bind the read to a regular file descriptor
   // and reject a final-component symlink substituted after validation.
+  await assertCanonicalSubjectPath(absolute);
   const before = await fs.lstat(absolute);
   if (!before.isFile()) throw new Error("Attestation subject is not a regular file.");
   const flags = fsConstants.O_RDONLY | (process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW);
@@ -79,8 +89,17 @@ async function fileSha256(absolute: string): Promise<string> {
     ) {
       throw new Error("Attestation subject changed identity during hashing preparation.");
     }
+    await assertCanonicalSubjectPath(absolute);
     const hash = createHash("sha256");
     for await (const chunk of handle.createReadStream({ autoClose: false })) hash.update(chunk);
+    await assertCanonicalSubjectPath(absolute);
+    const finalInfo = await fs.lstat(absolute);
+    if (
+      !finalInfo.isFile() ||
+      (process.platform !== "win32" && (finalInfo.dev !== info.dev || finalInfo.ino !== info.ino))
+    ) {
+      throw new Error("Attestation subject changed identity during hashing.");
+    }
     return hash.digest("hex");
   } finally {
     await handle.close();

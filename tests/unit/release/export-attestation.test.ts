@@ -306,6 +306,30 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     },
   );
 
+  it.skipIf(process.platform === "win32")(
+    "rejects a same-byte parent directory symlink inserted after inventory validation",
+    async () => {
+      const f = await fixture();
+      succeed(verifiedResult(f));
+      const gerbers = path.join(f.root, "build", "reviewed", "gerbers");
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), "brops-attestation-parent-outside-"));
+      roots.push(outside);
+      await fs.writeFile(path.join(outside, "board.gtl"), "real gerber bytes");
+
+      let swapped = false;
+      afterInventoryVerification = async () => {
+        await fs.rm(gerbers, { recursive: true });
+        await fs.symlink(outside, gerbers, "dir");
+        swapped = true;
+        afterInventoryVerification = undefined;
+      };
+      const result = await verify(f);
+      expect(swapped).toBe(true);
+      expect(result.status).toBe("rejected");
+      expect(mockedRun).not.toHaveBeenCalled();
+    },
+  );
+
   it("does not accept an expected SHA derived from attacker-controlled unsigned inputs", async () => {
     const f = await fixture();
     succeed(verifiedResult(f));

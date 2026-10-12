@@ -52829,7 +52829,13 @@ var oidcIssuer = "https://token.actions.githubusercontent.com";
 function allowedSubjectName(name) {
   return name.length > 0 && !name.includes("\\") && !/[\r\n\0]/u.test(name) && !name.startsWith("/") && name.split("/").every((piece) => piece !== "" && piece !== "." && piece !== "..");
 }
+async function assertCanonicalSubjectPath(absolute) {
+  if (import_node_path56.default.resolve(await import_promises19.default.realpath(absolute)) !== import_node_path56.default.resolve(absolute)) {
+    throw new Error("Attestation subject path is no longer canonical.");
+  }
+}
 async function fileSha256(absolute) {
+  await assertCanonicalSubjectPath(absolute);
   const before = await import_promises19.default.lstat(absolute);
   if (!before.isFile()) throw new Error("Attestation subject is not a regular file.");
   const flags = import_node_fs6.constants.O_RDONLY | (process.platform === "win32" ? 0 : import_node_fs6.constants.O_NOFOLLOW);
@@ -52840,8 +52846,14 @@ async function fileSha256(absolute) {
     if (!info.isFile() || !after.isFile() || process.platform !== "win32" && (info.dev !== before.dev || info.ino !== before.ino || after.dev !== info.dev || after.ino !== info.ino)) {
       throw new Error("Attestation subject changed identity during hashing preparation.");
     }
+    await assertCanonicalSubjectPath(absolute);
     const hash2 = (0, import_node_crypto7.createHash)("sha256");
     for await (const chunk of handle.createReadStream({ autoClose: false })) hash2.update(chunk);
+    await assertCanonicalSubjectPath(absolute);
+    const finalInfo = await import_promises19.default.lstat(absolute);
+    if (!finalInfo.isFile() || process.platform !== "win32" && (finalInfo.dev !== info.dev || finalInfo.ino !== info.ino)) {
+      throw new Error("Attestation subject changed identity during hashing.");
+    }
     return hash2.digest("hex");
   } finally {
     await handle.close();
