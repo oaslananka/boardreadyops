@@ -1,9 +1,17 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createSqlRetentionMaintenanceStore } from "../../../packages/db/src/retention-maintenance-store.js";
 
 const now = new Date("2026-07-31T05:00:00.000Z");
 
 describe("retention maintenance store", () => {
+  it("keeps the read-only retention preview aligned with case-insensitive hold admission", () => {
+    const script = readFileSync(new URL("../../../scripts/preview-retention-purge.mjs", import.meta.url), "utf8");
+    expect(script).toContain("lower(legal_holds.tenant_id) = lower(installations.account_login)");
+    expect(script).toContain("and legal_holds.active = true");
+    expect(script).not.toContain("delete from artifacts");
+  });
+
   it("purges expired runner request nonces in a bounded skip-locked batch", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ affected: 12 }] });
     const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
@@ -138,6 +146,7 @@ describe("retention maintenance store", () => {
     expect(sql).toContain("artifacts.retention_until <= $1::timestamptz");
     expect(sql).toContain("artifacts.retention_until is null");
     expect(sql).toContain("from legal_holds");
+    expect(sql).toContain("lower(legal_holds.tenant_id) = lower(installations.account_login)");
     expect(sql).toContain("legal_holds.active = true");
     expect(sql).toContain("when installations.plan_tier = 'free' then 30");
     expect(sql).toContain("when installations.plan_tier = 'team' then 365");

@@ -100,7 +100,7 @@ const artifactRetentionEligibleSql = `(
 and not exists (
   select 1
   from legal_holds
-  where legal_holds.tenant_id = installations.account_login
+  where lower(legal_holds.tenant_id) = lower(installations.account_login)
     and legal_holds.active = true
 )`;
 

@@ -21,7 +21,7 @@ function githubId(): number {
 
 async function cleanup(): Promise<void> {
   if (!executor) return;
-  await executor.query("delete from legal_holds where tenant_id like $1", [`${testPrefix}%`]);
+  await executor.query("delete from legal_holds where lower(tenant_id) like lower($1)", [`${testPrefix}%`]);
   await executor.query("delete from retention_policies where tenant_id like $1", [`${testPrefix}%`]);
   await executor.query("delete from installations where account_login like $1", [`${testPrefix}%`]);
 }
@@ -32,6 +32,7 @@ type FixtureInput = {
   policyDays?: number;
   retentionUntil?: string;
   legalHold?: boolean;
+  holdDifferentCase?: boolean;
 };
 
 async function createArtifactFixture(input: FixtureInput): Promise<string> {
@@ -75,7 +76,7 @@ async function createArtifactFixture(input: FixtureInput): Promise<string> {
     await database().query(
       `insert into legal_holds (id, tenant_id, created_by, reason, scope)
        values ($1, $2, 'test', 'Retention expiry integration hold', 'organization')`,
-      [randomUUID(), tenantId],
+      [randomUUID(), input.holdDifferentCase ? tenantId.toUpperCase() : tenantId],
     );
   }
   return artifactId;
@@ -182,6 +183,13 @@ describeDatabase("artifact retention expiry", () => {
         retentionUntil: "2026-09-01T12:00:00.000Z",
       }),
       createArtifactFixture({ suffix: "free-held", tier: "free", ageDays: 90, legalHold: true }),
+      createArtifactFixture({
+        suffix: "free-held-case",
+        tier: "free",
+        ageDays: 90,
+        legalHold: true,
+        holdDifferentCase: true,
+      }),
       createArtifactFixture({
         suffix: "business-persisted-held",
         tier: "business",

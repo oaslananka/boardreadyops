@@ -489,6 +489,7 @@ describe("SQL GitHub lifecycle audit writes", () => {
     expect(sql).toContain("'github_app_uninstall'");
     expect(sql).toContain("'pending'");
     expect(sql).toContain("from erasure_scope");
+    expect(sql).toContain("lower(erasure_scope.tenant_id) = lower(legal_holds.tenant_id)");
     expect(sql).toContain("on conflict do nothing");
   });
 

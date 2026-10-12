@@ -360,7 +360,7 @@ export function createSqlGitHubAppMetadataStore(
          ), matching_hold as (
            select legal_holds.id
              from legal_holds
-             join erasure_scope on erasure_scope.tenant_id = legal_holds.tenant_id
+             join erasure_scope on lower(erasure_scope.tenant_id) = lower(legal_holds.tenant_id)
             where legal_holds.active = true
               and (
                 legal_holds.scope = 'organization'

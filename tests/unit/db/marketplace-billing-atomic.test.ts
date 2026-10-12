@@ -41,6 +41,7 @@ describe("BillingStore atomic Marketplace processing", () => {
     expect(sql).toContain("requested_by = 'github_marketplace'");
     expect(sql).toContain("scope IN ('organization', 'user')");
     expect(sql).toContain("scope = $16::text");
+    expect(sql).toContain("lower(tenant_id) = lower((SELECT tenant_id FROM resolved_erasure_tenant))");
     expect(sql).toContain("status IN ('pending', 'running', 'blocked_by_hold')");
     expect(sql).toContain("DO NOTHING");
     expect(sql).toContain("processed_at");

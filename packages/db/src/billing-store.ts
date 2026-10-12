@@ -428,7 +428,7 @@ export class BillingStore {
           CASE
             WHEN EXISTS (
               SELECT 1 FROM legal_holds
-              WHERE tenant_id = (SELECT tenant_id FROM resolved_erasure_tenant)
+              WHERE lower(tenant_id) = lower((SELECT tenant_id FROM resolved_erasure_tenant))
                 AND active = TRUE
                 AND (
                   scope = 'organization'
