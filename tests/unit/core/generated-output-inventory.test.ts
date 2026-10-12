@@ -144,8 +144,14 @@ describe("generated output inventory safeguards", () => {
     const { root, manifest } = await outputDirectory();
     const dir = path.join(root, "many");
     await fs.mkdir(dir);
-    for (let i = 0; i < 4100; i++) {
-      await fs.writeFile(path.join(dir, `part-${i}.gbr`), "");
+    // Bound concurrent fixture creation: 4,100 sequential writes can exhaust
+    // the per-test timeout on slower Windows runners before the assertion runs.
+    for (let offset = 0; offset < 4100; offset += 64) {
+      await Promise.all(
+        Array.from({ length: Math.min(64, 4100 - offset) }, (_, index) =>
+          fs.writeFile(path.join(dir, `part-${offset + index}.gbr`), ""),
+        ),
+      );
     }
     const exceededEntries = await checkFirstPartyOutputSet(root, manifest, []);
     expect(exceededEntries.join(" ")).toContain("Output tree scan exceeds 4096 entries");
