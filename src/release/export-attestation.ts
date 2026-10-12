@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { verifyExportProvenance } from "../core/provenance.js";
@@ -61,9 +61,20 @@ function allowedSubjectName(name: string): boolean {
 }
 
 async function fileSha256(absolute: string): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(absolute)) hash.update(chunk);
-  return hash.digest("hex");
+  // The local inventory was validated earlier, but a file could be replaced
+  // before it is hashed for signing. Bind the read to a regular file descriptor
+  // and reject a final-component symlink substituted after validation.
+  const flags = fsConstants.O_RDONLY | (process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW);
+  const handle = await fs.open(absolute, flags);
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error("Attestation subject is not a regular file.");
+    const hash = createHash("sha256");
+    for await (const chunk of handle.createReadStream({ autoClose: false })) hash.update(chunk);
+    return hash.digest("hex");
+  } finally {
+    await handle.close();
+  }
 }
 
 async function prepareInventory(root: string, manifestPath: string, reviewedSha: string): Promise<SubjectInventory> {

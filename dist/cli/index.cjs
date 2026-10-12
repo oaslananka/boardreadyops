@@ -52830,9 +52830,17 @@ function allowedSubjectName(name) {
   return name.length > 0 && !name.includes("\\") && !/[\r\n\0]/u.test(name) && !name.startsWith("/") && name.split("/").every((piece) => piece !== "" && piece !== "." && piece !== "..");
 }
 async function fileSha256(absolute) {
-  const hash2 = (0, import_node_crypto7.createHash)("sha256");
-  for await (const chunk of (0, import_node_fs6.createReadStream)(absolute)) hash2.update(chunk);
-  return hash2.digest("hex");
+  const flags = import_node_fs6.constants.O_RDONLY | (process.platform === "win32" ? 0 : import_node_fs6.constants.O_NOFOLLOW);
+  const handle = await import_promises19.default.open(absolute, flags);
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error("Attestation subject is not a regular file.");
+    const hash2 = (0, import_node_crypto7.createHash)("sha256");
+    for await (const chunk of handle.createReadStream({ autoClose: false })) hash2.update(chunk);
+    return hash2.digest("hex");
+  } finally {
+    await handle.close();
+  }
 }
 async function prepareInventory(root, manifestPath, reviewedSha) {
   const absoluteRoot = await import_promises19.default.realpath(root);

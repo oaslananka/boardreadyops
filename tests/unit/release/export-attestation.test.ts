@@ -248,6 +248,38 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     expect(mockedRun).not.toHaveBeenCalled();
   });
 
+  it.skipIf(process.platform === "win32")(
+    "rejects an artifact swapped for an identical-byte symlink after inventory validation",
+    async () => {
+      const f = await fixture();
+      const target = path.join(f.root, "build", "reviewed", "gerbers", "board.gtl");
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), "brops-attestation-outside-"));
+      roots.push(outside);
+      const forged = path.join(outside, "same-bytes.gtl");
+      await fs.writeFile(forged, "real gerber bytes");
+
+      // Trigger the swap immediately before the final subject open. A path-based
+      // createReadStream() would follow this symlink and hash matching bytes.
+      const open = fs.open.bind(fs);
+      let swapped = false;
+      const spy = vi.spyOn(fs, "open").mockImplementation(async (file, flags, mode) => {
+        if (!swapped && file === target) {
+          await fs.rm(target);
+          await fs.symlink(forged, target);
+          swapped = true;
+        }
+        return open(file, flags, mode);
+      });
+      try {
+        expect((await verify(f)).status).toBe("rejected");
+        expect(swapped).toBe(true);
+        expect(mockedRun).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+    },
+  );
+
   it("does not accept an expected SHA derived from attacker-controlled unsigned inputs", async () => {
     const f = await fixture();
     succeed(verifiedResult(f));
