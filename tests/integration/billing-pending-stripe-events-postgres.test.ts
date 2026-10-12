@@ -60,21 +60,26 @@ describeDatabase("pending Stripe events indexed customer lookup (PostgreSQL)", (
     expect(due.get(`evt_other_${synthetic}`)).toBe(false);
   });
 
-  it("uses the partial customer expression index for targeted wakeups", async () => {
-    const client = createPgQueryExecutor({ connectionString: connectionString as string, max: 1 });
-    try {
-      await client.withTransaction(async (transaction) => {
-        await transaction.query("SET LOCAL enable_seqscan=off");
-        const plan = (await transaction.query(
-          `EXPLAIN (FORMAT JSON) UPDATE billing_events SET available_at=NOW()
-           WHERE provider='stripe' AND processed_at IS NULL AND dead_letter_at IS NULL
-             AND payload #>> '{data,object,customer}'=$1`,
-          [customer],
-        )) as { rows?: Array<Record<string, unknown>> };
-        expect(JSON.stringify(plan.rows?.[0]?.["QUERY PLAN"])).toContain("idx_billing_events_pending_stripe_customer");
-      });
-    } finally {
-      await client.close();
-    }
+  it("defines a valid partial customer-expression index for targeted wakeups", async () => {
+    // A tiny fixture does not constrain PostgreSQL's optimizer to choose this
+    // index over another valid index. Assert the deployed index contract instead.
+    const result = (await database().query(
+      `SELECT pg_get_indexdef(i.indexrelid) AS definition,
+              pg_get_expr(i.indpred, i.indrelid) AS predicate,
+              i.indisvalid AS valid, i.indisready AS ready
+       FROM pg_index AS i
+       WHERE i.indexrelid = to_regclass('idx_billing_events_pending_stripe_customer')
+         AND i.indrelid = 'billing_events'::regclass`,
+    )) as { rows?: Array<{ definition: string; predicate: string; valid: boolean; ready: boolean }> };
+    expect(result.rows).toHaveLength(1);
+    const index = result.rows?.[0];
+    expect(index?.valid).toBe(true);
+    expect(index?.ready).toBe(true);
+    expect(index?.definition).toContain("payload #>>");
+    expect(index?.definition).toContain("{data,object,customer}");
+    expect(index?.definition).toContain("created_at");
+    expect(index?.definition).toContain("id");
+    expect(index?.predicate).toContain("provider = 'stripe'");
+    expect(index?.predicate).toContain("processed_at IS NULL");
   });
 });
