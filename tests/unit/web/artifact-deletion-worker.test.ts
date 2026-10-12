@@ -36,7 +36,8 @@ const job: ClaimedArtifactDeletion = {
 
 function store(): ArtifactDeletionStore {
   return {
-    authorizeOrDeferDeletion: vi.fn(async () => "authorized" as const),
+    beginPhysicalDeletion: vi.fn(async () => "authorized" as const),
+    settlePhysicalDeletion: vi.fn(async () => "settled" as const),
     claimDeletions: vi.fn(),
     completeDeletion: vi.fn(async () => "completed" as const),
     failDeletion: vi.fn(async () => "retry" as const),
@@ -59,7 +60,7 @@ afterEach(async () => {
 describe("artifact deletion worker", () => {
   it.each(["held", "stale"] as const)("never unlinks when a post-claim check returns %s", async (authorization) => {
     const deletionStore = store();
-    vi.mocked(deletionStore.authorizeOrDeferDeletion).mockResolvedValue(authorization);
+    vi.mocked(deletionStore.beginPhysicalDeletion).mockResolvedValue(authorization);
     const deleteLocalObject = vi.fn(async () => "deleted" as const);
     await expect(
       processArtifactDeletion(job, {
@@ -69,9 +70,10 @@ describe("artifact deletion worker", () => {
         deleteLocalObject,
       }),
     ).resolves.toMatchObject({ status: authorization });
-    expect(deletionStore.authorizeOrDeferDeletion).toHaveBeenCalledWith({
+    expect(deletionStore.beginPhysicalDeletion).toHaveBeenCalledWith({
       deletionJobId: job.deletionJobId,
       workerId: "worker-1",
+      fenceToken: expect.any(String),
     });
     expect(deleteLocalObject).not.toHaveBeenCalled();
     expect(deletionStore.completeDeletion).not.toHaveBeenCalled();
@@ -80,7 +82,7 @@ describe("artifact deletion worker", () => {
 
   it("retries an authorization-query failure without unlinking", async () => {
     const deletionStore = store();
-    vi.mocked(deletionStore.authorizeOrDeferDeletion).mockRejectedValue(new Error("postgres temporary outage"));
+    vi.mocked(deletionStore.beginPhysicalDeletion).mockRejectedValue(new Error("postgres temporary outage"));
     const deleteLocalObject = vi.fn(async () => "deleted" as const);
     await expect(
       processArtifactDeletion(job, {
@@ -327,6 +329,50 @@ describe("artifact deletion worker", () => {
       workerId: "worker-1",
       outcome: "deleted",
     });
+  });
+
+  it("quarantines an unresolved fence when database completion is lost after unlink", async () => {
+    const deletionStore = store();
+    vi.mocked(deletionStore.completeDeletion).mockRejectedValueOnce(new Error("connection lost"));
+    vi.mocked(deletionStore.failDeletion).mockResolvedValue("stale");
+    const deleteLocalObject = vi.fn(async () => "deleted" as const);
+    const result = await processArtifactDeletion(job, {
+      workerId: "worker-1",
+      storageRoot: "/data",
+      store: deletionStore,
+      deleteLocalObject,
+    });
+    expect(result.status).toBe("stale");
+    expect(deleteLocalObject).toHaveBeenCalledTimes(1);
+    expect(deletionStore.settlePhysicalDeletion).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unresolved fence if even a committed completion cannot settle its token", async () => {
+    const deletionStore = store();
+    vi.mocked(deletionStore.settlePhysicalDeletion).mockResolvedValueOnce("stale");
+    const result = await processArtifactDeletion(job, {
+      workerId: "worker-1",
+      storageRoot: "/data",
+      store: deletionStore,
+      deleteLocalObject: async () => "missing",
+    });
+    expect(result.status).toBe("stale");
+  });
+
+  it("settles a failed physical attempt only after a committed failure transition", async () => {
+    const deletionStore = store();
+    const result = await processArtifactDeletion(job, {
+      workerId: "worker-1",
+      storageRoot: "/data",
+      store: deletionStore,
+      deleteLocalObject: async () => {
+        throw new ArtifactObjectDeletionError("synthetic error", { retryable: true });
+      },
+    });
+    expect(result.status).toBe("retry");
+    expect(deletionStore.settlePhysicalDeletion).toHaveBeenCalledWith(
+      expect.objectContaining({ deletionJobId: "job-1", workerId: "worker-1", outcome: "failed" }),
+    );
   });
 
   it("retries a local deletion when the storage root is not configured", async () => {

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Stats } from "node:fs";
 import { lstat, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -170,26 +171,41 @@ export async function processArtifactDeletion(
     return { ...base, status };
   }
 
+  // The per-attempt token is persisted before any external unlink begins.
+  const fenceToken = randomUUID();
+  let authorized = false;
+  let physicalOutcome: ArtifactObjectDeletionOutcome | "failed" | undefined;
   try {
-    // Recheck after claiming, immediately before attempting filesystem deletion.
-    // This narrows the enqueue-to-unlink gap but does not eliminate holds added
-    // concurrently after the check; no implicit erasure requeue is performed.
-    const authorization = await dependencies.store.authorizeOrDeferDeletion({
+    const authorization = await dependencies.store.beginPhysicalDeletion({
       deletionJobId: job.deletionJobId,
       workerId: dependencies.workerId,
+      fenceToken,
     });
     if (authorization !== "authorized") return { ...base, status: authorization };
+    authorized = true;
 
     const outcome = await (dependencies.deleteLocalObject ?? deleteLocalArtifactObject)(
       dependencies.storageRoot,
       job.storagePath,
-    );
+    ).catch((error: unknown) => {
+      physicalOutcome = "failed";
+      throw error;
+    });
+    physicalOutcome = outcome;
     const status = await dependencies.store.completeDeletion({
       deletionJobId: job.deletionJobId,
       workerId: dependencies.workerId,
       outcome,
     });
-    return { ...base, status, ...(status === "completed" ? { outcome } : {}) };
+    if (status !== "completed") return { ...base, status };
+    const settled = await dependencies.store.settlePhysicalDeletion({
+      deletionJobId: job.deletionJobId,
+      workerId: dependencies.workerId,
+      fenceToken,
+      outcome,
+    });
+    if (settled !== "settled") return { ...base, status: "stale" };
+    return { ...base, status: "completed", outcome };
   } catch (error) {
     const retryable = error instanceof ArtifactObjectDeletionError ? error.retryable : true;
     const status = await dependencies.store.failDeletion({
@@ -200,6 +216,17 @@ export async function processArtifactDeletion(
       errorClass: error instanceof Error ? error.name : "UnknownError",
       errorMessage: "Artifact object deletion did not reach a terminal state.",
     });
+    if (authorized && physicalOutcome === "failed" && (status === "retry" || status === "dead_letter")) {
+      // Only settle on an observed filesystem rejection and a committed
+      // failure transition. An unknown DB outcome preserves the fence.
+      const settled = await dependencies.store.settlePhysicalDeletion({
+        deletionJobId: job.deletionJobId,
+        workerId: dependencies.workerId,
+        fenceToken,
+        outcome: "failed",
+      });
+      if (settled !== "settled") return { ...base, status: "stale" };
+    }
     return { ...base, status };
   }
 }
