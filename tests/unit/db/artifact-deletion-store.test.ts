@@ -19,7 +19,7 @@ describe("artifact deletion store", () => {
     ).resolves.toBe("held");
     const sql = String(query.mock.calls[0]?.[0]);
     expect(sql).toContain("join installations on installations.id = jobs.installation_id");
-    expect(sql).toContain("legal_holds.tenant_id = claimed.account_login");
+    expect(sql).toContain("lower(legal_holds.tenant_id) = lower(claimed.account_login)");
     expect(sql).toContain("legal_holds.active = true");
     expect(sql).toContain("for update of jobs");
     expect(sql).toContain("jobs.lease_expires_at > $3::timestamptz");

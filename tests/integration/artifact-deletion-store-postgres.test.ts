@@ -177,6 +177,93 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     }
   });
 
+  it("blocks deletion across mixed-case GitHub tenant logins without leaking an unrelated tenant", async () => {
+    const label = `case-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const canonicalTenantId = `artifact-delete-${label}`;
+    const differentCase = canonicalTenantId.toUpperCase();
+    const otherTenant = `unrelated-${randomUUID()}`;
+    const jobId = await insertJob(tenant, randomUUID());
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    const store = createSqlArtifactDeletionStore(requireExecutor(), {
+      now: () => new Date(Date.now() + 1_000),
+      leaseSeconds: 120,
+    });
+
+    const unrelatedHold = await lifecycle.createLegalHold({
+      tenantId: otherTenant,
+      createdBy: "operator-case",
+      reason: "Do not affect a different GitHub tenant.",
+      scope: "organization",
+    });
+    let protectedHoldId: string | undefined;
+    let erasureId: string | undefined;
+    try {
+      // Unrelated holds still cannot suppress the correct tenant's lease.
+      const claimed = await store.claimDeletions({ workerId: "case-worker", limit: 1 });
+      expect(claimed[0]?.deletionJobId).toBe(jobId);
+      await expect(
+        store.authorizeOrDeferDeletion({
+          deletionJobId: jobId,
+          workerId: "case-worker",
+        }),
+      ).resolves.toBe("authorized");
+
+      const protectedHold = await lifecycle.createLegalHold({
+        tenantId: differentCase,
+        createdBy: "operator-case",
+        reason: "Protect data for the case-insensitive GitHub organization.",
+        scope: "organization",
+      });
+      protectedHoldId = protectedHold.id;
+      expect(await lifecycle.hasActiveHold(canonicalTenantId, "repository", tenant.repositoryId)).toBe(true);
+      expect((await lifecycle.listLegalHolds(canonicalTenantId)).map((h) => h.id)).toContain(protectedHold.id);
+
+      const erasure = await lifecycle.createErasure({
+        tenantId: canonicalTenantId,
+        requestedBy: "operator-case",
+        scope: "repository",
+        scopeId: tenant.repositoryId,
+      });
+      erasureId = erasure.id;
+      expect(erasure.status).toBe("blocked_by_hold");
+      await expect(
+        store.authorizeOrDeferDeletion({
+          deletionJobId: jobId,
+          workerId: "case-worker",
+        }),
+      ).resolves.toBe("held");
+
+      expect(
+        rows(
+          await requireExecutor().query(
+            "select status, attempt_count, last_error_class from artifact_deletion_jobs where id=$1",
+            [jobId],
+          ),
+        ),
+      ).toEqual([{ status: "available", attempt_count: 0, last_error_class: "legal_hold" }]);
+
+      await expect(lifecycle.releaseLegalHold(canonicalTenantId, protectedHold.id, "operator-case")).resolves.toBe(
+        true,
+      );
+      expect((await lifecycle.listLegalHolds(differentCase)).find((h) => h.id === protectedHold.id)?.active).toBe(
+        false,
+      );
+      expect(
+        rows(await requireExecutor().query("select status from erasure_requests where id=$1", [erasure.id])),
+      ).toEqual([{ status: "blocked_by_hold" }]);
+    } finally {
+      if (erasureId) {
+        await requireExecutor().query("delete from erasure_requests where id=$1", [erasureId]);
+      }
+      if (protectedHoldId) {
+        await requireExecutor().query("delete from legal_holds where id=$1", [protectedHoldId]);
+      }
+      await lifecycle.releaseLegalHold(otherTenant, unrelatedHold.id, "operator-case");
+      await requireExecutor().query("delete from legal_holds where id=$1", [unrelatedHold.id]);
+    }
+  });
+
   it("KNOWN-RISK: a committed hold after authorization does not prevent synthetic unlink", async () => {
     if (!connectionString) throw new Error("Disposable PostgreSQL connection required");
     const label = `race-${randomUUID().slice(0, 8)}`;

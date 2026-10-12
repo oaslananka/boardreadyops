@@ -151,7 +151,7 @@ export function createSqlArtifactDeletionStore(
             for update of jobs
          ), matching_hold as materialized (
            select 1 from legal_holds
-           join claimed on legal_holds.tenant_id = claimed.account_login
+           join claimed on lower(legal_holds.tenant_id) = lower(claimed.account_login)
            where legal_holds.active = true
            limit 1
          ), deferred as (

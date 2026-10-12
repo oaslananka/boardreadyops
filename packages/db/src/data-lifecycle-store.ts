@@ -322,9 +322,10 @@ export class DataLifecycleStore {
   }
 
   async listLegalHolds(tenantId: string): Promise<LegalHold[]> {
-    const r = (await this.db.query(`SELECT * FROM legal_holds WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 100`, [
-      tenantId,
-    ])) as { rows?: Array<Record<string, unknown>> };
+    const r = (await this.db.query(
+      `SELECT * FROM legal_holds WHERE lower(tenant_id)=lower($1) ORDER BY created_at DESC LIMIT 100`,
+      [tenantId],
+    )) as { rows?: Array<Record<string, unknown>> };
     return (r.rows ?? []).map((row) => ({
       id: String(row.id),
       tenantId: String(row.tenant_id),
@@ -402,7 +403,7 @@ export class DataLifecycleStore {
       `WITH matching_hold AS (
          SELECT 1
            FROM legal_holds
-          WHERE tenant_id=$2
+          WHERE lower(tenant_id)=lower($2)
             AND active=TRUE
             AND (
               scope='organization'
@@ -469,7 +470,7 @@ export class DataLifecycleStore {
 
   async releaseLegalHold(tenantId: string, holdId: string, releasedBy: string): Promise<boolean> {
     const r = (await this.db.query(
-      `UPDATE legal_holds SET active=FALSE, released_at=NOW(), released_by=$3 WHERE id=$1 AND tenant_id=$2 AND active=TRUE`,
+      `UPDATE legal_holds SET active=FALSE, released_at=NOW(), released_by=$3 WHERE id=$1 AND lower(tenant_id)=lower($2) AND active=TRUE`,
       [holdId, tenantId, releasedBy],
     )) as { rowCount?: number };
     return (r.rowCount ?? 0) > 0;
@@ -478,7 +479,7 @@ export class DataLifecycleStore {
   async hasActiveHold(tenantId: string, scope: string, scopeId?: string | null): Promise<boolean> {
     validateLifecycleScope(scope, scopeId);
     const r = (await this.db.query(
-      `SELECT 1 FROM legal_holds WHERE tenant_id=$1 AND active=TRUE AND (scope='organization' OR (scope=$2 AND (scope_id=$3 OR scope_id IS NULL))) LIMIT 1`,
+      `SELECT 1 FROM legal_holds WHERE lower(tenant_id)=lower($1) AND active=TRUE AND (scope='organization' OR (scope=$2 AND (scope_id=$3 OR scope_id IS NULL))) LIMIT 1`,
       [tenantId, scope, scopeId ?? null],
     )) as { rows?: unknown[] };
     return (r.rows?.length ?? 0) > 0;
