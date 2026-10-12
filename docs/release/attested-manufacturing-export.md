@@ -35,6 +35,8 @@ boardreadyops verify-export-attestation . \
   --run-attempt 1
 ```
 
+The verifier rejects signed evidence from `push`, `pull_request`, tag and PR refs: this opt-in authority is limited to a protected-branch `workflow_dispatch` run. Its expected target run must still be independently authorized; the certificate alone does not prove that branch protection was enforced at execution time.
+
 The optional `--bundle <path>` is only an attestation bundle transport, not an independent trust anchor. The verifier must successfully validate the Sigstore signature and GitHub OIDC certificate **and** the exact expected immutable source identity, repository ID, protected workflow signer, run ID/attempt and **all** signed manifest/output digests. Exit 0 and `{"status":"eligible"}` mean that this opt-in cryptographic evidence prerequisite matched; **they do not independently authorize a GA badge, release, production gate or two-owner tenancy acceptance**. Any mismatch, unsupported provider, missing artifact, changed source or missing verification fails closed.
 
 `boardreadyops generate . --reviewed-source-sha <sha>` and `boardreadyops export-checksums . --manifest <path> --reviewed-source-sha <sha>` are low-level tooling, not public strong-provenance decisions; the first demands a clean, exactly pinned Git checkout and the second recomputes the manifest and all actual outputs before returning an unsigned signing-input list.

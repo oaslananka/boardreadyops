@@ -39,7 +39,7 @@ const expectation: TrustedExportExpectation = {
   reviewedSha: sha,
   sourceRef: "refs/heads/review",
   workflowPath: ".github/workflows/boardreadyops-export.yml",
-  event: "push",
+  event: "workflow_dispatch",
   runId: "12345",
   runAttempt: 2,
 };
@@ -112,7 +112,7 @@ function verifiedResult(f: Fixture, overrides: Record<string, unknown> = {}) {
     buildSignerURI:
       "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review",
     runnerEnvironment: "github-hosted",
-    buildTrigger: "push",
+    buildTrigger: "workflow_dispatch",
     subjectAlternativeName:
       "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review",
     ...(overrides.cert as Record<string, unknown> | undefined),
@@ -176,6 +176,19 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     );
   });
 
+  it.each([
+    ["push event", { event: "push" }],
+    ["pull request event", { event: "pull_request" }],
+    ["tag ref", { sourceRef: "refs/tags/v1.0.0" }],
+    ["pull request ref", { sourceRef: "refs/pull/42/merge" }],
+    ["empty branch ref", { sourceRef: "refs/heads/" }],
+  ])("rejects unsupported signed-run expectation: %s", async (_case, change) => {
+    const f = await fixture();
+    succeed(verifiedResult(f));
+    expect((await verify(f, { ...expectation, ...change })).status).toBe("rejected");
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
+
   it("accepts the legacy structured SAN only when its value matches the trusted workflow", async () => {
     const f = await fixture();
     succeed(
@@ -224,7 +237,7 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     ],
     ["self-hosted runner", { runnerEnvironment: "self-hosted" }],
     ["incorrect issuer", { issuer: "https://other.invalid" }],
-    ["wrong event", { buildTrigger: "workflow_dispatch" }],
+    ["wrong event", { buildTrigger: "push" }],
   ])("rejects certificate mismatch: %s", async (_name, cert) => {
     const f = await fixture();
     succeed(verifiedResult(f, { cert }));
