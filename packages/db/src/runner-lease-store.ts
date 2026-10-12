@@ -139,7 +139,8 @@ function trustSnapshot(
 
   const uniqueReasons = new Set(rawReasons as string[]);
   const reasons = safeModeReasonOrder.filter((reason) => uniqueReasons.has(reason));
-  if (reasons.length !== rawReasons.length) return undefined;
+  if (reasons.length !== rawReasons.length || reasons.some((reason, index) => reason !== rawReasons[index]))
+    return undefined;
   if (mode === "standard" && reasons.length !== 0) return undefined;
   if (mode === "safe" && reasons.length === 0) return undefined;
   return { enabled: mode === "safe", reasons: [...reasons] };
