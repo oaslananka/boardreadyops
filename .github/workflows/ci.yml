@@ -201,6 +201,41 @@ jobs:
         if: ${{ needs.risk-profile.outputs.needs_unit == 'true' && (always() && steps.tests.outcome != 'success') }}
         run: exit 1
 
+  # Stable merge gate for the optional OS/Node test matrix.
+  unit-matrix-gate:
+    needs: [risk-profile, test-unit-matrix]
+    if: ${{ always() }}
+    name: ci / unit-matrix-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Enforce OS and Node matrix when risk routing enables it
+        shell: bash
+        env:
+          PROFILE_RESULT: ${{ needs.risk-profile.result }}
+          MATRIX_REQUIRED: ${{ needs.risk-profile.outputs.needs_unit_matrix }}
+          MATRIX_RESULT: ${{ needs.test-unit-matrix.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$PROFILE_RESULT" != "success" ]]; then
+            echo "::error::CI risk profile did not succeed."
+            exit 1
+          fi
+          if [[ "$MATRIX_REQUIRED" == "true" ]]; then
+            if [[ "$MATRIX_RESULT" != "success" ]]; then
+              echo "::error::Selected OS/Node matrix failed: $MATRIX_RESULT"
+              exit 1
+            fi
+          elif [[ "$MATRIX_REQUIRED" == "false" ]]; then
+            if [[ "$MATRIX_RESULT" != "skipped" ]]; then
+              echo "::error::Unselected matrix has unexpected result: $MATRIX_RESULT"
+              exit 1
+            fi
+          else
+            echo "::error::OS/Node matrix risk classification is missing."
+            exit 1
+          fi
+
   test-unit-matrix:
     needs: risk-profile
     if: needs.risk-profile.outputs.needs_unit_matrix == 'true'
