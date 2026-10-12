@@ -177,6 +177,40 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     }
   });
 
+  it("refuses an expired lease even if the deletion worker clock is a year behind PostgreSQL", async () => {
+    const label = `expired-clock-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const jobId = await insertJob(tenant, randomUUID());
+    const normalStore = createSqlArtifactDeletionStore(requireExecutor(), {
+      now: () => new Date(Date.now() + 1_000),
+      leaseSeconds: 120,
+    });
+    const claimed = await normalStore.claimDeletions({ workerId: "clock-skew-worker", limit: 1 });
+    expect(claimed[0]?.deletionJobId).toBe(jobId);
+
+    // The PostgreSQL lease is really expired; do not trust the caller's clock
+    // to decide that destructive filesystem work can begin.
+    await requireExecutor().query(
+      "update artifact_deletion_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where id=$1",
+      [jobId],
+    );
+    const oneYearBehind = new Date(Date.now() - 365 * 24 * 60 * 60 * 1_000);
+    const skewedStore = createSqlArtifactDeletionStore(requireExecutor(), {
+      now: () => oneYearBehind,
+    });
+    await expect(
+      skewedStore.authorizeOrDeferDeletion({
+        deletionJobId: jobId,
+        workerId: "clock-skew-worker",
+      }),
+    ).resolves.toBe("stale");
+    expect(
+      rows(
+        await requireExecutor().query("select status, lease_owner from artifact_deletion_jobs where id=$1", [jobId]),
+      ),
+    ).toEqual([{ status: "leased", lease_owner: "clock-skew-worker" }]);
+  });
+
   it("blocks deletion across mixed-case GitHub tenant logins without leaking an unrelated tenant", async () => {
     const label = `case-${randomUUID().slice(0, 8)}`;
     const tenant = await fixture(label);

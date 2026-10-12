@@ -22,10 +22,27 @@ describe("artifact deletion store", () => {
     expect(sql).toContain("lower(legal_holds.tenant_id) = lower(claimed.account_login)");
     expect(sql).toContain("legal_holds.active = true");
     expect(sql).toContain("for update of jobs");
-    expect(sql).toContain("jobs.lease_expires_at > $3::timestamptz");
+    expect(sql).toContain("jobs.lease_expires_at > clock_timestamp()");
     expect(sql).toContain("attempt_count = greatest(0, attempt_count - 1)");
-    expect(sql).toContain("interval '30 minutes'");
-    expect(query.mock.calls[0]?.[1]).toEqual(["job-1", "worker-1", now.toISOString()]);
+    expect(sql).toContain("available_at = clock_timestamp() + interval '30 minutes'");
+    expect(query.mock.calls[0]?.[1]).toEqual(["job-1", "worker-1"]);
+  });
+
+  it("anchors destructive lease authorization and hold deferral to the PostgreSQL clock", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ outcome: "stale" }] });
+    const skewedClock = new Date("2001-01-01T00:00:00.000Z");
+    const store = createSqlArtifactDeletionStore(executor(query), { now: () => skewedClock });
+    await expect(
+      store.authorizeOrDeferDeletion({
+        deletionJobId: "job-with-expired-lease",
+        workerId: "worker-clock-behind",
+      }),
+    ).resolves.toBe("stale");
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain("jobs.lease_expires_at > clock_timestamp()");
+    expect(sql).toContain("available_at = clock_timestamp() + interval '30 minutes'");
+    expect(sql).not.toContain("$3::timestamptz");
+    expect(query).toHaveBeenCalledWith(expect.any(String), ["job-with-expired-lease", "worker-clock-behind"]);
   });
 
   it("rejects stale leases and invalid worker identities without claiming authorization", async () => {

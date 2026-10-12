@@ -136,7 +136,8 @@ export function createSqlArtifactDeletionStore(
   return {
     async authorizeOrDeferDeletion(input) {
       if (!workerIdPattern.test(input.workerId)) throw new Error("invalid artifact deletion worker id");
-      // The job's current lease is the authority: stale workers must never unlink.
+      // The job's live lease is the authority: PostgreSQL's clock, not a
+      // potentially skewed worker clock, determines expiry before unlink.
       // A hold created AFTER this transaction but BEFORE filesystem unlink is
       // still a separate race requiring coordinated transactions/locking.
       const result = await executor.query(
@@ -147,7 +148,7 @@ export function createSqlArtifactDeletionStore(
             where jobs.id = $1
               and jobs.status = 'leased'
               and jobs.lease_owner = $2
-              and jobs.lease_expires_at > $3::timestamptz
+              and jobs.lease_expires_at > clock_timestamp()
             for update of jobs
          ), matching_hold as materialized (
            select 1 from legal_holds
@@ -157,7 +158,7 @@ export function createSqlArtifactDeletionStore(
          ), deferred as (
            update artifact_deletion_jobs
               set status = 'available',
-                  available_at = $3::timestamptz + interval '30 minutes',
+                  available_at = clock_timestamp() + interval '30 minutes',
                   lease_owner = null, lease_expires_at = null,
                   attempt_count = greatest(0, attempt_count - 1),
                   last_error_class = 'legal_hold',
@@ -170,7 +171,7 @@ export function createSqlArtifactDeletionStore(
            when exists (select 1 from claimed) and not exists (select 1 from matching_hold) then 'authorized'
            else 'stale'
          end as outcome`,
-        [input.deletionJobId, input.workerId, now().toISOString()],
+        [input.deletionJobId, input.workerId],
       );
       const outcome = text(rows(result)[0], "outcome");
       return outcome === "authorized" || outcome === "held" ? outcome : "stale";
