@@ -1,6 +1,6 @@
 # Source-to-Exported Manufacturing Artifact Proof — Design Contract
 
-**Status (2026-10-10): [#771](https://github.com/oaslananka/boardreadyops/issues/771) remains OPEN. Local source preflight and opt-in attestation verification helpers exist, but the trusted target-runner flow, real signed attestation and GA acceptance are NOT implemented.** This page specifies a trust boundary; it does not make any current release blocking check stronger. Coordinate [#756](https://github.com/oaslananka/boardreadyops/issues/756) (approved versus produced output) and [#753](https://github.com/oaslananka/boardreadyops/issues/753) (internal artifact validation).
+**Status (2026-10-12): [#771](https://github.com/oaslananka/boardreadyops/issues/771) remains OPEN.** The opt-in target-repository export/signing workflow and strict CLI policy are implemented; [one independently owned public-repository run](https://github.com/boardreadyops/gateway-board-demo/actions/runs/38026832338) generated and signed real KiCad manufacturing outputs, subsequently verified against 27 subjects. **This is not** two-private-installation acceptance ([#154](https://github.com/oaslananka/boardreadyops/issues/154)), a customer-facing GA trust badge, or a production/release approval. Coordinate [#756](https://github.com/oaslananka/boardreadyops/issues/756) and [#753](https://github.com/oaslananka/boardreadyops/issues/753).
 
 ## The user question
 
@@ -152,16 +152,17 @@ enable a source-bound gate there. Official references:
 [actions/attest](https://github.com/actions/attest), and
 [GitHub CLI verification policy](https://cli.github.com/manual/gh_attestation_verify).
 
-**Current status:** these are library and adversarial-test prerequisites,
-not a deployed target-repository job, actual signed export attestation,
-two-installation acceptance, supported end-user strong verification state,
-or release/GA approval. A positive library result must not directly change
-a release policy or a tenant-facing badge. The actual identity authority,
-protected runner/workflow, provider availability and independent customer
-acceptance remain open under #771 and #154.
+**Current status:** the library prerequisites above have been exercised by a
+real GitHub-hosted, protected-branch target workflow with an OIDC-signed
+manufacturing export in one independently owned public repository. Independent
+verification of that run's 27 manifest/Gerber/drill subjects and adversarial
+near-misses is recorded in [#771](https://github.com/oaslananka/boardreadyops/issues/771).
+This does **not** establish two-private-installation isolation (#154), a general
+customer-facing strong verification state, or release/GA approval. A positive
+library result alone must not grant a tenant-facing badge.
 
 
-## Opt-in target-runner export and signature path (not GA-commissioned)
+## Opt-in target-runner export and signature path (one public canary; not GA)
 
 The [reviewed manufacturing export runbook](attested-manufacturing-export.md)
 now documents a separately packaged composite Action and a target-repository
@@ -174,14 +175,21 @@ recomputes a manifest-plus-every-output checksum set and invokes SHA-pinned
 The associated CLI supports independent credentialed `gh attestation verify`
 against explicit owner-authorized repository/run/attempt expectations.
 
-This is an executable **integration contract** with local real KiCad validation,
-not evidence that a customer has installed the template, signed an export, or
-passed multi-installation acceptance. The template deliberately requires the
-owner to replace a future immutable BoardReadyOps commit SHA and project path;
-it must not be run against mutable refs. Private/internal native signing is
-Enterprise Cloud-gated; other private targets remain unverified. No GA trust
-level, release gate or production policy is changed by the mere existence of
-these components; #771 and #154 remain open.
+A separately owned **public canary** followed this contract in
+[target workflow run #38026832338](https://github.com/boardreadyops/gateway-board-demo/actions/runs/38026832338):
+protected `main` source `61473d6b7c2f3beb6daa0dcba191f4ea61ce04c9`,
+GitHub-hosted `workflow_dispatch`, real KiCad generation and GitHub OIDC
+signing. The documented independent verification matched all 27 signed
+manifest/Gerber/drill subjects and rejected wrong repository, run, attempt,
+source and modified output evidence. This is **one real public example**, not
+two unrelated private installation owners or complete customer acceptance.
+
+For a new target, the workflow template still requires independently reviewed
+immutable Action pin and real project path; never execute a mutable ref.
+Private/internal native signing is Enterprise Cloud-gated; unsupported
+private targets remain unverified. The opt-in CLI strict policy exists, but
+no global GA trust level, automatic dashboard badge, release pack approval or
+production policy is authorized. #771 and #154 remain open.
 
 
 ## Phase 3 bounded CLI policy prerequisite (not GA)

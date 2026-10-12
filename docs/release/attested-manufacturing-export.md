@@ -1,6 +1,6 @@
 # Opt-in target-repository manufacturing export and signed attestation
 
-**Status:** Implemented target-runner action/CLI and reviewed workflow **template**; not commissioned or GA-accepted. This is tracked by [#771](https://github.com/oaslananka/boardreadyops/issues/771). Real two-owner GitHub App installation acceptance is separately tracked by [#154](https://github.com/oaslananka/boardreadyops/issues/154). Release and production publication remain on hold.
+**Status:** Implemented target-runner Action/CLI, reviewed workflow **template**, and one independently validated **public target-repository canary** ([run #38026832338](https://github.com/boardreadyops/gateway-board-demo/actions/runs/38026832338)). This is **not GA acceptance**. The remaining customer scope is tracked by [#771](https://github.com/oaslananka/boardreadyops/issues/771), with two unrelated private GitHub App installations separately required by [#154](https://github.com/oaslananka/boardreadyops/issues/154). Release and production publication remain on hold.
 
 ## Trust model
 
@@ -45,4 +45,18 @@ The optional `--bundle <path>` is only an attestation bundle transport, not an i
 
 The local integration suite executes the **same composite Action shell** against a temporary, locally committed KiCad fixture with real `kicad-cli 10.0.x`, tests generated Gerber/Excellon and manifest bytes, and exercises negative commit/ref/runner/fork/dirty/ignored-output cases. Static tests verify the opt-in template's GitHub Action and OIDC signing order. This proves local functionality and contract coverage, **not a real GitHub-signed target artifact**.
 
-Before granting a stronger customer-facing source-bound state or completing #771, run an eligible real, independently owned target-repository `workflow_dispatch`, collect actual signed bundle and checksum subject evidence, verify with the independent CLI and negative replay/different-repo/different-run tests, then meet #154's two distinct real installation owners. Manual/offline packages remain inspectable at byte-consistent-only or unverified trust.
+**Existing real public canary:** The independently owned
+`boardreadyops/gateway-board-demo` [workflow run #38026832338](https://github.com/boardreadyops/gateway-board-demo/actions/runs/38026832338)
+completed with a protected `workflow_dispatch`, exact source commit and real
+KiCad 10 Gerber/Excellon exports. Recorded online and offline Sigstore
+verification checked 27 signed subjects; negative repository, SHA, run,
+attempt, signer and tampered-output cases were rejected. This establishes a
+single public target's opt-in cryptographic prerequisite, **not** the
+remaining two unrelated private-installation acceptance (#154), a universal
+customer-facing trust state or GA/release authorization.
+
+For each further target, independently authorize the exact run and verify its
+signed bundle, actual artifact digests and negative cases. Complete #154's
+separate two-owner isolation requirements before claiming customer GA.
+Manual/offline packages remain inspectable at byte-consistent-only or
+unverified trust.
