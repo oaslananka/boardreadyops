@@ -45,7 +45,9 @@ describe("container action release surfaces", () => {
   it("builds a GitHub-compatible Ubuntu image with an unprivileged account", async () => {
     const dockerfile = await readFile("apps/container/Dockerfile", "utf8");
 
-    expect(dockerfile).toContain("FROM ubuntu:26.04@sha256:");
+    expect(dockerfile).toContain("# renovate: datasource=docker depName=ubuntu currentValue=26.04");
+    expect(dockerfile).toMatch(/^FROM ubuntu@sha256:[a-f0-9]{64}$/mu);
+    expect(dockerfile).not.toMatch(/^FROM [^\n]+:[^\s]+@sha256:/mu);
     expect(dockerfile).toContain("ARG NODE_VERSION=24.21.0");
     expect(dockerfile).toContain("ARG BOARDREADYOPS_VERSION");
     expect(dockerfile).not.toContain("ARG BOARDREADYOPS_VERSION=latest");

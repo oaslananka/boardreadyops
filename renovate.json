@@ -17,6 +17,18 @@
       "depNameTemplate": "renovate/renovate",
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Ubuntu container action image by version and immutable digest without tag@digest syntax.",
+      "managerFilePatterns": ["/^apps\\/container\\/Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=docker depName=ubuntu currentValue=(?<currentValue>\\d{2}\\.\\d{2})\\nFROM ubuntu@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "depNameTemplate": "ubuntu",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "autoReplaceStringTemplate": "# renovate: datasource=docker depName=ubuntu currentValue={{{newValue}}}\nFROM ubuntu@{{{newDigest}}}"
     }
   ],
   "schedule": ["after 5am and before 8am every weekday"],
@@ -125,6 +137,19 @@
       "matchPackageNames": ["ghcr.io/renovatebot/renovate", "renovate/renovate"],
       "minimumReleaseAge": "7 days",
       "groupName": "self-hosted Renovate",
+      "automerge": false,
+      "addLabels": ["supply-chain", "manual-review"]
+    },
+    {
+      "description": "Prevent duplicate native Dockerfile updates for the digest-only Ubuntu container action image.",
+      "matchManagers": ["dockerfile"],
+      "matchFileNames": ["apps/container/Dockerfile"],
+      "enabled": false
+    },
+    {
+      "description": "Manually review the Ubuntu container action image custom digest updates.",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["apps/container/Dockerfile"],
       "automerge": false,
       "addLabels": ["supply-chain", "manual-review"]
     }
