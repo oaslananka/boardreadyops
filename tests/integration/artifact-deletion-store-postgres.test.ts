@@ -331,7 +331,7 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     const hold = new pg.Client({ connectionString, application_name: waiterName });
     await writer.connect();
     await hold.connect();
-    let writePromise: Promise<unknown> | undefined;
+    let writeResult: Promise<{ ok: true } | { ok: false; error: unknown }> | undefined;
     let committed = false;
     try {
       await writer.query("begin");
@@ -345,10 +345,17 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
         ).rows[0]?.outcome,
       ).toBe("authorized");
       // Start a true second backend's INSERT before the writer commits.
-      writePromise = hold.query(
-        "insert into legal_holds (id,tenant_id,created_by,reason,scope) values ($1,$2,'operator','Hold must not acknowledge during unlink','organization')",
-        [randomUUID(), tenantId],
-      );
+      // Observe a possible rejection immediately: PostgreSQL can reject the
+      // blocked INSERT before the polling loop reaches its later assertion.
+      writeResult = hold
+        .query(
+          "insert into legal_holds (id,tenant_id,created_by,reason,scope) values ($1,$2,'operator','Hold must not acknowledge during unlink','organization')",
+          [randomUUID(), tenantId],
+        )
+        .then(
+          () => ({ ok: true as const }),
+          (error: unknown) => ({ ok: false as const, error }),
+        );
       let waiting = false;
       for (let attempt = 0; attempt < 35; attempt++) {
         const observed = rows(
@@ -366,7 +373,7 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       expect(waiting).toBe(true);
       await writer.query("commit");
       committed = true;
-      await expect(writePromise).rejects.toMatchObject({ code: "B4401" });
+      await expect(writeResult).resolves.toMatchObject({ ok: false, error: { code: "B4401" } });
       await expect(
         store.completeDeletion({
           deletionJobId: jobId,
@@ -384,7 +391,7 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       ).resolves.toBe("settled");
     } finally {
       if (!committed) await writer.query("rollback").catch(() => {});
-      await writePromise?.catch(() => {});
+      await writeResult;
       await writer.end();
       await hold.end();
       await requireExecutor().query("delete from legal_holds where tenant_id=$1", [tenantId]);
@@ -452,6 +459,71 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       await writer.end();
       await waiter.end();
       await requireExecutor().query("delete from legal_holds where tenant_id=$1", [tenantId]);
+    }
+  });
+
+  it("rejects inactive-hold reactivation and installation deletion while a tenant unlink fence is unresolved", async () => {
+    const label = `hold-reactivate-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const tenantId = `artifact-delete-${label}`;
+    const workerId = "hold-reactivate-worker";
+    const jobId = await insertJob(tenant, randomUUID());
+    const token = randomUUID();
+    const store = createSqlArtifactDeletionStore(requireExecutor(), { now: () => new Date(Date.now() + 1_000) });
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    const hold = await lifecycle.createLegalHold({
+      tenantId,
+      createdBy: "operator",
+      reason: "Initial hold, later reactivated",
+      scope: "organization",
+    });
+
+    try {
+      await expect(lifecycle.releaseLegalHold(tenantId, hold.id, "operator")).resolves.toBe(true);
+      expect((await store.claimDeletions({ workerId, limit: 1 }))[0]?.deletionJobId).toBe(jobId);
+      await expect(store.beginPhysicalDeletion({ deletionJobId: jobId, workerId, fenceToken: token })).resolves.toBe(
+        "authorized",
+      );
+
+      // Reactivating an existing hold is another hold admission, not a bypass
+      // just because the hold record was already in the table.
+      await expect(
+        requireExecutor().query("update legal_holds set active=true where id=$1", [hold.id]),
+      ).rejects.toMatchObject({ code: "B4401" });
+      expect(rows(await requireExecutor().query("select active from legal_holds where id=$1", [hold.id]))).toEqual([
+        { active: false },
+      ]);
+
+      // Installation removal cannot invalidate the canonical tenant key
+      // while this external I/O outcome is still uncertain.
+      await expect(
+        requireExecutor().query("delete from installations where id=$1", [tenant.installationId]),
+      ).rejects.toMatchObject({ code: "B4401" });
+      expect(
+        rows(await requireExecutor().query("select id from installations where id=$1", [tenant.installationId])),
+      ).toHaveLength(1);
+
+      await expect(
+        store.completeDeletion({
+          deletionJobId: jobId,
+          workerId,
+          outcome: "missing",
+        }),
+      ).resolves.toBe("completed");
+      await expect(
+        store.settlePhysicalDeletion({
+          deletionJobId: jobId,
+          workerId,
+          fenceToken: token,
+          outcome: "missing",
+        }),
+      ).resolves.toBe("settled");
+      await expect(
+        requireExecutor().query("update legal_holds set active=true where id=$1 returning active", [hold.id]),
+      ).resolves.toMatchObject({ rows: [{ active: true }] });
+    } finally {
+      // Disposable-only test fixture; the local PG installation is never production.
+      await requireExecutor().query("delete from legal_holds where id=$1", [hold.id]);
     }
   });
 
