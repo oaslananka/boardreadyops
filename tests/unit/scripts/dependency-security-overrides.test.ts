@@ -52,7 +52,11 @@ describe("dependency security overrides", () => {
 
     expect(workspace.overrides?.["brace-expansion@>=5 <5.0.12"]).toBe("5.0.12");
     expect(workspace.overrides?.["fast-uri@>=3 <3.1.8"]).toBe("3.1.8");
-    expect(workspace.overrides?.["ip-address@<10.7.1"]).toBe("10.7.1");
+    const patchedIpAddress = workspace.overrides?.["ip-address@<10.7.1"];
+    expect(patchedIpAddress).toMatch(/^\d+\.\d+\.\d+$/u);
+    const [major = 0, minor = 0, patch = 0] = (patchedIpAddress ?? "0.0.0").split(".").map(Number);
+    expect(major > 10 || (major === 10 && (minor > 7 || (minor === 7 && patch >= 1)))).toBe(true);
+    expect(lockfile).toContain(`ip-address@${patchedIpAddress}:`);
     expect(workspace.overrides?.["undici@>=8.0.0 <8.11.0"]).toBe("8.11.0");
     expect(workspace.overrides?.["qs@>=6.11.1 <6.16.0"]).toBe("6.16.0");
     expect(workspace.minimumReleaseAgeExclude).toEqual(
