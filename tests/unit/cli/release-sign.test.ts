@@ -65,6 +65,36 @@ describe("release sign / verify commands", () => {
     expect(verify.output().stdout).toContain("signature");
   });
 
+  it("reports uncovered bundle files without changing the default verification exit code", async () => {
+    const { bundle, keyPath, pubPath } = await makeBundle();
+    await releaseSignCommand(bundle, { key: keyPath }, streams().streams);
+    await fs.mkdir(path.join(bundle, "reports"));
+    await fs.writeFile(path.join(bundle, "reports", "unexpected.gbr"), "unlisted fab output");
+
+    const out = streams();
+    expect(await releaseVerifyCommand(bundle, { publicKey: pubPath, format: "json" }, out.streams)).toBe(0);
+    expect(JSON.parse(out.output().stdout)).toMatchObject({
+      ok: true,
+      signature: { ok: true },
+      coverage: { ok: false, uncovered: ["reports/unexpected.gbr"] },
+    });
+
+    const strict = streams();
+    expect(await releaseVerifyCommand(bundle, { publicKey: pubPath, strictCoverage: true }, strict.streams)).toBe(1);
+    expect(strict.output().stderr).toContain("reports/unexpected.gbr");
+  });
+
+  it("does not exempt a nested manifest.json from strict bundle coverage", async () => {
+    const { bundle, keyPath, pubPath } = await makeBundle();
+    await releaseSignCommand(bundle, { key: keyPath }, streams().streams);
+    await fs.mkdir(path.join(bundle, "reports"));
+    await fs.writeFile(path.join(bundle, "reports", "manifest.json"), "unsigned payload");
+
+    const strict = streams();
+    expect(await releaseVerifyCommand(bundle, { publicKey: pubPath, strictCoverage: true }, strict.streams)).toBe(1);
+    expect(strict.output().stderr).toContain("reports/manifest.json");
+  });
+
   it("returns 2 when no key is provided", async () => {
     const { bundle } = await makeBundle();
     const io = streams();

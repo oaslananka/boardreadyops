@@ -170,6 +170,20 @@ describe("verifyManifestCoverage", () => {
     expect(after.uncovered).toContain("reports/extra.txt");
   });
 
+  it.skipIf(process.platform === "win32")("flags symlinks, including root sidecars, as uncovered", async () => {
+    const root = await writeFixture({});
+    const bundle = path.join(root, "bundle");
+    await fs.mkdir(bundle);
+    await fs.writeFile(path.join(bundle, "manifest.json"), JSON.stringify({ schemaVersion: 2, artifacts: [] }));
+    await fs.writeFile(path.join(root, "outside.gbr"), "private design data");
+    await fs.symlink(path.join(root, "outside.gbr"), path.join(bundle, "unexpected.gbr"));
+    await fs.symlink(path.join(root, "outside.gbr"), path.join(bundle, "manifest.sig"));
+
+    const result = await verifyManifestCoverage(bundle);
+    expect(result.ok).toBe(false);
+    expect(result.uncovered).toEqual(["manifest.sig", "unexpected.gbr"]);
+  });
+
   it("returns errors when manifest is missing", async () => {
     const root = await writeFixture({});
     const result = await verifyManifestCoverage(path.join(root, "nonexistent-bundle"));
