@@ -22,7 +22,7 @@ standard/safe paths remain unchanged.
    identical idempotent retries and rejects conflicting retries. Uninstall
    foreign-key cascading is preserved.
 
-No HTTP endpoint, release-run creation, workflow dispatch, outbox insertion,
+No **execution-authorizing** HTTP endpoint, release-run creation, workflow dispatch, outbox insertion,
 runner lease, secret access, artifact grant or OIDC permission is enabled.
 
 ## Required work before protected-release can execute
@@ -59,3 +59,23 @@ No live API calls the seal yet. Its future consumer must require an atomic
 authorized enqueue with fresh GitHub rules/commit evidence, tenant scoping,
 replay protection, exact run/attempt lease ownership and signed OIDC claims.
 The reserved UUIDs must never be accepted as capabilities on their own.
+
+
+## Session-only intent recording API (evidence only)
+
+The optional GET/POST endpoint at
+`/api/v1/repositories/{repositoryId}/protected-release-intent` is an
+**observation-only API**, not a release or workflow action. A signed GitHub
+viewer cookie is required; bearer tokens and generic application admin scopes
+are insufficient. A GET obtains a no-store, purpose/session/repository-bound,
+10-minute CSRF token. POST requires the configured HTTPS Origin, the CSRF
+header, a bounded strict JSON body containing only exact SHA and request ID,
+and the same signed viewer. Server-side recording rechecks database
+installation/repository mapping, live GitHub `admin` identity and the
+protected default branch rules/HEAD before writing the evidence candidate.
+
+The response's `dispatchAllowed: false` is descriptive, never a capability.
+No caller may promote an evidence candidate or execution seal to a runner
+lease, OIDC verification, artifact permission or trusted workflow by using this
+endpoint. The independently guarded execution-authority chain remains
+unimplemented and **PR #1110 stays draft** until complete.
