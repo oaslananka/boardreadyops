@@ -40,3 +40,22 @@ OIDC callback and cannot grant a release by itself.
 Issue #42 remains open, as does two-independent-installation acceptance #154.
 The evidence-only helpers must not be used as customer readiness or production
 release approval.
+
+
+## Non-executable identity seal (migration 0089; not an enabled feature)
+
+A separate immutable execution seal may reserve one branch-only run and
+attempt UUID for a previously recorded evidence candidate. The server-invoker
+transaction rebinds the canonical installation, repository, GitHub IDs, actor,
+default branch and exact candidate ref/SHA, rejecting private or disabled
+repositories. It refuses stale evidence using PostgreSQL server clock time,
+enforces one candidate / run / attempt identity, and computes its own SHA-256
+snapshot digest from the complete versioned identity.
+
+**A seal is not execution authority:** a database check forces
+`dispatch_allowed = false` permanently; no outbox, workflow,
+`release_runs` record, runner lease or OIDC callback is created.
+No live API calls the seal yet. Its future consumer must require an atomic
+authorized enqueue with fresh GitHub rules/commit evidence, tenant scoping,
+replay protection, exact run/attempt lease ownership and signed OIDC claims.
+The reserved UUIDs must never be accepted as capabilities on their own.
