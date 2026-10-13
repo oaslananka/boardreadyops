@@ -275,12 +275,37 @@ export function formatReleaseCertificateText(
   return `${lines.join("\n")}\n`;
 }
 
+function isManifestArtifact(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const artifact = value as Record<string, unknown>;
+  return (
+    typeof artifact.path === "string" &&
+    artifact.path.trim().length > 0 &&
+    typeof artifact.sha256 === "string" &&
+    /^[a-f0-9]{64}$/.test(artifact.sha256) &&
+    typeof artifact.bytes === "number" &&
+    Number.isSafeInteger(artifact.bytes) &&
+    artifact.bytes >= 0
+  );
+}
+
 async function readBundleManifest(
   manifestPath: string,
 ): Promise<{ ok: true; manifest: ReleaseEvidenceManifest } | { ok: false; errors: string[] }> {
   try {
-    const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as ReleaseEvidenceManifest;
-    return { ok: true, manifest };
+    const value: unknown = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    // An untrusted JSON file is not made valid by a TypeScript assertion. Both
+    // release verification paths must fail with evidence errors, not throw or
+    // interpret a missing/malformed artifact inventory as an empty release.
+    if (
+      !value ||
+      typeof value !== "object" ||
+      !Array.isArray((value as { artifacts?: unknown }).artifacts) ||
+      !(value as { artifacts: unknown[] }).artifacts.every(isManifestArtifact)
+    ) {
+      return { ok: false, errors: ["manifest has invalid artifact inventory"] };
+    }
+    return { ok: true, manifest: value as ReleaseEvidenceManifest };
   } catch (error) {
     return {
       ok: false,

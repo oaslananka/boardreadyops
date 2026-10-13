@@ -65,7 +65,7 @@ boardreadyops release pack . \
   --provenance-attestation https://github.com/oaslananka/boardreadyops/attestations/123
 ```
 
-`boardreadyops release verify [bundle]` reads `manifest.json` and recomputes every artifact digest. It exits with code `0` when all listed artifacts match, and code `1` when an artifact is missing, changed, truncated, or points outside the bundle directory.
+`boardreadyops release verify [bundle]` reads `manifest.json` and recomputes every artifact digest. It exits with code `0` when all listed artifacts match, and code `1` when an artifact is missing, changed, truncated, or points outside the bundle directory. A malformed artifact inventory (missing or non-array `artifacts`, or entries without a valid path, SHA-256 or nonnegative integer byte length) is always rejected as invalid evidence, even if the manifest was signed. This structural check does not establish trusted source-to-export provenance.
 
 ```bash
 boardreadyops release verify build/boardreadyops-release

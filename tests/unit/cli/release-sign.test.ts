@@ -109,6 +109,23 @@ describe("release sign / verify commands", () => {
     expect(io.output().stderr).toContain("manifest.sig");
   });
 
+  it("returns a verification failure for a signed malformed artifact inventory", async () => {
+    const { bundle, keyPath, pubPath } = await makeBundle();
+    await fs.writeFile(path.join(bundle, "manifest.json"), '{"schemaVersion":2,"artifacts":{"path":"board.gbr"}}');
+    expect(await releaseSignCommand(bundle, { key: keyPath }, streams().streams)).toBe(0);
+
+    const io = streams();
+    expect(
+      await releaseVerifyCommand(bundle, { publicKey: pubPath, strictCoverage: true, format: "json" }, io.streams),
+    ).toBe(1);
+    expect(JSON.parse(io.output().stdout)).toMatchObject({
+      ok: false,
+      errors: ["manifest has invalid artifact inventory"],
+      coverage: { ok: false, errors: ["manifest has invalid artifact inventory"] },
+      signature: { ok: true },
+    });
+  });
+
   it("fails verification when the manifest is tampered after signing", async () => {
     const { bundle, keyPath, pubPath } = await makeBundle();
     await releaseSignCommand(bundle, { key: keyPath }, streams().streams);

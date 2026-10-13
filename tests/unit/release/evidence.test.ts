@@ -85,6 +85,26 @@ describe("release evidence bundles", () => {
     expect(coverage.uncovered).toHaveLength(0);
   });
 
+  it.each([
+    ["object instead of array", { artifacts: { path: "report.json" } }],
+    ["missing artifact inventory", {}],
+    ["null artifact entry", { artifacts: [null] }],
+    ["invalid digest and size", { artifacts: [{ path: "report.json", sha256: 1, bytes: "0" }] }],
+    ["non-string artifact path", { artifacts: [{ path: null, sha256: "a".repeat(64), bytes: 0 }] }],
+  ])("fails closed on manifest with %s", async (_description, patch) => {
+    const root = await writeFixture({});
+    const bundle = path.join(root, "malformed-bundle");
+    await fs.mkdir(bundle);
+    await fs.writeFile(path.join(bundle, "manifest.json"), JSON.stringify({ schemaVersion: 2, ...patch }));
+
+    const verified = await verifyReleaseEvidenceBundle(bundle);
+    expect(verified.ok).toBe(false);
+    expect(verified.errors).toContainEqual(expect.stringContaining("invalid artifact inventory"));
+    const coverage = await verifyManifestCoverage(bundle);
+    expect(coverage.ok).toBe(false);
+    expect(coverage.errors).toContainEqual(expect.stringContaining("invalid artifact inventory"));
+  });
+
   it("reports explicit gaps and detects checksum drift", async () => {
     const root = await writeFixture({
       "board.kicad_pro": "{}",

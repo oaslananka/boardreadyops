@@ -32618,10 +32618,18 @@ function formatReleaseCertificateText(manifest, signature) {
   return `${lines.join("\n")}
 `;
 }
+function isManifestArtifact(value) {
+  if (!value || typeof value !== "object") return false;
+  const artifact = value;
+  return typeof artifact.path === "string" && artifact.path.trim().length > 0 && typeof artifact.sha256 === "string" && /^[a-f0-9]{64}$/.test(artifact.sha256) && typeof artifact.bytes === "number" && Number.isSafeInteger(artifact.bytes) && artifact.bytes >= 0;
+}
 async function readBundleManifest(manifestPath) {
   try {
-    const manifest = JSON.parse(await import_promises26.default.readFile(manifestPath, "utf8"));
-    return { ok: true, manifest };
+    const value = JSON.parse(await import_promises26.default.readFile(manifestPath, "utf8"));
+    if (!value || typeof value !== "object" || !Array.isArray(value.artifacts) || !value.artifacts.every(isManifestArtifact)) {
+      return { ok: false, errors: ["manifest has invalid artifact inventory"] };
+    }
+    return { ok: true, manifest: value };
   } catch (error51) {
     return {
       ok: false,
