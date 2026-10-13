@@ -47,12 +47,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function repositoryMatches(body: unknown, owner: string, repository: string, repositoryId: number): boolean {
+function repositoryMatches(
+  body: unknown,
+  owner: string,
+  repository: string,
+  repositoryId: number,
+  expectedBranch: string,
+): boolean {
   return (
     isRecord(body) &&
     body.id === repositoryId &&
     typeof body.full_name === "string" &&
     body.full_name.toLowerCase() === `${owner}/${repository}`.toLowerCase() &&
+    body.default_branch === expectedBranch &&
     body.archived === false &&
     body.disabled === false
   );
@@ -147,7 +154,8 @@ export async function inspectProtectedBranchHead(
   const request = input.request ?? fetch;
   try {
     const repoBefore = await readJson(request, `${apiBaseUrl}${repoPath}`, input.token);
-    if (!repositoryMatches(repoBefore, input.owner, input.repository, input.repositoryId)) return undefined;
+    if (!repositoryMatches(repoBefore, input.owner, input.repository, input.repositoryId, input.branch))
+      return undefined;
     const before = await readJson(request, `${apiBaseUrl}${branchPath}`, input.token);
     if (!branchMatches(before, input.branch, input.sha)) return undefined;
     const rules = await readJson(request, `${apiBaseUrl}${rulesPath}`, input.token);
@@ -155,7 +163,8 @@ export async function inspectProtectedBranchHead(
     const after = await readJson(request, `${apiBaseUrl}${branchPath}`, input.token);
     if (!branchMatches(after, input.branch, input.sha)) return undefined;
     const repoAfter = await readJson(request, `${apiBaseUrl}${repoPath}`, input.token);
-    if (!repositoryMatches(repoAfter, input.owner, input.repository, input.repositoryId)) return undefined;
+    if (!repositoryMatches(repoAfter, input.owner, input.repository, input.repositoryId, input.branch))
+      return undefined;
     return {
       source: "github-active-branch-rules",
       ref: input.ref,

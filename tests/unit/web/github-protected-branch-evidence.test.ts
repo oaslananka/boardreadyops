@@ -22,6 +22,7 @@ const repo = (id = repositoryId) => ({
   full_name: "octo-org/example",
   archived: false,
   disabled: false,
+  default_branch: "main",
 });
 const branch = (commit = sha) => ({ name: "main", protected: true, commit: { sha: commit } });
 const rules = [
@@ -100,6 +101,8 @@ describe("protected branch evidence (not release authorization)", () => {
     ["repo changed mid-verification", { secondRepo: repo(repositoryId + 1) }],
     ["archived repository", { firstRepo: { ...repo(), archived: true } }],
     ["disabled repository", { firstRepo: { ...repo(), disabled: true } }],
+    ["default branch changed", { firstRepo: { ...repo(), default_branch: "other" } }],
+    ["default branch changed mid-verification", { secondRepo: { ...repo(), default_branch: "other" } }],
     ["renamed repository", { firstRepo: { ...repo(), full_name: "octo-org/replaced" } }],
     ["unreadable repository", { repositoryStatus: 403 }],
     ["different head", { first: branch("b".repeat(40)) }],

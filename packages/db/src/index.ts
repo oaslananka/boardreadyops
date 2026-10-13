@@ -68,6 +68,7 @@ export * from "./external-review-store.js";
 export * from "./finding-decision-store.js";
 export * from "./lifecycle-store.js";
 export * from "./production-outcome-store.js";
+export * from "./protected-release-intent-store.js";
 export * from "./review-approval-store.js";
 export * from "./review-collaboration-store.js";
 export * from "./review-comment-store.js";
