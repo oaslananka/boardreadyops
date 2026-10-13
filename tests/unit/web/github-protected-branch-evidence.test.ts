@@ -20,7 +20,10 @@ const rules = [
   {
     type: "required_status_checks",
     ruleset_id: 27,
-    parameters: { required_status_checks: [{ context: "ci / test-unit" }] },
+    parameters: {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: "ci / test-unit" }],
+    },
   },
 ];
 
@@ -73,6 +76,25 @@ describe("protected branch evidence (not release authorization)", () => {
     ["unprotected branch", { first: { ...branch(), protected: false } }],
     ["missing review rule", { activeRules: rules.filter((rule) => rule.type !== "pull_request") }],
     ["missing required checks", { activeRules: rules.filter((rule) => rule.type !== "required_status_checks") }],
+    [
+      "insufficient review policy",
+      { activeRules: [{ type: "pull_request", parameters: { required_review_thread_resolution: false } }, rules[3]] },
+    ],
+    [
+      "non-strict status checks",
+      {
+        activeRules: [
+          rules[2],
+          {
+            type: "required_status_checks",
+            parameters: {
+              required_status_checks: [{ context: "ci / test-unit" }],
+              strict_required_status_checks_policy: false,
+            },
+          },
+        ],
+      },
+    ],
     ["non-array active rules", { activeRules: { rules } }],
     ["denied repository access", { branchStatus: 403 }],
     ["denied rules access", { ruleStatus: 403 }],
@@ -96,6 +118,17 @@ describe("protected branch evidence (not release authorization)", () => {
     const request = api();
     await expect(inspectProtectedBranchHead({ ...input, owner: "../another", request })).resolves.toBeUndefined();
     await expect(inspectProtectedBranchHead({ ...input, sha: "f".repeat(39), request })).resolves.toBeUndefined();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("does not send the installation token to non-GitHub API origins", async () => {
+    const request = api();
+    await expect(
+      inspectProtectedBranchHead({ ...input, apiBaseUrl: "https://example.org", request }),
+    ).resolves.toBeUndefined();
+    await expect(
+      inspectProtectedBranchHead({ ...input, apiBaseUrl: "https://api.github.com.evil.test", request }),
+    ).resolves.toBeUndefined();
     expect(request).not.toHaveBeenCalled();
   });
 

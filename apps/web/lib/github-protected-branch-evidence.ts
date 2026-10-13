@@ -58,13 +58,19 @@ function branchMatches(body: unknown, expectedBranch: string, sha: string): bool
 function meaningfulRules(value: unknown): boolean {
   if (!Array.isArray(value)) return false;
   const rules = value.filter(isRecord);
-  const hasReviewGate = rules.some((rule) => rule.type === "pull_request");
+  const hasReviewGate = rules.some(
+    (rule) =>
+      rule.type === "pull_request" &&
+      isRecord(rule.parameters) &&
+      rule.parameters.required_review_thread_resolution === true,
+  );
   const hasRequiredChecks = rules.some(
     (rule) =>
       rule.type === "required_status_checks" &&
       isRecord(rule.parameters) &&
       Array.isArray(rule.parameters.required_status_checks) &&
-      rule.parameters.required_status_checks.length > 0,
+      rule.parameters.required_status_checks.length > 0 &&
+      rule.parameters.strict_required_status_checks_policy === true,
   );
   return hasReviewGate && hasRequiredChecks;
 }
@@ -72,6 +78,7 @@ function meaningfulRules(value: unknown): boolean {
 async function readJson(request: Request, url: string, token: string): Promise<unknown> {
   const response = await request(url, {
     method: "GET",
+    redirect: "error",
     headers: {
       accept: "application/vnd.github+json",
       authorization: `Bearer ${token}`,
@@ -104,7 +111,17 @@ export async function inspectProtectedBranchHead(
     return undefined;
 
   const base = new URL(input.apiBaseUrl);
-  if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) return undefined;
+  if (
+    base.protocol !== "https:" ||
+    base.hostname !== "api.github.com" ||
+    base.port ||
+    base.pathname !== "/" ||
+    base.username ||
+    base.password ||
+    base.search ||
+    base.hash
+  )
+    return undefined;
 
   // URLs and the token are operational configuration, never derived from a PR.
   const apiBaseUrl = input.apiBaseUrl.replace(/\/$/u, "");
