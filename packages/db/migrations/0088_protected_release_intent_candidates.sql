@@ -106,6 +106,7 @@ begin
      and repository.github_repo_id = p_github_repository_id
      and installation.github_installation_id = p_github_installation_id
      and repository.disabled_at is null
+     and repository.private = false
      and installation.suspended_at is null
    for share of repository, installation;
 

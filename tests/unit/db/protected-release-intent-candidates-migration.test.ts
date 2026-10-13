@@ -29,6 +29,7 @@ describe("protected-release evidence-only candidate migration", () => {
     expect(sql).toContain("repository.github_repo_id = p_github_repository_id");
     expect(sql).toContain("installation.github_installation_id = p_github_installation_id");
     expect(sql).toContain("repository.disabled_at is null");
+    expect(sql).toContain("repository.private = false");
     expect(sql).toContain("installation.suspended_at is null");
     expect(sql).toContain("for share of repository, installation");
     expect(sql).toContain("p_ref is distinct from 'refs/heads/' || v_default_branch");
