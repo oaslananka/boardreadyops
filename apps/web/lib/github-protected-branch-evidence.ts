@@ -110,6 +110,69 @@ async function readJson(request: Request, url: string, token: string): Promise<u
   return response.json();
 }
 
+function validGitHubApiOrigin(apiBaseUrl: string): boolean {
+  if (!URL.canParse(apiBaseUrl)) return false;
+  const base = new URL(apiBaseUrl);
+  return (
+    base.protocol === "https:" &&
+    base.hostname === "api.github.com" &&
+    !base.port &&
+    base.pathname === "/" &&
+    !base.username &&
+    !base.password &&
+    !base.search &&
+    !base.hash
+  );
+}
+
+function validRepositoryTarget(
+  input: Pick<ProtectedBranchHeadInput, "owner" | "repository" | "token" | "apiBaseUrl">,
+): boolean {
+  return (
+    repositoryComponent.test(input.owner) &&
+    repositoryComponent.test(input.repository) &&
+    Boolean(input.token) &&
+    validGitHubApiOrigin(input.apiBaseUrl)
+  );
+}
+
+function validProtectedBranchRequest(input: ProtectedBranchHeadInput): boolean {
+  return (
+    validRepositoryTarget(input) &&
+    Number.isSafeInteger(input.repositoryId) &&
+    input.repositoryId > 0 &&
+    validBranch(input.branch) &&
+    input.ref === `refs/heads/${input.branch}` &&
+    exactSha.test(input.sha)
+  );
+}
+
+function validOperatorRequest(
+  input: Pick<ProtectedBranchHeadInput, "owner" | "repository" | "token" | "apiBaseUrl"> & {
+    actorLogin: string;
+    actorGithubUserId: number;
+  },
+): boolean {
+  const githubLogin = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/iu;
+  return (
+    validRepositoryTarget(input) &&
+    githubLogin.test(input.actorLogin) &&
+    Number.isSafeInteger(input.actorGithubUserId) &&
+    input.actorGithubUserId > 0
+  );
+}
+
+function adminPermissionMatches(evidence: unknown, actorId: number, actorLogin: string): boolean {
+  return (
+    isRecord(evidence) &&
+    evidence.permission === "admin" &&
+    isRecord(evidence.user) &&
+    evidence.user.id === actorId &&
+    typeof evidence.user.login === "string" &&
+    evidence.user.login.toLowerCase() === actorLogin.toLowerCase()
+  );
+}
+
 /**
  * Check branch HEAD before and after retrieving *effective* GitHub branch
  * rules, rejecting moved refs, missing rules, incomplete permissions and
@@ -119,31 +182,7 @@ async function readJson(request: Request, url: string, token: string): Promise<u
 export async function inspectProtectedBranchHead(
   input: ProtectedBranchHeadInput,
 ): Promise<ProtectedBranchHeadEvidence | undefined> {
-  if (
-    !repositoryComponent.test(input.owner) ||
-    !repositoryComponent.test(input.repository) ||
-    !Number.isSafeInteger(input.repositoryId) ||
-    input.repositoryId <= 0 ||
-    !validBranch(input.branch) ||
-    input.ref !== `refs/heads/${input.branch}` ||
-    !exactSha.test(input.sha) ||
-    !input.token ||
-    !URL.canParse(input.apiBaseUrl)
-  )
-    return undefined;
-
-  const base = new URL(input.apiBaseUrl);
-  if (
-    base.protocol !== "https:" ||
-    base.hostname !== "api.github.com" ||
-    base.port ||
-    base.pathname !== "/" ||
-    base.username ||
-    base.password ||
-    base.search ||
-    base.hash
-  )
-    return undefined;
+  if (!validProtectedBranchRequest(input)) return undefined;
 
   // URLs and the token are operational configuration, never derived from a PR.
   const apiBaseUrl = input.apiBaseUrl.replace(/\/$/u, "");
@@ -191,44 +230,13 @@ export async function inspectProtectedReleaseOperator(
     actorGithubUserId: number;
   },
 ): Promise<{ source: "github-repository-admin"; actorGithubUserId: number } | undefined> {
-  const githubLogin = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/iu;
-  if (
-    !githubLogin.test(input.actorLogin) ||
-    !Number.isSafeInteger(input.actorGithubUserId) ||
-    input.actorGithubUserId <= 0 ||
-    !repositoryComponent.test(input.owner) ||
-    !repositoryComponent.test(input.repository) ||
-    !input.token ||
-    !URL.canParse(input.apiBaseUrl)
-  )
-    return undefined;
-
-  const base = new URL(input.apiBaseUrl);
-  if (
-    base.protocol !== "https:" ||
-    base.hostname !== "api.github.com" ||
-    base.port ||
-    base.pathname !== "/" ||
-    base.username ||
-    base.password ||
-    base.search ||
-    base.hash
-  )
-    return undefined;
+  if (!validOperatorRequest(input)) return undefined;
 
   const path = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repository)}`;
   const endpoint = `${input.apiBaseUrl.replace(/\/$/u, "")}${path}/collaborators/${encodeURIComponent(input.actorLogin)}/permission`;
   try {
     const evidence = await readJson(input.request ?? fetch, endpoint, input.token);
-    if (
-      !isRecord(evidence) ||
-      evidence.permission !== "admin" ||
-      !isRecord(evidence.user) ||
-      evidence.user.id !== input.actorGithubUserId ||
-      typeof evidence.user.login !== "string" ||
-      evidence.user.login.toLowerCase() !== input.actorLogin.toLowerCase()
-    )
-      return undefined;
+    if (!adminPermissionMatches(evidence, input.actorGithubUserId, input.actorLogin)) return undefined;
     return {
       source: "github-repository-admin",
       actorGithubUserId: input.actorGithubUserId,

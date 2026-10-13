@@ -17,7 +17,7 @@ export type ProtectedReleaseSubjectExpectation = {
 type SignedClaims = Readonly<Record<string, unknown>>;
 
 function numericId(value: unknown): string | undefined {
-  if (typeof value !== "string" || value.length > 16 || !/^[1-9][0-9]*$/u.test(value)) return undefined;
+  if (typeof value !== "string" || value.length > 16 || !/^[1-9]\d*$/u.test(value)) return undefined;
   const parsed = BigInt(value);
   return parsed <= BigInt(Number.MAX_SAFE_INTEGER) ? value : undefined;
 }
