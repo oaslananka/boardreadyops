@@ -32546,10 +32546,23 @@ async function verifyManifestCoverage(bundleDir) {
   }
   const manifest = readResult.manifest;
   const covered = new Set((manifest.artifacts ?? []).map((artifact) => import_node_path68.default.resolve(outputDir, artifact.path)));
-  const SKIP = /* @__PURE__ */ new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
+  const rootSidecars = /* @__PURE__ */ new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
   const allFiles = [];
-  await collectFiles2(outputDir, allFiles);
-  const uncovered = allFiles.filter((file2) => !SKIP.has(import_node_path68.default.basename(file2)) && !covered.has(file2)).map((file2) => import_node_path68.default.relative(outputDir, file2).split(import_node_path68.default.sep).join("/")).sort((left, right) => left.localeCompare(right));
+  const symlinks = /* @__PURE__ */ new Set();
+  try {
+    await collectFiles2(outputDir, allFiles, symlinks, true);
+  } catch (error51) {
+    return {
+      ok: false,
+      manifestPath,
+      uncovered: [],
+      errors: [`bundle coverage could not be scanned: ${error51 instanceof Error ? error51.message : String(error51)}`]
+    };
+  }
+  const uncovered = allFiles.filter((file2) => {
+    const relative = import_node_path68.default.relative(outputDir, file2).split(import_node_path68.default.sep).join("/");
+    return symlinks.has(file2) || !rootSidecars.has(relative) && !covered.has(file2);
+  }).map((file2) => import_node_path68.default.relative(outputDir, file2).split(import_node_path68.default.sep).join("/")).sort((left, right) => left.localeCompare(right));
   return { ok: uncovered.length === 0, manifestPath, uncovered, errors: [] };
 }
 async function verifyReleaseEvidenceBundle(bundleDir) {
@@ -32671,19 +32684,21 @@ async function discoverManufacturingArtifacts(root) {
     (file2) => MANUFACTURING_EXTENSIONS.has(import_node_path68.default.extname(file2).toLowerCase()) || import_node_path68.default.basename(file2).toLowerCase().includes("readme")
   ).sort((left, right) => left.localeCompare(right));
 }
-async function collectFiles2(directory, output) {
+async function collectFiles2(directory, output, symlinks = /* @__PURE__ */ new Set(), strict = false) {
   let entries;
   try {
     entries = await import_promises26.default.readdir(directory, { withFileTypes: true });
-  } catch {
+  } catch (error51) {
+    if (strict) throw error51;
     return;
   }
   for (const entry of entries) {
     const target = import_node_path68.default.join(directory, entry.name);
     if (entry.isDirectory()) {
-      await collectFiles2(target, output);
-    } else if (entry.isFile()) {
+      await collectFiles2(target, output, symlinks, strict);
+    } else if (entry.isFile() || entry.isSymbolicLink()) {
       output.push(target);
+      if (entry.isSymbolicLink()) symlinks.add(target);
     }
   }
 }
@@ -56198,19 +56213,22 @@ async function resolveReleaseVerifySignature(bundleDir, options, stderr) {
   const signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
   return { signature, signatureRequired };
 }
-function writeReleaseVerifyOutcome(verification, signature, signatureRequired, options, streams) {
+function writeReleaseVerifyOutcome(verification, coverage, signature, signatureRequired, options, streams) {
   const signatureErrors = [...signature.errors];
   if (signatureRequired && !signature.present) {
     signatureErrors.push("expected a signed manifest (manifest.sig) but none was found");
   }
   const signatureOk = signatureErrors.length === 0 && (signature.present || !signatureRequired);
-  const ok = verification.ok && signatureOk;
+  const coverageErrors = [...coverage.errors, ...coverage.uncovered.map((file2) => `uncovered bundle file: ${file2}`)];
+  const coverageOk = coverage.errors.length === 0 && (!options.strictCoverage || coverage.ok);
+  const ok = verification.ok && signatureOk && coverageOk;
   if (options.format === "json") {
     streams.stdout.write(
       `${JSON.stringify(
         {
           ...verification,
           ok,
+          coverage,
           signature: {
             present: signature.present,
             ok: signatureOk,
@@ -56227,6 +56245,8 @@ function writeReleaseVerifyOutcome(verification, signature, signatureRequired, o
     const signatureNote = signature.present ? " and Ed25519 signature" : "";
     streams.stdout.write(`Release evidence bundle verified: ${verification.checked} artifact(s)${signatureNote}
 `);
+    if (!coverage.ok) streams.stderr.write(`Release bundle coverage warning: ${coverageErrors.join("; ")}
+`);
     if (verification.manifest) {
       streams.stdout.write(
         formatReleaseCertificateText(verification.manifest, { present: signature.present, ok: signatureOk })
@@ -56234,7 +56254,11 @@ function writeReleaseVerifyOutcome(verification, signature, signatureRequired, o
     }
   } else {
     streams.stderr.write(
-      `Release evidence bundle verification failed: ${[...verification.errors, ...signatureErrors].join("; ")}
+      `Release evidence bundle verification failed: ${[
+        ...verification.errors,
+        ...signatureErrors,
+        ...!coverageOk ? coverageErrors : []
+      ].join("; ")}
 `
     );
   }
@@ -56243,10 +56267,12 @@ function writeReleaseVerifyOutcome(verification, signature, signatureRequired, o
 async function releaseVerifyCommand(bundleInput, options, streams) {
   const bundleDir = import_node_path70.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
   const verification = await verifyReleaseEvidenceBundle(bundleDir);
+  const coverage = await verifyManifestCoverage(bundleDir);
   const signatureResolution = await resolveReleaseVerifySignature(bundleDir, options, streams.stderr);
   if ("exitCode" in signatureResolution) return signatureResolution.exitCode;
   return writeReleaseVerifyOutcome(
     verification,
+    coverage,
     signatureResolution.signature,
     signatureResolution.signatureRequired,
     options,
@@ -60949,7 +60975,7 @@ function registerAllCommands(program2, streams) {
   release.command("sign").argument("[bundle]", "release evidence bundle directory").option("--key <path>", "Ed25519 private key PEM used to sign the manifest").action(async (bundleInput, options) => {
     process.exitCode = await releaseSignCommand(bundleInput, options, streams);
   });
-  release.command("verify").argument("[bundle]", "release evidence bundle directory").option("--format <format>", "text or json", "text").option("--public-key <path>", "Ed25519 public key PEM to require and verify a signed manifest").option(
+  release.command("verify").argument("[bundle]", "release evidence bundle directory").option("--format <format>", "text or json", "text").option("--strict-coverage", "fail if the bundle contains files not covered by its manifest").option("--public-key <path>", "Ed25519 public key PEM to require and verify a signed manifest").option(
     "--trust-store <path>",
     "JSON trust store (array of {keyId, publicKey, validFrom, validUntil?, revokedAt?}) to verify against instead of a single --public-key, supporting key rotation and revocation"
   ).action(async (bundleInput, options) => {
