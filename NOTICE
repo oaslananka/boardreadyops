@@ -1805,7 +1805,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `husky@9.1.7`
   - Description: Modern native Git hooks
   - Homepage: https://github.com/typicode/husky#readme
-- `iconv-lite@0.7.2`, `iconv-lite@0.7.3`
+- `iconv-lite@0.7.3`
   - Description: Convert character encodings in pure javascript.
   - Homepage: https://github.com/pillarjs/iconv-lite
 - `image-ssim@0.2.0`
