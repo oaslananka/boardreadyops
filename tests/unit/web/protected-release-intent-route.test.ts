@@ -78,6 +78,18 @@ describe("non-dispatching protected release intent API", () => {
     ).toBe(401);
   });
 
+  it("rejects malformed session timestamps rather than minting an intent token", async () => {
+    for (const corrupted of [
+      { ...session, issuedAt: "not-a-date" },
+      { ...session, expiresAt: "not-a-date" },
+      { ...session, userId: 0 },
+    ]) {
+      const setup = deps(corrupted);
+      expect((await handleProtectedReleaseIntent(request("GET"), repoId, setup)).status).toBe(401);
+      expect(setup.record).not.toHaveBeenCalled();
+    }
+  });
+
   it("rejects no/mismatched CSRF, foreign origin and other repository without writing", async () => {
     const setup = deps();
     const get = await handleProtectedReleaseIntent(request("GET"), repoId, setup);

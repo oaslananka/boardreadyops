@@ -57,6 +57,13 @@ async function actualRecord(input: Parameters<Recorder>[0]): ReturnType<Recorder
   }
 }
 
+function validSessionForIntent(session: UserSession | undefined, now: Date): session is UserSession {
+  if (!session || !Number.isSafeInteger(session.userId) || session.userId <= 0) return false;
+  const issued = Date.parse(session.issuedAt);
+  const expires = Date.parse(session.expiresAt);
+  return Number.isFinite(issued) && Number.isFinite(expires) && issued <= now.getTime() && expires > now.getTime();
+}
+
 export async function handleProtectedReleaseIntent(
   request: Request,
   repositoryId: string,
@@ -76,7 +83,7 @@ export async function handleProtectedReleaseIntent(
   // Import dynamically: Next's cookies() may only be called inside a request.
   const viewer = dependencies.viewer ?? (await import("./viewer-authorization.js")).viewerAuthorization;
   const { session } = await viewer();
-  if (!session || Date.parse(session.issuedAt) > now.getTime() || Date.parse(session.expiresAt) <= now.getTime()) {
+  if (!validSessionForIntent(session, now)) {
     return reply(401, { error: "Signed GitHub session required" });
   }
 

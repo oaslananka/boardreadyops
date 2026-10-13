@@ -36,7 +36,7 @@ export function validProtectedIntentCsrfToken(
 ): boolean {
   if (!token || token.length > 256 || !repositoryId.test(repoId)) return false;
   const parts = token.split(".");
-  if (parts.length !== 2 || !/^[0-9]{13}$/u.test(parts[0] ?? "")) return false;
+  if (parts.length !== 2 || !/^\d{13}$/u.test(parts[0] ?? "")) return false;
   const expires = Number(parts[0]);
   if (!Number.isSafeInteger(expires) || expires <= now.getTime() || expires > now.getTime() + tokenLifetimeMs)
     return false;
