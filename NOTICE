@@ -192,9 +192,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `csp_evaluator@1.1.8`
   - Description: Evaluate Content Security Policies for a wide range of bypasses and weaknesses
   - Homepage: https://csp-evaluator.withgoogle.com/
-- `denque@2.1.0`
-  - Description: The fastest javascript implementation of a double-ended queue. Used by the official Redis, MongoDB, MariaDB & MySQL libraries for Node.js and many other libraries. Maintains compatability with deque.
-  - Homepage: https://docs.page/invertase/denque
 - `detect-libc@2.1.2`
   - Description: Node.js module to detect the C standard library (libc) implementation family and version
   - Homepage: https://github.com/lovell/detect-libc#readme
@@ -1808,7 +1805,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `husky@9.1.7`
   - Description: Modern native Git hooks
   - Homepage: https://github.com/typicode/husky#readme
-- `iconv-lite@0.7.2`
+- `iconv-lite@0.7.2`, `iconv-lite@0.7.3`
   - Description: Convert character encodings in pure javascript.
   - Homepage: https://github.com/pillarjs/iconv-lite
 - `image-ssim@0.2.0`
@@ -1996,7 +1993,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `mustache@4.2.0`
   - Description: Logic-less {{mustache}} templates with JavaScript
   - Homepage: https://github.com/janl/mustache.js
-- `mysql2@3.23.1`
+- `mysql2@3.23.4`
   - Description: fast mysql driver. Implements core protocol, prepared statements, ssl and compression in native JS
   - Homepage: https://sidorares.github.io/node-mysql2/docs
 - `named-placeholders@1.1.6`
