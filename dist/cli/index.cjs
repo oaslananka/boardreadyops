@@ -58027,19 +58027,19 @@ async function checkoutRunnerSource(options) {
   if (options.job.sourceMode !== "customer_checkout") {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
+  const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
   const workspaceRoot = import_node_path74.default.resolve(options.workspaceRoot);
   await (0, import_promises32.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
   if (process.platform !== "win32") await (0, import_promises32.chmod)(workspaceRoot, 448);
   const workspace = await (0, import_promises32.mkdtemp)(import_node_path74.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
-  if (process.platform !== "win32") await (0, import_promises32.chmod)(workspace, 448);
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
-  const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
   const git = async (args) => await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
     cwd: workspace,
     env: environment
   });
   try {
+    if (process.platform !== "win32") await (0, import_promises32.chmod)(workspace, 448);
     await git(["init", "--quiet"]);
     await git(["remote", "add", "origin", repository]);
     await git(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
