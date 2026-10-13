@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { inspectProtectedBranchHead } from "../../../apps/web/lib/github-protected-branch-evidence.js";
+import {
+  inspectProtectedBranchHead,
+  inspectProtectedReleaseOperator,
+} from "../../../apps/web/lib/github-protected-branch-evidence.js";
 
 const sha = "a".repeat(40);
 const input = {
@@ -137,5 +140,71 @@ describe("protected branch evidence (not release authorization)", () => {
       throw new Error("offline");
     });
     await expect(inspectProtectedBranchHead({ ...input, request })).resolves.toBeUndefined();
+  });
+});
+
+describe("repository administrator evidence (not release authorization)", () => {
+  const actorGithubUserId = 825312;
+  const operator = { ...input, actorLogin: "octocat", actorGithubUserId };
+
+  function permissionResponse(
+    body: unknown = { permission: "admin", role_name: "admin", user: { id: actorGithubUserId, login: "octocat" } },
+    status = 200,
+  ) {
+    return vi.fn(async () => new Response(JSON.stringify(body), { status }));
+  }
+
+  it("accepts a GitHub-verified admin login and numeric actor ID", async () => {
+    const request = permissionResponse();
+    await expect(inspectProtectedReleaseOperator({ ...operator, request })).resolves.toEqual({
+      source: "github-repository-admin",
+      actorGithubUserId,
+    });
+    expect(request).toHaveBeenCalledWith(
+      "https://api.github.com/repos/octo-org/example/collaborators/octocat/permission",
+      expect.objectContaining({ method: "GET", redirect: "error" }),
+    );
+  });
+
+  it.each([
+    ["write role", { permission: "write", user: { id: actorGithubUserId, login: "octocat" } }],
+    [
+      "custom non-admin role",
+      { permission: "write", role_name: "custom", user: { id: actorGithubUserId, login: "octocat" } },
+    ],
+    ["different GitHub ID", { permission: "admin", user: { id: 123, login: "octocat" } }],
+    ["different username", { permission: "admin", user: { id: actorGithubUserId, login: "other" } }],
+    ["malformed response", { permission: "admin" }],
+  ])("rejects %s", async (_case, body) => {
+    await expect(
+      inspectProtectedReleaseOperator({ ...operator, request: permissionResponse(body) }),
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([403, 404, 500])("fails closed for HTTP %d", async (status) => {
+    await expect(
+      inspectProtectedReleaseOperator({ ...operator, request: permissionResponse({}, status) }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("does not call GitHub for invalid actor identity or API origin", async () => {
+    const request = permissionResponse();
+    await expect(
+      inspectProtectedReleaseOperator({ ...operator, actorLogin: "../other", request }),
+    ).resolves.toBeUndefined();
+    await expect(
+      inspectProtectedReleaseOperator({ ...operator, actorGithubUserId: 0, request }),
+    ).resolves.toBeUndefined();
+    await expect(
+      inspectProtectedReleaseOperator({ ...operator, apiBaseUrl: "https://evil.example", request }),
+    ).resolves.toBeUndefined();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on network exceptions", async () => {
+    const request = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    await expect(inspectProtectedReleaseOperator({ ...operator, request })).resolves.toBeUndefined();
   });
 });

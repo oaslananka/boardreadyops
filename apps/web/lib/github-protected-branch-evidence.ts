@@ -147,3 +147,64 @@ export async function inspectProtectedBranchHead(
     return undefined;
   }
 }
+
+/**
+ * Observe a repository administrator using an installation token bound to the
+ * same repository. Only call this with an authenticated GitHub session's user
+ * identity and an authoritative stored installation/repository association.
+ *
+ * This is identity/role evidence, NOT a release authorization. The caller
+ * must still obtain explicit operator intent and store it immutably.
+ */
+export async function inspectProtectedReleaseOperator(
+  input: Pick<ProtectedBranchHeadInput, "apiBaseUrl" | "token" | "owner" | "repository" | "request"> & {
+    actorLogin: string;
+    actorGithubUserId: number;
+  },
+): Promise<{ source: "github-repository-admin"; actorGithubUserId: number } | undefined> {
+  const githubLogin = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/iu;
+  if (
+    !githubLogin.test(input.actorLogin) ||
+    !Number.isSafeInteger(input.actorGithubUserId) ||
+    input.actorGithubUserId <= 0 ||
+    !repositoryComponent.test(input.owner) ||
+    !repositoryComponent.test(input.repository) ||
+    !input.token ||
+    !URL.canParse(input.apiBaseUrl)
+  )
+    return undefined;
+
+  const base = new URL(input.apiBaseUrl);
+  if (
+    base.protocol !== "https:" ||
+    base.hostname !== "api.github.com" ||
+    base.port ||
+    base.pathname !== "/" ||
+    base.username ||
+    base.password ||
+    base.search ||
+    base.hash
+  )
+    return undefined;
+
+  const path = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repository)}`;
+  const endpoint = `${input.apiBaseUrl.replace(/\/$/u, "")}${path}/collaborators/${encodeURIComponent(input.actorLogin)}/permission`;
+  try {
+    const evidence = await readJson(input.request ?? fetch, endpoint, input.token);
+    if (
+      !isRecord(evidence) ||
+      evidence.permission !== "admin" ||
+      !isRecord(evidence.user) ||
+      evidence.user.id !== input.actorGithubUserId ||
+      typeof evidence.user.login !== "string" ||
+      evidence.user.login.toLowerCase() !== input.actorLogin.toLowerCase()
+    )
+      return undefined;
+    return {
+      source: "github-repository-admin",
+      actorGithubUserId: input.actorGithubUserId,
+    };
+  } catch {
+    return undefined;
+  }
+}
