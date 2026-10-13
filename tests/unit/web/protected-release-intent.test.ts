@@ -45,6 +45,7 @@ function github(role = "admin", head = sha) {
         default_branch: "main",
         archived: false,
         disabled: false,
+        private: false,
       });
     }
     throw new Error("unexpected endpoint");

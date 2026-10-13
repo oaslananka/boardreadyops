@@ -19,6 +19,7 @@ const repositoryRow = {
   owner: "org",
   name: "board",
   default_branch: "main",
+  repository_private: false,
 };
 
 function setup(
@@ -73,6 +74,7 @@ function setup(
         default_branch: "main",
         archived: false,
         disabled: false,
+        private: false,
       });
     throw new Error("unexpected URL");
   });
@@ -94,6 +96,7 @@ describe("server-only protected branch intent evidence recorder", () => {
     expect(fixture.githubRequest).toHaveBeenCalledTimes(6);
     expect(fixture.queries).toHaveLength(2);
     expect(fixture.queries[0]?.sql).toContain("repositories.disabled_at is null");
+    expect(fixture.queries[0]?.sql).toContain("repositories.private = false");
     expect(fixture.queries[0]?.sql).toContain("installations.suspended_at is null");
     expect(fixture.queries[1]?.sql).toContain("boardreadyops_record_protected_release_intent_candidate");
     expect(fixture.queries[1]?.params.slice(0, 4)).toEqual(["install-internal", "repo-internal", 501, 601]);
@@ -117,6 +120,7 @@ describe("server-only protected branch intent evidence recorder", () => {
   it.each([
     ["unavailable repository", { row: null }],
     ["different installation", { row: { ...repositoryRow, github_installation_id: "999" } }],
+    ["private repository", { row: { ...repositoryRow, repository_private: true } }],
     ["wrong repository ID", { githubRepositoryId: 999 }],
     ["non-admin operator", { actorPermission: "write" }],
     ["different signed identity", { actorId: 999 }],

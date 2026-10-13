@@ -61,7 +61,8 @@ function repositoryMatches(
     body.full_name.toLowerCase() === `${owner}/${repository}`.toLowerCase() &&
     body.default_branch === expectedBranch &&
     body.archived === false &&
-    body.disabled === false
+    body.disabled === false &&
+    body.private === false
   );
 }
 

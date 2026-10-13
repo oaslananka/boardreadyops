@@ -40,9 +40,11 @@ export async function recordProtectedReleaseIntentForViewer(
   const statement = [
     "select repositories.id as repository_id, repositories.github_repo_id,",
     "repositories.owner, repositories.name, repositories.default_branch,",
+    "repositories.private as repository_private,",
     "installations.id as installation_id, installations.github_installation_id",
     "from repositories join installations on installations.id = repositories.installation_id",
     "where repositories.id = $1 and repositories.disabled_at is null",
+    "and repositories.private = false",
     "and installations.suspended_at is null limit 1",
   ].join(" ");
   const result = (await dependencies.db.query(statement, [input.repositoryId])) as {
@@ -63,6 +65,7 @@ export async function recordProtectedReleaseIntentForViewer(
     typeof row.owner !== "string" ||
     typeof row.name !== "string" ||
     typeof row.default_branch !== "string" ||
+    row.repository_private !== false ||
     !session.installationIds.includes(githubInstallationId)
   )
     return undefined;
