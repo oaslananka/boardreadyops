@@ -20,6 +20,8 @@ export type ProtectedBranchHeadInput = {
   token: string;
   owner: string;
   repository: string;
+  /** Numeric GitHub repository ID resolved from authoritative installation-scoped state. */
+  repositoryId: number;
   /** Trusted target branch name, not a user-submitted PR base branch. */
   branch: string;
   ref: string;
@@ -43,6 +45,17 @@ function validBranch(branch: string): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function repositoryMatches(body: unknown, owner: string, repository: string, repositoryId: number): boolean {
+  return (
+    isRecord(body) &&
+    body.id === repositoryId &&
+    typeof body.full_name === "string" &&
+    body.full_name.toLowerCase() === `${owner}/${repository}`.toLowerCase() &&
+    body.archived === false &&
+    body.disabled === false
+  );
 }
 
 function branchMatches(body: unknown, expectedBranch: string, sha: string): boolean {
@@ -102,6 +115,8 @@ export async function inspectProtectedBranchHead(
   if (
     !repositoryComponent.test(input.owner) ||
     !repositoryComponent.test(input.repository) ||
+    !Number.isSafeInteger(input.repositoryId) ||
+    input.repositoryId <= 0 ||
     !validBranch(input.branch) ||
     input.ref !== `refs/heads/${input.branch}` ||
     !exactSha.test(input.sha) ||
@@ -126,16 +141,21 @@ export async function inspectProtectedBranchHead(
   // URLs and the token are operational configuration, never derived from a PR.
   const apiBaseUrl = input.apiBaseUrl.replace(/\/$/u, "");
   const path = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repository)}`;
+  const repoPath = path;
   const branchPath = `${path}/branches/${encodeURIComponent(input.branch)}`;
   const rulesPath = `${path}/rules/branches/${encodeURIComponent(input.branch)}`;
   const request = input.request ?? fetch;
   try {
+    const repoBefore = await readJson(request, `${apiBaseUrl}${repoPath}`, input.token);
+    if (!repositoryMatches(repoBefore, input.owner, input.repository, input.repositoryId)) return undefined;
     const before = await readJson(request, `${apiBaseUrl}${branchPath}`, input.token);
     if (!branchMatches(before, input.branch, input.sha)) return undefined;
     const rules = await readJson(request, `${apiBaseUrl}${rulesPath}`, input.token);
     if (!meaningfulRules(rules)) return undefined;
     const after = await readJson(request, `${apiBaseUrl}${branchPath}`, input.token);
     if (!branchMatches(after, input.branch, input.sha)) return undefined;
+    const repoAfter = await readJson(request, `${apiBaseUrl}${repoPath}`, input.token);
+    if (!repositoryMatches(repoAfter, input.owner, input.repository, input.repositoryId)) return undefined;
     return {
       source: "github-active-branch-rules",
       ref: input.ref,

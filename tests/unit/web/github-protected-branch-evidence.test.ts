@@ -5,16 +5,24 @@ import {
 } from "../../../apps/web/lib/github-protected-branch-evidence.js";
 
 const sha = "a".repeat(40);
+const repositoryId = 12345678;
 const input = {
   apiBaseUrl: "https://api.github.com",
   token: "test-installation-token",
   owner: "octo-org",
   repository: "example",
+  repositoryId,
   branch: "main",
   ref: "refs/heads/main",
   sha,
 };
 
+const repo = (id = repositoryId) => ({
+  id,
+  full_name: "octo-org/example",
+  archived: false,
+  disabled: false,
+});
 const branch = (commit = sha) => ({ name: "main", protected: true, commit: { sha: commit } });
 const rules = [
   { type: "deletion", ruleset_id: 27 },
@@ -34,8 +42,11 @@ function api(
   options: {
     first?: unknown;
     second?: unknown;
+    firstRepo?: unknown;
+    secondRepo?: unknown;
     activeRules?: unknown;
     branchStatus?: number;
+    repositoryStatus?: number;
     ruleStatus?: number;
   } = {},
 ) {
@@ -43,7 +54,16 @@ function api(
   const second = options.second ?? branch();
   const activeRules = options.activeRules ?? rules;
   let branchReads = 0;
+  let repositoryReads = 0;
   return vi.fn(async (url: string) => {
+    if (url.endsWith("/repos/octo-org/example")) {
+      return new Response(
+        JSON.stringify(++repositoryReads === 1 ? (options.firstRepo ?? repo()) : (options.secondRepo ?? repo())),
+        {
+          status: options.repositoryStatus ?? 200,
+        },
+      );
+    }
     if (url.endsWith("/rules/branches/main")) {
       return new Response(JSON.stringify(activeRules), { status: options.ruleStatus ?? 200 });
     }
@@ -65,15 +85,23 @@ describe("protected branch evidence (not release authorization)", () => {
       source: "github-active-branch-rules",
       requiredRuleTypes: ["pull_request", "required_status_checks"],
     });
-    expect(request).toHaveBeenCalledTimes(3);
+    expect(request).toHaveBeenCalledTimes(5);
     expect(request.mock.calls.map(([url]) => url)).toEqual([
+      "https://api.github.com/repos/octo-org/example",
       "https://api.github.com/repos/octo-org/example/branches/main",
       "https://api.github.com/repos/octo-org/example/rules/branches/main",
       "https://api.github.com/repos/octo-org/example/branches/main",
+      "https://api.github.com/repos/octo-org/example",
     ]);
   });
 
   it.each([
+    ["different repo ID", { firstRepo: repo(repositoryId + 1) }],
+    ["repo changed mid-verification", { secondRepo: repo(repositoryId + 1) }],
+    ["archived repository", { firstRepo: { ...repo(), archived: true } }],
+    ["disabled repository", { firstRepo: { ...repo(), disabled: true } }],
+    ["renamed repository", { firstRepo: { ...repo(), full_name: "octo-org/replaced" } }],
+    ["unreadable repository", { repositoryStatus: 403 }],
     ["different head", { first: branch("b".repeat(40)) }],
     ["head changed during lookup", { second: branch("b".repeat(40)) }],
     ["unprotected branch", { first: { ...branch(), protected: false } }],
@@ -121,6 +149,7 @@ describe("protected branch evidence (not release authorization)", () => {
     const request = api();
     await expect(inspectProtectedBranchHead({ ...input, owner: "../another", request })).resolves.toBeUndefined();
     await expect(inspectProtectedBranchHead({ ...input, sha: "f".repeat(39), request })).resolves.toBeUndefined();
+    await expect(inspectProtectedBranchHead({ ...input, repositoryId: -1, request })).resolves.toBeUndefined();
     expect(request).not.toHaveBeenCalled();
   });
 
