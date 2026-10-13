@@ -321,7 +321,20 @@ export function createSqlRunnerArtifactStore(
       const returnedStoragePath = stringColumn(row, "storage_path");
       const declaredBytes = numberColumn(row, "declared_bytes");
       const expectedSha256 = stringColumn(row, "expected_sha256");
-      if (!runId || !executionAttemptId || !leaseId || !returnedStoragePath || declaredBytes === undefined) {
+      if (
+        !runId ||
+        !uuidPattern.test(runId) ||
+        !executionAttemptId ||
+        !uuidPattern.test(executionAttemptId) ||
+        !leaseId ||
+        !uuidPattern.test(leaseId) ||
+        !returnedStoragePath ||
+        !validStoragePath(returnedStoragePath) ||
+        declaredBytes === undefined ||
+        declaredBytes < 0 ||
+        declaredBytes > 2_147_483_647 ||
+        (expectedSha256 !== undefined && !sha256Pattern.test(expectedSha256))
+      ) {
         throw new Error("artifact upload begin returned incomplete capability metadata");
       }
       return {
