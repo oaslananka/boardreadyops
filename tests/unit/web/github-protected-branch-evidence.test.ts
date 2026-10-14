@@ -6,6 +6,7 @@ import {
 
 const sha = "a".repeat(40);
 const repositoryId = 12345678;
+const ownerId = 9876543;
 const input = {
   apiBaseUrl: "https://api.github.com",
   token: "test-installation-token",
@@ -20,6 +21,7 @@ const input = {
 const repo = (id = repositoryId) => ({
   id,
   full_name: "octo-org/example",
+  owner: { id: ownerId, login: "octo-org" },
   archived: false,
   disabled: false,
   private: false,
@@ -85,6 +87,7 @@ describe("protected branch evidence (not release authorization)", () => {
       ref: "refs/heads/main",
       sha,
       source: "github-active-branch-rules",
+      githubOwnerId: ownerId,
       requiredRuleTypes: ["pull_request", "required_status_checks"],
     });
     expect(request).toHaveBeenCalledTimes(5);
@@ -100,6 +103,15 @@ describe("protected branch evidence (not release authorization)", () => {
   it.each([
     ["different repo ID", { firstRepo: repo(repositoryId + 1) }],
     ["repo changed mid-verification", { secondRepo: repo(repositoryId + 1) }],
+    ["missing owner identity", { firstRepo: { ...repo(), owner: undefined } }],
+    ["malformed owner ID", { firstRepo: { ...repo(), owner: { id: "9876543", login: "octo-org" } } }],
+    ["invalid owner ID", { firstRepo: { ...repo(), owner: { id: 0, login: "octo-org" } } }],
+    ["wrong owner login", { firstRepo: { ...repo(), owner: { id: ownerId, login: "other-org" } } }],
+    [
+      "owner transferred during verification",
+      { secondRepo: { ...repo(), owner: { id: ownerId + 1, login: "octo-org" } } },
+    ],
+
     ["archived repository", { firstRepo: { ...repo(), archived: true } }],
     ["disabled repository", { firstRepo: { ...repo(), disabled: true } }],
     ["private repository", { firstRepo: { ...repo(), private: true } }],

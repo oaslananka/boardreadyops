@@ -3,7 +3,8 @@ import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.
 import { ProtectedReleaseIntentStore } from "../../../packages/db/src/protected-release-intent-store.js";
 
 const evidence = {
-  version: 1 as const,
+  version: 2 as const,
+  githubOwnerId: 901,
   kind: "protected-branch" as const,
   installationId: 501,
   repositoryId: "repo-internal",
@@ -33,7 +34,7 @@ describe("protected-release evidence candidate store (never enqueues)", () => {
     const store = new ProtectedReleaseIntentStore(executor);
     await expect(store.record(evidence, context)).resolves.toEqual({ id: "saved", inserted: true });
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.sql).toContain("boardreadyops_record_protected_release_intent_candidate");
+    expect(calls[0]?.sql).toContain("boardreadyops_record_protected_release_intent_candidate_v2");
     expect(calls[0]?.sql).not.toContain("release_runs");
     expect(calls[0]?.sql).not.toContain("outbox");
     expect(calls[0]?.params).toEqual([
@@ -41,6 +42,7 @@ describe("protected-release evidence candidate store (never enqueues)", () => {
       "repo-internal",
       501,
       601,
+      901,
       701,
       "maintainer",
       "refs/heads/main",
@@ -64,6 +66,7 @@ describe("protected-release evidence candidate store (never enqueues)", () => {
     ["different GitHub installation", evidence, { ...context, githubInstallationId: 999 }],
     ["missing internal installation", evidence, { ...context, internalInstallationId: "" }],
     ["invalid repository ID", { ...evidence, githubRepositoryId: 0 }, context],
+    ["invalid owner ID", { ...evidence, githubOwnerId: -2 }, context],
     ["invalid actor ID", { ...evidence, actorGithubUserId: -1 }, context],
     ["PR code ref", { ...evidence, ref: "refs/pull/9/merge" }, context],
     ["invalid SHA", { ...evidence, sha: "wrong" }, context],

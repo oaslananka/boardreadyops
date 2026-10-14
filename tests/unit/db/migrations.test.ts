@@ -140,6 +140,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0087_signed_runner_tool_versions.sql",
       "0088_protected_release_intent_candidates.sql",
       "0089_protected_release_execution_seals.sql",
+      "0090_protected_release_verified_owner_evidence.sql",
     ]);
   });
 

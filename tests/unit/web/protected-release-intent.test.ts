@@ -42,6 +42,7 @@ function github(role = "admin", head = sha) {
       return Response.json({
         id: 456,
         full_name: "example-org/board",
+        owner: { id: 901, login: "example-org" },
         default_branch: "main",
         archived: false,
         disabled: false,
@@ -57,7 +58,8 @@ describe("non-authorizing protected-release intent evidence", () => {
     const request = github();
     const result = await inspectProtectedReleaseIntentCandidate({ ...base, request });
     expect(result).toMatchObject({
-      version: 1,
+      version: 2,
+      githubOwnerId: 901,
       kind: "protected-branch",
       installationId: 567,
       repositoryId: "repo-123",

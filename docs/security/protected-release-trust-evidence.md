@@ -17,7 +17,11 @@ standard/safe paths remain unchanged.
 4. Versioned evidence binds both GitHub and internal repository identity,
    actor, branch ref/SHA and explicit request ID. Its SHA-256 digest is for
    correlation, **not** signing, replay protection or authorization.
-5. The evidence-only migration 0088 persists a separate append-only table,
+5. Migration 0090 adds an evidence v2 owner-ID binding: both live GitHub
+   repository reads must agree on an immutable numeric owner ID. The v2
+   evidence digest and append-only row contain that ID. Existing v1 rows
+   remain untouched and cannot be used as v2 authority.
+6. The evidence-only migration 0088 persists a separate append-only table,
    rechecks current installation/repository identity with row locks, permits
    identical idempotent retries and rejects conflicting retries. Uninstall
    foreign-key cascading is preserved.

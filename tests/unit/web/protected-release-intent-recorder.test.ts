@@ -71,6 +71,7 @@ function setup(
       return Response.json({
         id: overrides.githubRepositoryId ?? 601,
         full_name: "org/board",
+        owner: { id: 901, login: "org" },
         default_branch: "main",
         archived: false,
         disabled: false,
@@ -99,7 +100,7 @@ describe("server-only protected branch intent evidence recorder", () => {
     expect(fixture.queries[0]?.sql).toContain("repositories.private = false");
     expect(fixture.queries[0]?.sql).toContain("installations.suspended_at is null");
     expect(fixture.queries[1]?.sql).toContain("boardreadyops_record_protected_release_intent_candidate");
-    expect(fixture.queries[1]?.params.slice(0, 4)).toEqual(["install-internal", "repo-internal", 501, 601]);
+    expect(fixture.queries[1]?.params.slice(0, 5)).toEqual(["install-internal", "repo-internal", 501, 601, 901]);
     expect(fixture.queries.map((q) => q.sql).join(" ")).not.toContain("control_plane_outbox");
   });
 

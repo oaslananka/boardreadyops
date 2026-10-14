@@ -7,6 +7,8 @@
  */
 export type ProtectedBranchHeadEvidence = {
   source: "github-active-branch-rules";
+  /** Verified numeric owner identity, stable across both GitHub repository reads. */
+  githubOwnerId: number;
   ref: string;
   sha: string;
   requiredRuleTypes: ["pull_request", "required_status_checks"];
@@ -45,6 +47,20 @@ function validBranch(branch: string): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function githubOwnerId(body: unknown, expectedOwner: string): number | undefined {
+  if (!isRecord(body) || !isRecord(body.owner)) return undefined;
+  const id = body.owner.id;
+  if (
+    !Number.isSafeInteger(id) ||
+    typeof id !== "number" ||
+    id <= 0 ||
+    typeof body.owner.login !== "string" ||
+    body.owner.login.toLowerCase() !== expectedOwner.toLowerCase()
+  )
+    return undefined;
+  return id;
 }
 
 function repositoryMatches(
@@ -196,6 +212,8 @@ export async function inspectProtectedBranchHead(
     const repoBefore = await readJson(request, `${apiBaseUrl}${repoPath}`, input.token);
     if (!repositoryMatches(repoBefore, input.owner, input.repository, input.repositoryId, input.branch))
       return undefined;
+    const ownerId = githubOwnerId(repoBefore, input.owner);
+    if (!ownerId) return undefined;
     const before = await readJson(request, `${apiBaseUrl}${branchPath}`, input.token);
     if (!branchMatches(before, input.branch, input.sha)) return undefined;
     const rules = await readJson(request, `${apiBaseUrl}${rulesPath}`, input.token);
@@ -203,10 +221,14 @@ export async function inspectProtectedBranchHead(
     const after = await readJson(request, `${apiBaseUrl}${branchPath}`, input.token);
     if (!branchMatches(after, input.branch, input.sha)) return undefined;
     const repoAfter = await readJson(request, `${apiBaseUrl}${repoPath}`, input.token);
-    if (!repositoryMatches(repoAfter, input.owner, input.repository, input.repositoryId, input.branch))
+    if (
+      !repositoryMatches(repoAfter, input.owner, input.repository, input.repositoryId, input.branch) ||
+      githubOwnerId(repoAfter, input.owner) !== ownerId
+    )
       return undefined;
     return {
       source: "github-active-branch-rules",
+      githubOwnerId: ownerId,
       ref: input.ref,
       sha: input.sha,
       requiredRuleTypes: ["pull_request", "required_status_checks"],

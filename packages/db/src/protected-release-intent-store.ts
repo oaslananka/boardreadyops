@@ -5,13 +5,14 @@ import type { SqlQueryExecutor } from "./lifecycle-store.js";
  * permission to dispatch, claim a runner lease or accept an OIDC callback.
  */
 export type ProtectedReleaseIntentEvidence = {
-  version: 1;
+  version: 2;
   kind: "protected-branch";
   /** Numeric GitHub installation ID, NOT installations.id. */
   installationId: number;
   /** Text internal repositories.id, not github_repo_id. */
   repositoryId: string;
   githubRepositoryId: number;
+  githubOwnerId: number;
   actorGithubUserId: number;
   actorLogin: string;
   ref: string;
@@ -48,7 +49,7 @@ export class ProtectedReleaseIntentStore {
     },
   ): Promise<RecordedProtectedReleaseIntent> {
     if (
-      evidence.version !== 1 ||
+      evidence.version !== 2 ||
       evidence.kind !== "protected-branch" ||
       !context.internalInstallationId ||
       !Number.isSafeInteger(context.githubInstallationId) ||
@@ -57,6 +58,8 @@ export class ProtectedReleaseIntentStore {
       evidence.installationId !== context.githubInstallationId ||
       !Number.isSafeInteger(evidence.githubRepositoryId) ||
       evidence.githubRepositoryId <= 0 ||
+      !Number.isSafeInteger(evidence.githubOwnerId) ||
+      evidence.githubOwnerId <= 0 ||
       !Number.isSafeInteger(evidence.actorGithubUserId) ||
       evidence.actorGithubUserId <= 0 ||
       !evidence.repositoryId ||
@@ -71,9 +74,9 @@ export class ProtectedReleaseIntentStore {
 
     const statement = [
       "select candidate_id, inserted",
-      "from boardreadyops_record_protected_release_intent_candidate(",
-      "$1, $2, $3::bigint, $4::bigint, $5::bigint,",
-      "$6, $7, $8, $9, $10, $11::timestamptz",
+      "from boardreadyops_record_protected_release_intent_candidate_v2(",
+      "$1, $2, $3::bigint, $4::bigint, $5::bigint, $6::bigint,",
+      "$7, $8, $9, $10, $11, $12::timestamptz",
       ")",
     ].join(" ");
     const raw = (await this.db.query(statement, [
@@ -81,6 +84,7 @@ export class ProtectedReleaseIntentStore {
       evidence.repositoryId,
       context.githubInstallationId,
       evidence.githubRepositoryId,
+      evidence.githubOwnerId,
       evidence.actorGithubUserId,
       evidence.actorLogin,
       evidence.ref,

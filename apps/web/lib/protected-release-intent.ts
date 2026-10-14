@@ -12,11 +12,12 @@ import {
  * this evidence before granting any runner privileges.
  */
 export type ProtectedReleaseIntentCandidate = {
-  version: 1;
+  version: 2;
   kind: "protected-branch";
   installationId: number;
   repositoryId: string;
   githubRepositoryId: number;
+  githubOwnerId: number;
   actorGithubUserId: number;
   actorLogin: string;
   ref: string;
@@ -111,11 +112,12 @@ export async function inspectProtectedReleaseIntentCandidate(
   if (!role) return undefined;
 
   const material = {
-    version: 1 as const,
+    version: 2 as const,
     kind: "protected-branch" as const,
     installationId: repository.installationId,
     repositoryId: repository.repositoryId,
     githubRepositoryId: repository.githubRepositoryId,
+    githubOwnerId: branch.githubOwnerId,
     actorGithubUserId: actor.githubUserId,
     actorLogin: actor.login,
     ref: branch.ref,
