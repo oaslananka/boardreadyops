@@ -303,6 +303,21 @@ export async function verifyReviewedExportAttestation(
       "No cryptographically verified attestation matched the expected workflow/run and exact output set.",
     );
   }
+  // The external verifier can take tens of seconds. The workspace is not
+  // immutable merely because its bytes matched the signed subjects earlier.
+  // Recheck the source and complete output set before returning an eligible
+  // result; no stale pre-verification hash may bless a changed checkout.
+  try {
+    const afterVerification = await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
+    if (
+      afterVerification.manifestPath !== inventory.manifestPath ||
+      afterVerification.checksums !== inventory.checksums
+    ) {
+      return rejected("Export source or subject inventory changed during attestation verification.");
+    }
+  } catch {
+    return rejected("Export source or subject inventory changed during attestation verification.");
+  }
   return {
     status: "eligible",
     reason: "Signed subject inventory and trusted target workflow identity match; GA acceptance remains separate.",
