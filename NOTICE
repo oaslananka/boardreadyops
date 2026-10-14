@@ -177,7 +177,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `before-after-hook@4.0.0`
   - Description: asynchronous before/error/after hooks for internal functionality
   - Homepage: https://github.com/gr2m/before-after-hook#readme
-- `chrome-launcher@1.2.1`
+- `chrome-launcher@1.2.2`
   - Description: Launch latest Chrome with the Devtools Protocol port open
   - Homepage: https://github.com/GoogleChrome/chrome-launcher#readme
 - `chromium-bidi@17.0.2`
@@ -479,7 +479,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `isexe@2.0.0`
   - Description: Minimal module to check if a file is executable.
   - Homepage: https://github.com/isaacs/isexe#readme
-- `knip@6.32.2`
+- `knip@6.32.3`
   - Description: Find and fix unused dependencies, exports and files in your TypeScript and JavaScript projects
   - Homepage: https://knip.dev
 - `lru-cache@5.1.1`
@@ -724,46 +724,46 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/bcoe/v8-coverage#readme
 - `@codecov/bundler-plugin-core@2.0.1`
   - Description: Official Codecov Bundler Plugin Core
-- `@commitlint/cli@21.2.2`
+- `@commitlint/cli@21.2.3`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/config-conventional@21.2.2`
+- `@commitlint/config-conventional@21.2.3`
   - Description: Shareable commitlint config enforcing conventional commits
   - Homepage: https://commitlint.js.org/
-- `@commitlint/config-validator@21.2.0`
+- `@commitlint/config-validator@21.2.3`
   - Description: config validator for commitlint.config.js
   - Homepage: https://commitlint.js.org/
-- `@commitlint/ensure@21.2.0`
+- `@commitlint/ensure@21.2.3`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
 - `@commitlint/execute-rule@21.0.1`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/format@21.2.2`
+- `@commitlint/format@21.2.3`
   - Description: Format commitlint reports
   - Homepage: https://commitlint.js.org/
-- `@commitlint/is-ignored@21.2.2`
+- `@commitlint/is-ignored@21.2.3`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/lint@21.2.2`
+- `@commitlint/lint@21.2.3`
   - Description: Lint a string against commitlint rules
   - Homepage: https://commitlint.js.org/
-- `@commitlint/load@21.2.2`
+- `@commitlint/load@21.2.3`
   - Description: Load shared commitlint configuration
   - Homepage: https://commitlint.js.org/
 - `@commitlint/message@21.2.0`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/parse@21.2.2`
+- `@commitlint/parse@21.2.3`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/read@21.2.1`
+- `@commitlint/read@21.2.3`
   - Description: Read commit messages from a specified range or last edit
   - Homepage: https://commitlint.js.org/
-- `@commitlint/resolve-extends@21.2.2`
+- `@commitlint/resolve-extends@21.2.3`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/rules@21.2.2`
+- `@commitlint/rules@21.2.3`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
 - `@commitlint/to-lines@21.0.1`
@@ -772,7 +772,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@commitlint/top-level@21.2.0`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/types@21.2.0`
+- `@commitlint/types@21.2.3`
   - Description: Shared types for commitlint packages
   - Homepage: https://commitlint.js.org/
 - `@conventional-changelog/git-client@3.1.2`
@@ -1766,7 +1766,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `graphmatch@1.1.1`
   - Description: A low-level utility for matching a string against a directed acyclic graph of regexes.
   - Homepage: https://github.com/fabiospampinato/graphmatch#readme
-- `happy-dom@20.11.3`
+- `happy-dom@20.11.15`
   - Description: Happy DOM is a JavaScript implementation of a web browser without its graphical user interface. It includes many web standards from WHATWG DOM and HTML.
   - Homepage: https://github.com/capricorn86/happy-dom
 - `has-flag@4.0.0`
@@ -1873,7 +1873,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `js-tokens@4.0.0`, `js-tokens@10.0.0`
   - Description: Tiny JavaScript tokenizer.
   - Homepage: https://github.com/lydell/js-tokens#readme
-- `js-yaml@4.3.2`, `js-yaml@5.4.1`
+- `js-yaml@4.3.2`, `js-yaml@5.4.3`
   - Description: YAML 1.2 parser and serializer
   - Homepage: https://github.com/nodeca/js-yaml#readme
 - `jsesc@3.1.0`
@@ -2084,19 +2084,19 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/unjs/pathe#readme
 - `perfect-debounce@2.1.0`
   - Homepage: https://github.com/unjs/perfect-debounce#readme
-- `pg@8.16.3`, `pg@8.23.0`
+- `pg@8.16.3`, `pg@8.23.1`
   - Description: PostgreSQL client - pure javascript & libpq with the same API
   - Homepage: https://github.com/brianc/node-postgres
-- `pg-cloudflare@1.4.0`
+- `pg-cloudflare@1.4.1`
   - Description: A socket implementation that can run on Cloudflare Workers using native TCP connections.
   - Homepage: https://github.com/brianc/node-postgres#readme
-- `pg-connection-string@2.14.0`
+- `pg-connection-string@2.14.1`
   - Description: Functions for dealing with a PostgreSQL connection string
   - Homepage: https://github.com/brianc/node-postgres/tree/master/packages/pg-connection-string
 - `pg-pool@3.14.0`
   - Description: Connection pool for node-postgres
   - Homepage: https://github.com/brianc/node-postgres/tree/master/packages/pg-pool#readme
-- `pg-protocol@1.16.0`
+- `pg-protocol@1.16.1`
   - Description: The postgres client/server binary protocol, implemented in TypeScript
   - Homepage: https://github.com/brianc/node-postgres#readme
 - `pg-types@2.2.0`
@@ -2105,7 +2105,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `pgpass@1.0.5`
   - Description: Module for reading .pgpass
   - Homepage: https://github.com/hoegaarden/pgpass#readme
-- `picomatch@4.0.5`
+- `picomatch@4.0.7`
   - Description: Blazing fast and accurate glob matcher written in JavaScript, with no dependencies and full support for standard and extended Bash glob features, including braces, extglobs, POSIX brackets, and regular expressions.
   - Homepage: https://github.com/micromatch/picomatch
 - `pkce-challenge@5.0.1`
@@ -2510,7 +2510,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 ## MIT OR Apache-2.0
 
-- `@biomejs/biome@2.5.8`
+- `@biomejs/biome@2.5.15`
   - Description: Biome is a toolchain for the web: formatter, linter and more
   - Homepage: https://biomejs.dev
 
