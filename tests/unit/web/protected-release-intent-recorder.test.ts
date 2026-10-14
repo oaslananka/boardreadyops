@@ -105,6 +105,8 @@ describe("server-only protected branch intent evidence recorder", () => {
 
   it.each([
     ["expired session", { ...session, expiresAt: "2026-10-13T07:59:00.000Z" }],
+    ["invalid expiration timestamp", { ...session, expiresAt: "not-a-date" }],
+    ["invalid issuance timestamp", { ...session, issuedAt: "not-a-date" }],
     ["future-issued session", { ...session, issuedAt: "2026-10-13T08:01:00.000Z" }],
     ["no installation access", { ...session, installationIds: [502] }],
     ["missing GitHub actor ID", { ...session, userId: 0 }],

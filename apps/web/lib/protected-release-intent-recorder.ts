@@ -31,6 +31,7 @@ export async function recordProtectedReleaseIntentForViewer(
     !Array.isArray(session.installationIds) ||
     !Number.isFinite(Date.parse(session.issuedAt)) ||
     Date.parse(session.issuedAt) > now.getTime() ||
+    !Number.isFinite(Date.parse(session.expiresAt)) ||
     Date.parse(session.expiresAt) <= now.getTime() ||
     !input.repositoryId ||
     input.repositoryId.length > 128
