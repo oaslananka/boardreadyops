@@ -33,8 +33,10 @@ branch-only queue/supersession contract and exact runner lease, dispatch,
 execution-attempt and OIDC callback binding.
 
 The experimental OIDC subject matcher supports GitHub's documented legacy and
-immutable repository-ID formats; it deliberately rejects customized subjects
-unless a reviewed policy is introduced. This matcher is not connected to an
+immutable repository-ID formats. Both formats require a signed owner ID that
+matches the independently verified persisted authority, not merely the ID
+repeated within the token. Customized subjects are rejected unless a reviewed
+policy is introduced. This matcher is not connected to an
 OIDC callback and cannot grant a release by itself.
 
 Issue #42 remains open, as does two-independent-installation acceptance #154.

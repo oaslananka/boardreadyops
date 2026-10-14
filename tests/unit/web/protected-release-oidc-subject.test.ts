@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { protectedReleaseSubjectMatches } from "../../../apps/web/lib/protected-release-oidc-subject.js";
 
-const expected = { repository: "org/board", repositoryId: "601", ref: "refs/heads/main" };
+const expected = { repository: "org/board", repositoryId: "601", repositoryOwnerId: "501", ref: "refs/heads/main" };
 const claims = {
   repository: "org/board",
   repository_id: "601",
@@ -40,6 +40,21 @@ describe("future protected-release signed GitHub OIDC subject", () => {
     ["missing subject", { sub: undefined }],
   ])("rejects %s", async (_label, patch) => {
     expect(protectedReleaseSubjectMatches({ ...claims, ...patch }, expected)).toBe(false);
+  });
+
+  it("rejects a matching immutable sub belonging to a different GitHub owner ID", () => {
+    const movedOwner = { ...claims, repository_owner_id: "502", sub: "repo:org@502/board@601:ref:refs/heads/main" };
+    expect(protectedReleaseSubjectMatches(movedOwner, expected)).toBe(false);
+  });
+
+  it("rejects legacy subject claims when their owner ID differs from the persisted owner", () => {
+    expect(protectedReleaseSubjectMatches({ ...claims, repository_owner_id: "502" }, expected)).toBe(false);
+  });
+
+  it("rejects a missing or malformed persisted owner ID", () => {
+    expect(protectedReleaseSubjectMatches(claims, { ...expected, repositoryOwnerId: "0" })).toBe(false);
+    expect(protectedReleaseSubjectMatches(claims, { ...expected, repositoryOwnerId: "invalid" })).toBe(false);
+    expect(protectedReleaseSubjectMatches({ ...claims, repository_owner_id: undefined }, expected)).toBe(false);
   });
 
   it("rejects a subject without a nonzero, stable repository ID", () => {

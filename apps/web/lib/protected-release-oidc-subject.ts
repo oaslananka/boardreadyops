@@ -11,6 +11,8 @@
 export type ProtectedReleaseSubjectExpectation = {
   repository: string;
   repositoryId: string;
+  /** Immutable GitHub owner ID from independently verified persisted authority. */
+  repositoryOwnerId: string;
   ref: string;
 };
 
@@ -28,10 +30,15 @@ export function protectedReleaseSubjectMatches(
 ): boolean {
   const repositoryId = numericId(expected.repositoryId);
   const actualRepositoryId = numericId(payload.repository_id);
+  const ownerId = numericId(expected.repositoryOwnerId);
+  const actualOwnerId = numericId(payload.repository_owner_id);
   if (
     !repositoryId ||
+    !ownerId ||
     !actualRepositoryId ||
+    !actualOwnerId ||
     actualRepositoryId !== repositoryId ||
+    actualOwnerId !== ownerId ||
     typeof payload.repository !== "string" ||
     payload.repository !== expected.repository ||
     typeof payload.ref !== "string" ||
@@ -46,8 +53,6 @@ export function protectedReleaseSubjectMatches(
   const legacy = `repo:${owner}/${name}:ref:${expected.ref}`;
   if (payload.sub === legacy) return true;
 
-  const ownerId = numericId(payload.repository_owner_id);
-  if (!ownerId) return false;
   const immutable = `repo:${owner}@${ownerId}/${name}@${repositoryId}:ref:${expected.ref}`;
   return payload.sub === immutable;
 }
