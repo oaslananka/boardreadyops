@@ -180,6 +180,46 @@ describeDatabase("protected-release verified owner evidence v2 in PostgreSQL", (
       [rows(old)[0]?.candidate_id],
     );
     expect(rows(snapshot)).toEqual([{ evidence_version: 1, github_owner_id: null }]);
+    const oldSeal = await db.query(
+      "select * from boardreadyops_seal_protected_release_identity($1,$2,$3,$4::bigint,$5::bigint,$6::bigint,$7,$8,$9::timestamptz)",
+      [
+        rows(old)[0]?.candidate_id,
+        installationId,
+        repositoryId,
+        githubInstallationId,
+        githubRepositoryId,
+        request.actorGithubUserId,
+        randomUUID(),
+        randomUUID(),
+        new Date().toISOString(),
+      ],
+    );
+    const sealed = await db.query(
+      "select snapshot_version, github_owner_id, dispatch_allowed from protected_release_execution_seals where id = $1",
+      [rows(oldSeal)[0]?.seal_id],
+    );
+    expect(rows(sealed)).toEqual([{ snapshot_version: 1, github_owner_id: null, dispatch_allowed: false }]);
+  });
+
+  it("rejects downgrading a v2 owner-bound candidate into a legacy v1 seal", async () => {
+    const db = database();
+    const candidate = await new ProtectedReleaseIntentStore(db).record(evidence(), context);
+    await expect(
+      db.query(
+        "select * from boardreadyops_seal_protected_release_identity($1,$2,$3,$4::bigint,$5::bigint,$6::bigint,$7,$8,$9::timestamptz)",
+        [
+          candidate.id,
+          installationId,
+          repositoryId,
+          githubInstallationId,
+          githubRepositoryId,
+          123456,
+          randomUUID(),
+          randomUUID(),
+          new Date().toISOString(),
+        ],
+      ),
+    ).rejects.toMatchObject({ code: "22023" });
   });
 
   it("does not create a release run, outbox effect or seal when recording owner evidence", async () => {

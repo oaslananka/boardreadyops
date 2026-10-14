@@ -58,6 +58,12 @@ repositories. It refuses stale evidence using PostgreSQL server clock time,
 enforces one candidate / run / attempt identity, and computes its own SHA-256
 snapshot digest from the complete versioned identity.
 
+Migration 0091 enforces a candidate-to-seal snapshot version match at the
+database insertion boundary: a v2 owner-verified candidate cannot be sealed
+using the legacy v1 identity digest that omits owner ID. Historical v1
+candidate/v1 seal pairs remain supported. The table reserves a separate
+owner-bound v2 snapshot shape, but no new v2 sealer or dispatch permit exists.
+
 **A seal is not execution authority:** a database check forces
 `dispatch_allowed = false` permanently; no outbox, workflow,
 `release_runs` record, runner lease or OIDC callback is created.
