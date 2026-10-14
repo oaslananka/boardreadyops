@@ -57658,11 +57658,17 @@ var RunnerControlPlaneClient = class {
   async publishTerminalResult(input) {
     return await this.signedJson("/api/v1/runner/results", input, leaseContext(input));
   }
-  async uploadArtifact(uploadUrl, filePath, maximumBytes) {
+  async uploadArtifact(uploadUrl, filePath, maximumBytes, expectedSha256) {
     const url2 = normalizeUploadUrl(uploadUrl);
+    if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
+      throw new Error("artifact upload SHA-256 declaration is invalid");
+    }
     const content = await (0, import_promises30.readFile)(filePath);
     if (content.byteLength !== maximumBytes) {
       throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${content.byteLength}`);
+    }
+    if ((0, import_node_crypto21.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
+      throw new Error("artifact digest changed before upload");
     }
     const response = await this.fetchImpl(url2, {
       method: "PUT",
@@ -58407,7 +58413,7 @@ async function publishArtifacts(client, job, artifacts) {
     if (capability?.maximumBytes !== artifact.bytes) {
       throw new Error("artifact capability did not match the declared artifact size");
     }
-    await client.uploadArtifact(capability.uploadUrl, artifact.filePath, capability.maximumBytes);
+    await client.uploadArtifact(capability.uploadUrl, artifact.filePath, capability.maximumBytes, artifact.sha256);
     published.push({
       kind: artifact.kind,
       name: artifact.name,

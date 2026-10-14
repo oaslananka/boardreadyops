@@ -1,4 +1,4 @@
-import { createPrivateKey, type KeyLike, randomBytes } from "node:crypto";
+import { createHash, createPrivateKey, type KeyLike, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { signRunnerRequest } from "../../packages/cloud-core/src/runner-request-signature.js";
 import {
@@ -119,11 +119,22 @@ export class RunnerControlPlaneClient {
     return await this.signedJson("/api/v1/runner/results", input, leaseContext(input));
   }
 
-  async uploadArtifact(uploadUrl: string, filePath: string, maximumBytes: number): Promise<void> {
+  async uploadArtifact(
+    uploadUrl: string,
+    filePath: string,
+    maximumBytes: number,
+    expectedSha256: string,
+  ): Promise<void> {
     const url = normalizeUploadUrl(uploadUrl);
+    if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
+      throw new Error("artifact upload SHA-256 declaration is invalid");
+    }
     const content = await readFile(filePath);
     if (content.byteLength !== maximumBytes) {
       throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${content.byteLength}`);
+    }
+    if (createHash("sha256").update(content).digest("hex") !== expectedSha256) {
+      throw new Error("artifact digest changed before upload");
     }
     const response = await this.fetchImpl(url, {
       method: "PUT",
