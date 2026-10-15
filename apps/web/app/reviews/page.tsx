@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ReviewListFilterBar } from "../../components/review/review-list-filters.js";
 import { ReviewListItem } from "../../components/review/review-list-item.js";
+import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { AppShell, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
@@ -82,12 +83,17 @@ function NoMatchingReviews() {
 function NoReviews() {
   return (
     <Panel title="No Reviews">
-      <EmptyState title="No hardware reviews found">
+      <EmptyState
+        title="No hardware reviews found"
+        action={
+          <Button asChild variant="outline">
+            <Link href="/runs">Browse run history</Link>
+          </Button>
+        }
+      >
         <p>Historical Runs remain in run history; this list contains only explicitly published Reviews.</p>
         <p>
-          <Link href="/runs" className="text-primary underline underline-offset-2">
-            Browse run history
-          </Link>
+          Start with a readiness run, then publish a Review from an authorized checkout when it is ready for sign-off.
         </p>
       </EmptyState>
     </Panel>
@@ -123,7 +129,14 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
             <h1 className="text-2xl font-bold text-foreground">Hardware Reviews</h1>
           </header>
           <Panel title="Sign in required">
-            <EmptyState title="Reviews are scoped to your installations">
+            <EmptyState
+              title="Reviews are scoped to your installations"
+              action={
+                <Button asChild>
+                  <a href="/api/auth/github/login">Sign in with GitHub</a>
+                </Button>
+              }
+            >
               <p>Sign in with GitHub so BoardReadyOps knows which repositories you can see.</p>
             </EmptyState>
           </Panel>

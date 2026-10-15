@@ -83,6 +83,8 @@ describe("ReviewsListPage", () => {
     loadViewerReviews.mockResolvedValue({ state: "signed-out" });
     const markup = await render();
     expect(markup).toContain("Sign in required");
+    expect(markup).toContain('href="/api/auth/github/login"');
+    expect(markup).toContain("Sign in with GitHub");
     expect(markup).not.toContain("awaiting a decision");
   });
 
@@ -127,5 +129,7 @@ describe("ReviewsListPage", () => {
     expect(markup).toContain("No hardware reviews found");
     expect(markup).toContain("Historical Runs remain in run history");
     expect(markup).toContain('href="/runs"');
+    expect(markup).toContain("Browse run history");
+    expect(markup).toContain('data-slot="button"');
   });
 });

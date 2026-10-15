@@ -203,8 +203,36 @@ describe("DeliveriesListPage", () => {
 
     const markup = await render();
     expect(markup).toContain("No validated revisions to share yet");
+    expect(markup).toContain('href="/runs"');
+    expect(markup).toContain("Inspect runs");
     // The form would be a control that cannot succeed, so it is absent rather than disabled.
     expect(markup).not.toContain("Create guest link");
+  });
+
+  it("links an editor with a validated revision to the authorized share form", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [],
+      revisions: [
+        {
+          id: "rev_ready",
+          projectName: "Gateway board",
+          revisionLabel: "rev C",
+          sourceKind: "github_commit",
+          bundleSha256: "a".repeat(64),
+          validationRunId: "run_good",
+          validationArtifactId: "artifact_good",
+        },
+      ],
+      deliveries: [],
+    });
+
+    const markup = await render();
+    expect(markup).toContain('href="#share-package"');
+    expect(markup).toContain('id="share-package"');
+    expect(markup).toContain("Create a guest link");
   });
 
   it("offers no create form to a viewer, who is refused server-side anyway", async () => {
@@ -219,6 +247,7 @@ describe("DeliveriesListPage", () => {
 
     const markup = await render();
     expect(markup).not.toContain("Share a package");
+    expect(markup).not.toContain('href="#share-package"');
   });
 
   it("distinguishes signed out from empty", async () => {

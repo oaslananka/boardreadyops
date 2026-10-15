@@ -196,8 +196,18 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                 rows={result.revisions}
                 rowKey={(revision) => revision.id}
                 empty={
-                  <EmptyState title="No package revisions yet">
-                    <p>Register a validated manufacturing archive below when a passing run has produced one.</p>
+                  <EmptyState
+                    title="No package revisions yet"
+                    action={
+                      <Button asChild variant="outline">
+                        <Link href="/runs">Inspect runs</Link>
+                      </Button>
+                    }
+                  >
+                    <p>
+                      Start with a passing run that produced a manufacturing archive. Register its validated evidence
+                      here before sharing.
+                    </p>
                   </EmptyState>
                 }
               />
@@ -223,8 +233,18 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                 rows={result.deliveries}
                 rowKey={(delivery) => delivery.id}
                 empty={
-                  <EmptyState title="No guest links yet">
-                    <p>Links you issue appear here until they expire, so nothing you have handed out is invisible.</p>
+                  <EmptyState
+                    title="No guest links yet"
+                    action={
+                      result.selected.role !== "viewer" &&
+                      result.revisions.some((revision) => revision.validationRunId && revision.validationArtifactId) ? (
+                        <Button asChild variant="outline">
+                          <a href="#share-package">Create a guest link</a>
+                        </Button>
+                      ) : null
+                    }
+                  >
+                    <p>Links you issue appear here until they expire. Only validated revisions can be shared.</p>
                   </EmptyState>
                 }
               />
@@ -263,11 +283,16 @@ function CreatePanel({
 
   if (validatedRevisions.length === 0) {
     return (
-      <Panel title="Share a package">
+      <Panel id="share-package" title="Share a package">
         <Alert tone="info" title="No validated revisions to share yet">
           Run BoardReadyOps on a connected GitHub project until it completes with a passing manufacturing archive, then
           register that artifact as a revision above. Guest links are not issued for revision records without live
           validation evidence.
+          <div className="mt-3">
+            <Button asChild variant="outline">
+              <Link href="/runs">Inspect runs</Link>
+            </Button>
+          </div>
         </Alert>
       </Panel>
     );
@@ -275,6 +300,7 @@ function CreatePanel({
 
   return (
     <Panel
+      id="share-package"
       title="Share a package"
       description="Only validated revisions are selectable. The guest link is shown once and only its hash is stored."
     >
