@@ -70,6 +70,20 @@ describe("run action recovery", () => {
     expect(container.textContent).not.toContain("42703");
   });
 
+  it("never queues a release preview without an explicit second confirmation", async () => {
+    const mockedFetch = vi.fn(async () => jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", mockedFetch);
+    await renderAndClick(root, container, "Queue release preview");
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(container.textContent).toContain("creates a package draft on the pull request");
+    await act(async () => {
+      button(container, "Cancel").click();
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
   it("shows the GitHub installation remedy when repository access needs attention", async () => {
     vi.stubGlobal(
       "fetch",
@@ -88,7 +102,11 @@ describe("run action recovery", () => {
       ),
     );
 
-    await renderAndClick(root, container, "Preview release");
+    await renderAndClick(root, container, "Queue release preview");
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    await act(async () => {
+      button(container, "Queue preview on pull request").click();
+    });
 
     expect(container.textContent).toContain("GitHub access needs attention.");
     expect(container.textContent).toContain("request-access-1");

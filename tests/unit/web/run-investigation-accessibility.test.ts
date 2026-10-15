@@ -203,6 +203,15 @@ describe("run investigation accessibility", () => {
     vi.unstubAllEnvs();
   });
 
+  it("keeps the run header stacked through tablet widths and wraps long source identities", () => {
+    const html = viewMarkup("findings");
+    expect(html).toContain("lg:flex-row lg:items-start lg:justify-between");
+    expect(html).toContain('class="min-w-0"');
+    expect(html).toContain("break-words text-xl font-bold");
+    expect(html).toContain("min-w-0 break-all");
+    expect(html).not.toContain("sm:flex-row sm:items-start sm:justify-between");
+  });
+
   it("links GitHub Actions logs and repository-owned artifacts from the authoritative workflow run", () => {
     const run = sampleRun();
     run.attempts = [
