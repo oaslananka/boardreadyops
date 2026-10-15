@@ -207,7 +207,7 @@ export function ProjectRowActions({
 }>) {
   if (!canRename && !canDelete) return null;
   const actions = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       {canRename ? (
         <RenameInline
           idField="projectId"
