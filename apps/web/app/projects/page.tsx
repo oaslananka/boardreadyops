@@ -59,12 +59,27 @@ function projectColumns(role: string, impact: WorkspaceProjectsImpact): readonly
       header: "Project",
       rowHeader: true,
       cell: (project) => (
-        <span className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-0.5">
           <span className="font-medium text-foreground">{project.name}</span>
           {project.description ? (
             <span className="text-meta text-muted-foreground break-words">{project.description}</span>
           ) : null}
-        </span>
+          {role !== "viewer" ? (
+            <div className="mt-1 md:hidden">
+              <ProjectRowActions
+                projectId={project.id}
+                projectName={project.name}
+                revisions={impact.byProject[project.id]?.revisions ?? 0}
+                deliveries={impact.byProject[project.id]?.deliveries ?? 0}
+                canRename={true}
+                canDelete={role === "owner"}
+                renameAction={renameProjectAction}
+                deleteAction={deleteProjectAction}
+                compact
+              />
+            </div>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -98,6 +113,8 @@ function projectColumns(role: string, impact: WorkspaceProjectsImpact): readonly
       id: "actions",
       header: "Actions",
       align: "end",
+      className: "hidden md:table-cell",
+      headerClassName: "hidden md:table-cell",
       cell: (project) => (
         <ProjectRowActions
           projectId={project.id}

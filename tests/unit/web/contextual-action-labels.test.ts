@@ -33,6 +33,43 @@ describe("contextual accessible action labels", () => {
     expect(html).toContain(">Delete</button>");
   });
 
+  it("exposes a named mobile project actions disclosure without losing role permissions", () => {
+    const html = renderToStaticMarkup(
+      createElement(ProjectRowActions, {
+        projectId: "project-1",
+        projectName: "Gateway Controller",
+        revisions: 2,
+        deliveries: 1,
+        canRename: true,
+        canDelete: true,
+        renameAction: action,
+        deleteAction: action,
+        compact: true,
+      }),
+    );
+
+    expect(html).toContain("<details");
+    expect(html).toContain('aria-label="Actions for Gateway Controller"');
+    expect(html).toContain(">Rename</button>");
+    expect(html).toContain(">Delete</button>");
+
+    const viewerHtml = renderToStaticMarkup(
+      createElement(ProjectRowActions, {
+        projectId: "project-1",
+        projectName: "Gateway Controller",
+        revisions: 2,
+        deliveries: 1,
+        canRename: false,
+        canDelete: false,
+        renameAction: action,
+        deleteAction: action,
+        compact: true,
+      }),
+    );
+    expect(viewerHtml).not.toContain("<details");
+    expect(viewerHtml).not.toContain(">Delete</button>");
+  });
+
   it("includes the workspace name in the rename action label", () => {
     const html = renderToStaticMarkup(
       createElement(WorkspaceDangerZone, {
