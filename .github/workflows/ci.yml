@@ -34,6 +34,7 @@ jobs:
       needs_cross_platform: ${{ steps.classify.outputs.needs_cross_platform }}
       needs_action_smoke: ${{ steps.classify.outputs.needs_action_smoke }}
       needs_accessibility: ${{ steps.classify.outputs.needs_accessibility }}
+      needs_visual: ${{ steps.classify.outputs.needs_visual }}
       needs_build: ${{ steps.classify.outputs.needs_build }}
       needs_dist: ${{ steps.classify.outputs.needs_dist }}
       needs_coverage: ${{ steps.classify.outputs.needs_coverage }}
@@ -625,14 +626,16 @@ jobs:
   # Visual baselines used to be checked only by qa-nightly. A pull request could therefore
   # change the page and merge with a stale baseline, entirely green, and the failure surfaced
   # the next morning on a run nobody was watching - pointing at a page that was correct. This
-  # runs the same suite at review time, gated on the same signal as the accessibility and
-  # qa-e2e jobs, so it costs nothing on pull requests that do not touch the web UI.
+  # runs the same suite at review time for web-UI-affecting changes, independent
+  # of report-only accessibility checks. Report renderers and wire schemas keep
+  # lint, typecheck, unit, coverage and accessibility checks, but do not gate on
+  # unrelated website fonts/screenshots. Main pushes still run the full suite.
   #
   # Baselines are Linux-only by name (*-chromium-linux.png). Regenerate them with the
   # qa-visual-baselines workflow, never by committing whatever a local run produced.
   visual:
     needs: risk-profile
-    if: needs.risk-profile.outputs.needs_accessibility == 'true'
+    if: needs.risk-profile.outputs.needs_visual == 'true'
     name: ci / visual
     runs-on: ubuntu-24.04
     timeout-minutes: 20
