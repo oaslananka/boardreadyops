@@ -98446,7 +98446,10 @@ var hardwareImpactV1Schema = external_exports.object({
       added: hardwareImpactCountSchema,
       resolved: hardwareImpactCountSchema,
       addedBlocking: hardwareImpactCountSchema,
-      resolvedBlocking: hardwareImpactCountSchema
+      resolvedBlocking: hardwareImpactCountSchema,
+      // Optional without a default: legacy signed results must retain their original digest.
+      worsened: hardwareImpactCountSchema.optional(),
+      improved: hardwareImpactCountSchema.optional()
     }).strict(),
     bom: external_exports.object({
       added: hardwareImpactCountSchema,
@@ -102895,10 +102898,11 @@ function hardwareImpactFactLines(impact) {
     );
   }
   const findings = impact.facts.findings;
-  if (findings.added > 0 || findings.resolved > 0) {
+  if (findings.added > 0 || findings.resolved > 0 || (findings.worsened ?? 0) > 0 || (findings.improved ?? 0) > 0) {
     const blocker = blockerSuffix(findings.addedBlocking, "new");
     const resolved = blockerSuffix(findings.resolvedBlocking, "resolved");
-    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}`);
+    const severityChanges = (findings.worsened ?? 0) > 0 || (findings.improved ?? 0) > 0 ? `; severity \u2191${findings.worsened ?? 0} / \u2193${findings.improved ?? 0}` : "";
+    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}${severityChanges}`);
   }
   const bomChanged = impact.facts.bom.added + impact.facts.bom.removed + impact.facts.bom.changed;
   if (bomChanged > 0) {
@@ -138461,7 +138465,7 @@ function unavailableImpact(baseline, candidate) {
         currentStatus: currentReadiness?.status ?? null,
         statusChanged: false
       },
-      findings: { added: 0, resolved: 0, addedBlocking: 0, resolvedBlocking: 0 },
+      findings: { added: 0, resolved: 0, addedBlocking: 0, resolvedBlocking: 0, worsened: 0, improved: 0 },
       bom: { added: 0, removed: 0, changed: 0, truncated: false },
       manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 0 }
     },
@@ -138483,7 +138487,9 @@ function factsFromDiff(diff) {
       added: diff.findings.added.length,
       resolved: diff.findings.resolved.length,
       addedBlocking: diff.findings.added.filter((finding2) => blockingSeverity(finding2.severity)).length,
-      resolvedBlocking: diff.findings.resolved.filter((finding2) => blockingSeverity(finding2.severity)).length
+      resolvedBlocking: diff.findings.resolved.filter((finding2) => blockingSeverity(finding2.severity)).length,
+      worsened: diff.findings.worsened.length,
+      improved: diff.findings.improved.length
     },
     bom: {
       // diff.fabrication.bom.rows is capped for display (see FabricationDiffOptions.maxBomRows), so
@@ -138508,8 +138514,8 @@ function assessmentFromFacts(facts, previous, current) {
   const readinessImproved = statusMoved(facts.readiness.previousStatus, facts.readiness.currentStatus, "better");
   const conclusionWorsened = previous.status === "passed" && current.status === "failed";
   const conclusionImproved = previous.status === "failed" && current.status === "passed";
-  const increased = readinessWorsened || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta < 0 || facts.findings.addedBlocking > 0 || conclusionWorsened;
-  const decreased = readinessImproved || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta > 0 || facts.findings.resolvedBlocking > 0 || conclusionImproved;
+  const increased = readinessWorsened || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta < 0 || facts.findings.addedBlocking > 0 || (facts.findings.worsened ?? 0) > 0 || conclusionWorsened;
+  const decreased = readinessImproved || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta > 0 || facts.findings.resolvedBlocking > 0 || (facts.findings.improved ?? 0) > 0 || conclusionImproved;
   let riskDirection;
   if (increased) {
     riskDirection = "increased";
@@ -138527,7 +138533,7 @@ function domainChanged(domain2, facts) {
     case "readiness":
       return facts.readiness.scoreDelta !== null ? facts.readiness.scoreDelta !== 0 || facts.readiness.statusChanged : facts.readiness.statusChanged;
     case "findings":
-      return facts.findings.added > 0 || facts.findings.resolved > 0;
+      return facts.findings.added > 0 || facts.findings.resolved > 0 || (facts.findings.worsened ?? 0) > 0 || (facts.findings.improved ?? 0) > 0;
     case "bom":
       return facts.bom.added > 0 || facts.bom.removed > 0 || facts.bom.changed > 0;
     case "manufacturing":
@@ -138561,6 +138567,12 @@ function evidenceFromDiff(diff) {
   }
   for (const finding2 of diff.findings.resolved) {
     evidence.push(findingEvidence("Resolved finding", finding2));
+  }
+  for (const { finding: finding2, previousSeverity } of diff.findings.worsened) {
+    evidence.push(findingEvidence(`Worsened finding (${previousSeverity} \u2192 ${finding2.severity})`, finding2));
+  }
+  for (const { finding: finding2, previousSeverity } of diff.findings.improved) {
+    evidence.push(findingEvidence(`Improved finding (${previousSeverity} \u2192 ${finding2.severity})`, finding2));
   }
   for (const row of diff.fabrication.bom.rows.filter((entry) => entry.status !== "unchanged")) {
     evidence.push({

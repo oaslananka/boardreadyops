@@ -192,10 +192,14 @@ function hardwareImpactFactLines(impact: NonNullable<RunResult["hardwareImpact"]
     );
   }
   const findings = impact.facts.findings;
-  if (findings.added > 0 || findings.resolved > 0) {
+  if (findings.added > 0 || findings.resolved > 0 || (findings.worsened ?? 0) > 0 || (findings.improved ?? 0) > 0) {
     const blocker = blockerSuffix(findings.addedBlocking, "new");
     const resolved = blockerSuffix(findings.resolvedBlocking, "resolved");
-    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}`);
+    const severityChanges =
+      (findings.worsened ?? 0) > 0 || (findings.improved ?? 0) > 0
+        ? `; severity ↑${findings.worsened ?? 0} / ↓${findings.improved ?? 0}`
+        : "";
+    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}${severityChanges}`);
   }
   const bomChanged = impact.facts.bom.added + impact.facts.bom.removed + impact.facts.bom.changed;
   if (bomChanged > 0) {

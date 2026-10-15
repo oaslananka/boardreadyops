@@ -24,6 +24,9 @@ export interface HardwareImpactV1 {
       resolved: number;
       addedBlocking: number;
       resolvedBlocking: number;
+      /** Optional for compatibility with v1 results emitted before severity-delta support. */
+      worsened?: number;
+      improved?: number;
     };
     bom: {
       added: number;

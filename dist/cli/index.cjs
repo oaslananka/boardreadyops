@@ -32311,7 +32311,10 @@ var init_src = __esm({
           added: hardwareImpactCountSchema,
           resolved: hardwareImpactCountSchema,
           addedBlocking: hardwareImpactCountSchema,
-          resolvedBlocking: hardwareImpactCountSchema
+          resolvedBlocking: hardwareImpactCountSchema,
+          // Optional without a default: legacy signed results must retain their original digest.
+          worsened: hardwareImpactCountSchema.optional(),
+          improved: hardwareImpactCountSchema.optional()
         }).strict(),
         bom: external_exports.object({
           added: hardwareImpactCountSchema,

@@ -162,6 +162,41 @@ describe("buildHardwareImpact", () => {
     expect(improved.assessment.riskDirection).toBe("decreased");
   });
 
+  it.each([
+    ["low", "high", "increased", "worsened"],
+    ["high", "low", "decreased", "improved"],
+  ] as const)(
+    "classifies a stable-fingerprint finding severity change from %s to %s as %s",
+    (before, after, direction, changeKind) => {
+      const original = finding("board.clearance", before, "Trace gap", "board.kicad_pcb");
+      const changed = finding("board.clearance", after, "Trace gap", "board.kicad_pcb");
+      expect(original.fingerprint).toBe(changed.fingerprint);
+      const impact = buildHardwareImpact({
+        baseline: { status: "available", sha: baseSha, result: run({ findings: [original] }) },
+        candidate: { sha: headSha, result: run({ findings: [changed] }) },
+      });
+      expect(impact.assessment).toMatchObject({
+        materialChange: true,
+        riskDirection: direction,
+        affectedDomains: ["findings"],
+      });
+      expect(impact.facts.findings).toMatchObject({
+        added: 0,
+        resolved: 0,
+        [changeKind]: 1,
+      });
+      expect(impact.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "finding",
+            fingerprint: original.fingerprint,
+            severity: after,
+          }),
+        ]),
+      );
+    },
+  );
+
   it("reports unchanged only when exact-base supported facts are unchanged", () => {
     const previous = run({ readiness: readiness(90, "ready") });
     const current = run({ readiness: readiness(90, "ready") });

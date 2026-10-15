@@ -271,6 +271,9 @@ export const hardwareImpactV1Schema = z
             resolved: hardwareImpactCountSchema,
             addedBlocking: hardwareImpactCountSchema,
             resolvedBlocking: hardwareImpactCountSchema,
+            // Optional without a default: legacy signed results must retain their original digest.
+            worsened: hardwareImpactCountSchema.optional(),
+            improved: hardwareImpactCountSchema.optional(),
           })
           .strict(),
         bom: z

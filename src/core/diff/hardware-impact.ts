@@ -67,7 +67,7 @@ function unavailableImpact(
         currentStatus: currentReadiness?.status ?? null,
         statusChanged: false,
       },
-      findings: { added: 0, resolved: 0, addedBlocking: 0, resolvedBlocking: 0 },
+      findings: { added: 0, resolved: 0, addedBlocking: 0, resolvedBlocking: 0, worsened: 0, improved: 0 },
       bom: { added: 0, removed: 0, changed: 0, truncated: false },
       manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 0 },
     },
@@ -91,6 +91,8 @@ function factsFromDiff(diff: RunDiff): HardwareImpactFacts {
       resolved: diff.findings.resolved.length,
       addedBlocking: diff.findings.added.filter((finding) => blockingSeverity(finding.severity)).length,
       resolvedBlocking: diff.findings.resolved.filter((finding) => blockingSeverity(finding.severity)).length,
+      worsened: diff.findings.worsened.length,
+      improved: diff.findings.improved.length,
     },
     bom: {
       // diff.fabrication.bom.rows is capped for display (see FabricationDiffOptions.maxBomRows), so
@@ -124,11 +126,13 @@ function assessmentFromFacts(
     readinessWorsened ||
     (facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta < 0) ||
     facts.findings.addedBlocking > 0 ||
+    (facts.findings.worsened ?? 0) > 0 ||
     conclusionWorsened;
   const decreased =
     readinessImproved ||
     (facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta > 0) ||
     facts.findings.resolvedBlocking > 0 ||
+    (facts.findings.improved ?? 0) > 0 ||
     conclusionImproved;
 
   let riskDirection: HardwareImpactRiskDirection;
@@ -152,7 +156,12 @@ function domainChanged(domain: HardwareImpactDomain, facts: HardwareImpactFacts)
         ? facts.readiness.scoreDelta !== 0 || facts.readiness.statusChanged
         : facts.readiness.statusChanged;
     case "findings":
-      return facts.findings.added > 0 || facts.findings.resolved > 0;
+      return (
+        facts.findings.added > 0 ||
+        facts.findings.resolved > 0 ||
+        (facts.findings.worsened ?? 0) > 0 ||
+        (facts.findings.improved ?? 0) > 0
+      );
     case "bom":
       return facts.bom.added > 0 || facts.bom.removed > 0 || facts.bom.changed > 0;
     case "manufacturing":
@@ -198,6 +207,12 @@ function evidenceFromDiff(diff: RunDiff): HardwareImpactEvidenceRef[] {
   }
   for (const finding of diff.findings.resolved) {
     evidence.push(findingEvidence("Resolved finding", finding));
+  }
+  for (const { finding, previousSeverity } of diff.findings.worsened) {
+    evidence.push(findingEvidence(`Worsened finding (${previousSeverity} → ${finding.severity})`, finding));
+  }
+  for (const { finding, previousSeverity } of diff.findings.improved) {
+    evidence.push(findingEvidence(`Improved finding (${previousSeverity} → ${finding.severity})`, finding));
   }
   for (const row of diff.fabrication.bom.rows.filter((entry) => entry.status !== "unchanged")) {
     evidence.push({

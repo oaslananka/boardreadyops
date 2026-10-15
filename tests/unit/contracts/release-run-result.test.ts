@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { releaseRunResultSchema } from "../../../packages/contracts/src/index.js";
+import { hardwareImpactV1Schema, releaseRunResultSchema } from "../../../packages/contracts/src/index.js";
 
 function validHardwareImpact() {
   return {
@@ -38,6 +38,18 @@ function validHardwareImpact() {
 }
 
 describe("release run result contract", () => {
+  it("accepts severity-delta impact counters without rewriting legacy signed evidence", () => {
+    const legacy = validHardwareImpact();
+    const old = hardwareImpactV1Schema.parse(legacy);
+    expect(old.facts.findings).not.toHaveProperty("worsened");
+    const updated = hardwareImpactV1Schema.parse({
+      ...legacy,
+      facts: { ...legacy.facts, findings: { ...legacy.facts.findings, worsened: 1, improved: 0 } },
+    });
+    expect(updated.facts.findings).toMatchObject({ worsened: 1, improved: 0 });
+    expect(JSON.stringify(old)).toBe(JSON.stringify(legacy));
+  });
+
   it("normalizes the rolling-upgrade payload into contract v1", () => {
     expect(
       releaseRunResultSchema.parse({

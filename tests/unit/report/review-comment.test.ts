@@ -87,6 +87,22 @@ describe("formatReviewComment", () => {
     expect(body).toContain("[JSON report](https://example/run)");
   });
 
+  it("surfaces stable-fingerprint severity changes in the native PR impact section", () => {
+    const changedImpact = impact();
+    changedImpact.facts.findings = {
+      added: 0,
+      resolved: 0,
+      addedBlocking: 0,
+      resolvedBlocking: 0,
+      worsened: 1,
+      improved: 0,
+    };
+    changedImpact.assessment = { materialChange: true, riskDirection: "increased", affectedDomains: ["findings"] };
+    const body = formatReviewComment({ ...result([]), hardwareImpact: changedImpact });
+    expect(body).toContain("risk increased");
+    expect(body).toContain("severity ↑1 / ↓0");
+  });
+
   it("renders a by-domain breakdown table when the run result carries one", () => {
     const findings = [
       finding("drc.clearance", "critical", "Clearance violation.", "board.kicad_pcb"),
