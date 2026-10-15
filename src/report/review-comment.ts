@@ -186,6 +186,9 @@ function hardwareImpactSection(impact: NonNullable<RunResult["hardwareImpact"]>)
 function hardwareImpactFactLines(impact: NonNullable<RunResult["hardwareImpact"]>): string[] {
   const lines: string[] = [];
   const readiness = impact.facts.readiness;
+  if (readiness.conclusion?.changed) {
+    lines.push(`- Release conclusion: ${readiness.conclusion.previous} → ${readiness.conclusion.current}`);
+  }
   if (readiness.scoreDelta !== 0 || readiness.statusChanged) {
     lines.push(
       `- Readiness: ${score(readiness.previousScore)} → ${score(readiness.currentScore)} (${delta(readiness.scoreDelta)})`,

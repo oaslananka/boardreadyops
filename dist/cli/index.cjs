@@ -32305,7 +32305,13 @@ var init_src = __esm({
           scoreDelta: external_exports.number().int().min(-100).max(100).nullable(),
           previousStatus: hardwareImpactReadinessStatusSchema.nullable(),
           currentStatus: hardwareImpactReadinessStatusSchema.nullable(),
-          statusChanged: external_exports.boolean()
+          statusChanged: external_exports.boolean(),
+          // Optional without a default so parsing legacy signed results preserves their digest.
+          conclusion: external_exports.object({
+            previous: external_exports.enum(["passed", "failed"]).nullable(),
+            current: external_exports.enum(["passed", "failed"]).nullable(),
+            changed: external_exports.boolean()
+          }).strict().optional()
         }).strict(),
         findings: external_exports.object({
           added: hardwareImpactCountSchema,

@@ -98440,7 +98440,13 @@ var hardwareImpactV1Schema = external_exports.object({
       scoreDelta: external_exports.number().int().min(-100).max(100).nullable(),
       previousStatus: hardwareImpactReadinessStatusSchema.nullable(),
       currentStatus: hardwareImpactReadinessStatusSchema.nullable(),
-      statusChanged: external_exports.boolean()
+      statusChanged: external_exports.boolean(),
+      // Optional without a default so parsing legacy signed results preserves their digest.
+      conclusion: external_exports.object({
+        previous: external_exports.enum(["passed", "failed"]).nullable(),
+        current: external_exports.enum(["passed", "failed"]).nullable(),
+        changed: external_exports.boolean()
+      }).strict().optional()
     }).strict(),
     findings: external_exports.object({
       added: hardwareImpactCountSchema,
@@ -102892,6 +102898,9 @@ function hardwareImpactSection(impact) {
 function hardwareImpactFactLines(impact) {
   const lines = [];
   const readiness = impact.facts.readiness;
+  if (readiness.conclusion?.changed) {
+    lines.push(`- Release conclusion: ${readiness.conclusion.previous} \u2192 ${readiness.conclusion.current}`);
+  }
   if (readiness.scoreDelta !== 0 || readiness.statusChanged) {
     lines.push(
       `- Readiness: ${score(readiness.previousScore)} \u2192 ${score(readiness.currentScore)} (${delta(readiness.scoreDelta)})`
@@ -138440,14 +138449,14 @@ function buildHardwareImpact(input) {
     return unavailableImpact(input.baseline, input.candidate);
   }
   const diff = diffRuns(input.baseline.result, input.candidate.result);
-  const facts = factsFromDiff(diff);
+  const facts = factsFromDiff(diff, input.baseline.result, input.candidate.result);
   return {
     version: 1,
     baseline: { status: "available", sha: input.baseline.sha },
     candidate: { sha: input.candidate.sha },
     facts,
-    assessment: assessmentFromFacts(facts, input.baseline.result, input.candidate.result),
-    evidence: evidenceFromDiff(diff)
+    assessment: assessmentFromFacts(facts),
+    evidence: evidenceFromDiff(diff, facts.readiness.conclusion)
   };
 }
 function unavailableImpact(baseline, candidate) {
@@ -138473,7 +138482,9 @@ function unavailableImpact(baseline, candidate) {
     evidence: []
   };
 }
-function factsFromDiff(diff) {
+function factsFromDiff(diff, previous, current) {
+  const previousConclusion = previous.status ?? null;
+  const currentConclusion = current.status ?? null;
   return {
     readiness: {
       previousScore: diff.readiness.previousScore,
@@ -138481,7 +138492,12 @@ function factsFromDiff(diff) {
       scoreDelta: diff.readiness.scoreDelta,
       previousStatus: diff.readiness.previousStatus,
       currentStatus: diff.readiness.currentStatus,
-      statusChanged: diff.readiness.previousStatus !== diff.readiness.currentStatus
+      statusChanged: diff.readiness.previousStatus !== diff.readiness.currentStatus,
+      conclusion: {
+        previous: previousConclusion,
+        current: currentConclusion,
+        changed: previousConclusion !== null && currentConclusion !== null && previousConclusion !== currentConclusion
+      }
     },
     findings: {
       added: diff.findings.added.length,
@@ -138507,13 +138523,13 @@ function factsFromDiff(diff) {
     }
   };
 }
-function assessmentFromFacts(facts, previous, current) {
+function assessmentFromFacts(facts) {
   const affectedDomains = DOMAIN_ORDER.filter((domain2) => domainChanged(domain2, facts));
   const materialChange = affectedDomains.length > 0;
   const readinessWorsened = statusMoved(facts.readiness.previousStatus, facts.readiness.currentStatus, "worse");
   const readinessImproved = statusMoved(facts.readiness.previousStatus, facts.readiness.currentStatus, "better");
-  const conclusionWorsened = previous.status === "passed" && current.status === "failed";
-  const conclusionImproved = previous.status === "failed" && current.status === "passed";
+  const conclusionWorsened = facts.readiness.conclusion?.previous === "passed" && facts.readiness.conclusion.current === "failed";
+  const conclusionImproved = facts.readiness.conclusion?.previous === "failed" && facts.readiness.conclusion.current === "passed";
   const increased = readinessWorsened || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta < 0 || facts.findings.addedBlocking > 0 || (facts.findings.worsened ?? 0) > 0 || conclusionWorsened;
   const decreased = readinessImproved || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta > 0 || facts.findings.resolvedBlocking > 0 || (facts.findings.improved ?? 0) > 0 || conclusionImproved;
   let riskDirection;
@@ -138531,7 +138547,7 @@ function assessmentFromFacts(facts, previous, current) {
 function domainChanged(domain2, facts) {
   switch (domain2) {
     case "readiness":
-      return facts.readiness.scoreDelta !== null ? facts.readiness.scoreDelta !== 0 || facts.readiness.statusChanged : facts.readiness.statusChanged;
+      return facts.readiness.conclusion?.changed === true || (facts.readiness.scoreDelta !== null ? facts.readiness.scoreDelta !== 0 || facts.readiness.statusChanged : facts.readiness.statusChanged);
     case "findings":
       return facts.findings.added > 0 || facts.findings.resolved > 0 || (facts.findings.worsened ?? 0) > 0 || (facts.findings.improved ?? 0) > 0;
     case "bom":
@@ -138551,8 +138567,15 @@ function blockingSeverity(severity) {
 function countByStatus(entries, status) {
   return entries.filter((entry) => entry.status === status).length;
 }
-function evidenceFromDiff(diff) {
+function evidenceFromDiff(diff, conclusion) {
   const evidence = [];
+  if (conclusion?.changed) {
+    evidence.push({
+      domain: "readiness",
+      kind: "readiness",
+      label: `Release conclusion ${conclusion.previous} \u2192 ${conclusion.current}`
+    });
+  }
   if (diff.readiness.scoreDelta !== 0 || diff.readiness.previousStatus !== diff.readiness.currentStatus) {
     evidence.push({
       domain: "readiness",

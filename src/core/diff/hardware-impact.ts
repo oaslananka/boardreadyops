@@ -38,14 +38,14 @@ export function buildHardwareImpact(input: BuildHardwareImpactInput): HardwareIm
   }
 
   const diff = diffRuns(input.baseline.result, input.candidate.result);
-  const facts = factsFromDiff(diff);
+  const facts = factsFromDiff(diff, input.baseline.result, input.candidate.result);
   return {
     version: 1,
     baseline: { status: "available", sha: input.baseline.sha },
     candidate: { sha: input.candidate.sha },
     facts,
-    assessment: assessmentFromFacts(facts, input.baseline.result, input.candidate.result),
-    evidence: evidenceFromDiff(diff),
+    assessment: assessmentFromFacts(facts),
+    evidence: evidenceFromDiff(diff, facts.readiness.conclusion),
   };
 }
 
@@ -76,7 +76,9 @@ function unavailableImpact(
   };
 }
 
-function factsFromDiff(diff: RunDiff): HardwareImpactFacts {
+function factsFromDiff(diff: RunDiff, previous: RunResult, current: RunResult): HardwareImpactFacts {
+  const previousConclusion = previous.status ?? null;
+  const currentConclusion = current.status ?? null;
   return {
     readiness: {
       previousScore: diff.readiness.previousScore,
@@ -85,6 +87,11 @@ function factsFromDiff(diff: RunDiff): HardwareImpactFacts {
       previousStatus: diff.readiness.previousStatus,
       currentStatus: diff.readiness.currentStatus,
       statusChanged: diff.readiness.previousStatus !== diff.readiness.currentStatus,
+      conclusion: {
+        previous: previousConclusion,
+        current: currentConclusion,
+        changed: previousConclusion !== null && currentConclusion !== null && previousConclusion !== currentConclusion,
+      },
     },
     findings: {
       added: diff.findings.added.length,
@@ -111,17 +118,15 @@ function factsFromDiff(diff: RunDiff): HardwareImpactFacts {
   };
 }
 
-function assessmentFromFacts(
-  facts: HardwareImpactFacts,
-  previous: RunResult,
-  current: RunResult,
-): HardwareImpactAssessment {
+function assessmentFromFacts(facts: HardwareImpactFacts): HardwareImpactAssessment {
   const affectedDomains = DOMAIN_ORDER.filter((domain) => domainChanged(domain, facts));
   const materialChange = affectedDomains.length > 0;
   const readinessWorsened = statusMoved(facts.readiness.previousStatus, facts.readiness.currentStatus, "worse");
   const readinessImproved = statusMoved(facts.readiness.previousStatus, facts.readiness.currentStatus, "better");
-  const conclusionWorsened = previous.status === "passed" && current.status === "failed";
-  const conclusionImproved = previous.status === "failed" && current.status === "passed";
+  const conclusionWorsened =
+    facts.readiness.conclusion?.previous === "passed" && facts.readiness.conclusion.current === "failed";
+  const conclusionImproved =
+    facts.readiness.conclusion?.previous === "failed" && facts.readiness.conclusion.current === "passed";
   const increased =
     readinessWorsened ||
     (facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta < 0) ||
@@ -152,9 +157,12 @@ function assessmentFromFacts(
 function domainChanged(domain: HardwareImpactDomain, facts: HardwareImpactFacts): boolean {
   switch (domain) {
     case "readiness":
-      return facts.readiness.scoreDelta !== null
-        ? facts.readiness.scoreDelta !== 0 || facts.readiness.statusChanged
-        : facts.readiness.statusChanged;
+      return (
+        facts.readiness.conclusion?.changed === true ||
+        (facts.readiness.scoreDelta !== null
+          ? facts.readiness.scoreDelta !== 0 || facts.readiness.statusChanged
+          : facts.readiness.statusChanged)
+      );
     case "findings":
       return (
         facts.findings.added > 0 ||
@@ -191,8 +199,18 @@ function countByStatus<T extends { status: string }>(entries: readonly T[], stat
   return entries.filter((entry) => entry.status === status).length;
 }
 
-function evidenceFromDiff(diff: RunDiff): HardwareImpactEvidenceRef[] {
+function evidenceFromDiff(
+  diff: RunDiff,
+  conclusion: HardwareImpactFacts["readiness"]["conclusion"],
+): HardwareImpactEvidenceRef[] {
   const evidence: HardwareImpactEvidenceRef[] = [];
+  if (conclusion?.changed) {
+    evidence.push({
+      domain: "readiness",
+      kind: "readiness",
+      label: `Release conclusion ${conclusion.previous} → ${conclusion.current}`,
+    });
+  }
   if (diff.readiness.scoreDelta !== 0 || diff.readiness.previousStatus !== diff.readiness.currentStatus) {
     evidence.push({
       domain: "readiness",

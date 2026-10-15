@@ -103,6 +103,24 @@ describe("formatReviewComment", () => {
     expect(body).toContain("severity ↑1 / ↓0");
   });
 
+  it("shows an observed release conclusion change independently of the readiness score", () => {
+    const changedImpact = impact();
+    changedImpact.facts.readiness = {
+      previousScore: 80,
+      currentScore: 80,
+      scoreDelta: 0,
+      previousStatus: "ready",
+      currentStatus: "ready",
+      statusChanged: false,
+      conclusion: { previous: "passed", current: "failed", changed: true },
+    };
+    changedImpact.assessment = { materialChange: true, riskDirection: "increased", affectedDomains: ["readiness"] };
+    const body = formatReviewComment({ ...result([]), hardwareImpact: changedImpact });
+    expect(body).toContain("Release conclusion: passed → failed");
+    expect(body).toContain("Material change · risk increased · 1 affected domain");
+    expect(body).not.toContain("No supported v1 facts changed.");
+  });
+
   it("renders a by-domain breakdown table when the run result carries one", () => {
     const findings = [
       finding("drc.clearance", "critical", "Clearance violation.", "board.kicad_pcb"),

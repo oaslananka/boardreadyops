@@ -18,6 +18,12 @@ export interface HardwareImpactV1 {
       previousStatus: "ready" | "at-risk" | "blocked" | null;
       currentStatus: "ready" | "at-risk" | "blocked" | null;
       statusChanged: boolean;
+      /** Additive v1 fact: an observed release verdict change is independent of readiness score. */
+      conclusion?: {
+        previous: "passed" | "failed" | null;
+        current: "passed" | "failed" | null;
+        changed: boolean;
+      };
     };
     findings: {
       added: number;

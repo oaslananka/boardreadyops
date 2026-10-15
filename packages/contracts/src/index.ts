@@ -263,6 +263,15 @@ export const hardwareImpactV1Schema = z
             previousStatus: hardwareImpactReadinessStatusSchema.nullable(),
             currentStatus: hardwareImpactReadinessStatusSchema.nullable(),
             statusChanged: z.boolean(),
+            // Optional without a default so parsing legacy signed results preserves their digest.
+            conclusion: z
+              .object({
+                previous: z.enum(["passed", "failed"]).nullable(),
+                current: z.enum(["passed", "failed"]).nullable(),
+                changed: z.boolean(),
+              })
+              .strict()
+              .optional(),
           })
           .strict(),
         findings: z

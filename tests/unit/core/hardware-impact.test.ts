@@ -197,6 +197,52 @@ describe("buildHardwareImpact", () => {
     },
   );
 
+  it.each([
+    ["passed", "failed", "increased"],
+    ["failed", "passed", "decreased"],
+  ] as const)("reports conclusion-only change %s → %s as material %s risk", (before, after, direction) => {
+    const impact = buildHardwareImpact({
+      baseline: {
+        status: "available",
+        sha: baseSha,
+        result: run({ status: before, readiness: readiness(80, "ready") }),
+      },
+      candidate: { sha: headSha, result: run({ status: after, readiness: readiness(80, "ready") }) },
+    });
+    expect(impact.assessment).toEqual({
+      materialChange: true,
+      riskDirection: direction,
+      affectedDomains: ["readiness"],
+    });
+    expect(impact.facts.readiness.conclusion).toEqual({ previous: before, current: after, changed: true });
+    expect(impact.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          domain: "readiness",
+          kind: "readiness",
+          label: `Release conclusion ${before} → ${after}`,
+        }),
+      ]),
+    );
+  });
+
+  it("does not infer a conclusion delta when the historical conclusion is unavailable", () => {
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: run({ status: undefined }) },
+      candidate: { sha: headSha, result: run({ status: "failed" }) },
+    });
+    expect(impact.assessment).toEqual({
+      materialChange: false,
+      riskDirection: "unchanged",
+      affectedDomains: [],
+    });
+    expect(impact.facts.readiness.conclusion).toEqual({
+      previous: null,
+      current: "failed",
+      changed: false,
+    });
+  });
+
   it("reports unchanged only when exact-base supported facts are unchanged", () => {
     const previous = run({ readiness: readiness(90, "ready") });
     const current = run({ readiness: readiness(90, "ready") });
@@ -289,6 +335,7 @@ describe("buildHardwareImpact", () => {
       previousStatus: null,
       currentStatus: "at-risk",
       statusChanged: true,
+      conclusion: { previous: "passed", current: "passed", changed: false },
     });
     expect(impact.assessment).toEqual({
       materialChange: true,
