@@ -8,7 +8,6 @@ import { boardReadyVersion } from "../../generated/version.js";
 import { activateRunnerIdentity, defaultRunnerIdentityDirectory } from "../../runner/identity.js";
 import {
   defaultRunnerWorkspaceRoot,
-  type RunnerArtifactMode,
   type RunnerWorkerOptions,
   runRunnerWorkerOnce,
   serveRunnerWorker,
@@ -46,16 +45,8 @@ export type RunnerActivateCliOptions = {
   format?: RunnerOutputFormat;
 };
 
-export type RunnerWorkCliOptions = {
+export type RunnerWorkCliOptions = Omit<RunnerWorkerOptions, "identityFile" | "runnerVersion" | "signal"> & {
   identity?: string;
-  workspaceRoot?: string;
-  repositoryMirrorRoot?: string;
-  heartbeatSeconds?: number;
-  pollSeconds?: number;
-  requireKicad?: boolean;
-  keepWorkspace?: boolean;
-  artifactMode?: RunnerArtifactMode;
-  customerArtifactRoot?: string;
   format?: RunnerOutputFormat;
 };
 

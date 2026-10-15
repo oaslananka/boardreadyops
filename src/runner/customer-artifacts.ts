@@ -3,7 +3,15 @@ import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
-import type { RunnerExecutionArtifact } from "./worker.js";
+
+type CustomerRunnerArtifact = {
+  kind: string;
+  name: string;
+  role: string;
+  filePath: string;
+  bytes: number;
+  sha256: string;
+};
 
 const maximumLocalArtifactBytes = 64 * 1024 * 1024;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -32,7 +40,7 @@ export async function persistCustomerRunnerArtifacts(input: {
   root: string;
   workspace: string;
   job: RunnerClaimedJob;
-  artifacts: readonly RunnerExecutionArtifact[];
+  artifacts: readonly CustomerRunnerArtifact[];
   signal?: AbortSignal;
 }): Promise<number> {
   input.signal?.throwIfAborted();

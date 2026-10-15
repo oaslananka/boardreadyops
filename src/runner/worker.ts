@@ -15,7 +15,7 @@ import { persistCustomerRunnerArtifacts } from "./customer-artifacts.js";
 import { type LoadedRunnerIdentity, loadRunnerIdentity } from "./identity.js";
 import { checkoutRunnerSource } from "./source.js";
 
-export type RunnerArtifactMode = "control-plane" | "metadata-only" | "customer-managed";
+type RunnerArtifactMode = "control-plane" | "metadata-only" | "customer-managed";
 
 export type RunnerWorkerOptions = {
   identityFile: string;
