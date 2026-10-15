@@ -58231,14 +58231,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
     const artifactMode = options.artifactMode ?? "control-plane";
-    const uploadedArtifacts = await resolveExecutionArtifacts(
-      dependencies,
-      client,
-      job,
-      execution,
-      artifactMode,
-      heartbeat
-    );
+    const uploadedArtifacts = execution.report ? await resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat) : [];
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
     const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode);
@@ -58462,8 +58455,8 @@ function wireFingerprint(fingerprint) {
   return wireFindingFingerprintPattern.test(fingerprint) ? fingerprint : void 0;
 }
 function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
-  const completed = execution.exitCode === 0 || execution.exitCode === 1;
-  const decision = decisionFromExitCode(execution.exitCode);
+  const completed = execution.report !== void 0 && (execution.exitCode === 0 || execution.exitCode === 1);
+  const decision = execution.report ? decisionFromExitCode(execution.exitCode) : "error";
   const findings = execution.report ? execution.report.findings.slice(0, 500).map((finding2) => {
     const fingerprint = wireFingerprint(finding2.fingerprint);
     return {

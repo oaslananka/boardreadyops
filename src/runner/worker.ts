@@ -187,14 +187,11 @@ export async function runRunnerWorkerOnce(
     heartbeat.assertLeaseActive();
 
     const artifactMode = options.artifactMode ?? "control-plane";
-    const uploadedArtifacts = await resolveExecutionArtifacts(
-      dependencies,
-      client,
-      job,
-      execution,
-      artifactMode,
-      heartbeat,
-    );
+    // Without a valid result report, even a zero exit code cannot authorize
+    // uploading generated artifacts or publishing a successful release verdict.
+    const uploadedArtifacts = execution.report
+      ? await resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat)
+      : [];
 
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
@@ -502,8 +499,8 @@ function terminalResultFromExecution(
   artifacts: ReleaseRunResult["artifacts"],
   artifactMode: RunnerArtifactMode,
 ): ReleaseRunResult {
-  const completed = execution.exitCode === 0 || execution.exitCode === 1;
-  const decision = decisionFromExitCode(execution.exitCode);
+  const completed = execution.report !== undefined && (execution.exitCode === 0 || execution.exitCode === 1);
+  const decision = execution.report ? decisionFromExitCode(execution.exitCode) : "error";
   const findings = execution.report
     ? execution.report.findings.slice(0, 500).map((finding) => {
         const fingerprint = wireFingerprint(finding.fingerprint);

@@ -620,6 +620,81 @@ notifiers:
     expect(runnerClient.publishTerminalResult).not.toHaveBeenCalled();
   });
 
+  it.each([0, 1])(
+    "never publishes a successful terminal decision without a parseable report (exit code %i)",
+    async (exitCode) => {
+      const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-no-report-"));
+      roots.push(workspace);
+      const runnerClient = client();
+      const overrides = dependencies(runnerClient.value);
+      Object.assign(overrides, {
+        checkoutSource: vi.fn(async () => workspace),
+        executePipeline: vi.fn(async (): Promise<RunnerExecutionOutput> => ({ exitCode, artifacts: [] })),
+      });
+
+      const result = await runRunnerWorkerOnce(
+        { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", artifactMode: "metadata-only" },
+        overrides,
+      );
+
+      expect(result).toMatchObject({ status: "completed", decision: "error" });
+      const terminal = (
+        runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+      )[0]?.[0];
+      expect(terminal?.result).toMatchObject({
+        status: "failed",
+        decision: "error",
+        findings: [{ ruleId: "runner.execution", severity: "error" }],
+      });
+      expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
+      expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not upload generated artifacts when the primary report is missing", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-invalid-report-artifact-"));
+    roots.push(workspace);
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(
+        async (): Promise<RunnerExecutionOutput> => ({
+          exitCode: 0,
+          artifacts: [
+            {
+              kind: "report/markdown",
+              name: "boardreadyops-result.md",
+              role: "summary",
+              filePath: path.join(workspace, "result.md"),
+              bytes: 5,
+              sha256: "a".repeat(64),
+            },
+          ],
+        }),
+      ),
+    });
+
+    const result = await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1" },
+      overrides,
+    );
+
+    expect(result).toMatchObject({ status: "completed", decision: "error" });
+    expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+    expect(runnerClient.uploadArtifact).not.toHaveBeenCalled();
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result).toMatchObject({
+      status: "failed",
+      decision: "error",
+      artifacts: [],
+      metrics: { artifacts_generated: 1, artifacts_uploaded: 0, artifacts_suppressed: 1 },
+    });
+    expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
+  });
+
   it("retains the workspace only when explicitly requested", async () => {
     const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-worker-"));
     roots.push(workspace);
