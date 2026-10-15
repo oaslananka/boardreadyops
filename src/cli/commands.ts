@@ -349,10 +349,11 @@ export function registerAllCommands(
       .option("--keep-workspace", "retain the checked-out workspace after completion")
       .option(
         "--artifact-mode <mode>",
-        "artifact handling: control-plane or metadata-only",
+        "artifact handling: control-plane, metadata-only or customer-managed",
         runnerArtifactMode,
         "control-plane",
       )
+      .option("--customer-artifact-root <path>", "private customer-owned artifact directory (customer-managed mode)")
       .option("--format <format>", "text or json", runnerOutputFormat, "text");
   addRunnerWorkOptions(runner.command("once").description("claim and process at most one runner job")).action(
     async (options: RunnerWorkCliOptions) => {
@@ -450,8 +451,8 @@ function runnerRevocationReason(value: string): RunnerRevokeRegistrationCliOptio
 }
 
 function runnerArtifactMode(value: string): RunnerWorkCliOptions["artifactMode"] {
-  if (value !== "control-plane" && value !== "metadata-only") {
-    throw new InvalidArgumentError("Runner artifact mode must be control-plane or metadata-only.");
+  if (value !== "control-plane" && value !== "metadata-only" && value !== "customer-managed") {
+    throw new InvalidArgumentError("Runner artifact mode must be control-plane, metadata-only or customer-managed.");
   }
   return value;
 }

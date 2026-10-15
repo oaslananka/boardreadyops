@@ -55,6 +55,7 @@ export type RunnerWorkCliOptions = {
   requireKicad?: boolean;
   keepWorkspace?: boolean;
   artifactMode?: RunnerArtifactMode;
+  customerArtifactRoot?: string;
   format?: RunnerOutputFormat;
 };
 
@@ -215,6 +216,7 @@ function workerOptions(options: RunnerWorkCliOptions): RunnerWorkerOptions {
     requireKicad: options.requireKicad ?? true,
     keepWorkspace: options.keepWorkspace ?? false,
     artifactMode: options.artifactMode ?? "control-plane",
+    ...(options.customerArtifactRoot ? { customerArtifactRoot: path.resolve(options.customerArtifactRoot) } : {}),
   };
 }
 

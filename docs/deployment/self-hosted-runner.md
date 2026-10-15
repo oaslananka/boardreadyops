@@ -192,7 +192,32 @@ sudo -u boardreadyops-runner boardreadyops runner serve \
   --format json
 ```
 
-`metadata-only` does not add a persistence backend: generated report files are deleted with the temporary workspace under the default cleanup policy. A customer-managed retention or export mechanism, when required, is a separately governed customer-side responsibility; BoardReadyOps does not configure or receive credentials for it.
+`metadata-only` does not add a persistence backend: generated report files are deleted with the temporary workspace under the default cleanup policy.
+
+### Customer-managed local artifact handoff (opt-in)
+
+A customer-hosted runner can retain **generated report artifacts** without transferring their bytes to the BoardReadyOps control plane. Provision a dedicated filesystem directory that the runner account owns with private permissions, **outside its ephemeral source workspace**. Encryption, backups, retention, quotas, mount reliability, and any later upload to customer-managed S3 or another store are the customer's responsibility. No cloud storage keys or local artifact paths are sent to BoardReadyOps.
+
+```bash
+# Provision as a trusted administrator; keep ownership and access with the runner account.
+sudo install -d -m 0700 -o boardreadyops-runner -g boardreadyops-runner /var/lib/boardreadyops-customer-artifacts
+
+sudo -u boardreadyops-runner boardreadyops runner serve \
+  --identity /var/lib/boardreadyops-runner/identity/runner.json \
+  --workspace-root /var/lib/boardreadyops-runner/workspaces \
+  --artifact-mode customer-managed \
+  --customer-artifact-root /var/lib/boardreadyops-customer-artifacts \
+  --format json
+```
+
+Each successfully verified attempt is handed off under `<artifact-root>/<run-uuid>/<execution-attempt-uuid>/`, with numbered `.bin` files and an atomic, customer-local `manifest.json` recording artifact names, SHA-256, byte counts, assigned repository commit, run and attempt IDs. Artifact names from the report are **not** used as filenames. The attempt path cannot overwrite an existing attempt, and source bytes must resolve inside the checkout, match their declared digest/size, and be bounded to 64 MiB per file. The local root refuses symlinks, weak POSIX directory permissions and overlap with ephemeral workspaces. Failed storage fails the entire job/lease rather than falsely reporting success.
+
+The terminal result includes normalized findings and metrics (`artifact_mode_customer_managed=1`, `artifacts_customer_stored`) but an **empty remote artifact list**; no managed artifact upload capabilities are requested. The option applies even in private safe-mode, without relaxing safe-mode restrictions. A missing primary analysis report prevents both remote upload and local artifact retention.
+
+**Limits and recovery:** This is a local filesystem handoff, not a customer cloud-provider API integration or a signed source-to-output attestation. A process/host crash before atomic rename may leave a hidden `.pending-*` staging directory; customer operators should examine and remove orphans only after quiescing the runner, following their retention/legal-hold policy. A successfully stored attempt can outlive a failed terminal callback; operator reconciliation must never overwrite an existing attempt. Customer-managed artifact storage does not imply normalized findings are free of proprietary design details or that all customer source/data stays private.
+
+**Independent commissioning remains required:** On a customer-controlled **private** repository with customer Git credentials, verify exact-SHA checkout, outbound-only network traffic, a real KiCad run, local byte/digest manifest accuracy and zero artifact-byte transfer. Exercise tampered digest, duplicate attempt, stale lease, SIGTERM/crash recovery, signed callback failure, tenant/identity isolation and local retention/backup/legal-hold handling. Do not mark the enterprise production/privacy acceptance complete solely because local unit tests pass.
+
 
 `kicad-cli` is required by default. Use `--no-require-kicad` only for a deliberate reduced-capability test runner.
 

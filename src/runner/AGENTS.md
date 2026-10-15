@@ -27,6 +27,7 @@ Read `docs/deployment/self-hosted-runner.md` and the managed-execution ADR befor
 
 - Artifact upload capabilities remain short-lived and attempt-bound.
 - Metadata-only mode must not request managed upload capabilities.
+- Customer-managed artifact handoff never exposes local storage paths on the wire and must fail closed on digest/root/attempt conflicts, without crossing temporary source workspace boundaries.
 - Verify declared size, digest, and identity before treating an upload as belonging to a run.
 
 ## Verification

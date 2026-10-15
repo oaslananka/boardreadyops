@@ -11,10 +11,11 @@ import {
   releaseRunResultSchema,
 } from "../../packages/contracts/src/index.js";
 import { loadRunnerPrivateKey, RunnerControlPlaneClient } from "./client.js";
+import { persistCustomerRunnerArtifacts } from "./customer-artifacts.js";
 import { type LoadedRunnerIdentity, loadRunnerIdentity } from "./identity.js";
 import { checkoutRunnerSource } from "./source.js";
 
-export type RunnerArtifactMode = "control-plane" | "metadata-only";
+export type RunnerArtifactMode = "control-plane" | "metadata-only" | "customer-managed";
 
 export type RunnerWorkerOptions = {
   identityFile: string;
@@ -26,6 +27,7 @@ export type RunnerWorkerOptions = {
   requireKicad?: boolean;
   keepWorkspace?: boolean;
   artifactMode?: RunnerArtifactMode;
+  customerArtifactRoot?: string;
   signal?: AbortSignal;
 };
 
@@ -133,6 +135,11 @@ export async function runRunnerWorkerOnce(
   overrides: Partial<RunnerWorkerDependencies> = {},
 ): Promise<RunnerWorkerResult> {
   const dependencies = { ...defaultDependencies, ...overrides };
+  if ((options.artifactMode === "customer-managed") !== (options.customerArtifactRoot !== undefined)) {
+    throw new Error(
+      "customer-managed artifact mode requires --customer-artifact-root, which cannot be used with other modes",
+    );
+  }
   const identity = await dependencies.loadIdentity(options.identityFile);
   const privateKey = await dependencies.loadPrivateKey(identity.privateKeyPath);
   const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
@@ -188,6 +195,23 @@ export async function runRunnerWorkerOnce(
     heartbeat.assertLeaseActive();
 
     const artifactMode = options.artifactMode ?? "control-plane";
+    const customerStored =
+      execution.report && artifactMode === "customer-managed"
+        ? await persistCustomerRunnerArtifacts({
+            root: options.customerArtifactRoot ?? "",
+            workspace,
+            job,
+            artifacts: execution.artifacts,
+            ...(options.signal ? { signal: options.signal } : {}),
+          })
+        : 0;
+    if (artifactMode === "customer-managed") {
+      dependencies.log("runner.artifacts.customer_stored", {
+        run_id: job.runId,
+        execution_attempt_id: job.executionAttemptId,
+        artifacts: customerStored,
+      });
+    }
     // Without a valid result report, even a zero exit code cannot authorize
     // uploading generated artifacts or publishing a successful release verdict.
     const uploadedArtifacts = execution.report
@@ -196,7 +220,7 @@ export async function runRunnerWorkerOnce(
 
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
-    const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode);
+    const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode, customerStored);
     const request: RunnerTerminalResultRequest = {
       protocolVersion: 1,
       runId: job.runId,
@@ -256,7 +280,7 @@ async function resolveExecutionArtifacts(
   artifactMode: RunnerArtifactMode,
   heartbeat: ReturnType<typeof createHeartbeatController>,
 ): Promise<ReleaseRunResult["artifacts"]> {
-  if (job.safeMode.enabled || artifactMode === "metadata-only") {
+  if (job.safeMode.enabled || artifactMode !== "control-plane") {
     if (execution.artifacts.length > 0) {
       dependencies.log("runner.artifacts.suppressed", {
         run_id: job.runId,
@@ -499,6 +523,7 @@ function terminalResultFromExecution(
   execution: RunnerExecutionOutput,
   artifacts: ReleaseRunResult["artifacts"],
   artifactMode: RunnerArtifactMode,
+  customerStored = 0,
 ): ReleaseRunResult {
   const completed = execution.report !== undefined && (execution.exitCode === 0 || execution.exitCode === 1);
   const decision = execution.report ? decisionFromExitCode(execution.exitCode) : "error";
@@ -542,6 +567,9 @@ function terminalResultFromExecution(
       findings_low: summary?.low ?? 0,
       findings_info: summary?.info ?? 0,
       artifact_mode_metadata_only: artifactMode === "metadata-only" ? 1 : 0,
+      ...(artifactMode === "customer-managed"
+        ? { artifact_mode_customer_managed: 1, artifacts_customer_stored: customerStored }
+        : {}),
       artifacts_generated: execution.artifacts.length,
       artifacts_uploaded: artifacts.length,
       artifacts_suppressed: Math.max(0, execution.artifacts.length - artifacts.length),
