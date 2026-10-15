@@ -41,6 +41,9 @@ jobs:
         run: corepack pnpm run qa:visual:update
         env:
           CI: "true"
+          # Must match ci / visual: the API/data fallback differs between
+          # a missing value and an explicitly empty DATABASE_URL.
+          DATABASE_URL: ""
       - name: Report what changed
         if: always()
         run: git --no-pager diff --stat -- tests/e2e/visual.spec.ts-snapshots
