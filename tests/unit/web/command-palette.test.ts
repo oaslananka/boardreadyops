@@ -59,7 +59,7 @@ describe("CommandPalette", () => {
   it("advertises the shortcut on the trigger rather than in decorative text", () => {
     const trigger = container.querySelector("[data-command-trigger]");
     expect(trigger?.getAttribute("aria-keyshortcuts")).toBe("Meta+K Control+K");
-    expect(trigger?.getAttribute("aria-label")).toBe("Search");
+    expect(trigger?.getAttribute("aria-label")).toBe("Go to a page or command");
   });
 
   it("renders no platform keycap on the server, so the markup never claims a Mac shortcut", () => {
@@ -73,6 +73,10 @@ describe("CommandPalette", () => {
     await press("k", { ctrlKey: true });
     expect(dialog()).not.toBeNull();
     expect(dialog()?.getAttribute("aria-modal")).toBe("true");
+    expect(dialog()?.querySelector('input[role="combobox"]')?.getAttribute("aria-label")).toBe(
+      "Find a page or command",
+    );
+    expect(dialog()?.textContent).toContain("Only pages and commands are searched");
     await press("Escape");
     expect(dialog()).toBeNull();
   });

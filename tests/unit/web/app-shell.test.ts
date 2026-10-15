@@ -49,7 +49,7 @@ describe("AppShell", () => {
     );
     expect(markup).toContain("data-command-trigger");
     expect(markup).toContain('aria-keyshortcuts="Meta+K Control+K"');
-    expect(markup).toContain('aria-label="Search"');
+    expect(markup).toContain('aria-label="Go to a page or command"');
   });
 
   it("renders the breadcrumb trail it is given, in the topbar rather than each page body", () => {
