@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { CopyButton } from "../../components/copy-button.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
+import { RunStateIndicators } from "../../components/run-state-indicators.js";
 import { Button } from "../../components/ui/button.js";
 import { CursorPagination, type DataColumn, DataTable } from "../../components/ui/data-table.js";
-import { AppShell, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
+import { AppShell, EmptyState, Panel } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { runCommitCopyAccessibleLabel } from "../../lib/accessibility-labels.js";
 import {
@@ -38,8 +39,8 @@ function when(value: string): string {
 const columns: readonly DataColumn<RunListingEntry>[] = [
   {
     id: "status",
-    header: "Outcome",
-    cell: (run) => <StatusBadge value={run.decision ?? run.status} />,
+    header: "Run state",
+    cell: (run) => <RunStateIndicators status={run.status} decision={run.decision} />,
   },
   {
     id: "repository",
