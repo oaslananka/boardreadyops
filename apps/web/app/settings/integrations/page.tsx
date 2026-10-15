@@ -42,7 +42,14 @@ export default async function IntegrationsSettingsPage() {
   const { snapshot } = result;
   return (
     <div className="flex flex-col gap-5">
-      <Panel title="Deployment readiness" description="Live control-plane configuration and database readiness.">
+      <Panel
+        title="Deployment readiness"
+        description="Live control-plane configuration and database readiness; not a claim that every repository is ready."
+      >
+        <p className="mb-3 text-sm text-muted-foreground">
+          Control-plane availability does not mean all repositories are ready for manufacturing. Check repository setup
+          and individual run evidence separately.
+        </p>
         <StatusBadge
           value={badgeValue(snapshot.deployment.status)}
           label={customerStatusLabel(snapshot.deployment.status)}
@@ -72,7 +79,7 @@ export default async function IntegrationsSettingsPage() {
               <div>
                 <dt className="text-meta font-medium text-muted-foreground">GitHub App</dt>
                 <dd className="mt-1">
-                  <StatusBadge value="ready" label="Connected" />
+                  <StatusBadge value="ready" label="GitHub App connected" />
                 </dd>
               </div>
               <div>
@@ -81,6 +88,9 @@ export default async function IntegrationsSettingsPage() {
                   {installation.repositories.ready}/{installation.repositories.total} ready ·{" "}
                   {installation.repositories.attention} attention · {installation.repositories.unconfigured}{" "}
                   unconfigured
+                </dd>
+                <dd className="mt-1 text-xs text-muted-foreground">
+                  Repository readiness is assessed separately from the GitHub App connection.
                 </dd>
               </div>
               <div>

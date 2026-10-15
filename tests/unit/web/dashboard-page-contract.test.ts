@@ -44,7 +44,9 @@ describe("dashboard operational hierarchy", () => {
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).toContain("Engineering status");
     expect(markup).toContain("Repositories with findings");
-    expect(markup).toContain("Supply alerts");
+    expect(markup).toContain("Supply alerts (recorded)");
+    expect(markup).toContain("No stored alerts does not prove that supply monitoring is enabled");
+    expect(markup).toContain("Recorded supply alerts only");
     expect(markup).toContain("No run yet");
     expect(markup).toContain("Supply-tracked boards");
     expect(markup).toContain("A zero does not mean your connected repositories have stopped being checked.");
