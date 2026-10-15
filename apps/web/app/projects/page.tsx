@@ -144,6 +144,26 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
             {/* Only shown when there is a choice to make. A switcher over one workspace is an
                 affordance that does nothing. */}
             <WorkspaceSwitcher workspaces={result.workspaces} selectedId={result.selected.id} basePath="/projects" />
+            <section
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-4 py-3"
+              aria-label="Current CAD workspace"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  Selected workspace: <strong>{result.selected.name}</strong>
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Projects here belong to this CAD workspace. Dashboard shows repository reviews available through
+                  GitHub App installations; those repositories are not automatically part of this workspace.
+                </p>
+              </div>
+              <Link
+                className="shrink-0 text-sm font-medium text-primary underline underline-offset-2"
+                href="/dashboard"
+              >
+                View GitHub repositories
+              </Link>
+            </section>
 
             <Panel
               title={result.selected.name}
