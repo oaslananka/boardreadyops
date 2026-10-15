@@ -262,9 +262,41 @@ describe("dependency and security automation configuration", () => {
     const validatorImage = await repositoryFile("scripts/validate-renovate-config.mjs");
     const validatorMatch = new RegExp(validatorManager?.matchStrings?.[0] ?? "(?!)", "u").exec(validatorImage);
     expect(validatorMatch?.groups).toMatchObject({
-      currentValue: "44.97.2",
-      currentDigest: "sha256:b9b32d70f395ec78b9c2a29633079ce4d249049e51018ad3f086417dadf96b86",
+      currentValue: "44.97.6",
+      currentDigest: "sha256:128e8d6d6cb07beccc009a2cfbdbe741e2c620a9f70a2b8fb72614ca33dbe5ac",
     });
+    const ubuntuManager = (
+      renovate.customManagers as Array<{
+        description?: string;
+        managerFilePatterns?: string[];
+        matchStrings?: string[];
+        autoReplaceStringTemplate?: string;
+      }>
+    ).find(
+      ({ description }) =>
+        description ===
+        "Track the Ubuntu container action image by version and immutable digest without tag@digest syntax.",
+    );
+    expect(ubuntuManager?.managerFilePatterns).toEqual(["/^apps\\/container\\/Dockerfile$/"]);
+    const actionDockerfilePin = await repositoryFile("apps/container/Dockerfile");
+    const ubuntuMatch = new RegExp(ubuntuManager?.matchStrings?.[0] ?? "(?!)", "u").exec(actionDockerfilePin);
+    expect(ubuntuMatch?.groups).toMatchObject({
+      currentValue: "26.04",
+      currentDigest: "sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7",
+    });
+    expect(ubuntuManager?.autoReplaceStringTemplate).toBe(
+      "# renovate: datasource=docker depName=ubuntu currentValue={{{newValue}}}\nFROM ubuntu@{{{newDigest}}}",
+    );
+    expect(
+      (
+        ubuntuManager?.autoReplaceStringTemplate
+          ?.replace("{{{newValue}}}", "26.04")
+          .replace("{{{newDigest}}}", `sha256:${"a".repeat(64)}`) ?? ""
+      ).split("\n"),
+    ).toEqual([
+      "# renovate: datasource=docker depName=ubuntu currentValue=26.04",
+      `FROM ubuntu@sha256:${"a".repeat(64)}`,
+    ]);
     expect(packageJson.scripts?.["deps:install-renovate"]).toBeUndefined();
     expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe("node scripts/renovate-post-upgrade.mjs");
     expect(renovateWorkflow.jobs?.validate).toBeDefined();
@@ -276,6 +308,19 @@ describe("dependency and security automation configuration", () => {
 
     const rules = (renovate.packageRules ?? []) as RenovateRule[];
     const byDescription = (description: string) => rules.find((rule) => rule.description === description);
+    expect(
+      byDescription("Prevent duplicate native Dockerfile updates for the digest-only Ubuntu container action image."),
+    ).toMatchObject({
+      matchManagers: ["dockerfile"],
+      matchFileNames: ["apps/container/Dockerfile"],
+      enabled: false,
+    });
+    expect(byDescription("Manually review the Ubuntu container action image custom digest updates.")).toMatchObject({
+      matchManagers: ["custom.regex"],
+      matchFileNames: ["apps/container/Dockerfile"],
+      automerge: false,
+      addLabels: ["supply-chain", "manual-review"],
+    });
 
     expect(
       byDescription(
@@ -339,7 +384,7 @@ describe("dependency and security automation configuration", () => {
     expect(packageJson.scripts?.["renovate:validate"]).toBe("node scripts/validate-renovate-config.mjs");
     expect(packageJson.scripts?.["renovate:validate"]).not.toContain("dlx");
     expect(validator).toContain(
-      "renovate/renovate:44.97.2@sha256:b9b32d70f395ec78b9c2a29633079ce4d249049e51018ad3f086417dadf96b86",
+      "renovate/renovate:44.97.6@sha256:128e8d6d6cb07beccc009a2cfbdbe741e2c620a9f70a2b8fb72614ca33dbe5ac",
     );
     expect(validator).toContain('"--network=none"');
     expect(validator).toContain("readonly");

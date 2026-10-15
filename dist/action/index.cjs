@@ -32417,7 +32417,7 @@ var require_scan = __commonJS({
     var scan2 = (input, options) => {
       const opts = options || {};
       const length = input.length - 1;
-      const scanToEnd = opts.parts === true || opts.scanToEnd === true;
+      const scanToEnd = opts.parts === true || opts.tokens === true || opts.scanToEnd === true;
       const slashes = [];
       const tokens = [];
       const parts = [];
@@ -32523,14 +32523,18 @@ var require_scan = __commonJS({
               negatedExtglob = true;
             }
             if (scanToEnd === true) {
+              let parens = 0;
               while (eos2() !== true && (code = advance2())) {
                 if (code === CHAR_BACKWARD_SLASH) {
                   backslashes = token.backslashes = true;
-                  code = advance2();
+                  advance2();
                   continue;
                 }
-                if (code === CHAR_RIGHT_PARENTHESES) {
-                  isGlob = token.isGlob = true;
+                if (code === CHAR_LEFT_PARENTHESES) {
+                  parens++;
+                  continue;
+                }
+                if (code === CHAR_RIGHT_PARENTHESES && --parens === 0) {
                   finished = true;
                   break;
                 }
@@ -32584,13 +32588,18 @@ var require_scan = __commonJS({
         if (opts.noparen !== true && code === CHAR_LEFT_PARENTHESES) {
           isGlob = token.isGlob = true;
           if (scanToEnd === true) {
+            let parens = 1;
             while (eos2() !== true && (code = advance2())) {
-              if (code === CHAR_LEFT_PARENTHESES) {
+              if (code === CHAR_BACKWARD_SLASH) {
                 backslashes = token.backslashes = true;
-                code = advance2();
+                advance2();
                 continue;
               }
-              if (code === CHAR_RIGHT_PARENTHESES) {
+              if (code === CHAR_LEFT_PARENTHESES) {
+                parens++;
+                continue;
+              }
+              if (code === CHAR_RIGHT_PARENTHESES && --parens === 0) {
                 finished = true;
                 break;
               }
@@ -32663,32 +32672,31 @@ var require_scan = __commonJS({
       if (opts.parts === true || opts.tokens === true) {
         let prevIndex;
         for (let idx = 0; idx < slashes.length; idx++) {
-          const n = prevIndex ? prevIndex + 1 : start;
+          const n2 = prevIndex !== void 0 ? prevIndex + 1 : start;
           const i = slashes[idx];
-          const value = input.slice(n, i);
+          const value2 = input.slice(n2, i);
           if (opts.tokens) {
             if (idx === 0 && start !== 0) {
               tokens[idx].isPrefix = true;
               tokens[idx].value = prefix2;
             } else {
-              tokens[idx].value = value;
+              tokens[idx].value = value2;
             }
             depth(tokens[idx]);
             state3.maxDepth += tokens[idx].depth;
           }
-          if (idx !== 0 || value !== "") {
-            parts.push(value);
+          if (i >= start) {
+            parts.push(value2);
+            prevIndex = i;
           }
-          prevIndex = i;
         }
-        if (prevIndex && prevIndex + 1 < input.length) {
-          const value = input.slice(prevIndex + 1);
-          parts.push(value);
-          if (opts.tokens) {
-            tokens[tokens.length - 1].value = value;
-            depth(tokens[tokens.length - 1]);
-            state3.maxDepth += tokens[tokens.length - 1].depth;
-          }
+        const n = prevIndex !== void 0 ? prevIndex + 1 : start;
+        const value = input.slice(n);
+        parts.push(value);
+        if (opts.tokens && prevIndex && prevIndex + 1 < input.length) {
+          tokens[tokens.length - 1].value = value;
+          depth(tokens[tokens.length - 1]);
+          state3.maxDepth += tokens[tokens.length - 1].depth;
         }
         state3.slashes = slashes;
         state3.parts = parts;
@@ -33531,6 +33539,7 @@ var require_parse2 = __commonJS({
             rest = rest.slice(3);
             consume("/**", 3);
           }
+          const isEnd = eos2() || state3.parens > 0 && rest === ")".repeat(state3.parens) && !extglobs.some((extglob) => extglob.type === "negate");
           if (prior.type === "bos" && eos2()) {
             prev.type = "globstar";
             prev.value += value;
@@ -33540,7 +33549,7 @@ var require_parse2 = __commonJS({
             consume(value);
             continue;
           }
-          if (prior.type === "slash" && prior.prev.type !== "bos" && !afterStar && eos2()) {
+          if (prior.type === "slash" && prior.prev.type !== "bos" && !afterStar && isEnd) {
             state3.output = state3.output.slice(0, -(prior.output + prev.output).length);
             prior.output = `(?:${prior.output}`;
             prev.type = "globstar";
@@ -70303,7 +70312,7 @@ function readBlockScalar(state3, parentIndent, props) {
         state3.position = linePosition + column;
         throwError(state3, "tab characters must not be used in indentation");
       }
-      if (column < maxLeadingIndent) {
+      if (column >= parentIndent && column < maxLeadingIndent) {
         state3.position = linePosition + column;
         throwError(state3, "bad indentation of a mapping entry");
       }
@@ -70513,13 +70522,16 @@ function readBlockMapping(state3, nodeIndent, flowIndent, props) {
           ch = state3.input.charCodeAt(++state3.position);
           if (!isWsOrEolOrEnd(ch)) throwError(state3, "a whitespace character is expected after the key-value separator within a block mapping");
           if (!mappingOpened) {
-            restoreState(state3, beforeKey);
-            addMappingEvent(state3, beforeKey.position, props.anchorStart, props.anchorEnd, props.tagStart, props.tagEnd, COLLECTION_STYLE.BLOCK);
+            state3.events.splice(beforeKey.eventsLength, 0, {
+              type: EVENT_ID.MAPPING,
+              start: beforeKey.position,
+              anchorStart: props.anchorStart,
+              anchorEnd: props.anchorEnd,
+              tagStart: props.tagStart,
+              tagEnd: props.tagEnd,
+              style: COLLECTION_STYLE.BLOCK
+            });
             mappingOpened = true;
-            parseNode(state3, flowIndent, CONTEXT_FLOW_OUT, false, true);
-            ch = state3.input.charCodeAt(state3.position);
-            while (isWhiteSpace(ch)) ch = state3.input.charCodeAt(++state3.position);
-            state3.position++;
           }
           detected = true;
           atExplicitKey = false;
@@ -70791,6 +70803,7 @@ function doubleQuoteWhitespaceOnly(layout) {
 function applyForceQuotesOption(layout) {
   if (!layout.presenterOptions.forceQuotes) return;
   if (layout.isKey || layout.style !== SCALAR_STYLE.PLAIN) return;
+  if (layout.node.tag !== layout.presenterOptions.schema.defaultScalarTag.tagName) return;
   layout.style = layout.node.value.includes("\n") ? SCALAR_STYLE.DOUBLE_QUOTED : _preferredQuotedStyle(layout);
 }
 function tryLongOrMultilineAsBlock(layout) {

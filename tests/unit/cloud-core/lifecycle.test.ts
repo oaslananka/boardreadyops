@@ -239,6 +239,31 @@ describe("GitHub App lifecycle normalization", () => {
     });
   });
 
+  it.each([null, {}, { fork: false }, { full_name: "" }])(
+    "fails safe on public PR with indeterminate head repository %j",
+    (headRepo) => {
+      const normalized = normalizeGitHubAppWebhook({
+        event: "pull_request",
+        delivery: "delivery-unknown-origin",
+        payload: {
+          action: "opened",
+          installation,
+          repository: publicRepository,
+          pull_request: {
+            number: 42,
+            base: { sha: baseSha },
+            head: { sha: headSha, ref: "feature/pcb-release", repo: headRepo },
+          },
+        },
+      });
+      expect(normalized.actions.at(-1)).toMatchObject({
+        type: "release_run.enqueue",
+        pullRequestFromFork: true,
+        safeMode: { enabled: true, reasons: ["fork-pull-request"] },
+      });
+    },
+  );
+
   it("orders draft, fork, and private safe-mode reasons deterministically", () => {
     const normalized = normalizeGitHubAppWebhook({
       event: "pull_request",

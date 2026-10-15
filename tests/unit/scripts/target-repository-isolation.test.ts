@@ -28,6 +28,12 @@ describe("target-repository two-installation isolation evidence", () => {
     expect(buildTargetRepositoryIsolationReport(evidence())).toEqual({
       event: "target_repository_two_installation_isolation_verified",
       sourceSha,
+      proof: {
+        kind: "synthetic-database-adversarial",
+        liveTwoOwnerAcceptance: false,
+        architecture: "ADR-0010",
+        milestone: "Cloud Control Plane Reliability",
+      },
       topology: {
         installations: 2,
         repositories: 2,
@@ -51,6 +57,17 @@ describe("target-repository two-installation isolation evidence", () => {
         responseLeakageFindings: 0,
       },
     });
+  });
+
+  it("never promotes synthetic callbacks to real two-owner acceptance", () => {
+    const report = buildTargetRepositoryIsolationReport(
+      evidence({
+        liveTwoOwnerAcceptance: true,
+        proof: { kind: "production" },
+      }),
+    );
+    expect(report.proof.liveTwoOwnerAcceptance).toBe(false);
+    expect(report.proof.kind).toBe("synthetic-database-adversarial");
   });
 
   it("fails closed when any required proof or invariant is missing", () => {

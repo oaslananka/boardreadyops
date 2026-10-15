@@ -138,10 +138,31 @@ export function dryRunPolicyImpact(input: {
     Number(roleAdded) +
     Number(evidencePackIntroduced) +
     Number(externalReviewIntroduced);
+  const relaxedFields: string[] = [];
+  if (input.previousPolicy) {
+    if (input.previousPolicy.requiredChecklist.some((item) => !input.newPolicy.requiredChecklist.includes(item))) {
+      relaxedFields.push("requiredChecklist");
+    }
+    if (input.previousPolicy.requiredRoles.some((role) => !input.newPolicy.requiredRoles.includes(role))) {
+      relaxedFields.push("requiredRoles");
+    }
+    if (previousGate !== undefined && (nextGate === undefined || severityRank[nextGate] < severityRank[previousGate])) {
+      relaxedFields.push("severityGate");
+    }
+    if (input.previousPolicy.requireEvidencePack && !input.newPolicy.requireEvidencePack) {
+      relaxedFields.push("requireEvidencePack");
+    }
+    if (input.previousPolicy.requireExternalReview && !input.newPolicy.requireExternalReview) {
+      relaxedFields.push("requireExternalReview");
+    }
+  }
   return {
     affectedRepositories: input.repositoriesCount,
     affectedReviews: input.existingReviewsCount,
     blockersIntroduced: blockers,
-    warnings: blockers > 0 ? ["New policy may block existing open reviews"] : [],
+    warnings: [
+      ...(blockers > 0 ? ["New policy may block existing open reviews"] : []),
+      ...(relaxedFields.length > 0 ? [`Policy relaxes existing review requirements: ${relaxedFields.join(", ")}`] : []),
+    ],
   };
 }

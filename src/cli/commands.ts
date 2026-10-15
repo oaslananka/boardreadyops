@@ -181,6 +181,7 @@ export function registerAllCommands(
     .command("verify")
     .argument("[bundle]", "release evidence bundle directory")
     .option("--format <format>", "text or json", "text")
+    .option("--strict-coverage", "fail if the bundle contains files not covered by its manifest")
     .option("--public-key <path>", "Ed25519 public key PEM to require and verify a signed manifest")
     .option(
       "--trust-store <path>",

@@ -15,6 +15,12 @@ export type TargetRepositoryIsolationEvidence = {
 export type TargetRepositoryIsolationReport = {
   event: "target_repository_two_installation_isolation_verified";
   sourceSha: string;
+  proof: {
+    kind: "synthetic-database-adversarial";
+    liveTwoOwnerAcceptance: false;
+    architecture: "ADR-0010";
+    milestone: "Cloud Control Plane Reliability";
+  };
   topology: { installations: 2; repositories: 2; runs: 2; executionAttempts: 2 };
   accepted: { independentCallbacks: number; independentCheckRuns: number };
   rejected: {

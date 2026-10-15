@@ -1,6 +1,6 @@
 # Opt-in target-repository manufacturing export and signed attestation
 
-**Status:** Implemented target-runner action/CLI and reviewed workflow **template**; not commissioned or GA-accepted. This is tracked by [#771](https://github.com/oaslananka/boardreadyops/issues/771). Real two-owner GitHub App installation acceptance is separately tracked by [#154](https://github.com/oaslananka/boardreadyops/issues/154). Release and production publication remain on hold.
+**Status:** Implemented target-runner Action/CLI, reviewed workflow **template**, and one independently validated **public target-repository canary** ([run #38026832338](https://github.com/boardreadyops/gateway-board-demo/actions/runs/38026832338)). This is **not GA acceptance**. The remaining customer scope is tracked by [#771](https://github.com/oaslananka/boardreadyops/issues/771), with two unrelated private GitHub App installations separately required by [#154](https://github.com/oaslananka/boardreadyops/issues/154). Release and production publication remain on hold.
 
 ## Trust model
 
@@ -35,6 +35,8 @@ boardreadyops verify-export-attestation . \
   --run-attempt 1
 ```
 
+The verifier rejects signed evidence from `push`, `pull_request`, tag and PR refs: this opt-in authority is limited to a protected-branch `workflow_dispatch` run. Its expected target run must still be independently authorized; the certificate alone does not prove that branch protection was enforced at execution time.
+
 The optional `--bundle <path>` is only an attestation bundle transport, not an independent trust anchor. The verifier must successfully validate the Sigstore signature and GitHub OIDC certificate **and** the exact expected immutable source identity, repository ID, protected workflow signer, run ID/attempt and **all** signed manifest/output digests. Exit 0 and `{"status":"eligible"}` mean that this opt-in cryptographic evidence prerequisite matched; **they do not independently authorize a GA badge, release, production gate or two-owner tenancy acceptance**. Any mismatch, unsupported provider, missing artifact, changed source or missing verification fails closed.
 
 `boardreadyops generate . --reviewed-source-sha <sha>` and `boardreadyops export-checksums . --manifest <path> --reviewed-source-sha <sha>` are low-level tooling, not public strong-provenance decisions; the first demands a clean, exactly pinned Git checkout and the second recomputes the manifest and all actual outputs before returning an unsigned signing-input list.
@@ -43,4 +45,18 @@ The optional `--bundle <path>` is only an attestation bundle transport, not an i
 
 The local integration suite executes the **same composite Action shell** against a temporary, locally committed KiCad fixture with real `kicad-cli 10.0.x`, tests generated Gerber/Excellon and manifest bytes, and exercises negative commit/ref/runner/fork/dirty/ignored-output cases. Static tests verify the opt-in template's GitHub Action and OIDC signing order. This proves local functionality and contract coverage, **not a real GitHub-signed target artifact**.
 
-Before granting a stronger customer-facing source-bound state or completing #771, run an eligible real, independently owned target-repository `workflow_dispatch`, collect actual signed bundle and checksum subject evidence, verify with the independent CLI and negative replay/different-repo/different-run tests, then meet #154's two distinct real installation owners. Manual/offline packages remain inspectable at byte-consistent-only or unverified trust.
+**Existing real public canary:** The independently owned
+`boardreadyops/gateway-board-demo` [workflow run #38026832338](https://github.com/boardreadyops/gateway-board-demo/actions/runs/38026832338)
+completed with a protected `workflow_dispatch`, exact source commit and real
+KiCad 10 Gerber/Excellon exports. Recorded online and offline Sigstore
+verification checked 27 signed subjects; negative repository, SHA, run,
+attempt, signer and tampered-output cases were rejected. This establishes a
+single public target's opt-in cryptographic prerequisite, **not** the
+remaining two unrelated private-installation acceptance (#154), a universal
+customer-facing trust state or GA/release authorization.
+
+For each further target, independently authorize the exact run and verify its
+signed bundle, actual artifact digests and negative cases. Complete #154's
+separate two-owner isolation requirements before claiming customer GA.
+Manual/offline packages remain inspectable at byte-consistent-only or
+unverified trust.

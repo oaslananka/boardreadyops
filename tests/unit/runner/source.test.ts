@@ -98,6 +98,22 @@ describe("checkoutRunnerSource", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("does not leave a checkout workspace when the customer mirror path escapes its root", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-source-"));
+    const mirror = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-mirror-"));
+    roots.push(root, mirror);
+    const claimed = job();
+    claimed.repository.owner = "..";
+    claimed.repository.name = "../../outside";
+    const execute = vi.fn<RunnerCommandExecutor>();
+
+    await expect(
+      checkoutRunnerSource({ job: claimed, workspaceRoot: root, repositoryMirrorRoot: mirror, execute }),
+    ).rejects.toThrow(/mirror path escaped/u);
+    expect(execute).not.toHaveBeenCalled();
+    await expect(readdir(root)).resolves.toEqual([]);
+  });
+
   it("fails closed when the checked-out SHA differs from the assignment", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-source-"));
     roots.push(root);

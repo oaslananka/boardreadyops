@@ -321,9 +321,10 @@ function pullRequestHeadRepositoryIsFork(pullRequest: Record<string, unknown>): 
 
 function pullRequestIsFromFork(repository: GitHubRepositoryRef, pullRequest: Record<string, unknown>): boolean {
   const headRepository = pullRequestHeadRepository(pullRequest);
+  // A missing or deleted head repository is NOT proof that the PR belongs to
+  // the base repository. Preserve restricted execution until origin is known.
   return (
-    pullRequestHeadRepositoryIsFork(pullRequest) ||
-    (headRepository !== undefined && headRepository !== repository.fullName)
+    pullRequestHeadRepositoryIsFork(pullRequest) || headRepository?.toLowerCase() !== repository.fullName.toLowerCase()
   );
 }
 

@@ -12,7 +12,11 @@ function semanticText(markdown: string): string {
 describe("manufacturing source-to-export provenance design boundary", () => {
   it("does not present current self-reported hashes or timestamps as reviewed-commit proof", async () => {
     const contract = await readFile(design, "utf8");
-    expect(semanticText(contract)).toMatch(/ga acceptance are not implemented/);
+    // One real public target run exists, but customer GA and two-private-owner
+    // acceptance are deliberately not established by this design contract.
+    expect(semanticText(contract)).toMatch(/not two.private.installation acceptance/);
+    expect(semanticText(contract)).toMatch(/not.*customer.facing ga trust badge/);
+    expect(contract).toContain("38026832338");
     expect(contract).toContain("sourceFingerprint");
     expect(contract).toContain("currentGitSha");
     expect(semanticText(contract)).toMatch(/source.bound verified/);

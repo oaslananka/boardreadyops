@@ -65,7 +65,7 @@ boardreadyops release pack . \
   --provenance-attestation https://github.com/oaslananka/boardreadyops/attestations/123
 ```
 
-`boardreadyops release verify [bundle]` reads `manifest.json` and recomputes every artifact digest. It exits with code `0` when all listed artifacts match, and code `1` when an artifact is missing, changed, truncated, or points outside the bundle directory.
+`boardreadyops release verify [bundle]` reads `manifest.json` and recomputes every artifact digest. It exits with code `0` when all listed artifacts match, and code `1` when an artifact is missing, changed, truncated, or points outside the bundle directory. A malformed artifact inventory (missing or non-array `artifacts`, or entries without a valid path, SHA-256 or nonnegative integer byte length) is always rejected as invalid evidence, even if the manifest was signed. This structural check does not establish trusted source-to-export provenance.
 
 ```bash
 boardreadyops release verify build/boardreadyops-release
@@ -97,7 +97,7 @@ The `checksums.txt` covers exactly the same files as `manifest.json`. The manife
 
 The manifest records every file that boardreadyops wrote into the bundle. If a post-processing step adds files to the bundle directory (for example an attestation tool that appends files), the `release verify` command's coverage check will flag them as uncovered.
 
-Uncovered files do not block `release verify` by default — coverage gaps are surfaced in the JSON output so automation can decide whether to treat them as blocking. Use `--strict-coverage` (when available) to make uncovered files a hard failure.
+Uncovered files do not block `release verify` by default — coverage gaps are surfaced in the JSON output under `coverage: { ok, uncovered, errors }`. Text output writes a warning for incomplete coverage. Use `--strict-coverage` to make uncovered files, symbolic links, or unreadable bundle directories a hard failure (exit code `1`), including when the manifest signature and listed checksums remain valid. Only the three root metadata sidecars (`manifest.json`, `checksums.txt`, `manifest.sig`) are exempt; nested files with those names are still bundle content. Coverage does not prove that a GitHub run produced these artifacts, nor does a green release verification authorize GA or production.
 
 ## Signing and provenance
 

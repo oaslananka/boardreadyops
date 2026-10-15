@@ -11,6 +11,7 @@ import { type AuditClauseMapping, exportPassportAuditClausesJson } from "../../r
 import { diffReleases, formatReleaseDiffText, type ReleaseSnapshot } from "../../release/diff.js";
 import {
   formatReleaseCertificateText,
+  verifyManifestCoverage,
   verifyReleaseEvidenceBundle,
   writeReleaseEvidenceBundle,
 } from "../../release/evidence.js";
@@ -61,6 +62,7 @@ export interface ReleasePrepareOptions extends CommonCliOptions {
 
 export interface ReleaseVerifyOptions {
   format?: "text" | "json";
+  strictCoverage?: boolean;
   publicKey?: string;
   trustStore?: string;
 }
@@ -336,6 +338,7 @@ async function resolveReleaseVerifySignature(
 
 function writeReleaseVerifyOutcome(
   verification: Awaited<ReturnType<typeof verifyReleaseEvidenceBundle>>,
+  coverage: Awaited<ReturnType<typeof verifyManifestCoverage>>,
   signature: ReleaseBundleSignatureResult,
   signatureRequired: boolean,
   options: ReleaseVerifyOptions,
@@ -346,7 +349,9 @@ function writeReleaseVerifyOutcome(
     signatureErrors.push("expected a signed manifest (manifest.sig) but none was found");
   }
   const signatureOk = signatureErrors.length === 0 && (signature.present || !signatureRequired);
-  const ok = verification.ok && signatureOk;
+  const coverageErrors = [...coverage.errors, ...coverage.uncovered.map((file) => `uncovered bundle file: ${file}`)];
+  const coverageOk = coverage.errors.length === 0 && (!options.strictCoverage || coverage.ok);
+  const ok = verification.ok && signatureOk && coverageOk;
 
   if (options.format === "json") {
     streams.stdout.write(
@@ -354,6 +359,7 @@ function writeReleaseVerifyOutcome(
         {
           ...verification,
           ok,
+          coverage,
           signature: {
             present: signature.present,
             ok: signatureOk,
@@ -368,6 +374,7 @@ function writeReleaseVerifyOutcome(
   } else if (ok) {
     const signatureNote = signature.present ? " and Ed25519 signature" : "";
     streams.stdout.write(`Release evidence bundle verified: ${verification.checked} artifact(s)${signatureNote}\n`);
+    if (!coverage.ok) streams.stderr.write(`Release bundle coverage warning: ${coverageErrors.join("; ")}\n`);
     if (verification.manifest) {
       streams.stdout.write(
         formatReleaseCertificateText(verification.manifest, { present: signature.present, ok: signatureOk }),
@@ -375,7 +382,11 @@ function writeReleaseVerifyOutcome(
     }
   } else {
     streams.stderr.write(
-      `Release evidence bundle verification failed: ${[...verification.errors, ...signatureErrors].join("; ")}\n`,
+      `Release evidence bundle verification failed: ${[
+        ...verification.errors,
+        ...signatureErrors,
+        ...(!coverageOk ? coverageErrors : []),
+      ].join("; ")}\n`,
     );
   }
   return ok ? 0 : 1;
@@ -388,10 +399,12 @@ export async function releaseVerifyCommand(
 ): Promise<number> {
   const bundleDir = path.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
   const verification = await verifyReleaseEvidenceBundle(bundleDir);
+  const coverage = await verifyManifestCoverage(bundleDir);
   const signatureResolution = await resolveReleaseVerifySignature(bundleDir, options, streams.stderr);
   if ("exitCode" in signatureResolution) return signatureResolution.exitCode;
   return writeReleaseVerifyOutcome(
     verification,
+    coverage,
     signatureResolution.signature,
     signatureResolution.signatureRequired,
     options,

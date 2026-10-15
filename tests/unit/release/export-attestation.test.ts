@@ -13,6 +13,23 @@ import { runProcess } from "../../../src/util/process.js";
 
 vi.mock("../../../src/util/process.js", () => ({ runProcess: vi.fn() }));
 
+// Simulate a filesystem mutation *after* the real inventory verifier has
+// completed, without monkey-patching platform-dependent fs.open bindings.
+let afterInventoryVerification: (() => Promise<void>) | undefined;
+vi.mock("../../../src/core/provenance.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../../src/core/provenance.js")>();
+  return {
+    ...original,
+    verifyExportProvenance: async (...args: Parameters<typeof original.verifyExportProvenance>) => {
+      const result = await original.verifyExportProvenance(...args);
+      if (afterInventoryVerification && result.status === "verified") {
+        await afterInventoryVerification();
+      }
+      return result;
+    },
+  };
+});
+
 const mockedRun = vi.mocked(runProcess);
 const roots: string[] = [];
 const sha = "a".repeat(40);
@@ -22,12 +39,13 @@ const expectation: TrustedExportExpectation = {
   reviewedSha: sha,
   sourceRef: "refs/heads/review",
   workflowPath: ".github/workflows/boardreadyops-export.yml",
-  event: "push",
+  event: "workflow_dispatch",
   runId: "12345",
   runAttempt: 2,
 };
 
 afterEach(async () => {
+  afterInventoryVerification = undefined;
   vi.resetAllMocks();
   for (const root of roots.splice(0)) await fs.rm(root, { recursive: true, force: true });
 });
@@ -94,7 +112,7 @@ function verifiedResult(f: Fixture, overrides: Record<string, unknown> = {}) {
     buildSignerURI:
       "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review",
     runnerEnvironment: "github-hosted",
-    buildTrigger: "push",
+    buildTrigger: "workflow_dispatch",
     subjectAlternativeName:
       "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review",
     ...(overrides.cert as Record<string, unknown> | undefined),
@@ -158,6 +176,19 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     );
   });
 
+  it.each([
+    ["push event", { event: "push" }],
+    ["pull request event", { event: "pull_request" }],
+    ["tag ref", { sourceRef: "refs/tags/v1.0.0" }],
+    ["pull request ref", { sourceRef: "refs/pull/42/merge" }],
+    ["empty branch ref", { sourceRef: "refs/heads/" }],
+  ])("rejects unsupported signed-run expectation: %s", async (_case, change) => {
+    const f = await fixture();
+    succeed(verifiedResult(f));
+    expect((await verify(f, { ...expectation, ...change })).status).toBe("rejected");
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
+
   it("accepts the legacy structured SAN only when its value matches the trusted workflow", async () => {
     const f = await fixture();
     succeed(
@@ -206,7 +237,7 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     ],
     ["self-hosted runner", { runnerEnvironment: "self-hosted" }],
     ["incorrect issuer", { issuer: "https://other.invalid" }],
-    ["wrong event", { buildTrigger: "workflow_dispatch" }],
+    ["wrong event", { buildTrigger: "push" }],
   ])("rejects certificate mismatch: %s", async (_name, cert) => {
     const f = await fixture();
     succeed(verifiedResult(f, { cert }));
@@ -237,6 +268,31 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     expect((await verify(f)).status).toBe("rejected");
   });
 
+  it.each([
+    ["existing Gerber bytes", "gerber"],
+    ["additional unlisted output", "extra"],
+    ["source input bytes", "source"],
+  ] as const)("rejects %s changed while the external verifier runs", async (_scenario, kind) => {
+    const f = await fixture();
+    const signedStatement = verifiedResult(f);
+    mockedRun.mockImplementation(async () => {
+      if (kind === "gerber") {
+        // Same-byte-length replacement after the initial inventory has passed.
+        await fs.writeFile(path.join(f.root, "build/reviewed/gerbers/board.gtl"), "fake gerber bytes");
+      } else if (kind === "extra") {
+        await fs.writeFile(path.join(f.root, "build/reviewed/gerbers/unlisted.gtl"), "other fabrication file");
+      } else {
+        await fs.writeFile(path.join(f.root, "board.kicad_pcb"), "(kicad_pcb replaced)");
+      }
+      return { code: 0, stdout: JSON.stringify([signedStatement]), stderr: "", timedOut: false };
+    });
+
+    const result = await verify(f);
+    expect(mockedRun).toHaveBeenCalledOnce();
+    expect(result.status).toBe("rejected");
+    expect(result.reason).toMatch(/changed|inventory|source|subject/iu);
+  });
+
   it("rejects tampered output or undeclared extras before attempting trust verification", async () => {
     const f = await fixture();
     await fs.writeFile(path.join(f.root, "build/reviewed/drill/board.drl"), "tampered");
@@ -247,6 +303,57 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     expect((await verify(g)).status).toBe("rejected");
     expect(mockedRun).not.toHaveBeenCalled();
   });
+
+  it.skipIf(process.platform === "win32")(
+    "rejects an artifact swapped for an identical-byte symlink after inventory validation",
+    async () => {
+      const f = await fixture();
+      succeed(verifiedResult(f));
+      const target = path.join(f.root, "build", "reviewed", "gerbers", "board.gtl");
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), "brops-attestation-outside-"));
+      roots.push(outside);
+      const forged = path.join(outside, "same-bytes.gtl");
+      await fs.writeFile(forged, "real gerber bytes");
+
+      // The original inventory verification succeeds first, then a same-byte
+      // symlink is substituted before the attestation signing inventory hashes.
+      let swapped = false;
+      afterInventoryVerification = async () => {
+        await fs.rm(target);
+        await fs.symlink(forged, target);
+        swapped = true;
+        afterInventoryVerification = undefined;
+      };
+      const result = await verify(f);
+      expect(swapped).toBe(true);
+      expect(result.status).toBe("rejected");
+      expect(mockedRun).not.toHaveBeenCalled();
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "rejects a same-byte parent directory symlink inserted after inventory validation",
+    async () => {
+      const f = await fixture();
+      succeed(verifiedResult(f));
+      const gerbers = path.join(f.root, "build", "reviewed", "gerbers");
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), "brops-attestation-parent-outside-"));
+      roots.push(outside);
+      await fs.writeFile(path.join(outside, "board.gtl"), "real gerber bytes");
+
+      let swapped = false;
+      afterInventoryVerification = async () => {
+        await fs.rm(gerbers, { recursive: true });
+        await fs.symlink(outside, gerbers, "dir");
+        swapped = true;
+        afterInventoryVerification = undefined;
+      };
+      const result = await verify(f);
+      expect(swapped).toBe(true);
+      expect(result.status).toBe("rejected");
+      expect(mockedRun).not.toHaveBeenCalled();
+    },
+  );
 
   it("does not accept an expected SHA derived from attacker-controlled unsigned inputs", async () => {
     const f = await fixture();

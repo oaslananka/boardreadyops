@@ -65,6 +65,36 @@ describe("release sign / verify commands", () => {
     expect(verify.output().stdout).toContain("signature");
   });
 
+  it("reports uncovered bundle files without changing the default verification exit code", async () => {
+    const { bundle, keyPath, pubPath } = await makeBundle();
+    await releaseSignCommand(bundle, { key: keyPath }, streams().streams);
+    await fs.mkdir(path.join(bundle, "reports"));
+    await fs.writeFile(path.join(bundle, "reports", "unexpected.gbr"), "unlisted fab output");
+
+    const out = streams();
+    expect(await releaseVerifyCommand(bundle, { publicKey: pubPath, format: "json" }, out.streams)).toBe(0);
+    expect(JSON.parse(out.output().stdout)).toMatchObject({
+      ok: true,
+      signature: { ok: true },
+      coverage: { ok: false, uncovered: ["reports/unexpected.gbr"] },
+    });
+
+    const strict = streams();
+    expect(await releaseVerifyCommand(bundle, { publicKey: pubPath, strictCoverage: true }, strict.streams)).toBe(1);
+    expect(strict.output().stderr).toContain("reports/unexpected.gbr");
+  });
+
+  it("does not exempt a nested manifest.json from strict bundle coverage", async () => {
+    const { bundle, keyPath, pubPath } = await makeBundle();
+    await releaseSignCommand(bundle, { key: keyPath }, streams().streams);
+    await fs.mkdir(path.join(bundle, "reports"));
+    await fs.writeFile(path.join(bundle, "reports", "manifest.json"), "unsigned payload");
+
+    const strict = streams();
+    expect(await releaseVerifyCommand(bundle, { publicKey: pubPath, strictCoverage: true }, strict.streams)).toBe(1);
+    expect(strict.output().stderr).toContain("reports/manifest.json");
+  });
+
   it("returns 2 when no key is provided", async () => {
     const { bundle } = await makeBundle();
     const io = streams();
@@ -77,6 +107,23 @@ describe("release sign / verify commands", () => {
     const io = streams();
     expect(await releaseVerifyCommand(bundle, { publicKey: pubPath }, io.streams)).toBe(1);
     expect(io.output().stderr).toContain("manifest.sig");
+  });
+
+  it("returns a verification failure for a signed malformed artifact inventory", async () => {
+    const { bundle, keyPath, pubPath } = await makeBundle();
+    await fs.writeFile(path.join(bundle, "manifest.json"), '{"schemaVersion":2,"artifacts":{"path":"board.gbr"}}');
+    expect(await releaseSignCommand(bundle, { key: keyPath }, streams().streams)).toBe(0);
+
+    const io = streams();
+    expect(
+      await releaseVerifyCommand(bundle, { publicKey: pubPath, strictCoverage: true, format: "json" }, io.streams),
+    ).toBe(1);
+    expect(JSON.parse(io.output().stdout)).toMatchObject({
+      ok: false,
+      errors: ["manifest has invalid artifact inventory"],
+      coverage: { ok: false, errors: ["manifest has invalid artifact inventory"] },
+      signature: { ok: true },
+    });
   });
 
   it("fails verification when the manifest is tampered after signing", async () => {

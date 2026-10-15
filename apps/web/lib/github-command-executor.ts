@@ -225,9 +225,10 @@ export async function readGitHubPullRequestContext(input: {
   const pullRequestDraft = payload?.draft === true;
   const headRepository = record(head?.repo);
   const headRepositoryName = typeof headRepository?.full_name === "string" ? headRepository.full_name : undefined;
+  // A missing/deleted PR source must not silently become trusted same-repo
+  // execution during a user-requested rerun or release preview.
   const pullRequestFromFork =
-    headRepository?.fork === true ||
-    (headRepositoryName !== undefined && headRepositoryName !== `${input.owner}/${input.repo}`);
+    headRepository?.fork === true || headRepositoryName?.toLowerCase() !== `${input.owner}/${input.repo}`.toLowerCase();
   return { headCommitSha, headRef, baseCommitSha, pullRequestDraft, pullRequestFromFork };
 }
 

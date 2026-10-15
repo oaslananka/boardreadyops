@@ -95,8 +95,8 @@ describe("compatibility matrix", () => {
     expect(supportMatrix).toBe(renderSupportMatrix(config));
     expect(supportMatrix).toContain("| KiCad | 9.0 | Minimum supported, upstream EOL, not CI-tested |");
     expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line |");
-    expect(supportMatrix).toContain("Latest verified patch: **10.0.6**");
-    expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line | 10.0.6 |");
+    expect(supportMatrix).toContain("Latest verified patch: **10.0.7**");
+    expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line | 10.0.7 |");
     expect(supportMatrix).not.toContain("| KiCad | 9.1 | Supported |");
     expect(supportMatrix).not.toContain("| KiCad | 10.1 | Supported |");
     expect(supportMatrix).toContain("| Node.js | 22 | Minimum supported runtime |");
@@ -420,24 +420,21 @@ describe("compatibility matrix", () => {
         "kicad-ppa-series": "10.0",
         "node-version": 22,
         "postgres-version": "16",
-        "postgres-image":
-          "public.ecr.aws/docker/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "postgres-image": "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
       },
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
         "node-version": 24,
         "postgres-version": "16",
-        "postgres-image":
-          "public.ecr.aws/docker/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "postgres-image": "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
       },
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
         "node-version": 24,
         "postgres-version": "17",
-        "postgres-image":
-          "public.ecr.aws/docker/library/postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+        "postgres-image": "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
       },
     ]);
     expect(integration?.env?.DATABASE_URL).toBe("postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test");
@@ -458,16 +455,16 @@ describe("compatibility matrix", () => {
     expect(pg17Setup?.run).toContain('pg_restore "$' + '{arguments[@]}" < "$archive"');
     expect(pg17Setup?.run).toContain('[[ -f "$archive" && ! -L "$archive" ]]');
     expect(pg17Setup?.run).toContain(
-      "public.ecr.aws/docker/library/postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+      "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
     );
     expect(integrationRuns).toContain("--reporter=default --reporter=junit");
     expect(integrationRuns).toContain("pnpm --filter @boardreadyops/db db:migrate");
     expect(integrationRuns).toContain("pnpm run test:int");
     expect(config.kicad.tested).toEqual(["10.0"]);
     expect(config.kicad.eol).toEqual(["9.0"]);
-    expect(config.source_checked.date).toBe("2026-09-01");
-    expect(config.source_checked.kicad.release).toBe("https://www.kicad.org/blog/2026/08/KiCad-10.0.6-Release/");
-    expect(config.kicad.latestVerified).toBe("10.0.6");
+    expect(config.source_checked.date).toBe("2026-10-12");
+    expect(config.source_checked.kicad.release).toBe("https://www.kicad.org/blog/2026/10/KiCad-10.0.7-Release/");
+    expect(config.kicad.latestVerified).toBe("10.0.7");
     expect(config.node.supported).toEqual(["22", "24"]);
     expect(config.node.current).toEqual(["26"]);
     expect(crossPlatform?.strategy?.matrix?.os).toEqual(["ubuntu-24.04", "macos-latest", "windows-2025-vs2026"]);

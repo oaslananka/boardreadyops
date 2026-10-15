@@ -18,6 +18,7 @@ queue_rules:
     queue_conditions:
       - base = main
       - -draft
+      - check-success = @github-actions/ci / unit-matrix-gate
 
 pull_request_rules:
   # Security workflow changes require manual attention.

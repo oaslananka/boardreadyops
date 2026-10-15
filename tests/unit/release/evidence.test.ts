@@ -85,6 +85,26 @@ describe("release evidence bundles", () => {
     expect(coverage.uncovered).toHaveLength(0);
   });
 
+  it.each([
+    ["object instead of array", { artifacts: { path: "report.json" } }],
+    ["missing artifact inventory", {}],
+    ["null artifact entry", { artifacts: [null] }],
+    ["invalid digest and size", { artifacts: [{ path: "report.json", sha256: 1, bytes: "0" }] }],
+    ["non-string artifact path", { artifacts: [{ path: null, sha256: "a".repeat(64), bytes: 0 }] }],
+  ])("fails closed on manifest with %s", async (_description, patch) => {
+    const root = await writeFixture({});
+    const bundle = path.join(root, "malformed-bundle");
+    await fs.mkdir(bundle);
+    await fs.writeFile(path.join(bundle, "manifest.json"), JSON.stringify({ schemaVersion: 2, ...patch }));
+
+    const verified = await verifyReleaseEvidenceBundle(bundle);
+    expect(verified.ok).toBe(false);
+    expect(verified.errors).toContainEqual(expect.stringContaining("invalid artifact inventory"));
+    const coverage = await verifyManifestCoverage(bundle);
+    expect(coverage.ok).toBe(false);
+    expect(coverage.errors).toContainEqual(expect.stringContaining("invalid artifact inventory"));
+  });
+
   it("reports explicit gaps and detects checksum drift", async () => {
     const root = await writeFixture({
       "board.kicad_pro": "{}",
@@ -168,6 +188,20 @@ describe("verifyManifestCoverage", () => {
     const after = await verifyManifestCoverage(written.outputDir);
     expect(after.ok).toBe(false);
     expect(after.uncovered).toContain("reports/extra.txt");
+  });
+
+  it.skipIf(process.platform === "win32")("flags symlinks, including root sidecars, as uncovered", async () => {
+    const root = await writeFixture({});
+    const bundle = path.join(root, "bundle");
+    await fs.mkdir(bundle);
+    await fs.writeFile(path.join(bundle, "manifest.json"), JSON.stringify({ schemaVersion: 2, artifacts: [] }));
+    await fs.writeFile(path.join(root, "outside.gbr"), "private design data");
+    await fs.symlink(path.join(root, "outside.gbr"), path.join(bundle, "unexpected.gbr"));
+    await fs.symlink(path.join(root, "outside.gbr"), path.join(bundle, "manifest.sig"));
+
+    const result = await verifyManifestCoverage(bundle);
+    expect(result.ok).toBe(false);
+    expect(result.uncovered).toEqual(["manifest.sig", "unexpected.gbr"]);
   });
 
   it("returns errors when manifest is missing", async () => {

@@ -235,7 +235,10 @@ describe("dryRunPolicyImpact", () => {
       newPolicy: changed,
     });
     expect(result.blockersIntroduced).toBe(1);
-    expect(result.warnings).toEqual(["New policy may block existing open reviews"]);
+    expect(result.warnings).toEqual([
+      "New policy may block existing open reviews",
+      "Policy relaxes existing review requirements: requiredChecklist",
+    ]);
   });
 
   it("reports newly imposed reviewer roles, mandatory packs and external review", () => {
@@ -255,6 +258,64 @@ describe("dryRunPolicyImpact", () => {
     });
     expect(result.blockersIntroduced).toBe(3);
     expect(result.warnings).toEqual(["New policy may block existing open reviews"]);
+  });
+
+  it("warns about a policy relaxation even when it introduces no new blockers", () => {
+    const previous = policy({
+      scope: "organization",
+      name: "current",
+      requiredChecklist: ["fab-approved"],
+      requiredRoles: ["owner"],
+      severityGate: "medium",
+      requireEvidencePack: true,
+      requireExternalReview: true,
+    });
+    const relaxed = policy({
+      scope: "organization",
+      name: "next",
+      requiredChecklist: [],
+      requiredRoles: [],
+      severityGate: "error",
+      requireEvidencePack: false,
+      requireExternalReview: false,
+    });
+
+    const result = dryRunPolicyImpact({
+      existingReviewsCount: 3,
+      repositoriesCount: 2,
+      newPolicy: relaxed,
+      previousPolicy: previous,
+    });
+    expect(result.blockersIntroduced).toBe(0);
+    expect(result.warnings).toEqual([
+      "Policy relaxes existing review requirements: requiredChecklist, requiredRoles, severityGate, requireEvidencePack, requireExternalReview",
+    ]);
+  });
+
+  it("reports both new blockers and removed requirements in a checklist substitution", () => {
+    const previous = policy({
+      scope: "organization",
+      name: "old",
+      requiredChecklist: ["fab-approved"],
+      requiredRoles: ["lead"],
+    });
+    const next = policy({
+      scope: "organization",
+      name: "new",
+      requiredChecklist: ["security-approved"],
+      requiredRoles: ["lead"],
+    });
+    const result = dryRunPolicyImpact({
+      existingReviewsCount: 6,
+      repositoriesCount: 2,
+      previousPolicy: previous,
+      newPolicy: next,
+    });
+    expect(result.blockersIntroduced).toBe(1);
+    expect(result.warnings).toEqual([
+      "New policy may block existing open reviews",
+      "Policy relaxes existing review requirements: requiredChecklist",
+    ]);
   });
 
   it("treats a first-ever policy (no previous policy) as introducing a fresh checklist blocker", () => {
