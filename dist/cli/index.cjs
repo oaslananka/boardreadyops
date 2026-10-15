@@ -52938,6 +52938,13 @@ async function prepareInventory(root, manifestPath, reviewedSha) {
     names.set(relative, actual);
   }
   if (names.size > 1024) throw new Error("GitHub attestations support at most 1024 subjects.");
+  const finalLocal = await verifyExportProvenance(absoluteRoot, relativeManifest, { currentGitSha: reviewedSha });
+  if (finalLocal.status !== "verified" || finalLocal.gitShaMatch !== true) {
+    throw new Error("Export source or output inventory changed while preparing signing checksums.");
+  }
+  if (await fileSha256(absoluteManifest) !== names.get(relativeManifest)) {
+    throw new Error("Export manifest changed while preparing signing checksums.");
+  }
   const checksums = `${[...names].sort(([a], [b]) => a.localeCompare(b)).map(([name, digest2]) => `${digest2}  ${name}`).join("\n")}
 `;
   return { names, checksums, manifestPath: absoluteManifest };

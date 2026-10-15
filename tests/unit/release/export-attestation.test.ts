@@ -153,6 +153,49 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     expect(mockedRun).not.toHaveBeenCalled();
   });
 
+  it.each(["source", "unlisted-output"] as const)(
+    "refuses to prepare signing checksums if %s changes after initial validation",
+    async (kind) => {
+      const f = await fixture();
+      let mutated = false;
+      afterInventoryVerification = async () => {
+        afterInventoryVerification = undefined;
+        if (kind === "source") {
+          await fs.writeFile(path.join(f.root, "board.kicad_pcb"), "(kicad_pcb changed during checksums)");
+        } else {
+          await fs.writeFile(path.join(f.root, "build/reviewed/gerbers/unlisted.gtl"), "late injected output");
+        }
+        mutated = true;
+      };
+
+      await expect(
+        prepareExportAttestationChecksums({ root: f.root, manifestPath: f.manifestPath, reviewedSha: sha }),
+      ).rejects.toThrow(/changed|inventory|source|inconsistent/u);
+      expect(mutated).toBe(true);
+      expect(mockedRun).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects a manifest mutation after the final local inventory check", async () => {
+    const f = await fixture();
+    let checks = 0;
+    afterInventoryVerification = async () => {
+      checks++;
+      if (checks !== 2) return;
+      afterInventoryVerification = undefined;
+      const file = path.join(f.root, f.manifestPath);
+      const manifest = JSON.parse(await fs.readFile(file, "utf8")) as Record<string, unknown>;
+      manifest.generatedAt = "2026-10-11T01:02:03Z";
+      await fs.writeFile(file, JSON.stringify(manifest));
+    };
+
+    await expect(
+      prepareExportAttestationChecksums({ root: f.root, manifestPath: f.manifestPath, reviewedSha: sha }),
+    ).rejects.toThrow(/manifest changed/u);
+    expect(checks).toBe(2);
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
+
   it("requires successful verifier execution and matching certificate + every subject digest", async () => {
     const f = await fixture();
     succeed(verifiedResult(f));
