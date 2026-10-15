@@ -26,7 +26,7 @@ it("pins direct Lighthouse tooling and keeps credential-free audit scripts", () 
 
   expect(packageJson.devDependencies["@unlighthouse/core"]).toBeUndefined();
   expect(packageJson.devDependencies.lighthouse).toBe("13.5.0");
-  expect(packageJson.devDependencies["chrome-launcher"]).toBe("1.2.1");
+  expect(packageJson.devDependencies["chrome-launcher"]).toBe("1.2.2");
   expect(packageJson.scripts["qa:unlighthouse:auth"]).toBe("node scripts/unlighthouse-authenticated.mjs");
   expect(packageJson.scripts["qa:unlighthouse:auth:debug"]).toBe("node scripts/unlighthouse-authenticated.mjs --debug");
   expect(packageJson.scripts["qa:unlighthouse:auth:routes"]).toBe(

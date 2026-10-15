@@ -61,6 +61,14 @@ export function buildTargetRepositoryIsolationReport(input) {
   return {
     event: "target_repository_two_installation_isolation_verified",
     sourceSha: evidence.sourceSha,
+    // This exercises two synthetic database fixtures, not two real GitHub App
+    // owners. Never permit aggregate counts to imply live tenant acceptance.
+    proof: {
+      kind: "synthetic-database-adversarial",
+      liveTwoOwnerAcceptance: false,
+      architecture: "ADR-0010",
+      milestone: "Cloud Control Plane Reliability",
+    },
     topology: {
       installations: 2,
       repositories: 2,

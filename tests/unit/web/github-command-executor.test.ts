@@ -290,7 +290,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 describe("GitHub command API helpers", () => {
   it("reads the current pull request head ref, head SHA, and base SHA", async () => {
     const request = vi.fn(async () =>
-      jsonResponse({ head: { ref: "feature/board", sha: "a".repeat(40) }, base: { sha: "b".repeat(40) } }),
+      jsonResponse({
+        head: { ref: "feature/board", sha: "a".repeat(40), repo: { full_name: "octo/board", fork: false } },
+        base: { sha: "b".repeat(40) },
+      }),
     );
 
     await expect(
@@ -307,6 +310,47 @@ describe("GitHub command API helpers", () => {
       "https://github.test/api/v3/repos/octo/board/pulls/7",
       expect.objectContaining({ method: "GET" }),
     );
+  });
+
+  it.each([null, {}, { fork: false }, { full_name: "" }])(
+    "treats unknown GitHub PR head repository %j as untrusted on command lookup",
+    async (repo) => {
+      const request = vi.fn(async () =>
+        jsonResponse({
+          head: { ref: "feature/board", sha: "a".repeat(40), repo },
+          base: { sha: "b".repeat(40) },
+        }),
+      );
+      await expect(
+        readGitHubPullRequestContext({
+          apiBaseUrl: "https://github.test/api/v3",
+          token: "token",
+          owner: "octo",
+          repo: "board",
+          pullRequestNumber: 7,
+          request,
+        }),
+      ).resolves.toMatchObject({ pullRequestFromFork: true });
+    },
+  );
+
+  it("preserves trusted same-repository PR identity regardless of GitHub name casing", async () => {
+    const request = vi.fn(async () =>
+      jsonResponse({
+        head: { ref: "feature/board", sha: "a".repeat(40), repo: { full_name: "OCTO/BOARD", fork: false } },
+        base: { sha: "b".repeat(40) },
+      }),
+    );
+    await expect(
+      readGitHubPullRequestContext({
+        apiBaseUrl: "https://github.test/api/v3",
+        token: "token",
+        owner: "octo",
+        repo: "board",
+        pullRequestNumber: 7,
+        request,
+      }),
+    ).resolves.toMatchObject({ pullRequestFromFork: false });
   });
 
   it("derives draft and fork state from the GitHub pull request response", async () => {

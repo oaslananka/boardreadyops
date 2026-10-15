@@ -425,7 +425,7 @@ async function publishArtifacts(
     if (capability?.maximumBytes !== artifact.bytes) {
       throw new Error("artifact capability did not match the declared artifact size");
     }
-    await client.uploadArtifact(capability.uploadUrl, artifact.filePath, capability.maximumBytes);
+    await client.uploadArtifact(capability.uploadUrl, artifact.filePath, capability.maximumBytes, artifact.sha256);
     published.push({
       kind: artifact.kind,
       name: artifact.name,

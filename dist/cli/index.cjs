@@ -13715,7 +13715,7 @@ var require_scan = __commonJS({
     var scan2 = (input, options) => {
       const opts = options || {};
       const length = input.length - 1;
-      const scanToEnd = opts.parts === true || opts.scanToEnd === true;
+      const scanToEnd = opts.parts === true || opts.tokens === true || opts.scanToEnd === true;
       const slashes = [];
       const tokens = [];
       const parts = [];
@@ -13821,14 +13821,18 @@ var require_scan = __commonJS({
               negatedExtglob = true;
             }
             if (scanToEnd === true) {
+              let parens = 0;
               while (eos2() !== true && (code = advance2())) {
                 if (code === CHAR_BACKWARD_SLASH) {
                   backslashes = token.backslashes = true;
-                  code = advance2();
+                  advance2();
                   continue;
                 }
-                if (code === CHAR_RIGHT_PARENTHESES) {
-                  isGlob = token.isGlob = true;
+                if (code === CHAR_LEFT_PARENTHESES) {
+                  parens++;
+                  continue;
+                }
+                if (code === CHAR_RIGHT_PARENTHESES && --parens === 0) {
                   finished = true;
                   break;
                 }
@@ -13882,13 +13886,18 @@ var require_scan = __commonJS({
         if (opts.noparen !== true && code === CHAR_LEFT_PARENTHESES) {
           isGlob = token.isGlob = true;
           if (scanToEnd === true) {
+            let parens = 1;
             while (eos2() !== true && (code = advance2())) {
-              if (code === CHAR_LEFT_PARENTHESES) {
+              if (code === CHAR_BACKWARD_SLASH) {
                 backslashes = token.backslashes = true;
-                code = advance2();
+                advance2();
                 continue;
               }
-              if (code === CHAR_RIGHT_PARENTHESES) {
+              if (code === CHAR_LEFT_PARENTHESES) {
+                parens++;
+                continue;
+              }
+              if (code === CHAR_RIGHT_PARENTHESES && --parens === 0) {
                 finished = true;
                 break;
               }
@@ -13961,32 +13970,31 @@ var require_scan = __commonJS({
       if (opts.parts === true || opts.tokens === true) {
         let prevIndex;
         for (let idx = 0; idx < slashes.length; idx++) {
-          const n = prevIndex ? prevIndex + 1 : start;
+          const n2 = prevIndex !== void 0 ? prevIndex + 1 : start;
           const i = slashes[idx];
-          const value = input.slice(n, i);
+          const value2 = input.slice(n2, i);
           if (opts.tokens) {
             if (idx === 0 && start !== 0) {
               tokens[idx].isPrefix = true;
               tokens[idx].value = prefix;
             } else {
-              tokens[idx].value = value;
+              tokens[idx].value = value2;
             }
             depth(tokens[idx]);
             state.maxDepth += tokens[idx].depth;
           }
-          if (idx !== 0 || value !== "") {
-            parts.push(value);
+          if (i >= start) {
+            parts.push(value2);
+            prevIndex = i;
           }
-          prevIndex = i;
         }
-        if (prevIndex && prevIndex + 1 < input.length) {
-          const value = input.slice(prevIndex + 1);
-          parts.push(value);
-          if (opts.tokens) {
-            tokens[tokens.length - 1].value = value;
-            depth(tokens[tokens.length - 1]);
-            state.maxDepth += tokens[tokens.length - 1].depth;
-          }
+        const n = prevIndex !== void 0 ? prevIndex + 1 : start;
+        const value = input.slice(n);
+        parts.push(value);
+        if (opts.tokens && prevIndex && prevIndex + 1 < input.length) {
+          tokens[tokens.length - 1].value = value;
+          depth(tokens[tokens.length - 1]);
+          state.maxDepth += tokens[tokens.length - 1].depth;
         }
         state.slashes = slashes;
         state.parts = parts;
@@ -14829,6 +14837,7 @@ var require_parse = __commonJS({
             rest = rest.slice(3);
             consume("/**", 3);
           }
+          const isEnd = eos2() || state.parens > 0 && rest === ")".repeat(state.parens) && !extglobs.some((extglob) => extglob.type === "negate");
           if (prior.type === "bos" && eos2()) {
             prev.type = "globstar";
             prev.value += value;
@@ -14838,7 +14847,7 @@ var require_parse = __commonJS({
             consume(value);
             continue;
           }
-          if (prior.type === "slash" && prior.prev.type !== "bos" && !afterStar && eos2()) {
+          if (prior.type === "slash" && prior.prev.type !== "bos" && !afterStar && isEnd) {
             state.output = state.output.slice(0, -(prior.output + prev.output).length);
             prior.output = `(?:${prior.output}`;
             prev.type = "globstar";
@@ -32546,10 +32555,23 @@ async function verifyManifestCoverage(bundleDir) {
   }
   const manifest = readResult.manifest;
   const covered = new Set((manifest.artifacts ?? []).map((artifact) => import_node_path68.default.resolve(outputDir, artifact.path)));
-  const SKIP = /* @__PURE__ */ new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
+  const rootSidecars = /* @__PURE__ */ new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
   const allFiles = [];
-  await collectFiles2(outputDir, allFiles);
-  const uncovered = allFiles.filter((file2) => !SKIP.has(import_node_path68.default.basename(file2)) && !covered.has(file2)).map((file2) => import_node_path68.default.relative(outputDir, file2).split(import_node_path68.default.sep).join("/")).sort((left, right) => left.localeCompare(right));
+  const symlinks = /* @__PURE__ */ new Set();
+  try {
+    await collectFiles2(outputDir, allFiles, symlinks, true);
+  } catch (error51) {
+    return {
+      ok: false,
+      manifestPath,
+      uncovered: [],
+      errors: [`bundle coverage could not be scanned: ${error51 instanceof Error ? error51.message : String(error51)}`]
+    };
+  }
+  const uncovered = allFiles.filter((file2) => {
+    const relative = import_node_path68.default.relative(outputDir, file2).split(import_node_path68.default.sep).join("/");
+    return symlinks.has(file2) || !rootSidecars.has(relative) && !covered.has(file2);
+  }).map((file2) => import_node_path68.default.relative(outputDir, file2).split(import_node_path68.default.sep).join("/")).sort((left, right) => left.localeCompare(right));
   return { ok: uncovered.length === 0, manifestPath, uncovered, errors: [] };
 }
 async function verifyReleaseEvidenceBundle(bundleDir) {
@@ -32605,10 +32627,18 @@ function formatReleaseCertificateText(manifest, signature) {
   return `${lines.join("\n")}
 `;
 }
+function isManifestArtifact(value) {
+  if (!value || typeof value !== "object") return false;
+  const artifact = value;
+  return typeof artifact.path === "string" && artifact.path.trim().length > 0 && typeof artifact.sha256 === "string" && /^[a-f0-9]{64}$/.test(artifact.sha256) && typeof artifact.bytes === "number" && Number.isSafeInteger(artifact.bytes) && artifact.bytes >= 0;
+}
 async function readBundleManifest(manifestPath) {
   try {
-    const manifest = JSON.parse(await import_promises26.default.readFile(manifestPath, "utf8"));
-    return { ok: true, manifest };
+    const value = JSON.parse(await import_promises26.default.readFile(manifestPath, "utf8"));
+    if (!value || typeof value !== "object" || !Array.isArray(value.artifacts) || !value.artifacts.every(isManifestArtifact)) {
+      return { ok: false, errors: ["manifest has invalid artifact inventory"] };
+    }
+    return { ok: true, manifest: value };
   } catch (error51) {
     return {
       ok: false,
@@ -32671,19 +32701,21 @@ async function discoverManufacturingArtifacts(root) {
     (file2) => MANUFACTURING_EXTENSIONS.has(import_node_path68.default.extname(file2).toLowerCase()) || import_node_path68.default.basename(file2).toLowerCase().includes("readme")
   ).sort((left, right) => left.localeCompare(right));
 }
-async function collectFiles2(directory, output) {
+async function collectFiles2(directory, output, symlinks = /* @__PURE__ */ new Set(), strict = false) {
   let entries;
   try {
     entries = await import_promises26.default.readdir(directory, { withFileTypes: true });
-  } catch {
+  } catch (error51) {
+    if (strict) throw error51;
     return;
   }
   for (const entry of entries) {
     const target = import_node_path68.default.join(directory, entry.name);
     if (entry.isDirectory()) {
-      await collectFiles2(target, output);
-    } else if (entry.isFile()) {
+      await collectFiles2(target, output, symlinks, strict);
+    } else if (entry.isFile() || entry.isSymbolicLink()) {
       output.push(target);
+      if (entry.isSymbolicLink()) symlinks.add(target);
     }
   }
 }
@@ -38239,7 +38271,7 @@ function readBlockScalar(state, parentIndent, props) {
         state.position = linePosition + column;
         throwError(state, "tab characters must not be used in indentation");
       }
-      if (column < maxLeadingIndent) {
+      if (column >= parentIndent && column < maxLeadingIndent) {
         state.position = linePosition + column;
         throwError(state, "bad indentation of a mapping entry");
       }
@@ -38449,13 +38481,16 @@ function readBlockMapping(state, nodeIndent, flowIndent, props) {
           ch = state.input.charCodeAt(++state.position);
           if (!isWsOrEolOrEnd(ch)) throwError(state, "a whitespace character is expected after the key-value separator within a block mapping");
           if (!mappingOpened) {
-            restoreState(state, beforeKey);
-            addMappingEvent(state, beforeKey.position, props.anchorStart, props.anchorEnd, props.tagStart, props.tagEnd, COLLECTION_STYLE.BLOCK);
+            state.events.splice(beforeKey.eventsLength, 0, {
+              type: EVENT_ID.MAPPING,
+              start: beforeKey.position,
+              anchorStart: props.anchorStart,
+              anchorEnd: props.anchorEnd,
+              tagStart: props.tagStart,
+              tagEnd: props.tagEnd,
+              style: COLLECTION_STYLE.BLOCK
+            });
             mappingOpened = true;
-            parseNode(state, flowIndent, CONTEXT_FLOW_OUT, false, true);
-            ch = state.input.charCodeAt(state.position);
-            while (isWhiteSpace(ch)) ch = state.input.charCodeAt(++state.position);
-            state.position++;
           }
           detected = true;
           atExplicitKey = false;
@@ -38727,6 +38762,7 @@ function doubleQuoteWhitespaceOnly(layout) {
 function applyForceQuotesOption(layout) {
   if (!layout.presenterOptions.forceQuotes) return;
   if (layout.isKey || layout.style !== SCALAR_STYLE.PLAIN) return;
+  if (layout.node.tag !== layout.presenterOptions.schema.defaultScalarTag.tagName) return;
   layout.style = layout.node.value.includes("\n") ? SCALAR_STYLE.DOUBLE_QUOTED : _preferredQuotedStyle(layout);
 }
 function tryLongOrMultilineAsBlock(layout) {
@@ -52829,10 +52865,35 @@ var oidcIssuer = "https://token.actions.githubusercontent.com";
 function allowedSubjectName(name) {
   return name.length > 0 && !name.includes("\\") && !/[\r\n\0]/u.test(name) && !name.startsWith("/") && name.split("/").every((piece) => piece !== "" && piece !== "." && piece !== "..");
 }
+async function assertCanonicalSubjectPath(absolute) {
+  if (import_node_path56.default.resolve(await import_promises19.default.realpath(absolute)) !== import_node_path56.default.resolve(absolute)) {
+    throw new Error("Attestation subject path is no longer canonical.");
+  }
+}
 async function fileSha256(absolute) {
-  const hash2 = (0, import_node_crypto7.createHash)("sha256");
-  for await (const chunk of (0, import_node_fs6.createReadStream)(absolute)) hash2.update(chunk);
-  return hash2.digest("hex");
+  await assertCanonicalSubjectPath(absolute);
+  const before = await import_promises19.default.lstat(absolute);
+  if (!before.isFile()) throw new Error("Attestation subject is not a regular file.");
+  const flags = import_node_fs6.constants.O_RDONLY | (process.platform === "win32" ? 0 : import_node_fs6.constants.O_NOFOLLOW);
+  const handle = await import_promises19.default.open(absolute, flags);
+  try {
+    const info = await handle.stat();
+    const after = await import_promises19.default.lstat(absolute);
+    if (!info.isFile() || !after.isFile() || process.platform !== "win32" && (info.dev !== before.dev || info.ino !== before.ino || after.dev !== info.dev || after.ino !== info.ino)) {
+      throw new Error("Attestation subject changed identity during hashing preparation.");
+    }
+    await assertCanonicalSubjectPath(absolute);
+    const hash2 = (0, import_node_crypto7.createHash)("sha256");
+    for await (const chunk of handle.createReadStream({ autoClose: false })) hash2.update(chunk);
+    await assertCanonicalSubjectPath(absolute);
+    const finalInfo = await import_promises19.default.lstat(absolute);
+    if (!finalInfo.isFile() || process.platform !== "win32" && (finalInfo.dev !== info.dev || finalInfo.ino !== info.ino)) {
+      throw new Error("Attestation subject changed identity during hashing.");
+    }
+    return hash2.digest("hex");
+  } finally {
+    await handle.close();
+  }
 }
 async function prepareInventory(root, manifestPath, reviewedSha) {
   const absoluteRoot = await import_promises19.default.realpath(root);
@@ -52874,7 +52935,9 @@ async function prepareExportAttestationChecksums(options) {
   return (await prepareInventory(options.root, options.manifestPath, options.reviewedSha)).checksums;
 }
 function validExpectation(e) {
-  return repoPattern.test(e.repository) && /^\d+$/u.test(e.repositoryId) && shaPattern.test(e.reviewedSha) && /^refs\/(heads|tags|pull)\/[^\r\n]+$/u.test(e.sourceRef) && /^\.github\/workflows\/[a-zA-Z0-9_.-]+\.ya?ml$/u.test(e.workflowPath) && /^[a-z_]+$/u.test(e.event) && /^[1-9]\d*$/u.test(e.runId) && Number.isSafeInteger(e.runAttempt) && e.runAttempt > 0;
+  return repoPattern.test(e.repository) && /^\d+$/u.test(e.repositoryId) && shaPattern.test(e.reviewedSha) && // Only a protected-branch workflow_dispatch is a supported export signer.
+  // A signed push/tag/PR run cannot fulfill the target-repository contract.
+  /^refs\/heads\/[^\r\n]+$/u.test(e.sourceRef) && /^\.github\/workflows\/[a-zA-Z0-9_.-]+\.ya?ml$/u.test(e.workflowPath) && e.event === "workflow_dispatch" && /^[1-9]\d*$/u.test(e.runId) && Number.isSafeInteger(e.runAttempt) && e.runAttempt > 0;
 }
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -52959,6 +53022,14 @@ async function verifyReviewedExportAttestation(options) {
     return rejected(
       "No cryptographically verified attestation matched the expected workflow/run and exact output set."
     );
+  }
+  try {
+    const afterVerification = await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
+    if (afterVerification.manifestPath !== inventory.manifestPath || afterVerification.checksums !== inventory.checksums) {
+      return rejected("Export source or subject inventory changed during attestation verification.");
+    }
+  } catch {
+    return rejected("Export source or subject inventory changed during attestation verification.");
   }
   return {
     status: "eligible",
@@ -56171,19 +56242,22 @@ async function resolveReleaseVerifySignature(bundleDir, options, stderr) {
   const signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
   return { signature, signatureRequired };
 }
-function writeReleaseVerifyOutcome(verification, signature, signatureRequired, options, streams) {
+function writeReleaseVerifyOutcome(verification, coverage, signature, signatureRequired, options, streams) {
   const signatureErrors = [...signature.errors];
   if (signatureRequired && !signature.present) {
     signatureErrors.push("expected a signed manifest (manifest.sig) but none was found");
   }
   const signatureOk = signatureErrors.length === 0 && (signature.present || !signatureRequired);
-  const ok = verification.ok && signatureOk;
+  const coverageErrors = [...coverage.errors, ...coverage.uncovered.map((file2) => `uncovered bundle file: ${file2}`)];
+  const coverageOk = coverage.errors.length === 0 && (!options.strictCoverage || coverage.ok);
+  const ok = verification.ok && signatureOk && coverageOk;
   if (options.format === "json") {
     streams.stdout.write(
       `${JSON.stringify(
         {
           ...verification,
           ok,
+          coverage,
           signature: {
             present: signature.present,
             ok: signatureOk,
@@ -56200,6 +56274,8 @@ function writeReleaseVerifyOutcome(verification, signature, signatureRequired, o
     const signatureNote = signature.present ? " and Ed25519 signature" : "";
     streams.stdout.write(`Release evidence bundle verified: ${verification.checked} artifact(s)${signatureNote}
 `);
+    if (!coverage.ok) streams.stderr.write(`Release bundle coverage warning: ${coverageErrors.join("; ")}
+`);
     if (verification.manifest) {
       streams.stdout.write(
         formatReleaseCertificateText(verification.manifest, { present: signature.present, ok: signatureOk })
@@ -56207,7 +56283,11 @@ function writeReleaseVerifyOutcome(verification, signature, signatureRequired, o
     }
   } else {
     streams.stderr.write(
-      `Release evidence bundle verification failed: ${[...verification.errors, ...signatureErrors].join("; ")}
+      `Release evidence bundle verification failed: ${[
+        ...verification.errors,
+        ...signatureErrors,
+        ...!coverageOk ? coverageErrors : []
+      ].join("; ")}
 `
     );
   }
@@ -56216,10 +56296,12 @@ function writeReleaseVerifyOutcome(verification, signature, signatureRequired, o
 async function releaseVerifyCommand(bundleInput, options, streams) {
   const bundleDir = import_node_path70.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
   const verification = await verifyReleaseEvidenceBundle(bundleDir);
+  const coverage = await verifyManifestCoverage(bundleDir);
   const signatureResolution = await resolveReleaseVerifySignature(bundleDir, options, streams.stderr);
   if ("exitCode" in signatureResolution) return signatureResolution.exitCode;
   return writeReleaseVerifyOutcome(
     verification,
+    coverage,
     signatureResolution.signature,
     signatureResolution.signatureRequired,
     options,
@@ -57584,11 +57666,17 @@ var RunnerControlPlaneClient = class {
   async publishTerminalResult(input) {
     return await this.signedJson("/api/v1/runner/results", input, leaseContext(input));
   }
-  async uploadArtifact(uploadUrl, filePath, maximumBytes) {
+  async uploadArtifact(uploadUrl, filePath, maximumBytes, expectedSha256) {
     const url2 = normalizeUploadUrl(uploadUrl);
+    if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
+      throw new Error("artifact upload SHA-256 declaration is invalid");
+    }
     const content = await (0, import_promises30.readFile)(filePath);
     if (content.byteLength !== maximumBytes) {
       throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${content.byteLength}`);
+    }
+    if ((0, import_node_crypto21.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
+      throw new Error("artifact digest changed before upload");
     }
     const response = await this.fetchImpl(url2, {
       method: "PUT",
@@ -57966,19 +58054,19 @@ async function checkoutRunnerSource(options) {
   if (options.job.sourceMode !== "customer_checkout") {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
+  const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
   const workspaceRoot = import_node_path74.default.resolve(options.workspaceRoot);
   await (0, import_promises32.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
   if (process.platform !== "win32") await (0, import_promises32.chmod)(workspaceRoot, 448);
   const workspace = await (0, import_promises32.mkdtemp)(import_node_path74.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
-  if (process.platform !== "win32") await (0, import_promises32.chmod)(workspace, 448);
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
-  const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
   const git = async (args) => await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
     cwd: workspace,
     env: environment
   });
   try {
+    if (process.platform !== "win32") await (0, import_promises32.chmod)(workspace, 448);
     await git(["init", "--quiet"]);
     await git(["remote", "add", "origin", repository]);
     await git(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
@@ -58333,7 +58421,7 @@ async function publishArtifacts(client, job, artifacts) {
     if (capability?.maximumBytes !== artifact.bytes) {
       throw new Error("artifact capability did not match the declared artifact size");
     }
-    await client.uploadArtifact(capability.uploadUrl, artifact.filePath, capability.maximumBytes);
+    await client.uploadArtifact(capability.uploadUrl, artifact.filePath, capability.maximumBytes, artifact.sha256);
     published.push({
       kind: artifact.kind,
       name: artifact.name,
@@ -60922,7 +61010,7 @@ function registerAllCommands(program2, streams) {
   release.command("sign").argument("[bundle]", "release evidence bundle directory").option("--key <path>", "Ed25519 private key PEM used to sign the manifest").action(async (bundleInput, options) => {
     process.exitCode = await releaseSignCommand(bundleInput, options, streams);
   });
-  release.command("verify").argument("[bundle]", "release evidence bundle directory").option("--format <format>", "text or json", "text").option("--public-key <path>", "Ed25519 public key PEM to require and verify a signed manifest").option(
+  release.command("verify").argument("[bundle]", "release evidence bundle directory").option("--format <format>", "text or json", "text").option("--strict-coverage", "fail if the bundle contains files not covered by its manifest").option("--public-key <path>", "Ed25519 public key PEM to require and verify a signed manifest").option(
     "--trust-store <path>",
     "JSON trust store (array of {keyId, publicKey, validFrom, validUntil?, revokedAt?}) to verify against instead of a single --public-key, supporting key rotation and revocation"
   ).action(async (bundleInput, options) => {

@@ -14,7 +14,12 @@ The normalized lifecycle action records these reasons in deterministic order:
 2. `fork-pull-request`
 3. `private-repository`
 
-Safe mode is enabled when one or more reasons apply.
+Safe mode is enabled when one or more reasons apply. If a PR source repository is
+missing, deleted, or does not establish that the head belongs to the base repository,
+webhook normalization and slash-command PR lookups conservatively assign
+`fork-pull-request` rather than treating an unknown origin as trusted. Repository
+name comparisons are case-insensitive, as in GitHub's repository API. This
+unknown-origin restriction does not authorize privileged workflow dispatch.
 
 ## Dispatch policy
 

@@ -184,11 +184,26 @@ export async function verifyManifestCoverage(bundleDir: string): Promise<Release
   }
   const manifest = readResult.manifest;
   const covered = new Set((manifest.artifacts ?? []).map((artifact) => path.resolve(outputDir, artifact.path)));
-  const SKIP = new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
+  // Only root sidecars are exempt: a nested manifest.json or manifest.sig
+  // is unlisted bundle content, not release metadata.
+  const rootSidecars = new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
   const allFiles: string[] = [];
-  await collectFiles(outputDir, allFiles);
+  const symlinks = new Set<string>();
+  try {
+    await collectFiles(outputDir, allFiles, symlinks, true);
+  } catch (error) {
+    return {
+      ok: false,
+      manifestPath,
+      uncovered: [],
+      errors: [`bundle coverage could not be scanned: ${error instanceof Error ? error.message : String(error)}`],
+    };
+  }
   const uncovered = allFiles
-    .filter((file) => !SKIP.has(path.basename(file)) && !covered.has(file))
+    .filter((file) => {
+      const relative = path.relative(outputDir, file).split(path.sep).join("/");
+      return symlinks.has(file) || (!rootSidecars.has(relative) && !covered.has(file));
+    })
     .map((file) => path.relative(outputDir, file).split(path.sep).join("/"))
     .sort((left, right) => left.localeCompare(right));
   return { ok: uncovered.length === 0, manifestPath, uncovered, errors: [] };
@@ -260,12 +275,37 @@ export function formatReleaseCertificateText(
   return `${lines.join("\n")}\n`;
 }
 
+function isManifestArtifact(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const artifact = value as Record<string, unknown>;
+  return (
+    typeof artifact.path === "string" &&
+    artifact.path.trim().length > 0 &&
+    typeof artifact.sha256 === "string" &&
+    /^[a-f0-9]{64}$/.test(artifact.sha256) &&
+    typeof artifact.bytes === "number" &&
+    Number.isSafeInteger(artifact.bytes) &&
+    artifact.bytes >= 0
+  );
+}
+
 async function readBundleManifest(
   manifestPath: string,
 ): Promise<{ ok: true; manifest: ReleaseEvidenceManifest } | { ok: false; errors: string[] }> {
   try {
-    const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as ReleaseEvidenceManifest;
-    return { ok: true, manifest };
+    const value: unknown = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    // An untrusted JSON file is not made valid by a TypeScript assertion. Both
+    // release verification paths must fail with evidence errors, not throw or
+    // interpret a missing/malformed artifact inventory as an empty release.
+    if (
+      !value ||
+      typeof value !== "object" ||
+      !Array.isArray((value as { artifacts?: unknown }).artifacts) ||
+      !(value as { artifacts: unknown[] }).artifacts.every(isManifestArtifact)
+    ) {
+      return { ok: false, errors: ["manifest has invalid artifact inventory"] };
+    }
+    return { ok: true, manifest: value as ReleaseEvidenceManifest };
   } catch (error) {
     return {
       ok: false,
@@ -341,19 +381,26 @@ async function discoverManufacturingArtifacts(root: string): Promise<string[]> {
     .sort((left, right) => left.localeCompare(right));
 }
 
-async function collectFiles(directory: string, output: string[]): Promise<void> {
+async function collectFiles(
+  directory: string,
+  output: string[],
+  symlinks: Set<string> = new Set(),
+  strict = false,
+): Promise<void> {
   let entries: import("node:fs").Dirent[];
   try {
     entries = await fs.readdir(directory, { withFileTypes: true });
-  } catch {
+  } catch (error) {
+    if (strict) throw error;
     return;
   }
   for (const entry of entries) {
     const target = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      await collectFiles(target, output);
-    } else if (entry.isFile()) {
+      await collectFiles(target, output, symlinks, strict);
+    } else if (entry.isFile() || entry.isSymbolicLink()) {
       output.push(target);
+      if (entry.isSymbolicLink()) symlinks.add(target);
     }
   }
 }

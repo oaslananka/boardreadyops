@@ -66,6 +66,7 @@ describe("main branch governance ruleset", () => {
       "ci / lint",
       "ci / typecheck",
       "ci / test-unit",
+      "ci / unit-matrix-gate",
       "ci / build",
       "ci / verify-dist",
       "ci / coverage-gate",
@@ -134,7 +135,7 @@ describe("main branch governance ruleset", () => {
         name: "main",
         merge_method: "squash",
         batch_size: 1,
-        queue_conditions: ["base = main", "-draft"],
+        queue_conditions: ["base = main", "-draft", "check-success = @github-actions/ci / unit-matrix-gate"],
       },
     ]);
     expect(mergifySource).not.toContain("auto_merge_conditions");

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { verifyExportProvenance } from "../core/provenance.js";
@@ -60,10 +60,50 @@ function allowedSubjectName(name: string): boolean {
   );
 }
 
+async function assertCanonicalSubjectPath(absolute: string): Promise<void> {
+  // O_NOFOLLOW protects only the final component; a parent directory can
+  // become a symlink after the first-party inventory was checked. Reject
+  // any such alias before and after descriptor-bound hashing.
+  if (path.resolve(await fs.realpath(absolute)) !== path.resolve(absolute)) {
+    throw new Error("Attestation subject path is no longer canonical.");
+  }
+}
+
 async function fileSha256(absolute: string): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(absolute)) hash.update(chunk);
-  return hash.digest("hex");
+  // The local inventory was validated earlier, but a file could be replaced
+  // before it is hashed for signing. Bind the read to a regular file descriptor
+  // and reject a final-component symlink substituted after validation.
+  await assertCanonicalSubjectPath(absolute);
+  const before = await fs.lstat(absolute);
+  if (!before.isFile()) throw new Error("Attestation subject is not a regular file.");
+  const flags = fsConstants.O_RDONLY | (process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW);
+  const handle = await fs.open(absolute, flags);
+  try {
+    const info = await handle.stat();
+    const after = await fs.lstat(absolute);
+    if (
+      !info.isFile() ||
+      !after.isFile() ||
+      (process.platform !== "win32" &&
+        (info.dev !== before.dev || info.ino !== before.ino || after.dev !== info.dev || after.ino !== info.ino))
+    ) {
+      throw new Error("Attestation subject changed identity during hashing preparation.");
+    }
+    await assertCanonicalSubjectPath(absolute);
+    const hash = createHash("sha256");
+    for await (const chunk of handle.createReadStream({ autoClose: false })) hash.update(chunk);
+    await assertCanonicalSubjectPath(absolute);
+    const finalInfo = await fs.lstat(absolute);
+    if (
+      !finalInfo.isFile() ||
+      (process.platform !== "win32" && (finalInfo.dev !== info.dev || finalInfo.ino !== info.ino))
+    ) {
+      throw new Error("Attestation subject changed identity during hashing.");
+    }
+    return hash.digest("hex");
+  } finally {
+    await handle.close();
+  }
 }
 
 async function prepareInventory(root: string, manifestPath: string, reviewedSha: string): Promise<SubjectInventory> {
@@ -137,9 +177,11 @@ function validExpectation(e: TrustedExportExpectation): boolean {
     repoPattern.test(e.repository) &&
     /^\d+$/u.test(e.repositoryId) &&
     shaPattern.test(e.reviewedSha) &&
-    /^refs\/(heads|tags|pull)\/[^\r\n]+$/u.test(e.sourceRef) &&
+    // Only a protected-branch workflow_dispatch is a supported export signer.
+    // A signed push/tag/PR run cannot fulfill the target-repository contract.
+    /^refs\/heads\/[^\r\n]+$/u.test(e.sourceRef) &&
     /^\.github\/workflows\/[a-zA-Z0-9_.-]+\.ya?ml$/u.test(e.workflowPath) &&
-    /^[a-z_]+$/u.test(e.event) &&
+    e.event === "workflow_dispatch" &&
     /^[1-9]\d*$/u.test(e.runId) &&
     Number.isSafeInteger(e.runAttempt) &&
     e.runAttempt > 0
@@ -260,6 +302,21 @@ export async function verifyReviewedExportAttestation(
     return rejected(
       "No cryptographically verified attestation matched the expected workflow/run and exact output set.",
     );
+  }
+  // The external verifier can take tens of seconds. The workspace is not
+  // immutable merely because its bytes matched the signed subjects earlier.
+  // Recheck the source and complete output set before returning an eligible
+  // result; no stale pre-verification hash may bless a changed checkout.
+  try {
+    const afterVerification = await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
+    if (
+      afterVerification.manifestPath !== inventory.manifestPath ||
+      afterVerification.checksums !== inventory.checksums
+    ) {
+      return rejected("Export source or subject inventory changed during attestation verification.");
+    }
+  } catch {
+    return rejected("Export source or subject inventory changed during attestation verification.");
   }
   return {
     status: "eligible",

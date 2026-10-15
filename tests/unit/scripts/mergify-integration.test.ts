@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import * as yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
@@ -45,13 +46,70 @@ describe("Mergify integration contract", () => {
         name: "main",
         merge_method: "squash",
         batch_size: 1,
-        queue_conditions: ["base = main", "-draft"],
+        queue_conditions: ["base = main", "-draft", "check-success = @github-actions/ci / unit-matrix-gate"],
       },
     ]);
 
     for (const rule of config.pull_request_rules ?? []) {
       expect(rule.actions).not.toHaveProperty("queue");
       expect(rule.actions).not.toHaveProperty("merge");
+    }
+  });
+
+  it("requires the optional OS/Node matrix through a stable Mergify queue gate", () => {
+    const workflow = yaml.load(ci) as {
+      jobs: Record<
+        string,
+        {
+          name?: string;
+          needs?: string[];
+          if?: string;
+          steps?: Array<{ env?: Record<string, string>; run?: string }>;
+        }
+      >;
+    };
+    const gate = workflow.jobs["unit-matrix-gate"];
+    expect(gate?.name).toBe("ci / unit-matrix-gate");
+    expect(gate?.needs).toEqual(["risk-profile", "test-unit-matrix"]);
+    expect(gate?.if).toContain("always()");
+    const enforcement = gate?.steps?.[0];
+    expect(enforcement?.env?.MATRIX_REQUIRED).toContain("needs.risk-profile.outputs.needs_unit_matrix");
+    expect(enforcement?.env?.MATRIX_RESULT).toContain("needs.test-unit-matrix.result");
+    expect(enforcement?.run).toContain('"$MATRIX_RESULT" != "success"');
+    expect(enforcement?.run).toContain('"$MATRIX_RESULT" != "skipped"');
+    expect(enforcement?.run).toContain('"$PROFILE_RESULT" != "success"');
+  });
+
+  it.skipIf(process.platform === "win32")("fails closed on broken or unexpected CI matrix outcomes", () => {
+    const workflow = yaml.load(ci) as {
+      jobs: Record<string, { steps?: Array<{ run?: string }> }>;
+    };
+    const script = workflow.jobs["unit-matrix-gate"]?.steps?.[0]?.run;
+    expect(script).toBeTruthy();
+    const run = (profile: string, required: string, result: string) => {
+      execFileSync("bash", ["-c", script ?? "exit 2"], {
+        env: {
+          ...process.env,
+          PROFILE_RESULT: profile,
+          MATRIX_REQUIRED: required,
+          MATRIX_RESULT: result,
+        },
+        stdio: "pipe",
+      });
+    };
+    expect(() => run("success", "true", "success")).not.toThrow();
+    expect(() => run("success", "false", "skipped")).not.toThrow();
+    const rejectedCases: Array<[string, string, string]> = [
+      ["success", "true", "failure"],
+      ["success", "true", "skipped"],
+      ["success", "true", "cancelled"],
+      ["success", "false", "success"],
+      ["success", "false", "failure"],
+      ["success", "", "skipped"],
+      ["failure", "false", "skipped"],
+    ];
+    for (const [profile, required, result] of rejectedCases) {
+      expect(() => run(profile, required, result)).toThrow();
     }
   });
 

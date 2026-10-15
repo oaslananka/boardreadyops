@@ -27,15 +27,14 @@ export async function checkoutRunnerSource(options: CheckoutRunnerSourceOptions)
   if (options.job.sourceMode !== "customer_checkout") {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
+  // Validate the mirror locator before creating a checkout workspace.
+  const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
   const workspaceRoot = path.resolve(options.workspaceRoot);
   await mkdir(workspaceRoot, { recursive: true, mode: 0o700 });
   if (process.platform !== "win32") await chmod(workspaceRoot, 0o700);
   const workspace = await mkdtemp(path.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
-  if (process.platform !== "win32") await chmod(workspace, 0o700);
-
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
-  const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
   const git = async (args: readonly string[]) =>
     await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
       cwd: workspace,
@@ -43,6 +42,7 @@ export async function checkoutRunnerSource(options: CheckoutRunnerSourceOptions)
     });
 
   try {
+    if (process.platform !== "win32") await chmod(workspace, 0o700);
     await git(["init", "--quiet"]);
     await git(["remote", "add", "origin", repository]);
     await git(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);

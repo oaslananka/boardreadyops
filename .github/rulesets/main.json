@@ -47,6 +47,9 @@
             "context": "ci / test-unit"
           },
           {
+            "context": "ci / unit-matrix-gate"
+          },
+          {
             "context": "ci / build"
           },
           {
