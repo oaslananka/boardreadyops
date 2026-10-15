@@ -150,6 +150,18 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
     expect(markup).toContain("+ New Governance Policy");
   });
 
+  it("describes only the two hosted-enforced policy layers and discloses override relaxations", () => {
+    const markup = renderToStaticMarkup(createElement(PoliciesClient));
+    expect(markup).toContain("Hosted review enforcement");
+    expect(markup).toContain("Organization baseline");
+    expect(markup).toContain("Repository overrides");
+    expect(markup).toContain("Team and exception layers are not enforced");
+    expect(markup).toContain("can relax the organization severity gate");
+    expect(markup).not.toContain("Stricter rules apply automatically");
+    expect(markup).not.toContain("Repositories inherit organization and team baselines");
+    expect(markup).not.toContain("Rules currently enforced on all hardware pull requests");
+  });
+
   it("GET /api/v1/policies returns list of tenant policies", async () => {
     vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
       status: "authenticated",
