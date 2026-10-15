@@ -164,7 +164,11 @@ export class BillingStore {
       ),
       updated_customer AS (
         UPDATE billing_customers
-        SET tier = $5, status = $13, trial_ends_at = $14::timestamptz, current_period_end = $10::timestamptz, updated_at = NOW()
+        SET tier = $5,
+            status = CASE WHEN last_invoice_event_created_at IS NULL
+                           OR last_invoice_event_created_at < $12::timestamptz
+                          THEN $13 ELSE status END,
+            trial_ends_at = $14::timestamptz, current_period_end = $10::timestamptz, updated_at = NOW()
         WHERE tenant_id IN (SELECT tenant_id FROM upserted_subscription)
         RETURNING tenant_id
       ),
@@ -203,6 +207,57 @@ export class BillingStore {
       `UPDATE billing_customers SET status='active', grace_ends_at=NULL, updated_at=NOW() WHERE tenant_id=$1 AND status='past_due'`,
       [tenantId],
     );
+  }
+
+  /** Customer linkage wakes pre-checkout events without processing them inline. */
+  async wakePendingStripeCustomerEvents(stripeCustomerId: string): Promise<void> {
+    await this.db.query(
+      `UPDATE billing_events SET available_at=NOW()
+       WHERE provider='stripe' AND processed_at IS NULL AND dead_letter_at IS NULL
+         AND payload #>> '{data,object,customer}' = $1`,
+      [stripeCustomerId],
+    );
+  }
+
+  /**
+   * A Stripe invoice timestamp has only second precision. Do not silently
+   * acknowledge opposite outcomes in the same second: they require provider
+   * reconciliation, not an arrival-order decision about paid entitlements.
+   * Caller owns the customer advisory lock and the surrounding transaction.
+   */
+  async applyStripeInvoiceEvent(input: {
+    tenantId: string;
+    eventCreatedAt: string;
+    outcome: "paid" | "failed";
+  }): Promise<"applied" | "stale" | "conflict" | "missing_customer"> {
+    const paid = input.outcome === "paid";
+    const graceEnds = new Date(Date.now() + 14 * 86_400_000).toISOString();
+    const result = (await this.db.query(
+      `UPDATE billing_customers
+       SET status = CASE
+             WHEN $3::boolean AND status='past_due' THEN 'active'
+             WHEN NOT $3::boolean THEN 'past_due'
+             ELSE status END,
+           grace_ends_at = CASE WHEN $3::boolean THEN NULL ELSE $4::timestamptz END,
+           last_invoice_event_created_at=$2::timestamptz,
+           last_invoice_event_outcome=$5::text, updated_at=NOW()
+       WHERE tenant_id=$1 AND
+         (last_invoice_event_created_at IS NULL OR last_invoice_event_created_at < $2::timestamptz)
+       RETURNING id`,
+      [input.tenantId, input.eventCreatedAt, paid, graceEnds, input.outcome],
+    )) as { rows?: Array<{ id: string }> };
+    if ((result.rows?.length ?? 0) > 0) return "applied";
+
+    const current = (await this.db.query(
+      `SELECT last_invoice_event_created_at = $2::timestamptz AS same_second,
+              last_invoice_event_outcome
+       FROM billing_customers WHERE tenant_id=$1`,
+      [input.tenantId, input.eventCreatedAt],
+    )) as { rows?: Array<{ same_second: boolean | null; last_invoice_event_outcome: string | null }> };
+    const existing = current.rows?.[0];
+    if (!existing) return "missing_customer";
+    if (existing.same_second && existing.last_invoice_event_outcome !== input.outcome) return "conflict";
+    return "stale";
   }
 
   async recordEvent(input: {
