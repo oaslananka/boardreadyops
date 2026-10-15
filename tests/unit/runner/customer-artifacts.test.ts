@@ -80,6 +80,41 @@ describe("persistCustomerRunnerArtifacts", () => {
     await expect(persistCustomerRunnerArtifacts(input)).rejects.toThrow(/already exist/u);
     expect(await readdir(path.join(f.root, runId))).toEqual([executionAttemptId]);
   });
+  it("rejects an active attempt reservation before touching its destination", async () => {
+    const f = await fixture();
+    const runRoot = path.join(f.root, runId);
+    await mkdir(runRoot, { mode: 0o700 });
+    const claimFile = path.join(runRoot, `.claim-${executionAttemptId}`);
+    await writeFile(claimFile, "another runner has this attempt", { flag: "wx", mode: 0o600 });
+
+    await expect(
+      persistCustomerRunnerArtifacts({
+        root: f.root,
+        workspace: f.workspace,
+        job: job(),
+        artifacts: [f.artifact],
+      }),
+    ).rejects.toThrow(/claimed|already in progress|already exist/u);
+    expect(await readdir(runRoot)).toEqual([`.claim-${executionAttemptId}`]);
+    await expect(readFile(claimFile, "utf8")).resolves.toBe("another runner has this attempt");
+  });
+
+  it("permits at most one simultaneous writer for one run/attempt", async () => {
+    const f = await fixture();
+    const input = { root: f.root, workspace: f.workspace, job: job(), artifacts: [f.artifact] };
+    const settled = await Promise.allSettled([
+      persistCustomerRunnerArtifacts(input),
+      persistCustomerRunnerArtifacts(input),
+    ]);
+
+    expect(settled.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(settled.filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect(await readdir(path.join(f.root, runId))).toEqual([executionAttemptId]);
+    await expect(readFile(path.join(f.root, runId, executionAttemptId, "artifact-001.bin"), "utf8")).resolves.toBe(
+      "sample report",
+    );
+  });
+
   it("rejects a digest mismatch and removes uncommitted staging files", async () => {
     const f = await fixture();
     const bad = { ...f.artifact, sha256: "0".repeat(64) };

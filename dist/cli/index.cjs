@@ -58087,64 +58087,79 @@ async function persistCustomerRunnerArtifacts(input) {
     if (error51.code !== "EEXIST") throw error51;
   });
   await privateDirectory(runRoot);
-  const destination = import_node_path74.default.join(runRoot, input.job.executionAttemptId);
-  const existing = await (0, import_promises32.lstat)(destination).catch((error51) => {
-    if (error51.code === "ENOENT") return void 0;
-    throw error51;
-  });
-  if (existing) throw new Error("customer artifacts for this run attempt already exist");
-  const staging = await (0, import_promises32.mkdtemp)(import_node_path74.default.join(runRoot, ".pending-"));
+  const claimPath = import_node_path74.default.join(runRoot, `.claim-${input.job.executionAttemptId}`);
+  let claim;
   try {
-    const manifestArtifacts = [];
-    for (const [index, artifact] of input.artifacts.entries()) {
-      input.signal?.throwIfAborted();
-      const realSource = await (0, import_promises32.realpath)(artifact.filePath);
-      if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-      const handle = await (0, import_promises32.open)(artifact.filePath, import_node_fs10.constants.O_RDONLY | (import_node_fs10.constants.O_NOFOLLOW ?? 0));
-      let content;
-      try {
-        const stats = await handle.stat();
-        if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
-          throw new Error("runner artifact is not a bounded regular file");
-        }
-        content = await handle.readFile();
-      } finally {
-        await handle.close();
-      }
-      const digest2 = (0, import_node_crypto23.createHash)("sha256").update(content).digest("hex");
-      if (content.length !== artifact.bytes || digest2 !== artifact.sha256) {
-        throw new Error("runner artifact bytes do not match its declaration");
-      }
-      const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
-      await (0, import_promises32.writeFile)(import_node_path74.default.join(staging, filename), content, { flag: "wx", mode: 384 });
-      manifestArtifacts.push({
-        filename,
-        kind: artifact.kind,
-        name: artifact.name,
-        role: artifact.role,
-        bytes: artifact.bytes,
-        sha256: artifact.sha256
-      });
-    }
-    const manifest = {
-      version: 1,
-      repository: `${input.job.repository.owner}/${input.job.repository.name}`,
-      commitSha: input.job.repository.commitSha,
-      runId: input.job.runId,
-      executionAttemptId: input.job.executionAttemptId,
-      artifacts: manifestArtifacts
-    };
-    await (0, import_promises32.writeFile)(import_node_path74.default.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}
-`, {
-      flag: "wx",
-      mode: 384
-    });
-    input.signal?.throwIfAborted();
-    await (0, import_promises32.rename)(staging, destination);
-    return input.artifacts.length;
+    claim = await (0, import_promises32.open)(claimPath, "wx", 384);
   } catch (error51) {
-    await (0, import_promises32.rm)(staging, { recursive: true, force: true });
+    if (error51.code === "EEXIST") {
+      throw new Error("customer artifact attempt is already claimed; inspect before retrying");
+    }
     throw error51;
+  }
+  try {
+    await claim.close();
+    const destination = import_node_path74.default.join(runRoot, input.job.executionAttemptId);
+    const existing = await (0, import_promises32.lstat)(destination).catch((error51) => {
+      if (error51.code === "ENOENT") return void 0;
+      throw error51;
+    });
+    if (existing) throw new Error("customer artifacts for this run attempt already exist");
+    const staging = await (0, import_promises32.mkdtemp)(import_node_path74.default.join(runRoot, ".pending-"));
+    try {
+      const manifestArtifacts = [];
+      for (const [index, artifact] of input.artifacts.entries()) {
+        input.signal?.throwIfAborted();
+        const realSource = await (0, import_promises32.realpath)(artifact.filePath);
+        if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
+        const handle = await (0, import_promises32.open)(artifact.filePath, import_node_fs10.constants.O_RDONLY | (import_node_fs10.constants.O_NOFOLLOW ?? 0));
+        let content;
+        try {
+          const stats = await handle.stat();
+          if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
+            throw new Error("runner artifact is not a bounded regular file");
+          }
+          content = await handle.readFile();
+        } finally {
+          await handle.close();
+        }
+        const digest2 = (0, import_node_crypto23.createHash)("sha256").update(content).digest("hex");
+        if (content.length !== artifact.bytes || digest2 !== artifact.sha256) {
+          throw new Error("runner artifact bytes do not match its declaration");
+        }
+        const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
+        await (0, import_promises32.writeFile)(import_node_path74.default.join(staging, filename), content, { flag: "wx", mode: 384 });
+        manifestArtifacts.push({
+          filename,
+          kind: artifact.kind,
+          name: artifact.name,
+          role: artifact.role,
+          bytes: artifact.bytes,
+          sha256: artifact.sha256
+        });
+      }
+      const manifest = {
+        version: 1,
+        repository: `${input.job.repository.owner}/${input.job.repository.name}`,
+        commitSha: input.job.repository.commitSha,
+        runId: input.job.runId,
+        executionAttemptId: input.job.executionAttemptId,
+        artifacts: manifestArtifacts
+      };
+      await (0, import_promises32.writeFile)(import_node_path74.default.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}
+`, {
+        flag: "wx",
+        mode: 384
+      });
+      input.signal?.throwIfAborted();
+      await (0, import_promises32.rename)(staging, destination);
+      return input.artifacts.length;
+    } catch (error51) {
+      await (0, import_promises32.rm)(staging, { recursive: true, force: true });
+      throw error51;
+    }
+  } finally {
+    await (0, import_promises32.rm)(claimPath, { force: true });
   }
 }
 

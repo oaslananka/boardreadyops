@@ -62,63 +62,80 @@ export async function persistCustomerRunnerArtifacts(input: {
     if (error.code !== "EEXIST") throw error;
   });
   await privateDirectory(runRoot);
-  const destination = path.join(runRoot, input.job.executionAttemptId);
-  const existing = await lstat(destination).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return undefined;
-    throw error;
-  });
-  if (existing) throw new Error("customer artifacts for this run attempt already exist");
-
-  const staging = await mkdtemp(path.join(runRoot, ".pending-"));
+  // Exclusive create serializes concurrent attempts using the same customer root.
+  // An orphaned claim after a host crash is an explicit operator-recovery barrier.
+  const claimPath = path.join(runRoot, `.claim-${input.job.executionAttemptId}`);
+  let claim: Awaited<ReturnType<typeof open>>;
   try {
-    const manifestArtifacts = [];
-    for (const [index, artifact] of input.artifacts.entries()) {
-      input.signal?.throwIfAborted();
-      const realSource = await realpath(artifact.filePath);
-      if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-      const handle = await open(artifact.filePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-      let content: Buffer;
-      try {
-        const stats = await handle.stat();
-        if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
-          throw new Error("runner artifact is not a bounded regular file");
-        }
-        content = await handle.readFile();
-      } finally {
-        await handle.close();
-      }
-      const digest = createHash("sha256").update(content).digest("hex");
-      if (content.length !== artifact.bytes || digest !== artifact.sha256) {
-        throw new Error("runner artifact bytes do not match its declaration");
-      }
-      const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
-      await writeFile(path.join(staging, filename), content, { flag: "wx", mode: 0o600 });
-      manifestArtifacts.push({
-        filename,
-        kind: artifact.kind,
-        name: artifact.name,
-        role: artifact.role,
-        bytes: artifact.bytes,
-        sha256: artifact.sha256,
-      });
-    }
-    const manifest = {
-      version: 1,
-      repository: `${input.job.repository.owner}/${input.job.repository.name}`,
-      commitSha: input.job.repository.commitSha,
-      runId: input.job.runId,
-      executionAttemptId: input.job.executionAttemptId,
-      artifacts: manifestArtifacts,
-    };
-    await writeFile(path.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, {
-      flag: "wx",
-      mode: 0o600,
-    });
-    input.signal?.throwIfAborted();
-    await rename(staging, destination);
-    return input.artifacts.length;
+    claim = await open(claimPath, "wx", 0o600);
   } catch (error) {
-    await rm(staging, { recursive: true, force: true });
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      throw new Error("customer artifact attempt is already claimed; inspect before retrying");
+    }
     throw error;
+  }
+  try {
+    await claim.close();
+    const destination = path.join(runRoot, input.job.executionAttemptId);
+    const existing = await lstat(destination).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined;
+      throw error;
+    });
+    if (existing) throw new Error("customer artifacts for this run attempt already exist");
+
+    const staging = await mkdtemp(path.join(runRoot, ".pending-"));
+    try {
+      const manifestArtifacts = [];
+      for (const [index, artifact] of input.artifacts.entries()) {
+        input.signal?.throwIfAborted();
+        const realSource = await realpath(artifact.filePath);
+        if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
+        const handle = await open(artifact.filePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+        let content: Buffer;
+        try {
+          const stats = await handle.stat();
+          if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
+            throw new Error("runner artifact is not a bounded regular file");
+          }
+          content = await handle.readFile();
+        } finally {
+          await handle.close();
+        }
+        const digest = createHash("sha256").update(content).digest("hex");
+        if (content.length !== artifact.bytes || digest !== artifact.sha256) {
+          throw new Error("runner artifact bytes do not match its declaration");
+        }
+        const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
+        await writeFile(path.join(staging, filename), content, { flag: "wx", mode: 0o600 });
+        manifestArtifacts.push({
+          filename,
+          kind: artifact.kind,
+          name: artifact.name,
+          role: artifact.role,
+          bytes: artifact.bytes,
+          sha256: artifact.sha256,
+        });
+      }
+      const manifest = {
+        version: 1,
+        repository: `${input.job.repository.owner}/${input.job.repository.name}`,
+        commitSha: input.job.repository.commitSha,
+        runId: input.job.runId,
+        executionAttemptId: input.job.executionAttemptId,
+        artifacts: manifestArtifacts,
+      };
+      await writeFile(path.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, {
+        flag: "wx",
+        mode: 0o600,
+      });
+      input.signal?.throwIfAborted();
+      await rename(staging, destination);
+      return input.artifacts.length;
+    } catch (error) {
+      await rm(staging, { recursive: true, force: true });
+      throw error;
+    }
+  } finally {
+    await rm(claimPath, { force: true });
   }
 }
