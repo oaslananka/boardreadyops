@@ -95363,7 +95363,10 @@ function checkReadinessStatus(allowed, readiness) {
   };
 }
 function checkRequiredOutputs(readiness) {
-  const missing = readiness?.missingRequired ?? [];
+  if (!readiness) {
+    return { ok: false, message: "Required output presence cannot be verified without readiness data." };
+  }
+  const missing = readiness.missingRequired;
   return {
     ok: missing.length === 0,
     message: missing.length === 0 ? "All required outputs are present." : `Missing required outputs: ${missing.join(", ")}.`
