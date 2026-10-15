@@ -58054,6 +58054,7 @@ var import_promises32 = require("node:fs/promises");
 var import_node_path74 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
 async function checkoutRunnerSource(options) {
+  options.signal?.throwIfAborted();
   if (options.job.sourceMode !== "customer_checkout") {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
@@ -58064,10 +58065,14 @@ async function checkoutRunnerSource(options) {
   const workspace = await (0, import_promises32.mkdtemp)(import_node_path74.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
-  const git = async (args) => await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
-    cwd: workspace,
-    env: environment
-  });
+  const git = async (args) => {
+    options.signal?.throwIfAborted();
+    return await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
+      cwd: workspace,
+      env: environment,
+      ...options.signal ? { signal: options.signal } : {}
+    });
+  };
   try {
     if (process.platform !== "win32") await (0, import_promises32.chmod)(workspace, 448);
     await git(["init", "--quiet"]);
@@ -58079,6 +58084,7 @@ async function checkoutRunnerSource(options) {
       throw new Error(`checked-out commit did not match the assigned commit: ${resolved}`);
     }
     await git(["remote", "remove", "origin"]);
+    options.signal?.throwIfAborted();
     return workspace;
   } catch (error51) {
     await (0, import_promises32.rm)(workspace, { recursive: true, force: true });
@@ -58091,12 +58097,14 @@ async function executeRunnerCommand(command, args, options) {
       cwd: options.cwd,
       env: options.env,
       stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true
+      windowsHide: true,
+      ...options.signal ? { signal: options.signal } : {}
     });
     let stdout = "";
     let stderr = "";
     let outputBytes = 0;
     let outputExceeded = false;
+    let abortError;
     const collect3 = (current, chunk) => {
       outputBytes += Buffer.byteLength(chunk, "utf8");
       if (outputBytes > maximumCommandOutputBytes) {
@@ -58114,8 +58122,18 @@ async function executeRunnerCommand(command, args, options) {
     child.stderr.on("data", (chunk) => {
       stderr = collect3(stderr, chunk);
     });
-    child.once("error", reject);
+    child.once("error", (error51) => {
+      if (options.signal?.aborted) {
+        abortError = error51;
+      } else {
+        reject(error51);
+      }
+    });
     child.once("close", (code, signal) => {
+      if (abortError) {
+        reject(abortError);
+        return;
+      }
       const result = { stdout, stderr };
       if (outputExceeded) {
         reject(new Error(`${command} output exceeded ${maximumCommandOutputBytes} bytes`));
@@ -58218,7 +58236,8 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     workspace = await dependencies.checkoutSource({
       job,
       workspaceRoot,
-      ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: options.repositoryMirrorRoot }
+      ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: options.repositoryMirrorRoot },
+      ...options.signal ? { signal: options.signal } : {}
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.setStage("running");

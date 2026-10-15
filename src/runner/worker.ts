@@ -173,6 +173,7 @@ export async function runRunnerWorkerOnce(
       job,
       workspaceRoot,
       ...(options.repositoryMirrorRoot === undefined ? {} : { repositoryMirrorRoot: options.repositoryMirrorRoot }),
+      ...(options.signal ? { signal: options.signal } : {}),
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
 

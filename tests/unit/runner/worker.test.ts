@@ -740,6 +740,29 @@ notifiers:
     });
   });
 
+  it("propagates shutdown to the source checkout and relinquishes the lease", async () => {
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    const controller = new AbortController();
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async (checkoutOptions: { signal?: AbortSignal }) => {
+        expect(checkoutOptions.signal).toBe(controller.signal);
+        controller.abort();
+        throw new Error("source checkout aborted");
+      }),
+    });
+
+    await expect(
+      runRunnerWorkerOnce(
+        { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", signal: controller.signal },
+        overrides,
+      ),
+    ).rejects.toThrow(/runner shutdown requested/u);
+    expect(runnerClient.relinquish).toHaveBeenCalledWith(expect.objectContaining({ reason: "shutdown" }));
+    expect(overrides.executePipeline).not.toHaveBeenCalled();
+    expect(runnerClient.publishTerminalResult).not.toHaveBeenCalled();
+  });
+
   it("aborts in-flight execution, relinquishes the lease for shutdown, and cleans the workspace", async () => {
     const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-abort-"));
     roots.push(workspace);
