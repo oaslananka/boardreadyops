@@ -65,7 +65,7 @@ function OperationalSummarySection({ summary }: Readonly<{ summary: DashboardRep
           [
             ["Repositories", summary.repositories],
             ["Repositories with findings", summary.repositoriesWithOpenFindings],
-            ["Supply alerts", summary.supplyAlerts],
+            ["Supply alerts (recorded)", summary.supplyAlerts],
             ["No run yet", summary.repositoriesWithoutRuns],
             ["Supply-tracked boards", summary.watchedBoards],
           ] as const
@@ -77,8 +77,10 @@ function OperationalSummarySection({ summary }: Readonly<{ summary: DashboardRep
         ))}
       </dl>
       <p className="mt-3 text-xs text-muted-foreground">
-        Supply-tracked boards counts registered component-monitoring records, not GitHub readiness runs. A zero does not
-        mean your connected repositories have stopped being checked.
+        Recorded supply alerts only: these are stored findings, not a live risk assessment. No stored alerts does not
+        prove that supply monitoring is enabled or that components are risk-free. Supply-tracked boards counts
+        registered component-monitoring records, not GitHub readiness runs. A zero does not mean your connected
+        repositories have stopped being checked.
       </p>
     </section>
   );
@@ -225,7 +227,7 @@ const repositoryColumns: readonly DataColumn<RepositoryRow>[] = [
   },
   {
     id: "supply",
-    header: "Supply alerts",
+    header: "Supply alerts (recorded)",
     align: "end",
     cell: (repository) => <span className="tabular-nums">{repository.openSupplyFindings}</span>,
   },

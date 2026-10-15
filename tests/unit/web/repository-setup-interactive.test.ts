@@ -193,4 +193,55 @@ describe("repository setup readiness controls", () => {
     expect(container.textContent).not.toContain("Setup pull request #12");
     expect(container.textContent).not.toContain("First repository probe failed.");
   });
+
+  it("treats a verified repository as ready without a new setup PR", async () => {
+    const verified = {
+      ...readyForProbe,
+      setupWorkflowStatus: "ready",
+      setupConfigStatus: "ready",
+      setupObservedSha: "abcdef1234567890",
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [verified] }),
+      );
+    });
+
+    expect(container.textContent).toContain("Repository setup verified");
+    expect(container.textContent).toContain("No new setup pull request is needed");
+    expect([...container.querySelectorAll("a")].some((link) => link.getAttribute("href") === "/runs")).toBe(true);
+    expect(() => button(container, "Open setup pull request")).toThrow("button not found");
+    const advanced = container.querySelector("details");
+    expect(advanced?.open).toBe(false);
+    expect(advanced?.querySelector("summary")?.textContent).toContain("Change verified setup");
+  });
+
+  it("preserves an explicit reviewed update path for verified setup", async () => {
+    const verified = { ...readyForProbe, setupWorkflowStatus: "ready", setupConfigStatus: "ready" };
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        ok: true,
+        outcome: "created",
+        pullRequestNumber: 21,
+        pullRequestUrl: "https://github.test/octo/board-one/pull/21",
+        setupRevision: 2,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [verified] }),
+      );
+    });
+    const advanced = container.querySelector("details");
+    if (!(advanced instanceof HTMLDetailsElement)) throw new Error("change setup details not found");
+    expect(fetchMock).not.toHaveBeenCalled();
+    advanced.open = true;
+    await act(async () => {
+      button(container, "Open configuration update PR").click();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Setup pull request #21");
+  });
 });

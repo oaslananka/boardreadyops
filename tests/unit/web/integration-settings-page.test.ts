@@ -22,5 +22,8 @@ describe("Integrations & Health settings page", () => {
       expect(page).toContain(text);
     }
     expect(page).toContain("loadIntegrationHealth");
+    expect(page).toContain("Control-plane availability does not mean all repositories are ready");
+    expect(page).toContain("GitHub App connected");
+    expect(page).toContain("Repository readiness is assessed separately");
   });
 });
