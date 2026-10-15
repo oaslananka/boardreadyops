@@ -262,8 +262,8 @@ describe("dependency and security automation configuration", () => {
     const validatorImage = await repositoryFile("scripts/validate-renovate-config.mjs");
     const validatorMatch = new RegExp(validatorManager?.matchStrings?.[0] ?? "(?!)", "u").exec(validatorImage);
     expect(validatorMatch?.groups).toMatchObject({
-      currentValue: "44.97.2",
-      currentDigest: "sha256:b9b32d70f395ec78b9c2a29633079ce4d249049e51018ad3f086417dadf96b86",
+      currentValue: "44.97.6",
+      currentDigest: "sha256:128e8d6d6cb07beccc009a2cfbdbe741e2c620a9f70a2b8fb72614ca33dbe5ac",
     });
     const ubuntuManager = (
       renovate.customManagers as Array<{
@@ -384,7 +384,7 @@ describe("dependency and security automation configuration", () => {
     expect(packageJson.scripts?.["renovate:validate"]).toBe("node scripts/validate-renovate-config.mjs");
     expect(packageJson.scripts?.["renovate:validate"]).not.toContain("dlx");
     expect(validator).toContain(
-      "renovate/renovate:44.97.2@sha256:b9b32d70f395ec78b9c2a29633079ce4d249049e51018ad3f086417dadf96b86",
+      "renovate/renovate:44.97.6@sha256:128e8d6d6cb07beccc009a2cfbdbe741e2c620a9f70a2b8fb72614ca33dbe5ac",
     );
     expect(validator).toContain('"--network=none"');
     expect(validator).toContain("readonly");

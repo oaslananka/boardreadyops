@@ -130,6 +130,14 @@ certificate also binds the expected repository ID, workflow, source commit,
 ref, event, run/attempt, and the signed statement includes **exactly** the
 manifest and every actual output hash, with no duplicates or extra subjects.
 
+After the external `gh attestation verify` process completes, the local
+verifier **re-reads the pinned source and full output inventory** and refuses an
+eligible result if files were added, removed, modified or replaced while the
+cryptographic check ran. The signature and initial checksums alone cannot
+bless a workspace that changed during a long-running verification. This is a
+defense-in-depth local consistency check, not a replacement for a trusted
+run identity or a production release approval.
+
 The expected identity values **must** come from an independently authorized
 target-repository installation/run record and a reviewed workflow. They must
 never be copied from the unsigned export manifest, untrusted workflow output,

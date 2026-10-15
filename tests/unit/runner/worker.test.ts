@@ -269,6 +269,7 @@ describe("runRunnerWorkerOnce", () => {
       expect.stringContaining(`/artifacts/${artifactId}/upload`),
       artifactFile,
       5,
+      execution.artifacts[0]?.sha256,
     );
     const terminal = (
       runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>

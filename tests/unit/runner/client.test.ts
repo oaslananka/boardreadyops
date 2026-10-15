@@ -204,6 +204,60 @@ describe("RunnerControlPlaneClient", () => {
     expect(normalizeControlPlaneUrl("http://127.0.0.1:3000").origin).toBe("http://127.0.0.1:3000");
   });
 
+  it("refuses same-size artifact tampering before contacting the upload endpoint", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-digest-"));
+    roots.push(root);
+    const artifact = path.join(root, "report.json");
+    await writeFile(artifact, "world", "utf8");
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    const client = new RunnerControlPlaneClient({
+      baseUrl: "https://control.example",
+      runnerId,
+      runnerVersion: boardReadyVersion,
+      privateKey: keys.privateKey,
+      fetch: fetchMock as typeof fetch,
+    });
+
+    await expect(
+      client.uploadArtifact("https://control.example/upload?cap=x", artifact, 5, "not-a-digest"),
+    ).rejects.toThrow(/SHA-256 declaration is invalid/u);
+    await expect(
+      client.uploadArtifact(
+        "https://control.example/upload?cap=x",
+        artifact,
+        5,
+        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+      ),
+    ).rejects.toThrow(/artifact digest changed before upload/u);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uploads only bytes matching the declared size and SHA-256 digest", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-valid-upload-"));
+    roots.push(root);
+    const artifact = path.join(root, "report.json");
+    await writeFile(artifact, "hello", "utf8");
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    const client = new RunnerControlPlaneClient({
+      baseUrl: "https://control.example",
+      runnerId,
+      runnerVersion: boardReadyVersion,
+      privateKey: keys.privateKey,
+      fetch: fetchMock as typeof fetch,
+    });
+    await client.uploadArtifact(
+      "https://control.example/upload?cap=x",
+      artifact,
+      5,
+      "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(URL),
+      expect.objectContaining({ method: "PUT", redirect: "error", body: Buffer.from("hello") }),
+    );
+  });
+
   it("does not upload an artifact whose size changed after capability issuance", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-client-"));
     roots.push(root);
@@ -218,9 +272,9 @@ describe("RunnerControlPlaneClient", () => {
       fetch: fetchMock as typeof fetch,
     });
 
-    await expect(client.uploadArtifact("https://control.example/upload?cap=x", artifact, 5)).rejects.toThrow(
-      /artifact size changed/u,
-    );
+    await expect(
+      client.uploadArtifact("https://control.example/upload?cap=x", artifact, 5, "a".repeat(64)),
+    ).rejects.toThrow(/artifact size changed/u);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

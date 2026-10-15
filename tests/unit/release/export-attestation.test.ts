@@ -268,6 +268,31 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     expect((await verify(f)).status).toBe("rejected");
   });
 
+  it.each([
+    ["existing Gerber bytes", "gerber"],
+    ["additional unlisted output", "extra"],
+    ["source input bytes", "source"],
+  ] as const)("rejects %s changed while the external verifier runs", async (_scenario, kind) => {
+    const f = await fixture();
+    const signedStatement = verifiedResult(f);
+    mockedRun.mockImplementation(async () => {
+      if (kind === "gerber") {
+        // Same-byte-length replacement after the initial inventory has passed.
+        await fs.writeFile(path.join(f.root, "build/reviewed/gerbers/board.gtl"), "fake gerber bytes");
+      } else if (kind === "extra") {
+        await fs.writeFile(path.join(f.root, "build/reviewed/gerbers/unlisted.gtl"), "other fabrication file");
+      } else {
+        await fs.writeFile(path.join(f.root, "board.kicad_pcb"), "(kicad_pcb replaced)");
+      }
+      return { code: 0, stdout: JSON.stringify([signedStatement]), stderr: "", timedOut: false };
+    });
+
+    const result = await verify(f);
+    expect(mockedRun).toHaveBeenCalledOnce();
+    expect(result.status).toBe("rejected");
+    expect(result.reason).toMatch(/changed|inventory|source|subject/iu);
+  });
+
   it("rejects tampered output or undeclared extras before attempting trust verification", async () => {
     const f = await fixture();
     await fs.writeFile(path.join(f.root, "build/reviewed/drill/board.drl"), "tampered");
