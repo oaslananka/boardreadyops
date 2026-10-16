@@ -98,7 +98,9 @@ jobs:
           repository="$1"
           bootstrap_legacy_inline="$2"
           deploy_root="/home/ubuntu/boardreadyops-cloud"
-          policy_file="/opt/boardreadyops-cloud/release-repositories"
+          # Keep the root-owned legacy file until separately authorized migration.
+          legacy_policy_file="/opt/boardreadyops-cloud/release-repositories"
+          policy_file="${deploy_root}/release-repositories"
           policy_override_file="${deploy_root}/compose.release-policy.yml"
           container_policy_path="/run/policies/repositories"
           deploy_runbook="${deploy_root}/deploy.sh"
@@ -107,6 +109,31 @@ jobs:
           fail() {
             printf 'cloud-commission: %s\n' "$1" >&2
             exit 78
+          }
+
+          # Reject host runbooks that overwrite the verified running image tag.
+          # The rendered Compose JSON may include settings; parse it in memory only.
+          verify_pinned_runtime_compose() {
+            local image_ref="$1"
+            local source_path="$2"
+            local override_path="$3"
+            local image_tag="${image_ref#boardreadyops-web-runtime:}"
+            BOARDREADYOPS_IMAGE_TAG="${image_tag}" \
+              "${deploy_runbook}" -f "${override_path}" config --format json 2>/dev/null \
+              | python3 -c '
+          import json, sys
+          image, source, destination = sys.argv[1:]
+          try:
+              services = json.load(sys.stdin)["services"]
+              for name in ("web", "worker"):
+                  service = services[name]
+                  assert service.get("image") == image
+                  mounts = [m for m in service.get("volumes", []) if m.get("target") == destination]
+                  assert len(mounts) == 1
+                  assert mounts[0].get("source") == source and mounts[0].get("read_only") is True
+          except (ValueError, KeyError, AssertionError, TypeError):
+              sys.exit(1)
+          ' "${image_ref}" "${source_path}" "${container_policy_path}" >/dev/null
           }
 
           container_for_service() {
@@ -283,12 +310,12 @@ jobs:
               environment:
                 BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
               volumes:
-                - /opt/boardreadyops-cloud/release-repositories:/run/policies/repositories:ro
+                - /home/ubuntu/boardreadyops-cloud/release-repositories:/run/policies/repositories:ro
             worker:
               environment:
                 BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
               volumes:
-                - /opt/boardreadyops-cloud/release-repositories:/run/policies/repositories:ro
+                - /home/ubuntu/boardreadyops-cloud/release-repositories:/run/policies/repositories:ro
           ROLL_OUT_OVERRIDE
             then
               bootstrap_abort "cannot render Compose rollout override"
@@ -303,6 +330,9 @@ jobs:
               rollback_legacy_bootstrap
               exit 1
             fi
+
+            verify_pinned_runtime_compose "${web_image_ref}" "${policy_file}" "${policy_override_file}" \
+              || bootstrap_abort "host deploy runbook cannot preserve pinned runtime image and policy mount"
 
             recreate_attempted=1
             if ! BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
@@ -353,6 +383,10 @@ jobs:
             printf '%s\n' 'cloud-commission: legacy inline rollout migrated with dedicated release-policy override and current runtime image'
           }
 
+          # Never migrate privileged host paths during normal commissioning.
+          if [ ! -f "${policy_file}" ] && [ -f "${legacy_policy_file}" ]; then
+            fail "legacy rollout policy source requires separately approved migration; see docs/deployment/self-hosted.md"
+          fi
           if [ ! -f "${policy_file}" ]; then
             bootstrap_legacy_rollout
           fi
@@ -413,6 +447,9 @@ jobs:
               "${deploy_runbook}" -f "${policy_override_file}" \
               up -d --no-deps --force-recreate web worker >/dev/null
           }
+
+          verify_pinned_runtime_compose "${web_image_ref}" "${policy_file}" "${policy_override_file}" \
+            || fail "host deploy runbook cannot preserve pinned runtime image and policy mount"
 
           next_policy="$(mktemp "${policy_file}.next.XXXXXX")"
           previous_policy="$(mktemp "${policy_file}.previous.XXXXXX")"
