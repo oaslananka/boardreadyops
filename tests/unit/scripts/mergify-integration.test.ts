@@ -28,6 +28,7 @@ describe("Mergify integration contract", () => {
         name: string;
         merge_method?: string;
         batch_size?: number;
+        checks_timeout?: string;
         queue_conditions?: string[];
       }>;
       merge_protections_settings?: Record<string, unknown>;
@@ -46,6 +47,7 @@ describe("Mergify integration contract", () => {
         name: "main",
         merge_method: "squash",
         batch_size: 1,
+        checks_timeout: "30 min",
         queue_conditions: ["base = main", "-draft", "check-success = @github-actions/ci / unit-matrix-gate"],
       },
     ]);
