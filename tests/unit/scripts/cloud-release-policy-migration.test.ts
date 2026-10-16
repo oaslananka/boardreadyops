@@ -22,6 +22,7 @@ function fixture() {
   const backup = path.join(deployment, "compose.release-policy.legacy.yml");
   const activePathFile = path.join(root, "active.txt");
   const failOnceFile = path.join(root, "fail-once");
+  const delayedReadinessFile = path.join(root, "delayed-readiness");
   const bin = path.join(root, "bin");
   fs.mkdirSync(path.dirname(legacy), { recursive: true });
   fs.mkdirSync(deployment, { recursive: true });
@@ -56,6 +57,10 @@ case "$1" in
       *) exit 9 ;;
     esac ;;
   exec)
+    if [ "$3" = node ] && [ -f "${"$"}MOCK_DELAY_READINESS_FILE" ]; then
+      rm -f "${"$"}MOCK_DELAY_READINESS_FILE"
+      exit 26
+    fi
     if [ "$3" = cat ]; then cat "$(cat "${"$"}MOCK_ACTIVE_SOURCE_FILE")"; fi ;;
   *) exit 10 ;;
 esac
@@ -83,7 +88,8 @@ PY
     ;;
   up)
     if [ -e "${"$"}MOCK_FAIL_ONCE_FILE" ]; then rm -f "${"$"}MOCK_FAIL_ONCE_FILE"; exit 20; fi
-    printf '%s' "$source_path" > "${"$"}MOCK_ACTIVE_SOURCE_FILE" ;;
+    printf '%s' "$source_path" > "${"$"}MOCK_ACTIVE_SOURCE_FILE"
+    if [ "${"$"}MOCK_SLOW_READINESS" = 1 ]; then : > "${"$"}MOCK_DELAY_READINESS_FILE"; fi ;;
   *) exit 17 ;;
 esac
 `,
@@ -94,6 +100,8 @@ esac
     PATH: `${bin}:${process.env.PATH ?? ""}`,
     MOCK_ACTIVE_SOURCE_FILE: activePathFile,
     MOCK_FAIL_ONCE_FILE: failOnceFile,
+    MOCK_DELAY_READINESS_FILE: delayedReadinessFile,
+    MOCK_SLOW_READINESS: "0",
     MOCK_BAD_PIN: "0",
   };
   return {
@@ -107,10 +115,10 @@ esac
     activePathFile,
     failOnceFile,
     env,
-    run: (mode: string, badPin = false) =>
+    run: (mode: string, badPin = false, delayedReadiness = false) =>
       spawnSync("bash", [file, mode], {
         encoding: "utf8",
-        env: { ...env, MOCK_BAD_PIN: badPin ? "1" : "0" },
+        env: { ...env, MOCK_BAD_PIN: badPin ? "1" : "0", MOCK_SLOW_READINESS: delayedReadiness ? "1" : "0" },
         timeout: 15000,
       }),
   };
@@ -146,6 +154,13 @@ describeOnLinux("non-secret policy bind-mount migration", () => {
     expect(rolledBack.status, rolledBack.stderr).toBe(0);
     expect(fs.readFileSync(f.activePathFile, "utf8")).toBe(f.legacy);
     expect(fs.readFileSync(f.override, "utf8")).toContain(`${f.legacy}:/run/policies/repositories:ro`);
+  });
+
+  it("waits for transient consumer warm-up after recreation", () => {
+    const f = fixture();
+    const result = f.run("--apply", false, true);
+    expect(result.status, result.stderr).toBe(0);
+    expect(fs.readFileSync(f.activePathFile, "utf8")).toBe(f.current);
   });
 
   it("refuses a stale rollback that would erase later repository grants", () => {

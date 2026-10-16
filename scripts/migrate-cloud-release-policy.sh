@@ -74,6 +74,15 @@ verify_mounts() {
     docker exec "${cid}" cat "${container_path}" | cmp -s - "${expected}" || return 1
   done
 }
+# Allow a bounded warm-up after replacement; wrong images and mounts still fail closed.
+wait_for_mounts() {
+  local expected="$1" attempt
+  for attempt in $(seq 1 30); do
+    if verify_mounts "${expected}"; then return 0; fi
+    if [[ "${attempt}" != 30 ]]; then sleep 2; fi
+  done
+  return 1
+}
 verify_mounts "${source_file}" || fail 'current mounts, pinned image, policy contents or readiness are not consistent'
 
 candidate=""
@@ -93,7 +102,7 @@ restore_legacy() {
   if ! cp -p "${backup}" "${stage}"; then rm -f "${stage}"; return 1; fi
   if ! mv "${stage}" "${override}"; then rm -f "${stage}"; return 1; fi
   if ! BOARDREADYOPS_IMAGE_TAG="${image_tag}" "${runbook}" -f "${override}" up -d --no-deps --force-recreate web worker >/dev/null; then return 1; fi
-  verify_mounts "${legacy_file}" || return 1
+  wait_for_mounts "${legacy_file}" || return 1
 }
 finish() {
   local result="$?"
@@ -170,7 +179,7 @@ if [[ "${mode}" = --apply ]]; then
   mv "${candidate}" "${override}" || fail 'cannot install new override'
   candidate=""
   BOARDREADYOPS_IMAGE_TAG="${image_tag}" "${runbook}" -f "${override}" up -d --no-deps --force-recreate web worker >/dev/null || fail 'consumer recreation failed'
-  verify_mounts "${policy_file}" || fail 'new consumer mount, image or readiness verification failed'
+  wait_for_mounts "${policy_file}" || fail 'new consumer mount, image or readiness verification failed'
   committed=1
   echo 'release-policy migration: committed; original root-owned file and previous override retained for rollback'
 else
@@ -178,7 +187,7 @@ else
   mv "${candidate}" "${override}" || fail 'cannot restore previous override'
   candidate=""
   BOARDREADYOPS_IMAGE_TAG="${image_tag}" "${runbook}" -f "${override}" up -d --no-deps --force-recreate web worker >/dev/null || fail 'legacy consumer recreation failed'
-  verify_mounts "${legacy_file}" || fail 'restored legacy mount, image or readiness verification failed'
+  wait_for_mounts "${legacy_file}" || fail 'restored legacy mount, image or readiness verification failed'
   committed=1
   echo 'release-policy migration: legacy override and consumers restored; new non-secret file kept for review'
 fi
