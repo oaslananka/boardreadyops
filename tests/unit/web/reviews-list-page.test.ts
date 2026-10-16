@@ -133,8 +133,8 @@ describe("ReviewsListPage", () => {
     expect(markup).toContain("See the design, not just a report");
     expect(markup).toContain("Sample designs, not your repository");
     expect(markup).toContain("not recorded findings or manufacturing approval");
-    expect(markup).toContain("/demo/zaptrace-sample-pcb.svg");
-    expect(markup).toContain("/demo/zaptrace-sample-schematic.svg");
+    expect(markup).toContain("/demo/zaptrace-sample-pcb.png");
+    expect(markup).toContain("/demo/zaptrace-sample-schematic.png");
     expect(markup).toContain('href="/runs"');
     expect(markup).toContain("Browse your runs");
     expect(markup).toContain("Publish your first Review");

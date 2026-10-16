@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 /**
- * These static SVGs were plotted locally from the Zaptrace QA engineering
+ * These static PNG previews were rasterized from native KiCad SVGs plotted locally from the Zaptrace QA engineering
  * examples. They are illustrations, never an approved customer Review.
  */
 export function ReviewEmptyVisualPreview() {
@@ -27,11 +27,11 @@ export function ReviewEmptyVisualPreview() {
         <figure className="min-w-0 overflow-hidden rounded-lg border border-border bg-[#0b1220]">
           <div className="flex items-center justify-between gap-3 border-b border-white/15 px-3 py-2 text-white">
             <figcaption className="text-xs font-semibold">PCB · copper &amp; components</figcaption>
-            <span className="text-[11px] text-white/65">KiCad native SVG</span>
+            <span className="text-[11px] text-white/65">Native KiCad plot</span>
           </div>
-          {/* biome-ignore lint/performance/noImgElement: Static local SVG demo keeps source geometry. */}
+          {/* biome-ignore lint/performance/noImgElement: Static render of the first-party sample KiCad plot. */}
           <img
-            src="/demo/zaptrace-sample-pcb.svg"
+            src="/demo/zaptrace-sample-pcb.png"
             alt="Example KiCad PCB drawing with copper traces, pads and connectors"
             className="h-60 w-full object-contain p-3 sm:h-72"
           />
@@ -39,11 +39,11 @@ export function ReviewEmptyVisualPreview() {
         <figure className="min-w-0 overflow-hidden rounded-lg border border-border bg-[#faf9f5]">
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 text-slate-800">
             <figcaption className="text-xs font-semibold">Schematic · nets &amp; symbols</figcaption>
-            <span className="text-[11px] text-slate-500">KiCad native SVG</span>
+            <span className="text-[11px] text-slate-500">Native KiCad plot</span>
           </div>
-          {/* biome-ignore lint/performance/noImgElement: Static local SVG demo keeps source geometry. */}
+          {/* biome-ignore lint/performance/noImgElement: Static render of the first-party sample KiCad plot. */}
           <img
-            src="/demo/zaptrace-sample-schematic.svg"
+            src="/demo/zaptrace-sample-schematic.png"
             alt="Example KiCad schematic with ESP32, I2C components and net labels"
             className="h-60 w-full object-contain p-3 sm:h-72"
           />
