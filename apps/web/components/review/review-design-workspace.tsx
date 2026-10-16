@@ -33,6 +33,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
   const selected = findings.find((finding) => finding.fingerprint === selectedFingerprint);
   const blocking = findings.filter(isBlocking).length;
   const snapshots = review.headSnapshots ?? [];
+  const nativeViews = snapshots.filter((snapshot) => snapshot.name.startsWith("kicad_native_")).length;
   const optionalBaseSnapshots = review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {};
 
   return (
@@ -118,9 +119,10 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
                 onSelectFinding={setSelectedFingerprint}
               />
               <p className="text-xs text-muted-foreground">
-                Published review snapshots are component/layer summaries, not exact native KiCad copper or schematic
-                geometry. A marker indicates a linked reference, not verified physical fault coordinates or fabrication
-                approval.
+                {nativeViews > 0
+                  ? String(nativeViews) +
+                    " view(s) plotted by the local KiCad exporter; other views, if present, are summaries. Native artwork does not attest to manufacturing readiness. Finding locations are only shown when independently linked."
+                  : "Published review snapshots are component/layer summaries, not exact native KiCad copper or schematic geometry. A marker indicates a linked reference, not verified physical fault coordinates or fabrication approval."}
               </p>
             </>
           ) : (

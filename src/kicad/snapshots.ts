@@ -6,6 +6,8 @@ import {
   type SnapshotArtifact,
   type SnapshotFinding,
 } from "@boardreadyops/contracts";
+import { detectKicadCli } from "./cli.js";
+import { exportNativeKicadSnapshots } from "./native-snapshots.js";
 import { parsePcb } from "./pcb.js";
 import { parseSchematic } from "./schematic.js";
 
@@ -15,6 +17,8 @@ export interface GenerateSnapshotsOptions {
   schematicFiles?: string[];
   pcbFiles?: string[];
   findings?: SnapshotFinding[];
+  /** Explicitly disable native plotting for non-native fixtures or compatibility. */
+  nativeCli?: string | false;
 }
 
 async function renderSchematicFile(file: string, findings?: SnapshotFinding[]): Promise<SnapshotArtifact | undefined> {
@@ -85,16 +89,42 @@ async function renderPcbFile(file: string, findings?: SnapshotFinding[]): Promis
 
 export async function generateSnapshots(options: GenerateSnapshotsOptions): Promise<SnapshotArtifact[]> {
   const artifacts: SnapshotArtifact[] = [];
+  const cli =
+    options.nativeCli === false
+      ? undefined
+      : await detectKicadCli(typeof options.nativeCli === "string" ? options.nativeCli : undefined);
+  const nativeCliPath = cli?.found ? cli.path : undefined;
 
   for (const file of options.schematicFiles ?? []) {
+    const native = nativeCliPath
+      ? await exportNativeKicadSnapshots(nativeCliPath, file, "schematic").catch(() => [])
+      : [];
+    if (native.length) {
+      artifacts.push(...native);
+      continue;
+    }
     const artifact = await renderSchematicFile(file, options.findings);
     if (artifact) artifacts.push(artifact);
   }
 
   for (const file of options.pcbFiles ?? []) {
-    const pcbArtifacts = await renderPcbFile(file, options.findings);
-    artifacts.push(...pcbArtifacts);
+    const parsedLayers = await parsePcb(file)
+      .then((pcb) => pcb.copperLayers)
+      .catch(() => []);
+    const native = nativeCliPath
+      ? await exportNativeKicadSnapshots(
+          nativeCliPath,
+          file,
+          "pcb_layer",
+          parsedLayers.length ? parsedLayers : ["F.Cu", "B.Cu"],
+        ).catch(() => [])
+      : [];
+    if (native.length) {
+      artifacts.push(...native);
+      continue;
+    }
+    artifacts.push(...(await renderPcbFile(file, options.findings)));
   }
 
-  return artifacts;
+  return artifacts.slice(0, 64);
 }
