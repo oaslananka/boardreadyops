@@ -450,6 +450,29 @@ jobs:
             exit 1
           fi
 
+          # Verify each running consumer observes the newly commissioned repository.
+          # Atomic host-file replacement can leave a file bind mount on an old inode.
+          policy_visible_in_consumer() {
+            local container="$1"
+            docker exec "${container}" node -e '
+              const fs = require("node:fs");
+              const [file, repository] = process.argv.slice(1);
+              try {
+                const entries = fs.readFileSync(file, "utf8").toLowerCase().split(/[\s,]+/);
+                if (!entries.includes(repository)) process.exit(1);
+              } catch {
+                process.exit(1);
+              }
+            ' "${container_policy_path}" "${repository}" >/dev/null 2>&1
+          }
+
+          if ! policy_visible_in_consumer "${web_container}" \
+            || ! policy_visible_in_consumer "${worker_container}"; then
+            printf '%s\n' 'cloud-commission: consumers did not observe updated rollout policy; restoring previous rollout policy' >&2
+            restore_previous_policy
+            exit 1
+          fi
+
           docker inspect --format '{{.Name}} status={{.State.Status}}' "${web_container}" "${worker_container}"
           printf 'cloud-commission: repository commissioned successfully\n'
           REMOTE_COMMISSION

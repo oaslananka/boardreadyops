@@ -83,6 +83,16 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain("docker restart");
     expect(workflow).toContain("consumers failed to restart; restoring previous rollout policy");
     expect(workflow).toContain("consumers failed readiness; restoring previous rollout policy");
+    expect(workflow).toContain("policy_visible_in_consumer() {");
+    expect(workflow).toContain('policy_visible_in_consumer "${web_container}"');
+    expect(workflow).toContain('policy_visible_in_consumer "${worker_container}"');
+    expect(workflow).toContain("consumers did not observe updated rollout policy; restoring previous rollout policy");
+    expect(workflow.indexOf("policy_visible_in_consumer() {")).toBeGreaterThan(
+      workflow.indexOf('previous_policy="$(mktemp'),
+    );
+    expect(workflow.indexOf("consumers did not observe updated rollout policy")).toBeLessThan(
+      workflow.indexOf("repository commissioned successfully"),
+    );
     expect(workflow).toContain("container_for_service");
     expect(workflow).toContain("http://127.0.0.1:3000/api/health/ready");
     expect(workflow).toContain("http://127.0.0.1:3001/health/ready");
