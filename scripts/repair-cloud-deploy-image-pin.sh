@@ -26,7 +26,7 @@ fail() { printf 'cloud-image-pin: %s\n' "$1" >&2; exit 78; }
 [[ "$(stat -c '%u' "${wrapper}")" = "$(id -u)" ]] || fail 'deployment wrapper must be owned by the caller'
 bash -n "${wrapper}" || fail 'existing wrapper fails bash syntax check'
 
-count_line() { grep -Fxc -- "$1" "${wrapper}" || true; }
+count_line() { local needle="$1"; grep -Fxc -- "${needle}" "${wrapper}" || true; }
 legacy_count="$(count_line "${legacy}")"
 patched_count="$(count_line "${new_line}")"
 case "${legacy_count}:${patched_count}" in
