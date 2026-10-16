@@ -118,7 +118,11 @@ esac
     run: (mode: string, badPin = false, delayedReadiness = false) =>
       spawnSync("bash", [file, mode], {
         encoding: "utf8",
-        env: { ...env, MOCK_BAD_PIN: badPin ? "1" : "0", MOCK_SLOW_READINESS: delayedReadiness ? "1" : "0" },
+        env: {
+          ...env,
+          MOCK_BAD_PIN: badPin ? "1" : "0",
+          MOCK_SLOW_READINESS: delayedReadiness ? "1" : "0",
+        },
         timeout: 15000,
       }),
   };
