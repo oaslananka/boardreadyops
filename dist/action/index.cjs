@@ -138358,11 +138358,13 @@ async function upsertPullRequestComment(result, artifactName2, format = "report"
     return "";
   }
   const octokit = getOctokit(token);
-  const body2 = format === "review" ? formatReviewComment(result, reviewReports(artifactName2)) : formatMarkdown(
-    result,
-    [],
-    result.hardwareImpact ? void 0 : await fabricationDiff(token, owner, repo, artifactName2, pull, result)
-  );
+  let body2;
+  if (format === "review") {
+    body2 = formatReviewComment(result, reviewReports(artifactName2));
+  } else {
+    const legacyDiff = result.hardwareImpact ? void 0 : await fabricationDiff(token, owner, repo, artifactName2, pull, result);
+    body2 = formatMarkdown(result, [], legacyDiff);
+  }
   const comments = await octokit.paginate(octokit.rest.issues.listComments, {
     owner,
     repo,
