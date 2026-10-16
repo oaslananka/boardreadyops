@@ -267,6 +267,18 @@ describe("run investigation accessibility", () => {
     expect(markup).not.toContain("Decision: Pass");
   });
 
+  it("does not present an absent score or safe execution mode as a fabrication pass", () => {
+    const run = sampleRun();
+    run.readinessScore = undefined;
+    const children = createElement(SummaryView, { run });
+    const markup = renderToStaticMarkup(createElement(RunPageFrame, { run, active: "summary", children }));
+    expect(markup).toContain("Not reported");
+    expect(markup).toContain("Readiness score unavailable");
+    expect(markup).toContain("Safe (restricted execution)");
+    expect(markup).toContain("Trust mode describes execution permissions, not whether fabrication checks passed.");
+    expect(markup).toContain("Ready to fabricate");
+  });
+
   it("renders storage-neutral release lineage with explicit missing governance context", () => {
     const run = sampleRun();
     run.reviewId = "review-123";

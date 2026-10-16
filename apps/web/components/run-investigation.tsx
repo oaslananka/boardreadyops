@@ -88,7 +88,11 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
         <fieldset>
           <legend className="sr-only">Readiness score</legend>
           <div className="run-readiness-signature flex flex-col items-center rounded-md border border-border bg-muted px-4 py-2">
-            <strong className="text-2xl font-bold text-foreground">{run.readinessScore ?? "—"}</strong>
+            <strong
+              className={`${run.readinessScore === undefined ? "text-sm" : "text-2xl"} font-bold text-foreground`}
+            >
+              {run.readinessScore ?? "Not reported"}
+            </strong>
             <span className="text-xs text-muted-foreground">Readiness score</span>
             <span className="sr-only">
               {run.readinessScore === undefined
@@ -717,7 +721,9 @@ function SourceRuntimePanel({ run }: Readonly<{ run: RunDetail }>) {
         </Definition>
         <Definition label="BoardReadyOps">{run.boardReadyOpsVersion ?? "Not reported"}</Definition>
         <Definition label="KiCad">{run.kicadVersion ?? "Not reported"}</Definition>
-        <Definition label="Trust mode">{humanize(run.trustMode)}</Definition>
+        <Definition label="Trust mode">
+          {run.trustMode === "safe" ? "Safe (restricted execution)" : humanize(run.trustMode)}
+        </Definition>
         <Definition label="Safe-mode reasons">
           {run.safeModeReasons.length > 0 ? run.safeModeReasons.map(humanize).join(" · ") : "None"}
         </Definition>
@@ -735,6 +741,9 @@ function SourceRuntimePanel({ run }: Readonly<{ run: RunDetail }>) {
           {run.setupWorkflowContractVersion ? `v${run.setupWorkflowContractVersion}` : "Not recorded"}
         </Definition>
       </DefinitionGrid>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Trust mode describes execution permissions, not whether fabrication checks passed.
+      </p>
       {/* The links are the only way out to GitHub from this page, so they get the touch
           minimum; `[&_a]` keeps it in one place rather than on each of the four. */}
       <nav
