@@ -33,6 +33,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
   const selected = findings.find((finding) => finding.fingerprint === selectedFingerprint);
   const blocking = findings.filter(isBlocking).length;
   const snapshots = review.headSnapshots ?? [];
+  const optionalBaseSnapshots = review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {};
 
   return (
     <section aria-label="Hardware design inspection workspace" className="space-y-3">
@@ -110,7 +111,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
             <>
               <ReviewCanvas
                 headSnapshots={snapshots}
-                {...(review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {})}
+                {...optionalBaseSnapshots}
                 findings={review.findings}
                 comments={review.comments}
                 selectedFindingFingerprint={selectedFingerprint}
