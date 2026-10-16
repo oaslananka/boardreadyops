@@ -83,6 +83,24 @@ describe("CLI review publish command", () => {
     );
     expect(schematicSnapshot).toBeDefined();
     expect(schematicSnapshot?.content).toContain("<svg");
+    expect(
+      body.snapshots?.every((snapshot) => !(snapshot as { name?: string }).name?.startsWith("kicad_native_")),
+    ).toBe(true);
+  });
+
+  it("never enables source-derived design artwork without an explicit opt-in", async () => {
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const exitCode = await reviewPublishCommand(fixtureRoot, liveOptions({ dryRun: true, nativeVisuals: true }), {
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+    });
+    expect(exitCode).toBe(0);
+    expect(stdout.output).toContain("Upload Mode: snapshots");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("preserves the human-oriented text result by default", async () => {

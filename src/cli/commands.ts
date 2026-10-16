@@ -402,6 +402,10 @@ export function registerAllCommands(
       .option("--base <commit>", "base git commit or run id for diff computation")
       .option("--head <commit>", "head git commit (defaults to HEAD)")
       .option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata")
+      .option(
+        "--native-visuals",
+        "explicitly upload KiCad-native PCB/schematic artwork (may disclose detailed design IP)",
+      )
       .option("--dry-run", "simulate review publish without uploading")
       .option("--token <token>", "workspace API token")
       .option("--server <url>", "BoardReadyOps cloud server URL")

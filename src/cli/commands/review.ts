@@ -15,6 +15,8 @@ export interface ReviewPublishOptions extends CommonCliOptions {
   base?: string;
   head?: string;
   upload?: UploadMode;
+  /** Informed opt-in to publishing source-derived PCB/schematic geometry. */
+  nativeVisuals?: boolean;
   dryRun?: boolean;
   token?: string;
   server?: string;
@@ -116,7 +118,12 @@ export async function reviewPublishCommand(
   const headSha = options.head ?? getGitCommitSha("HEAD");
   const baseSha = options.base ? getGitCommitSha(options.base) : undefined;
   const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
-  const uploadMode: UploadMode = options.upload ?? "metadata";
+  // Native artwork contains source-derived design IP even though it is SVG, not
+  // a KiCad source file. Never send it under the default metadata-only mode.
+  const uploadMode: UploadMode =
+    options.nativeVisuals && (!options.upload || options.upload === "metadata")
+      ? "snapshots"
+      : (options.upload ?? "metadata");
   const server = (options.server ?? process.env.BOARDREADYOPS_SERVER_URL ?? "https://app.boardreadyops.com").replace(
     /\/$/,
     "",
@@ -178,6 +185,7 @@ export async function reviewPublishCommand(
   }
 
   const snapshots: SnapshotArtifact[] = await generateSnapshots({
+    ...(options.nativeVisuals ? {} : { nativeCli: false }),
     schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => path.resolve(root, f))),
     pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => path.resolve(root, f))),
     findings: findings.map((f) => ({
