@@ -49,6 +49,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@bufbuild/protoplugin@2.12.0`
   - Description: Helps to create your own Protocol Buffers code generators.
   - Homepage: https://github.com/bufbuild/protobuf-es#readme
+- `@codspeed/core@5.7.1`
+  - Description: The core Node library used to integrate with Codspeed runners
+  - Homepage: https://codspeed.io
+- `@codspeed/vitest-plugin@5.7.1`
+  - Description: vitest plugin for CodSpeed
+  - Homepage: https://codspeed.io
 - `@electric-sql/pglite@0.4.3`
   - Description: PGlite is a WASM Postgres build packaged into a TypeScript client library that enables you to run Postgres in the browser, Node.js and Bun, with no need to install any other dependencies. It is only 3.7mb gzipped.
   - Homepage: https://pglite.dev
@@ -1398,12 +1404,18 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `async@3.2.6`
   - Description: Higher-order functions and common patterns for asynchronous code
   - Homepage: https://caolan.github.io/async/
+- `asynckit@0.4.0`
+  - Description: Minimal async jobs utility library, with streams support
+  - Homepage: https://github.com/alexindigo/asynckit#readme
 - `atomically@2.1.1`
   - Description: Read and write files atomically and reliably.
   - Homepage: https://github.com/fabiospampinato/atomically#readme
 - `aws-ssl-profiles@1.1.2`
   - Description: AWS RDS SSL certificates bundles.
   - Homepage: https://github.com/mysqljs/aws-ssl-profiles#readme
+- `axios@1.20.0`
+  - Description: Promise based HTTP client for the browser and node.js
+  - Homepage: https://axios-http.com
 - `balanced-match@4.0.4`
   - Description: Match balanced character pairs, like "{" and "}"
   - Homepage: https://github.com/juliangruber/balanced-match#readme
@@ -1493,6 +1505,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `color-name@1.1.4`
   - Description: A list of color names and its values
   - Homepage: https://github.com/colorjs/color-name
+- `combined-stream@1.0.8`
+  - Description: A stream that emits multiple other streams one after another.
+  - Homepage: https://github.com/felixge/node-combined-stream
 - `commander@2.20.3`, `commander@14.0.3`, `commander@15.0.0`
   - Description: the complete solution for node.js command-line programs
   - Homepage: https://github.com/tj/commander.js#readme
@@ -1556,6 +1571,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `defu@6.1.7`
   - Description: Recursively assign default properties. Lightweight and Fast!
   - Homepage: https://github.com/unjs/defu#readme
+- `delayed-stream@1.0.0`
+  - Description: Buffers events from a stream until you are ready to handle them.
+  - Homepage: https://github.com/felixge/node-delayed-stream
 - `depd@2.0.0`
   - Description: Deprecate all the things
   - Homepage: https://github.com/dougwilson/nodejs-depd#readme
@@ -1616,6 +1634,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `es-object-atoms@1.1.1`
   - Description: ES Object-related atoms: Object, ToObject, RequireObjectCoercible
   - Homepage: https://github.com/ljharb/es-object-atoms#readme
+- `es-set-tostringtag@2.1.0`
+  - Description: A helper to optimistically set Symbol.toStringTag, when possible.
+  - Homepage: https://github.com/es-shims/es-set-tostringtag#readme
 - `es-toolkit@1.48.1`
   - Description: A state-of-the-art, high-performance JavaScript utility library with a small bundle size and strong type annotations.
   - Homepage: https://es-toolkit.dev
@@ -1709,9 +1730,15 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `find-my-way@9.7.0`
   - Description: Crazy fast http radix based router
   - Homepage: https://github.com/delvedor/find-my-way#readme
-- `find-up@5.0.0`
+- `find-up@5.0.0`, `find-up@6.3.0`
   - Description: Find a file or directory by walking up parent directories
   - Homepage: https://github.com/sindresorhus/find-up#readme
+- `follow-redirects@1.16.1`
+  - Description: HTTP and HTTPS modules that follow redirects.
+  - Homepage: https://github.com/follow-redirects/follow-redirects
+- `form-data@4.0.6`
+  - Description: A library to create readable "multipart/form-data" streams. Can be used to submit forms and file uploads to other web applications.
+  - Homepage: https://github.com/form-data/form-data#readme
 - `formatly@0.3.0`
   - Description: Formats your code with whatever formatter your project is already using. 🧼
   - Homepage: https://github.com/JoshuaKGoldberg/formatly#readme
@@ -1775,7 +1802,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `has-symbols@1.1.0`
   - Description: Determine if the JS environment has Symbol support. Supports spec, or shams.
   - Homepage: https://github.com/ljharb/has-symbols#readme
-- `hasown@2.0.3`
+- `has-tostringtag@1.0.2`
+  - Description: Determine if the JS environment has `Symbol.toStringTag` support. Supports spec, or shams.
+  - Homepage: https://github.com/inspect-js/has-tostringtag#readme
+- `hasown@2.0.3`, `hasown@2.0.4`
   - Description: A robust, ES3 compatible, "has own property" predicate.
   - Homepage: https://github.com/inspect-js/hasOwn#readme
 - `hono@4.13.13`
@@ -1915,7 +1945,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `lint-staged@17.3.0`
   - Description: Lint files staged by git
   - Homepage: https://github.com/lint-staged/lint-staged#readme
-- `locate-path@6.0.0`
+- `locate-path@6.0.0`, `locate-path@7.2.0`
   - Description: Get the first path that exists on disk of multiple paths
   - Homepage: https://github.com/sindresorhus/locate-path#readme
 - `lodash@4.18.1`
@@ -1963,10 +1993,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `merge-stream@2.0.0`
   - Description: Create a stream that emits events from multiple other streams
   - Homepage: https://github.com/grncdr/merge-stream#readme
-- `mime-db@1.54.0`
+- `mime-db@1.52.0`, `mime-db@1.54.0`
   - Description: Media Type Database
   - Homepage: https://github.com/jshttp/mime-db#readme
-- `mime-types@3.0.2`
+- `mime-types@2.1.35`, `mime-types@3.0.2`
   - Description: The ultimate javascript content-type utility.
   - Homepage: https://github.com/jshttp/mime-types#readme
 - `minimist@1.2.8`
@@ -2016,6 +2046,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `node-fetch@2.7.0`
   - Description: A light-weight module that brings window.fetch to node.js
   - Homepage: https://github.com/bitinn/node-fetch
+- `node-gyp-build@4.8.4`
+  - Description: Build tool and bindings loader for node-gyp that supports prebuilds
+  - Homepage: https://github.com/prebuild/node-gyp-build
 - `node-releases@2.0.57`
   - Description: Node.js releases data
   - Homepage: https://github.com/chicoxyzzy/node-releases#readme
@@ -2049,10 +2082,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `oxc-resolver@11.24.2`
   - Description: Oxc Resolver Node API
   - Homepage: https://oxc.rs
-- `p-limit@3.1.0`
+- `p-limit@3.1.0`, `p-limit@4.0.0`
   - Description: Run multiple promise-returning & async functions with limited concurrency
   - Homepage: https://github.com/sindresorhus/p-limit#readme
-- `p-locate@5.0.0`
+- `p-locate@5.0.0`, `p-locate@6.0.0`
   - Description: Get the first fulfilled promise that satisfies the provided testing function
   - Homepage: https://github.com/sindresorhus/p-locate#readme
 - `parent-module@1.0.1`
@@ -2067,7 +2100,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `parseurl@1.3.3`
   - Description: parse a url with memoization
   - Homepage: https://github.com/pillarjs/parseurl#readme
-- `path-exists@4.0.0`
+- `path-exists@4.0.0`, `path-exists@5.0.0`
   - Description: Check if a path exists
   - Homepage: https://github.com/sindresorhus/path-exists#readme
 - `path-expression-matcher@1.5.0`
@@ -2150,7 +2183,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `proxy-addr@2.0.8`
   - Description: Determine address of proxied request
   - Homepage: https://github.com/jshttp/proxy-addr#readme
-- `proxy-from-env@1.1.0`
+- `proxy-from-env@1.1.0`, `proxy-from-env@2.1.0`
   - Description: Offers getProxyForUrl to get the proxy URL for a URL, respecting the *_PROXY (e.g. HTTP_PROXY) and NO_PROXY environment variables.
   - Homepage: https://github.com/Rob--W/proxy-from-env#readme
 - `punycode.js@2.3.1`
@@ -2278,6 +2311,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `sql-escaper@1.5.1`
   - Description: 🛡️ Faster SQL escape and format for JavaScript (Node.js, Bun, and Deno).
   - Homepage: https://github.com/mysqljs/sql-escaper#readme
+- `stack-trace@1.0.0-pre2`
+  - Description: Get v8 stack traces as an array of CallSite objects.
+  - Homepage: https://github.com/felixge/node-stack-trace
 - `stackback@0.0.2`
   - Description: return list of CallSite objects from a captured stacktrace
   - Homepage: https://github.com/shtylman/node-stackback#readme
@@ -2486,7 +2522,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `yargs@17.7.3`, `yargs@18.0.0`
   - Description: yargs the modern, pirate-themed, successor to optimist.
   - Homepage: https://yargs.js.org/
-- `yocto-queue@0.1.0`
+- `yocto-queue@0.1.0`, `yocto-queue@1.2.2`
   - Description: Tiny queue data structure
   - Homepage: https://github.com/sindresorhus/yocto-queue#readme
 - `yoctocolors@2.1.2`
