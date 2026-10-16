@@ -369,7 +369,9 @@ jobs:
             echo "::warning::KiCad ${{ matrix.kicad-version }} package index not ready (attempt ${attempt}/4); retrying"
             sleep 15
           done
-          sudo apt-get install --yes kicad
+          # Transient Launchpad HTTP 503 also affects large signed .deb downloads.
+          # Retry only the package transport; do not bypass APT integrity checks.
+          sudo apt-get install --yes -o Acquire::Retries=5 kicad
           version="$(kicad-cli version)"
           echo "kicad-cli ${version}"
           if [[ "${version}" != "${{ matrix.kicad-version }}".* ]]; then
