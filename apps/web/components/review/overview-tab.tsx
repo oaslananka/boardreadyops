@@ -227,8 +227,8 @@ export function OverviewTab({
 
       {review.effectivePolicy ? (
         <Panel
-          title="Effective Policy & Inheritance"
-          description="The release gate below is resolved from organization defaults plus any repository-level overrides. Each value names the policy layer that supplied it."
+          title="Current configured policy (not a run snapshot)"
+          description="The policy below is resolved from the current organization and repository settings. It is not historical evidence of the policy used for this review revision; a run-bound policy snapshot is not recorded. Sources identify the layer for each displayed field."
           tone="inset"
         >
           <DefinitionGrid>

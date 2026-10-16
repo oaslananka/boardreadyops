@@ -166,7 +166,11 @@ describe("Review Detail Tabs", () => {
 
     const overview = renderToStaticMarkup(createElement(OverviewTab, { review: policyReview }));
 
-    expect(overview).toContain("Effective Policy &amp; Inheritance");
+    expect(overview).not.toContain("Effective Policy &amp; Inheritance");
+    expect(overview).toContain("Current configured policy (not a run snapshot)");
+    expect(overview).toContain("resolved from the current organization and repository settings");
+    expect(overview).toContain("not historical evidence of the policy used for this review revision");
+
     expect(overview).toContain("Org baseline");
     expect(overview).toContain("Repository · Repo override");
     expect(overview).toContain("Organization · Org baseline");
