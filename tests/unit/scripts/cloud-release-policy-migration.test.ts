@@ -124,6 +124,16 @@ describe("non-secret policy bind-mount migration", () => {
     expect(fs.readFileSync(f.override, "utf8")).toContain(`${f.legacy}:/run/policies/repositories:ro`);
   });
 
+  it("refuses a stale rollback that would erase later repository grants", () => {
+    const f = fixture();
+    expect(f.run("--apply").status).toBe(0);
+    fs.appendFileSync(f.current, "another-owner/synthetic-private\\n".replace("\\n", "\n"));
+    const result = f.run("--rollback");
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("policy changed since migration");
+    expect(fs.readFileSync(f.activePathFile, "utf8")).toBe(f.current);
+  });
+
   it("restores the original mounts if recreation fails", () => {
     const f = fixture();
     fs.writeFileSync(f.failOnceFile, "yes");

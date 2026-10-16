@@ -37,6 +37,7 @@ esac
 if [ "${mode}" = --rollback ]; then
   [ -f "${backup}" ] && [ ! -L "${backup}" ] || fail 'previous override backup is unavailable'
   [ "$(grep -Fc -- "${old_binding}" "${backup}" || true)" = 2 ] || fail 'previous override backup has unexpected bindings'
+  cmp -s "${legacy_file}" "${policy_file}" || fail 'policy changed since migration; reconcile before rollback to avoid losing grants'
 else
   [ ! -e "${backup}" ] && [ ! -L "${backup}" ] || fail 'previous override backup already exists'
   [ ! -e "${policy_file}" ] && [ ! -L "${policy_file}" ] || fail 'new policy location already exists'
