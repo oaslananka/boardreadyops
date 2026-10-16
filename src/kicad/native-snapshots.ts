@@ -102,7 +102,9 @@ async function pcbLayer(
   layer: string,
 ): Promise<SnapshotArtifact | undefined> {
   if (!/^(?:F|B|In\d+)\.Cu$/u.test(layer)) return undefined;
-  const extras = layer === "F.Cu" ? ["F.SilkS"] : layer === "B.Cu" ? ["B.SilkS"] : [];
+  const extras: string[] = [];
+  if (layer === "F.Cu") extras.push("F.SilkS");
+  if (layer === "B.Cu") extras.push("B.SilkS");
   const output = path.join(tempRoot, `pcb-${layer.replaceAll(".", "_")}.svg`);
   const result = await runProcess(
     cliPath,

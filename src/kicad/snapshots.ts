@@ -119,10 +119,8 @@ async function pcbOrSummary(
 }
 
 export async function generateSnapshots(options: GenerateSnapshotsOptions): Promise<SnapshotArtifact[]> {
-  const cli =
-    options.nativeCli === false
-      ? undefined
-      : await detectKicadCli(typeof options.nativeCli === "string" ? options.nativeCli : undefined);
+  const cliPath = typeof options.nativeCli === "string" ? options.nativeCli : undefined;
+  const cli = options.nativeCli === false ? undefined : await detectKicadCli(cliPath);
   const nativeCliPath = cli?.found ? cli.path : undefined;
   const schematics = (options.schematicFiles ?? []).map((file) =>
     schematicOrSummary(file, nativeCliPath, options.findings),
