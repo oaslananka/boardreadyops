@@ -9,6 +9,7 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 [![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
 [![Security](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
+[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/oaslananka/boardreadyops?utm_source=badge)
 
 [![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
 [![npm downloads](https://img.shields.io/npm/dt/boardreadyops)](https://www.npmjs.com/package/boardreadyops)

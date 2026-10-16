@@ -1,0 +1,42 @@
+name: codspeed
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  benchmarks:
+    name: Run benchmarks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # OIDC token used to authenticate uploads to CodSpeed; no long-lived token is stored.
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - run: corepack enable
+      - run: node scripts/toolchain.mjs corepack-install
+      - run: corepack pnpm run deps:install-ci
+      - name: Run the benchmarks
+        # CodSpeedHQ/action v5.5.0
+        uses: CodSpeedHQ/action@821a40cd6c80e3cfe387caf55668287addd808da
+        with:
+          mode: simulation
+          run: pnpm exec vitest bench --run

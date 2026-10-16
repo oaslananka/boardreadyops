@@ -165,6 +165,7 @@
     "@boardreadyops/contracts": "workspace:*",
     "@boardreadyops/db": "workspace:*",
     "@codecov/bundler-plugin-core": "2.0.1",
+    "@codspeed/vitest-plugin": "^5.7.1",
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
     "@modelcontextprotocol/sdk": "1.31.0",
