@@ -118,7 +118,13 @@ describe("main branch governance ruleset", () => {
     const mergifySource = await repositoryFile(".mergify.yml");
     const mergify = (await import("js-yaml")).load(mergifySource) as {
       merge_queue?: { mode: string; max_parallel_checks: number };
-      queue_rules?: Array<{ name: string; merge_method?: string; batch_size?: number; queue_conditions?: string[] }>;
+      queue_rules?: Array<{
+        name: string;
+        merge_method?: string;
+        batch_size?: number;
+        checks_timeout?: string;
+        queue_conditions?: string[];
+      }>;
       merge_protections_settings?: Record<string, unknown>;
       scopes?: unknown;
     };
@@ -135,6 +141,7 @@ describe("main branch governance ruleset", () => {
         name: "main",
         merge_method: "squash",
         batch_size: 1,
+        checks_timeout: "30 min",
         queue_conditions: ["base = main", "-draft", "check-success = @github-actions/ci / unit-matrix-gate"],
       },
     ]);
