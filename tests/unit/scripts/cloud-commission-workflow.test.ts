@@ -42,7 +42,7 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain(`deploy_runbook="${deployRoot}/deploy.sh"`);
     expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
     expect(workflow).toContain("policy override already exists without a policy file");
-    expect(workflow).toContain("release-repositories:/run/policies/repositories:ro");
+    expect(workflow).toContain("/home/ubuntu/boardreadyops-cloud/release-repositories:/run/policies/repositories:ro");
     expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories");
     expect(workflow).toContain("boardreadyops-web-runtime:");
     expect(workflow).toContain("legacy consumers are not running the same runtime image");
@@ -72,7 +72,9 @@ describe("cloud repository commissioning workflow", () => {
     const workerContainer = "$" + "{worker_container}";
 
     expect(workflow).toContain('repository="$1"');
-    expect(workflow).toContain('policy_file="/opt/boardreadyops-cloud/release-repositories"');
+    expect(workflow).toContain(`policy_file="${deployRoot}/release-repositories"`);
+    expect(workflow).toContain('legacy_policy_file="/opt/boardreadyops-cloud/release-repositories"');
+    expect(workflow).toContain("legacy rollout policy source requires separately approved migration");
     expect(workflow).toContain('container_policy_path="/run/policies/repositories"');
     expect(workflow).toContain("^[a-z0-9_.-]+/[a-z0-9_.-]+$");
     expect(workflow).toContain('tr "[:upper:]" "[:lower:]"');
@@ -83,6 +85,11 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain("sort -u");
     expect(workflow).toContain(`cmp -s "${policyFile}" "${nextPolicy}"`);
     expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
+    expect(workflow).toContain("verify_pinned_runtime_compose() {");
+    expect(workflow).toContain("host deploy runbook cannot preserve pinned runtime image and policy mount");
+    expect(workflow.indexOf("verify_pinned_runtime_compose() {")).toBeLessThan(
+      workflow.indexOf('next_policy="$(mktemp'),
+    );
     expect(workflow).toContain("recreate_consumers() {");
     expect(workflow).toContain(`BOARDREADYOPS_IMAGE_TAG="${runningImageTag}"`);
     expect(workflow).toContain("up -d --no-deps --force-recreate web worker");

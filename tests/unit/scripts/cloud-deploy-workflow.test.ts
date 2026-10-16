@@ -34,6 +34,12 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain("run_deploy build migrate web worker");
     expect(workflow).toContain("run_deploy up -d --build migrate web worker");
     expect(workflow).toContain("verify_release_policy_mount");
+    expect(workflow).toContain('legacy_policy_file="/opt/boardreadyops-cloud/release-repositories"');
+    expect(workflow).toContain(`migrated_policy_file="${deployRoot}/release-repositories"`);
+    expect(workflow).toContain('case "${old_bindings}:${new_bindings}" in');
+    expect(workflow).toContain('2:0) policy_file="${legacy_policy_file}"');
+    expect(workflow).toContain('0:2) policy_file="${migrated_policy_file}"');
+    expect(workflow).toContain("release-policy override has ambiguous or unsupported policy mounts");
     expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE");
     expect(workflow).not.toContain("sed -i");
     expect(documentation).toContain("compose.release-policy.yml");
