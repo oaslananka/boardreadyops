@@ -8,6 +8,7 @@ const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const repairSource = path.join(repoRoot, "scripts/repair-cloud-deploy-image-pin.sh");
 const createdDirectories: string[] = [];
 const describeOnLinux = process.platform === "linux" ? describe : describe.skip;
+const shell = "$";
 
 afterEach(() => {
   for (const dir of createdDirectories.splice(0)) {
@@ -25,18 +26,16 @@ function fixture() {
   const original = [
     "#!/usr/bin/env bash",
     "set -euo pipefail",
-    'repo_dir="${HOME}/repo"',
+    `repo_dir="${shell}{HOME}/repo"`,
     'fail() { printf "%s\\n" "$1" >&2; exit 78; }',
     "export BOARDREADYOPS_GIT_SHA",
-    'BOARDREADYOPS_GIT_SHA="$(git -C "${repo_dir}" rev-parse HEAD)"',
-    'export BOARDREADYOPS_IMAGE_TAG="${BOARDREADYOPS_GIT_SHA}"',
+    `BOARDREADYOPS_GIT_SHA="$(git -C "${shell}{repo_dir}" rev-parse HEAD)"`,
+    `export BOARDREADYOPS_IMAGE_TAG="${shell}{BOARDREADYOPS_GIT_SHA}"`,
     "exec doppler run --project boardreadyops --config runtime -- true",
     "",
   ].join("\n");
   fs.writeFileSync(wrapper, original, { mode: 0o750 });
-  const source = fs
-    .readFileSync(repairSource, "utf8")
-    .replaceAll("/home/ubuntu/boardreadyops-cloud", deployRoot);
+  const source = fs.readFileSync(repairSource, "utf8").replaceAll("/home/ubuntu/boardreadyops-cloud", deployRoot);
   const script = path.join(root, "repair.sh");
   fs.writeFileSync(script, source, { mode: 0o700 });
   const run = (mode: "--check" | "--apply" | "--rollback") =>
@@ -46,9 +45,9 @@ function fixture() {
 
 function evaluatePinnedTag(wrapper: string, given?: string) {
   const lines = fs.readFileSync(wrapper, "utf8").split("\n");
-  const start = lines.findIndex((line) => line.startsWith('if [[ -n "${BOARDREADYOPS_IMAGE_TAG:-}"'));
-  const end = lines.findIndex((line) =>
-    line === 'export BOARDREADYOPS_IMAGE_TAG="${BOARDREADYOPS_IMAGE_TAG:-${BOARDREADYOPS_GIT_SHA}}"',
+  const start = lines.findIndex((line) => line.startsWith(`if [[ -n "${shell}{BOARDREADYOPS_IMAGE_TAG:-}"`));
+  const end = lines.findIndex(
+    (line) => line === `export BOARDREADYOPS_IMAGE_TAG="${shell}{BOARDREADYOPS_IMAGE_TAG:-${shell}{BOARDREADYOPS_GIT_SHA}}"`,
   );
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
@@ -57,7 +56,7 @@ function evaluatePinnedTag(wrapper: string, given?: string) {
     "fail() { echo rejected >&2; exit 78; }",
     `BOARDREADYOPS_GIT_SHA="${"b".repeat(40)}"`,
     ...lines.slice(start, end + 1),
-    'printf "%s" "${BOARDREADYOPS_IMAGE_TAG}"',
+    `printf "%s" "${shell}{BOARDREADYOPS_IMAGE_TAG}"`,
   ].join("\n");
   const env = { ...process.env };
   delete env.BOARDREADYOPS_IMAGE_TAG;
