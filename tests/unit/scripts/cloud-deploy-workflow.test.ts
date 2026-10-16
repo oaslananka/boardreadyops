@@ -25,6 +25,10 @@ describe("cloud-deploy topology preflight", () => {
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
     const deployRoot = "$" + "{deploy_root}";
     const policyOverrideFile = "$" + "{policy_override_file}";
+    const oldBindings = "$" + "{old_bindings}";
+    const newBindings = "$" + "{new_bindings}";
+    const legacyPolicyFile = "$" + "{legacy_policy_file}";
+    const migratedPolicyFile = "$" + "{migrated_policy_file}";
 
     expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
     expect(workflow).toContain("run_deploy()");
@@ -36,9 +40,9 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain("verify_release_policy_mount");
     expect(workflow).toContain('legacy_policy_file="/opt/boardreadyops-cloud/release-repositories"');
     expect(workflow).toContain(`migrated_policy_file="${deployRoot}/release-repositories"`);
-    expect(workflow).toContain('case "${old_bindings}:${new_bindings}" in');
-    expect(workflow).toContain('2:0) policy_file="${legacy_policy_file}"');
-    expect(workflow).toContain('0:2) policy_file="${migrated_policy_file}"');
+    expect(workflow).toContain(`case "${oldBindings}:${newBindings}" in`);
+    expect(workflow).toContain(`2:0) policy_file="${legacyPolicyFile}"`);
+    expect(workflow).toContain(`0:2) policy_file="${migratedPolicyFile}"`);
     expect(workflow).toContain("release-policy override has ambiguous or unsupported policy mounts");
     expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE");
     expect(workflow).not.toContain("sed -i");

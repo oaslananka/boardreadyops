@@ -33,12 +33,15 @@ function fixture() {
     `services:\n  web:\n    volumes:\n      - ${legacy}:/run/policies/repositories:ro\n  worker:\n    volumes:\n      - ${legacy}:/run/policies/repositories:ro\n`,
     { mode: 0o600 },
   );
-  const script = fs.readFileSync(migrationScript, "utf8")
+  const script = fs
+    .readFileSync(migrationScript, "utf8")
     .replaceAll("/opt/boardreadyops-cloud/release-repositories", legacy)
     .replaceAll("/home/ubuntu/boardreadyops-cloud", deployment);
   const file = path.join(root, "migrate.sh");
   fs.writeFileSync(file, script, { mode: 0o700 });
-  fs.writeFileSync(path.join(bin, "docker"), `#!/usr/bin/env bash
+  fs.writeFileSync(
+    path.join(bin, "docker"),
+    `#!/usr/bin/env bash
 set -euo pipefail
 case "$1" in
   ps)
@@ -56,8 +59,12 @@ case "$1" in
     if [ "$3" = cat ]; then cat "$(cat "${"$"}MOCK_ACTIVE_SOURCE_FILE")"; fi ;;
   *) exit 10 ;;
 esac
-`, { mode: 0o700 });
-  fs.writeFileSync(path.join(deployment, "deploy.sh"), `#!/usr/bin/env bash
+`,
+    { mode: 0o700 },
+  );
+  fs.writeFileSync(
+    path.join(deployment, "deploy.sh"),
+    `#!/usr/bin/env bash
 set -euo pipefail
 [ "$1" = -f ] || exit 15
 override="$2"
@@ -79,7 +86,9 @@ PY
     printf '%s' "$source_path" > "${"$"}MOCK_ACTIVE_SOURCE_FILE" ;;
   *) exit 17 ;;
 esac
-`, { mode: 0o700 });
+`,
+    { mode: 0o700 },
+  );
   const env = {
     ...process.env,
     PATH: `${bin}:${process.env.PATH ?? ""}`,
@@ -88,10 +97,22 @@ esac
     MOCK_BAD_PIN: "0",
   };
   return {
-    root, file, deployment, legacy, current, override, backup, activePathFile, failOnceFile, env,
-    run: (mode: string, badPin = false) => spawnSync("bash", [file, mode], {
-      encoding: "utf8", env: { ...env, MOCK_BAD_PIN: badPin ? "1" : "0" }, timeout: 15000,
-    }),
+    root,
+    file,
+    deployment,
+    legacy,
+    current,
+    override,
+    backup,
+    activePathFile,
+    failOnceFile,
+    env,
+    run: (mode: string, badPin = false) =>
+      spawnSync("bash", [file, mode], {
+        encoding: "utf8",
+        env: { ...env, MOCK_BAD_PIN: badPin ? "1" : "0" },
+        timeout: 15000,
+      }),
   };
 }
 
@@ -127,7 +148,7 @@ describe("non-secret policy bind-mount migration", () => {
   it("refuses a stale rollback that would erase later repository grants", () => {
     const f = fixture();
     expect(f.run("--apply").status).toBe(0);
-    fs.appendFileSync(f.current, "another-owner/synthetic-private\\n".replace("\\n", "\n"));
+    fs.appendFileSync(f.current, "another-owner/synthetic-private\n");
     const result = f.run("--rollback");
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("policy changed since migration");
