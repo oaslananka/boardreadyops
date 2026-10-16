@@ -224,7 +224,7 @@ export function ReviewCanvas({
   onAddCommentAtPoint,
 }: Readonly<ReviewCanvasProps>) {
   const [selectedSheetOrLayer, setSelectedSheetOrLayer] = useState<string>(headSnapshots[0]?.sheetOrLayer ?? "Main");
-  const [viewMode, setViewMode] = useState<ViewMode>("overlay");
+  const [viewMode, setViewMode] = useState<ViewMode>("head");
   const [opacity, setOpacity] = useState<number>(0.5);
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -233,6 +233,18 @@ export function ReviewCanvas({
   const [hasMoved, setHasMoved] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Only a published finding anchor selects a sheet; never infer a location from a
+  // rule message, source filename, or component label.
+  useEffect(() => {
+    if (!selectedFindingFingerprint) return;
+    const linked = headSnapshots.find((snapshot) =>
+      snapshot.anchors.some(
+        (anchor) => anchor.kind === "finding" && anchor.metadata?.fingerprint === selectedFindingFingerprint,
+      ),
+    );
+    if (linked) setSelectedSheetOrLayer(linked.sheetOrLayer);
+  }, [selectedFindingFingerprint, headSnapshots]);
 
   const currentHeadSnapshot = headSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer) ?? headSnapshots[0];
   const currentBaseSnapshot = baseSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer) ?? baseSnapshots[0];
@@ -311,6 +323,9 @@ export function ReviewCanvas({
   const baseSrc = toImageSrc(currentBaseSnapshot?.content);
   const headSrc = toImageSrc(currentHeadSnapshot?.content);
 
+  // An absent base must never dim the head or present a fabricated comparison.
+  const effectiveViewMode = baseSrc ? viewMode : "head";
+
   const modeButtonClass = (active: boolean) =>
     `rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
 
@@ -338,6 +353,7 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "overlay")}
+              disabled={!baseSrc}
               onClick={() => setViewMode("overlay")}
               title="Overlay with opacity slider"
             >
@@ -346,6 +362,7 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "split")}
+              disabled={!baseSrc}
               onClick={() => setViewMode("split")}
               title="Side-by-side comparison"
             >
@@ -354,6 +371,7 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "diff")}
+              disabled={!baseSrc}
               onClick={() => setViewMode("diff")}
               title="Difference highlight"
             >
@@ -370,6 +388,7 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "base")}
+              disabled={!baseSrc}
               onClick={() => setViewMode("base")}
               title="Base revision only"
             >
@@ -379,7 +398,7 @@ export function ReviewCanvas({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {viewMode === "overlay" ? (
+          {effectiveViewMode === "overlay" ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Base</span>
               <input
@@ -432,7 +451,7 @@ export function ReviewCanvas({
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
-        className={`relative h-96 overflow-hidden rounded-md border border-border bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`relative h-[27rem] overflow-hidden rounded-md border border-border bg-muted md:h-[34rem] ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -444,11 +463,11 @@ export function ReviewCanvas({
             transformOrigin: "0 0",
           }}
         >
-          {viewMode === "split" ? (
+          {effectiveViewMode === "split" ? (
             <SplitViewport baseSrc={baseSrc} headSrc={headSrc} />
           ) : (
             <StackedLayersView
-              viewMode={viewMode}
+              viewMode={effectiveViewMode}
               baseSrc={baseSrc}
               headSrc={headSrc}
               opacity={opacity}

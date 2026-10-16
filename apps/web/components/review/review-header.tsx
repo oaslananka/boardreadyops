@@ -69,7 +69,7 @@ export function ReviewHeader({
 
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge value={decisionTone} label={decisionLabel} />
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>Digest:</span>
             <code className="rounded-sm bg-muted px-1.5 py-0.5">
               {evidenceDigest.slice(0, 10)}...{evidenceDigest.slice(-6)}
