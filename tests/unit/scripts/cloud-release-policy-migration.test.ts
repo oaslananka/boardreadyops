@@ -12,6 +12,36 @@ afterEach(() => {
   for (const dir of fixtures.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
+function createDockerMock(bin: string) {
+  fs.writeFileSync(
+    path.join(bin, "docker"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+  ps)
+    case "$*" in *service=web*) echo web-id ;; *service=worker*) echo worker-id ;; *) exit 8 ;; esac ;;
+  image) echo sha256:live-image ;;
+  inspect)
+    case "$*" in
+      *'.Config.Image'*) echo boardreadyops-web-runtime:running-tag ;;
+      *'.Image'*) echo sha256:live-image ;;
+      *'.Config.Env'*) echo 'BOARDREADYOPS_RELEASE_REPOSITORIES_FILE=/run/policies/repositories' ;;
+      *'.Mounts'*) printf '%s|/run/policies/repositories\\n' "$(cat "${"$"}MOCK_ACTIVE_SOURCE_FILE")" ;;
+      *) exit 9 ;;
+    esac ;;
+  exec)
+    if [ "$3" = node ] && [ -f "${"$"}MOCK_DELAY_READINESS_FILE" ]; then
+      rm -f "${"$"}MOCK_DELAY_READINESS_FILE"
+      exit 26
+    fi
+    if [ "$3" = cat ]; then cat "$(cat "${"$"}MOCK_ACTIVE_SOURCE_FILE")"; fi ;;
+  *) exit 10 ;;
+esac
+`,
+    { mode: 0o700 },
+  );
+}
+
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "boardreadyops-policy-test-"));
   fixtures.push(root);
@@ -40,33 +70,7 @@ function fixture() {
     .replaceAll("/home/ubuntu/boardreadyops-cloud", deployment);
   const file = path.join(root, "migrate.sh");
   fs.writeFileSync(file, script, { mode: 0o700 });
-  fs.writeFileSync(
-    path.join(bin, "docker"),
-    `#!/usr/bin/env bash
-set -euo pipefail
-case "$1" in
-  ps)
-    case "$*" in *service=web*) echo web-id ;; *service=worker*) echo worker-id ;; *) exit 8 ;; esac ;;
-  image) echo sha256:live-image ;;
-  inspect)
-    case "$*" in
-      *'.Config.Image'*) echo boardreadyops-web-runtime:running-tag ;;
-      *'.Image'*) echo sha256:live-image ;;
-      *'.Config.Env'*) echo 'BOARDREADYOPS_RELEASE_REPOSITORIES_FILE=/run/policies/repositories' ;;
-      *'.Mounts'*) printf '%s|/run/policies/repositories\\n' "$(cat "${"$"}MOCK_ACTIVE_SOURCE_FILE")" ;;
-      *) exit 9 ;;
-    esac ;;
-  exec)
-    if [ "$3" = node ] && [ -f "${"$"}MOCK_DELAY_READINESS_FILE" ]; then
-      rm -f "${"$"}MOCK_DELAY_READINESS_FILE"
-      exit 26
-    fi
-    if [ "$3" = cat ]; then cat "$(cat "${"$"}MOCK_ACTIVE_SOURCE_FILE")"; fi ;;
-  *) exit 10 ;;
-esac
-`,
-    { mode: 0o700 },
-  );
+  createDockerMock(bin);
   fs.writeFileSync(
     path.join(deployment, "deploy.sh"),
     `#!/usr/bin/env bash
