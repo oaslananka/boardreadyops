@@ -22,8 +22,8 @@ export default function PoliciesPage() {
         <header>
           <h1 className="text-2xl font-bold text-foreground">Organization Governance & Release Policies</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Hosted review enforcement uses organization policies and repository overrides. Team and review exceptions
-            are not enforced; repository overrides can relax some organization rules.
+            Hosted reviews enforce organization and repository policies. Team and review exceptions are not enforced;
+            repository overrides can relax rules.
           </p>
         </header>
 

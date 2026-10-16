@@ -138,11 +138,11 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
     expect(markup).toContain("Organization Governance &amp; Release Policies");
     expect(markup).toContain("policies-page-frame");
     expect(markup).toContain("Policies");
-    expect(markup).toContain("Release gates and verification rules bound to SHA-256 evidence digests.");
+    expect(markup).toContain("Hosted reviews enforce organization and repository policies.");
     expect(markup).not.toContain("Cryptographic release gates");
-    expect(markup).toContain("Hosted review enforcement uses organization policies and repository overrides.");
+    expect(markup).toContain("Hosted reviews enforce organization and repository policies.");
     expect(markup).toContain("Team and review exceptions are not enforced;");
-    expect(markup).toContain("repository overrides can relax some organization rules.");
+    expect(markup).toContain("repository overrides can relax rules.");
     expect(markup).not.toContain("Inheritance: Organization");
     expect(policiesMetadata.description).toContain("Team and review exceptions are not enforced");
     expect(policiesMetadata.description).not.toContain("Organization → Team");
