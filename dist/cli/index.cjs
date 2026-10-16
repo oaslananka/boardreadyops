@@ -3529,8 +3529,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path80) {
-      let input = path80;
+    function removeDotSegments(path81) {
+      let input = path81;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3939,8 +3939,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path80 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path80 && path80 !== "/" ? path80 : void 0;
+        const path81 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path81 && path81 !== "/" ? path81 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -8277,12 +8277,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats2(ajv3, list, fs31, exportName) {
+    function addFormats2(ajv3, list, fs32, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv3.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv3.addFormat(f, fs31[f]);
+        ajv3.addFormat(f, fs32[f]);
     }
     module2.exports = exports2 = formatsPlugin;
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -8294,9 +8294,9 @@ var require_dist = __commonJS({
 var require_resolve_from = __commonJS({
   "node_modules/resolve-from/index.js"(exports2, module2) {
     "use strict";
-    var path80 = require("path");
+    var path81 = require("path");
     var Module = require("module");
-    var fs31 = require("fs");
+    var fs32 = require("fs");
     var resolveFrom = (fromDir, moduleId, silent) => {
       if (typeof fromDir !== "string") {
         throw new TypeError(`Expected \`fromDir\` to be of type \`string\`, got \`${typeof fromDir}\``);
@@ -8305,17 +8305,17 @@ var require_resolve_from = __commonJS({
         throw new TypeError(`Expected \`moduleId\` to be of type \`string\`, got \`${typeof moduleId}\``);
       }
       try {
-        fromDir = fs31.realpathSync(fromDir);
+        fromDir = fs32.realpathSync(fromDir);
       } catch (err) {
         if (err.code === "ENOENT") {
-          fromDir = path80.resolve(fromDir);
+          fromDir = path81.resolve(fromDir);
         } else if (silent) {
           return null;
         } else {
           throw err;
         }
       }
-      const fromFile = path80.join(fromDir, "noop.js");
+      const fromFile = path81.join(fromDir, "noop.js");
       const resolveFileName = () => Module._resolveFilename(moduleId, {
         id: fromFile,
         filename: fromFile,
@@ -8387,7 +8387,7 @@ var require_parent_module = __commonJS({
 var require_import_fresh = __commonJS({
   "node_modules/import-fresh/index.js"(exports2, module2) {
     "use strict";
-    var path80 = require("path");
+    var path81 = require("path");
     var resolveFrom = require_resolve_from();
     var parentModule = require_parent_module();
     module2.exports = (moduleId) => {
@@ -8395,7 +8395,7 @@ var require_import_fresh = __commonJS({
         throw new TypeError("Expected a string");
       }
       const parentPath = parentModule(__filename);
-      const cwd = parentPath ? path80.dirname(parentPath) : __dirname;
+      const cwd = parentPath ? path81.dirname(parentPath) : __dirname;
       const filePath = resolveFrom(cwd, moduleId);
       const oldModule = require.cache[filePath];
       if (oldModule && oldModule.parent) {
@@ -12403,7 +12403,7 @@ ${error51.message}`;
         return typescript.sys.fileExists(fileName);
       });
       if (filePath !== void 0) {
-        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path80) => typescript.sys.readFile(path80));
+        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path81) => typescript.sys.readFile(path81));
         if (error51) {
           throw new Error(`Error in ${filePath}: ${error51.messageText.toString()}`);
         }
@@ -12526,42 +12526,42 @@ var require_defaults2 = __commonJS({
 var require_env_paths = __commonJS({
   "node_modules/env-paths/index.js"(exports2, module2) {
     "use strict";
-    var path80 = require("path");
-    var os7 = require("os");
-    var homedir = os7.homedir();
-    var tmpdir = os7.tmpdir();
+    var path81 = require("path");
+    var os8 = require("os");
+    var homedir = os8.homedir();
+    var tmpdir = os8.tmpdir();
     var { env } = process;
     var macos = (name) => {
-      const library = path80.join(homedir, "Library");
+      const library = path81.join(homedir, "Library");
       return {
-        data: path80.join(library, "Application Support", name),
-        config: path80.join(library, "Preferences", name),
-        cache: path80.join(library, "Caches", name),
-        log: path80.join(library, "Logs", name),
-        temp: path80.join(tmpdir, name)
+        data: path81.join(library, "Application Support", name),
+        config: path81.join(library, "Preferences", name),
+        cache: path81.join(library, "Caches", name),
+        log: path81.join(library, "Logs", name),
+        temp: path81.join(tmpdir, name)
       };
     };
     var windows = (name) => {
-      const appData = env.APPDATA || path80.join(homedir, "AppData", "Roaming");
-      const localAppData = env.LOCALAPPDATA || path80.join(homedir, "AppData", "Local");
+      const appData = env.APPDATA || path81.join(homedir, "AppData", "Roaming");
+      const localAppData = env.LOCALAPPDATA || path81.join(homedir, "AppData", "Local");
       return {
         // Data/config/cache/log are invented by me as Windows isn't opinionated about this
-        data: path80.join(localAppData, name, "Data"),
-        config: path80.join(appData, name, "Config"),
-        cache: path80.join(localAppData, name, "Cache"),
-        log: path80.join(localAppData, name, "Log"),
-        temp: path80.join(tmpdir, name)
+        data: path81.join(localAppData, name, "Data"),
+        config: path81.join(appData, name, "Config"),
+        cache: path81.join(localAppData, name, "Cache"),
+        log: path81.join(localAppData, name, "Log"),
+        temp: path81.join(tmpdir, name)
       };
     };
     var linux = (name) => {
-      const username = path80.basename(homedir);
+      const username = path81.basename(homedir);
       return {
-        data: path80.join(env.XDG_DATA_HOME || path80.join(homedir, ".local", "share"), name),
-        config: path80.join(env.XDG_CONFIG_HOME || path80.join(homedir, ".config"), name),
-        cache: path80.join(env.XDG_CACHE_HOME || path80.join(homedir, ".cache"), name),
+        data: path81.join(env.XDG_DATA_HOME || path81.join(homedir, ".local", "share"), name),
+        config: path81.join(env.XDG_CONFIG_HOME || path81.join(homedir, ".config"), name),
+        cache: path81.join(env.XDG_CACHE_HOME || path81.join(homedir, ".cache"), name),
         // https://wiki.debian.org/XDGBaseDirectorySpecification#state
-        log: path80.join(env.XDG_STATE_HOME || path80.join(homedir, ".local", "state"), name),
-        temp: path80.join(tmpdir, username, name)
+        log: path81.join(env.XDG_STATE_HOME || path81.join(homedir, ".local", "state"), name),
+        temp: path81.join(tmpdir, username, name)
       };
     };
     var envPaths = (name, options) => {
@@ -12642,11 +12642,11 @@ var require_util2 = __commonJS({
       map2.set(key, result);
       return result;
     }
-    function getPropertyByPath(source, path80) {
-      if (typeof path80 === "string" && Object.prototype.hasOwnProperty.call(source, path80)) {
-        return source[path80];
+    function getPropertyByPath(source, path81) {
+      if (typeof path81 === "string" && Object.prototype.hasOwnProperty.call(source, path81)) {
+        return source[path81];
       }
-      const parsedPath = typeof path80 === "string" ? path80.split(".") : path80;
+      const parsedPath = typeof path81 === "string" ? path81.split(".") : path81;
       return parsedPath.reduce((previous, key) => {
         if (previous === void 0) {
           return previous;
@@ -12657,9 +12657,9 @@ var require_util2 = __commonJS({
     function removeUndefinedValuesFromObject(options) {
       return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== void 0));
     }
-    async function isDirectory(path80) {
+    async function isDirectory(path81) {
       try {
-        const stat3 = await fs_1.promises.stat(path80);
+        const stat3 = await fs_1.promises.stat(path81);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -12668,9 +12668,9 @@ var require_util2 = __commonJS({
         throw e;
       }
     }
-    function isDirectorySync(path80) {
+    function isDirectorySync(path81) {
       try {
-        const stat3 = fs_1.default.statSync(path80);
+        const stat3 = fs_1.default.statSync(path81);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -12768,7 +12768,7 @@ var require_ExplorerBase = __commonJS({
           const idx = importStack.indexOf(fullPath);
           if (idx !== -1) {
             throw new Error(`Circular import detected:
-${[...importStack, fullPath].map((path80, i) => `${i + 1}. ${path80}`).join("\n")} (same as ${idx + 1}.)`);
+${[...importStack, fullPath].map((path81, i) => `${i + 1}. ${path81}`).join("\n")} (same as ${idx + 1}.)`);
           }
         }
       }
@@ -12955,9 +12955,9 @@ var require_Explorer = __commonJS({
           throw error51;
         }
       }
-      async #fileExists(path80) {
+      async #fileExists(path81) {
         try {
-          await promises_1.default.stat(path80);
+          await promises_1.default.stat(path81);
           return true;
         } catch (e) {
           return false;
@@ -13117,9 +13117,9 @@ var require_ExplorerSync = __commonJS({
           throw error51;
         }
       }
-      #fileExists(path80) {
+      #fileExists(path81) {
         try {
-          fs_1.default.statSync(path80);
+          fs_1.default.statSync(path81);
           return true;
         } catch (e) {
           return false;
@@ -13245,7 +13245,7 @@ var require_dist2 = __commonJS({
       };
     }
     function getResolvedSearchPlaces(moduleName, toolDefinedSearchPlaces, userConfiguredOptions) {
-      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path80) => path80.replace("{name}", moduleName));
+      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path81) => path81.replace("{name}", moduleName));
       if (userConfiguredOptions.mergeSearchPlaces) {
         return [...userConfiguredSearchPlaces ?? [], ...toolDefinedSearchPlaces];
       }
@@ -13656,8 +13656,8 @@ var require_utils2 = __commonJS({
       }
       return output;
     };
-    exports2.basename = (path80, { windows } = {}) => {
-      const segs = path80.split(windows ? /[\\/]/ : "/");
+    exports2.basename = (path81, { windows } = {}) => {
+      const segs = path81.split(windows ? /[\\/]/ : "/");
       const last = segs[segs.length - 1];
       if (last === "") {
         return segs[segs.length - 2];
@@ -15424,10 +15424,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path80) {
-  if (!path80)
+function getElementAtPath(obj, path81) {
+  if (!path81)
     return obj;
-  return path80.reduce((acc, key) => acc?.[key], obj);
+  return path81.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -15755,11 +15755,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path80, issues) {
+function prefixIssues(path81, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path80);
+    iss.path.unshift(path81);
     return iss;
   });
 }
@@ -15976,16 +15976,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError2(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path80 = []) => {
+  const processError = (error52, path81 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path80, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path81, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path80, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path81, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path80, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path81, ...issue2.path]);
       } else {
-        const fullpath = [...path80, ...issue2.path];
+        const fullpath = [...path81, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -16012,17 +16012,17 @@ function formatError2(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path80 = []) => {
+  const processError = (error52, path81 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path80, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path81, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path80, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path81, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path80, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path81, ...issue2.path]);
       } else {
-        const fullpath = [...path80, ...issue2.path];
+        const fullpath = [...path81, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -16054,8 +16054,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path80 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path80) {
+  const path81 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path81) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -29485,13 +29485,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path80 = ref.slice(1).split("/").filter(Boolean);
-  if (path80.length === 0) {
+  const path81 = ref.slice(1).split("/").filter(Boolean);
+  if (path81.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path80[0] === defsKey) {
-    const key = path80[1];
+  if (path81[0] === defsKey) {
+    const key = path81[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -32659,8 +32659,8 @@ async function writeReport(outputDir, relativePath, content) {
   const target = import_node_path68.default.join(outputDir, relativePath);
   await import_promises26.default.mkdir(import_node_path68.default.dirname(target), { recursive: true });
   await import_promises26.default.writeFile(target, content, "utf8");
-  const digest2 = await fileDigest2(target);
-  return { path: relativePath, kind: "report", ...digest2 };
+  const digest3 = await fileDigest2(target);
+  return { path: relativePath, kind: "report", ...digest3 };
 }
 async function copyManufacturingArtifacts(root, outputDir) {
   const files = await discoverManufacturingArtifacts(root);
@@ -32671,8 +32671,8 @@ async function copyManufacturingArtifacts(root, outputDir) {
     const target = import_node_path68.default.join(outputDir, targetRelative);
     await import_promises26.default.mkdir(import_node_path68.default.dirname(target), { recursive: true });
     await import_promises26.default.copyFile(source, target);
-    const digest2 = await fileDigest2(target);
-    artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest2 });
+    const digest3 = await fileDigest2(target);
+    artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest3 });
   }
   return artifacts;
 }
@@ -32691,12 +32691,12 @@ async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
     const target = import_node_path68.default.join(outputDir, targetRelative);
     await import_promises26.default.mkdir(import_node_path68.default.dirname(target), { recursive: true });
     await import_promises26.default.copyFile(source, target);
-    const digest2 = await fileDigest2(target);
+    const digest3 = await fileDigest2(target);
     artifacts.push({
       path: targetRelative,
       sourcePath: normalizeRelative(root, source),
       kind: "generated",
-      ...digest2
+      ...digest3
     });
   }
   return artifacts;
@@ -32931,7 +32931,7 @@ __export(index_exports, {
   runCli: () => runCli
 });
 module.exports = __toCommonJS(index_exports);
-var import_node_path81 = __toESM(require("node:path"), 1);
+var import_node_path82 = __toESM(require("node:path"), 1);
 
 // node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
@@ -36044,9 +36044,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [path]
    * @return {(string|null|Command)}
    */
-  executableDir(path80) {
-    if (path80 === void 0) return this._executableDir;
-    this._executableDir = path80;
+  executableDir(path81) {
+    if (path81 === void 0) return this._executableDir;
+    this._executableDir = path81;
     return this;
   }
   /**
@@ -43487,10 +43487,10 @@ function dependencyFrom(key, value, warnings) {
   const table = value;
   const versionSpec = stringField(table.version);
   const git = stringField(table.git);
-  const path80 = stringField(table.path);
+  const path81 = stringField(table.path);
   const overridePath = stringField(table.override_path);
   if (git) {
-    const subPath = path80;
+    const subPath = path81;
     return {
       declaredName: key,
       source: subPath === void 0 ? { kind: "git", url: git } : { kind: "git", url: git, path: subPath },
@@ -43502,8 +43502,8 @@ function dependencyFrom(key, value, warnings) {
     warnings.push(`Dependency "${key}" is overridden by local source at "${overridePath}".`);
     return { declaredName: key, source: { kind: "local", path: overridePath }, versionSpec, pinned: false };
   }
-  if (path80) {
-    return { declaredName: key, source: { kind: "local", path: path80 }, versionSpec, pinned: false };
+  if (path81) {
+    return { declaredName: key, source: { kind: "local", path: path81 }, versionSpec, pinned: false };
   }
   return {
     declaredName: key,
@@ -43512,7 +43512,7 @@ function dependencyFrom(key, value, warnings) {
     pinned: isPinned(versionSpec)
   };
 }
-function parseIdfManifest(content, path80) {
+function parseIdfManifest(content, path81) {
   const warnings = [];
   let document;
   try {
@@ -43521,12 +43521,12 @@ function parseIdfManifest(content, path80) {
     return {
       dependencies: [],
       warnings: [
-        `${path80 ?? "idf_component.yml"} is not valid YAML: ${error51 instanceof Error ? error51.message : "unknown"}`
+        `${path81 ?? "idf_component.yml"} is not valid YAML: ${error51 instanceof Error ? error51.message : "unknown"}`
       ]
     };
   }
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
-    return { dependencies: [], warnings: [`${path80 ?? "idf_component.yml"} does not contain a mapping.`] };
+    return { dependencies: [], warnings: [`${path81 ?? "idf_component.yml"} does not contain a mapping.`] };
   }
   const root = document;
   const raw = root.dependencies;
@@ -43541,7 +43541,7 @@ function parseIdfManifest(content, path80) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return {
       dependencies: [],
-      warnings: [`${path80 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
+      warnings: [`${path81 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
     };
   }
   const dependencies = [];
@@ -43886,8 +43886,8 @@ init_path();
 var assumedMetricFormat = { integerDigits: 3, decimalDigits: 3 };
 var assumedInchFormat = { integerDigits: 2, decimalDigits: 4 };
 var inchToMm = 25.4;
-function warning(code, message, path80) {
-  return path80 === void 0 ? { code, message } : { code, message, path: path80 };
+function warning(code, message, path81) {
+  return path81 === void 0 ? { code, message } : { code, message, path: path81 };
 }
 function attributeBody(line) {
   const match = /^;\s*#@!\s*(.+)$/u.exec(line.trim());
@@ -43912,7 +43912,7 @@ function coordinateValue(raw, format) {
   const parsed = Number.parseFloat(`${integerPart}.${decimalPart || "0"}`);
   return negative ? -parsed : parsed;
 }
-function parseHeaderLine(line, state, warnings, path80) {
+function parseHeaderLine(line, state, warnings, path81) {
   const trimmed = line.trim();
   const attribute = attributeBody(trimmed);
   if (attribute) {
@@ -43949,14 +43949,14 @@ function parseHeaderLine(line, state, warnings, path80) {
           state.decimalDigits = mask[2].length;
         } else if (modifier !== "000.000") {
           warnings.push(
-            warning("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path80)
+            warning("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path81)
           );
         }
       }
     }
   }
 }
-function parseExcellon(content, path80) {
+function parseExcellon(content, path81) {
   const warnings = [];
   const state = {
     units: void 0,
@@ -43990,7 +43990,7 @@ function parseExcellon(content, path80) {
         warning(
           "excellon.assumed-coordinate-format",
           `No coordinate format declared; assumed ${format.integerDigits}.${format.decimalDigits} for ${units}. Coordinates from this file are an assumption, not a measurement.`,
-          path80
+          path81
         )
       );
     }
@@ -44021,7 +44021,7 @@ function parseExcellon(content, path80) {
       const diameterMm = (state.units ?? "mm") === "inch" ? rawDiameter * inchToMm : rawDiameter;
       if (!Number.isFinite(diameterMm) || diameterMm <= 0) {
         warnings.push(
-          warning("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path80)
+          warning("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path81)
         );
       } else {
         toolsByCode.set(code, { code, diameterMm, plated: pendingToolPlated ?? state.filePlated });
@@ -44030,7 +44030,7 @@ function parseExcellon(content, path80) {
       continue;
     }
     if (inHeader && !bodyStarted) {
-      parseHeaderLine(trimmed, state, warnings, path80);
+      parseHeaderLine(trimmed, state, warnings, path81);
       continue;
     }
     const toolSelect = /^T(\d+)\s*$/u.exec(trimmed);
@@ -44041,7 +44041,7 @@ function parseExcellon(content, path80) {
           warning(
             "excellon.undefined-tool",
             `The body selects tool T${toolSelect[1]}, which the header never defines. Its holes are not counted.`,
-            path80
+            path81
           )
         );
       }
@@ -44050,7 +44050,7 @@ function parseExcellon(content, path80) {
     const coordinate = /^(?:G0[05]\s*)?X([+-]?[\d.]+)Y([+-]?[\d.]+)(.*)$/u.exec(trimmed);
     if (!coordinate?.[1] || !coordinate[2]) continue;
     if (!currentTool) {
-      warnings.push(warning("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path80));
+      warnings.push(warning("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path81));
       continue;
     }
     const active = resolvedFormat();
@@ -44069,19 +44069,19 @@ function parseExcellon(content, path80) {
       warning(
         "excellon.assumed-plating",
         "Nothing in this file states whether its holes are plated; treated as plated. A rule must not block a release on this.",
-        path80
+        path81
       )
     );
   }
   if (state.units === void 0) {
-    warnings.push(warning("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path80));
+    warnings.push(warning("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path81));
   }
   if (slotCount > 0) {
     warnings.push(
       warning(
         "excellon.slots-collapsed",
         `${slotCount} slot(s) recorded at their start point only; slot length is not represented.`,
-        path80
+        path81
       )
     );
   }
@@ -44168,13 +44168,13 @@ function applyApertureBlockWord(ledger, compact) {
   if (ledger.block !== void 0) ledger.block.selected = code;
   referenceBlockAperture(ledger, code);
 }
-function readApertureEvidence(ledger, scale, path80) {
+function readApertureEvidence(ledger, scale, path81) {
   return {
     apertures: [...ledger.file].map(([code, definition]) => inMillimetres(code, definition, scale)),
     warnings: [
-      ...definitionWarnings(ledger, path80),
-      ...undefinedApertureWarnings(ledger, path80),
-      ...placementWarnings(ledger, path80)
+      ...definitionWarnings(ledger, path81),
+      ...undefinedApertureWarnings(ledger, path81),
+      ...placementWarnings(ledger, path81)
     ]
   };
 }
@@ -44420,13 +44420,13 @@ function inMillimetres(code, definition, scale) {
 function holeInMillimetres(hole, scale) {
   return hole === void 0 ? void 0 : { kind: "diameter", diameterMm: hole.diameter * scale };
 }
-function definitionWarnings(ledger, path80) {
+function definitionWarnings(ledger, path81) {
   const shown = ledger.problems.slice(0, maxDefinitionWarnings);
   const warnings = shown.map(
     (problem) => warning2(
       problem.kind === "malformed" ? "gerber.malformed-aperture-definition" : "gerber.unsupported-aperture-definition",
       `${problemSubject(problem)}, but ${problem.detail}; ${problem.kind === "malformed" ? "nothing is read from that definition." : "its shape is not read from this file. The numbers are the file's own, in whatever units it declares."}`,
-      path80
+      path81
     )
   );
   const rest = ledger.problems.length - shown.length;
@@ -44435,7 +44435,7 @@ function definitionWarnings(ledger, path80) {
       warning2(
         "gerber.unreadable-aperture-definition",
         `There ${rest === 1 ? "is 1 further definition" : `are ${rest} further definitions`} this reader could not use, which ${rest === 1 ? "is" : "are"} not listed here.`,
-        path80
+        path81
       )
     );
   }
@@ -44446,14 +44446,14 @@ function problemSubject(problem) {
   const block = problem.blockCode === void 0 ? "An unnamed aperture block" : `Aperture block D${problem.blockCode}`;
   return `${block} defines aperture D${problem.code}`;
 }
-function undefinedApertureWarnings(ledger, path80) {
+function undefinedApertureWarnings(ledger, path81) {
   const warnings = [];
   if (ledger.undefinedInFileScope.length > 0) {
     warnings.push(
       warning2(
         "gerber.undefined-aperture",
         `The file selects ${listApertureCodes(ledger.undefinedInFileScope.map((code) => ({ code })))}, which it never defines; what is plotted with it cannot be read from this file.`,
-        path80
+        path81
       )
     );
   }
@@ -44467,20 +44467,20 @@ function undefinedApertureWarnings(ledger, path80) {
             qualifier: entry.blockCode === void 0 ? void 0 : `(in block D${entry.blockCode})`
           }))
         )}, which the block never defines; what those blocks draw cannot be read from this file.`,
-        path80
+        path81
       )
     );
   }
   return warnings;
 }
-function placementWarnings(ledger, path80) {
+function placementWarnings(ledger, path81) {
   if (ledger.placements.count === 0) return [];
   const codes = listApertureCodes(ledger.placements.codes.map((code) => ({ code })));
   return [
     warning2(
       "gerber.unmodelled-aperture-block",
       `Aperture block ${codes} is placed ${ledger.placements.count === 1 ? "once" : `${ledger.placements.count} times`}. A block's own shape is not modelled, so each placement contributes its flash point only and the geometry read from this file is incomplete.`,
-      path80
+      path81
     )
   ];
 }
@@ -44489,8 +44489,8 @@ function listApertureCodes(codes) {
   const rest = codes.length - maxListedApertureCodes;
   return rest > 0 ? `${shown} and ${rest} more` : shown;
 }
-function warning2(code, message, path80) {
-  return path80 === void 0 ? { code, message } : { code, message, path: path80 };
+function warning2(code, message, path81) {
+  return path81 === void 0 ? { code, message } : { code, message, path: path81 };
 }
 
 // src/multicad/gerber-geometry.ts
@@ -44748,7 +44748,7 @@ function recordUnterminated(evidence, body) {
   if (evidence.count === 0) evidence.excerpt = boundedExcerpt(body);
   evidence.count += 1;
 }
-function unterminatedWarnings(unterminated, path80) {
+function unterminatedWarnings(unterminated, path81) {
   const warnings = [];
   const extended = unterminated.extended;
   if (extended.count > 0) {
@@ -44756,7 +44756,7 @@ function unterminatedWarnings(unterminated, path80) {
       warning3(
         "gerber.unterminated-extended-command",
         `An extended command is not closed by "%". There ${extended.count === 1 ? "is 1" : `are ${extended.count}`} of them, the first reading "${extended.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path80
+        path81
       )
     );
   }
@@ -44766,7 +44766,7 @@ function unterminatedWarnings(unterminated, path80) {
       warning3(
         "gerber.unterminated-word-command",
         `A command is not terminated by "*". There ${word.count === 1 ? "is 1" : `are ${word.count}`} of them, the first reading "${word.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path80
+        path81
       )
     );
   }
@@ -44800,8 +44800,8 @@ function samePoint2(a, b) {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
 }
 var plottedOperation = /^(?:G\d+)?(?:X([+-]?\d+))?(?:Y([+-]?\d+))?(?:I[+-]?\d+)?(?:J[+-]?\d+)?D(0?[123])$/u;
-function warning3(code, message, path80) {
-  return path80 === void 0 ? { code, message } : { code, message, path: path80 };
+function warning3(code, message, path81) {
+  return path81 === void 0 ? { code, message } : { code, message, path: path81 };
 }
 function snapshotFileState(state, apertures) {
   return {
@@ -44891,7 +44891,7 @@ function readFileState(commands, unterminated) {
   }
   return snapshotFileState(state, apertures);
 }
-function parseGerber(content, path80) {
+function parseGerber(content, path81) {
   const commands = tokenizeGerber(content);
   const unterminated = {
     extended: { count: 0, excerpt: void 0 },
@@ -44910,14 +44910,14 @@ function parseGerber(content, path80) {
   const identity = state.fileFunction ? identityFromFileFunction(state.fileFunction) : void 0;
   const warnings = [];
   if (units === void 0) {
-    warnings.push(warning3("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path80));
+    warnings.push(warning3("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path81));
   }
   if (!declaredFormat) {
     warnings.push(
       warning3(
         "gerber.assumed-coordinate-format",
         "No %FS% format specification; assumed 3.5 with leading zeros omitted. Coordinates from this file are an assumption, not a measurement.",
-        path80
+        path81
       )
     );
   }
@@ -44926,7 +44926,7 @@ function parseGerber(content, path80) {
       warning3(
         "gerber.incremental-coordinates",
         "This file uses incremental coordinates, which are not interpreted; no geometry was read from it.",
-        path80
+        path81
       )
     );
   }
@@ -44935,13 +44935,13 @@ function parseGerber(content, path80) {
       warning3(
         "gerber.unmodelled-file-function",
         `The file declares TF.FileFunction "${state.fileFunction}", which is not a stackup layer; its role comes from the filename.`,
-        path80
+        path81
       )
     );
   }
-  warnings.push(...unterminatedWarnings(unterminated, path80));
+  warnings.push(...unterminatedWarnings(unterminated, path81));
   const scale = units === "inch" ? inchToMm2 : 1;
-  const apertureEvidence = readApertureEvidence(state.apertures, scale, path80);
+  const apertureEvidence = readApertureEvidence(state.apertures, scale, path81);
   warnings.push(...apertureEvidence.warnings);
   const collector = createGerberGeometryCollector({
     apertures: apertureEvidence.apertures,
@@ -52945,7 +52945,7 @@ async function prepareInventory(root, manifestPath, reviewedSha) {
   if (await fileSha256(absoluteManifest) !== names.get(relativeManifest)) {
     throw new Error("Export manifest changed while preparing signing checksums.");
   }
-  const checksums = `${[...names].sort(([a], [b]) => a.localeCompare(b)).map(([name, digest2]) => `${digest2}  ${name}`).join("\n")}
+  const checksums = `${[...names].sort(([a], [b]) => a.localeCompare(b)).map(([name, digest3]) => `${digest3}  ${name}`).join("\n")}
 `;
   return { names, checksums, manifestPath: absoluteManifest };
 }
@@ -52980,8 +52980,8 @@ function matchesVerifiedResult(value, e, inventory) {
   const remaining = new Map(inventory.names);
   for (const subject of subjects) {
     if (!isRecord(subject) || typeof subject.name !== "string") return false;
-    const digest2 = recordAt(subject, "digest")?.sha256;
-    if (remaining.get(subject.name) !== digest2) return false;
+    const digest3 = recordAt(subject, "digest")?.sha256;
+    if (remaining.get(subject.name) !== digest3) return false;
     remaining.delete(subject.name);
   }
   return remaining.size === 0;
@@ -54619,8 +54619,8 @@ async function collectStepArtifacts(outputDir, absoluteOutput, step) {
   const artifacts = [];
   for (const file2 of files) {
     const relativePath = toPosix(import_node_path62.default.relative(outputDir, file2));
-    const digest2 = await fileDigest(file2);
-    artifacts.push({ path: relativePath, kind: step.artifactKind, ...digest2 });
+    const digest3 = await fileDigest(file2);
+    artifacts.push({ path: relativePath, kind: step.artifactKind, ...digest3 });
   }
   return artifacts;
 }
@@ -55799,8 +55799,8 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
       errorCodes: ["UNSUPPORTED_ALGORITHM"]
     };
   }
-  const digest2 = (0, import_node_crypto14.createHash)("sha256").update(bytes).digest("hex");
-  if (signature.manifestDigest && signature.manifestDigest !== digest2) {
+  const digest3 = (0, import_node_crypto14.createHash)("sha256").update(bytes).digest("hex");
+  if (signature.manifestDigest && signature.manifestDigest !== digest3) {
     errors.push("manifest digest in signature does not match manifest contents");
     errorCodes.push("DIGEST_MISMATCH");
   }
@@ -56396,8 +56396,8 @@ async function releaseHandoffCommand(pathInput, options, streams) {
     const target = import_node_path70.default.join(outputDir, file2.target);
     await import_promises28.default.mkdir(import_node_path70.default.dirname(target), { recursive: true });
     await import_promises28.default.copyFile(import_node_path70.default.resolve(root, file2.source), target);
-    const digest2 = await sha256File(target);
-    manifestFiles.push({ ...file2, ...digest2 });
+    const digest3 = await sha256File(target);
+    manifestFiles.push({ ...file2, ...digest3 });
   }
   const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
   const manifest = buildHandoffManifest(summary, plan, manifestFiles, generatedAt);
@@ -56522,8 +56522,8 @@ async function gitState2(root) {
 
 // src/cli/commands/review.ts
 var import_node_child_process4 = require("node:child_process");
-var import_node_crypto18 = require("node:crypto");
-var import_node_path71 = __toESM(require("node:path"), 1);
+var import_node_crypto19 = require("node:crypto");
+var import_node_path72 = __toESM(require("node:path"), 1);
 
 // packages/cloud-core/src/archive-sanitizer.ts
 var DEFAULT_MAX_COMPRESSED_SIZE = 50 * 1024 * 1024;
@@ -56604,11 +56604,11 @@ function assertNonce(value) {
 function runnerRequestBodyDigest(body) {
   return (0, import_node_crypto16.createHash)("sha256").update(body).digest("hex");
 }
-function normalizeRunnerRequestPath(path80) {
-  if (!path80.startsWith("/") || path80.startsWith("//") || path80.includes("#") || path80.includes("\\")) {
+function normalizeRunnerRequestPath(path81) {
+  if (!path81.startsWith("/") || path81.startsWith("//") || path81.includes("#") || path81.includes("\\")) {
     throw new Error("runner request path must be an absolute application path without a fragment");
   }
-  const rawPath = path80.split("?", 1)[0] ?? path80;
+  const rawPath = path81.split("?", 1)[0] ?? path81;
   if (/%2f|%5c/iu.test(rawPath)) {
     throw new Error("runner request path cannot contain encoded path separators");
   }
@@ -56623,7 +56623,7 @@ function normalizeRunnerRequestPath(path80) {
       throw new Error("runner request path cannot contain dot segments");
     }
   }
-  const url2 = new URL(path80, canonicalBaseUrl);
+  const url2 = new URL(path81, canonicalBaseUrl);
   if (url2.origin !== canonicalBaseUrl) {
     throw new Error("runner request path must remain within the application origin");
   }
@@ -56697,8 +56697,147 @@ function mapFindingsForCloud(findings) {
 init_version();
 
 // src/kicad/snapshots.ts
-var import_node_crypto17 = require("node:crypto");
+var import_node_crypto18 = require("node:crypto");
 init_src();
+
+// src/kicad/native-snapshots.ts
+var import_node_crypto17 = require("node:crypto");
+var import_promises29 = __toESM(require("node:fs/promises"), 1);
+var import_node_os4 = __toESM(require("node:os"), 1);
+var import_node_path71 = __toESM(require("node:path"), 1);
+var MAX_SVG_BYTES = 2 * 1024 * 1024;
+var MAX_SHEETS = 16;
+var EXPORT_TIMEOUT_MS = 45e3;
+var PROCESS_LIMITS = { timeoutMs: EXPORT_TIMEOUT_MS, maxStdoutBytes: 8192, maxStderrBytes: 8192 };
+function digest(value) {
+  return (0, import_node_crypto17.createHash)("sha256").update(value).digest("hex");
+}
+function sourceDigest(file2) {
+  return import_promises29.default.readFile(file2).then(digest);
+}
+function normalizeKicadSvg(raw) {
+  const svg = raw.replace(/<\?xml[^?]*\?>/giu, "").replace(/<!DOCTYPE\s+svg\s+PUBLIC\s+["'][^"']+["']\s+["'][^"']+["']\s*>/giu, "").trim();
+  if (Buffer.byteLength(svg, "utf8") > MAX_SVG_BYTES || !svg.includes("</svg>")) return void 0;
+  const opening = /<svg\b[^>]*>/isu.exec(svg)?.[0];
+  const coordinates = opening?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]?.trim().split(/\s+/u).map(Number);
+  if (coordinates?.length !== 4) return void 0;
+  const width = coordinates[2];
+  const height = coordinates[3];
+  if (!width || !height || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+    return void 0;
+  if (/<(?:script|foreignObject|iframe|object|embed|animate|set)\b|<!ENTITY\b|@import\b/iu.test(svg)) return void 0;
+  if (/\son[a-z]+\s*=/iu.test(svg)) return void 0;
+  if ([...svg.matchAll(/\b(?:xlink:)?href\s*=\s*["']([^"']+)["']/giu)].some((match) => !match[1]?.startsWith("#")))
+    return void 0;
+  if ([...svg.matchAll(/url\(\s*["']?([^)"']+)/giu)].some((match) => !match[1]?.trim().startsWith("#")))
+    return void 0;
+  return { svg, width, height };
+}
+async function collectSvg(output, beforeSha, sourceFile, kind, label) {
+  const buffer = await import_promises29.default.readFile(output);
+  if (!buffer.length || buffer.length > MAX_SVG_BYTES) return void 0;
+  const normalized = normalizeKicadSvg(buffer.toString("utf8"));
+  if (!normalized || await sourceDigest(sourceFile) !== beforeSha) return void 0;
+  const id = digest([beforeSha, label].join(":")).slice(0, 16);
+  return {
+    id: `snap_native_${id}`,
+    name: `kicad_native_${label.replace(/[^a-zA-Z0-9_.-]/gu, "_")}.svg`,
+    kind,
+    format: "svg",
+    sheetOrLayer: label,
+    width: normalized.width,
+    height: normalized.height,
+    content: normalized.svg,
+    sha256: digest(normalized.svg),
+    // Summary anchors cannot be mapped to genuine KiCad coordinates.
+    anchors: []
+  };
+}
+async function stageSource(sourceFile, tempRoot, sourceSha) {
+  const stage = import_node_path71.default.join(tempRoot, "source");
+  await import_promises29.default.mkdir(stage);
+  const input = import_node_path71.default.join(stage, import_node_path71.default.basename(sourceFile));
+  await import_promises29.default.copyFile(sourceFile, input);
+  const adjacent = (await import_promises29.default.readdir(import_node_path71.default.dirname(sourceFile), { withFileTypes: true })).filter(
+    (entry) => entry.isFile() && /\.(kicad_sch|kicad_pro)$/iu.test(entry.name) && entry.name !== import_node_path71.default.basename(sourceFile)
+  ).slice(0, 32);
+  await Promise.all(
+    adjacent.map(async ({ name }) => {
+      const from = import_node_path71.default.join(import_node_path71.default.dirname(sourceFile), name);
+      if ((await import_promises29.default.stat(from)).size <= MAX_SVG_BYTES * 4) await import_promises29.default.copyFile(from, import_node_path71.default.join(stage, name));
+    })
+  );
+  return await sourceDigest(input) === sourceSha ? input : void 0;
+}
+async function pcbLayer(cliPath, input, original, beforeSha, tempRoot, label, layer) {
+  if (!/^(?:F|B|In\d+)\.Cu$/u.test(layer)) return void 0;
+  const extras = [];
+  if (layer === "F.Cu") extras.push("F.SilkS");
+  if (layer === "B.Cu") extras.push("B.SilkS");
+  const output = import_node_path71.default.join(tempRoot, `pcb-${layer.replaceAll(".", "_")}.svg`);
+  const result = await runProcess(
+    cliPath,
+    [
+      "pcb",
+      "export",
+      "svg",
+      "--layers",
+      [layer, ...extras, "Edge.Cuts"].join(","),
+      "--mode-single",
+      "--fit-page-to-board",
+      "--output",
+      output,
+      input
+    ],
+    PROCESS_LIMITS
+  );
+  if (result.code !== 0 || result.timedOut) return void 0;
+  return collectSvg(output, beforeSha, original, "pcb_layer", `${label} / ${layer}`).catch(() => void 0);
+}
+async function pcbSnapshots(cliPath, input, original, beforeSha, tempRoot, label, layers) {
+  const found = await Promise.all(
+    [...new Set(layers)].slice(0, MAX_SHEETS).map((layer) => pcbLayer(cliPath, input, original, beforeSha, tempRoot, label, layer))
+  );
+  return found.filter((artifact) => artifact !== void 0);
+}
+async function schematicSnapshots(cliPath, input, original, beforeSha, tempRoot, label) {
+  const outputDirectory2 = import_node_path71.default.join(tempRoot, "sheets");
+  await import_promises29.default.mkdir(outputDirectory2, { recursive: true });
+  const result = await runProcess(
+    cliPath,
+    ["sch", "export", "svg", "--output", outputDirectory2, input],
+    PROCESS_LIMITS
+  );
+  if (result.code !== 0 || result.timedOut) return [];
+  const names = (await import_promises29.default.readdir(outputDirectory2)).filter((name) => name.endsWith(".svg")).sort().slice(0, MAX_SHEETS);
+  const found = await Promise.all(
+    names.map(
+      (name) => collectSvg(
+        import_node_path71.default.join(outputDirectory2, name),
+        beforeSha,
+        original,
+        "schematic",
+        `${label} / ${name.replace(/\.svg$/iu, "")}`
+      ).catch(() => void 0)
+    )
+  );
+  return found.filter((artifact) => artifact !== void 0);
+}
+async function exportNativeKicadSnapshots(cliPath, sourceFile, kind, layers = []) {
+  const beforeSha = await sourceDigest(sourceFile).catch(() => void 0);
+  if (!beforeSha) return [];
+  const directory = await import_promises29.default.mkdtemp(import_node_path71.default.join(import_node_os4.default.tmpdir(), "boardreadyops-native-svg-"));
+  const label = import_node_path71.default.basename(sourceFile).replace(/\.(kicad_sch|kicad_pcb)$/iu, "");
+  try {
+    const staged = await stageSource(sourceFile, directory, beforeSha);
+    if (!staged) return [];
+    return kind === "pcb_layer" ? await pcbSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label, layers) : await schematicSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label);
+  } finally {
+    await import_promises29.default.rm(directory, { recursive: true, force: true });
+  }
+}
+
+// src/kicad/snapshots.ts
 async function renderSchematicFile(file2, findings) {
   try {
     const parsed = await parseSchematic(file2);
@@ -56709,7 +56848,7 @@ async function renderSchematicFile(file2, findings) {
       Array.from(parsed.netLabels)
     );
     const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-    const sha2562 = (0, import_node_crypto17.createHash)("sha256").update(svg).digest("hex");
+    const sha2562 = (0, import_node_crypto18.createHash)("sha256").update(svg).digest("hex");
     return {
       id: `snap_sch_${sheetName}`,
       name: `schematic_${sheetName}.svg`,
@@ -56737,7 +56876,7 @@ async function renderPcbFile(file2, findings) {
         parsed.footprints.map((fp) => ({ reference: fp.reference, footprint: fp.footprint, at: fp.at }))
       );
       const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-      const sha2562 = (0, import_node_crypto17.createHash)("sha256").update(svg).digest("hex");
+      const sha2562 = (0, import_node_crypto18.createHash)("sha256").update(svg).digest("hex");
       artifacts.push({
         id: `snap_pcb_${layer.replaceAll(".", "_")}`,
         name: `pcb_${layer.replaceAll(".", "_")}.svg`,
@@ -56755,17 +56894,35 @@ async function renderPcbFile(file2, findings) {
   }
   return artifacts;
 }
+async function schematicOrSummary(file2, cliPath, findings) {
+  const native = cliPath ? await exportNativeKicadSnapshots(cliPath, file2, "schematic").catch(() => []) : [];
+  if (native.length) return native;
+  const summary = await renderSchematicFile(file2, findings);
+  return summary ? [summary] : [];
+}
+async function pcbOrSummary(file2, cliPath, findings) {
+  if (cliPath) {
+    const layers = await parsePcb(file2).then((pcb) => pcb.copperLayers).catch(() => []);
+    const native = await exportNativeKicadSnapshots(
+      cliPath,
+      file2,
+      "pcb_layer",
+      layers.length ? layers : ["F.Cu", "B.Cu"]
+    ).catch(() => []);
+    if (native.length) return native;
+  }
+  return renderPcbFile(file2, findings);
+}
 async function generateSnapshots(options) {
-  const artifacts = [];
-  for (const file2 of options.schematicFiles ?? []) {
-    const artifact = await renderSchematicFile(file2, options.findings);
-    if (artifact) artifacts.push(artifact);
-  }
-  for (const file2 of options.pcbFiles ?? []) {
-    const pcbArtifacts = await renderPcbFile(file2, options.findings);
-    artifacts.push(...pcbArtifacts);
-  }
-  return artifacts;
+  const cliPath = typeof options.nativeCli === "string" ? options.nativeCli : void 0;
+  const cli = options.nativeCli === false ? void 0 : await detectKicadCli(cliPath);
+  const nativeCliPath = cli?.found ? cli.path : void 0;
+  const schematics = (options.schematicFiles ?? []).map(
+    (file2) => schematicOrSummary(file2, nativeCliPath, options.findings)
+  );
+  const boards = (options.pcbFiles ?? []).map((file2) => pcbOrSummary(file2, nativeCliPath, options.findings));
+  const rendered = await Promise.all([...schematics, ...boards]);
+  return rendered.flat().slice(0, 64);
 }
 
 // src/cli/commands/review.ts
@@ -56838,7 +56995,7 @@ async function reviewPublishCommand(target, options, streams) {
   const headSha = options.head ?? getGitCommitSha("HEAD");
   const baseSha = options.base ? getGitCommitSha(options.base) : void 0;
   const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
-  const uploadMode = options.upload ?? "metadata";
+  const uploadMode = options.nativeVisuals && (!options.upload || options.upload === "metadata") ? "snapshots" : options.upload ?? "metadata";
   const server = (options.server ?? process.env.BOARDREADYOPS_SERVER_URL ?? "https://app.boardreadyops.com").replace(
     /\/$/,
     ""
@@ -56857,8 +57014,8 @@ async function reviewPublishCommand(target, options, streams) {
     failOn: "never"
   });
   const findings = mapFindingsForCloud(result.findings);
-  const rulePackDigest = (0, import_node_crypto18.createHash)("sha256").update("boardreadyops-v1").digest("hex");
-  const configDigest = (0, import_node_crypto18.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
+  const rulePackDigest = (0, import_node_crypto19.createHash)("sha256").update("boardreadyops-v1").digest("hex");
+  const configDigest = (0, import_node_crypto19.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
   const evidenceDigest = computeEvidenceDigest({
     toolVersion: boardReadyVersion,
     rulePackDigest,
@@ -56904,8 +57061,9 @@ async function reviewPublishCommand(target, options, streams) {
     return 1;
   }
   const snapshots = await generateSnapshots({
-    schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => import_node_path71.default.resolve(root, f))),
-    pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => import_node_path71.default.resolve(root, f))),
+    ...options.nativeVisuals ? {} : { nativeCli: false },
+    schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => import_node_path72.default.resolve(root, f))),
+    pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => import_node_path72.default.resolve(root, f))),
     findings: findings.map((f) => ({
       fingerprint: f.fingerprint,
       ruleId: f.ruleId,
@@ -57065,17 +57223,17 @@ async function reviewVerifyCommand(target, options, streams) {
 }
 
 // src/cli/commands/runner.ts
-var import_node_path78 = __toESM(require("node:path"), 1);
+var import_node_path79 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-enrollment-admin.ts
 var import_node_child_process5 = require("node:child_process");
-var import_node_crypto20 = require("node:crypto");
-var import_promises29 = require("node:fs/promises");
-var import_node_os4 = __toESM(require("node:os"), 1);
-var import_node_path72 = __toESM(require("node:path"), 1);
+var import_node_crypto21 = require("node:crypto");
+var import_promises30 = require("node:fs/promises");
+var import_node_os5 = __toESM(require("node:os"), 1);
+var import_node_path73 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-registration-enrollment-store.ts
-var import_node_crypto19 = require("node:crypto");
+var import_node_crypto20 = require("node:crypto");
 var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
 var repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
@@ -57102,8 +57260,8 @@ function isoColumn(row, key) {
   const parsed = new Date(value);
   return Number.isNaN(parsed.valueOf()) ? void 0 : parsed.toISOString();
 }
-function digest(value) {
-  return (0, import_node_crypto19.createHash)("sha256").update(value, "utf8").digest("hex");
+function digest2(value) {
+  return (0, import_node_crypto20.createHash)("sha256").update(value, "utf8").digest("hex");
 }
 function positiveInteger3(value, fallback, name, maximum) {
   const selected = value ?? fallback;
@@ -57137,8 +57295,8 @@ function validActorId(value) {
 }
 function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
   const now = options.now ?? (() => /* @__PURE__ */ new Date());
-  const id = options.id ?? import_node_crypto19.randomUUID;
-  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto19.randomBytes)(32).toString("base64url"));
+  const id = options.id ?? import_node_crypto20.randomUUID;
+  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto20.randomBytes)(32).toString("base64url"));
   const enrollmentTtlSeconds = positiveInteger3(options.enrollmentTtlSeconds, 15 * 60, "enrollmentTtlSeconds", 60 * 60);
   return {
     async issueEnrollment(input) {
@@ -57179,7 +57337,7 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
           name,
           input.scope,
           allowedRepositories,
-          digest(token),
+          digest2(token),
           expiresAt.toISOString()
         ]
       );
@@ -57221,7 +57379,7 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
            $4,
            $5::jsonb
          )`,
-        [at.toISOString(), digest(input.enrollmentToken), publicKey, digest(publicKey), JSON.stringify(capabilities)]
+        [at.toISOString(), digest2(input.enrollmentToken), publicKey, digest2(publicKey), JSON.stringify(capabilities)]
       );
       const row = rows(result)[0];
       const outcome = stringColumn(row, "outcome");
@@ -57268,15 +57426,15 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
 var maximumPsqlOutputBytes = 1024 * 1024;
 var defaultDependencies = {
   query: executePsqlQuery,
-  token: () => (0, import_node_crypto20.randomBytes)(32).toString("base64url")
+  token: () => (0, import_node_crypto21.randomBytes)(32).toString("base64url")
 };
 async function issueRunnerEnrollment(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
-  const databaseUrlFile = import_node_path72.default.resolve(options.databaseUrlFile);
-  const tokenOutputFile = import_node_path72.default.resolve(options.tokenOutputFile);
+  const databaseUrlFile = import_node_path73.default.resolve(options.databaseUrlFile);
+  const tokenOutputFile = import_node_path73.default.resolve(options.tokenOutputFile);
   await assertPrivateFile(databaseUrlFile, "database URL file");
   await prepareTokenOutput(tokenOutputFile);
-  const databaseUrl = (await (0, import_promises29.readFile)(databaseUrlFile, "utf8")).trim();
+  const databaseUrl = (await (0, import_promises30.readFile)(databaseUrlFile, "utf8")).trim();
   validateDatabaseUrl(databaseUrl);
   const enrollmentToken = dependencies.token();
   validateEnrollmentToken(enrollmentToken);
@@ -57313,14 +57471,14 @@ async function issueRunnerEnrollment(options, overrides = {}) {
       tokenOutputFile
     };
   } finally {
-    if (!accepted) await (0, import_promises29.unlink)(tokenOutputFile).catch(() => void 0);
+    if (!accepted) await (0, import_promises30.unlink)(tokenOutputFile).catch(() => void 0);
   }
 }
 async function revokeRunnerRegistration(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
-  const databaseUrlFile = import_node_path72.default.resolve(options.databaseUrlFile);
+  const databaseUrlFile = import_node_path73.default.resolve(options.databaseUrlFile);
   await assertPrivateFile(databaseUrlFile, "database URL file");
-  const databaseUrl = (await (0, import_promises29.readFile)(databaseUrlFile, "utf8")).trim();
+  const databaseUrl = (await (0, import_promises30.readFile)(databaseUrlFile, "utf8")).trim();
   validateDatabaseUrl(databaseUrl);
   const executor = {
     query: async (sql, params = []) => await dependencies.query(databaseUrl, sql, params)
@@ -57339,11 +57497,11 @@ async function revokeRunnerRegistration(options, overrides = {}) {
 async function executePsqlQuery(databaseUrl, sql, params) {
   const invocation = psqlInvocation(sql, params);
   const connection = parseDatabaseConnection(databaseUrl);
-  const secretDirectory = await (0, import_promises29.mkdtemp)(import_node_path72.default.join(import_node_os4.default.tmpdir(), "boardreadyops-psql-"));
-  const passwordFile = import_node_path72.default.join(secretDirectory, "pgpass");
+  const secretDirectory = await (0, import_promises30.mkdtemp)(import_node_path73.default.join(import_node_os5.default.tmpdir(), "boardreadyops-psql-"));
+  const passwordFile = import_node_path73.default.join(secretDirectory, "pgpass");
   try {
-    if (process.platform !== "win32") await (0, import_promises29.chmod)(secretDirectory, 448);
-    await (0, import_promises29.writeFile)(
+    if (process.platform !== "win32") await (0, import_promises30.chmod)(secretDirectory, 448);
+    await (0, import_promises30.writeFile)(
       passwordFile,
       `${pgpassField(connection.host)}:${pgpassField(connection.port)}:${pgpassField(connection.database)}:${pgpassField(connection.user)}:${pgpassField(connection.password)}
 `,
@@ -57353,7 +57511,7 @@ async function executePsqlQuery(databaseUrl, sql, params) {
         flag: "wx"
       }
     );
-    if (process.platform !== "win32") await (0, import_promises29.chmod)(passwordFile, 384);
+    if (process.platform !== "win32") await (0, import_promises30.chmod)(passwordFile, 384);
     const result = await runPsql({
       environment: {
         ...process.env,
@@ -57378,7 +57536,7 @@ async function executePsqlQuery(databaseUrl, sql, params) {
     }
     return { rows: [row] };
   } finally {
-    await (0, import_promises29.rm)(secretDirectory, { recursive: true, force: true });
+    await (0, import_promises30.rm)(secretDirectory, { recursive: true, force: true });
   }
 }
 async function runPsql(input) {
@@ -57452,8 +57610,8 @@ function psqlInvocation(sql, params) {
   throw new Error("runner enrollment administration received an unsupported database query");
 }
 function issuePsqlInvocation(params) {
-  const [issuedAt, installationId, registrationId, enrollmentId, name, scope, repositories, digest2, expiresAt] = params;
-  if (typeof issuedAt !== "string" || typeof installationId !== "string" || typeof registrationId !== "string" || typeof enrollmentId !== "string" || typeof name !== "string" || typeof scope !== "string" || !Array.isArray(repositories) || repositories.some((repository) => typeof repository !== "string") || typeof digest2 !== "string" || typeof expiresAt !== "string") {
+  const [issuedAt, installationId, registrationId, enrollmentId, name, scope, repositories, digest3, expiresAt] = params;
+  if (typeof issuedAt !== "string" || typeof installationId !== "string" || typeof registrationId !== "string" || typeof enrollmentId !== "string" || typeof name !== "string" || typeof scope !== "string" || !Array.isArray(repositories) || repositories.some((repository) => typeof repository !== "string") || typeof digest3 !== "string" || typeof expiresAt !== "string") {
     throw new Error("runner enrollment database parameters were invalid");
   }
   return {
@@ -57465,7 +57623,7 @@ function issuePsqlInvocation(params) {
       registration_name: name,
       registration_scope: scope,
       allowed_repositories: JSON.stringify(repositories),
-      token_digest: digest2,
+      token_digest: digest3,
       expires_at: expiresAt
     },
     statement: `
@@ -57581,28 +57739,28 @@ function validateEnrollmentToken(value) {
   }
 }
 async function prepareTokenOutput(filePath) {
-  if (await (0, import_promises29.stat)(filePath).catch(() => void 0)) {
+  if (await (0, import_promises30.stat)(filePath).catch(() => void 0)) {
     throw new Error(`refusing to overwrite an existing enrollment token file: ${filePath}`);
   }
-  const directory = import_node_path72.default.dirname(filePath);
-  const existing = await (0, import_promises29.stat)(directory).catch(() => void 0);
+  const directory = import_node_path73.default.dirname(filePath);
+  const existing = await (0, import_promises30.stat)(directory).catch(() => void 0);
   if (existing && !existing.isDirectory()) {
     throw new Error(`enrollment token output parent is not a directory: ${directory}`);
   }
-  if (!existing) await (0, import_promises29.mkdir)(directory, { recursive: true, mode: 448 });
-  if (process.platform !== "win32") await (0, import_promises29.chmod)(directory, 448);
+  if (!existing) await (0, import_promises30.mkdir)(directory, { recursive: true, mode: 448 });
+  if (process.platform !== "win32") await (0, import_promises30.chmod)(directory, 448);
 }
 async function writeSecretFile(filePath, enrollmentToken) {
-  await (0, import_promises29.writeFile)(filePath, `${enrollmentToken}
+  await (0, import_promises30.writeFile)(filePath, `${enrollmentToken}
 `, {
     encoding: "utf8",
     flag: "wx",
     mode: 384
   });
-  if (process.platform !== "win32") await (0, import_promises29.chmod)(filePath, 384);
+  if (process.platform !== "win32") await (0, import_promises30.chmod)(filePath, 384);
 }
 async function assertPrivateFile(filePath, label) {
-  const info = await (0, import_promises29.stat)(filePath).catch(() => void 0);
+  const info = await (0, import_promises30.stat)(filePath).catch(() => void 0);
   if (!info?.isFile()) throw new Error(`${label} does not exist or is not a regular file`);
   if (process.platform !== "win32" && (info.mode & 63) !== 0) {
     throw new Error(`${label} must not be readable or writable by group or other users`);
@@ -57613,15 +57771,15 @@ async function assertPrivateFile(filePath, label) {
 init_version();
 
 // src/runner/identity.ts
-var import_node_crypto22 = require("node:crypto");
-var import_promises31 = require("node:fs/promises");
-var import_node_os5 = __toESM(require("node:os"), 1);
-var import_node_path73 = __toESM(require("node:path"), 1);
+var import_node_crypto23 = require("node:crypto");
+var import_promises32 = require("node:fs/promises");
+var import_node_os6 = __toESM(require("node:os"), 1);
+var import_node_path74 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/client.ts
-var import_node_crypto21 = require("node:crypto");
-var import_promises30 = require("node:fs/promises");
+var import_node_crypto22 = require("node:crypto");
+var import_promises31 = require("node:fs/promises");
 init_src();
 var responseBodyLimitBytes = 1024 * 1024;
 var runnerProtocolHeaderNames = {
@@ -57661,7 +57819,7 @@ var RunnerControlPlaneClient = class {
     this.privateKey = options.privateKey;
     this.fetchImpl = options.fetch ?? fetch;
     this.now = options.now ?? (() => /* @__PURE__ */ new Date());
-    this.nonce = options.nonce ?? (() => (0, import_node_crypto21.randomBytes)(24).toString("base64url"));
+    this.nonce = options.nonce ?? (() => (0, import_node_crypto22.randomBytes)(24).toString("base64url"));
     this.requestTimeoutMs = positiveInteger4(options.requestTimeoutMs ?? 3e4, "requestTimeoutMs");
   }
   async claim(input) {
@@ -57690,11 +57848,11 @@ var RunnerControlPlaneClient = class {
     if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
       throw new Error("artifact upload SHA-256 declaration is invalid");
     }
-    const content = await (0, import_promises30.readFile)(filePath);
+    const content = await (0, import_promises31.readFile)(filePath);
     if (content.byteLength !== maximumBytes) {
       throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${content.byteLength}`);
     }
-    if ((0, import_node_crypto21.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
+    if ((0, import_node_crypto22.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
       throw new Error("artifact digest changed before upload");
     }
     const response = await this.fetchImpl(url2, {
@@ -57712,8 +57870,8 @@ var RunnerControlPlaneClient = class {
       throw new RunnerControlPlaneError(`artifact upload failed with HTTP ${response.status}`, response.status, body);
     }
   }
-  async signedJson(path80, value, context = {}) {
-    const target = new URL(path80, this.baseUrl);
+  async signedJson(path81, value, context = {}) {
+    const target = new URL(path81, this.baseUrl);
     if (target.origin !== this.baseUrl.origin) {
       throw new Error("runner request path escaped the configured control-plane origin");
     }
@@ -57812,7 +57970,7 @@ async function activateRunner(input) {
   }
 }
 async function loadRunnerPrivateKey(filePath) {
-  return (0, import_node_crypto21.createPrivateKey)(await (0, import_promises30.readFile)(filePath, "utf8"));
+  return (0, import_node_crypto22.createPrivateKey)(await (0, import_promises31.readFile)(filePath, "utf8"));
 }
 function normalizeControlPlaneUrl(value) {
   let url2;
@@ -57878,25 +58036,25 @@ var privateKeyName = "runner-private-key.pem";
 var publicKeyName = "runner-public-key.pem";
 var identityFileName = "runner.json";
 function defaultRunnerIdentityDirectory() {
-  return import_node_path73.default.join(import_node_os5.default.homedir(), ".config", "boardreadyops", "runner");
+  return import_node_path74.default.join(import_node_os6.default.homedir(), ".config", "boardreadyops", "runner");
 }
 async function activateRunnerIdentity(options) {
   const controlPlaneUrl = normalizeControlPlaneUrl(options.controlPlaneUrl).origin;
-  const enrollmentTokenFile = import_node_path73.default.resolve(options.enrollmentTokenFile);
+  const enrollmentTokenFile = import_node_path74.default.resolve(options.enrollmentTokenFile);
   await assertPrivateFile2(enrollmentTokenFile, "runner enrollment token file");
-  const enrollmentToken = (await (0, import_promises31.readFile)(enrollmentTokenFile, "utf8")).trim();
+  const enrollmentToken = (await (0, import_promises32.readFile)(enrollmentTokenFile, "utf8")).trim();
   if (enrollmentToken.length < 43 || enrollmentToken.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(enrollmentToken)) {
     throw new Error("runner enrollment token file does not contain a valid enrollment token");
   }
   const capabilities = normalizeCapabilities(options.capabilities ?? []);
   const labels = normalizeCapabilities(options.labels ?? []);
-  const identityDirectory = import_node_path73.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
+  const identityDirectory = import_node_path74.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
   await prepareIdentityDirectory(identityDirectory);
-  const identityFile = import_node_path73.default.join(identityDirectory, identityFileName);
-  const privateKeyFile = import_node_path73.default.join(identityDirectory, privateKeyName);
-  const publicKeyFile = import_node_path73.default.join(identityDirectory, publicKeyName);
+  const identityFile = import_node_path74.default.join(identityDirectory, identityFileName);
+  const privateKeyFile = import_node_path74.default.join(identityDirectory, privateKeyName);
+  const publicKeyFile = import_node_path74.default.join(identityDirectory, publicKeyName);
   await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
-  const generated = (0, import_node_crypto22.generateKeyPairSync)("ed25519");
+  const generated = (0, import_node_crypto23.generateKeyPairSync)("ed25519");
   const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
   const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
   const activated = await activateRunner({
@@ -57928,7 +58086,7 @@ async function activateRunnerIdentity(options) {
 `, 384);
     written.push(identityFile);
   } catch (error51) {
-    await Promise.all(written.map((file2) => (0, import_promises31.unlink)(file2).catch(() => void 0)));
+    await Promise.all(written.map((file2) => (0, import_promises32.unlink)(file2).catch(() => void 0)));
     throw error51;
   }
   return {
@@ -57940,17 +58098,17 @@ async function activateRunnerIdentity(options) {
   };
 }
 async function loadRunnerIdentity(identityFileInput) {
-  const identityFile = import_node_path73.default.resolve(identityFileInput);
-  await assertPrivateDirectory(import_node_path73.default.dirname(identityFile), "runner identity directory");
+  const identityFile = import_node_path74.default.resolve(identityFileInput);
+  await assertPrivateDirectory(import_node_path74.default.dirname(identityFile), "runner identity directory");
   await assertPrivateFile2(identityFile, "runner identity file");
   let value;
   try {
-    value = JSON.parse(await (0, import_promises31.readFile)(identityFile, "utf8"));
+    value = JSON.parse(await (0, import_promises32.readFile)(identityFile, "utf8"));
   } catch {
     throw new Error("runner identity file is not valid JSON");
   }
   const identity = parseIdentity(value);
-  const directory = import_node_path73.default.dirname(identityFile);
+  const directory = import_node_path74.default.dirname(identityFile);
   const privateKeyPath = resolveIdentityChild(directory, identity.privateKeyFile, "privateKeyFile");
   const publicKeyPath = resolveIdentityChild(directory, identity.publicKeyFile, "publicKeyFile");
   await assertPrivateFile2(privateKeyPath, "runner private key file");
@@ -58008,30 +58166,30 @@ function normalizeCapabilities(values) {
   return normalized;
 }
 function relativeFile(value, name) {
-  if (typeof value !== "string" || value.length < 1 || import_node_path73.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
+  if (typeof value !== "string" || value.length < 1 || import_node_path74.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
     throw new Error(`runner identity ${name} must be a relative file within the identity directory`);
   }
   return value;
 }
 function resolveIdentityChild(directory, relative, name) {
-  const resolved = import_node_path73.default.resolve(directory, relative);
-  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path73.default.sep}`)) {
+  const resolved = import_node_path74.default.resolve(directory, relative);
+  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path74.default.sep}`)) {
     throw new Error(`runner identity ${name} escapes the identity directory`);
   }
   return resolved;
 }
 async function prepareIdentityDirectory(directory) {
-  const existing = await (0, import_promises31.lstat)(directory).catch(() => void 0);
+  const existing = await (0, import_promises32.lstat)(directory).catch(() => void 0);
   if (existing && (existing.isSymbolicLink() || !existing.isDirectory())) {
     throw new Error(`runner identity directory is not a directory: ${directory}`);
   }
   if (!existing) {
-    await (0, import_promises31.mkdir)(directory, { recursive: true, mode: 448 });
+    await (0, import_promises32.mkdir)(directory, { recursive: true, mode: 448 });
   }
-  if (process.platform !== "win32") await (0, import_promises31.chmod)(directory, 448);
+  if (process.platform !== "win32") await (0, import_promises32.chmod)(directory, 448);
 }
 async function assertPrivateDirectory(directory, label) {
-  const info = await (0, import_promises31.lstat)(directory).catch(() => void 0);
+  const info = await (0, import_promises32.lstat)(directory).catch(() => void 0);
   if (!info?.isDirectory() || info.isSymbolicLink()) {
     throw new Error(`${label} does not exist or is not a regular directory`);
   }
@@ -58040,7 +58198,7 @@ async function assertPrivateDirectory(directory, label) {
   }
 }
 async function assertPrivateFile2(filePath, label) {
-  const info = await (0, import_promises31.lstat)(filePath).catch(() => void 0);
+  const info = await (0, import_promises32.lstat)(filePath).catch(() => void 0);
   if (!info?.isFile() || info.isSymbolicLink()) throw new Error(`${label} does not exist or is not a regular file`);
   if (process.platform !== "win32" && (info.mode & 63) !== 0) {
     throw new Error(`${label} must not be readable or writable by group or other users`);
@@ -58048,35 +58206,35 @@ async function assertPrivateFile2(filePath, label) {
 }
 async function assertTargetsDoNotExist(files) {
   for (const file2 of files) {
-    if (await (0, import_promises31.lstat)(file2).catch(() => void 0)) {
+    if (await (0, import_promises32.lstat)(file2).catch(() => void 0)) {
       throw new Error(`refusing to overwrite existing runner identity material: ${file2}`);
     }
   }
 }
 async function writeExclusive(filePath, content, mode) {
-  await (0, import_promises31.writeFile)(filePath, content, { encoding: "utf8", flag: "wx", mode });
-  if (process.platform !== "win32") await (0, import_promises31.chmod)(filePath, mode);
+  await (0, import_promises32.writeFile)(filePath, content, { encoding: "utf8", flag: "wx", mode });
+  if (process.platform !== "win32") await (0, import_promises32.chmod)(filePath, mode);
 }
 
 // src/runner/worker.ts
-var import_promises34 = require("node:fs/promises");
-var import_node_os6 = __toESM(require("node:os"), 1);
-var import_node_path76 = __toESM(require("node:path"), 1);
+var import_promises35 = require("node:fs/promises");
+var import_node_os7 = __toESM(require("node:os"), 1);
+var import_node_path77 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/customer-artifacts.ts
-var import_node_crypto23 = require("node:crypto");
+var import_node_crypto24 = require("node:crypto");
 var import_node_fs10 = require("node:fs");
-var import_promises32 = require("node:fs/promises");
-var import_node_path74 = __toESM(require("node:path"), 1);
+var import_promises33 = require("node:fs/promises");
+var import_node_path75 = __toESM(require("node:path"), 1);
 var maximumLocalArtifactBytes = 64 * 1024 * 1024;
 var uuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 function inside(parent, candidate) {
-  const relative = import_node_path74.default.relative(parent, candidate);
-  return relative === "" || relative !== ".." && !relative.startsWith(`..${import_node_path74.default.sep}`) && !import_node_path74.default.isAbsolute(relative);
+  const relative = import_node_path75.default.relative(parent, candidate);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${import_node_path75.default.sep}`) && !import_node_path75.default.isAbsolute(relative);
 }
 async function privateDirectory(directory) {
-  const info = await (0, import_promises32.lstat)(directory);
+  const info = await (0, import_promises33.lstat)(directory);
   if (!info.isDirectory() || info.isSymbolicLink()) {
     throw new Error("customer artifact directory is not a regular directory");
   }
@@ -58090,23 +58248,23 @@ async function persistCustomerRunnerArtifacts(input) {
     throw new Error("customer artifact destination requires canonical run and attempt UUIDs");
   }
   if (input.artifacts.length > 100) throw new Error("too many customer artifacts");
-  const root = import_node_path74.default.resolve(input.root);
-  const workspace = await (0, import_promises32.realpath)(input.workspace);
-  await (0, import_promises32.mkdir)(root, { recursive: true, mode: 448 });
+  const root = import_node_path75.default.resolve(input.root);
+  const workspace = await (0, import_promises33.realpath)(input.workspace);
+  await (0, import_promises33.mkdir)(root, { recursive: true, mode: 448 });
   await privateDirectory(root);
-  const realRoot = await (0, import_promises32.realpath)(root);
+  const realRoot = await (0, import_promises33.realpath)(root);
   if (inside(realRoot, workspace) || inside(workspace, realRoot)) {
     throw new Error("customer artifact root must not overlap the temporary source workspace");
   }
-  const runRoot = import_node_path74.default.join(root, input.job.runId);
-  await (0, import_promises32.mkdir)(runRoot, { mode: 448 }).catch((error51) => {
+  const runRoot = import_node_path75.default.join(root, input.job.runId);
+  await (0, import_promises33.mkdir)(runRoot, { mode: 448 }).catch((error51) => {
     if (error51.code !== "EEXIST") throw error51;
   });
   await privateDirectory(runRoot);
-  const claimPath = import_node_path74.default.join(runRoot, `.claim-${input.job.executionAttemptId}`);
+  const claimPath = import_node_path75.default.join(runRoot, `.claim-${input.job.executionAttemptId}`);
   let claim;
   try {
-    claim = await (0, import_promises32.open)(claimPath, "wx", 384);
+    claim = await (0, import_promises33.open)(claimPath, "wx", 384);
   } catch (error51) {
     if (error51.code === "EEXIST") {
       throw new Error("customer artifact attempt is already claimed; inspect before retrying");
@@ -58115,20 +58273,20 @@ async function persistCustomerRunnerArtifacts(input) {
   }
   try {
     await claim.close();
-    const destination = import_node_path74.default.join(runRoot, input.job.executionAttemptId);
-    const existing = await (0, import_promises32.lstat)(destination).catch((error51) => {
+    const destination = import_node_path75.default.join(runRoot, input.job.executionAttemptId);
+    const existing = await (0, import_promises33.lstat)(destination).catch((error51) => {
       if (error51.code === "ENOENT") return void 0;
       throw error51;
     });
     if (existing) throw new Error("customer artifacts for this run attempt already exist");
-    const staging = await (0, import_promises32.mkdtemp)(import_node_path74.default.join(runRoot, ".pending-"));
+    const staging = await (0, import_promises33.mkdtemp)(import_node_path75.default.join(runRoot, ".pending-"));
     try {
       const manifestArtifacts = [];
       for (const [index, artifact] of input.artifacts.entries()) {
         input.signal?.throwIfAborted();
-        const realSource = await (0, import_promises32.realpath)(artifact.filePath);
+        const realSource = await (0, import_promises33.realpath)(artifact.filePath);
         if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-        const handle = await (0, import_promises32.open)(artifact.filePath, import_node_fs10.constants.O_RDONLY | (import_node_fs10.constants.O_NOFOLLOW ?? 0));
+        const handle = await (0, import_promises33.open)(artifact.filePath, import_node_fs10.constants.O_RDONLY | (import_node_fs10.constants.O_NOFOLLOW ?? 0));
         let content;
         try {
           const stats = await handle.stat();
@@ -58139,12 +58297,12 @@ async function persistCustomerRunnerArtifacts(input) {
         } finally {
           await handle.close();
         }
-        const digest2 = (0, import_node_crypto23.createHash)("sha256").update(content).digest("hex");
-        if (content.length !== artifact.bytes || digest2 !== artifact.sha256) {
+        const digest3 = (0, import_node_crypto24.createHash)("sha256").update(content).digest("hex");
+        if (content.length !== artifact.bytes || digest3 !== artifact.sha256) {
           throw new Error("runner artifact bytes do not match its declaration");
         }
         const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
-        await (0, import_promises32.writeFile)(import_node_path74.default.join(staging, filename), content, { flag: "wx", mode: 384 });
+        await (0, import_promises33.writeFile)(import_node_path75.default.join(staging, filename), content, { flag: "wx", mode: 384 });
         manifestArtifacts.push({
           filename,
           kind: artifact.kind,
@@ -58162,27 +58320,27 @@ async function persistCustomerRunnerArtifacts(input) {
         executionAttemptId: input.job.executionAttemptId,
         artifacts: manifestArtifacts
       };
-      await (0, import_promises32.writeFile)(import_node_path74.default.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}
+      await (0, import_promises33.writeFile)(import_node_path75.default.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}
 `, {
         flag: "wx",
         mode: 384
       });
       input.signal?.throwIfAborted();
-      await (0, import_promises32.rename)(staging, destination);
+      await (0, import_promises33.rename)(staging, destination);
       return input.artifacts.length;
     } catch (error51) {
-      await (0, import_promises32.rm)(staging, { recursive: true, force: true });
+      await (0, import_promises33.rm)(staging, { recursive: true, force: true });
       throw error51;
     }
   } finally {
-    await (0, import_promises32.rm)(claimPath, { force: true });
+    await (0, import_promises33.rm)(claimPath, { force: true });
   }
 }
 
 // src/runner/source.ts
 var import_node_child_process6 = require("node:child_process");
-var import_promises33 = require("node:fs/promises");
-var import_node_path75 = __toESM(require("node:path"), 1);
+var import_promises34 = require("node:fs/promises");
+var import_node_path76 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
 async function checkoutRunnerSource(options) {
   options.signal?.throwIfAborted();
@@ -58190,10 +58348,10 @@ async function checkoutRunnerSource(options) {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
   const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
-  const workspaceRoot = import_node_path75.default.resolve(options.workspaceRoot);
-  await (0, import_promises33.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
-  if (process.platform !== "win32") await (0, import_promises33.chmod)(workspaceRoot, 448);
-  const workspace = await (0, import_promises33.mkdtemp)(import_node_path75.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
+  const workspaceRoot = import_node_path76.default.resolve(options.workspaceRoot);
+  await (0, import_promises34.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
+  if (process.platform !== "win32") await (0, import_promises34.chmod)(workspaceRoot, 448);
+  const workspace = await (0, import_promises34.mkdtemp)(import_node_path76.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
   const git = async (args) => {
@@ -58205,7 +58363,7 @@ async function checkoutRunnerSource(options) {
     });
   };
   try {
-    if (process.platform !== "win32") await (0, import_promises33.chmod)(workspace, 448);
+    if (process.platform !== "win32") await (0, import_promises34.chmod)(workspace, 448);
     await git(["init", "--quiet"]);
     await git(["remote", "add", "origin", repository]);
     await git(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
@@ -58218,7 +58376,7 @@ async function checkoutRunnerSource(options) {
     options.signal?.throwIfAborted();
     return workspace;
   } catch (error51) {
-    await (0, import_promises33.rm)(workspace, { recursive: true, force: true });
+    await (0, import_promises34.rm)(workspace, { recursive: true, force: true });
     throw error51;
   }
 }
@@ -58285,9 +58443,9 @@ function repositoryRemote(job, repositoryMirrorRoot) {
   if (!repositoryMirrorRoot) {
     return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
   }
-  const root = import_node_path75.default.resolve(repositoryMirrorRoot);
-  const candidate = import_node_path75.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
-  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path75.default.sep}`)) {
+  const root = import_node_path76.default.resolve(repositoryMirrorRoot);
+  const candidate = import_node_path76.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
+  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path76.default.sep}`)) {
     throw new Error("repository mirror path escaped the configured mirror root");
   }
   return candidate;
@@ -58321,13 +58479,13 @@ var defaultDependencies2 = {
   executePipeline: async () => {
     throw new Error("runner execution pipeline adapter is not configured");
   },
-  removeWorkspace: async (workspace) => await (0, import_promises34.rm)(workspace, { recursive: true, force: true }),
+  removeWorkspace: async (workspace) => await (0, import_promises35.rm)(workspace, { recursive: true, force: true }),
   recoverCrashWorkspaces: recoverRunnerCrashWorkspaces,
   sleep: abortableSleep,
   log: () => void 0
 };
 function defaultRunnerWorkspaceRoot() {
-  return import_node_path76.default.join(import_node_os6.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
+  return import_node_path77.default.join(import_node_os7.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
 }
 async function runRunnerWorkerOnce(options, overrides = {}) {
   const dependencies = { ...defaultDependencies2, ...overrides };
@@ -58341,7 +58499,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
   const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
   const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
   const workspaceRoot = runnerActiveWorkspaceRoot(
-    import_node_path76.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path77.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   const claim = await client.claim({
@@ -58493,7 +58651,7 @@ async function serveRunnerWorker(options, overrides = {}) {
   const identity = await dependencies.loadIdentity(options.identityFile);
   if (options.signal?.aborted) return;
   const recovered = await dependencies.recoverCrashWorkspaces(
-    import_node_path76.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path77.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   if (recovered > 0) {
@@ -58694,12 +58852,12 @@ async function bestEffortRelinquish(client, job, reason, message) {
   }).catch(() => void 0);
 }
 function runnerActiveWorkspaceRoot(workspaceRoot, runnerId) {
-  return import_node_path76.default.join(import_node_path76.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
+  return import_node_path77.default.join(import_node_path77.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
 }
 async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
-  const root = import_node_path76.default.resolve(workspaceRoot);
-  const namespace = import_node_path76.default.join(root, ".boardreadyops-active");
-  const namespaceInfo = await (0, import_promises34.lstat)(namespace).catch((error51) => {
+  const root = import_node_path77.default.resolve(workspaceRoot);
+  const namespace = import_node_path77.default.join(root, ".boardreadyops-active");
+  const namespaceInfo = await (0, import_promises35.lstat)(namespace).catch((error51) => {
     if (error51.code === "ENOENT") return void 0;
     throw error51;
   });
@@ -58708,7 +58866,7 @@ async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
     throw new Error("runner active workspace namespace is not a regular directory");
   }
   const activeRoot = runnerActiveWorkspaceRoot(root, runnerId);
-  const activeInfo = await (0, import_promises34.lstat)(activeRoot).catch((error51) => {
+  const activeInfo = await (0, import_promises35.lstat)(activeRoot).catch((error51) => {
     if (error51.code === "ENOENT") return void 0;
     throw error51;
   });
@@ -58716,8 +58874,8 @@ async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
   if (activeInfo.isSymbolicLink() || !activeInfo.isDirectory()) {
     throw new Error("runner identity workspace namespace is not a regular directory");
   }
-  const entries = await (0, import_promises34.readdir)(activeRoot);
-  await (0, import_promises34.rm)(activeRoot, { recursive: true, force: true });
+  const entries = await (0, import_promises35.readdir)(activeRoot);
+  await (0, import_promises35.rm)(activeRoot, { recursive: true, force: true });
   return entries.length;
 }
 function boundedSeconds(value, name, minimum, maximum) {
@@ -58763,33 +58921,33 @@ var RunnerShutdownError = class extends Error {
 };
 
 // src/cli/runner-pipeline.ts
-var import_node_crypto24 = require("node:crypto");
-var import_promises35 = require("node:fs/promises");
-var import_node_path77 = __toESM(require("node:path"), 1);
+var import_node_crypto25 = require("node:crypto");
+var import_promises36 = require("node:fs/promises");
+var import_node_path78 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
 async function executeRunnerPipeline(workspace, job, options) {
   options.signal?.throwIfAborted();
-  const relativeOutputDirectory = import_node_path77.default.join(".boardreadyops-runner", job.executionAttemptId);
-  const outputDirectory2 = import_node_path77.default.join(workspace, relativeOutputDirectory);
-  await (0, import_promises35.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
+  const relativeOutputDirectory = import_node_path78.default.join(".boardreadyops-runner", job.executionAttemptId);
+  const outputDirectory2 = import_node_path78.default.join(workspace, relativeOutputDirectory);
+  await (0, import_promises36.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
   const targets = [
     {
       kind: "report/json",
       name: "boardreadyops-result.json",
       role: "primary",
-      relative: import_node_path77.default.join(relativeOutputDirectory, "result.json")
+      relative: import_node_path78.default.join(relativeOutputDirectory, "result.json")
     },
     {
       kind: "report/sarif",
       name: "boardreadyops-result.sarif",
       role: "sarif",
-      relative: import_node_path77.default.join(relativeOutputDirectory, "result.sarif")
+      relative: import_node_path78.default.join(relativeOutputDirectory, "result.sarif")
     },
     {
       kind: "report/markdown",
       name: "boardreadyops-result.md",
       role: "summary",
-      relative: import_node_path77.default.join(relativeOutputDirectory, "result.md")
+      relative: import_node_path78.default.join(relativeOutputDirectory, "result.md")
     }
   ];
   const output = new import_node_stream.Writable({ write: (_chunk, _encoding, callback) => callback() });
@@ -58813,11 +58971,11 @@ async function executeRunnerPipeline(workspace, job, options) {
     options.signal ? { signal: options.signal } : {}
   );
   options.signal?.throwIfAborted();
-  const report = await readRunReport(import_node_path77.default.join(workspace, targets[0].relative));
+  const report = await readRunReport(import_node_path78.default.join(workspace, targets[0].relative));
   const runnerReport = report ? runnerReportFromResult(report) : void 0;
   const artifacts = [];
   for (const target of targets) {
-    const filePath = import_node_path77.default.join(workspace, target.relative);
+    const filePath = import_node_path78.default.join(workspace, target.relative);
     const artifact = await runnerArtifact(filePath, target.kind, target.name, target.role).catch(() => void 0);
     if (artifact) artifacts.push(artifact);
   }
@@ -58828,16 +58986,16 @@ async function executeRunnerPipeline(workspace, job, options) {
   };
 }
 async function runnerArtifact(filePath, kind, name, role) {
-  const info = await (0, import_promises35.stat)(filePath);
+  const info = await (0, import_promises36.stat)(filePath);
   if (!info.isFile() || info.size > 2147483647) throw new Error(`runner artifact is invalid: ${filePath}`);
-  const content = await (0, import_promises35.readFile)(filePath);
+  const content = await (0, import_promises36.readFile)(filePath);
   return {
     kind,
     name,
     role,
     filePath,
     bytes: content.byteLength,
-    sha256: (0, import_node_crypto24.createHash)("sha256").update(content).digest("hex")
+    sha256: (0, import_node_crypto25.createHash)("sha256").update(content).digest("hex")
   };
 }
 function runnerReportFromResult(report) {
@@ -58890,7 +59048,7 @@ function runnerReportFromResult(report) {
 }
 async function readRunReport(filePath) {
   try {
-    const value = JSON.parse(await (0, import_promises35.readFile)(filePath, "utf8"));
+    const value = JSON.parse(await (0, import_promises36.readFile)(filePath, "utf8"));
     return value.schemaVersion === 1 && value.tool?.name === "boardreadyops" && Array.isArray(value.findings) ? value : void 0;
   } catch {
     return void 0;
@@ -58901,12 +59059,12 @@ async function readRunReport(filePath) {
 async function runnerIssueEnrollmentCommand(options, streams) {
   try {
     const issued = await issueRunnerEnrollment({
-      databaseUrlFile: import_node_path78.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path79.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       name: options.name,
       scope: options.scope,
       allowedRepositories: options.repository ?? [],
-      tokenOutputFile: import_node_path78.default.resolve(options.tokenOutput),
+      tokenOutputFile: import_node_path79.default.resolve(options.tokenOutput),
       ...options.ttlSeconds === void 0 ? {} : { ttlSeconds: options.ttlSeconds }
     });
     writeRunnerOutput(
@@ -58930,7 +59088,7 @@ async function runnerIssueEnrollmentCommand(options, streams) {
 async function runnerRevokeRegistrationCommand(options, streams) {
   try {
     const revoked = await revokeRunnerRegistration({
-      databaseUrlFile: import_node_path78.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path79.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       registrationId: options.registrationId,
       actorId: options.actorId,
@@ -58953,8 +59111,8 @@ async function runnerActivateCommand(options, streams) {
   try {
     const activated = await activateRunnerIdentity({
       controlPlaneUrl: options.url,
-      enrollmentTokenFile: import_node_path78.default.resolve(options.enrollmentTokenFile),
-      identityDirectory: import_node_path78.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
+      enrollmentTokenFile: import_node_path79.default.resolve(options.enrollmentTokenFile),
+      identityDirectory: import_node_path79.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
       capabilities: options.capability ?? [],
       labels: options.label ?? []
     });
@@ -59034,20 +59192,20 @@ function workerOptions(options) {
     identityFile: identityPath(options),
     runnerVersion: boardReadyVersion,
     workspaceRoot: workspacePath(options),
-    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path78.default.resolve(options.repositoryMirrorRoot) },
+    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path79.default.resolve(options.repositoryMirrorRoot) },
     ...options.heartbeatSeconds === void 0 ? {} : { heartbeatSeconds: options.heartbeatSeconds },
     ...options.pollSeconds === void 0 ? {} : { pollSeconds: options.pollSeconds },
     requireKicad: options.requireKicad ?? true,
     keepWorkspace: options.keepWorkspace ?? false,
     artifactMode: options.artifactMode ?? "control-plane",
-    ...options.customerArtifactRoot ? { customerArtifactRoot: import_node_path78.default.resolve(options.customerArtifactRoot) } : {}
+    ...options.customerArtifactRoot ? { customerArtifactRoot: import_node_path79.default.resolve(options.customerArtifactRoot) } : {}
   };
 }
 function identityPath(options) {
-  return import_node_path78.default.resolve(options.identity ?? import_node_path78.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
+  return import_node_path79.default.resolve(options.identity ?? import_node_path79.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
 }
 function workspacePath(options) {
-  return import_node_path78.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
+  return import_node_path79.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
 }
 function createRunnerLogger(stream, format) {
   return (event, fields = {}) => {
@@ -59075,7 +59233,7 @@ function safeMessage(error51) {
 }
 
 // src/cli/commands/sbom.ts
-var import_node_path79 = __toESM(require("node:path"), 1);
+var import_node_path80 = __toESM(require("node:path"), 1);
 init_t();
 
 // src/report/component-identity.ts
@@ -59338,7 +59496,7 @@ async function sbomCommand(pathInput, options, streams) {
     return 2;
   }
   const locale = resolveLocale();
-  const root = await canonicalRoot(import_node_path79.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path80.default.resolve(normalizePathInput(pathInput ?? ".")));
   const loaded = await loadConfig(root, options.config);
   if (loaded.errors.length > 0) {
     for (const error51 of loaded.errors) {
@@ -59372,7 +59530,7 @@ async function writeHbom(root, output, content, stdout) {
     stdout.write(content);
     return;
   }
-  await writeTextFile(import_node_path79.default.resolve(root, normalizePathInput(output)), content);
+  await writeTextFile(import_node_path80.default.resolve(root, normalizePathInput(output)), content);
 }
 
 // schemas/agent-plan.schema.json
@@ -61089,12 +61247,12 @@ function assuranceLine(profile) {
 }
 
 // src/cli/commands/verify-export-attestation.ts
-var import_promises36 = __toESM(require("node:fs/promises"), 1);
-var import_node_path80 = __toESM(require("node:path"), 1);
+var import_promises37 = __toESM(require("node:fs/promises"), 1);
+var import_node_path81 = __toESM(require("node:path"), 1);
 init_path();
 async function exportVerifyCommand(pathInput, options, streams) {
   try {
-    const root = await import_promises36.default.realpath(import_node_path80.default.resolve(normalizePathInput(pathInput)));
+    const root = await import_promises37.default.realpath(import_node_path81.default.resolve(normalizePathInput(pathInput)));
     const attempt = Number(options.runAttempt);
     const result = await verifyReviewedExportAttestation({
       root,
@@ -61266,7 +61424,10 @@ function registerAllCommands(program2, streams) {
   );
   const review = program2.command("review").description("manage and publish hardware reviews");
   addCommonOptions(
-    review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
+    review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option(
+      "--native-visuals",
+      "explicitly upload KiCad-native PCB/schematic artwork (may disclose detailed design IP)"
+    ).option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
   ).action(async (pathInput, options) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
   });
@@ -61388,7 +61549,7 @@ function isCommanderDisplay(error51) {
   return error51 instanceof Error && "code" in error51 && (error51.code === "commander.helpDisplayed" || error51.code === "commander.version");
 }
 var cliEntry = process.argv.at(1);
-var cliEntryName = cliEntry ? import_node_path81.default.basename(cliEntry) : "";
+var cliEntryName = cliEntry ? import_node_path82.default.basename(cliEntry) : "";
 if (cliEntry && !process.env.VITEST && (cliEntryName === "boardreadyops" || cliEntryName === "index.ts" || cliEntryName === "index.js" || cliEntryName === "index.cjs")) {
   void runCli(process.argv.slice(2)).then((code) => {
     process.exitCode = code;
