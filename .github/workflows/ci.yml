@@ -350,8 +350,11 @@ jobs:
       - name: Install KiCad ${{ matrix.kicad-version }}
         run: |
           set -euo pipefail
-          sudo add-apt-repository --yes "ppa:kicad/kicad-${{ matrix.kicad-ppa-series }}-releases"
-          sudo apt-get update -qq
+          # Suppress the implicit PPA update and fetch signed package indexes once.
+          # Launchpad Translation-en intermittently returns HTTP 503; it is not
+          # needed for package selection or signature verification.
+          sudo add-apt-repository --yes --no-update "ppa:kicad/kicad-${{ matrix.kicad-ppa-series }}-releases"
+          sudo apt-get update -o Acquire::Languages=none -qq
           sudo apt-get install --yes kicad
           version="$(kicad-cli version)"
           echo "kicad-cli ${version}"
