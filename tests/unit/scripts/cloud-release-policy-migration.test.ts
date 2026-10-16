@@ -116,7 +116,10 @@ esac
   };
 }
 
-describe("non-secret policy bind-mount migration", () => {
+// This operator script targets Linux Docker hosts; BSD stat/Windows shells are not its contract.
+const describeOnLinux = process.platform === "linux" ? describe : describe.skip;
+
+describeOnLinux("non-secret policy bind-mount migration", () => {
   it("checks image pinning before any write or consumer recreation", () => {
     const f = fixture();
     const ok = f.run("--check");
