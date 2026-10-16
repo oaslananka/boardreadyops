@@ -5,7 +5,7 @@ import PoliciesClient from "./policies-client.js";
 
 export const metadata = {
   title: "Organization Policies",
-  description: "Inheritance: Organization → Team → Repository → Review exception. No hidden precedence.",
+  description: "Hosted review policies use organization baselines with repository overrides. Team and review exceptions are not enforced.",
 };
 
 export const dynamic = "force-dynamic";
@@ -21,8 +21,7 @@ export default function PoliciesPage() {
         <header>
           <h1 className="text-2xl font-bold text-foreground">Organization Governance & Release Policies</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Release gates and verification rules bound to SHA-256 evidence digests. Inheritance: Organization → Team →
-            Repository → Review exception.
+            Hosted review enforcement uses organization policies and repository overrides. Team and review exceptions are not enforced; repository overrides can relax some organization rules.
           </p>
         </header>
 
