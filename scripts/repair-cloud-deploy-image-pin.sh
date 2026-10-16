@@ -27,6 +27,9 @@ fail() { printf 'cloud-image-pin: %s\n' "$1" >&2; exit 78; }
 bash -n "${wrapper}" || fail 'existing wrapper fails bash syntax check'
 
 count_line() { local needle="$1"; grep -Fxc -- "${needle}" "${wrapper}" || true; }
+# A second assignment would override even the corrected pinning guard.
+assignment_count="$(grep -Ec '^[[:space:]]*(export[[:space:]]+)?BOARDREADYOPS_IMAGE_TAG=' "${wrapper}" || true)"
+[[ "${assignment_count}" = 1 ]] || fail 'wrapper must contain exactly one image tag assignment'
 legacy_count="$(count_line "${legacy}")"
 patched_count="$(count_line "${new_line}")"
 case "${legacy_count}:${patched_count}" in
