@@ -30,10 +30,11 @@ type ArtifactDetail = RunDetail["artifacts"][number];
 type AttemptDetail = RunDetail["attempts"][number];
 type FindingDetail = RunDetail["findings"][number];
 
-export type RunView = "artifacts" | "attempts" | "audit" | "findings" | "publication" | "summary";
+export type RunView = "artifacts" | "attempts" | "audit" | "design" | "findings" | "publication" | "summary";
 
 const navigationItems: ReadonlyArray<{ view: RunView; label: string; suffix: string }> = [
   { view: "summary", label: "Summary", suffix: "" },
+  { view: "design", label: "PCB / Schematic", suffix: "/design" },
   { view: "attempts", label: "Attempts", suffix: "/attempts" },
   { view: "findings", label: "Findings", suffix: "/findings" },
   { view: "artifacts", label: "Artifacts", suffix: "/artifacts" },
@@ -83,7 +84,7 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
           </span>
         </p>
       </div>
-      <div className="flex min-w-0 flex-col items-start gap-3 lg:shrink-0 lg:items-end">
+      <div className="flex min-w-0 flex-col items-start gap-3 lg:max-w-sm lg:shrink lg:items-end">
         <fieldset>
           <legend className="sr-only">Readiness score</legend>
           <div className="run-readiness-signature flex flex-col items-center rounded-md border border-border bg-muted px-4 py-2">
