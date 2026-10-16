@@ -72,6 +72,7 @@ describe("ReviewsListPage", () => {
 
     const markup = await render();
     expect(markup).toContain("Add ESD protection to USB-C port");
+    expect(markup).not.toContain('aria-label="Example PCB and schematic design views"');
     expect(markup).toContain("acme/board");
     expect(markup).toContain('href="/reviews/rev_real_1"');
     expect(markup).toContain(">1</strong> awaiting a decision");
@@ -86,6 +87,8 @@ describe("ReviewsListPage", () => {
     expect(markup).toContain('href="/api/auth/github/login"');
     expect(markup).toContain("Sign in with GitHub");
     expect(markup).not.toContain("awaiting a decision");
+    expect(markup).toContain('aria-label="Example PCB and schematic design views"');
+    expect(markup).toContain("Example only");
   });
 
   it("uses CAD-format-neutral copy, not a KiCad-specific claim", () => {
@@ -126,10 +129,15 @@ describe("ReviewsListPage", () => {
     loadViewerReviews.mockResolvedValue({ state: "ok", next: undefined, reviews: [] });
     const markup = await render();
     expect(markup).not.toContain("Review filters");
-    expect(markup).toContain("No hardware reviews found");
-    expect(markup).toContain("Historical Runs remain in run history");
+    expect(markup).toContain('aria-label="Example PCB and schematic design views"');
+    expect(markup).toContain("See the design, not just a report");
+    expect(markup).toContain("Sample designs, not your repository");
+    expect(markup).toContain("not recorded findings or manufacturing approval");
+    expect(markup).toContain("/demo/zaptrace-sample-pcb.png");
+    expect(markup).toContain("/demo/zaptrace-sample-schematic.png");
     expect(markup).toContain('href="/runs"');
-    expect(markup).toContain("Browse run history");
-    expect(markup).toContain('data-slot="button"');
+    expect(markup).toContain("Browse your runs");
+    expect(markup).toContain("Publish your first Review");
+    expect(markup.indexOf("See the design, not just a report")).toBeLessThan(markup.indexOf('id="publish-review"'));
   });
 });

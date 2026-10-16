@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
 import { ReviewListFilterBar } from "../../components/review/review-list-filters.js";
 import { ReviewListItem } from "../../components/review/review-list-item.js";
 import { Button } from "../../components/ui/button.js";
@@ -128,6 +129,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
           <header>
             <h1 className="text-2xl font-bold text-foreground">Hardware Reviews</h1>
           </header>
+          <ReviewEmptyVisualPreview />
           <Panel title="Sign in required">
             <EmptyState
               title="Reviews are scoped to your installations"
@@ -154,7 +156,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
   // The bundled demo reviews carry full finding detail, so they keep the richer card; database
   // rows only have what the listing query selects, which is a table's worth. Both go through the
   // same filter so the two shapes cannot diverge in what a filter means.
-  let reviewsBody = <NoReviews />;
+  let reviewsBody = <ReviewEmptyVisualPreview />;
   let shown = 0;
   if (listing.state === "fixtures") {
     const visible = applyReviewListFilters(listing.reviews, filters);
@@ -198,7 +200,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
           </p>
         </header>
 
-        <ReviewPublishingGuidance />
+        {total > 0 ? <ReviewPublishingGuidance /> : null}
 
         {total > 0 ? (
           <ReviewListFilterBar
@@ -214,6 +216,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
         ) : null}
 
         {reviewsBody}
+        {total === 0 ? <ReviewPublishingGuidance /> : null}
       </main>
     </AppShell>
   );
