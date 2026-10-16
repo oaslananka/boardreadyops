@@ -46,7 +46,9 @@ function fixture() {
 function evaluatePinnedTag(wrapper: string, given?: string) {
   const lines = fs.readFileSync(wrapper, "utf8").split("\n");
   const start = lines.findIndex((line) => line.startsWith(`if [[ -n "${shell}{BOARDREADYOPS_IMAGE_TAG:-}"`));
-  const end = lines.indexOf(`export BOARDREADYOPS_IMAGE_TAG="${shell}{BOARDREADYOPS_IMAGE_TAG:-${shell}{BOARDREADYOPS_GIT_SHA}}"`);
+  const end = lines.indexOf(
+    `export BOARDREADYOPS_IMAGE_TAG="${shell}{BOARDREADYOPS_IMAGE_TAG:-${shell}{BOARDREADYOPS_GIT_SHA}}"`,
+  );
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
   const script = [
