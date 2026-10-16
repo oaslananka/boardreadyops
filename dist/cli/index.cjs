@@ -30934,7 +30934,7 @@ var init_summary = __esm({
 
 // src/report/markdown.ts
 function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
-  const fabricationView = fabrication ? formatFabricationDiff(fabrication, locale) : void 0;
+  const fabricationView = fabrication && !result.hardwareImpact ? formatFabricationDiff(fabrication, locale) : void 0;
   const topFindings2 = result.findings.slice(0, 10).map(markdownFinding);
   const fixFindings = result.findings.filter((finding2) => finding2.fix).slice(0, 10).map(markdownFinding);
   const plugins = (result.plugins ?? []).map((plugin) => ({

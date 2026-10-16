@@ -97262,7 +97262,7 @@ var summary_default = "# {{labels.reportTitle}}\n\n| {{labels.metric}} | {{label
 // src/report/markdown.ts
 var stickyMarker = "<!-- boardreadyops:sticky:v1 -->";
 function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
-  const fabricationView = fabrication ? formatFabricationDiff(fabrication, locale) : void 0;
+  const fabricationView = fabrication && !result.hardwareImpact ? formatFabricationDiff(fabrication, locale) : void 0;
   const topFindings3 = result.findings.slice(0, 10).map(markdownFinding);
   const fixFindings = result.findings.filter((finding2) => finding2.fix).slice(0, 10).map(markdownFinding);
   const plugins = (result.plugins ?? []).map((plugin) => ({
@@ -138358,7 +138358,11 @@ async function upsertPullRequestComment(result, artifactName2, format = "report"
     return "";
   }
   const octokit = getOctokit(token);
-  const body2 = format === "review" ? formatReviewComment(result, reviewReports(artifactName2)) : formatMarkdown(result, [], await fabricationDiff(token, owner, repo, artifactName2, pull, result));
+  const body2 = format === "review" ? formatReviewComment(result, reviewReports(artifactName2)) : formatMarkdown(
+    result,
+    [],
+    result.hardwareImpact ? void 0 : await fabricationDiff(token, owner, repo, artifactName2, pull, result)
+  );
   const comments = await octokit.paginate(octokit.rest.issues.listComments, {
     owner,
     repo,

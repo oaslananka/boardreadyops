@@ -29,7 +29,11 @@ export async function upsertPullRequestComment(
   const body =
     format === "review"
       ? formatReviewComment(result, reviewReports(artifactName))
-      : formatMarkdown(result, [], await fabricationDiff(token, owner, repo, artifactName, pull, result));
+      : formatMarkdown(
+          result,
+          [],
+          result.hardwareImpact ? undefined : await fabricationDiff(token, owner, repo, artifactName, pull, result),
+        );
   const comments = await octokit.paginate(octokit.rest.issues.listComments, {
     owner,
     repo,

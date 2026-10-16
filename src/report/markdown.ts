@@ -23,7 +23,10 @@ export function formatMarkdown(
   fabrication?: FabricationDiff,
   locale: Locale = "en",
 ): string {
-  const fabricationView = fabrication ? formatFabricationDiff(fabrication, locale) : undefined;
+  // Canonical exact-PR-base impact and the legacy last-run comparison use different baselines.
+  // Never display both as though they describe the same change.
+  const fabricationView =
+    fabrication && !result.hardwareImpact ? formatFabricationDiff(fabrication, locale) : undefined;
   const topFindings = result.findings.slice(0, 10).map(markdownFinding);
   const fixFindings = result.findings
     .filter((finding) => finding.fix)

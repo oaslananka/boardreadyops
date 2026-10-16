@@ -1,6 +1,7 @@
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import findingsSchema from "../../../schemas/findings.schema.json" with { type: "json" };
+import { diffFabrication } from "../../../src/core/diff/fabrication.js";
 import { createFinding, summarizeFindings } from "../../../src/core/findings.js";
 import type { RunResult } from "../../../src/core/result.js";
 import { formatJson } from "../../../src/report/json.js";
@@ -285,6 +286,48 @@ describe("report formats", () => {
     expect(body).toContain("Risk direction: increased");
     expect(body).toContain("Affected domains: readiness, findings, bom, manufacturing");
     expect(body).toContain("not fabrication authorization");
+  });
+
+  it("shows one canonical PR base comparison when legacy previous-run values disagree", () => {
+    const result = sampleResult([]);
+    result.hardwareImpact = {
+      version: 1,
+      baseline: { status: "available", sha: "a".repeat(40) },
+      candidate: { sha: "b".repeat(40) },
+      facts: {
+        readiness: {
+          previousScore: 76,
+          currentScore: 31,
+          scoreDelta: -45,
+          previousStatus: "ready",
+          currentStatus: "at-risk",
+          statusChanged: true,
+        },
+        findings: { added: 3, resolved: 0, addedBlocking: 3, resolvedBlocking: 0 },
+        bom: { added: 0, removed: 0, changed: 0, truncated: false },
+        manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 1 },
+      },
+      assessment: { materialChange: true, riskDirection: "increased", affectedDomains: ["manufacturing"] },
+      evidence: [],
+    };
+    const legacyDiff = diffFabrication(
+      { bom: [], outputs: [{ kind: "drill", files: [{ path: "fab/board.drl", digest: "same" }] }] },
+      { bom: [], outputs: [{ kind: "drill", files: [{ path: "fab/board.drl", digest: "same" }] }] },
+      [],
+      [],
+    );
+    const exactBase = formatMarkdown(result, [], legacyDiff);
+    expect(exactBase).toContain("## Hardware Change Impact");
+    expect(exactBase).toContain("Manufacturing outputs: 0 added, 0 removed, 1 changed");
+    expect(exactBase).not.toContain("## Fabrication Changes");
+    // When the exact base is unavailable, an unrelated last-run diff must not look like the PR comparison.
+    result.hardwareImpact.baseline = { status: "unavailable", sha: "a".repeat(40), reason: "not-found" };
+    const unavailable = formatMarkdown(result, [], legacyDiff);
+    expect(unavailable).toContain("Exact-base comparison unavailable");
+    expect(unavailable).not.toContain("## Fabrication Changes");
+    expect(unavailable).not.toContain("Manufacturing outputs: 0 added");
+    // Historical no-impact callers still retain their existing legacy-diff report.
+    expect(formatMarkdown(sampleResult([]), [], legacyDiff)).toContain("## Fabrication Changes");
   });
 
   it("renders a positive readiness score delta with an explicit plus sign", () => {
