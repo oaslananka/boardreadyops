@@ -8,56 +8,52 @@ import { runProcess } from "../util/process.js";
 const MAX_SVG_BYTES = 2 * 1024 * 1024;
 const MAX_SHEETS = 16;
 const EXPORT_TIMEOUT_MS = 45_000;
+const PROCESS_LIMITS = { timeoutMs: EXPORT_TIMEOUT_MS, maxStdoutBytes: 8192, maxStderrBytes: 8192 };
 
-function digest(input: Buffer | string): string {
-  return createHash("sha256").update(input).digest("hex");
+function digest(value: string | Buffer): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
-/**
- * Accept only self-contained SVG exported by the local KiCad CLI.
- * In particular, do not preserve an external DTD or allow externally linked
- * resources in an image that will later be displayed in a browser.
- */
+function sourceDigest(file: string): Promise<string> {
+  return fs.readFile(file).then(digest);
+}
+
+/** Native output is still untrusted browser-bound content. */
 export function normalizeKicadSvg(raw: string): { svg: string; width: number; height: number } | undefined {
   const svg = raw
     .replace(/<\?xml[^?]*\?>/giu, "")
     .replace(/<!DOCTYPE\s+svg\s+PUBLIC\s+["'][^"']+["']\s+["'][^"']+["']\s*>/giu, "")
     .trim();
+  if (Buffer.byteLength(svg, "utf8") > MAX_SVG_BYTES || !svg.includes("</svg>")) return undefined;
   const opening = /<svg\b[^>]*>/isu.exec(svg)?.[0];
-  const dimensions =
-    opening && /\bviewBox\s*=\s*["']\s*([+-]?[\d.]+)\s+([+-]?[\d.]+)\s+([\d.]+)\s+([\d.]+)\s*["']/iu.exec(opening);
-  if (!opening || !dimensions || !svg.includes("</svg>")) return undefined;
-  const width = Number(dimensions[3]);
-  const height = Number(dimensions[4]);
-  if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) return undefined;
-  if (Buffer.byteLength(svg, "utf8") > MAX_SVG_BYTES) return undefined;
-  if (/<(?:script|foreignObject|iframe|object|embed|animate|set)\b|<!ENTITY\b|@import\b/iu.test(svg)) {
+  const coordinates = opening
+    ?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]
+    ?.trim()
+    .split(/\s+/u)
+    .map(Number);
+  if (coordinates?.length !== 4) return undefined;
+  const width = coordinates[2];
+  const height = coordinates[3];
+  if (!width || !height || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
     return undefined;
-  }
+  if (/<(?:script|foreignObject|iframe|object|embed|animate|set)\b|<!ENTITY\b|@import\b/iu.test(svg)) return undefined;
   if (/\son[a-z]+\s*=/iu.test(svg)) return undefined;
-  for (const match of svg.matchAll(/\b(?:xlink:)?href\s*=\s*["']([^"']+)["']/giu)) {
-    if (!match[1]?.startsWith("#")) return undefined;
-  }
-  // SVG filter/fill URLs are limited to fragment references within the exported SVG.
-  for (const match of svg.matchAll(/url\(\s*["']?([^)"']+)/giu)) {
-    if (!match[1]?.trim().startsWith("#")) return undefined;
-  }
+  if ([...svg.matchAll(/\b(?:xlink:)?href\s*=\s*["']([^"']+)["']/giu)].some((match) => !match[1]?.startsWith("#")))
+    return undefined;
+  if ([...svg.matchAll(/url\(\s*["']?([^)"']+)/giu)].some((match) => !match[1]?.trim().startsWith("#")))
+    return undefined;
   return { svg, width, height };
-}
-
-async function sourceDigest(file: string): Promise<string> {
-  return digest(await fs.readFile(file));
 }
 
 async function collectSvg(
   output: string,
   beforeSha: string,
   sourceFile: string,
-  kind: SnapshotArtifact["kind"],
+  kind: "schematic" | "pcb_layer",
   label: string,
 ): Promise<SnapshotArtifact | undefined> {
   const buffer = await fs.readFile(output);
-  if (buffer.length === 0 || buffer.length > MAX_SVG_BYTES) return undefined;
+  if (!buffer.length || buffer.length > MAX_SVG_BYTES) return undefined;
   const normalized = normalizeKicadSvg(buffer.toString("utf8"));
   if (!normalized || (await sourceDigest(sourceFile)) !== beforeSha) return undefined;
   const id = digest([beforeSha, label].join(":")).slice(0, 16);
@@ -71,16 +67,115 @@ async function collectSvg(
     height: normalized.height,
     content: normalized.svg,
     sha256: digest(normalized.svg),
-    // Do not overlay synthetic component or fault coordinates onto a native plot.
+    // Summary anchors cannot be mapped to genuine KiCad coordinates.
     anchors: [],
   };
 }
 
-/**
- * No network or hosted KiCad calls. The native SVG is produced in a temporary
- * directory from the exact local file given by the authenticated publisher.
- * Missing/incompatible KiCad simply returns no native images to the caller.
- */
+async function stageSource(sourceFile: string, tempRoot: string, sourceSha: string): Promise<string | undefined> {
+  const stage = path.join(tempRoot, "source");
+  await fs.mkdir(stage);
+  const input = path.join(stage, path.basename(sourceFile));
+  await fs.copyFile(sourceFile, input);
+  const adjacent = (await fs.readdir(path.dirname(sourceFile), { withFileTypes: true }))
+    .filter(
+      (entry) =>
+        entry.isFile() && /\.(kicad_sch|kicad_pro)$/iu.test(entry.name) && entry.name !== path.basename(sourceFile),
+    )
+    .slice(0, 32);
+  await Promise.all(
+    adjacent.map(async ({ name }) => {
+      const from = path.join(path.dirname(sourceFile), name);
+      if ((await fs.stat(from)).size <= MAX_SVG_BYTES * 4) await fs.copyFile(from, path.join(stage, name));
+    }),
+  );
+  return (await sourceDigest(input)) === sourceSha ? input : undefined;
+}
+
+async function pcbLayer(
+  cliPath: string,
+  input: string,
+  original: string,
+  beforeSha: string,
+  tempRoot: string,
+  label: string,
+  layer: string,
+): Promise<SnapshotArtifact | undefined> {
+  if (!/^(?:F|B|In\d+)\.Cu$/u.test(layer)) return undefined;
+  const extras = layer === "F.Cu" ? ["F.SilkS"] : layer === "B.Cu" ? ["B.SilkS"] : [];
+  const output = path.join(tempRoot, `pcb-${layer.replaceAll(".", "_")}.svg`);
+  const result = await runProcess(
+    cliPath,
+    [
+      "pcb",
+      "export",
+      "svg",
+      "--layers",
+      [layer, ...extras, "Edge.Cuts"].join(","),
+      "--mode-single",
+      "--fit-page-to-board",
+      "--output",
+      output,
+      input,
+    ],
+    PROCESS_LIMITS,
+  );
+  if (result.code !== 0 || result.timedOut) return undefined;
+  return collectSvg(output, beforeSha, original, "pcb_layer", `${label} / ${layer}`).catch(() => undefined);
+}
+
+async function pcbSnapshots(
+  cliPath: string,
+  input: string,
+  original: string,
+  beforeSha: string,
+  tempRoot: string,
+  label: string,
+  layers: string[],
+): Promise<SnapshotArtifact[]> {
+  const found = await Promise.all(
+    [...new Set(layers)]
+      .slice(0, MAX_SHEETS)
+      .map((layer) => pcbLayer(cliPath, input, original, beforeSha, tempRoot, label, layer)),
+  );
+  return found.filter((artifact): artifact is SnapshotArtifact => artifact !== undefined);
+}
+
+async function schematicSnapshots(
+  cliPath: string,
+  input: string,
+  original: string,
+  beforeSha: string,
+  tempRoot: string,
+  label: string,
+): Promise<SnapshotArtifact[]> {
+  const outputDirectory = path.join(tempRoot, "sheets");
+  await fs.mkdir(outputDirectory, { recursive: true });
+  const result = await runProcess(
+    cliPath,
+    ["sch", "export", "svg", "--output", outputDirectory, input],
+    PROCESS_LIMITS,
+  );
+  if (result.code !== 0 || result.timedOut) return [];
+  const names = (await fs.readdir(outputDirectory))
+    .filter((name) => name.endsWith(".svg"))
+    .sort()
+    .slice(0, MAX_SHEETS);
+  const found = await Promise.all(
+    names.map((name) =>
+      collectSvg(
+        path.join(outputDirectory, name),
+        beforeSha,
+        original,
+        "schematic",
+        `${label} / ${name.replace(/\.svg$/iu, "")}`,
+      ).catch(() => undefined),
+    ),
+  );
+  return found.filter((artifact): artifact is SnapshotArtifact => artifact !== undefined);
+}
+
+/** Locally plot in an isolated, temporary KiCad project copy. */
 export async function exportNativeKicadSnapshots(
   cliPath: string,
   sourceFile: string,
@@ -91,84 +186,12 @@ export async function exportNativeKicadSnapshots(
   if (!beforeSha) return [];
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-native-svg-"));
   const label = path.basename(sourceFile).replace(/\.(kicad_sch|kicad_pcb)$/iu, "");
-  const exports: SnapshotArtifact[] = [];
-
   try {
-    // KiCad may create .kicad_prl beside its input. Render against a temporary
-    // read-only-in-practice copy so the customer's source workspace stays clean.
-    // Carry adjacent project sheets/settings needed for conventional hierarchies.
-    const staging = path.join(directory, "source");
-    await fs.mkdir(staging);
-    const sourceDir = path.dirname(sourceFile);
-    const inputFile = path.join(staging, path.basename(sourceFile));
-    await fs.copyFile(sourceFile, inputFile);
-    const adjacent = (await fs.readdir(sourceDir, { withFileTypes: true }))
-      .filter((entry) => entry.isFile() && /\.(kicad_sch|kicad_pro)$/iu.test(entry.name))
-      .slice(0, 32);
-    for (const entry of adjacent) {
-      if (entry.name === path.basename(sourceFile)) continue;
-      const from = path.join(sourceDir, entry.name);
-      const stat = await fs.stat(from);
-      if (stat.size <= MAX_SVG_BYTES * 4) await fs.copyFile(from, path.join(staging, entry.name));
-    }
-    if ((await sourceDigest(inputFile)) !== beforeSha) return [];
-
-    if (kind === "pcb_layer") {
-      for (const layer of layers.slice(0, MAX_SHEETS)) {
-        if (!/^(?:F|B|In\d+)\.Cu$/u.test(layer)) continue;
-        const supportingLayers: string[] = [];
-        if (layer === "F.Cu") supportingLayers.push("F.SilkS");
-        if (layer === "B.Cu") supportingLayers.push("B.SilkS");
-        const output = path.join(directory, `pcb-${layer.replaceAll(".", "_")}.svg`);
-        const processResult = await runProcess(
-          cliPath,
-          [
-            "pcb",
-            "export",
-            "svg",
-            "--layers",
-            [layer, ...supportingLayers, "Edge.Cuts"].join(","),
-            "--mode-single",
-            "--fit-page-to-board",
-            "--output",
-            output,
-            inputFile,
-          ],
-          { timeoutMs: EXPORT_TIMEOUT_MS, maxStdoutBytes: 8192, maxStderrBytes: 8192 },
-        );
-        if (processResult.code !== 0 || processResult.timedOut) continue;
-        const artifact = await collectSvg(output, beforeSha, sourceFile, "pcb_layer", `${label} / ${layer}`).catch(
-          () => undefined,
-        );
-        if (artifact) exports.push(artifact);
-      }
-    } else {
-      const outputDirectory = path.join(directory, "sheets");
-      await fs.mkdir(outputDirectory, { recursive: true });
-      const result = await runProcess(cliPath, ["sch", "export", "svg", "--output", outputDirectory, inputFile], {
-        timeoutMs: EXPORT_TIMEOUT_MS,
-        maxStdoutBytes: 8192,
-        maxStderrBytes: 8192,
-      });
-      if (result.code === 0 && !result.timedOut) {
-        const names = (await fs.readdir(outputDirectory))
-          .filter((name) => name.endsWith(".svg"))
-          .sort()
-          .slice(0, MAX_SHEETS);
-        for (const name of names) {
-          const sheetName = name.replace(/\.svg$/iu, "");
-          const artifact = await collectSvg(
-            path.join(outputDirectory, name),
-            beforeSha,
-            sourceFile,
-            "schematic",
-            `${label} / ${sheetName}`,
-          ).catch(() => undefined);
-          if (artifact) exports.push(artifact);
-        }
-      }
-    }
-    return exports;
+    const staged = await stageSource(sourceFile, directory, beforeSha);
+    if (!staged) return [];
+    return kind === "pcb_layer"
+      ? await pcbSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label, layers)
+      : await schematicSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label);
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }

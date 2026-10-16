@@ -87,44 +87,47 @@ async function renderPcbFile(file: string, findings?: SnapshotFinding[]): Promis
   return artifacts;
 }
 
+async function schematicOrSummary(
+  file: string,
+  cliPath: string | undefined,
+  findings: SnapshotFinding[] | undefined,
+): Promise<SnapshotArtifact[]> {
+  const native = cliPath ? await exportNativeKicadSnapshots(cliPath, file, "schematic").catch(() => []) : [];
+  if (native.length) return native;
+  const summary = await renderSchematicFile(file, findings);
+  return summary ? [summary] : [];
+}
+
+async function pcbOrSummary(
+  file: string,
+  cliPath: string | undefined,
+  findings: SnapshotFinding[] | undefined,
+): Promise<SnapshotArtifact[]> {
+  if (cliPath) {
+    const layers = await parsePcb(file)
+      .then((pcb) => pcb.copperLayers)
+      .catch(() => []);
+    const native = await exportNativeKicadSnapshots(
+      cliPath,
+      file,
+      "pcb_layer",
+      layers.length ? layers : ["F.Cu", "B.Cu"],
+    ).catch(() => []);
+    if (native.length) return native;
+  }
+  return renderPcbFile(file, findings);
+}
+
 export async function generateSnapshots(options: GenerateSnapshotsOptions): Promise<SnapshotArtifact[]> {
-  const artifacts: SnapshotArtifact[] = [];
   const cli =
     options.nativeCli === false
       ? undefined
       : await detectKicadCli(typeof options.nativeCli === "string" ? options.nativeCli : undefined);
   const nativeCliPath = cli?.found ? cli.path : undefined;
-
-  for (const file of options.schematicFiles ?? []) {
-    const native = nativeCliPath
-      ? await exportNativeKicadSnapshots(nativeCliPath, file, "schematic").catch(() => [])
-      : [];
-    if (native.length) {
-      artifacts.push(...native);
-      continue;
-    }
-    const artifact = await renderSchematicFile(file, options.findings);
-    if (artifact) artifacts.push(artifact);
-  }
-
-  for (const file of options.pcbFiles ?? []) {
-    const parsedLayers = await parsePcb(file)
-      .then((pcb) => pcb.copperLayers)
-      .catch(() => []);
-    const native = nativeCliPath
-      ? await exportNativeKicadSnapshots(
-          nativeCliPath,
-          file,
-          "pcb_layer",
-          parsedLayers.length ? parsedLayers : ["F.Cu", "B.Cu"],
-        ).catch(() => [])
-      : [];
-    if (native.length) {
-      artifacts.push(...native);
-      continue;
-    }
-    artifacts.push(...(await renderPcbFile(file, options.findings)));
-  }
-
-  return artifacts.slice(0, 64);
+  const schematics = (options.schematicFiles ?? []).map((file) =>
+    schematicOrSummary(file, nativeCliPath, options.findings),
+  );
+  const boards = (options.pcbFiles ?? []).map((file) => pcbOrSummary(file, nativeCliPath, options.findings));
+  const rendered = await Promise.all([...schematics, ...boards]);
+  return rendered.flat().slice(0, 64);
 }
