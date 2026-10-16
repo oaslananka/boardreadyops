@@ -246,6 +246,77 @@ describe("report formats", () => {
     expect(populated).not.toMatch(/{{|}}/);
   });
 
+  it("includes structured hardware impact in the default Action PR Markdown report", () => {
+    const result = sampleResult([]);
+    result.hardwareImpact = {
+      version: 1,
+      baseline: { status: "available", sha: "a".repeat(40) },
+      candidate: { sha: "b".repeat(40) },
+      facts: {
+        readiness: {
+          previousScore: 82,
+          currentScore: 71,
+          scoreDelta: -11,
+          previousStatus: "ready",
+          currentStatus: "at-risk",
+          statusChanged: true,
+          conclusion: { previous: "passed", current: "failed", changed: true },
+        },
+        findings: { added: 2, resolved: 1, addedBlocking: 1, resolvedBlocking: 0, worsened: 1, improved: 0 },
+        bom: { added: 1, removed: 0, changed: 2, truncated: false },
+        manufacturing: { outputsAdded: 0, outputsRemoved: 1, outputsChanged: 0 },
+      },
+      assessment: {
+        materialChange: true,
+        riskDirection: "increased",
+        affectedDomains: ["readiness", "findings", "bom", "manufacturing"],
+      },
+      evidence: [],
+    };
+    const body = formatMarkdown(result);
+    expect(body).toContain("## Hardware Change Impact");
+    expect(body).toContain(`Base commit: \`${"a".repeat(40)}\``);
+    expect(body).toContain(`Candidate commit: \`${"b".repeat(40)}\``);
+    expect(body).toContain("Release conclusion: passed → failed");
+    expect(body).toContain("Readiness score: 82 → 71 (-11)");
+    expect(body).toContain("2 added, 1 resolved");
+    expect(body).toContain("BOM: 1 added, 0 removed, 2 changed");
+    expect(body).toContain("Manufacturing outputs: 0 added, 1 removed, 0 changed");
+    expect(body).toContain("Risk direction: increased");
+    expect(body).toContain("Affected domains: readiness, findings, bom, manufacturing");
+    expect(body).toContain("not fabrication authorization");
+  });
+
+  it("never invents a material delta when the exact base is unavailable", () => {
+    const result = sampleResult([]);
+    result.hardwareImpact = {
+      version: 1,
+      baseline: { status: "unavailable", sha: "a".repeat(40), reason: "not-found" },
+      candidate: { sha: "b".repeat(40) },
+      facts: {
+        readiness: {
+          previousScore: null,
+          currentScore: 71,
+          scoreDelta: null,
+          previousStatus: null,
+          currentStatus: "at-risk",
+          statusChanged: false,
+        },
+        findings: { added: 0, resolved: 0, addedBlocking: 0, resolvedBlocking: 0 },
+        bom: { added: 0, removed: 0, changed: 0, truncated: false },
+        manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 0 },
+      },
+      assessment: { materialChange: false, riskDirection: "unknown", affectedDomains: [] },
+      evidence: [],
+    };
+    const body = formatMarkdown(result);
+    expect(body).toContain("## Hardware Change Impact");
+    expect(body).toContain("Exact-base comparison unavailable");
+    expect(body).not.toContain("Risk direction: increased");
+    expect(body).not.toContain("Observed changes");
+    expect(body).not.toContain("No material change");
+  });
+
   it("renders pseudo-locale PR Markdown labels for hard-coded string smoke coverage", () => {
     const markdown = formatMarkdown(sampleResult([]), [], undefined, "__PSEUDO__");
     expect(markdown).toContain("# [[BoardReadyOps Report]]");

@@ -30920,7 +30920,7 @@ var init_finding_context = __esm({
 var pr_comment_default;
 var init_pr_comment = __esm({
   "src/report/templates/pr-comment.mustache"() {
-    pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasEvidence}}\n\n## {{labels.evidenceTitle}}\n\n{{evidence.exact}} {{labels.evidenceMeasured}}, {{evidence.heuristic}} {{labels.evidenceInferred}}.\n\n{{#evidence.hasBlockingOnInference}}\n{{labels.evidenceBlocking}}\n\n{{#evidence.blockingOnInference}}\n- `{{.}}`\n{{/evidence.blockingOnInference}}\n{{/evidence.hasBlockingOnInference}}\n{{/hasEvidence}}\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
+    pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasHardwareImpact}}\n\n## Hardware Change Impact\n\n- Base commit: `{{hardwareImpact.baseSha}}`\n- Candidate commit: `{{hardwareImpact.candidateSha}}`\n{{#hardwareImpact.baselineAvailable}}\n\n### Observed changes\n\n{{#hardwareImpact.conclusionChanged}}\n- Release conclusion: {{hardwareImpact.previousConclusion}} \u2192 {{hardwareImpact.currentConclusion}}\n{{/hardwareImpact.conclusionChanged}}\n- Readiness score: {{hardwareImpact.previousScore}} \u2192 {{hardwareImpact.currentScore}} ({{hardwareImpact.scoreDelta}})\n- Findings: {{hardwareImpact.findings.added}} added, {{hardwareImpact.findings.resolved}} resolved ({{hardwareImpact.findings.addedBlocking}} new blockers, {{hardwareImpact.findings.resolvedBlocking}} resolved blockers)\n{{#hardwareImpact.hasSeverityChanges}}\n- Severity changes: {{hardwareImpact.severityWorsened}} worsened, {{hardwareImpact.severityImproved}} improved\n{{/hardwareImpact.hasSeverityChanges}}\n- BOM: {{hardwareImpact.bom.added}} added, {{hardwareImpact.bom.removed}} removed, {{hardwareImpact.bom.changed}} changed\n- Manufacturing outputs: {{hardwareImpact.manufacturing.outputsAdded}} added, {{hardwareImpact.manufacturing.outputsRemoved}} removed, {{hardwareImpact.manufacturing.outputsChanged}} changed\n\n### Derived impact\n\n- Risk direction: {{hardwareImpact.riskDirection}}\n- Material change: {{hardwareImpact.materialChange}}\n- Affected domains: {{hardwareImpact.affectedDomains}}\n\n_This is a deterministic PR impact summary, not fabrication authorization._\n{{/hardwareImpact.baselineAvailable}}\n{{^hardwareImpact.baselineAvailable}}\n\n**Exact-base comparison unavailable.** A trustworthy material-change or risk delta cannot be inferred without an eligible baseline.\n{{/hardwareImpact.baselineAvailable}}\n{{/hasHardwareImpact}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasEvidence}}\n\n## {{labels.evidenceTitle}}\n\n{{evidence.exact}} {{labels.evidenceMeasured}}, {{evidence.heuristic}} {{labels.evidenceInferred}}.\n\n{{#evidence.hasBlockingOnInference}}\n{{labels.evidenceBlocking}}\n\n{{#evidence.blockingOnInference}}\n- `{{.}}`\n{{/evidence.blockingOnInference}}\n{{/evidence.hasBlockingOnInference}}\n{{/hasEvidence}}\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
   }
 });
 
@@ -30942,6 +30942,7 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none"
   }));
   const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : void 0;
+  const hardwareImpactView = result.hardwareImpact ? formatHardwareImpact(result.hardwareImpact) : void 0;
   const evidenceView = result.evidence && result.evidence.exact + result.evidence.heuristic + result.evidence.unclassified > 0 ? { ...result.evidence, hasBlockingOnInference: result.evidence.blockingOnInference.length > 0 } : void 0;
   const releaseModeView = result.releaseMode ? formatReleaseMode(result.releaseMode, locale) : void 0;
   return mustache_default.render(
@@ -30958,6 +30959,8 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
       artifacts,
       hasFabricationDiff: Boolean(fabricationView),
       fabrication: fabricationView,
+      hasHardwareImpact: Boolean(hardwareImpactView),
+      hardwareImpact: hardwareImpactView,
       hasEvidence: Boolean(evidenceView),
       evidence: evidenceView,
       hasBomRisk: Boolean(bomRiskView),
@@ -31033,6 +31036,30 @@ function markdownLabels(locale) {
     status: t("report.status", {}, locale),
     topFindings: t("report.topFindings", {}, locale),
     total: t("report.total", {}, locale)
+  };
+}
+function formatHardwareImpact(impact) {
+  const readiness = impact.facts.readiness;
+  const conclusion = readiness.conclusion;
+  return {
+    baseSha: impact.baseline.sha,
+    candidateSha: impact.candidate.sha,
+    baselineAvailable: impact.baseline.status === "available",
+    conclusionChanged: conclusion?.changed === true,
+    previousConclusion: conclusion?.previous ?? "n/a",
+    currentConclusion: conclusion?.current ?? "n/a",
+    previousScore: readiness.previousScore ?? "n/a",
+    currentScore: readiness.currentScore ?? "n/a",
+    scoreDelta: readiness.scoreDelta === null ? "n/a" : readiness.scoreDelta > 0 ? `+${readiness.scoreDelta}` : String(readiness.scoreDelta),
+    findings: impact.facts.findings,
+    bom: impact.facts.bom,
+    manufacturing: impact.facts.manufacturing,
+    hasSeverityChanges: (impact.facts.findings.worsened ?? 0) + (impact.facts.findings.improved ?? 0) > 0,
+    severityWorsened: impact.facts.findings.worsened ?? 0,
+    severityImproved: impact.facts.findings.improved ?? 0,
+    materialChange: impact.assessment.materialChange ? "yes" : "no",
+    riskDirection: impact.assessment.riskDirection,
+    affectedDomains: impact.assessment.affectedDomains.length > 0 ? impact.assessment.affectedDomains.join(", ") : "none"
   };
 }
 function formatBomRisk(risk) {
