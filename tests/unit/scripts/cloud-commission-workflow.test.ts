@@ -67,6 +67,9 @@ describe("cloud repository commissioning workflow", () => {
     const deployRoot = "$" + "{deploy_root}";
     const policyFile = "$" + "{policy_file}";
     const nextPolicy = "$" + "{next_policy}";
+    const runningImageTag = "$" + "{running_image_tag}";
+    const webContainer = "$" + "{web_container}";
+    const workerContainer = "$" + "{worker_container}";
 
     expect(workflow).toContain('repository="$1"');
     expect(workflow).toContain('policy_file="/opt/boardreadyops-cloud/release-repositories"');
@@ -81,20 +84,18 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain(`cmp -s "${policyFile}" "${nextPolicy}"`);
     expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
     expect(workflow).toContain("recreate_consumers() {");
-    expect(workflow).toContain('BOARDREADYOPS_IMAGE_TAG="${running_image_tag}"');
-    expect(workflow).toContain('up -d --no-deps --force-recreate web worker');
+    expect(workflow).toContain(`BOARDREADYOPS_IMAGE_TAG="${runningImageTag}"`);
+    expect(workflow).toContain("up -d --no-deps --force-recreate web worker");
     expect(workflow).toContain('web_container="$(container_for_service web)"');
     expect(workflow).toContain('worker_container="$(container_for_service worker)"');
     expect(workflow).toContain("consumer recreate failed; restoring previous rollout policy");
     expect(workflow).toContain("rollback could not recreate consumers");
     expect(workflow).toContain("consumers failed readiness; restoring previous rollout policy");
-    expect(workflow.indexOf("recreate_consumers() {")).toBeLessThan(
-      workflow.indexOf('next_policy="$(mktemp'),
-    );
-    expect(workflow).not.toContain('docker restart "${web_container}" "${worker_container}"');
+    expect(workflow.indexOf("recreate_consumers() {")).toBeLessThan(workflow.indexOf('next_policy="$(mktemp'));
+    expect(workflow).not.toContain(`docker restart "${webContainer}" "${workerContainer}"`);
     expect(workflow).toContain("policy_visible_in_consumer() {");
-    expect(workflow).toContain('policy_visible_in_consumer "${web_container}"');
-    expect(workflow).toContain('policy_visible_in_consumer "${worker_container}"');
+    expect(workflow).toContain(`policy_visible_in_consumer "${webContainer}"`);
+    expect(workflow).toContain(`policy_visible_in_consumer "${workerContainer}"`);
     expect(workflow).toContain("consumers did not observe updated rollout policy; restoring previous rollout policy");
     expect(workflow.indexOf("policy_visible_in_consumer() {")).toBeGreaterThan(
       workflow.indexOf('previous_policy="$(mktemp'),
