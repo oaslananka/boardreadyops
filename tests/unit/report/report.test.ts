@@ -287,6 +287,36 @@ describe("report formats", () => {
     expect(body).toContain("not fabrication authorization");
   });
 
+  it("renders a positive readiness score delta with an explicit plus sign", () => {
+    const result = sampleResult([]);
+    result.hardwareImpact = {
+      version: 1,
+      baseline: { status: "available", sha: "a".repeat(40) },
+      candidate: { sha: "b".repeat(40) },
+      facts: {
+        readiness: {
+          previousScore: 70,
+          currentScore: 82,
+          scoreDelta: 12,
+          previousStatus: "at-risk",
+          currentStatus: "ready",
+          statusChanged: true,
+        },
+        findings: { added: 0, resolved: 0, addedBlocking: 0, resolvedBlocking: 0 },
+        bom: { added: 0, removed: 0, changed: 0, truncated: false },
+        manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 0 },
+      },
+      assessment: { materialChange: true, riskDirection: "decreased", affectedDomains: ["readiness"] },
+      evidence: [],
+    };
+    const body = formatMarkdown(result);
+    expect(body).toContain("Readiness score: 70 → 82 (+12)");
+    expect(body).toContain("Risk direction: decreased");
+    result.hardwareImpact.facts.readiness.scoreDelta = 0;
+    result.hardwareImpact.facts.readiness.currentScore = 70;
+    expect(formatMarkdown(result)).toContain("Readiness score: 70 → 70 (0)");
+  });
+
   it("never invents a material delta when the exact base is unavailable", () => {
     const result = sampleResult([]);
     result.hardwareImpact = {

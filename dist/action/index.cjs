@@ -97378,7 +97378,7 @@ function formatHardwareImpact(impact) {
     currentConclusion: conclusion?.current ?? "n/a",
     previousScore: readiness.previousScore ?? "n/a",
     currentScore: readiness.currentScore ?? "n/a",
-    scoreDelta: readiness.scoreDelta === null ? "n/a" : readiness.scoreDelta > 0 ? `+${readiness.scoreDelta}` : String(readiness.scoreDelta),
+    scoreDelta: formatScoreDelta(readiness.scoreDelta),
     findings: impact.facts.findings,
     bom: impact.facts.bom,
     manufacturing: impact.facts.manufacturing,
@@ -97389,6 +97389,11 @@ function formatHardwareImpact(impact) {
     riskDirection: impact.assessment.riskDirection,
     affectedDomains: impact.assessment.affectedDomains.length > 0 ? impact.assessment.affectedDomains.join(", ") : "none"
   };
+}
+function formatScoreDelta(value) {
+  if (value === null) return "n/a";
+  if (value > 0) return `+${value}`;
+  return String(value);
 }
 function formatBomRisk(risk) {
   const atRiskComponents = risk.components.filter((c) => c.riskLevel !== "none").map((c) => {
