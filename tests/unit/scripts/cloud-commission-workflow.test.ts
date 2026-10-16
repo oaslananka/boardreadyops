@@ -80,9 +80,18 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain("sort -u");
     expect(workflow).toContain(`cmp -s "${policyFile}" "${nextPolicy}"`);
     expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
-    expect(workflow).toContain("docker restart");
-    expect(workflow).toContain("consumers failed to restart; restoring previous rollout policy");
+    expect(workflow).toContain("recreate_consumers() {");
+    expect(workflow).toContain('BOARDREADYOPS_IMAGE_TAG="${running_image_tag}"');
+    expect(workflow).toContain('up -d --no-deps --force-recreate web worker');
+    expect(workflow).toContain('web_container="$(container_for_service web)"');
+    expect(workflow).toContain('worker_container="$(container_for_service worker)"');
+    expect(workflow).toContain("consumer recreate failed; restoring previous rollout policy");
+    expect(workflow).toContain("rollback could not recreate consumers");
     expect(workflow).toContain("consumers failed readiness; restoring previous rollout policy");
+    expect(workflow.indexOf("recreate_consumers() {")).toBeLessThan(
+      workflow.indexOf('next_policy="$(mktemp'),
+    );
+    expect(workflow).not.toContain('docker restart "${web_container}" "${worker_container}"');
     expect(workflow).toContain("policy_visible_in_consumer() {");
     expect(workflow).toContain('policy_visible_in_consumer "${web_container}"');
     expect(workflow).toContain('policy_visible_in_consumer "${worker_container}"');

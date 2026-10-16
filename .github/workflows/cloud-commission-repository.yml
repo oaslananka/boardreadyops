@@ -391,6 +391,29 @@ jobs:
               || fail "${service} rollout policy mount source does not match the commissioned host path"
           done
 
+          # Recreate is necessary for file bind mounts: a host-side atomic rename
+          # changes the inode and docker restart retains the original file mount.
+          web_image_ref="$(docker inspect "${web_container}" --format '{{.Config.Image}}')"
+          worker_image_ref="$(docker inspect "${worker_container}" --format '{{.Config.Image}}')"
+          web_image_id="$(docker inspect "${web_container}" --format '{{.Image}}')"
+          worker_image_id="$(docker inspect "${worker_container}" --format '{{.Image}}')"
+          test "${web_image_ref}" = "${worker_image_ref}" || fail "web and worker runtime tags differ"
+          test "${web_image_id}" = "${worker_image_id}" || fail "web and worker runtime images differ"
+          case "${web_image_ref}" in
+            boardreadyops-web-runtime:*) ;;
+            *) fail "consumers do not run a BoardReadyOps runtime image" ;;
+          esac
+          running_image_tag="${web_image_ref#boardreadyops-web-runtime:}"
+          test -n "${running_image_tag}" || fail "running runtime image tag is empty"
+          tagged_image_id="$(docker image inspect "${web_image_ref}" --format '{{.Id}}' 2>/dev/null || true)"
+          test "${tagged_image_id}" = "${web_image_id}" || fail "running runtime tag does not resolve to live image"
+
+          recreate_consumers() {
+            BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
+              "${deploy_runbook}" -f "${policy_override_file}" \
+              up -d --no-deps --force-recreate web worker >/dev/null
+          }
+
           next_policy="$(mktemp "${policy_file}.next.XXXXXX")"
           previous_policy="$(mktemp "${policy_file}.previous.XXXXXX")"
           cleanup() {
@@ -409,7 +432,7 @@ jobs:
           chmod --reference="${policy_file}" "${next_policy}"
 
           if cmp -s "${policy_file}" "${next_policy}"; then
-            printf 'cloud-commission: repository already present; restarting consumers to reload policy\n'
+            printf 'cloud-commission: repository already present; recreating consumers to refresh policy mount\n'
           else
             mv "${next_policy}" "${policy_file}"
             next_policy=""
@@ -417,18 +440,37 @@ jobs:
           fi
 
           restore_previous_policy() {
-            if [ -n "${previous_policy}" ] && [ -f "${previous_policy}" ]; then
-              mv "${previous_policy}" "${policy_file}"
-              previous_policy=""
+            if [ -z "${previous_policy}" ] || [ ! -f "${previous_policy}" ]; then
+              printf '%s\n' 'cloud-commission: rollback policy backup is unavailable' >&2
+              return 1
             fi
-            docker restart "${web_container}" "${worker_container}" >/dev/null || true
+            mv "${previous_policy}" "${policy_file}" || return 1
+            previous_policy=""
+            if ! recreate_consumers; then
+              printf '%s\n' 'cloud-commission: rollback could not recreate consumers' >&2
+              return 1
+            fi
           }
 
-          if ! docker restart "${web_container}" "${worker_container}" >/dev/null; then
-            printf '%s\n' 'cloud-commission: consumers failed to restart; restoring previous rollout policy' >&2
-            restore_previous_policy
+          if ! recreate_consumers; then
+            printf '%s\n' 'cloud-commission: consumer recreate failed; restoring previous rollout policy' >&2
+            restore_previous_policy || fail "consumer recreation failed and rollback failed"
             exit 1
           fi
+
+          if ! web_container="$(container_for_service web)" \
+            || ! worker_container="$(container_for_service worker)"; then
+            printf '%s\n' 'cloud-commission: consumers missing after recreate; restoring previous rollout policy' >&2
+            restore_previous_policy || fail "consumers missing and rollback failed"
+            exit 1
+          fi
+          for container in "${web_container}" "${worker_container}"; do
+            if [ "$(docker inspect "${container}" --format '{{.Image}}')" != "${web_image_id}" ]; then
+              printf '%s\n' 'cloud-commission: consumer image changed after recreate; restoring previous rollout policy' >&2
+              restore_previous_policy || fail "runtime image changed and rollback failed"
+              exit 1
+            fi
+          done
 
           healthy=0
           for _ in $(seq 1 30); do
@@ -446,7 +488,7 @@ jobs:
 
           if [ "${healthy}" != "1" ]; then
             printf '%s\n' 'cloud-commission: consumers failed readiness; restoring previous rollout policy' >&2
-            restore_previous_policy
+            restore_previous_policy || fail "consumer readiness failed and rollback failed"
             exit 1
           fi
 
@@ -469,7 +511,7 @@ jobs:
           if ! policy_visible_in_consumer "${web_container}" \
             || ! policy_visible_in_consumer "${worker_container}"; then
             printf '%s\n' 'cloud-commission: consumers did not observe updated rollout policy; restoring previous rollout policy' >&2
-            restore_previous_policy
+            restore_previous_policy || fail "policy visibility failed and rollback failed"
             exit 1
           fi
 
