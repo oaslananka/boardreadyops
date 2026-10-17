@@ -8,7 +8,7 @@ boardreadyops --help
 boardreadyops doctor
 ```
 
-**Repository-prepared version:** `boardreadyops@1.68.3` reflects this checkout's
+**Repository-prepared version:** `boardreadyops@1.69.0` reflects this checkout's
 source candidate, **not proof of npm publication**. Confirm the current public
 version at [npm](https://www.npmjs.com/package/boardreadyops). For a one-off
 install of the latest published version:

@@ -5,7 +5,7 @@ BOARD-60 verifies that public references, generated documentation, release versi
 ## Current Supersession (2026-06-19)
 
 This page records historical audit evidence below. The repository-prepared
-package version is `boardreadyops@1.68.3`; it may not be published.
+package version is `boardreadyops@1.69.0`; it may not be published.
 Consult [npm](https://www.npmjs.com/package/boardreadyops) and
 [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) for
 actual public availability, and [Release Channel Verification](channel-verification.md)
