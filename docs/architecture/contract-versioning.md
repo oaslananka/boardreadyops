@@ -34,6 +34,27 @@ Older v1 callbacks remain valid with no tool versions, and their digest input is
 unchanged. The dashboard must show missing values as unreported rather than
 infer versions from the workflow template, release tag or other runs.
 
+### Deployed v1 callback compatibility during rolling upgrades
+
+The canonical target-repository workflow sends observed `toolVersions` by default.
+A prior production v1 receiver used a strict result schema before that optional
+field existed. If that receiver responds with **HTTP 400** and the exact
+`{"error":"invalid runner result"}` shape, the workflow may retry once
+without `toolVersions` using the **same GitHub OIDC token, audience, run ID,
+attempt ID, source SHA, trust mode, safe-mode reasons and readiness decision**.
+Only that optional field can be removed. Other 400 responses, authentication
+failures, changed/malformed error shapes and unknown fields must not trigger
+compatibility stripping or weaken validation; all non-accepted results still
+fail the workflow. The v1 dashboard then correctly reports missing tool
+versions as unreported.
+
+This is a rollout bridge, not a permanent substitute for a synchronized Cloud
+deployment. Once the strict Cloud receiver understands `toolVersions`, the
+first signed request is accepted and the version observations are retained.
+Before publishing new additive top-level result fields, verify deployed Cloud
+receiver compatibility or implement a similarly narrowly scoped transition;
+never relax authority-bearing result schema `.strict()` globally.
+
 ## 2. Semantic Versioning & Schema Lifecycle
 
 BoardReadyOps adheres to Semantic Versioning (SemVer 2.0.0) across all binary and library releases.
