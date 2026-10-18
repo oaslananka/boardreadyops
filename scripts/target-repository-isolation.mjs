@@ -60,6 +60,15 @@ export function validateTargetRepositoryIsolationEvidence(input) {
     ),
     optionalCommentWarnings: requiredCount(input, "optionalCommentWarnings", 1, "optional comment warnings"),
     responseLeakageFindings: requiredCount(input, "responseLeakageFindings", 0, "response leakage findings"),
+    scopedAuditExports: requiredCount(input, "scopedAuditExports", 2, "scoped audit exports"),
+    deniedForeignAuditReads: requiredCount(input, "deniedForeignAuditReads", 2, "foreign audit reads denied"),
+    auditCanaryLeakageFindings: requiredCount(input, "auditCanaryLeakageFindings", 0, "audit canary leakage findings"),
+    checkRunPublicationLeakageFindings: requiredCount(
+      input,
+      "checkRunPublicationLeakageFindings",
+      0,
+      "Check Run publication leakage findings",
+    ),
   };
 }
 
@@ -99,6 +108,10 @@ export function buildTargetRepositoryIsolationReport(input) {
       rejectedCallbackPublications: evidence.rejectedCallbackPublications,
       optionalCommentWarnings: evidence.optionalCommentWarnings,
       responseLeakageFindings: evidence.responseLeakageFindings,
+      scopedAuditExports: evidence.scopedAuditExports,
+      deniedForeignAuditReads: evidence.deniedForeignAuditReads,
+      auditCanaryLeakageFindings: evidence.auditCanaryLeakageFindings,
+      checkRunPublicationLeakageFindings: evidence.checkRunPublicationLeakageFindings,
     },
   };
 }

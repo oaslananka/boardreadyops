@@ -11,6 +11,7 @@ import {
   verifyGitHubActionsOidcToken,
 } from "../../apps/web/lib/github-actions-oidc.js";
 import { resultOidcExpectations } from "../../apps/web/lib/result-oidc-expectations.js";
+import { createSqlAuditLogStore } from "../../packages/db/src/audit-log-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -355,6 +356,74 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       }),
     ]);
 
+    // The same two installation fixtures must also have isolated audit exports
+    // and Check Run publication payloads. Synthetic canaries exercise the
+    // metadata scrubber without reading or exporting any production secrets.
+    const auditStore = createSqlAuditLogStore(executor);
+    const auditCanary = "Bearer synthetic-audit-canary-only";
+    // Audit events are append-only by contract; insert a separate synthetic
+    // record rather than weakening the immutability trigger or mutating history.
+    await executor.query(
+      `insert into audit_events (
+         id, installation_id, event_type, actor_type, subject_type,
+         subject_id, repository_id, release_run_id, metadata, created_at
+       ) values ($1, $2, 'issue154.synthetic_sensitive_canary', 'system',
+                 'release_run', $3, $4, $3,
+                 jsonb_build_object('reason', $5::text, 'internalTenantCanary', $6::text), now())`,
+      [
+        "10000000-0000-4000-8000-000000000006",
+        fixtures.a.installationId,
+        fixtures.a.runId,
+        fixtures.a.repositoryId,
+        auditCanary,
+        `${fixtures.b.owner}/${fixtures.b.name}`,
+      ],
+    );
+    let scopedAuditExports = 0;
+    let deniedForeignAuditReads = 0;
+    const auditCanaryLeakageFindings: string[] = [];
+    const checkRunPublicationLeakageFindings: string[] = [];
+    for (const [own, foreign, publication] of [
+      [fixtures.a, fixtures.b, checkRunPublications[0]],
+      [fixtures.b, fixtures.a, checkRunPublications[1]],
+    ] as const) {
+      const ownAudit = await auditStore.listAuditEvents({
+        installationId: own.installationId,
+        repositoryId: own.repositoryId,
+        releaseRunId: own.runId,
+      });
+      expect(ownAudit.length).toBeGreaterThan(0);
+      expect(ownAudit.every((event) => event.installationId === own.installationId)).toBe(true);
+      const exported = JSON.stringify(ownAudit);
+      if (
+        exported.includes(auditCanary) ||
+        exported.includes("internalTenantCanary") ||
+        exported.includes(foreign.owner)
+      ) {
+        auditCanaryLeakageFindings.push(own.owner);
+      }
+      const foreignAudit = await auditStore.listAuditEvents({
+        installationId: foreign.installationId,
+        repositoryId: own.repositoryId,
+        releaseRunId: own.runId,
+      });
+      expect(foreignAudit).toEqual([]);
+      scopedAuditExports += 1;
+      deniedForeignAuditReads += 1;
+
+      const serializedPublication = JSON.stringify(publication);
+      if (
+        serializedPublication.includes(foreign.owner) ||
+        serializedPublication.includes(foreign.repositoryId) ||
+        serializedPublication.includes(foreign.runId) ||
+        serializedPublication.includes(foreign.attemptId)
+      ) {
+        checkRunPublicationLeakageFindings.push(own.owner);
+      }
+    }
+    expect(auditCanaryLeakageFindings).toEqual([]);
+    expect(checkRunPublicationLeakageFindings).toEqual([]);
+
     // A signed repeat for the SAME completed run/attempt must remain idempotent
     // at the domain-result boundary. Check Run publication may be retried: its
     // delivery is intentionally separate from the immutable terminal result.
@@ -491,6 +560,10 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
         rejectedCallbackPublications: 0,
         optionalCommentWarnings: acceptedABody.publicationWarnings?.length ?? 0,
         responseLeakageFindings: leakageFindings.length,
+        scopedAuditExports,
+        deniedForeignAuditReads,
+        auditCanaryLeakageFindings: auditCanaryLeakageFindings.length,
+        checkRunPublicationLeakageFindings: checkRunPublicationLeakageFindings.length,
       };
       await fs.writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
       await fs.chmod(evidencePath, 0o600);

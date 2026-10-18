@@ -21,6 +21,10 @@ function evidence(overrides: Record<string, unknown> = {}) {
     rejectedCallbackPublications: 0,
     optionalCommentWarnings: 1,
     responseLeakageFindings: 0,
+    scopedAuditExports: 2,
+    deniedForeignAuditReads: 2,
+    auditCanaryLeakageFindings: 0,
+    checkRunPublicationLeakageFindings: 0,
     ...overrides,
   };
 }
@@ -59,6 +63,10 @@ describe("target-repository two-installation isolation evidence", () => {
         rejectedCallbackPublications: 0,
         optionalCommentWarnings: 1,
         responseLeakageFindings: 0,
+        scopedAuditExports: 2,
+        deniedForeignAuditReads: 2,
+        auditCanaryLeakageFindings: 0,
+        checkRunPublicationLeakageFindings: 0,
       },
     });
   });
@@ -84,6 +92,15 @@ describe("target-repository two-installation isolation evidence", () => {
     expect(() => validateTargetRepositoryIsolationEvidence(evidence({ responseLeakageFindings: 1 }))).toThrow(
       "response leakage",
     );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ scopedAuditExports: 1 }))).toThrow(
+      "scoped audit exports",
+    );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ auditCanaryLeakageFindings: 1 }))).toThrow(
+      "audit canary leakage",
+    );
+    expect(() =>
+      validateTargetRepositoryIsolationEvidence(evidence({ checkRunPublicationLeakageFindings: 1 })),
+    ).toThrow("Check Run publication leakage");
   });
 
   it("rejects non-exact source revisions", () => {
