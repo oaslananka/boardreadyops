@@ -140,6 +140,7 @@ function callbackRequest(
     attemptId?: string;
     trustMode?: string;
     safeModeReasons?: string;
+    body?: Record<string, unknown>;
   } = {},
 ): Request {
   const url = new URL("https://boardreadyops.test/api/v1/runs/github-actions-result");
@@ -153,7 +154,7 @@ function callbackRequest(
       "x-boardreadyops-trust-mode": options.trustMode ?? fixture.trustMode,
       "x-boardreadyops-safe-mode-reasons": options.safeModeReasons ?? fixture.safeModeReasons.join(","),
     },
-    body: JSON.stringify(resultBody(fixture)),
+    body: JSON.stringify(options.body ?? resultBody(fixture)),
   });
 }
 
@@ -327,6 +328,60 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
         runId: fixtures.b.runId,
       }),
     ]);
+
+    // A signed repeat for the SAME completed run/attempt must remain idempotent
+    // at the domain-result boundary. Check Run publication may be retried: its
+    // delivery is intentionally separate from the immutable terminal result.
+    const preReplay = rows(
+      await executor.query(
+        `select id, version, terminal_result_digest,
+              (select count(*)::int from findings where run_id = release_runs.id) as findings,
+              (select count(*)::int from release_run_results where run_id = release_runs.id) as results
+         from release_runs where id = any($1::text[]) order by id`,
+        [[fixtures.a.runId, fixtures.b.runId]],
+      ),
+    );
+    const replay = await handleGitHubActionsResultRequest(
+      callbackRequest(fixtures.a, token(fixtures.a)),
+      routeDependencies,
+    );
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({
+      ok: true,
+      status: "replayed",
+      runId: fixtures.a.runId,
+      executionAttemptId: fixtures.a.attemptId,
+    });
+    expect(
+      rows(
+        await executor.query(
+          `select id, version, terminal_result_digest,
+              (select count(*)::int from findings where run_id = release_runs.id) as findings,
+              (select count(*)::int from release_run_results where run_id = release_runs.id) as results
+         from release_runs where id = any($1::text[]) order by id`,
+          [[fixtures.a.runId, fixtures.b.runId]],
+        ),
+      ),
+    ).toEqual(preReplay);
+
+    // A VALID signed OIDC identity cannot overwrite a different terminal
+    // digest, even on the same legitimate run/attempt. Unlike modified-claim
+    // negatives, this exercises the persisted terminal conflict path (409).
+    const beforeConflict = await stateSnapshot();
+    const publicationsBeforeConflict = checkRunPublications.length;
+    const conflict = await handleGitHubActionsResultRequest(
+      callbackRequest(fixtures.b, token(fixtures.b), {
+        body: { ...resultBody(fixtures.b), decision: "fail", conclusion: "failure" },
+      }),
+      routeDependencies,
+    );
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toMatchObject({
+      ok: false,
+      error: "terminal result conflicts with the persisted result",
+    });
+    expect(await stateSnapshot()).toEqual(beforeConflict);
+    expect(checkRunPublications).toHaveLength(publicationsBeforeConflict);
 
     const acceptedState = await stateSnapshot();
     const acceptedPublicationCount = checkRunPublications.length;
