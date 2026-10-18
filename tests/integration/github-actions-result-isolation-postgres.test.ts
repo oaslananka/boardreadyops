@@ -31,6 +31,7 @@ const fixtures = {
   a: {
     installationId: "10000000-0000-4000-8000-000000000001",
     githubInstallationId: 9_100_001,
+    previousAttemptId: "10000000-0000-4000-8000-000000000005",
     repositoryId: "10000000-0000-4000-8000-000000000002",
     githubRepositoryId: "910000002",
     owner: "isolation-owner-a",
@@ -73,9 +74,9 @@ function rows(result: unknown): QueryRow[] {
   return Array.isArray(value) ? (value as QueryRow[]) : [];
 }
 
-function audience(fixture: Fixture, targetSha = fixture.commitSha): string {
+function audience(fixture: Fixture, targetSha = fixture.commitSha, attemptId = fixture.attemptId): string {
   const reasons = fixture.safeModeReasons.length > 0 ? fixture.safeModeReasons.join(",") : "none";
-  return `boardreadyops-cloud:${fixture.runId}:${fixture.attemptId}:${targetSha}:${fixture.trustMode}:${reasons}`;
+  return `boardreadyops-cloud:${fixture.runId}:${attemptId}:${targetSha}:${fixture.trustMode}:${reasons}`;
 }
 
 function workflowRef(fixture: Fixture): string {
@@ -269,6 +270,20 @@ beforeAll(async () => {
                  $3::timestamptz, $3::timestamptz, $4)`,
       [fixture.attemptId, fixture.runId, "2026-08-02T04:29:00.000Z", `workflow-${fixture.owner}`],
     );
+    if ("previousAttemptId" in fixture) {
+      // The A run now points at attempt #2, while #1 is a genuinely persisted,
+      // superseded GitHub-dispatched attempt. A forged/nonexistent attempt UUID
+      // does not exercise this important historical-attempt boundary.
+      await executor.query(`update release_run_attempts set attempt_number = 2 where id = $1`, [fixture.attemptId]);
+      await executor.query(
+        `insert into release_run_attempts (
+           id, run_id, attempt_number, status, created_at,
+           dispatch_requested_at, dispatched_at, completed_at, github_workflow_dispatch_id
+         ) values ($1, $2, 1, 'superseded', $3::timestamptz,
+                   $3::timestamptz, $3::timestamptz, $3::timestamptz, $4)`,
+        [fixture.previousAttemptId, fixture.runId, "2026-08-02T04:28:00.000Z", "workflow-superseded-a"],
+      );
+    }
   }
 });
 
@@ -283,10 +298,21 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
   it("accepts independent callbacks and rejects cross-installation, stale, claim-mutated, and trust-mutated callbacks", async () => {
     if (!executor) throw new Error("DATABASE_URL is required");
 
-    const acceptedA = await handleGitHubActionsResultRequest(
-      callbackRequest(fixtures.a, token(fixtures.a)),
-      routeDependencies,
-    );
+    // Race a signed, once-dispatched but now superseded attempt against the
+    // valid current attempt. Both requests start without awaiting the other.
+    const signedCurrentToken = token(fixtures.a);
+    const staleAttemptToken = token(fixtures.a, {
+      aud: audience(fixtures.a, fixtures.a.commitSha, fixtures.a.previousAttemptId),
+    });
+    const [acceptedA, staleAttemptResponse] = await Promise.all([
+      handleGitHubActionsResultRequest(callbackRequest(fixtures.a, signedCurrentToken), routeDependencies),
+      handleGitHubActionsResultRequest(
+        callbackRequest(fixtures.a, staleAttemptToken, { attemptId: fixtures.a.previousAttemptId }),
+        routeDependencies,
+      ),
+    ]);
+    expect(staleAttemptResponse.status).toBe(401);
+    const staleAttemptDenial = JSON.stringify(await staleAttemptResponse.json());
     expect(acceptedA.status).toBe(202);
     const acceptedABody = (await acceptedA.json()) as {
       publicationWarnings?: string[];
@@ -341,8 +367,10 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
         [[fixtures.a.runId, fixtures.b.runId]],
       ),
     );
+    // Reuse the EXACT signed JWT string and identical request body, not a
+    // newly minted equivalent identity. The immutable result must replay.
     const replay = await handleGitHubActionsResultRequest(
-      callbackRequest(fixtures.a, token(fixtures.a)),
+      callbackRequest(fixtures.a, signedCurrentToken),
       routeDependencies,
     );
     expect(replay.status).toBe(200);
@@ -385,7 +413,7 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
 
     const acceptedState = await stateSnapshot();
     const acceptedPublicationCount = checkRunPublications.length;
-    const rejectedResponses: string[] = [];
+    const rejectedResponses: string[] = [staleAttemptDenial];
 
     for (const [requestFixture, bearerFixture] of [
       [fixtures.b, fixtures.a],
@@ -398,15 +426,6 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       expect(response.status).toBe(401);
       rejectedResponses.push(JSON.stringify(await response.json()));
     }
-
-    const staleResponse = await handleGitHubActionsResultRequest(
-      callbackRequest(fixtures.a, token(fixtures.a), {
-        attemptId: "30000000-0000-4000-8000-000000000004",
-      }),
-      routeDependencies,
-    );
-    expect(staleResponse.status).toBe(401);
-    rejectedResponses.push(JSON.stringify(await staleResponse.json()));
 
     const claimMutations = [
       { repository: `${fixtures.b.owner}/${fixtures.b.name}` },
@@ -450,6 +469,7 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       String(fixture.githubInstallationId),
       fixture.runId,
       fixture.attemptId,
+      ...(fixture.owner === fixtures.a.owner ? [fixtures.a.previousAttemptId] : []),
     ]);
     const leakageFindings = rejectedResponses.filter((body) => forbidden.some((value) => body.includes(value)));
     expect(leakageFindings).toEqual([]);
@@ -463,6 +483,8 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
         independentCheckRunsPublished: 2,
         crossInstallationCallbacksRejected: 2,
         staleAttemptCallbacksRejected: 1,
+        exactSignedJwtReplaysAccepted: 1,
+        persistedSupersededAttemptRacesRejected: 1,
         claimMutationCallbacksRejected: claimMutations.length,
         trustSnapshotCallbacksRejected: 2,
         rejectedCallbackMutations: 0,

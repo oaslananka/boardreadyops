@@ -32,6 +32,13 @@ export function validateTargetRepositoryIsolationEvidence(input) {
       "cross-installation callbacks",
     ),
     staleAttemptCallbacksRejected: requiredCount(input, "staleAttemptCallbacksRejected", 1, "stale-attempt callbacks"),
+    exactSignedJwtReplaysAccepted: requiredCount(input, "exactSignedJwtReplaysAccepted", 1, "exact signed JWT replays"),
+    persistedSupersededAttemptRacesRejected: requiredCount(
+      input,
+      "persistedSupersededAttemptRacesRejected",
+      1,
+      "persisted superseded attempt races",
+    ),
     claimMutationCallbacksRejected: requiredCount(
       input,
       "claimMutationCallbacksRejected",
@@ -73,15 +80,17 @@ export function buildTargetRepositoryIsolationReport(input) {
       installations: 2,
       repositories: 2,
       runs: 2,
-      executionAttempts: 2,
+      executionAttempts: 3,
     },
     accepted: {
       independentCallbacks: evidence.independentCallbacksAccepted,
       independentCheckRuns: evidence.independentCheckRunsPublished,
+      exactSignedJwtReplays: evidence.exactSignedJwtReplaysAccepted,
     },
     rejected: {
       crossInstallationCallbacks: evidence.crossInstallationCallbacksRejected,
       staleAttemptCallbacks: evidence.staleAttemptCallbacksRejected,
+      persistedSupersededAttemptRaces: evidence.persistedSupersededAttemptRacesRejected,
       claimMutationCallbacks: evidence.claimMutationCallbacksRejected,
       trustSnapshotCallbacks: evidence.trustSnapshotCallbacksRejected,
     },
