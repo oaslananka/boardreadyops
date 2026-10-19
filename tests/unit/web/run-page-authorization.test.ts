@@ -23,6 +23,15 @@ describe("run page authorization", () => {
     expect(pages.length).toBeGreaterThanOrEqual(6);
   });
 
+  it("links run-design baselines only after the authorized run lookup", async () => {
+    const source = await readFile(join(runPagesRoot, "design", "page.tsx"), "utf8");
+    const authorizedRunLookup = source.indexOf("authorizeRepository: viewer.authorizeRepository");
+    const firstBaselineLookup = source.indexOf("loadRunDesignBaseSnapshots(runId, result.run.repositoryId)");
+    expect(authorizedRunLookup).toBeGreaterThan(0);
+    expect(firstBaselineLookup).toBeGreaterThan(authorizedRunLookup);
+    expect(source).toContain('if (result.state === "not-found") notFound()');
+  });
+
   it("passes a viewer authorizer on every run page", async () => {
     // Without one, loadRunDashboard resolves a private repository to "not found" for everyone
     // including its owner, which is exactly the regression this guards.
