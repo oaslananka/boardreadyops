@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handleResultRequest, type ResultRouteDependencies } from "../../../apps/web/app/api/v1/runs/result/route.js";
+import { completeGitHubCheckRun, upsertReadinessComment } from "../../../apps/web/lib/github-app-check-run-client.js";
 
 const query = vi.fn();
 const createPullRequestCheckRun = vi.fn(async () => ({ id: 1 }));
@@ -1001,6 +1002,108 @@ describe("readiness result route authentication and publication", () => {
     expect(publicationParams[4]).toContain("status 403");
     expect(publicationParams[5]).toBe("runner.result.publication_failed");
   });
+
+  it.each(["comment lookup", "comment creation"] as const)(
+    "keeps Check Run publication successful when a Checks-only installation token gets HTTP 403 during %s",
+    async (denialStage) => {
+      const fakeInstallationToken = "synthetic-installation-checks-write-only";
+      const fakeApiBaseUrl = "https://api.github.test";
+      const sent: Array<{ method: string; path: string; tokenScoped: boolean; body: string }> = [];
+      const githubRequest = vi.fn(async (url: string, options: RequestInit) => {
+        const parsed = new URL(url);
+        const method = options.method ?? "GET";
+        const headers = options.headers as Record<string, string>;
+        const body = typeof options.body === "string" ? options.body : "";
+        sent.push({
+          method,
+          path: parsed.pathname,
+          tokenScoped: headers.authorization === `Bearer ${fakeInstallationToken}`,
+          body,
+        });
+        if (method === "PATCH" && parsed.pathname === "/repos/octo-org/hardware-board/check-runs/987") {
+          return new Response(JSON.stringify({ id: 987 }), { status: 200 });
+        }
+        if (parsed.pathname === "/repos/octo-org/hardware-board/issues/42/comments") {
+          if (method === "GET") {
+            return denialStage === "comment lookup"
+              ? new Response(JSON.stringify({ message: "Resource not accessible by integration" }), { status: 403 })
+              : new Response(JSON.stringify([]), { status: 200 });
+          }
+          if (method === "POST") {
+            return new Response(JSON.stringify({ message: "Resource not accessible by integration" }), { status: 403 });
+          }
+        }
+        throw new Error(`Unexpected GitHub request: ${method} ${parsed.pathname}`);
+      });
+      query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: "run-123",
+              github_check_run_id: 987,
+              pull_request_number: 42,
+              owner: "octo-org",
+              name: "hardware-board",
+              github_installation_id: 12345,
+              trust_mode: "safe",
+              safe_mode_reasons: ["private-repository"],
+            },
+          ],
+        })
+        .mockResolvedValue({ rows: [] });
+      const restrictedClient: NonNullable<ResultRouteDependencies["checkRunClient"]> = () =>
+        ({
+          completeCheckRun: (input: Parameters<typeof completeGitHubCheckRun>[0]["input"]) =>
+            completeGitHubCheckRun({
+              apiBaseUrl: fakeApiBaseUrl,
+              token: fakeInstallationToken,
+              input,
+              request: githubRequest,
+            }),
+          createPullRequestComment: (input: {
+            repositoryOwner: string;
+            repositoryName: string;
+            pullRequestNumber: number;
+            body: string;
+          }) =>
+            upsertReadinessComment({
+              apiBaseUrl: fakeApiBaseUrl,
+              token: fakeInstallationToken,
+              ...input,
+              request: githubRequest,
+            }),
+        }) as never;
+      const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+      const response = await handleResultRequest(resultRequest({ body }), {
+        ...dependencies,
+        checkRunClient: restrictedClient,
+      });
+      expect(response.status).toBe(202);
+      await expect(response.json()).resolves.toMatchObject({
+        ok: true,
+        status: "accepted",
+        checkRunUpdated: true,
+        pullRequestCommentCreated: false,
+        publicationWarnings: [expect.stringContaining("status 403")],
+      });
+      expect(sent).toHaveLength(denialStage === "comment creation" ? 3 : 2);
+      expect(sent.every((entry) => entry.tokenScoped)).toBe(true);
+      expect(sent[0]).toMatchObject({ method: "PATCH", path: "/repos/octo-org/hardware-board/check-runs/987" });
+      expect(JSON.parse(sent[0]?.body ?? "{}")).toMatchObject({ status: "completed", conclusion: "success" });
+      expect(sent[1]).toMatchObject({ method: "GET", path: "/repos/octo-org/hardware-board/issues/42/comments" });
+      if (denialStage === "comment creation") {
+        expect(sent[2]).toMatchObject({ method: "POST", path: "/repos/octo-org/hardware-board/issues/42/comments" });
+      } else {
+        expect(sent).not.toEqual(expect.arrayContaining([expect.objectContaining({ method: "POST" })]));
+      }
+      const [publicationSql, publicationParams] = query.mock.calls[1] as [string, unknown[]];
+      expect(publicationSql).toContain("last_publication_error = $5");
+      expect(publicationParams[2]).toBe(true);
+      expect(publicationParams[3]).toBe(false);
+      expect(publicationParams[4]).toContain("status 403");
+      expect(publicationParams[5]).toBe("runner.result.publication_failed");
+    },
+  );
 
   it("requests a replay when the required check run cannot be published", async () => {
     const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
