@@ -61,6 +61,37 @@ describe("run design visual inspection", () => {
     expect(html).toContain("Supply a verifiable manufacturer part number");
   });
 
+  it("exposes a real recorded base only as a visual comparison, never an engineering verdict", () => {
+    const html = renderToStaticMarkup(
+      createElement(RunDesignView, {
+        runId: "run-1",
+        snapshots: [visual],
+        baseSnapshots: [{ ...visual, id: "base", sha256: "b".repeat(64) }],
+      }),
+    );
+    expect(html).toContain("1 base views");
+    expect(html).toContain("Base/head comparison is a visual overlay");
+    expect(html).toContain("not a dimensional or electrical verification");
+    expect(html).toContain('title="Overlay with opacity slider"');
+    const overlay = html.match(/<button[^>]+title="Overlay with opacity slider"[^>]*>/u)?.[0] ?? "";
+    expect(overlay).not.toContain("disabled");
+  });
+
+  it("does not compare mismatched design layers or pretend they are the same board view", () => {
+    const html = renderToStaticMarkup(
+      createElement(RunDesignView, {
+        runId: "run-1",
+        snapshots: [visual],
+        baseSnapshots: [{ ...visual, id: "base", sheetOrLayer: "B.Cu", sha256: "b".repeat(64) }],
+      }),
+    );
+    const overlay = html.match(/<button[^>]+title="Overlay with opacity slider"[^>]*>/u)?.[0] ?? "";
+    expect(overlay).toContain("disabled");
+    expect(html).toContain("1 base views");
+    expect(html).toContain("F.Cu");
+    expect(html).toContain("B.Cu");
+  });
+
   it("does not misrepresent a run with no published design IP", () => {
     const html = renderToStaticMarkup(createElement(RunDesignView, { runId: "run-1", snapshots: [] }));
     expect(html).toContain("No PCB or schematic preview published for this run");
