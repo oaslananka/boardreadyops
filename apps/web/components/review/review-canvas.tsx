@@ -47,6 +47,36 @@ export function comparableReviewSnapshots(base?: SnapshotArtifact, head?: Snapsh
   return base.width === head.width && base.height === head.height;
 }
 
+/** Position an anchor on the rendered image after object-fit:contain letterboxing. */
+export function positionContainedImageAnchor(
+  x: number,
+  y: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+): { x: number; y: number } | undefined {
+  if (
+    [x, y, canvasWidth, canvasHeight, imageWidth, imageHeight].some((n) => !Number.isFinite(n)) ||
+    x < 0 ||
+    x > 1 ||
+    y < 0 ||
+    y > 1 ||
+    canvasWidth <= 0 ||
+    canvasHeight <= 0 ||
+    imageWidth <= 0 ||
+    imageHeight <= 0
+  )
+    return undefined;
+  const scale = Math.min(canvasWidth / imageWidth, canvasHeight / imageHeight);
+  const fittedWidth = imageWidth * scale;
+  const fittedHeight = imageHeight * scale;
+  return {
+    x: ((canvasWidth - fittedWidth) / 2 + x * fittedWidth) / canvasWidth,
+    y: ((canvasHeight - fittedHeight) / 2 + y * fittedHeight) / canvasHeight,
+  };
+}
+
 function toImageSrc(content?: string): string {
   if (!content) return "";
   if (content.startsWith("data:") || content.startsWith("http://") || content.startsWith("https://")) {
@@ -67,6 +97,7 @@ interface CanvasMarkersProps {
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
   comments: DemoComment[];
+  markerCanvas?: { canvasWidth: number; canvasHeight: number; imageWidth: number; imageHeight: number } | undefined;
   selectedFindingFingerprint?: string | undefined;
   onSelectFinding?: ((fingerprint: string) => void) | undefined;
   onSelectComment?: ((commentId: string) => void) | undefined;
@@ -76,10 +107,22 @@ function CanvasMarkersLayer({
   sheetAnchors,
   relevantFindings,
   comments,
+  markerCanvas,
   selectedFindingFingerprint,
   onSelectFinding,
   onSelectComment,
 }: Readonly<CanvasMarkersProps>) {
+  const markerPosition = (anchor: CanvasAnchor) =>
+    markerCanvas
+      ? positionContainedImageAnchor(
+          anchor.x,
+          anchor.y,
+          markerCanvas.canvasWidth,
+          markerCanvas.canvasHeight,
+          markerCanvas.imageWidth,
+          markerCanvas.imageHeight,
+        )
+      : undefined;
   return (
     <div className="pointer-events-none absolute inset-0">
       {sheetAnchors.map((anchor) => {
@@ -87,18 +130,24 @@ function CanvasMarkersLayer({
           const fp = String(anchor.metadata.fingerprint);
           const isSelected = fp === selectedFindingFingerprint;
           const sev = String(anchor.metadata.severity ?? "warning");
-
+          const position = markerPosition(anchor);
+          // Until the real image viewport is measured, native markers are not positioned.
+          if (anchor.metadata.provenance === "kicad-json-object-position" && !position) return null;
           return (
             <button
               type="button"
               key={anchor.id}
               className={`${markerBase} ${markerSeverityClass(sev)} pointer-events-auto ${isSelected ? "ring-2 ring-primary" : ""}`}
-              style={{ left: `${anchor.x * 100}%`, top: `${anchor.y * 100}%` }}
+              style={{ left: `${(position?.x ?? anchor.x) * 100}%`, top: `${(position?.y ?? anchor.y) * 100}%` }}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectFinding?.(fp);
               }}
-              title={`Finding: ${anchor.metadata.ruleId}\n${anchor.metadata.message}`}
+              title={
+                anchor.metadata.provenance === "kicad-json-object-position"
+                  ? `KiCad-reported source object position (not the precise violation): ${anchor.metadata.ruleId}\n${anchor.metadata.message}`
+                  : `Finding: ${anchor.metadata.ruleId}\n${anchor.metadata.message}`
+              }
             >
               {anchor.targetRef}
             </button>
@@ -109,12 +158,13 @@ function CanvasMarkersLayer({
           const compFinding = relevantFindings.find((f) => f.component === anchor.targetRef);
           if (compFinding) {
             const isSelected = compFinding.fingerprint === selectedFindingFingerprint;
+            const position = markerPosition(anchor);
             return (
               <button
                 type="button"
                 key={anchor.id}
                 className={`${markerBase} ${markerSeverityClass(compFinding.severity)} pointer-events-auto ${isSelected ? "ring-2 ring-primary" : ""}`}
-                style={{ left: `${anchor.x * 100}%`, top: `${anchor.y * 100}%` }}
+                style={{ left: `${(position?.x ?? anchor.x) * 100}%`, top: `${(position?.y ?? anchor.y) * 100}%` }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelectFinding?.(compFinding.fingerprint);
@@ -188,6 +238,7 @@ function StackedLayersView({
   sheetAnchors,
   relevantFindings,
   comments,
+  markerCanvas,
   selectedFindingFingerprint,
   onSelectFinding,
   onSelectComment,
@@ -199,6 +250,7 @@ function StackedLayersView({
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
   comments: DemoComment[];
+  markerCanvas?: { canvasWidth: number; canvasHeight: number; imageWidth: number; imageHeight: number } | undefined;
   selectedFindingFingerprint?: string | undefined;
   onSelectFinding?: ((fingerprint: string) => void) | undefined;
   onSelectComment?: ((commentId: string) => void) | undefined;
@@ -234,9 +286,10 @@ function StackedLayersView({
       ) : null}
 
       <CanvasMarkersLayer
-        sheetAnchors={sheetAnchors}
+        sheetAnchors={viewMode === "base" ? [] : sheetAnchors}
         relevantFindings={relevantFindings}
         comments={comments}
+        markerCanvas={markerCanvas}
         selectedFindingFingerprint={selectedFindingFingerprint}
         onSelectFinding={onSelectFinding}
         onSelectComment={onSelectComment}
@@ -266,6 +319,23 @@ export function ReviewCanvas({
   const [hasMoved, setHasMoved] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const update = () => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      setCanvasSize((previous) =>
+        previous.width === width && previous.height === height ? previous : { width, height },
+      );
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   // Only a published finding anchor selects a sheet; never infer a location from a
   // rule message, source filename, or component label.
@@ -357,6 +427,13 @@ export function ReviewCanvas({
 
   const baseSrc = toImageSrc(currentBaseSnapshot?.content);
   const headSrc = toImageSrc(currentHeadSnapshot?.content);
+  const dimensions = currentHeadSnapshot ? svgViewBox(currentHeadSnapshot) : undefined;
+  const imageWidth = dimensions?.[2] ?? currentHeadSnapshot?.width;
+  const imageHeight = dimensions?.[3] ?? currentHeadSnapshot?.height;
+  const markerCanvas =
+    imageWidth && imageHeight && canvasSize.width && canvasSize.height
+      ? { canvasWidth: canvasSize.width, canvasHeight: canvasSize.height, imageWidth, imageHeight }
+      : undefined;
 
   // Differing SVG viewBox origins and scales cannot be overlaid faithfully.
   const comparable = comparableReviewSnapshots(currentBaseSnapshot, currentHeadSnapshot);
@@ -520,6 +597,7 @@ export function ReviewCanvas({
               sheetAnchors={sheetAnchors}
               relevantFindings={relevantFindings}
               comments={comments}
+              markerCanvas={markerCanvas}
               selectedFindingFingerprint={selectedFindingFingerprint}
               onSelectFinding={onSelectFinding}
               onSelectComment={onSelectComment}

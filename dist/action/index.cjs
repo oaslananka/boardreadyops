@@ -72510,6 +72510,7 @@ async function parsePcb(file2) {
   const text = await readDesignFile(file2) ?? "";
   const model = parseKicadDocument(text, "pcb");
   const copperLayerNames = copperLayers(model);
+  const outlineBounds = rectangularOutlineBounds(model);
   return {
     footprints: footprints(model),
     revision: revision(model),
@@ -72517,6 +72518,7 @@ async function parsePcb(file2) {
     copperLayers: copperLayerNames,
     copperAreas: copperAreas(model),
     boardArea: boardArea(model),
+    ...outlineBounds ? { outlineBounds } : {},
     outlineClosed: isOutlineClosed(model),
     copperLayerCount: copperLayerNames.length,
     stackupLayerCount: stackupLayerCount(model),
@@ -72611,6 +72613,18 @@ function copperAreas(model) {
     }
   }
   return areas;
+}
+function rectangularOutlineBounds(model) {
+  const rectangles = edgePrimitiveLists(model, "gr_rect");
+  if (rectangles.length !== 1 || ["gr_line", "gr_arc", "gr_circle", "gr_poly", "gr_curve"].some((name) => edgePrimitiveLists(model, name).length > 0))
+    return void 0;
+  const rect = rectangles[0] && startEndFromList(rectangles[0]);
+  if (!rect) return void 0;
+  const minX = Math.min(rect.start.x, rect.end.x);
+  const minY = Math.min(rect.start.y, rect.end.y);
+  const maxX = Math.max(rect.start.x, rect.end.x);
+  const maxY = Math.max(rect.start.y, rect.end.y);
+  return maxX > minX && maxY > minY ? { minX, minY, maxX, maxY } : void 0;
 }
 function boardArea(model) {
   const rect = edgePrimitiveLists(model, "gr_rect").map((block) => startEndFromList(block)).find((segment2) => Boolean(segment2));
@@ -88477,10 +88491,12 @@ function parseKicadDiagnostics(reportText, fallbackRule) {
   const diagnostics = [];
   const report = kicadReportSchema.safeParse(parsed);
   if (report.success) {
+    const coordinateUnits = parsed && typeof parsed === "object" && "coordinate_units" in parsed ? parsed.coordinate_units : void 0;
     for (const key of ["violations", "diagnostics", "errors", "warnings"]) {
       for (const diagnostic of report.data[key] ?? []) {
         const normalized = normalizeDiagnostic(diagnostic, fallbackRule);
         if (normalized) {
+          if (coordinateUnits === "mm") normalized.raw.coordinate_units = "mm";
           diagnostics.push(normalized);
         }
       }

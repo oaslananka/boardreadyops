@@ -41180,6 +41180,7 @@ async function parsePcb(file2) {
   const text = await readDesignFile(file2) ?? "";
   const model = parseKicadDocument(text, "pcb");
   const copperLayerNames = copperLayers(model);
+  const outlineBounds = rectangularOutlineBounds(model);
   return {
     footprints: footprints(model),
     revision: revision(model),
@@ -41187,6 +41188,7 @@ async function parsePcb(file2) {
     copperLayers: copperLayerNames,
     copperAreas: copperAreas(model),
     boardArea: boardArea(model),
+    ...outlineBounds ? { outlineBounds } : {},
     outlineClosed: isOutlineClosed(model),
     copperLayerCount: copperLayerNames.length,
     stackupLayerCount: stackupLayerCount(model),
@@ -41281,6 +41283,18 @@ function copperAreas(model) {
     }
   }
   return areas;
+}
+function rectangularOutlineBounds(model) {
+  const rectangles = edgePrimitiveLists(model, "gr_rect");
+  if (rectangles.length !== 1 || ["gr_line", "gr_arc", "gr_circle", "gr_poly", "gr_curve"].some((name) => edgePrimitiveLists(model, name).length > 0))
+    return void 0;
+  const rect = rectangles[0] && startEndFromList(rectangles[0]);
+  if (!rect) return void 0;
+  const minX = Math.min(rect.start.x, rect.end.x);
+  const minY = Math.min(rect.start.y, rect.end.y);
+  const maxX = Math.max(rect.start.x, rect.end.x);
+  const maxY = Math.max(rect.start.y, rect.end.y);
+  return maxX > minX && maxY > minY ? { minX, minY, maxX, maxY } : void 0;
 }
 function boardArea(model) {
   const rect = edgePrimitiveLists(model, "gr_rect").map((block) => startEndFromList(block)).find((segment2) => Boolean(segment2));
@@ -42635,10 +42649,12 @@ function parseKicadDiagnostics(reportText, fallbackRule) {
   const diagnostics = [];
   const report = kicadReportSchema.safeParse(parsed);
   if (report.success) {
+    const coordinateUnits = parsed && typeof parsed === "object" && "coordinate_units" in parsed ? parsed.coordinate_units : void 0;
     for (const key of ["violations", "diagnostics", "errors", "warnings"]) {
       for (const diagnostic of report.data[key] ?? []) {
         const normalized = normalizeDiagnostic(diagnostic, fallbackRule);
         if (normalized) {
+          if (coordinateUnits === "mm") normalized.raw.coordinate_units = "mm";
           diagnostics.push(normalized);
         }
       }
@@ -56765,6 +56781,61 @@ function normalizeKicadSvg(raw) {
     return void 0;
   return { svg, width, height };
 }
+function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
+  if (snapshot.kind !== "pcb_layer" || !snapshot.name.startsWith("kicad_native_") || !snapshot.sheetOrLayer.endsWith(" / F.Cu") || snapshot.format !== "svg" || !snapshot.content)
+    return [];
+  const opening = /<svg\b[^>]*>/isu.exec(snapshot.content)?.[0];
+  const box = opening?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]?.trim().split(/\s+/u).map(Number);
+  if (!box || box.length !== 4 || box.some((v) => !Number.isFinite(v))) return [];
+  const [originX, originY, width, height] = box;
+  const boardWidth = bounds.maxX - bounds.minX;
+  const boardHeight = bounds.maxY - bounds.minY;
+  if (originX === void 0 || originY === void 0 || width === void 0 || height === void 0 || Math.abs(originX) > 1e-4 || Math.abs(originY) > 1e-4 || Math.abs(width - boardWidth) > 1e-3 || Math.abs(height - boardHeight) > 1e-3 || boardWidth <= 0 || boardHeight <= 0)
+    return [];
+  const result = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const finding2 of findings) {
+    if (!finding2.ruleId.startsWith("drc.") || !finding2.fingerprint || !finding2.details || finding2.details.coordinate_units !== "mm" || !Array.isArray(finding2.details.items))
+      continue;
+    for (const item2 of finding2.details.items) {
+      if (!item2 || typeof item2 !== "object") continue;
+      const candidate = item2;
+      const description = candidate.description;
+      const uuid3 = candidate.uuid;
+      const pos = candidate.pos;
+      if (typeof description !== "string" || !/\bon F\.Cu$/iu.test(description.trim()) || typeof uuid3 !== "string" || !/^[a-f0-9-]{36}$/iu.test(uuid3) || !pos || typeof pos !== "object")
+        continue;
+      const { x, y } = pos;
+      if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const xx = (x - bounds.minX) / boardWidth;
+      const yy = (y - bounds.minY) / boardHeight;
+      if (xx < 0 || xx > 1 || yy < 0 || yy > 1) continue;
+      const key = `${finding2.fingerprint}:${uuid3}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const name = /\bof ([#A-Za-z0-9_]+) on F\.Cu$/iu.exec(description)?.[1] ?? "Item";
+      result.push({
+        id: `kicad_item_${finding2.fingerprint.slice(0, 12)}_${uuid3.slice(0, 8)}`,
+        kind: "finding",
+        targetRef: name,
+        x: xx,
+        y: yy,
+        layer: "F.Cu",
+        metadata: {
+          fingerprint: finding2.fingerprint,
+          ruleId: finding2.ruleId,
+          severity: finding2.severity,
+          message: finding2.message.slice(0, 500),
+          sourceUuid: uuid3,
+          provenance: "kicad-json-object-position",
+          locationMeaning: "Referenced source object, not verified violation center"
+        }
+      });
+      if (result.length >= 48) return result;
+    }
+  }
+  return result;
+}
 async function collectSvg(output, beforeSha, sourceFile, kind, label) {
   const buffer = await import_promises29.default.readFile(output);
   if (!buffer.length || buffer.length > MAX_SVG_BYTES) return void 0;
@@ -56936,14 +57007,21 @@ async function schematicOrSummary(file2, cliPath, findings) {
 }
 async function pcbOrSummary(file2, cliPath, findings) {
   if (cliPath) {
-    const layers = await parsePcb(file2).then((pcb) => pcb.copperLayers).catch(() => []);
+    const pcb = await parsePcb(file2).catch(() => void 0);
+    const layers = pcb?.copperLayers ?? [];
     const native = await exportNativeKicadSnapshots(
       cliPath,
       file2,
       "pcb_layer",
       layers.length ? layers : ["F.Cu", "B.Cu"]
     ).catch(() => []);
-    if (native.length) return native;
+    if (native.length) {
+      const bounds = pcb?.outlineBounds;
+      return bounds && findings?.length ? native.map((snapshot) => ({
+        ...snapshot,
+        anchors: verifiedNativePcbItemAnchors(snapshot, bounds, findings)
+      })) : native;
+    }
   }
   return renderPcbFile(file2, findings);
 }
@@ -57113,11 +57191,14 @@ async function reviewPublishCommand(target, options, streams) {
     ...options.nativeVisuals ? {} : { nativeCli: false },
     schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => import_node_path72.default.resolve(root, f))),
     pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => import_node_path72.default.resolve(root, f))),
-    findings: findings.map((f) => ({
+    // The Cloud wire format intentionally omits native KiCad diagnostic details.
+    // Snapshot linking needs the original trusted run findings before that projection.
+    findings: result.findings.map((f) => ({
       fingerprint: f.fingerprint,
       ruleId: f.ruleId,
       severity: f.severity,
-      message: f.message
+      message: f.message,
+      ...f.details ? { details: f.details } : {}
     }))
   });
   if (!jsonOutput) streams.stdout.write(`\u{1F680} Publishing review to ${server}...

@@ -206,11 +206,14 @@ export async function reviewPublishCommand(
     ...(options.nativeVisuals ? {} : { nativeCli: false }),
     schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => path.resolve(root, f))),
     pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => path.resolve(root, f))),
-    findings: findings.map((f) => ({
+    // The Cloud wire format intentionally omits native KiCad diagnostic details.
+    // Snapshot linking needs the original trusted run findings before that projection.
+    findings: result.findings.map((f) => ({
       fingerprint: f.fingerprint,
       ruleId: f.ruleId,
       severity: f.severity,
       message: f.message,
+      ...(f.details ? { details: f.details } : {}),
     })),
   });
 

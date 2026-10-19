@@ -7,7 +7,7 @@ import {
   type SnapshotFinding,
 } from "@boardreadyops/contracts";
 import { detectKicadCli } from "./cli.js";
-import { exportNativeKicadSnapshots } from "./native-snapshots.js";
+import { exportNativeKicadSnapshots, verifiedNativePcbItemAnchors } from "./native-snapshots.js";
 import { parsePcb } from "./pcb.js";
 import { parseSchematic } from "./schematic.js";
 
@@ -104,16 +104,23 @@ async function pcbOrSummary(
   findings: SnapshotFinding[] | undefined,
 ): Promise<SnapshotArtifact[]> {
   if (cliPath) {
-    const layers = await parsePcb(file)
-      .then((pcb) => pcb.copperLayers)
-      .catch(() => []);
+    const pcb = await parsePcb(file).catch(() => undefined);
+    const layers = pcb?.copperLayers ?? [];
     const native = await exportNativeKicadSnapshots(
       cliPath,
       file,
       "pcb_layer",
       layers.length ? layers : ["F.Cu", "B.Cu"],
     ).catch(() => []);
-    if (native.length) return native;
+    if (native.length) {
+      const bounds = pcb?.outlineBounds;
+      return bounds && findings?.length
+        ? native.map((snapshot) => ({
+            ...snapshot,
+            anchors: verifiedNativePcbItemAnchors(snapshot, bounds, findings),
+          }))
+        : native;
+    }
   }
   return renderPcbFile(file, findings);
 }

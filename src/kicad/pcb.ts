@@ -29,8 +29,17 @@ export interface PcbFootprint {
     | undefined;
 }
 
+export interface PcbOutlineBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
 export interface ParsedPcb {
   footprints: PcbFootprint[];
+  /** Only an unambiguous single rectangular Edge.Cuts outline has a verified transform. */
+  outlineBounds?: PcbOutlineBounds | undefined;
   revision?: string | undefined;
   drillSizes: string[];
   copperLayers: string[];
@@ -46,6 +55,7 @@ export async function parsePcb(file: string): Promise<ParsedPcb> {
   const text = (await readDesignFile(file)) ?? "";
   const model = parseKicadDocument(text, "pcb");
   const copperLayerNames = copperLayers(model);
+  const outlineBounds = rectangularOutlineBounds(model);
   return {
     footprints: footprints(model),
     revision: revision(model),
@@ -53,6 +63,7 @@ export async function parsePcb(file: string): Promise<ParsedPcb> {
     copperLayers: copperLayerNames,
     copperAreas: copperAreas(model),
     boardArea: boardArea(model),
+    ...(outlineBounds ? { outlineBounds } : {}),
     outlineClosed: isOutlineClosed(model),
     copperLayerCount: copperLayerNames.length,
     stackupLayerCount: stackupLayerCount(model),
@@ -169,6 +180,24 @@ function copperAreas(model: KiCadDocumentModel): Map<string, number> {
     }
   }
   return areas;
+}
+
+function rectangularOutlineBounds(model: KiCadDocumentModel): PcbOutlineBounds | undefined {
+  const rectangles = edgePrimitiveLists(model, "gr_rect");
+  // Multiple/disconnected Edge.Cuts shapes or arcs require a real board geometry API,
+  // not guessed pixel coordinates. Fail closed.
+  if (
+    rectangles.length !== 1 ||
+    ["gr_line", "gr_arc", "gr_circle", "gr_poly", "gr_curve"].some((name) => edgePrimitiveLists(model, name).length > 0)
+  )
+    return undefined;
+  const rect = rectangles[0] && startEndFromList(rectangles[0]);
+  if (!rect) return undefined;
+  const minX = Math.min(rect.start.x, rect.end.x);
+  const minY = Math.min(rect.start.y, rect.end.y);
+  const maxX = Math.max(rect.start.x, rect.end.x);
+  const maxY = Math.max(rect.start.y, rect.end.y);
+  return maxX > minX && maxY > minY ? { minX, minY, maxX, maxY } : undefined;
 }
 
 function boardArea(model: KiCadDocumentModel): number | undefined {

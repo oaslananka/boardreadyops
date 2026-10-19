@@ -1,7 +1,11 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { comparableReviewSnapshots, ReviewCanvas } from "../../../apps/web/components/review/review-canvas.js";
+import {
+  comparableReviewSnapshots,
+  positionContainedImageAnchor,
+  ReviewCanvas,
+} from "../../../apps/web/components/review/review-canvas.js";
 import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
 import { buildDemoSnapshots } from "../../../apps/web/lib/demo-snapshots.js";
 
@@ -72,6 +76,20 @@ describe("ReviewCanvas", () => {
     expect(html).toMatch(/disabled=""[^>]+title="Difference highlight"/u);
     expect(html).toContain('alt="Head Revision Snapshot Layer"');
     expect(html).not.toContain('alt="Base Revision Snapshot Layer"');
+  });
+
+  it("positions native object markers inside the letterboxed PCB SVG on desktop and mobile", () => {
+    // Equal source dimensions, but wide vs. tall viewport: object-fit:contain adds padding.
+    const anchorX = (145.621548 - 135.255) / 25.4;
+    const anchorY = (107.108452 - 92.075) / 25.4;
+    const desktop = positionContainedImageAnchor(anchorX, anchorY, 486, 540, 25.4, 25.4);
+    expect(desktop?.x).toBeCloseTo(anchorX, 9);
+    expect(desktop?.y).toBeCloseTo((27 + anchorY * 486) / 540, 9);
+    const mobile = positionContainedImageAnchor(anchorX, anchorY, 390, 304, 25.4, 25.4);
+    expect(mobile?.x).toBeCloseTo((43 + anchorX * 304) / 390, 9);
+    expect(mobile?.y).toBeCloseTo(anchorY, 9);
+    expect(positionContainedImageAnchor(0.5, 0.5, 0, 400, 25.4, 25.4)).toBeUndefined();
+    expect(positionContainedImageAnchor(1.4, 0.5, 300, 400, 25.4, 25.4)).toBeUndefined();
   });
 
   it("renders a finding marker for each anchor linked to a finding", () => {

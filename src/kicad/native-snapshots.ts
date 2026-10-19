@@ -2,8 +2,9 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { SnapshotArtifact } from "@boardreadyops/contracts";
+import type { CanvasAnchor, SnapshotArtifact, SnapshotFinding } from "@boardreadyops/contracts";
 import { runProcess } from "../util/process.js";
+import type { PcbOutlineBounds } from "./pcb.js";
 
 const MAX_SVG_BYTES = 2 * 1024 * 1024;
 const MAX_SHEETS = 16;
@@ -43,6 +44,106 @@ export function normalizeKicadSvg(raw: string): { svg: string; width: number; he
   if ([...svg.matchAll(/url\(\s*["']?([^)"']+)/giu)].some((match) => !match[1]?.trim().startsWith("#")))
     return undefined;
   return { svg, width, height };
+}
+
+/**
+ * A marker points to a KiCad-reported *source object*, never to an inferred
+ * DRC fault center. Only exact millimeter reports, F.Cu items with UUIDs,
+ * and a single rectangular Edge.Cuts with a matching native plot qualify.
+ */
+export function verifiedNativePcbItemAnchors(
+  snapshot: SnapshotArtifact,
+  bounds: PcbOutlineBounds,
+  findings: readonly SnapshotFinding[],
+): CanvasAnchor[] {
+  if (
+    snapshot.kind !== "pcb_layer" ||
+    !snapshot.name.startsWith("kicad_native_") ||
+    !snapshot.sheetOrLayer.endsWith(" / F.Cu") ||
+    snapshot.format !== "svg" ||
+    !snapshot.content
+  )
+    return [];
+  const opening = /<svg\b[^>]*>/isu.exec(snapshot.content)?.[0];
+  const box = opening
+    ?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]
+    ?.trim()
+    .split(/\s+/u)
+    .map(Number);
+  if (!box || box.length !== 4 || box.some((v) => !Number.isFinite(v))) return [];
+  const [originX, originY, width, height] = box;
+  const boardWidth = bounds.maxX - bounds.minX;
+  const boardHeight = bounds.maxY - bounds.minY;
+  if (
+    originX === undefined ||
+    originY === undefined ||
+    width === undefined ||
+    height === undefined ||
+    Math.abs(originX) > 0.0001 ||
+    Math.abs(originY) > 0.0001 ||
+    Math.abs(width - boardWidth) > 0.001 ||
+    Math.abs(height - boardHeight) > 0.001 ||
+    boardWidth <= 0 ||
+    boardHeight <= 0
+  )
+    return [];
+
+  const result: CanvasAnchor[] = [];
+  const seen = new Set<string>();
+  for (const finding of findings) {
+    if (
+      !finding.ruleId.startsWith("drc.") ||
+      !finding.fingerprint ||
+      !finding.details ||
+      finding.details.coordinate_units !== "mm" ||
+      !Array.isArray(finding.details.items)
+    )
+      continue;
+    for (const item of finding.details.items) {
+      if (!item || typeof item !== "object") continue;
+      const candidate = item as Record<string, unknown>;
+      const description = candidate.description;
+      const uuid = candidate.uuid;
+      const pos = candidate.pos;
+      if (
+        typeof description !== "string" ||
+        !/\bon F\.Cu$/iu.test(description.trim()) ||
+        typeof uuid !== "string" ||
+        !/^[a-f0-9-]{36}$/iu.test(uuid) ||
+        !pos ||
+        typeof pos !== "object"
+      )
+        continue;
+      const { x, y } = pos as { x?: unknown; y?: unknown };
+      if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const xx = (x - bounds.minX) / boardWidth;
+      const yy = (y - bounds.minY) / boardHeight;
+      if (xx < 0 || xx > 1 || yy < 0 || yy > 1) continue;
+      const key = `${finding.fingerprint}:${uuid}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const name = /\bof ([#A-Za-z0-9_]+) on F\.Cu$/iu.exec(description)?.[1] ?? "Item";
+      result.push({
+        id: `kicad_item_${finding.fingerprint.slice(0, 12)}_${uuid.slice(0, 8)}`,
+        kind: "finding",
+        targetRef: name,
+        x: xx,
+        y: yy,
+        layer: "F.Cu",
+        metadata: {
+          fingerprint: finding.fingerprint,
+          ruleId: finding.ruleId,
+          severity: finding.severity,
+          message: finding.message.slice(0, 500),
+          sourceUuid: uuid,
+          provenance: "kicad-json-object-position",
+          locationMeaning: "Referenced source object, not verified violation center",
+        },
+      });
+      if (result.length >= 48) return result;
+    }
+  }
+  return result;
 }
 
 async function collectSvg(

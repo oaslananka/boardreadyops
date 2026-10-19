@@ -36,6 +36,21 @@ export function visibleReviewFindings(findings: readonly DemoFinding[], filter: 
   });
 }
 
+function hasNativeObjectPosition(review: DemoReview, fingerprint: string): boolean {
+  return Boolean(
+    review.headSnapshots?.some(
+      (snapshot) =>
+        snapshot.name.startsWith("kicad_native_") &&
+        snapshot.anchors.some(
+          (anchor) =>
+            anchor.kind === "finding" &&
+            anchor.metadata?.fingerprint === fingerprint &&
+            anchor.metadata.provenance === "kicad-json-object-position",
+        ),
+    ),
+  );
+}
+
 /**
  * Zaptrace's three-pane engineering review adapted to BoardReadyOps's published
  * snapshots and findings. A summary SVG is not exact native KiCad geometry.
@@ -53,6 +68,15 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
   const snapshots = review.headSnapshots ?? [];
   const nativeViews = snapshots.filter((snapshot) => snapshot.name.startsWith("kicad_native_")).length;
   const optionalBaseSnapshots = review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {};
+  const selectCanvasFinding = (fingerprint: string) => {
+    // A source-bound marker may point to a finding excluded by the current list filter.
+    // Selecting a marker must also make its finding visible in the inspector.
+    if (!visibleFindings.some((finding) => finding.fingerprint === fingerprint)) {
+      setFilter("all");
+      setQuery("");
+    }
+    setSelectedFingerprint(fingerprint);
+  };
 
   return (
     <section aria-label="Hardware design inspection workspace" className="space-y-3">
@@ -181,7 +205,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
                 findings={review.findings}
                 comments={review.comments}
                 selectedFindingFingerprint={selectedFingerprint}
-                onSelectFinding={setSelectedFingerprint}
+                onSelectFinding={selectCanvasFinding}
               />
               <p className="text-xs text-muted-foreground">
                 {nativeViews > 0
@@ -227,9 +251,11 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
                 <dd className="mt-1">{selected.disposition.replaceAll("_", " ")}</dd>
               </div>
               <div className="rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground">
-                {isLinkedInSnapshot(review, selected.fingerprint)
-                  ? "Reference mapped in a published summary snapshot; verify location in native KiCad."
-                  : "No verified image location is available for this finding. Inspect its source path and native KiCad evidence."}
+                {hasNativeObjectPosition(review, selected.fingerprint)
+                  ? "Marker identifies a source object recorded by KiCad DRC, not the exact violation geometry. Open KiCad to verify the fault."
+                  : isLinkedInSnapshot(review, selected.fingerprint)
+                    ? "Reference mapped in a published summary snapshot; verify location in native KiCad."
+                    : "No verified image location is available for this finding. Inspect its source path and native KiCad evidence."}
               </div>
             </dl>
           ) : (
