@@ -39,6 +39,32 @@ describe("Review Detail Tabs", () => {
     expect(header).toContain("Request changes");
   });
 
+  it("labels a manual Review without inventing a PR number or base commit", () => {
+    const manual = { ...review, pullRequestNumber: 0, baseCommitSha: "0".repeat(40) };
+    const header = renderToStaticMarkup(
+      createElement(ReviewHeader, {
+        reviewId: manual.id,
+        title: manual.title,
+        repositoryName: manual.repositoryName,
+        pullRequestNumber: manual.pullRequestNumber,
+        status: manual.status,
+        decision: manual.decision,
+        currentRevisionSequence: manual.currentRevisionSequence,
+        baseCommitSha: manual.baseCommitSha,
+        headCommitSha: manual.headCommitSha,
+        evidenceDigest: manual.evidenceDigest,
+        evidenceState: manual.evidenceState,
+      }),
+    );
+    expect(header).toContain("Manual review");
+    expect(header).toContain("No base");
+    expect(header).not.toContain("PR #0");
+    expect(header).not.toContain("0000000");
+    const overview = renderToStaticMarkup(createElement(OverviewTab, { review: manual }));
+    expect(overview).toContain("Not recorded");
+    expect(overview).not.toContain("Open the visual diff");
+  });
+
   it("shows authorized persisted Review revision run links, but no invented fixture source run", () => {
     const persisted = renderToStaticMarkup(
       createElement(ReviewView, {

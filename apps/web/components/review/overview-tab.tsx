@@ -281,7 +281,11 @@ export function OverviewTab({
         actions={
           onOpenChanges ? (
             <Button type="button" size="sm" variant="outline" onClick={onOpenChanges}>
-              {hasCanvas(review) ? "Open the visual diff" : "Open Changes"}
+              {hasCanvas(review)
+                ? (review.baseSnapshots?.length ?? 0) > 0
+                  ? "Compare source revisions"
+                  : "Inspect PCB & schematic"
+                : "Open Changes"}
             </Button>
           ) : undefined
         }
@@ -294,7 +298,7 @@ export function OverviewTab({
           <Definition label="Repository">{review.repositoryName}</Definition>
           <Definition label="Author">{review.createdBy}</Definition>
           <Definition label="Base Commit">
-            <code>{review.baseCommitSha}</code>
+            <code>{/^0+$/u.test(review.baseCommitSha) ? "Not recorded" : review.baseCommitSha}</code>
           </Definition>
           <Definition label="Head Commit">
             <code>{review.headCommitSha}</code>

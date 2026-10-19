@@ -1,7 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ReviewDesignWorkspace } from "../../../apps/web/components/review/review-design-workspace.js";
+import {
+  ReviewDesignWorkspace,
+  visibleReviewFindings,
+} from "../../../apps/web/components/review/review-design-workspace.js";
 import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
 
 const base = DEMO_REVIEWS[0];
@@ -63,9 +66,13 @@ describe("Zaptrace-inspired BoardReadyOps review workspace", () => {
     expect(html).toContain("2 recorded");
     expect(html).toContain("1 open critical/error");
     expect(html).toContain("Snapshot marker available");
-    expect(html).toContain("No snapshot marker");
+    expect(html).not.toContain("No snapshot marker");
     expect(html).toContain("Insufficient clearance on U1");
-    expect(html).toContain("Pin mismatch on U2");
+    expect(html).not.toContain("Pin mismatch on U2");
+    expect(html).toContain("Blockers (1)");
+    expect(html).toContain("All (2)");
+    expect(html).toContain("1 of 2 findings shown");
+    expect(html).toContain("Search findings by rule, component or message");
     expect(html).toContain("not exact native KiCad");
     expect(html).toContain("not verified");
     expect(html).toContain("xl:grid-cols-[minmax(275px,1.05fr)_minmax(0,1.9fr)_minmax(235px,0.95fr)]");
@@ -73,6 +80,16 @@ describe("Zaptrace-inspired BoardReadyOps review workspace", () => {
     expect(html).toContain("h-[19rem]");
     // Engineering detail remains fully present in the inspector even when the list preview is clamped.
     expect(html).toContain('class="mt-1 break-words">Insufficient clearance on U1');
+  });
+
+  it("filters actual blocker records by severity, disposition and query without losing other findings", () => {
+    expect(visibleReviewFindings(review.findings, "blocking", "").map((x) => x.fingerprint)).toEqual([
+      "fp-source-bound",
+    ]);
+    expect(visibleReviewFindings(review.findings, "all", "")).toHaveLength(2);
+    expect(visibleReviewFindings(review.findings, "all", "u2").map((x) => x.fingerprint)).toEqual(["fp-unmapped"]);
+    expect(visibleReviewFindings(review.findings, "blocking", "PIN mismatch")).toEqual([]);
+    expect(visibleReviewFindings([{ ...u1, disposition: "waived" }], "blocking", "")).toEqual([]);
   });
 
   it("does not invent a PCB image or a passing verdict when no snapshots or findings exist", () => {

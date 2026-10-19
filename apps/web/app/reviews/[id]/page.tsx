@@ -10,7 +10,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const viewer = await viewerAuthorization();
   const review = await loadServerReview(id, viewer.session);
   return {
-    title: review ? `${review.title} · Review #${review.pullRequestNumber}` : "Review Details",
+    title: review
+      ? `${review.title} · ${review.pullRequestNumber > 0 ? `PR #${review.pullRequestNumber}` : "Manual review"}`
+      : "Review Details",
     description: "Hardware Review & Evidence OS review workspace.",
   };
 }
@@ -30,7 +32,7 @@ export default async function ReviewDetailPage({ params }: Readonly<{ params: Pr
       breadcrumbs={[
         { href: "/", label: "Home" },
         { href: "/reviews", label: "Reviews" },
-        { label: `PR #${review.pullRequestNumber}` },
+        { label: review.pullRequestNumber > 0 ? `PR #${review.pullRequestNumber}` : "Manual review" },
       ]}
     >
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">

@@ -23,15 +23,33 @@ function isLinkedInSnapshot(review: DemoReview, fingerprint: string): boolean {
   );
 }
 
+type FindingFilter = "blocking" | "all";
+
+export function visibleReviewFindings(findings: readonly DemoFinding[], filter: FindingFilter, query: string) {
+  const search = query.trim().toLowerCase();
+  return findings.filter((finding) => {
+    if (filter === "blocking" && !isBlocking(finding)) return false;
+    if (!search) return true;
+    return [finding.ruleId, finding.message, finding.component, finding.path].some((value) =>
+      value?.toLowerCase().includes(search),
+    );
+  });
+}
+
 /**
  * Zaptrace's three-pane engineering review adapted to BoardReadyOps's published
  * snapshots and findings. A summary SVG is not exact native KiCad geometry.
  */
 export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview }>) {
   const findings = [...review.findings].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
-  const [selectedFingerprint, setSelectedFingerprint] = useState<string | undefined>(findings[0]?.fingerprint);
-  const selected = findings.find((finding) => finding.fingerprint === selectedFingerprint);
   const blocking = findings.filter(isBlocking).length;
+  const [filter, setFilter] = useState<FindingFilter>(blocking > 0 ? "blocking" : "all");
+  const [query, setQuery] = useState("");
+  const visibleFindings = visibleReviewFindings(findings, filter, query);
+  const [selectedFingerprint, setSelectedFingerprint] = useState<string | undefined>(
+    findings.find(isBlocking)?.fingerprint ?? findings[0]?.fingerprint,
+  );
+  const selected = visibleFindings.find((finding) => finding.fingerprint === selectedFingerprint) ?? visibleFindings[0];
   const snapshots = review.headSnapshots ?? [];
   const nativeViews = snapshots.filter((snapshot) => snapshot.name.startsWith("kicad_native_")).length;
   const optionalBaseSnapshots = review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {};
@@ -63,45 +81,89 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
             <span className="text-xs text-muted-foreground">{findings.length} recorded</span>
           </div>
           {findings.length ? (
-            <div className="mt-3 flex max-h-[32rem] flex-col gap-2 overflow-y-auto">
-              {findings.map((finding) => {
-                const active = finding.fingerprint === selectedFingerprint;
-                return (
+            <>
+              <div className="mt-3 space-y-2">
+                <fieldset className="flex flex-wrap gap-1">
+                  <legend className="sr-only">Finding severity filter</legend>
                   <button
-                    key={finding.fingerprint}
                     type="button"
-                    aria-pressed={active}
-                    onClick={() => setSelectedFingerprint(finding.fingerprint)}
-                    className={
-                      "w-full min-w-0 rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
-                      (active ? "border-primary bg-primary/10" : "border-border bg-background hover:border-primary/50")
-                    }
+                    aria-pressed={filter === "blocking"}
+                    className={`rounded-md border px-2.5 py-1.5 text-xs ${filter === "blocking" ? "border-danger text-danger" : "border-border text-muted-foreground"}`}
+                    onClick={() => setFilter("blocking")}
                   >
-                    <span
-                      className={[
-                        "block text-xs font-semibold",
-                        isBlocking(finding) ? "text-danger" : "text-muted-foreground",
-                      ].join(" ")}
-                    >
-                      {finding.severity.toUpperCase()} · {finding.ruleId}
-                    </span>
-                    <span className="mt-1 line-clamp-2 block break-words text-sm text-foreground">
-                      {finding.message}
-                    </span>
-                    <span
+                    Blockers ({blocking})
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={filter === "all"}
+                    className={`rounded-md border px-2.5 py-1.5 text-xs ${filter === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
+                    onClick={() => setFilter("all")}
+                  >
+                    All ({findings.length})
+                  </button>
+                </fieldset>
+                <label className="sr-only" htmlFor="review-finding-search">
+                  Search findings by rule, component or message
+                </label>
+                <input
+                  id="review-finding-search"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.currentTarget.value)}
+                  placeholder="Search rules, parts, messages"
+                  className="w-full min-w-0 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                />
+                <p className="text-xs text-muted-foreground" role="status">
+                  {visibleFindings.length} of {findings.length} findings shown
+                </p>
+              </div>
+              <div className="mt-3 flex max-h-[32rem] flex-col gap-2 overflow-y-auto">
+                {visibleFindings.map((finding) => {
+                  const active = finding.fingerprint === selectedFingerprint;
+                  return (
+                    <button
+                      key={finding.fingerprint}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setSelectedFingerprint(finding.fingerprint)}
                       className={
-                        "mt-2 block text-xs " +
-                        (isLinkedInSnapshot(review, finding.fingerprint) ? "text-primary" : "text-muted-foreground")
+                        "w-full min-w-0 rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
+                        (active
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-background hover:border-primary/50")
                       }
                     >
-                      {isLinkedInSnapshot(review, finding.fingerprint)
-                        ? "Snapshot marker available"
-                        : "No snapshot marker"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                      <span
+                        className={[
+                          "block text-xs font-semibold",
+                          isBlocking(finding) ? "text-danger" : "text-muted-foreground",
+                        ].join(" ")}
+                      >
+                        {finding.severity.toUpperCase()} · {finding.ruleId}
+                      </span>
+                      <span className="mt-1 line-clamp-2 block break-words text-sm text-foreground">
+                        {finding.message}
+                      </span>
+                      <span
+                        className={
+                          "mt-2 block text-xs " +
+                          (isLinkedInSnapshot(review, finding.fingerprint) ? "text-primary" : "text-muted-foreground")
+                        }
+                      >
+                        {isLinkedInSnapshot(review, finding.fingerprint)
+                          ? "Snapshot marker available"
+                          : "No snapshot marker"}
+                      </span>
+                    </button>
+                  );
+                })}
+                {visibleFindings.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
+                    No findings match these filters. Switch to All or clear the search.
+                  </p>
+                ) : null}
+              </div>
+            </>
           ) : (
             <p className="mt-3 text-sm text-muted-foreground">
               No findings are recorded for this Review. This does not independently verify manufacturing readiness.

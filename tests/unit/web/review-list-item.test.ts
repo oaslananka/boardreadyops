@@ -16,4 +16,17 @@ describe("ReviewListItem", () => {
     expect(markup).toContain("PR #42");
     expect(markup.indexOf("3 blockers")).toBeLessThan(markup.indexOf("persistent"));
   });
+
+  it("identifies published run reviews without a pull request or recorded base", () => {
+    const review = DEMO_REVIEWS[0];
+    if (!review) throw new Error("Review fixture missing");
+    const html = renderToStaticMarkup(
+      createElement(ReviewListItem, {
+        review: { ...review, pullRequestNumber: 0, baseCommitSha: "0".repeat(40) },
+      }),
+    );
+    expect(html).toContain("Manual review");
+    expect(html).toContain("No base");
+    expect(html).not.toContain("PR #0");
+  });
 });

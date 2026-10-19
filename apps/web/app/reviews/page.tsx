@@ -42,7 +42,7 @@ const columns: readonly DataColumn<ReviewListEntry>[] = [
         </Link>
         <div className="mt-0.5 text-meta text-muted-foreground">
           {review.repositoryName}
-          {review.pullRequestNumber === undefined ? "" : ` · PR #${review.pullRequestNumber}`}
+          {(review.pullRequestNumber ?? 0) > 0 ? ` · PR #${review.pullRequestNumber}` : " · Manual review"}
         </div>
       </>
     ),

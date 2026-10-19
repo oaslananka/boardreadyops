@@ -60,7 +60,7 @@ export function ReviewHeader({
           <span aria-hidden="true">/</span>
           <span className="break-all">{repositoryName}</span>
           <span aria-hidden="true">/</span>
-          <span>PR #{pullRequestNumber}</span>
+          <span>{pullRequestNumber > 0 ? `PR #${pullRequestNumber}` : "Manual review"}</span>
           <span className="rounded-full border border-border px-2 py-0.5 text-xs">Rev {currentRevisionSequence}</span>
           <StatusBadge value={status} />
         </div>
@@ -109,7 +109,7 @@ export function ReviewHeader({
         </div>
 
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <code>{baseCommitSha.slice(0, 7)}</code>
+          <code>{/^0+$/u.test(baseCommitSha) ? "No base" : baseCommitSha.slice(0, 7)}</code>
           <span aria-hidden="true">→</span>
           <code>{headCommitSha.slice(0, 7)}</code>
         </div>
