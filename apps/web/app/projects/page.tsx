@@ -5,6 +5,7 @@ import { AppShell } from "../../components/app-shell.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
 import { ProjectRowActions, WorkspaceDangerZone } from "../../components/projects/teardown-forms.js";
 import { CreateProjectForm, CreateWorkspaceForm } from "../../components/projects/workspace-forms.js";
+import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
 import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { EmptyState, Pagination, Panel, StatusBadge } from "../../components/ui.js";
@@ -279,6 +280,7 @@ function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-co
   // workspace is the whole of what the page can offer, so it leads rather than sits at the bottom.
   return (
     <>
+      <ReviewEmptyVisualPreview mode="onboarding" />
       <Panel title="Create your first workspace" description="A workspace holds projects, revisions and deliveries.">
         <CreateWorkspaceForm action={createWorkspaceAction} />
       </Panel>
