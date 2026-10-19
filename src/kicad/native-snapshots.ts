@@ -70,7 +70,7 @@ export function verifiedNativePcbItemAnchors(
     ?.trim()
     .split(/\s+/u)
     .map(Number);
-  if (!box || box.length !== 4 || box.some((v) => !Number.isFinite(v))) return [];
+  if (box?.length !== 4 || box.some((value) => !Number.isFinite(value))) return [];
   const [originX, originY, width, height] = box;
   const boardWidth = bounds.maxX - bounds.minX;
   const boardHeight = bounds.maxY - bounds.minY;

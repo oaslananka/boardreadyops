@@ -56786,7 +56786,7 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
     return [];
   const opening = /<svg\b[^>]*>/isu.exec(snapshot.content)?.[0];
   const box = opening?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]?.trim().split(/\s+/u).map(Number);
-  if (!box || box.length !== 4 || box.some((v) => !Number.isFinite(v))) return [];
+  if (box?.length !== 4 || box.some((value) => !Number.isFinite(value))) return [];
   const [originX, originY, width, height] = box;
   const boardWidth = bounds.maxX - bounds.minX;
   const boardHeight = bounds.maxY - bounds.minY;

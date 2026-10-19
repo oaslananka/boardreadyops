@@ -82,9 +82,9 @@ describe("Source-bound KiCad DRC object markers", () => {
     expect(
       verifiedNativePcbItemAnchors({ ...plot, content: '<svg viewBox="0 0 26.4 25.4"></svg>' }, bounds, findings("mm")),
     ).toEqual([]);
-    expect(verifiedNativePcbItemAnchors(plot, bounds, [{ ...findings("mm")[0]!, ruleId: "bom.missing-mpn" }])).toEqual(
-      [],
-    );
+    const sourceFinding = findings("mm")[0];
+    if (!sourceFinding) throw new Error("Expected KiCad DRC diagnostic");
+    expect(verifiedNativePcbItemAnchors(plot, bounds, [{ ...sourceFinding, ruleId: "bom.missing-mpn" }])).toEqual([]);
   });
   it("recognizes only a single source-declared rectangular Edge.Cuts outline", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "bro-native-bounds-"));
