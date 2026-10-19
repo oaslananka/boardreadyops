@@ -27,7 +27,7 @@ const image = {
 
 async function query(sql: string, params: unknown[] = []) {
   if (!database) throw new Error("Disposable PostgreSQL database is not configured");
-  return database.query(sql, params);
+  return (await database.query(sql, params)) as { rows: Record<string, unknown>[] };
 }
 
 function publishRequest(key: string, overrides: Record<string, unknown> = {}) {
@@ -85,12 +85,12 @@ suite("atomic run/snapshot/Review ingestion on disposable PostgreSQL", () => {
     const key = `accepted-${randomUUID()}`;
     const first = await postRun(publishRequest(key));
     expect(first.status).toBe(201);
-    const { runId } = await first.json();
+    const { runId } = (await first.json()) as { runId: string };
     const rows = await query("SELECT width, height, content FROM run_snapshots WHERE run_id=$1", [runId]);
     expect(rows.rows).toMatchObject([{ width: 280, height: 116, content: svg }]);
     const second = await postRun(publishRequest(key));
     expect(second.status).toBe(200);
-    expect((await second.json()).deduplicated).toBe(true);
+    expect(((await second.json()) as { deduplicated: boolean }).deduplicated).toBe(true);
     const count = await query("SELECT COUNT(*)::int AS total FROM release_runs WHERE idempotency_key=$1", [key]);
     expect(count.rows[0]?.total).toBe(1);
   });
@@ -104,7 +104,7 @@ suite("atomic run/snapshot/Review ingestion on disposable PostgreSQL", () => {
       }),
     );
     expect(response.status).toBe(201);
-    const body = await response.json();
+    const body = (await response.json()) as { reviewUrl: string; runId: string };
     expect(body.reviewUrl).toMatch(/^\/reviews\/[0-9a-f-]{36}$/u);
     const reviews = await query("SELECT COUNT(*)::int AS total FROM reviews WHERE head_run_id=$1", [body.runId]);
     expect(reviews.rows[0]?.total).toBe(1);
