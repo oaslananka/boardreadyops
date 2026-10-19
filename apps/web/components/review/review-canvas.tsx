@@ -93,6 +93,45 @@ function markerSeverityClass(severity: string): string {
   return "bg-warning text-white";
 }
 
+/** Group native DRC references to the same physical object and image point. */
+export function groupNativeSourceAnchors(anchors: readonly CanvasAnchor[]): Map<string, CanvasAnchor[]> {
+  const grouped = new Map<string, CanvasAnchor[]>();
+  for (const anchor of anchors) {
+    const key = nativeAnchorKey(anchor);
+    if (!key) continue;
+    const group = grouped.get(key);
+    if (group) group.push(anchor);
+    else grouped.set(key, [anchor]);
+  }
+  return grouped;
+}
+
+/** A repeated click cycles through the distinct rule findings on one source object. */
+export function nextSourceFindingFingerprint(group: readonly CanvasAnchor[], selected?: string): string | undefined {
+  const options = [
+    ...new Set(
+      group
+        .map((anchor) => anchor.metadata?.fingerprint)
+        .filter((fingerprint): fingerprint is string => typeof fingerprint === "string" && fingerprint.length > 0),
+    ),
+  ];
+  if (!options.length) return undefined;
+  return options[(options.indexOf(selected ?? "") + 1) % options.length];
+}
+
+function nativeAnchorKey(anchor: CanvasAnchor): string | undefined {
+  const sourceUuid = anchor.metadata?.sourceUuid;
+  if (
+    anchor.kind !== "finding" ||
+    anchor.metadata?.provenance !== "kicad-json-object-position" ||
+    typeof sourceUuid !== "string" ||
+    !Number.isFinite(anchor.x) ||
+    !Number.isFinite(anchor.y)
+  )
+    return undefined;
+  return [sourceUuid, anchor.layer ?? "", anchor.x.toFixed(8), anchor.y.toFixed(8)].join(":");
+}
+
 interface CanvasMarkersProps {
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
@@ -123,6 +162,7 @@ function CanvasMarkersLayer({
           markerCanvas.imageHeight,
         )
       : undefined;
+  const sourceGroups = groupNativeSourceAnchors(sheetAnchors);
   return (
     <div className="pointer-events-none absolute inset-0">
       {sheetAnchors.map((anchor) => {
@@ -131,17 +171,29 @@ function CanvasMarkersLayer({
           const isSelected = fp === selectedFindingFingerprint;
           const sev = String(anchor.metadata.severity ?? "warning");
           const position = markerPosition(anchor);
+          const key = nativeAnchorKey(anchor);
+          const group = key ? sourceGroups.get(key) : undefined;
+          if (group && group.length > 1 && group[0]?.id !== anchor.id) return null;
+          const nextFp = nextSourceFindingFingerprint(group ?? [anchor], selectedFindingFingerprint) ?? fp;
           // Until the real image viewport is measured, native markers are not positioned.
           if (anchor.metadata.provenance === "kicad-json-object-position" && !position) return null;
           return (
             <button
               type="button"
               key={anchor.id}
+              aria-label={
+                group && group.length > 1
+                  ? (anchor.targetRef ?? "KiCad source object") +
+                    ", " +
+                    group.length +
+                    " source findings; click to cycle"
+                  : undefined
+              }
               className={`${markerBase} ${markerSeverityClass(sev)} pointer-events-auto ${isSelected ? "ring-2 ring-primary" : ""}`}
               style={{ left: `${(position?.x ?? anchor.x) * 100}%`, top: `${(position?.y ?? anchor.y) * 100}%` }}
               onClick={(e) => {
                 e.stopPropagation();
-                onSelectFinding?.(fp);
+                onSelectFinding?.(nextFp);
               }}
               title={
                 anchor.metadata.provenance === "kicad-json-object-position"
@@ -149,7 +201,7 @@ function CanvasMarkersLayer({
                   : `Finding: ${anchor.metadata.ruleId}\n${anchor.metadata.message}`
               }
             >
-              {anchor.targetRef}
+              {anchor.targetRef} {group && group.length > 1 ? <span>({group.length})</span> : null}
             </button>
           );
         }

@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   comparableReviewSnapshots,
+  groupNativeSourceAnchors,
+  nextSourceFindingFingerprint,
   positionContainedImageAnchor,
   ReviewCanvas,
 } from "../../../apps/web/components/review/review-canvas.js";
@@ -90,6 +92,40 @@ describe("ReviewCanvas", () => {
     expect(mobile?.y).toBeCloseTo(anchorY, 9);
     expect(positionContainedImageAnchor(0.5, 0.5, 0, 400, 25.4, 25.4)).toBeUndefined();
     expect(positionContainedImageAnchor(1.4, 0.5, 300, 400, 25.4, 25.4)).toBeUndefined();
+  });
+
+  it("groups genuine KiCad DRC findings on one SW2 pad without hiding either rule", () => {
+    const build = (fp: string, ruleId: string, uuid: string, x = 0.408131811) => ({
+      id: fp,
+      kind: "finding" as const,
+      targetRef: "SW2",
+      x,
+      y: 0.591868189,
+      layer: "F.Cu",
+      metadata: {
+        fingerprint: fp,
+        sourceUuid: uuid,
+        provenance: "kicad-json-object-position",
+        ruleId,
+        severity: "error",
+        message: ruleId,
+      },
+    });
+    const sw2 = "bf7f5122-bc89-413e-aa3e-f19064ff92f7";
+    const first = build("fp-short", "drc.shorting_items", sw2);
+    const second = build("fp-mask", "drc.solder_mask_bridge", sw2);
+    const other = build("fp-other", "drc.shorting_items", "e64a93e8-7151-4d54-9e68-010203116100");
+    const groups = groupNativeSourceAnchors([first, second, other]);
+    expect(groups.size).toBe(2);
+    const sw2Group = [...groups.values()].find((group) => group.some((a) => a.id === "fp-short"));
+    expect(sw2Group?.map((a) => a.metadata.fingerprint)).toEqual(["fp-short", "fp-mask"]);
+    expect(nextSourceFindingFingerprint(sw2Group ?? [])).toBe("fp-short");
+    expect(nextSourceFindingFingerprint(sw2Group ?? [], "fp-short")).toBe("fp-mask");
+    expect(nextSourceFindingFingerprint(sw2Group ?? [], "fp-mask")).toBe("fp-short");
+    expect(groupNativeSourceAnchors([{ ...second, x: 0.5 }, first]).size).toBe(2);
+    expect(
+      groupNativeSourceAnchors([{ ...first, metadata: { ...first.metadata, provenance: "unverified" } }]).size,
+    ).toBe(0);
   });
 
   it("renders a finding marker for each anchor linked to a finding", () => {
