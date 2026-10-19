@@ -1,12 +1,25 @@
 import type { SnapshotArtifact } from "@boardreadyops/contracts";
 import Link from "next/link";
-import { ReviewCanvas } from "./review/review-canvas.js";
+import type { RunDetail } from "../lib/run-dashboard.js";
+import { RunDesignWorkspace } from "./run-design-workspace.js";
 
 export function RunDesignView({
   runId,
   snapshots,
   reviewId,
-}: Readonly<{ runId: string; snapshots: SnapshotArtifact[]; reviewId?: string }>) {
+  findings = [],
+  totalFindings = 0,
+  repository = "",
+  commitSha = "",
+}: Readonly<{
+  runId: string;
+  snapshots: SnapshotArtifact[];
+  reviewId?: string;
+  findings?: RunDetail["findings"];
+  totalFindings?: number;
+  repository?: string;
+  commitSha?: string;
+}>) {
   const native = snapshots.filter((item) => item.name.startsWith("kicad_native_")).length;
   return (
     <section aria-label="Run design inspection" className="space-y-4">
@@ -24,7 +37,13 @@ export function RunDesignView({
       </div>
       {snapshots.length ? (
         <>
-          <ReviewCanvas headSnapshots={snapshots} />
+          <RunDesignWorkspace
+            snapshots={snapshots}
+            findings={findings}
+            totalFindings={totalFindings}
+            repository={repository}
+            commitSha={commitSha}
+          />
           <p className="text-xs text-muted-foreground">
             {native
               ? "KiCad-native artwork shows source-derived design geometry. Other views may be summary diagrams."

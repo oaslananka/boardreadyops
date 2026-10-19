@@ -40,6 +40,10 @@ export default async function RunDesignPage({ params }: Readonly<RunDesignPagePr
       <RunDesignView
         runId={runId}
         snapshots={snapshots}
+        findings={result.run.findings}
+        totalFindings={result.run.findingsPage.total}
+        repository={result.run.repository}
+        commitSha={result.run.commitSha}
         {...(result.run.reviewId ? { reviewId: result.run.reviewId } : {})}
       />
     </RunPageFrame>

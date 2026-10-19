@@ -33,6 +33,34 @@ describe("run design visual inspection", () => {
     expect(html).toContain("/runs/run-1/findings");
     expect(html).toContain("/reviews/review-1");
   });
+  it("shows real recorded findings alongside the source artwork in the Run view", () => {
+    const html = renderToStaticMarkup(
+      createElement(RunDesignView, {
+        runId: "run-1",
+        snapshots: [visual],
+        findings: [
+          {
+            id: "f1",
+            ruleId: "bom.missing-mpn",
+            severity: "high",
+            message: "C1 has no manufacturer part number.",
+            path: "board.kicad_sch",
+            kind: undefined,
+            waivedAt: undefined,
+          },
+        ],
+        totalFindings: 14,
+        repository: "example/hardware",
+        commitSha: "a".repeat(40),
+      }),
+    );
+    expect(html).toContain("Recorded findings");
+    expect(html).toContain("Finding inspector");
+    expect(html).toContain("1 of 14");
+    expect(html).toContain("C1 has no manufacturer part number.");
+    expect(html).toContain("Supply a verifiable manufacturer part number");
+  });
+
   it("does not misrepresent a run with no published design IP", () => {
     const html = renderToStaticMarkup(createElement(RunDesignView, { runId: "run-1", snapshots: [] }));
     expect(html).toContain("No PCB or schematic preview published for this run");
