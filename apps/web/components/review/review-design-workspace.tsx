@@ -56,7 +56,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
         </div>
       </header>
 
-      <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(190px,0.8fr)_minmax(0,2.4fr)_minmax(220px,1fr)]">
+      <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(275px,1.05fr)_minmax(0,1.9fr)_minmax(235px,0.95fr)]">
         <div className="order-2 min-w-0 rounded-lg border border-border bg-card p-3 xl:order-1">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground">Findings</h3>
@@ -85,7 +85,9 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
                     >
                       {finding.severity.toUpperCase()} · {finding.ruleId}
                     </span>
-                    <span className="mt-1 block text-sm text-foreground">{finding.message}</span>
+                    <span className="mt-1 line-clamp-2 block break-words text-sm text-foreground">
+                      {finding.message}
+                    </span>
                     <span
                       className={
                         "mt-2 block text-xs " +
@@ -111,6 +113,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
           {snapshots.length ? (
             <>
               <ReviewCanvas
+                compactMobile
                 headSnapshots={snapshots}
                 {...optionalBaseSnapshots}
                 findings={review.findings}
@@ -126,7 +129,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
               </p>
             </>
           ) : (
-            <div className="flex min-h-[25rem] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card p-6 text-center">
+            <div className="flex min-h-[17rem] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card p-6 text-center md:min-h-[25rem]">
               <p className="text-base font-semibold text-foreground">
                 No schematic or PCB snapshot is available for this revision.
               </p>

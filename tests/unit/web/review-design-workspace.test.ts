@@ -68,6 +68,11 @@ describe("Zaptrace-inspired BoardReadyOps review workspace", () => {
     expect(html).toContain("Pin mismatch on U2");
     expect(html).toContain("not exact native KiCad");
     expect(html).toContain("not verified");
+    expect(html).toContain("xl:grid-cols-[minmax(275px,1.05fr)_minmax(0,1.9fr)_minmax(235px,0.95fr)]");
+    expect(html).toContain("line-clamp-2");
+    expect(html).toContain("h-[19rem]");
+    // Engineering detail remains fully present in the inspector even when the list preview is clamped.
+    expect(html).toContain('class="mt-1 break-words">Insufficient clearance on U1');
   });
 
   it("does not invent a PCB image or a passing verdict when no snapshots or findings exist", () => {
@@ -77,6 +82,8 @@ describe("Zaptrace-inspired BoardReadyOps review workspace", () => {
     expect(html).toContain("No schematic or PCB snapshot is available for this revision.");
     expect(html).toContain("No findings are recorded for this Review.");
     expect(html).toContain("does not independently verify manufacturing readiness");
+    expect(html).toContain("min-h-[17rem]");
+    expect(html).toContain("md:min-h-[25rem]");
     expect(html).not.toContain("source-bound-test");
   });
 });
