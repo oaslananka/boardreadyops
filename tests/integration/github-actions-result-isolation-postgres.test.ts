@@ -10,6 +10,7 @@ import {
   resetGitHubActionsOidcJwksCache,
   verifyGitHubActionsOidcToken,
 } from "../../apps/web/lib/github-actions-oidc.js";
+import { completeGitHubCheckRun, upsertReadinessComment } from "../../apps/web/lib/github-app-check-run-client.js";
 import { resultOidcExpectations } from "../../apps/web/lib/result-oidc-expectations.js";
 import { createSqlAuditLogStore } from "../../packages/db/src/audit-log-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
@@ -185,6 +186,28 @@ async function stateSnapshot(): Promise<unknown> {
 }
 
 const checkRunPublications: QueryRow[] = [];
+const restrictedAppHttpCalls: Array<{ method: string; path: string; checksOnlyTokenUsed: boolean }> = [];
+const restrictedAppToken = "synthetic-fixture-token-checks-only";
+const restrictedAppHttp = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
+  const requestUrl = new URL(url instanceof Request ? url.url : url);
+  const method = options?.method ?? "GET";
+  const headers = options?.headers as Record<string, string>;
+  restrictedAppHttpCalls.push({
+    method,
+    path: requestUrl.pathname,
+    checksOnlyTokenUsed: headers.authorization === `Bearer ${restrictedAppToken}`,
+  });
+  const ownerA = `/repos/${fixtures.a.owner}/${fixtures.a.name}`;
+  if (requestUrl.pathname === `${ownerA}/check-runs/${fixtures.a.checkRunId}` && method === "PATCH") {
+    return new Response(JSON.stringify({ id: fixtures.a.checkRunId }), { status: 200 });
+  }
+  if (requestUrl.pathname === `${ownerA}/issues/${fixtures.a.pullRequestNumber}/comments` && method === "GET") {
+    // This simulates the API 403 observed with a real downscoped BoardReadyOps
+    // installation token. NEVER place real tokens in the CI environment.
+    return new Response(JSON.stringify({ message: "Resource not accessible by integration" }), { status: 403 });
+  }
+  throw new Error(`Unexpected private fixture GitHub request ${method} ${requestUrl.pathname}`);
+});
 const jwksFetch = vi.fn(
   async () =>
     new Response(JSON.stringify({ keys: [publicJwk] }), {
@@ -197,8 +220,30 @@ const resultDependencies: ResultRouteDependencies = {
   queryExecutor: () => executor,
   checkRunClient: () =>
     ({
-      completeCheckRun: async (input: QueryRow) => {
-        checkRunPublications.push(input);
+      completeCheckRun: async (input: Parameters<typeof completeGitHubCheckRun>[0]["input"]) => {
+        checkRunPublications.push(input as unknown as QueryRow);
+        if (input.repositoryOwner === fixtures.a.owner) {
+          await completeGitHubCheckRun({
+            apiBaseUrl: "https://api.github.test",
+            token: restrictedAppToken,
+            input,
+            request: restrictedAppHttp,
+          });
+        }
+      },
+      createPullRequestComment: async (input: QueryRow) => {
+        if (input.repositoryOwner !== fixtures.a.owner) {
+          throw new Error("Foreign installation must never publish a comment");
+        }
+        await upsertReadinessComment({
+          apiBaseUrl: "https://api.github.test",
+          token: restrictedAppToken,
+          repositoryOwner: String(input.repositoryOwner),
+          repositoryName: String(input.repositoryName),
+          pullRequestNumber: Number(input.pullRequestNumber),
+          body: String(input.body),
+          request: restrictedAppHttp,
+        });
       },
     }) as never,
   detailsUrl: (runId) => `https://boardreadyops.test/runs/${runId}`,
@@ -223,6 +268,8 @@ beforeAll(async () => {
   if (!executor) return;
   resetGitHubActionsOidcJwksCache();
   checkRunPublications.length = 0;
+  restrictedAppHttpCalls.length = 0;
+  restrictedAppHttp.mockClear();
   await executor.query("delete from installations where id = any($1::text[])", [
     [fixtures.a.installationId, fixtures.b.installationId],
   ]);
@@ -324,7 +371,7 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       status: "accepted",
       checkRunUpdated: true,
       pullRequestCommentCreated: false,
-      publicationWarnings: ["GitHub pull-request comment publication is not configured"],
+      publicationWarnings: [expect.stringContaining("status 403")],
     });
 
     const acceptedB = await handleGitHubActionsResultRequest(
@@ -339,6 +386,35 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       pullRequestCommentCreated: false,
     });
 
+    expect(restrictedAppHttpCalls).toEqual([
+      {
+        method: "PATCH",
+        path: `/repos/${fixtures.a.owner}/${fixtures.a.name}/check-runs/${fixtures.a.checkRunId}`,
+        checksOnlyTokenUsed: true,
+      },
+      {
+        method: "GET",
+        path: `/repos/${fixtures.a.owner}/${fixtures.a.name}/issues/${fixtures.a.pullRequestNumber}/comments`,
+        checksOnlyTokenUsed: true,
+      },
+    ]);
+    // A later identical JWT replay legitimately tries publication again;
+    // count only this first accepted callback in the evidence summary.
+    const restrictedAppFirstAcceptanceCalls = [...restrictedAppHttpCalls];
+    const restrictedAppPublication = rows(
+      await executor.query(
+        `select github_check_published_at is not null as check_published,
+                github_comment_published_at is not null as comment_published,
+                last_publication_error
+           from release_run_results where run_id = $1`,
+        [fixtures.a.runId],
+      ),
+    )[0];
+    expect(restrictedAppPublication).toMatchObject({
+      check_published: true,
+      comment_published: false,
+      last_publication_error: expect.stringContaining("status 403"),
+    });
     expect(checkRunPublications).toEqual([
       expect.objectContaining({
         installationId: String(fixtures.a.githubInstallationId),
@@ -564,6 +640,14 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
         deniedForeignAuditReads,
         auditCanaryLeakageFindings: auditCanaryLeakageFindings.length,
         checkRunPublicationLeakageFindings: checkRunPublicationLeakageFindings.length,
+        restrictedAppCheckRunUpdates: restrictedAppFirstAcceptanceCalls.filter((call) => call.method === "PATCH")
+          .length,
+        restrictedAppCommentDenials: restrictedAppFirstAcceptanceCalls.filter((call) => call.method === "GET").length,
+        restrictedAppWarningPersistence: Number(
+          restrictedAppPublication?.check_published === true &&
+            restrictedAppPublication?.comment_published === false &&
+            String(restrictedAppPublication?.last_publication_error).includes("status 403"),
+        ),
       };
       await fs.writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
       await fs.chmod(evidencePath, 0o600);

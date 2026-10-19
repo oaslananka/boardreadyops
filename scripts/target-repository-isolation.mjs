@@ -69,6 +69,24 @@ export function validateTargetRepositoryIsolationEvidence(input) {
       0,
       "Check Run publication leakage findings",
     ),
+    restrictedAppCheckRunUpdates: requiredCount(
+      input,
+      "restrictedAppCheckRunUpdates",
+      1,
+      "restricted App Check Run updates",
+    ),
+    restrictedAppCommentDenials: requiredCount(
+      input,
+      "restrictedAppCommentDenials",
+      1,
+      "restricted App comment denials",
+    ),
+    restrictedAppWarningPersistence: requiredCount(
+      input,
+      "restrictedAppWarningPersistence",
+      1,
+      "restricted App warning persistence",
+    ),
   };
 }
 
@@ -112,6 +130,9 @@ export function buildTargetRepositoryIsolationReport(input) {
       deniedForeignAuditReads: evidence.deniedForeignAuditReads,
       auditCanaryLeakageFindings: evidence.auditCanaryLeakageFindings,
       checkRunPublicationLeakageFindings: evidence.checkRunPublicationLeakageFindings,
+      restrictedAppCheckRunUpdates: evidence.restrictedAppCheckRunUpdates,
+      restrictedAppCommentDenials: evidence.restrictedAppCommentDenials,
+      restrictedAppWarningPersistence: evidence.restrictedAppWarningPersistence,
     },
   };
 }

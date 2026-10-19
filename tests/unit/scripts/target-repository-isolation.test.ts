@@ -25,6 +25,9 @@ function evidence(overrides: Record<string, unknown> = {}) {
     deniedForeignAuditReads: 2,
     auditCanaryLeakageFindings: 0,
     checkRunPublicationLeakageFindings: 0,
+    restrictedAppCheckRunUpdates: 1,
+    restrictedAppCommentDenials: 1,
+    restrictedAppWarningPersistence: 1,
     ...overrides,
   };
 }
@@ -67,6 +70,9 @@ describe("target-repository two-installation isolation evidence", () => {
         deniedForeignAuditReads: 2,
         auditCanaryLeakageFindings: 0,
         checkRunPublicationLeakageFindings: 0,
+        restrictedAppCheckRunUpdates: 1,
+        restrictedAppCommentDenials: 1,
+        restrictedAppWarningPersistence: 1,
       },
     });
   });
@@ -94,6 +100,15 @@ describe("target-repository two-installation isolation evidence", () => {
     );
     expect(() => validateTargetRepositoryIsolationEvidence(evidence({ scopedAuditExports: 1 }))).toThrow(
       "scoped audit exports",
+    );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ restrictedAppCheckRunUpdates: 0 }))).toThrow(
+      "restricted App Check Run updates",
+    );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ restrictedAppCommentDenials: 0 }))).toThrow(
+      "restricted App comment denials",
+    );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ restrictedAppWarningPersistence: 0 }))).toThrow(
+      "restricted App warning persistence",
     );
     expect(() => validateTargetRepositoryIsolationEvidence(evidence({ auditCanaryLeakageFindings: 1 }))).toThrow(
       "audit canary leakage",
