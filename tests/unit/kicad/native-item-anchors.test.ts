@@ -72,6 +72,28 @@ describe("Source-bound KiCad DRC object markers", () => {
     // Multi-layer zones and arbitrary midpoints must NOT generate markers.
     expect(anchors.map((a) => a.targetRef)).toEqual(["SW2"]);
   });
+  it("maps only KiCad-reported B.Cu objects into the actual native B.Cu view", () => {
+    const back = { ...plot, name: "kicad_native_board_B.Cu.svg", sheetOrLayer: "board / B.Cu" };
+    const sourceFinding = findings("mm")[0];
+    if (!sourceFinding) throw new Error("Expected diagnostic");
+    const pad = {
+      description: "Pad 1 [3.3V] of D2 on B.Cu",
+      uuid: "c71b2196-ae56-4853-92ac-5497683704cd",
+      pos: { x: 138.785, y: 99.9275 },
+    };
+    const finding = { ...sourceFinding, details: { coordinate_units: "mm", items: [pad] } };
+    const anchors = verifiedNativePcbItemAnchors(back, bounds, [finding]);
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0]).toMatchObject({
+      targetRef: "D2",
+      layer: "B.Cu",
+      metadata: { sourceUuid: pad.uuid, locationMeaning: "Referenced source object, not verified violation center" },
+    });
+    expect(anchors[0]?.x).toBeCloseTo((138.785 - bounds.minX) / 25.4, 6);
+    expect(anchors[0]?.y).toBeCloseTo((99.9275 - bounds.minY) / 25.4, 6);
+    expect(verifiedNativePcbItemAnchors(plot, bounds, [finding])).toEqual([]);
+  });
+
   it("fails closed when source units, plot geometry, layer, or item provenance differ", () => {
     expect(verifiedNativePcbItemAnchors(plot, bounds, findings("mil"))).toEqual([]);
     expect(verifiedNativePcbItemAnchors({ ...plot, kind: "schematic" }, bounds, findings("mm"))).toEqual([]);
@@ -91,8 +113,12 @@ describe("Source-bound KiCad DRC object markers", () => {
     temporary.push(root);
     const file = path.join(root, "board.kicad_pcb");
     const rectangle = '(gr_rect (start 135.255 92.075) (end 160.655 117.475) (stroke (width 0.1)) (layer "Edge.Cuts"))';
-    await fs.writeFile(file, `(kicad_pcb (version 20240108) ${rectangle})`);
-    expect((await parsePcb(file)).outlineBounds).toEqual(bounds);
+    const layerDefinitions = '(layers (0 "F.Cu" signal) (31 "B.Cu" jumper))';
+    await fs.writeFile(file, `(kicad_pcb (version 20240108) ${layerDefinitions} ${rectangle})`);
+    const parsed = await parsePcb(file);
+    expect(parsed.outlineBounds).toEqual(bounds);
+    expect(parsed.copperLayers).toEqual(["F.Cu"]);
+    expect(parsed.plotCopperLayers).toEqual(["F.Cu", "B.Cu"]);
     await fs.writeFile(
       file,
       `(kicad_pcb (version 20240108) ${rectangle} (gr_line (start 1 2) (end 3 4) (layer "Edge.Cuts")))`,

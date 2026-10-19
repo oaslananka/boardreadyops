@@ -41186,6 +41186,7 @@ async function parsePcb(file2) {
     revision: revision(model),
     drillSizes: drillSizes(model),
     copperLayers: copperLayerNames,
+    plotCopperLayers: pcbPlotLayers(model),
     copperAreas: copperAreas(model),
     boardArea: boardArea(model),
     ...outlineBounds ? { outlineBounds } : {},
@@ -41253,6 +41254,12 @@ function revision(model) {
 }
 function drillSizes(model) {
   return findKiCadLists(model, "drill").map((drill) => listValue(drill)).filter((value) => Boolean(value && Number.isFinite(Number(value))));
+}
+function pcbPlotLayers(model) {
+  const definitions = findKiCadLists(model, "layers")[0];
+  if (!definitions) return copperLayers(model);
+  const layers = directChildLists(definitions).filter((layer) => ["signal", "power", "jumper"].includes(listValue(layer, 2) ?? "")).map((layer) => listValue(layer, 1) ?? "").filter((layer) => /^(?:F|B|In\d+)\.Cu$/u.test(layer));
+  return layers.length ? [...new Set(layers)] : copperLayers(model);
 }
 function copperLayers(model) {
   const layerBlock = findKiCadLists(model, "layers")[0];
@@ -56782,7 +56789,8 @@ function normalizeKicadSvg(raw) {
   return { svg, width, height };
 }
 function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
-  if (snapshot.kind !== "pcb_layer" || !snapshot.name.startsWith("kicad_native_") || !snapshot.sheetOrLayer.endsWith(" / F.Cu") || snapshot.format !== "svg" || !snapshot.content)
+  const layer = snapshot.sheetOrLayer.endsWith(" / F.Cu") ? "F.Cu" : snapshot.sheetOrLayer.endsWith(" / B.Cu") ? "B.Cu" : void 0;
+  if (snapshot.kind !== "pcb_layer" || !snapshot.name.startsWith("kicad_native_") || !layer || snapshot.format !== "svg" || !snapshot.content)
     return [];
   const opening = /<svg\b[^>]*>/isu.exec(snapshot.content)?.[0];
   const box = opening?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]?.trim().split(/\s+/u).map(Number);
@@ -56803,7 +56811,7 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
       const description = candidate.description;
       const uuid3 = candidate.uuid;
       const pos = candidate.pos;
-      if (typeof description !== "string" || !/\bon F\.Cu$/iu.test(description.trim()) || typeof uuid3 !== "string" || !/^[a-f0-9-]{36}$/iu.test(uuid3) || !pos || typeof pos !== "object")
+      if (typeof description !== "string" || !description.trim().endsWith(` on ${layer}`) || typeof uuid3 !== "string" || !/^[a-f0-9-]{36}$/iu.test(uuid3) || !pos || typeof pos !== "object")
         continue;
       const { x, y } = pos;
       if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) continue;
@@ -56813,14 +56821,14 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
       const key = `${finding2.fingerprint}:${uuid3}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const name = /\bof ([#A-Za-z0-9_]+) on F\.Cu$/iu.exec(description)?.[1] ?? "Item";
+      const name = /\bof ([#A-Za-z0-9_]+) on (?:F|B)\.Cu$/iu.exec(description)?.[1] ?? "Item";
       result.push({
         id: `kicad_item_${finding2.fingerprint.slice(0, 12)}_${uuid3.slice(0, 8)}`,
         kind: "finding",
         targetRef: name,
         x: xx,
         y: yy,
-        layer: "F.Cu",
+        layer,
         metadata: {
           fingerprint: finding2.fingerprint,
           ruleId: finding2.ruleId,
@@ -57008,7 +57016,7 @@ async function schematicOrSummary(file2, cliPath, findings) {
 async function pcbOrSummary(file2, cliPath, findings) {
   if (cliPath) {
     const pcb = await parsePcb(file2).catch(() => void 0);
-    const layers = pcb?.copperLayers ?? [];
+    const layers = pcb?.plotCopperLayers ?? [];
     const native = await exportNativeKicadSnapshots(
       cliPath,
       file2,

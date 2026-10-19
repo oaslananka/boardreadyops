@@ -105,7 +105,7 @@ async function pcbOrSummary(
 ): Promise<SnapshotArtifact[]> {
   if (cliPath) {
     const pcb = await parsePcb(file).catch(() => undefined);
-    const layers = pcb?.copperLayers ?? [];
+    const layers = pcb?.plotCopperLayers ?? [];
     const native = await exportNativeKicadSnapshots(
       cliPath,
       file,

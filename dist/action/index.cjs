@@ -72516,6 +72516,7 @@ async function parsePcb(file2) {
     revision: revision(model),
     drillSizes: drillSizes(model),
     copperLayers: copperLayerNames,
+    plotCopperLayers: pcbPlotLayers(model),
     copperAreas: copperAreas(model),
     boardArea: boardArea(model),
     ...outlineBounds ? { outlineBounds } : {},
@@ -72583,6 +72584,12 @@ function revision(model) {
 }
 function drillSizes(model) {
   return findKiCadLists(model, "drill").map((drill) => listValue(drill)).filter((value) => Boolean(value && Number.isFinite(Number(value))));
+}
+function pcbPlotLayers(model) {
+  const definitions = findKiCadLists(model, "layers")[0];
+  if (!definitions) return copperLayers(model);
+  const layers = directChildLists(definitions).filter((layer) => ["signal", "power", "jumper"].includes(listValue(layer, 2) ?? "")).map((layer) => listValue(layer, 1) ?? "").filter((layer) => /^(?:F|B|In\d+)\.Cu$/u.test(layer));
+  return layers.length ? [...new Set(layers)] : copperLayers(model);
 }
 function copperLayers(model) {
   const layerBlock = findKiCadLists(model, "layers")[0];

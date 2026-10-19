@@ -48,18 +48,23 @@ export function normalizeKicadSvg(raw: string): { svg: string; width: number; he
 
 /**
  * A marker points to a KiCad-reported *source object*, never to an inferred
- * DRC fault center. Only exact millimeter reports, F.Cu items with UUIDs,
- * and a single rectangular Edge.Cuts with a matching native plot qualify.
+ * DRC fault center. Only exact millimeter reports, layer-matched copper
+ * objects with UUIDs, and a rectangular Edge.Cuts/plot alignment qualify.
  */
 export function verifiedNativePcbItemAnchors(
   snapshot: SnapshotArtifact,
   bounds: PcbOutlineBounds,
   findings: readonly SnapshotFinding[],
 ): CanvasAnchor[] {
+  const layer = snapshot.sheetOrLayer.endsWith(" / F.Cu")
+    ? "F.Cu"
+    : snapshot.sheetOrLayer.endsWith(" / B.Cu")
+      ? "B.Cu"
+      : undefined;
   if (
     snapshot.kind !== "pcb_layer" ||
     !snapshot.name.startsWith("kicad_native_") ||
-    !snapshot.sheetOrLayer.endsWith(" / F.Cu") ||
+    !layer ||
     snapshot.format !== "svg" ||
     !snapshot.content
   )
@@ -107,7 +112,7 @@ export function verifiedNativePcbItemAnchors(
       const pos = candidate.pos;
       if (
         typeof description !== "string" ||
-        !/\bon F\.Cu$/iu.test(description.trim()) ||
+        !description.trim().endsWith(` on ${layer}`) ||
         typeof uuid !== "string" ||
         !/^[a-f0-9-]{36}$/iu.test(uuid) ||
         !pos ||
@@ -122,14 +127,14 @@ export function verifiedNativePcbItemAnchors(
       const key = `${finding.fingerprint}:${uuid}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const name = /\bof ([#A-Za-z0-9_]+) on F\.Cu$/iu.exec(description)?.[1] ?? "Item";
+      const name = /\bof ([#A-Za-z0-9_]+) on (?:F|B)\.Cu$/iu.exec(description)?.[1] ?? "Item";
       result.push({
         id: `kicad_item_${finding.fingerprint.slice(0, 12)}_${uuid.slice(0, 8)}`,
         kind: "finding",
         targetRef: name,
         x: xx,
         y: yy,
-        layer: "F.Cu",
+        layer,
         metadata: {
           fingerprint: finding.fingerprint,
           ruleId: finding.ruleId,

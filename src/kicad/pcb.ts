@@ -43,6 +43,8 @@ export interface ParsedPcb {
   revision?: string | undefined;
   drillSizes: string[];
   copperLayers: string[];
+  /** Actual plot-capable copper, including KiCad jumper-layer designation. */
+  plotCopperLayers: string[];
   copperAreas: Map<string, number>;
   boardArea?: number | undefined;
   outlineClosed: boolean;
@@ -61,6 +63,7 @@ export async function parsePcb(file: string): Promise<ParsedPcb> {
     revision: revision(model),
     drillSizes: drillSizes(model),
     copperLayers: copperLayerNames,
+    plotCopperLayers: pcbPlotLayers(model),
     copperAreas: copperAreas(model),
     boardArea: boardArea(model),
     ...(outlineBounds ? { outlineBounds } : {}),
@@ -142,6 +145,16 @@ function drillSizes(model: KiCadDocumentModel): string[] {
   return findKiCadLists(model, "drill")
     .map((drill) => listValue(drill))
     .filter((value): value is string => Boolean(value && Number.isFinite(Number(value))));
+}
+
+function pcbPlotLayers(model: KiCadDocumentModel): string[] {
+  const definitions = findKiCadLists(model, "layers")[0];
+  if (!definitions) return copperLayers(model);
+  const layers = directChildLists(definitions)
+    .filter((layer) => ["signal", "power", "jumper"].includes(listValue(layer, 2) ?? ""))
+    .map((layer) => listValue(layer, 1) ?? "")
+    .filter((layer) => /^(?:F|B|In\d+)\.Cu$/u.test(layer));
+  return layers.length ? [...new Set(layers)] : copperLayers(model);
 }
 
 function copperLayers(model: KiCadDocumentModel): string[] {
