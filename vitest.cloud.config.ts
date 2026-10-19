@@ -31,10 +31,9 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      // Mirrors vitest.config.ts: next/font/google ships empty because Next replaces loader
-      // calls at build time, so any module calling one throws without this stub. This config
-      // runs the web tests for the cloud coverage gate and needs the same alias.
-      "next/font/google": fileURLToPath(new URL("tests/stubs/next-font-google.ts", import.meta.url)),
+      // Mirrors vitest.config.ts: Next replaces next/font/local at build time, so
+      // Cloud coverage tests that import the root layout need the same stub.
+      "next/font/local": fileURLToPath(new URL("tests/stubs/next-font-local.ts", import.meta.url)),
       // Same reason: revalidatePath throws outside a request scope, so a Server Action cannot
       // be called directly in a test without this.
       "next/cache": fileURLToPath(new URL("tests/stubs/next-cache.ts", import.meta.url)),
