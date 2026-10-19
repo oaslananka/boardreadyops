@@ -6,6 +6,7 @@ import { RunDesignWorkspace } from "./run-design-workspace.js";
 export function RunDesignView({
   runId,
   snapshots,
+  baseSnapshots = [],
   reviewId,
   findings = [],
   totalFindings = 0,
@@ -14,6 +15,7 @@ export function RunDesignView({
 }: Readonly<{
   runId: string;
   snapshots: SnapshotArtifact[];
+  baseSnapshots?: SnapshotArtifact[];
   reviewId?: string;
   findings?: RunDetail["findings"];
   totalFindings?: number;
@@ -33,12 +35,16 @@ export function RunDesignView({
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="rounded-md border border-border px-2 py-1">{snapshots.length} published views</span>
           <span className="rounded-md border border-border px-2 py-1">{native} KiCad-native</span>
+          {baseSnapshots.length > 0 ? (
+            <span className="rounded-md border border-border px-2 py-1">{baseSnapshots.length} base views</span>
+          ) : null}
         </div>
       </div>
       {snapshots.length ? (
         <>
           <RunDesignWorkspace
             snapshots={snapshots}
+            baseSnapshots={baseSnapshots}
             findings={findings}
             totalFindings={totalFindings}
             repository={repository}
@@ -48,6 +54,9 @@ export function RunDesignView({
             {native
               ? "KiCad-native artwork shows source-derived design geometry. Other views may be summary diagrams."
               : "These are schematic/PCB summaries, not complete native KiCad design geometry."}{" "}
+            {baseSnapshots.length > 0
+              ? "Base/head comparison is a visual overlay, not a dimensional or electrical verification. "
+              : "No exact-commit base images are available for comparison. "}
             Finding coordinates are not inferred from these pictures and the drawings do not certify manufacturing
             readiness.
           </p>
