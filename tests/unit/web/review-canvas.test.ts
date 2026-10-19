@@ -24,6 +24,14 @@ describe("ReviewCanvas", () => {
     }
   });
 
+  it("keeps long native sheet names inside the viewport on narrow screens", () => {
+    const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
+    expect(markup).toContain('class="flex min-w-0 max-w-full flex-wrap items-center gap-3"');
+    expect(markup).toContain(
+      'class="min-w-0 max-w-full rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground"',
+    );
+  });
+
   it("renders a finding marker for each anchor linked to a finding", () => {
     const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
     const findingAnchorCount = headSnapshots[0]?.anchors.filter((a) => a.kind === "finding").length ?? 0;

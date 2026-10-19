@@ -337,7 +337,7 @@ export function ReviewCanvas({
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
       <section className="flex flex-wrap items-center justify-between gap-3" aria-label="Canvas instruments">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
           <label htmlFor="sheet-select" className="text-xs text-muted-foreground">
             Layer / Sheet:
           </label>
@@ -345,7 +345,7 @@ export function ReviewCanvas({
             id="sheet-select"
             value={selectedSheetOrLayer}
             onChange={(e) => setSelectedSheetOrLayer(e.currentTarget.value)}
-            className="rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground"
+            className="min-w-0 max-w-full rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground"
           >
             {availableSheets.map((name) => (
               <option key={name} value={name}>
