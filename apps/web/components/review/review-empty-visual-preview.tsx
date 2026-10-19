@@ -4,7 +4,8 @@ import Link from "next/link";
  * These static PNG previews were rasterized from native KiCad SVGs plotted locally from the Zaptrace QA engineering
  * examples. They are illustrations, never an approved customer Review.
  */
-export function ReviewEmptyVisualPreview() {
+export function ReviewEmptyVisualPreview({ mode = "reviews" }: Readonly<{ mode?: "onboarding" | "reviews" }> = {}) {
+  const onboarding = mode === "onboarding";
   return (
     <section
       aria-label="Example PCB and schematic design views"
@@ -13,10 +14,13 @@ export function ReviewEmptyVisualPreview() {
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">A visual hardware review</p>
-          <h2 className="mt-1 text-xl font-bold text-foreground">See the design, not just a report</h2>
+          <h2 className="mt-1 text-xl font-bold text-foreground">
+            {onboarding ? "Your next hardware review starts with the board" : "See the design, not just a report"}
+          </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Explore PCB copper and schematic views alongside findings when you publish a Review with native KiCad
-            snapshots.
+            {onboarding
+              ? "See what a visual PCB and schematic review looks like, then connect your own design to get real, commit-bound findings."
+              : "Explore PCB copper and schematic views alongside findings when you publish a Review with native KiCad snapshots."}
           </p>
         </div>
         <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
@@ -49,16 +53,44 @@ export function ReviewEmptyVisualPreview() {
           />
         </figure>
       </div>
+      {onboarding ? (
+        <ol
+          className="grid gap-3 px-4 pb-4 text-sm sm:grid-cols-3 sm:px-6"
+          aria-label="From design to production review"
+        >
+          <li className="rounded-lg border border-border bg-muted/25 p-3">
+            <span className="text-xs font-semibold text-primary">01 · See the design</span>
+            <p className="mt-1 text-foreground">PCB, schematic and source revision.</p>
+          </li>
+          <li className="rounded-lg border border-border bg-muted/25 p-3">
+            <span className="text-xs font-semibold text-primary">02 · Investigate blockers</span>
+            <p className="mt-1 text-foreground">Findings tied to recorded evidence.</p>
+          </li>
+          <li className="rounded-lg border border-border bg-muted/25 p-3">
+            <span className="text-xs font-semibold text-primary">03 · Prepare the handoff</span>
+            <p className="mt-1 text-foreground">Verify the package before fabrication.</p>
+          </li>
+        </ol>
+      ) : null}
       <footer className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4 sm:px-6">
         <p className="max-w-xl text-xs text-muted-foreground">
           Sample designs, not your repository, not recorded findings or manufacturing approval.
         </p>
         <div className="flex flex-wrap items-center gap-4 text-sm font-medium">
+          {onboarding ? (
+            <Link
+              href="/setup"
+              className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-primary-foreground hover:opacity-90"
+            >
+              Connect a repository →
+            </Link>
+          ) : (
+            <Link href="/reviews#publish-review" className="text-primary underline-offset-4 hover:underline">
+              Publish your first Review →
+            </Link>
+          )}
           <Link href="/runs" className="text-primary underline-offset-4 hover:underline">
             Browse your runs →
-          </Link>
-          <Link href="/reviews#publish-review" className="text-primary underline-offset-4 hover:underline">
-            Publish your first Review →
           </Link>
         </div>
       </footer>

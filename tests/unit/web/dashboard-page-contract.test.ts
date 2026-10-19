@@ -54,6 +54,28 @@ describe("dashboard operational hierarchy", () => {
     expect(markup).not.toContain("trend");
   });
 
+  it("leads with a clearly labeled PCB preview when most repositories have never run", async () => {
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 37,
+      repositoriesWithOpenFindings: 1,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 36,
+      watchedBoards: 0,
+    });
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("Your next hardware review starts with the board");
+    expect(markup).toContain("Example only");
+    expect(markup).toContain('href="/setup"');
+    expect(markup.indexOf("Your next hardware review starts with the board")).toBeLessThan(
+      markup.indexOf("Engineering status"),
+    );
+  });
+
+  it("does not interrupt experienced teams with onboarding visuals", async () => {
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).not.toContain("Your next hardware review starts with the board");
+  });
+
   it("renders repository account groups as sections with a wide, scrollable table", async () => {
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).toContain("octocat/widgets");

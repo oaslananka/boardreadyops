@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
+import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { AppShell, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
@@ -265,6 +266,9 @@ function DashboardBody({
 
   return (
     <div className="flex flex-col gap-5">
+      {summary.repositoriesWithoutRuns > summary.repositories / 2 ? (
+        <ReviewEmptyVisualPreview mode="onboarding" />
+      ) : null}
       <OperationalSummarySection summary={summary} />
       <AttentionBanner summary={summary} groups={groups} />
       <RepositorySections groups={groups} />
