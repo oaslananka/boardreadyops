@@ -6,7 +6,7 @@ import {
   resolveRunPageTitle,
   runDashboardLoaderDependencies,
 } from "../../../../lib/run-dashboard.js";
-import { loadRunDesignSnapshots } from "../../../../lib/run-design-snapshots.js";
+import { loadRunDesignBaseSnapshots, loadRunDesignSnapshots } from "../../../../lib/run-design-snapshots.js";
 import { shouldLiveRefreshRun } from "../../../../lib/run-live-refresh.js";
 import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
@@ -34,12 +34,16 @@ export default async function RunDesignPage({ params }: Readonly<RunDesignPagePr
   );
   if (result.state === "not-found") notFound();
   if (result.state === "not-configured") return <RunUnavailable runId={runId} />;
-  const snapshots = await loadRunDesignSnapshots(runId, result.run.repositoryId);
+  const [snapshots, baseSnapshots] = await Promise.all([
+    loadRunDesignSnapshots(runId, result.run.repositoryId),
+    loadRunDesignBaseSnapshots(runId, result.run.repositoryId),
+  ]);
   return (
     <RunPageFrame run={result.run} active="design" liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}>
       <RunDesignView
         runId={runId}
         snapshots={snapshots}
+        baseSnapshots={baseSnapshots}
         findings={result.run.findings}
         totalFindings={result.run.findingsPage.total}
         repository={result.run.repository}
