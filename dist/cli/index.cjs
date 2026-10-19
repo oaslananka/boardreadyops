@@ -57008,6 +57008,21 @@ function getGitCommitSha(ref = "HEAD") {
     return "0".repeat(40);
   }
 }
+function resolveReviewPublishRef(sourceRoot, headSha) {
+  try {
+    const gitExec = resolveGitExecutable();
+    const run = (args) => (0, import_node_child_process4.execFileSync)(gitExec, ["-C", sourceRoot, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    const actualSha = run(["rev-parse", "HEAD"]);
+    if (actualSha !== headSha) return headSha;
+    const branch = run(["symbolic-ref", "--quiet", "--short", "HEAD"]);
+    return branch && !branch.startsWith("-") ? `refs/heads/${branch}` : headSha;
+  } catch {
+    return headSha;
+  }
+}
 function getGitOriginRepo() {
   try {
     const gitExec = resolveGitExecutable();
@@ -57118,7 +57133,7 @@ async function reviewPublishCommand(target, options, streams) {
       body: JSON.stringify({
         repositoryId,
         commitSha: headSha,
-        ref: "refs/heads/main",
+        ref: resolveReviewPublishRef(root, headSha),
         pullRequestNumber: options.pr,
         triggerKind: "manual",
         findings,

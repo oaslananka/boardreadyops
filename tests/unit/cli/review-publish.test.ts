@@ -1,8 +1,15 @@
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import reviewPublishSchema from "../../../schemas/review-publish-result.schema.json" with { type: "json" };
-import { type ReviewPublishOptions, reviewPublishCommand } from "../../../src/cli/commands/review.js";
+import {
+  type ReviewPublishOptions,
+  resolveReviewPublishRef,
+  reviewPublishCommand,
+} from "../../../src/cli/commands/review.js";
 import { schemaCommand } from "../../../src/cli/commands/schema.js";
 import { boardReadyVersion } from "../../../src/generated/version.js";
 
@@ -52,6 +59,26 @@ function validateResult(value: unknown): void {
   const validate = new Ajv2020({ allErrors: true }).compile(reviewPublishSchema);
   expect(validate(value), JSON.stringify(validate.errors)).toBe(true);
 }
+
+describe("CLI review publish source provenance", () => {
+  it("uses the exact checked-out branch and never invents main for a detached or explicit commit", () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), "bro-ref-test-"));
+    const run = (...args: string[]) => execFileSync("git", ["-C", temp, ...args], { encoding: "utf8" }).trim();
+    try {
+      run("init", "-q", "-b", "test/real-two-revisions");
+      run("config", "user.name", "Review Test");
+      run("config", "user.email", "review@example.test");
+      run("commit", "--allow-empty", "-qm", "fixture");
+      const sha = run("rev-parse", "HEAD");
+      expect(resolveReviewPublishRef(temp, sha)).toBe("refs/heads/test/real-two-revisions");
+      expect(resolveReviewPublishRef(temp, "a".repeat(40))).toBe("a".repeat(40));
+      run("checkout", "--detach", "-q", "HEAD");
+      expect(resolveReviewPublishRef(temp, sha)).toBe(sha);
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("CLI review publish command", () => {
   afterEach(() => {

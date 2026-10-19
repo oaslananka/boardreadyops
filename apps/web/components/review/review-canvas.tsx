@@ -19,6 +19,34 @@ export interface ReviewCanvasProps {
 
 export type ViewMode = "head" | "base" | "overlay" | "diff" | "split";
 
+function svgViewBox(snapshot: SnapshotArtifact): number[] | undefined {
+  if (snapshot.format !== "svg" || typeof snapshot.content !== "string") return undefined;
+  const opening = /<svg\b[^>]*>/isu.exec(snapshot.content)?.[0];
+  const values = opening
+    ?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]
+    ?.trim()
+    .split(/\s+/u)
+    .map(Number);
+  return values?.length === 4 && values.every(Number.isFinite) ? values : undefined;
+}
+
+/** Visual subtraction requires the same image coordinate frame. */
+export function comparableReviewSnapshots(base?: SnapshotArtifact, head?: SnapshotArtifact): boolean {
+  if (
+    !base ||
+    !head ||
+    base.kind !== head.kind ||
+    base.format !== head.format ||
+    base.sheetOrLayer !== head.sheetOrLayer
+  )
+    return false;
+  const before = svgViewBox(base);
+  const after = svgViewBox(head);
+  if (before || after)
+    return Boolean(before && after && before.every((value, i) => Math.abs(value - (after[i] ?? NaN)) < 0.000001));
+  return base.width === head.width && base.height === head.height;
+}
+
 function toImageSrc(content?: string): string {
   if (!content) return "";
   if (content.startsWith("data:") || content.startsWith("http://") || content.startsWith("https://")) {
@@ -185,7 +213,9 @@ function StackedLayersView({
           className="absolute inset-0 size-full object-contain"
           style={{
             opacity: viewMode === "overlay" ? 1 - opacity : 1,
-            filter: viewMode === "diff" ? "invert(1) grayscale(1)" : "none",
+            // Difference blending subtracts the original base pixels; inverting
+            // those pixels falsely highlights geometry that has not changed.
+            filter: "none",
           }}
         />
       ) : null}
@@ -328,8 +358,12 @@ export function ReviewCanvas({
   const baseSrc = toImageSrc(currentBaseSnapshot?.content);
   const headSrc = toImageSrc(currentHeadSnapshot?.content);
 
-  // An absent base must never dim the head or present a fabricated comparison.
-  const effectiveViewMode = baseSrc ? viewMode : "head";
+  // Differing SVG viewBox origins and scales cannot be overlaid faithfully.
+  const comparable = comparableReviewSnapshots(currentBaseSnapshot, currentHeadSnapshot);
+  const effectiveViewMode =
+    !baseSrc || (!comparable && (viewMode === "overlay" || viewMode === "diff" || viewMode === "split"))
+      ? "head"
+      : viewMode;
 
   const modeButtonClass = (active: boolean) =>
     `rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
@@ -358,7 +392,7 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "overlay")}
-              disabled={!baseSrc}
+              disabled={!comparable}
               onClick={() => setViewMode("overlay")}
               title="Overlay with opacity slider"
             >
@@ -367,7 +401,7 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "split")}
-              disabled={!baseSrc}
+              disabled={!comparable}
               onClick={() => setViewMode("split")}
               title="Side-by-side comparison"
             >
@@ -376,7 +410,7 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "diff")}
-              disabled={!baseSrc}
+              disabled={!comparable}
               onClick={() => setViewMode("diff")}
               title="Difference highlight"
             >
@@ -452,6 +486,13 @@ export function ReviewCanvas({
           </div>
         </div>
       </section>
+
+      {baseSrc && headSrc && !comparable ? (
+        <p className="rounded-md border border-warning/40 bg-warning-surface p-2 text-xs text-warning" role="status">
+          These revisions have different canvas coordinates or image dimensions. Visual comparison is unavailable;
+          inspect each source revision separately.
+        </p>
+      ) : null}
 
       <section
         ref={containerRef}

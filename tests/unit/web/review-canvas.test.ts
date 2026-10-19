@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ReviewCanvas } from "../../../apps/web/components/review/review-canvas.js";
+import { comparableReviewSnapshots, ReviewCanvas } from "../../../apps/web/components/review/review-canvas.js";
 import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
 import { buildDemoSnapshots } from "../../../apps/web/lib/demo-snapshots.js";
 
@@ -30,6 +30,48 @@ describe("ReviewCanvas", () => {
     expect(markup).toContain(
       'class="min-w-0 max-w-full rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground"',
     );
+  });
+
+  it("permits visual compare only with exactly matched sheet identity and native viewport", () => {
+    const base = {
+      id: "pcb-base",
+      name: "kicad_native_board.svg",
+      kind: "pcb_layer" as const,
+      format: "svg" as const,
+      sheetOrLayer: "board / F.Cu",
+      width: 26,
+      height: 26,
+      content: '<svg viewBox="0.0000 0.0000 25.4000 25.4000"></svg>',
+      sha256: "a".repeat(64),
+      anchors: [],
+    };
+    const head = { ...base, id: "pcb-head", sha256: "b".repeat(64) };
+    expect(comparableReviewSnapshots(base, head)).toBe(true);
+    expect(comparableReviewSnapshots(base, { ...head, sheetOrLayer: "board / B.Cu" })).toBe(false);
+    expect(comparableReviewSnapshots(base, { ...head, content: '<svg viewBox="1 0 25.4 25.4"></svg>' })).toBe(false);
+    expect(comparableReviewSnapshots(base, { ...head, content: '<svg viewBox="0 0 26.4 25.4"></svg>' })).toBe(false);
+    expect(comparableReviewSnapshots(undefined, head)).toBe(false);
+  });
+
+  it("disables a dishonest overlay when native coordinate frames are different", () => {
+    const base = {
+      id: "base",
+      name: "kicad_native_base.svg",
+      kind: "pcb_layer" as const,
+      format: "svg" as const,
+      sheetOrLayer: "board / F.Cu",
+      width: 26,
+      height: 26,
+      content: '<svg viewBox="0 0 25.4 25.4"></svg>',
+      sha256: "a".repeat(64),
+      anchors: [],
+    };
+    const head = { ...base, content: '<svg viewBox="1 0 25.4 25.4"></svg>', id: "head" };
+    const html = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots: [head], baseSnapshots: [base] }));
+    expect(html).toContain("These revisions have different canvas coordinates");
+    expect(html).toMatch(/disabled=""[^>]+title="Difference highlight"/u);
+    expect(html).toContain('alt="Head Revision Snapshot Layer"');
+    expect(html).not.toContain('alt="Base Revision Snapshot Layer"');
   });
 
   it("renders a finding marker for each anchor linked to a finding", () => {

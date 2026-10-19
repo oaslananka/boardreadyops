@@ -92,6 +92,24 @@ function getGitCommitSha(ref = "HEAD"): string {
   }
 }
 
+/** A branch is only provenance for the checked-out commit; never fabricate `main`. */
+export function resolveReviewPublishRef(sourceRoot: string, headSha: string): string {
+  try {
+    const gitExec = resolveGitExecutable();
+    const run = (args: string[]) =>
+      execFileSync(gitExec, ["-C", sourceRoot, ...args], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    const actualSha = run(["rev-parse", "HEAD"]);
+    if (actualSha !== headSha) return headSha;
+    const branch = run(["symbolic-ref", "--quiet", "--short", "HEAD"]);
+    return branch && !branch.startsWith("-") ? `refs/heads/${branch}` : headSha;
+  } catch {
+    return headSha;
+  }
+}
+
 function getGitOriginRepo(): string | undefined {
   try {
     const gitExec = resolveGitExecutable();
@@ -209,7 +227,7 @@ export async function reviewPublishCommand(
       body: JSON.stringify({
         repositoryId,
         commitSha: headSha,
-        ref: "refs/heads/main",
+        ref: resolveReviewPublishRef(root, headSha),
         pullRequestNumber: options.pr,
         triggerKind: "manual",
         findings,
