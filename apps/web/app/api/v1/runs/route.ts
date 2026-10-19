@@ -224,26 +224,28 @@ export async function POST(request: Request): Promise<Response> {
 
   const idempotencyKey = request.headers.get("idempotency-key")?.trim() ?? undefined;
   try {
-    const existingResponse = await checkIdempotentRun(executor, repositoryId, idempotencyKey);
-    if (existingResponse) return existingResponse;
+    return await executor.withTransaction(async (transaction) => {
+      const existingResponse = await checkIdempotentRun(transaction, repositoryId, idempotencyKey);
+      if (existingResponse) return existingResponse;
 
-    const runId = randomUUID();
-    const now = new Date().toISOString();
-    const decision = payload.decision ?? (payload.findings.some((f) => f.severity === "error") ? "fail" : "pass");
+      const runId = randomUUID();
+      const now = new Date().toISOString();
+      const decision = payload.decision ?? (payload.findings.some((f) => f.severity === "error") ? "fail" : "pass");
 
-    await insertRunEntities(executor, runId, repositoryId, idempotencyKey, payload, now, decision);
-    const reviewUrl = await syncReviewForRun(executor, repositoryId, runId, payload, auth.actorId);
+      await insertRunEntities(transaction, runId, repositoryId, idempotencyKey, payload, now, decision);
+      const reviewUrl = await syncReviewForRun(transaction, repositoryId, runId, payload, auth.actorId);
 
-    return Response.json(
-      {
-        ok: true,
-        runId,
-        status: "completed",
-        decision,
-        ...(reviewUrl ? { reviewUrl } : {}),
-      },
-      { status: 201 },
-    );
+      return Response.json(
+        {
+          ok: true,
+          runId,
+          status: "completed",
+          decision,
+          ...(reviewUrl ? { reviewUrl } : {}),
+        },
+        { status: 201 },
+      );
+    });
   } finally {
     await executor.close();
   }
