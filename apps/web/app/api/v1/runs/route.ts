@@ -29,7 +29,17 @@ export const ingestRunRequestSchema = z.object({
   // Review-canvas snapshots (rendered SVG + finding anchors) from `boardreadyops review publish`;
   // see src/kicad/snapshots.ts::generateSnapshots. Content is inline SVG text, so these ride the
   // same JSON payload as findings rather than going through the binary artifact upload protocol.
-  snapshots: z.array(snapshotArtifactSchema).max(64).default([]),
+  // The snapshot columns are PostgreSQL int4. Accept fractional SVG viewBox
+  // dimensions at the API edge but reject out-of-range values before any write.
+  snapshots: z
+    .array(
+      snapshotArtifactSchema.extend({
+        width: z.number().positive().max(2_147_483_647),
+        height: z.number().positive().max(2_147_483_647),
+      }),
+    )
+    .max(64)
+    .default([]),
   evidenceDigest: z
     .string()
     .regex(/^[0-9a-f]{64}$/u)
@@ -153,8 +163,8 @@ async function insertRunEntities(
         s.kind,
         s.format,
         s.sheetOrLayer,
-        s.width,
-        s.height,
+        Math.ceil(s.width),
+        Math.ceil(s.height),
         s.content ?? "",
         s.sha256,
         JSON.stringify(s.anchors),

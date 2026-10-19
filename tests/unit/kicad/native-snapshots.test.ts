@@ -40,6 +40,8 @@ describe.skipIf(!cli.found || !cli.path)("real local KiCad CLI native renders", 
     expect(images[0]?.content).toContain("<svg");
     expect(images[0]?.content).not.toContain("<!DOCTYPE");
     expect(images[0]?.sha256).toBe(hash(images[0]?.content ?? ""));
+    expect(Number.isInteger(images[0]?.width)).toBe(true);
+    expect(Number.isInteger(images[0]?.height)).toBe(true);
     expect(hash(await fs.readFile(pcbFile))).toBe(before);
   });
 
@@ -51,6 +53,8 @@ describe.skipIf(!cli.found || !cli.path)("real local KiCad CLI native renders", 
       expect(image).toMatchObject({ kind: "schematic", format: "svg", anchors: [] });
       expect(image.width).toBeGreaterThan(0);
       expect(image.height).toBeGreaterThan(0);
+      expect(Number.isInteger(image.width)).toBe(true);
+      expect(Number.isInteger(image.height)).toBe(true);
     }
     expect(hash(await fs.readFile(schFile))).toBe(before);
   });

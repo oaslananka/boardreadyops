@@ -66,8 +66,8 @@ describe("POST /api/v1/runs persists review-canvas snapshots", () => {
             kind: "schematic",
             format: "svg",
             sheetOrLayer: "board",
-            width: 1200,
-            height: 800,
+            width: 279.4,
+            height: 115.6,
             content: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
             sha256: "f".repeat(64),
             anchors: [],
@@ -89,6 +89,40 @@ describe("POST /api/v1/runs persists review-canvas snapshots", () => {
     expect(params).toContain("schematic_board.svg");
     expect(params).toContain('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
     expect(params).toContain("f".repeat(64));
+    // KiCad SVG viewBox dimensions can be fractional; SQL int4 columns cannot.
+    // Stored dimensions round up without changing source SVG geometry.
+    expect(params[7]).toBe(280);
+    expect(params[8]).toBe(116);
+  });
+
+  it("rejects out-of-range SVG dimensions before inserting any run", async () => {
+    const request = new Request("https://boardreadyops.test/api/v1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        repositoryId: "repo-1",
+        commitSha: "a".repeat(40),
+        ref: "refs/heads/main",
+        triggerKind: "manual",
+        snapshots: [
+          {
+            id: "too-big",
+            name: "pcb.svg",
+            kind: "pcb_layer",
+            format: "svg",
+            sheetOrLayer: "F.Cu",
+            width: 2_147_483_648,
+            height: 100,
+            sha256: "f".repeat(64),
+            anchors: [],
+          },
+        ],
+      }),
+    });
+    const response = await postRun(request);
+    expect(response.status).toBe(400);
+    expect(mockQuery.mock.calls.some(([sql]) => String(sql).includes("insert into release_runs"))).toBe(false);
+    expect(mockQuery.mock.calls.some(([sql]) => String(sql).includes("insert into run_snapshots"))).toBe(false);
   });
 
   it("does not touch run_snapshots when no snapshots are published", async () => {

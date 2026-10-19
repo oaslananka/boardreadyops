@@ -38,6 +38,20 @@ afterEach(async () => {
 });
 
 describe("KiCad-native offline exporter without requiring installed KiCad", () => {
+  it("rounds fractional native SVG dimensions for SQL while preserving exact artwork", async () => {
+    const originalSvg = '<svg viewBox="0 0 279.4 115.6"><path d="M1 1"/></svg>';
+    mockProcess.mockImplementation(async (_command, args) => {
+      const output = args[args.indexOf("--output") + 1];
+      if (!output) throw new Error("output missing");
+      await fs.writeFile(output, originalSvg);
+      return result;
+    });
+    const artwork = await exportNativeKicadSnapshots("fake-kicad-cli", original, "pcb_layer", ["F.Cu"]);
+    expect(artwork).toHaveLength(1);
+    expect(artwork[0]).toMatchObject({ width: 280, height: 116 });
+    expect(artwork[0]?.content).toContain('viewBox="0 0 279.4 115.6"');
+  });
+
   it("uses temporary source copies, keeps the original clean, supports native PCB layers and stable IDs", async () => {
     successfulPlot();
     const art = await exportNativeKicadSnapshots("fake-kicad-cli", original, "pcb_layer", [
