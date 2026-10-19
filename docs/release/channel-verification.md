@@ -5,7 +5,7 @@ BoardReadyOps consumption channels. The current contract is version-derived and
 kept synchronized by `release:readme`; timestamped verification snapshots are
 immutable evidence and are not rewritten by release bumps.
 
-> **Source candidate:** `boardreadyops@1.68.3` (`v1.68.3`) is prepared
+> **Source candidate:** `boardreadyops@1.69.0` (`v1.69.0`) is prepared
 > in this repository revision, **not necessarily published**. Check
 > [npm](https://www.npmjs.com/package/boardreadyops) and
 > [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases)
@@ -16,7 +16,7 @@ immutable evidence and are not rewritten by release bumps.
 
 | Surface | Current contract |
 | --- | --- |
-| Prepared source candidate | `v1.68.3` (not publication evidence) |
+| Prepared source candidate | `v1.69.0` (not publication evidence) |
 | Public release | Check [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) |
 | npm package | Check the registry's actual `latest` dist-tag |
 | Binary assets | Confirm platform binaries, `SHA256SUMS`, and `sbom.cyclonedx.json` on the published tag |
