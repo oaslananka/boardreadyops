@@ -15,12 +15,14 @@ type RunFinding = RunDetail["findings"][number];
  */
 export function RunDesignWorkspace({
   snapshots,
+  baseSnapshots = [],
   findings,
   totalFindings,
   repository,
   commitSha,
 }: Readonly<{
   snapshots: SnapshotArtifact[];
+  baseSnapshots?: SnapshotArtifact[];
   findings: RunFinding[];
   totalFindings: number;
   repository: string;
@@ -94,6 +96,7 @@ export function RunDesignWorkspace({
       <div className="order-1 min-w-0 xl:order-2">
         <ReviewCanvas
           headSnapshots={snapshots}
+          baseSnapshots={baseSnapshots}
           compactMobile
           {...(recordedAnchor ? { selectedFindingFingerprint: selectedFingerprint } : {})}
           onSelectFinding={(fingerprint) => {
