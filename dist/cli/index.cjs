@@ -56777,8 +56777,10 @@ async function collectSvg(output, beforeSha, sourceFile, kind, label) {
     kind,
     format: "svg",
     sheetOrLayer: label,
-    width: normalized.width,
-    height: normalized.height,
+    // PostgreSQL run_snapshots stores INTEGER dimensions. Preserve the exact
+    // SVG viewBox in `content`; only round up the display metadata.
+    width: Math.ceil(normalized.width),
+    height: Math.ceil(normalized.height),
     content: normalized.svg,
     sha256: digest(normalized.svg),
     // Summary anchors cannot be mapped to genuine KiCad coordinates.
