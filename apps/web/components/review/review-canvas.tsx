@@ -249,8 +249,10 @@ export function ReviewCanvas({
     if (linked) setSelectedSheetOrLayer(linked.sheetOrLayer);
   }, [selectedFindingFingerprint, headSnapshots]);
 
-  const currentHeadSnapshot = headSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer) ?? headSnapshots[0];
-  const currentBaseSnapshot = baseSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer) ?? baseSnapshots[0];
+  // Never compare a head layer with an unrelated base layer just because it
+  // happens to be first. An unmatched sheet has no defensible visual diff.
+  const currentHeadSnapshot = headSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer);
+  const currentBaseSnapshot = baseSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer);
 
   const availableSheets = Array.from(
     new Set([...headSnapshots.map((s) => s.sheetOrLayer), ...baseSnapshots.map((s) => s.sheetOrLayer)]),
