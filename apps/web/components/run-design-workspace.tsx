@@ -10,7 +10,7 @@ type RunFinding = RunDetail["findings"][number];
 
 /**
  * A run is evidence, not an approved Review. Only a recorded snapshot anchor with
- * the same persisted finding identity may select a visual location; rule text and
+ * the same persisted finding fingerprint may select a visual location; rule text and
  * component names are never converted into guessed coordinates.
  */
 export function RunDesignWorkspace({
@@ -28,17 +28,26 @@ export function RunDesignWorkspace({
 }>) {
   const [selectedId, setSelectedId] = useState<string | undefined>(findings[0]?.id);
   const selected = findings.find((finding) => finding.id === selectedId);
-  const recordedAnchor = selected
-    ? snapshots.some((snapshot) =>
-        snapshot.anchors.some((anchor) => anchor.kind === "finding" && anchor.metadata?.fingerprint === selected.id),
-      )
-    : false;
+  // Fingerprints are published by the runner; the database generates unrelated row IDs.
+  // Fail closed on missing or ambiguous fingerprints so a marker cannot select a different finding.
+  const selectedFingerprint =
+    selected?.fingerprint && findings.filter((finding) => finding.fingerprint === selected.fingerprint).length === 1
+      ? selected.fingerprint
+      : undefined;
+  const recordedAnchor = Boolean(
+    selectedFingerprint &&
+      snapshots.some((snapshot) =>
+        snapshot.anchors.some(
+          (anchor) => anchor.kind === "finding" && anchor.metadata?.fingerprint === selectedFingerprint,
+        ),
+      ),
+  );
   const sourceUrl = selected ? githubFindingSourceUrl(repository, commitSha, selected.path) : undefined;
   const sourceLabel = selected?.path && selected.path !== "." ? selected.path : "Repository-level finding";
 
   return (
     <section
-      className="grid min-w-0 gap-3 xl:grid-cols-[minmax(210px,0.9fr)_minmax(0,2.15fr)_minmax(210px,0.95fr)]"
+      className="grid min-w-0 gap-3 xl:grid-cols-[minmax(265px,1.05fr)_minmax(0,1.9fr)_minmax(235px,0.95fr)]"
       aria-label="Run design investigation workspace"
     >
       <aside className="order-2 min-w-0 rounded-lg border border-border bg-card p-3 xl:order-1">
@@ -67,7 +76,7 @@ export function RunDesignWorkspace({
                   <span className="block text-xs font-semibold text-primary">
                     {finding.severity.toUpperCase()} · {finding.ruleId}
                   </span>
-                  <span className="mt-1 block break-words text-sm text-foreground">{finding.message}</span>
+                  <span className="mt-1 line-clamp-2 block break-words text-sm text-foreground">{finding.message}</span>
                   {finding.waivedAt ? (
                     <span className="mt-1 block text-xs text-muted-foreground">Waived · remains recorded</span>
                   ) : null}
@@ -85,11 +94,13 @@ export function RunDesignWorkspace({
       <div className="order-1 min-w-0 xl:order-2">
         <ReviewCanvas
           headSnapshots={snapshots}
-          {...(recordedAnchor ? { selectedFindingFingerprint: selectedId } : {})}
+          compactMobile
+          {...(recordedAnchor ? { selectedFindingFingerprint: selectedFingerprint } : {})}
           onSelectFinding={(fingerprint) => {
-            // A snapshot may contain markers with identities not present in this run's
-            // currently loaded finding page. Never fabricate a link in that case.
-            if (findings.some((finding) => finding.id === fingerprint)) setSelectedId(fingerprint);
+            // A snapshot may contain anchors outside the current findings page. Only
+            // one exact persisted fingerprint may select a finding; otherwise ignore.
+            const matching = findings.filter((finding) => finding.fingerprint && finding.fingerprint === fingerprint);
+            if (matching.length === 1 && matching[0]) setSelectedId(matching[0].id);
           }}
         />
         <p className="mt-2 text-xs text-muted-foreground">

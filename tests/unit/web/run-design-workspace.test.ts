@@ -18,7 +18,8 @@ const artwork = {
 };
 const findings = [
   {
-    id: "recorded-1",
+    id: "db-row-1",
+    fingerprint: "published-fingerprint-1",
     ruleId: "release.changelog-present",
     severity: "medium",
     message: "CHANGELOG.md is missing.",
@@ -27,7 +28,8 @@ const findings = [
     waivedAt: undefined,
   },
   {
-    id: "recorded-2",
+    id: "db-row-2",
+    fingerprint: "published-fingerprint-2",
     ruleId: "design.board-outline",
     severity: "high",
     message: "PCB outline is open.",
@@ -63,7 +65,7 @@ describe("recorded run design workspace", () => {
     expect(html).not.toContain("edit CAD");
   });
 
-  it("highlights a physical location only with an exact persisted finding identifier", () => {
+  it("selects a marker only when the recorded wire fingerprint matches (not its database row ID)", () => {
     const anchors = [
       {
         id: "marker-1",
@@ -71,12 +73,57 @@ describe("recorded run design workspace", () => {
         targetRef: "C1",
         x: 0.4,
         y: 0.3,
-        metadata: { fingerprint: "recorded-1", ruleId: "release.changelog-present", severity: "medium" },
+        metadata: { fingerprint: "published-fingerprint-1", ruleId: "release.changelog-present", severity: "medium" },
       },
     ];
     const html = render(anchors);
     expect(html).toContain("This finding has a recorded image anchor");
     expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain("ring-2 ring-primary");
+  });
+
+  it("never links a marker whose metadata incorrectly contains a database row ID", () => {
+    const html = render([
+      {
+        id: "wrong-key",
+        kind: "finding" as const,
+        targetRef: "C1",
+        x: 0.4,
+        y: 0.3,
+        metadata: { fingerprint: "db-row-1", ruleId: "release.changelog-present", severity: "medium" },
+      },
+    ]);
+    expect(html).toContain("No verified image coordinate is linked");
+    expect(html).not.toContain("ring-2 ring-primary");
+  });
+
+  it("rejects absent and duplicate fingerprints instead of selecting the wrong database row", () => {
+    const first = findings[0];
+    const second = findings[1];
+    if (!first || !second) throw new Error("missing finding fixtures");
+    const anchors = [
+      {
+        id: "marker",
+        kind: "finding" as const,
+        targetRef: "C1",
+        x: 0.4,
+        y: 0.3,
+        metadata: { fingerprint: "published-fingerprint-1", ruleId: "release.changelog-present", severity: "medium" },
+      },
+    ];
+    const missing = render(anchors, [{ ...first, fingerprint: undefined }]);
+    const ambiguous = render(anchors, [first, { ...second, fingerprint: first.fingerprint }]);
+    expect(missing).toContain("No verified image coordinate is linked");
+    expect(ambiguous).toContain("No verified image coordinate is linked");
+    expect(missing).not.toContain("ring-2 ring-primary");
+    expect(ambiguous).not.toContain("ring-2 ring-primary");
+  });
+
+  it("keeps the real desktop and shorter mobile canvas within a readable three-panel investigation", () => {
+    const html = render();
+    expect(html).toContain("h-[19rem]");
+    expect(html).toContain("xl:grid-cols-[minmax(265px,1.05fr)_minmax(0,1.9fr)_minmax(235px,0.95fr)]");
+    expect(html).toContain("line-clamp-2");
   });
 
   it("does not generate a source link from untrusted paths", () => {
