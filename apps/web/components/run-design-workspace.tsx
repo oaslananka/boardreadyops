@@ -34,6 +34,7 @@ export function RunDesignWorkspace({
       )
     : false;
   const sourceUrl = selected ? githubFindingSourceUrl(repository, commitSha, selected.path) : undefined;
+  const sourceLabel = selected?.path && selected.path !== "." ? selected.path : "Repository-level finding";
 
   return (
     <section
@@ -112,10 +113,8 @@ export function RunDesignWorkspace({
                   <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
                     {selected.path} ↗
                   </a>
-                ) : selected.path && selected.path !== "." ? (
-                  selected.path
                 ) : (
-                  "Repository-level finding"
+                  sourceLabel
                 )}
               </p>
             </div>
