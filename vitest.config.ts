@@ -38,11 +38,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      // next/font/google ships empty; Next replaces loader calls at build time, so importing
-      // any module that calls one would throw here without a stub.
-      // fileURLToPath, not pathname: stripping a leading slash by hand only produces a
-      // valid path on Windows and breaks the alias everywhere else.
-      "next/font/google": fileURLToPath(new URL("tests/stubs/next-font-google.ts", import.meta.url)),
+      // Next replaces next/font/local loader calls at build time. A metadata/unit test
+      // importing the root layout needs a minimal stub rather than an actual font loader.
+      // fileURLToPath preserves correct paths across Linux and Windows.
+      "next/font/local": fileURLToPath(new URL("tests/stubs/next-font-local.ts", import.meta.url)),
       // revalidatePath throws outside a request scope, so a Server Action cannot be called
       // directly in a test without this.
       "next/cache": fileURLToPath(new URL("tests/stubs/next-cache.ts", import.meta.url)),
