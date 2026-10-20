@@ -27,6 +27,7 @@ export type RunnerWorkerOptions = {
   requireKicad?: boolean;
   keepWorkspace?: boolean;
   artifactMode?: RunnerArtifactMode;
+  manufacturingDraftUpload?: boolean;
   customerArtifactRoot?: string;
   signal?: AbortSignal;
 };
@@ -98,7 +99,7 @@ export type RunnerWorkerDependencies = {
   executePipeline: (
     workspace: string,
     job: RunnerClaimedJob,
-    options: { requireKicad: boolean; signal?: AbortSignal },
+    options: { requireKicad: boolean; manufacturingDraftUpload?: boolean; signal?: AbortSignal },
   ) => Promise<RunnerExecutionOutput>;
   removeWorkspace: (workspace: string) => Promise<void>;
   recoverCrashWorkspaces: (workspaceRoot: string, runnerId: string) => Promise<number>;
@@ -135,6 +136,12 @@ export async function runRunnerWorkerOnce(
   overrides: Partial<RunnerWorkerDependencies> = {},
 ): Promise<RunnerWorkerResult> {
   const dependencies = { ...defaultDependencies, ...overrides };
+  if (
+    options.manufacturingDraftUpload &&
+    ((options.artifactMode ?? "control-plane") !== "control-plane" || options.requireKicad === false)
+  ) {
+    throw new Error("Manufacturing draft upload requires control-plane artifacts and KiCad enforcement");
+  }
   if ((options.artifactMode === "customer-managed") !== (options.customerArtifactRoot !== undefined)) {
     throw new Error(
       "customer-managed artifact mode requires --customer-artifact-root, which cannot be used with other modes",
@@ -169,6 +176,15 @@ export async function runRunnerWorkerOnce(
   });
 
   await validateClaimedRunnerJob(client, job, options.signal);
+  if (options.manufacturingDraftUpload && (job.safeMode.enabled || job.repository.private)) {
+    await bestEffortRelinquish(
+      client,
+      job,
+      "job_error",
+      "Draft cloud upload is refused for private or safe-mode jobs.",
+    );
+    throw new Error("Manufacturing draft upload is refused for private or safe-mode jobs");
+  }
 
   let workspace: string | undefined;
   let terminalPublished = false;
@@ -189,6 +205,7 @@ export async function runRunnerWorkerOnce(
     heartbeat.start();
     const execution = await dependencies.executePipeline(workspace, job, {
       requireKicad: options.requireKicad ?? true,
+      ...(options.manufacturingDraftUpload ? { manufacturingDraftUpload: true } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();

@@ -194,6 +194,20 @@ sudo -u boardreadyops-runner boardreadyops runner serve \
 
 `metadata-only` does not add a persistence backend: generated report files are deleted with the temporary workspace under the default cleanup policy.
 
+### Opt-in cloud manufacturing *draft* (public repositories only)
+
+Manufacturing ZIP bytes may contain a customer’s board layout and engineering IP. They are **not** uploaded by default. An operator who explicitly permits cloud storage of an **unsigned draft** for a **public, non-safe-mode, single-project KiCad 10** repository can add `--manufacturing-draft-upload` to `runner once` or `runner serve` while retaining `--artifact-mode control-plane` and mandatory KiCad. Before analysis, the runner checks the exact server-assigned Git SHA against a clean checkout, generates real Gerber and Excellon outputs, verifies the source and artifact digests, and prepares a local ZIP. Only when that same run exits successfully with readiness `ready` does it request an attempt-bound capability and upload the ZIP, tagged `kind=archive`, `role=draft-manufacturing`, and `contentType=application/zip`.
+
+```bash
+boardreadyops runner once \
+  --identity /var/lib/boardreadyops-runner/identity/runner.json \
+  --workspace-root /var/lib/boardreadyops-runner/workspaces \
+  --artifact-mode control-plane \
+  --manufacturing-draft-upload
+```
+
+Private/safe-mode jobs and `metadata-only`/`customer-managed` modes refuse this option rather than silently changing privacy policy. Uploaded drafts **never** satisfy the `role=manufacturing` delivery eligibility gate. They have **no trusted signature, customer authorization or approval to fabricate**. A public repository does not imply the right to share third-party IP: obtain authorization before opting in. Live cloud end-to-end delivery acceptance remains separate.
+
 ### Customer-managed local artifact handoff (opt-in)
 
 A customer-hosted runner can retain **generated report artifacts** without transferring their bytes to the BoardReadyOps control plane. Provision a dedicated filesystem directory that the runner account owns with private permissions, **outside its ephemeral source workspace**. Encryption, backups, retention, quotas, mount reliability, and any later upload to customer-managed S3 or another store are the customer's responsibility. No cloud storage keys or local artifact paths are sent to BoardReadyOps.

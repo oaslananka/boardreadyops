@@ -206,6 +206,7 @@ function workerOptions(options: RunnerWorkCliOptions): RunnerWorkerOptions {
     ...(options.pollSeconds === undefined ? {} : { pollSeconds: options.pollSeconds }),
     requireKicad: options.requireKicad ?? true,
     keepWorkspace: options.keepWorkspace ?? false,
+    ...(options.manufacturingDraftUpload ? { manufacturingDraftUpload: true } : {}),
     artifactMode: options.artifactMode ?? "control-plane",
     ...(options.customerArtifactRoot ? { customerArtifactRoot: path.resolve(options.customerArtifactRoot) } : {}),
   };

@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -446,6 +446,102 @@ describe("runRunnerWorkerOnce", () => {
     });
     expect(terminal?.result).not.toHaveProperty("storagePath");
     expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
+  });
+
+  it("refuses draft cloud uploads in customer-managed or metadata-only modes before claiming", async () => {
+    for (const artifactMode of ["metadata-only", "customer-managed"] as const) {
+      const runnerClient = client();
+      await expect(
+        runRunnerWorkerOnce(
+          {
+            identityFile: "/identity/runner.json",
+            runnerVersion: "1.26.1",
+            artifactMode,
+            manufacturingDraftUpload: true,
+          },
+          dependencies(runnerClient.value),
+        ),
+      ).rejects.toThrow(/requires control-plane artifacts/);
+      expect(runnerClient.claim).not.toHaveBeenCalled();
+    }
+  });
+
+  it("refuses opt-in draft upload on private or safe-mode jobs before checking out customer sources", async () => {
+    const privateJob = { ...claimedJob(), repository: { ...claimedJob().repository, private: true } };
+    const unsafeJobs = [
+      privateJob,
+      claimedJob("customer_checkout", { enabled: true, reasons: ["draft-pull-request"] }),
+    ];
+    for (const job of unsafeJobs) {
+      const runnerClient = client(job);
+      const overrides = dependencies(runnerClient.value);
+      await expect(
+        runRunnerWorkerOnce(
+          { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", manufacturingDraftUpload: true },
+          overrides,
+        ),
+      ).rejects.toThrow(/refused for private or safe-mode/);
+      expect(overrides.checkoutSource).not.toHaveBeenCalled();
+      expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+      expect(runnerClient.relinquish).toHaveBeenCalledWith(expect.objectContaining({ reason: "job_error" }));
+    }
+  });
+
+  it("uploads an explicitly requested draft only under the draft role via scoped artifact capability", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "bro-runner-draft-publish-"));
+    roots.push(workspace);
+    const filePath = path.join(workspace, "draft.zip");
+    await writeFile(filePath, Buffer.from("PK\x03\x04real generated ZIP fixture"));
+    const bytes = (await readFile(filePath)).byteLength;
+    const sha256 = createHash("sha256")
+      .update(await readFile(filePath))
+      .digest("hex");
+    const runnerClient = client();
+    runnerClient.value.issueArtifactCapabilities = vi.fn(async (request: RunnerArtifactCapabilityRequest) => ({
+      protocolVersion: 1 as const,
+      uploads: request.artifacts.map((artifact, index) => ({
+        artifactId: `0000000${index + 1}-1111-4111-8111-111111111111`,
+        storagePath: `${runId}/${attemptId}/draft-${index}.bin`,
+        uploadUrl: `https://control.example/upload/${index}?cap=${"u".repeat(43)}`,
+        expiresAt: "2026-07-14T02:10:00.000Z",
+        maximumBytes: artifact.bytes,
+      })),
+    }));
+    const pipeline = vi.fn(async () => ({
+      exitCode: 0,
+      report: { summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 }, findings: [] },
+      artifacts: [
+        {
+          kind: "archive",
+          name: "draft.zip",
+          role: "draft-manufacturing",
+          filePath,
+          bytes,
+          sha256,
+          contentType: "application/zip",
+        },
+      ],
+    }));
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, { checkoutSource: vi.fn(async () => workspace), executePipeline: pipeline });
+    await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", manufacturingDraftUpload: true },
+      overrides,
+    );
+    expect(pipeline).toHaveBeenCalledWith(
+      workspace,
+      expect.anything(),
+      expect.objectContaining({ manufacturingDraftUpload: true }),
+    );
+    expect(runnerClient.value.uploadArtifact).toHaveBeenCalledTimes(1);
+    const request = (runnerClient.value.issueArtifactCapabilities as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(request.artifacts).toEqual([
+      expect.objectContaining({ kind: "archive", role: "draft-manufacturing", contentType: "application/zip", sha256 }),
+    ]);
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result.artifacts).toEqual([expect.objectContaining({ role: "draft-manufacturing" })]);
   });
 
   it("rejects customer-managed mode without its artifact root before claiming work", async () => {

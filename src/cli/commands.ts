@@ -357,6 +357,10 @@ export function registerAllCommands(
       .option("--heartbeat-seconds <seconds>", "lease heartbeat interval", runnerSeconds, 30)
       .option("--poll-seconds <seconds>", "empty-queue and failure retry interval", runnerSeconds, 15)
       .option("--no-require-kicad", "allow execution without kicad-cli")
+      .option(
+        "--manufacturing-draft-upload",
+        "explicitly upload an unsigned, unapproved manufacturing draft for a public non-safe-mode run",
+      )
       .option("--keep-workspace", "retain the checked-out workspace after completion")
       .option(
         "--artifact-mode <mode>",

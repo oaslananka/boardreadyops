@@ -92,6 +92,8 @@ boardreadyops runner serve \
   --format json
 ```
 
+The optional `--manufacturing-draft-upload` flag additionally transfers a locally verified but **unsigned and non-approving** Gerber/Excellon ZIP through scoped cloud artifact capabilities, only for public, non-safe-mode, KiCad-required runs using `control-plane` mode. This is disabled by default; it is not a signed manufacturing delivery. See the privacy constraints in [Self-hosted runner mode](deployment/self-hosted-runner.md).
+
 The worker accepts only `customer_checkout` assignments, fetches the exact server-assigned SHA with customer-controlled Git credentials or a local mirror, and removes the temporary workspace by default. Artifact mode defaults to `control-plane`, which uploads only generated reports through attempt-bound capabilities. `--artifact-mode metadata-only` sends the bounded terminal findings/metrics/readiness result without requesting artifact capabilities or transferring report artifact bytes. See [Self-hosted runner mode](deployment/self-hosted-runner.md) for the trust boundary, permissions, network policy, service configuration, private-repository evidence, updates, and rollback.
 
 ## Agent planning
