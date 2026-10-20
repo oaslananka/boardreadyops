@@ -110,7 +110,7 @@ export interface WorkspaceDeliveryRecord {
   projectId: string;
   projectName: string;
   expiresAt: string;
-  signedArchiveUrl: string;
+  signedArchiveUrl?: string | undefined;
   recipientNotes?: string | undefined;
   createdAt: string;
 }
@@ -120,7 +120,7 @@ export interface DeliveryRecord {
   revisionId: string;
   accessTokenHash: string;
   expiresAt: string;
-  signedArchiveUrl: string;
+  signedArchiveUrl?: string | undefined;
   recipientNotes?: string | undefined;
   createdAt: string;
 }
@@ -173,7 +173,7 @@ type DeliveryRow = {
   revision_id: string;
   access_token_hash: string;
   expires_at: string | Date;
-  signed_archive_url: string;
+  signed_archive_url: string | null;
   recipient_notes: string | null;
   created_at: string | Date;
 };
@@ -240,7 +240,7 @@ function mapDelivery(row: DeliveryRow): DeliveryRecord {
     revisionId: row.revision_id,
     accessTokenHash: row.access_token_hash,
     expiresAt: new Date(row.expires_at).toISOString(),
-    signedArchiveUrl: row.signed_archive_url,
+    ...(row.signed_archive_url !== null ? { signedArchiveUrl: row.signed_archive_url } : {}),
     ...(row.recipient_notes !== null ? { recipientNotes: row.recipient_notes } : {}),
     createdAt: new Date(row.created_at).toISOString(),
   };
@@ -861,7 +861,7 @@ export class WorkspaceStore {
         id: string;
         revision_id: string;
         expires_at: string | Date;
-        signed_archive_url: string;
+        signed_archive_url: string | null;
         recipient_notes: string | null;
         created_at: string | Date;
         revision_label: string;
@@ -877,7 +877,7 @@ export class WorkspaceStore {
       projectId: row.project_id,
       projectName: row.project_name,
       expiresAt: new Date(row.expires_at).toISOString(),
-      signedArchiveUrl: row.signed_archive_url,
+      ...(row.signed_archive_url !== null ? { signedArchiveUrl: row.signed_archive_url } : {}),
       ...(row.recipient_notes !== null ? { recipientNotes: row.recipient_notes } : {}),
       createdAt: new Date(row.created_at).toISOString(),
     }));
@@ -916,11 +916,11 @@ export class WorkspaceStore {
     id?: string | undefined;
     revisionId: string;
     expiresAt: Date | string;
-    signedArchiveUrl: string;
+    signedArchiveUrl?: string | undefined;
     recipientNotes?: string | undefined;
     rawToken?: string | undefined;
   }): Promise<{ delivery: DeliveryRecord; rawToken: string }> {
-    if (!isHttpsDeliveryArchiveUrl(input.signedArchiveUrl)) {
+    if (input.signedArchiveUrl !== undefined && !isHttpsDeliveryArchiveUrl(input.signedArchiveUrl)) {
       throw new Error("Signed archive URL must be credential-free HTTPS");
     }
     const id = input.id ?? `del_${randomUUID()}`;
@@ -932,7 +932,7 @@ export class WorkspaceStore {
       `insert into deliveries (id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes)
        values ($1, $2, $3, $4, $5, $6)
        returning id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes, created_at`,
-      [id, input.revisionId, accessTokenHash, expiresAt, input.signedArchiveUrl, input.recipientNotes ?? null],
+      [id, input.revisionId, accessTokenHash, expiresAt, input.signedArchiveUrl ?? null, input.recipientNotes ?? null],
     )) as { rows?: DeliveryRow[] };
 
     const row = result?.rows?.[0];
@@ -1078,6 +1078,8 @@ export class WorkspaceStore {
     )) as { rows?: DeliveryRow[] };
 
     const row = result?.rows?.[0];
-    return row && isHttpsDeliveryArchiveUrl(row.signed_archive_url) ? mapDelivery(row) : null;
+    return row && (row.signed_archive_url === null || isHttpsDeliveryArchiveUrl(row.signed_archive_url))
+      ? mapDelivery(row)
+      : null;
   }
 }

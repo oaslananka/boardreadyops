@@ -76,7 +76,8 @@ const createSchema = z.object({
     .min(1, "Give the archive URL the recipient should download.")
     .max(2048)
     .url("That is not a valid URL.")
-    .refine(isHttpsDeliveryArchiveUrl, "Use an HTTPS archive URL without embedded credentials."),
+    .refine(isHttpsDeliveryArchiveUrl, "Use an HTTPS archive URL without embedded credentials.")
+    .optional(),
   recipientNotes: z.string().trim().max(2048).optional(),
   expiresInDays: z
     .string()
@@ -107,7 +108,7 @@ export const createDeliveryLinkAction = defineAction(createSchema, async (input,
     const { delivery, rawToken } = await store.createDeliveryLink({
       revisionId: input.revisionId,
       expiresAt,
-      signedArchiveUrl: input.signedArchiveUrl,
+      ...(input.signedArchiveUrl ? { signedArchiveUrl: input.signedArchiveUrl } : {}),
       ...(input.recipientNotes ? { recipientNotes: input.recipientNotes } : {}),
     });
 

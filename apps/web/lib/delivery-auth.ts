@@ -13,7 +13,7 @@ type DeliveryRow = {
   revision_id: string;
   access_token_hash: string;
   expires_at: string | Date;
-  signed_archive_url: string;
+  signed_archive_url: string | null;
   recipient_notes: string | null;
   created_at: string | Date;
   evidence_valid: boolean;
@@ -61,7 +61,10 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
 
   // A guest token can outlive its originating run. Never disclose an archive URL after the
   // manufacturing evidence loses the passing verdict, artifact, digest or commit binding.
-  if (row.evidence_valid !== true || !isHttpsDeliveryArchiveUrl(row.signed_archive_url)) {
+  if (
+    row.evidence_valid !== true ||
+    (row.signed_archive_url !== null && !isHttpsDeliveryArchiveUrl(row.signed_archive_url))
+  ) {
     return { ok: false, status: 404, error: "Delivery manufacturing evidence or archive URL is no longer valid" };
   }
 
@@ -73,7 +76,7 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
       revisionId: row.revision_id,
       accessTokenHash: row.access_token_hash,
       expiresAt: new Date(row.expires_at).toISOString(),
-      signedArchiveUrl: row.signed_archive_url,
+      ...(row.signed_archive_url !== null ? { signedArchiveUrl: row.signed_archive_url } : {}),
       ...(row.recipient_notes !== null ? { recipientNotes: row.recipient_notes } : {}),
       createdAt: new Date(row.created_at).toISOString(),
     },

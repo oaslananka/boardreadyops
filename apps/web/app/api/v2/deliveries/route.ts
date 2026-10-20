@@ -17,7 +17,8 @@ const createDeliverySchema = z.object({
   signedArchiveUrl: z
     .string()
     .url()
-    .refine(isHttpsDeliveryArchiveUrl, "Use an HTTPS archive URL without embedded credentials."),
+    .refine(isHttpsDeliveryArchiveUrl, "Use an HTTPS archive URL without embedded credentials.")
+    .optional(),
   recipientNotes: z.string().max(2048).optional(),
 });
 
@@ -74,7 +75,7 @@ export async function POST(request: Request): Promise<Response> {
     const { delivery, rawToken } = await store.createDeliveryLink({
       revisionId: parsed.data.revisionId,
       expiresAt: parsed.data.expiresAt,
-      signedArchiveUrl: parsed.data.signedArchiveUrl,
+      ...(parsed.data.signedArchiveUrl ? { signedArchiveUrl: parsed.data.signedArchiveUrl } : {}),
       recipientNotes: parsed.data.recipientNotes,
     });
     return Response.json({ ok: true, delivery, rawToken }, { status: 201 });

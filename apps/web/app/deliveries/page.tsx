@@ -112,7 +112,12 @@ function deliveryColumns(canRevoke: boolean): readonly DataColumn<WorkspaceDeliv
     {
       id: "archive",
       header: "Legacy reference",
-      cell: (delivery) => <span className="font-mono text-meta break-all">{delivery.signedArchiveUrl}</span>,
+      cell: (delivery) =>
+        delivery.signedArchiveUrl ? (
+          <span className="font-mono text-meta break-all">{delivery.signedArchiveUrl}</span>
+        ) : (
+          <span className="text-meta text-muted-foreground">First-party artifact</span>
+        ),
     },
     {
       id: "notes",

@@ -41,6 +41,24 @@ describe("verifyDeliveryToken", () => {
     expect(result.delivery?.recipientNotes).toBe("Review package for JLCPCB");
   });
 
+  it("accepts a valid first-party delivery without any legacy external archive URL", async () => {
+    const db = new MockDeliveryDb();
+    const rawToken = "a".repeat(64);
+    db.deliveries.push({
+      id: "del_first_party",
+      revision_id: "rev_approved",
+      access_token_hash: createHash("sha256").update(rawToken).digest("hex"),
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      signed_archive_url: null,
+      recipient_notes: null,
+      created_at: new Date().toISOString(),
+      evidence_valid: true,
+    });
+    const result = await verifyDeliveryToken(rawToken, db);
+    expect(result.status).toBe(200);
+    expect(result.delivery?.signedArchiveUrl).toBeUndefined();
+  });
+
   it("returns 410 Gone for expired delivery token", async () => {
     const db = new MockDeliveryDb();
     const rawToken = "expired_token_12345";

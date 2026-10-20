@@ -166,6 +166,30 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("Live");
   });
 
+  it("renders first-party artifact status for deliveries without a legacy external URL", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [],
+      revisions: [],
+      deliveries: [
+        {
+          id: "del_first_party",
+          revisionId: "rev_ready",
+          revisionLabel: "rev C",
+          projectId: "prj_ready",
+          projectName: "Gateway board",
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          createdAt: "2026-09-07T00:00:00.000Z",
+        },
+      ],
+    });
+    const markup = await render();
+    expect(markup).toContain("First-party artifact");
+    expect(markup).not.toContain("https://storage.example.com");
+  });
+
   it("marks a link whose window has closed rather than showing it as live", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",

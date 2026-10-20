@@ -32,7 +32,6 @@ export function DeliveryCreateForm({
   const [acknowledged, setAcknowledged] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const revisionId = useId();
-  const urlId = useId();
   const notesId = useId();
   const expiryId = useId();
   const titleId = useId();
@@ -72,27 +71,10 @@ export function DeliveryCreateForm({
               ) : null}
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-meta font-medium text-foreground" htmlFor={urlId}>
-                Legacy external archive reference
-              </label>
-              <Input
-                id={urlId}
-                name="signedArchiveUrl"
-                type="url"
-                maxLength={2048}
-                required
-                placeholder="https://storage.example.com/gateway-rev-c.zip"
-                aria-describedby={`${urlId}-hint`}
-              />
-              <p id={`${urlId}-hint`} className="text-meta text-muted-foreground">
-                Compatibility reference only. Guest downloads are served from the stored BoardReadyOps manufacturing
-                artifact, never this external address.
-              </p>
-              {fieldError(state, "signedArchiveUrl") ? (
-                <p className="text-meta text-danger">{fieldError(state, "signedArchiveUrl")}</p>
-              ) : null}
-            </div>
+            <p className="text-meta text-muted-foreground">
+              Recipients download the stored manufacturing artifact verified against this revision. No external URL is
+              needed.
+            </p>
 
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">

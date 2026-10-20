@@ -67,6 +67,13 @@ describeDatabase("WorkspaceStore (PostgreSQL Integration)", () => {
     });
     expect(delivery.revisionId).toBe(rev.id);
 
+    const firstParty = await store.createDeliveryLink({
+      revisionId: rev.id,
+      expiresAt: new Date(Date.now() + 3600 * 1000),
+    });
+    expect(firstParty.delivery.signedArchiveUrl).toBeUndefined();
+    expect(firstParty.rawToken).toMatch(/^[0-9a-f]{64}$/u);
+
     // An uploaded revision alone has no validated manufacturing run or archive evidence.
     const retrievedDelivery = await store.getDeliveryByToken(rawToken);
     expect(retrievedDelivery).toBeNull();
