@@ -59,8 +59,10 @@ export function ManufacturingShareAuthorizationForm({
                 required
                 className="mt-1"
               />
-              I authorize guest access to this exact stored archive and source revision. I understand this is not an
-              engineering signature or an authorization to fabricate.
+              <span>
+                I authorize guest access to this exact stored archive and source revision. I understand this is not an
+                engineering signature or an authorization to fabricate.
+              </span>
             </label>
             <Button type="submit" disabled={submitting || pending.length === 0}>
               {submitting ? "Authorizing…" : "Permit guest sharing"}
