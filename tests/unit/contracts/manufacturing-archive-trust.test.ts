@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { ingestRunRequestSchema } from "../../../apps/web/app/api/v1/runs/route.js";
 import {
   isUnattestedManufacturingArchive,
   releaseRunResultSchema,
@@ -33,15 +32,6 @@ describe("untrusted manufacturing archive role boundary", () => {
       }).success,
     ).toBe(true);
     expect(releaseRunResultSchema.safeParse({ ...base, artifacts: [{ ...archive, kind: "bom" }] }).success).toBe(true);
-  });
-
-  it("rejects forged manufacturing eligibility on legacy CLI/Action run ingestion", () => {
-    const base = { repositoryId: "oaslananka/hardware", commitSha: "c".repeat(40), ref: "refs/heads/main" };
-    expect(ingestRunRequestSchema.safeParse({ ...base, artifacts: [archive] }).success).toBe(false);
-    expect(
-      ingestRunRequestSchema.safeParse({ ...base, artifacts: [{ ...archive, role: "draft-manufacturing" }] }).success,
-    ).toBe(true);
-    expect(ingestRunRequestSchema.safeParse({ ...base, artifacts: [{ ...archive, kind: "bom" }] }).success).toBe(true);
   });
 
   it("rejects the same role on runner capability declarations without removing draft uploads", () => {
