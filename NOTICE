@@ -215,8 +215,8 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `import-in-the-middle@3.3.3`
   - Description: Intercept imports in Node.js
   - Homepage: https://github.com/nodejs/import-in-the-middle#readme
-- `legacy-javascript@0.0.1`
-  - Description: Identify legacy polyfills and code transforms.
+- `legacy-javascript@0.0.3`
+  - Description: Identify legacy polyfills and code transforms
   - Homepage: https://github.com/GoogleChrome/lighthouse#readme
 - `lighthouse@13.5.0`
   - Description: Automated auditing, performance metrics, and best practices for the web.
@@ -888,7 +888,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@jridgewell/trace-mapping@0.3.31`
   - Description: Trace the original position through a source map
   - Homepage: https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping
-- `@modelcontextprotocol/sdk@1.31.0`
+- `@modelcontextprotocol/sdk@1.32.0`
   - Description: Model Context Protocol implementation for TypeScript
   - Homepage: https://modelcontextprotocol.io
 - `@next/env@16.3.8`
@@ -951,7 +951,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@octokit/types@16.0.0`
   - Description: Shared TypeScript definitions for Octokit projects
   - Homepage: https://github.com/octokit/types.ts#readme
-- `@oxc-project/types@0.133.0`, `@oxc-project/types@0.143.0`
+- `@oxc-project/types@0.143.0`, `@oxc-project/types@0.153.0`
   - Description: Types for Oxc AST nodes
   - Homepage: https://oxc.rs
 - `@radix-ui/number@1.1.3`
@@ -2251,7 +2251,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `robots-parser@3.0.1`
   - Description: A specification compliant robots.txt parser with wildcard (*) matching support.
   - Homepage: https://github.com/samclarke/robots-parser
-- `rolldown@1.0.3`
+- `rolldown@1.2.13`
   - Description: Fast JavaScript/TypeScript bundler in Rust with Rollup-compatible API.
   - Homepage: https://rolldown.rs/
 - `rollup@4.62.5`
@@ -2478,7 +2478,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `vary@1.1.2`
   - Description: Manipulate the HTTP Vary header
   - Homepage: https://github.com/jshttp/vary#readme
-- `vite@8.0.16`
+- `vite@8.2.4`
   - Description: Native-ESM powered web dev build tool
   - Homepage: https://vite.dev
 - `vitest@4.1.11`
@@ -2564,7 +2564,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `axe-core@4.11.4`, `axe-core@4.13.0`
   - Description: Accessibility engine for automated Web UI testing
   - Homepage: https://www.deque.com/axe/
-- `lightningcss@1.32.0`
+- `lightningcss@1.32.0`, `lightningcss@1.33.0`
   - Description: A CSS parser, transformer, and minifier written in Rust
   - Homepage: https://github.com/parcel-bundler/lightningcss#readme
 
