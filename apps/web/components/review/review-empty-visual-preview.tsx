@@ -4,7 +4,15 @@ import Link from "next/link";
  * These static PNG previews were rasterized from native KiCad SVGs plotted locally from the Zaptrace QA engineering
  * examples. They are illustrations, never an approved customer Review.
  */
-export function ReviewEmptyVisualPreview({ mode = "reviews" }: Readonly<{ mode?: "onboarding" | "reviews" }> = {}) {
+export function ReviewEmptyVisualPreview({
+  mode = "reviews",
+  actionHref = "/setup",
+  actionLabel = "Connect a repository",
+}: Readonly<{
+  mode?: "onboarding" | "reviews";
+  actionHref?: string;
+  actionLabel?: string;
+}> = {}) {
   const onboarding = mode === "onboarding";
   return (
     <section
@@ -79,10 +87,10 @@ export function ReviewEmptyVisualPreview({ mode = "reviews" }: Readonly<{ mode?:
         <div className="flex flex-wrap items-center gap-4 text-sm font-medium">
           {onboarding ? (
             <Link
-              href="/setup"
+              href={actionHref}
               className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-primary-foreground hover:opacity-90"
             >
-              Connect a repository →
+              {actionLabel} →
             </Link>
           ) : (
             <Link href="/reviews#publish-review" className="text-primary underline-offset-4 hover:underline">

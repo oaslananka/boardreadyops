@@ -261,8 +261,26 @@ function DashboardBody({
   groups: RepositoryGroup[];
   summary: DashboardRepositorySummary;
 }>) {
-  if (!hasSession) return <SignInRequiredPanel />;
-  if (summary.repositories === 0) return <NoRepositoriesPanel />;
+  if (!hasSession) {
+    return (
+      <div className="flex flex-col gap-4">
+        <ReviewEmptyVisualPreview
+          mode="onboarding"
+          actionHref="/api/auth/github/login"
+          actionLabel="Sign in to connect a board"
+        />
+        <SignInRequiredPanel />
+      </div>
+    );
+  }
+  if (summary.repositories === 0) {
+    return (
+      <div className="flex flex-col gap-4">
+        <ReviewEmptyVisualPreview mode="onboarding" actionLabel="Connect your first board" />
+        <NoRepositoriesPanel />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">

@@ -183,6 +183,13 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
               </Link>
             </section>
 
+            {result.total === 0 ? (
+              <ReviewEmptyVisualPreview
+                mode="onboarding"
+                actionHref="/projects/new"
+                actionLabel="Add your first project source"
+              />
+            ) : null}
             <Panel
               title={result.selected.name}
               description={`You are ${customerStatusLabel(result.selected.role)} of this workspace · ${customerPlanLabel(result.selected.planTier)} plan`}
@@ -249,30 +256,40 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
 function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-configured" | "no-workspaces" }>) {
   if (state === "signed-out") {
     return (
-      <Panel title="Workspaces">
-        <EmptyState title="Sign in to see your projects">
-          <p>Projects live in workspaces, and a workspace is scoped to the people in it.</p>
-          <Button asChild className="mt-3">
-            <a href="/api/auth/github/login">Sign in with GitHub</a>
-          </Button>
-        </EmptyState>
-      </Panel>
+      <>
+        <ReviewEmptyVisualPreview
+          mode="onboarding"
+          actionHref="/api/auth/github/login"
+          actionLabel="Sign in to start"
+        />
+        <Panel title="Workspaces">
+          <EmptyState title="Sign in to see your projects">
+            <p>Projects live in workspaces, and a workspace is scoped to the people in it.</p>
+            <Button asChild className="mt-3">
+              <a href="/api/auth/github/login">Sign in with GitHub</a>
+            </Button>
+          </EmptyState>
+        </Panel>
+      </>
     );
   }
 
   if (state === "not-configured") {
     return (
-      <Panel title="Workspaces">
-        <EmptyState title="Workspaces are not configured">
-          <p>
-            This deployment has no control-plane database, so workspaces and projects cannot be stored. Repository
-            reviews still work through the GitHub App.
-          </p>
-          <Button asChild variant="outline" className="mt-3">
-            <Link href="/setup">Go to Setup</Link>
-          </Button>
-        </EmptyState>
-      </Panel>
+      <>
+        <ReviewEmptyVisualPreview mode="onboarding" actionLabel="Connect a GitHub repository" />
+        <Panel title="Workspaces">
+          <EmptyState title="Workspaces are not configured">
+            <p>
+              This deployment has no control-plane database, so workspaces and projects cannot be stored. Repository
+              reviews still work through the GitHub App.
+            </p>
+            <Button asChild variant="outline" className="mt-3">
+              <Link href="/setup">Go to Setup</Link>
+            </Button>
+          </EmptyState>
+        </Panel>
+      </>
     );
   }
 

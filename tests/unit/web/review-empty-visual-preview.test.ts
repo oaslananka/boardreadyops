@@ -17,6 +17,20 @@ describe("visual-first hardware onboarding", () => {
     expect(html).not.toContain('href="/reviews#publish-review"');
   });
 
+  it("uses explicit sign-in routing for signed-out visitors while keeping example labeling", () => {
+    const html = renderToStaticMarkup(
+      createElement(ReviewEmptyVisualPreview, {
+        mode: "onboarding",
+        actionHref: "/api/auth/github/login",
+        actionLabel: "Sign in to connect a board",
+      }),
+    );
+    expect(html).toContain('href="/api/auth/github/login"');
+    expect(html).toContain("Sign in to connect a board");
+    expect(html).not.toContain('href="/setup"');
+    expect(html).toContain("Example only");
+  });
+
   it("preserves the existing review publishing path outside onboarding", () => {
     const html = renderToStaticMarkup(createElement(ReviewEmptyVisualPreview));
     expect(html).toContain("See the design, not just a report");
