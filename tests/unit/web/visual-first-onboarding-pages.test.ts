@@ -71,7 +71,14 @@ describe("first-use visual-first routes", () => {
     expect(html.indexOf("Your next hardware review starts with the board")).toBeLessThan(
       html.indexOf("Create your first workspace"),
     );
-    expect(html).toContain('href="/setup"');
+    expect(html).toContain('href="/dashboard"');
+    expect(html).toContain('href="/runs"');
+    expect(html).toContain("No CAD workspace is required");
+    expect(html).toContain("separate memberships");
+    expect(html).toContain("do not automatically import");
+    expect(html).toContain("Create your first workspace");
+    expect(html).toContain("Optional: group CAD projects");
+    expect(repositoriesMock).not.toHaveBeenCalled();
   });
 
   it("places an example before a genuinely empty authorized workspace", async () => {

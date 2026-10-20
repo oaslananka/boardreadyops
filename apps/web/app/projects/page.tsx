@@ -2,7 +2,6 @@ import type { ProjectRecord } from "@boardreadyops/db";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell.js";
-import { GuidedChecklist } from "../../components/guided-checklist.js";
 import { ProjectRowActions, WorkspaceDangerZone } from "../../components/projects/teardown-forms.js";
 import { CreateProjectForm, CreateWorkspaceForm } from "../../components/projects/workspace-forms.js";
 import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
@@ -293,30 +292,40 @@ function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-co
     );
   }
 
-  // Signed in, database present, no membership yet. This is the one state where creating a
-  // workspace is the whole of what the page can offer, so it leads rather than sits at the bottom.
+  // A GitHub App repository is not a CAD workspace membership. Keep both
+  // paths available without implying a user must reconnect an existing repository.
   return (
     <>
-      <ReviewEmptyVisualPreview mode="onboarding" />
-      <Panel title="Create your first workspace" description="A workspace holds projects, revisions and deliveries.">
-        <CreateWorkspaceForm action={createWorkspaceAction} />
-      </Panel>
-      <Panel title="Or start from a repository">
-        <GuidedChecklist
-          heading="Already using the GitHub App?"
-          steps={[
-            {
-              id: "setup",
-              label: "Link a repository to run readiness checks on pull requests",
-              status: "current",
-              href: "/setup",
-              actionLabel: "Go to Setup",
-            },
-            { id: "detect", label: "BoardReadyOps detects the CAD format and normalizes it", status: "upcoming" },
-            { id: "review", label: "Work the findings each run reports", status: "upcoming" },
-          ]}
-        />
-      </Panel>
+      <ReviewEmptyVisualPreview
+        mode="onboarding"
+        actionHref="/dashboard"
+        actionLabel="Explore your GitHub repositories"
+      />
+      <section className="grid min-w-0 gap-4 lg:grid-cols-2" aria-label="Choose your hardware workflow">
+        <Panel
+          title="Continue with GitHub repositories"
+          description="No CAD workspace is required to inspect your existing repository readiness runs."
+        >
+          <p className="text-sm text-muted-foreground">
+            GitHub App repositories are shown on Dashboard. CAD workspaces have separate memberships and do not
+            automatically import those repositories. Your existing runs and findings remain available.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button asChild>
+              <Link href="/dashboard">View repositories</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/runs">Browse readiness runs</Link>
+            </Button>
+          </div>
+        </Panel>
+        <Panel
+          title="Create your first workspace"
+          description="Optional: group CAD projects, revisions and manufacturing deliveries in a shared workspace."
+        >
+          <CreateWorkspaceForm action={createWorkspaceAction} />
+        </Panel>
+      </section>
     </>
   );
 }
