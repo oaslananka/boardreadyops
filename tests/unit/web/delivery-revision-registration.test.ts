@@ -9,9 +9,10 @@ const store = vi.hoisted(() => ({
 }));
 
 const close = vi.hoisted(() => vi.fn(async () => undefined));
+const query = vi.hoisted(() => vi.fn(async () => ({ rows: [{}] })));
 
 vi.mock("../../../apps/web/lib/workspace-store-access.js", () => ({
-  openWorkspaceStore: vi.fn(async () => ({ store, executor: { close } })),
+  openWorkspaceStore: vi.fn(async () => ({ store, executor: { close, query } })),
 }));
 
 vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
@@ -24,9 +25,12 @@ vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
 
 process.env.DATABASE_URL = "postgres://test_user:test_secret@test_db_host:5432/test_db";
 
-const { createDeliveryLinkAction, registerValidatedRevisionAction } = await import(
-  "../../../apps/web/app/deliveries/actions.js"
-);
+const {
+  authorizeManufacturingShareAction,
+  createDeliveryLinkAction,
+  registerValidatedRevisionAction,
+  revokeManufacturingShareAction,
+} = await import("../../../apps/web/app/deliveries/actions.js");
 
 const idle = { status: "idle" } as never;
 
@@ -55,6 +59,7 @@ function delivery(): FormData {
 beforeEach(() => {
   vi.clearAllMocks();
   store.workspaceRoleFor.mockResolvedValue("owner");
+  query.mockResolvedValue({ rows: [{}] });
   store.registerValidatedRevisionFromArtifact.mockResolvedValue({
     id: "rev-1",
     projectId: "prj-1",
@@ -130,6 +135,49 @@ describe("validated delivery revision actions", () => {
     expect(result).toMatchObject({ status: "ok", data: { token: "raw-token", deliveryId: "del-1" } });
     expect(store.revisionHasValidatedManufacturingEvidence).toHaveBeenCalledWith("rev-1");
     expect(store.createDeliveryLink).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a guest link without explicit manufacturing sharing authorization", async () => {
+    query.mockResolvedValue({ rows: [] });
+    const result = await createDeliveryLinkAction(idle, delivery());
+    expect(result).toMatchObject({ status: "error" });
+    expect(JSON.stringify(result)).toContain("explicit owner/admin sharing authorization");
+    expect(store.createDeliveryLink).not.toHaveBeenCalled();
+  });
+
+  it("requires an explicit acknowledgement and owner/admin role to authorize sharing", async () => {
+    const noCheckbox = await authorizeManufacturingShareAction(idle, form({ revisionId: "rev-1" }));
+    expect(noCheckbox).toMatchObject({ status: "error" });
+    store.workspaceRoleFor.mockResolvedValue("member");
+    const unauthorized = await authorizeManufacturingShareAction(
+      idle,
+      form({ revisionId: "rev-1", acknowledgement: "AUTHORIZE_SHARING" }),
+    );
+    expect(unauthorized).toMatchObject({ status: "error" });
+    store.workspaceRoleFor.mockResolvedValue("owner");
+    const approved = await authorizeManufacturingShareAction(
+      idle,
+      form({ revisionId: "rev-1", acknowledgement: "AUTHORIZE_SHARING" }),
+    );
+    expect(approved).toMatchObject({ status: "ok" });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("insert into manufacturing_share_authorizations"), [
+      "rev-1",
+      4711,
+      "owner-person",
+    ]);
+  });
+
+  it("requires owner/admin to revoke an existing sharing authorization", async () => {
+    store.workspaceRoleFor.mockResolvedValue("viewer");
+    expect(await revokeManufacturingShareAction(idle, form({ revisionId: "rev-1" }))).toMatchObject({
+      status: "error",
+    });
+    store.workspaceRoleFor.mockResolvedValue("admin");
+    expect(await revokeManufacturingShareAction(idle, form({ revisionId: "rev-1" }))).toMatchObject({ status: "ok" });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("update manufacturing_share_authorizations"), [
+      "rev-1",
+      4711,
+    ]);
   });
 
   it("rejects unsafe archive schemes before creating a public guest link", async () => {

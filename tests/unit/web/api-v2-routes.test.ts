@@ -12,6 +12,7 @@ const mockMembershipQuery = vi.fn();
 const mockProjectQuery = vi.fn();
 const mockRevisionWorkspaceQuery = vi.fn();
 const mockValidatedEvidenceQuery = vi.fn();
+const mockShareAuthorizationQuery = vi.fn();
 
 /**
  * The authorization lookups are routed to their own mocks so `mockQuery` keeps carrying only the
@@ -25,6 +26,9 @@ const mockValidatedEvidenceQuery = vi.fn();
 vi.mock("../../../packages/db/src/pg-executor.js", () => ({
   createPgQueryExecutor: vi.fn(() => ({
     query: (sql: string, params: readonly unknown[]) => {
+      if (sql.startsWith("insert into deliveries")) return mockQuery(sql, params);
+      if (sql.includes("from manufacturing_share_authorizations as share"))
+        return mockShareAuthorizationQuery(sql, params);
       if (sql.includes("from workspace_members")) return mockMembershipQuery(sql, params);
       if (
         sql.includes("from revisions") &&
@@ -51,6 +55,7 @@ describe("API v2 Routes", () => {
     mockMembershipQuery.mockReset().mockResolvedValue({ rows: [{ role: "owner" }] });
     mockRevisionWorkspaceQuery.mockReset().mockResolvedValue({ rows: [{ workspace_id: "ws_123" }] });
     mockValidatedEvidenceQuery.mockReset().mockResolvedValue({ rows: [{}] });
+    mockShareAuthorizationQuery.mockReset().mockResolvedValue({ rows: [{}] });
     mockProjectQuery.mockReset().mockResolvedValue({
       rows: [
         {

@@ -930,7 +930,27 @@ export class WorkspaceStore {
 
     const result = (await this.executor.query(
       `insert into deliveries (id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes)
-       values ($1, $2, $3, $4, $5, $6)
+       select $1, $2, $3, $4, $5, $6 from revisions as revision
+       join projects as project on project.id = revision.project_id
+       join repositories as repository on
+         lower(repository.owner || '/' || repository.name) = lower(project.github_repo_full_name)
+       join manufacturing_share_authorizations as share
+         on share.revision_id = revision.id
+        and share.revoked_at is null
+        and share.workspace_id = project.workspace_id
+        and share.run_id = revision.validation_run_id
+        and share.artifact_id = revision.validation_artifact_id
+        and share.commit_sha = revision.commit_sha
+        and share.archive_sha256 = revision.bundle_sha256
+       join release_runs as run on run.id = share.run_id
+         and run.repository_id = repository.id
+         and run.status = 'completed' and run.decision = 'pass'
+         and run.completed_at is not null and run.commit_sha = revision.commit_sha
+       join artifacts as artifact on artifact.id = share.artifact_id
+         and artifact.run_id = run.id and artifact.role = 'manufacturing'
+         and artifact.kind = 'archive' and artifact.bytes > 0
+         and artifact.sha256 = revision.bundle_sha256
+       where revision.id = $2
        returning id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes, created_at`,
       [id, input.revisionId, accessTokenHash, expiresAt, input.signedArchiveUrl ?? null, input.recipientNotes ?? null],
     )) as { rows?: DeliveryRow[] };
@@ -1070,6 +1090,13 @@ export class WorkspaceStore {
               and artifacts.kind = 'archive'
               and artifacts.bytes > 0
               and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+            join manufacturing_share_authorizations as share
+              on share.revision_id = revisions.id
+              and share.revoked_at is null
+              and share.run_id = release_runs.id
+              and share.artifact_id = artifacts.id
+              and share.commit_sha = release_runs.commit_sha
+              and share.archive_sha256 = artifacts.sha256
             where revisions.id = deliveries.revision_id
               and revisions.bundle_sha256 = artifacts.sha256
               and revisions.commit_sha = release_runs.commit_sha

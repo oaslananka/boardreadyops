@@ -1,6 +1,11 @@
 "use server";
 
-import { isHttpsDeliveryArchiveUrl } from "@boardreadyops/db";
+import {
+  authorizeManufacturingShare,
+  isHttpsDeliveryArchiveUrl,
+  revisionHasManufacturingShareAuthorization,
+  revokeManufacturingShare,
+} from "@boardreadyops/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { fail, ok } from "../../lib/action-result.js";
@@ -68,6 +73,68 @@ export const registerValidatedRevisionAction = defineAction(registerRevisionSche
   }
 });
 
+const sharingDecisionSchema = z.object({
+  revisionId: z.string().min(1),
+  acknowledgement: z.literal("AUTHORIZE_SHARING"),
+});
+
+/** Sharing authorization is a human decision, NOT a fabrication signature. */
+export const authorizeManufacturingShareAction = defineAction(sharingDecisionSchema, async (input, { session }) => {
+  if (!process.env.DATABASE_URL) return fail("Database is not configured.");
+  const { store, executor } = await openWorkspaceStore(process.env.DATABASE_URL);
+  try {
+    const workspaceId = await store.workspaceIdForRevision(input.revisionId);
+    const role = workspaceId
+      ? await store.workspaceRoleFor(workspaceId, { githubUserId: session.userId, login: session.login })
+      : null;
+    if (role !== "owner" && role !== "admin")
+      return fail("Only a verified workspace owner or admin can authorize sharing.");
+    const authorized = await authorizeManufacturingShare(executor, input.revisionId, {
+      githubUserId: session.userId,
+      login: session.login,
+    });
+    if (!authorized)
+      return fail("Sharing consent was not recorded. The evidence may be stale or previously authorized.");
+    revalidatePath("/deliveries");
+    return ok(
+      { revisionId: input.revisionId },
+      "Sharing permitted for this exact source and archive digest; fabrication is not approved.",
+    );
+  } finally {
+    await executor.close();
+  }
+});
+
+export const revokeManufacturingShareAction = defineAction(
+  z.object({ revisionId: z.string().min(1) }),
+  async (input, { session }) => {
+    if (!process.env.DATABASE_URL) return fail("Database is not configured.");
+    const { store, executor } = await openWorkspaceStore(process.env.DATABASE_URL);
+    try {
+      const workspaceId = await store.workspaceIdForRevision(input.revisionId);
+      const role = workspaceId
+        ? await store.workspaceRoleFor(workspaceId, { githubUserId: session.userId, login: session.login })
+        : null;
+      if (role !== "owner" && role !== "admin") return fail("Only workspace owners or admins may revoke sharing.");
+      if (
+        !(await revokeManufacturingShare(executor, input.revisionId, {
+          githubUserId: session.userId,
+          login: session.login,
+        }))
+      ) {
+        return fail("No active sharing authorization exists for this revision.");
+      }
+      revalidatePath("/deliveries");
+      return ok(
+        { revisionId: input.revisionId },
+        "Sharing revoked; existing guest links no longer authorize downloads.",
+      );
+    } finally {
+      await executor.close();
+    }
+  },
+);
+
 const createSchema = z.object({
   revisionId: z.string().min(1, "Pick a revision to share."),
   signedArchiveUrl: z
@@ -102,6 +169,10 @@ export const createDeliveryLinkAction = defineAction(createSchema, async (input,
     if (role === "viewer") return fail("Viewers cannot create delivery links.");
     if (!(await store.revisionHasValidatedManufacturingEvidence(input.revisionId))) {
       return fail("This revision is not backed by validated manufacturing evidence.");
+    }
+
+    if (!(await revisionHasManufacturingShareAuthorization(executor, input.revisionId))) {
+      return fail("This revision needs explicit owner/admin sharing authorization before a guest link can be issued.");
     }
 
     const expiresAt = new Date(Date.now() + input.expiresInDays * 86_400_000).toISOString();

@@ -174,6 +174,21 @@ class MockWorkspaceDb implements SqlQueryExecutor {
       return { rows: [row] };
     }
 
+    // Route the new INSERT .. SELECT through the delivery fixture, not the revision listing stub.
+    if (s.startsWith("insert into deliveries")) {
+      const row = {
+        id: params[0],
+        revision_id: params[1],
+        access_token_hash: params[2],
+        expires_at: params[3],
+        signed_archive_url: params[4],
+        recipient_notes: params[5],
+        created_at: new Date().toISOString(),
+      };
+      this.deliveries.push(row);
+      return { rows: [row] };
+    }
+
     if (s.includes("from revisions") && s.includes("join projects")) {
       const workspaceId = params[0];
       const rows = this.revisions
@@ -209,20 +224,6 @@ class MockWorkspaceDb implements SqlQueryExecutor {
     }
 
     // Deliveries
-    if (s.includes("insert into deliveries")) {
-      const row = {
-        id: params[0],
-        revision_id: params[1],
-        access_token_hash: params[2],
-        expires_at: params[3],
-        signed_archive_url: params[4],
-        recipient_notes: params[5],
-        created_at: new Date().toISOString(),
-      };
-      this.deliveries.push(row);
-      return { rows: [row] };
-    }
-
     if (s.includes("from deliveries") && s.includes("access_token_hash = $1")) {
       const hash = params[0] as string;
       const match = this.deliveries.find(

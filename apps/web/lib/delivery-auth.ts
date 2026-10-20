@@ -40,6 +40,13 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
                 and artifacts.kind = 'archive'
                 and artifacts.bytes > 0
                 and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+              join manufacturing_share_authorizations as share
+                on share.revision_id = revisions.id
+                and share.revoked_at is null
+                and share.run_id = release_runs.id
+                and share.artifact_id = artifacts.id
+                and share.commit_sha = release_runs.commit_sha
+                and share.archive_sha256 = artifacts.sha256
               where revisions.id = deliveries.revision_id
                 and revisions.bundle_sha256 = artifacts.sha256
                 and revisions.commit_sha = release_runs.commit_sha

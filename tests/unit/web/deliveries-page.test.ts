@@ -17,6 +17,10 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(async () => new Map([["host", "boardreadyops.test"]])),
 }));
 
+vi.mock("../../../apps/web/components/deliveries/manufacturing-share-authorization-form.js", () => ({
+  ManufacturingShareAuthorizationForm: () => null,
+}));
+
 const loadWorkspaceDeliveries = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/web/lib/delivery-listing.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -251,6 +255,7 @@ describe("DeliveriesListPage", () => {
         },
       ],
       deliveries: [],
+      authorizedRevisionIds: ["rev_ready"],
     });
 
     const markup = await render();

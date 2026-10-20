@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppShell } from "../../components/app-shell.js";
 import { DeliveryCreateForm } from "../../components/deliveries/delivery-create-form.js";
 import { DeliveryRevokeButton } from "../../components/deliveries/delivery-revoke-button.js";
+import { ManufacturingShareAuthorizationForm } from "../../components/deliveries/manufacturing-share-authorization-form.js";
 import { ValidatedRevisionRegisterForm } from "../../components/deliveries/validated-revision-register-form.js";
 import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
@@ -13,7 +14,13 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../lib/delivery-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
-import { createDeliveryLinkAction, registerValidatedRevisionAction, revokeDeliveryLinkAction } from "./actions.js";
+import {
+  authorizeManufacturingShareAction,
+  createDeliveryLinkAction,
+  registerValidatedRevisionAction,
+  revokeDeliveryLinkAction,
+  revokeManufacturingShareAction,
+} from "./actions.js";
 
 export const metadata: Metadata = {
   title: "Release Deliveries & Fabrication Packages",
@@ -231,6 +238,24 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
               </Panel>
             ) : null}
 
+            {(result.selected.role === "owner" || result.selected.role === "admin") &&
+            result.revisions.some((revision) => revision.validationRunId && revision.validationArtifactId) ? (
+              <Panel
+                title="Explicit permission to share"
+                description="Readiness checks are not manufacturing approval. An owner/admin must separately permit
+                  guest sharing for one exact source commit and archive checksum."
+              >
+                <ManufacturingShareAuthorizationForm
+                  revisions={result.revisions.filter(
+                    (revision) => revision.validationRunId && revision.validationArtifactId,
+                  )}
+                  authorizedRevisionIds={result.authorizedRevisionIds ?? []}
+                  approveAction={authorizeManufacturingShareAction}
+                  revokeAction={revokeManufacturingShareAction}
+                />
+              </Panel>
+            ) : null}
+
             <Panel title={result.selected.name} description="Newest first. An expired link stops working on its own.">
               <DataTable
                 caption={`Guest delivery links in ${result.selected.name}`}
@@ -283,7 +308,10 @@ function CreatePanel({
   origin: string;
 }>) {
   const validatedRevisions = result.revisions.filter(
-    (revision) => revision.validationRunId !== undefined && revision.validationArtifactId !== undefined,
+    (revision) =>
+      revision.validationRunId !== undefined &&
+      revision.validationArtifactId !== undefined &&
+      (result.authorizedRevisionIds ?? []).includes(revision.id),
   );
 
   if (validatedRevisions.length === 0) {

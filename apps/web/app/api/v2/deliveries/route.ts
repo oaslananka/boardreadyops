@@ -1,4 +1,8 @@
-import { isHttpsDeliveryArchiveUrl, WorkspaceStore } from "@boardreadyops/db";
+import {
+  isHttpsDeliveryArchiveUrl,
+  revisionHasManufacturingShareAuthorization,
+  WorkspaceStore,
+} from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest } from "../../../../lib/api-auth.js";
@@ -68,6 +72,13 @@ export async function POST(request: Request): Promise<Response> {
     if (!(await store.revisionHasValidatedManufacturingEvidence(revision.id))) {
       return Response.json(
         { ok: false, error: "Revision is not backed by validated manufacturing evidence" },
+        { status: 409 },
+      );
+    }
+
+    if (!(await revisionHasManufacturingShareAuthorization(executor, revision.id))) {
+      return Response.json(
+        { ok: false, error: "Explicit owner/admin sharing authorization is required" },
         { status: 409 },
       );
     }

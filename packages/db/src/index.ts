@@ -67,6 +67,7 @@ export * from "./data-lifecycle-store.js";
 export * from "./external-review-store.js";
 export * from "./finding-decision-store.js";
 export * from "./lifecycle-store.js";
+export * from "./manufacturing-share-authorization-store.js";
 export * from "./production-outcome-store.js";
 export * from "./protected-release-execution-seal-store.js";
 export * from "./protected-release-intent-store.js";
