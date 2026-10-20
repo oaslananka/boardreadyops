@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -278,6 +279,69 @@ describe("signed artifact download route", () => {
     expect(response.headers.get("content-disposition")).toContain("filename*=UTF-8''board%20r%C3%A9sum%C3%A9.zip");
     expect(recordDownloadStarted).toHaveBeenCalledOnce();
     expect(recordDownloadStarted).toHaveBeenCalledWith(artifact({ bytes: Buffer.byteLength(payload) }));
+  });
+
+  it.each(["manufacturing", "draft-manufacturing"])(
+    "rejects a same-size tampered %s ZIP before audit or download",
+    async (role) => {
+      const root = await temporaryDirectory();
+      await mkdir(path.join(root, "run-123"));
+      const payload = "fabrication-data";
+      const original = "fabrication-date"; // same byte count, different SHA-256
+      expect(Buffer.byteLength(payload)).toBe(Buffer.byteLength(original));
+      await writeFile(path.join(root, "run-123", "board.zip"), payload);
+      const expectedSha256 = createHash("sha256").update(original).digest("hex");
+      const recordDownloadStarted = vi.fn(async () => undefined);
+      const response = await handleArtifactDownloadRequest(
+        signedRequest("run-123", "artifact-456"),
+        { runId: "run-123", artifactId: "artifact-456" },
+        dependencies(
+          root,
+          async () => ({
+            state: "found",
+            artifact: artifact({
+              kind: "archive",
+              role,
+              sha256: expectedSha256,
+              bytes: Buffer.byteLength(original),
+            }),
+          }),
+          {},
+          recordDownloadStarted,
+        ),
+      );
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "manufacturing archive content does not match its verified digest",
+      });
+      expect(recordDownloadStarted).not.toHaveBeenCalled();
+    },
+  );
+
+  it("streams a digest-matched manufacturing ZIP and records the access", async () => {
+    const root = await temporaryDirectory();
+    await mkdir(path.join(root, "run-123"));
+    const payload = "PK" + "fabrication-data";
+    await writeFile(path.join(root, "run-123", "board.zip"), payload);
+    const sha256 = createHash("sha256").update(payload).digest("hex");
+    const recordDownloadStarted = vi.fn(async () => undefined);
+    const response = await handleArtifactDownloadRequest(
+      signedRequest("run-123", "artifact-456"),
+      { runId: "run-123", artifactId: "artifact-456" },
+      dependencies(
+        root,
+        async () => ({
+          state: "found",
+          artifact: artifact({ kind: "archive", role: "manufacturing", sha256, bytes: Buffer.byteLength(payload) }),
+        }),
+        {},
+        recordDownloadStarted,
+      ),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(payload);
+    expect(response.headers.get("x-boardreadyops-artifact-sha256")).toBe(sha256);
+    expect(recordDownloadStarted).toHaveBeenCalledOnce();
   });
 
   it("rejects metadata size mismatches without serving the file", async () => {

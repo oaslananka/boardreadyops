@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { Readable } from "node:stream";
@@ -204,6 +205,34 @@ function jsonError(error: string, status: number): Response {
   );
 }
 
+function isManufacturingArchive(artifact: ArtifactDownloadRecord): boolean {
+  return artifact.kind === "archive" && (artifact.role === "manufacturing" || artifact.role === "draft-manufacturing");
+}
+
+/** Hash using fixed-size positional reads so the same open file can stream from byte zero. */
+async function verifyOpenArchiveDigest(
+  fileHandle: Awaited<ReturnType<typeof open>>,
+  bytes: number,
+  expectedSha256: string,
+): Promise<boolean> {
+  if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) return false;
+  const hash = createHash("sha256");
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  let offset = 0;
+  try {
+    while (offset < bytes) {
+      const next = Math.min(buffer.byteLength, bytes - offset);
+      const { bytesRead } = await fileHandle.read(buffer, 0, next, offset);
+      if (bytesRead === 0) return false;
+      hash.update(buffer.subarray(0, bytesRead));
+      offset += bytesRead;
+    }
+  } catch {
+    return false;
+  }
+  return hash.digest("hex") === expectedSha256;
+}
+
 export async function handleArtifactDownloadRequest(
   request: Request,
   params: { runId: string; artifactId: string },
@@ -275,6 +304,17 @@ export async function handleArtifactDownloadRequest(
     return jsonError("artifact metadata does not match the stored file", 409);
   }
 
+  // A signed URL authenticates the artifact locator, not the underlying mutable
+  // storage bytes. Do not distribute a manufacturing archive when its content no
+  // longer matches the SHA-256 persisted at upload time.
+  if (
+    isManufacturingArchive(lookup.artifact) &&
+    !(await verifyOpenArchiveDigest(fileHandle, fileStat.size, lookup.artifact.sha256))
+  ) {
+    await fileHandle.close();
+    return jsonError("manufacturing archive content does not match its verified digest", 409);
+  }
+
   try {
     await dependencies.recordDownloadStarted(lookup.artifact);
   } catch {
@@ -282,7 +322,7 @@ export async function handleArtifactDownloadRequest(
     return jsonError("artifact access audit is temporarily unavailable", 503);
   }
 
-  const nodeStream = fileHandle.createReadStream({ autoClose: true });
+  const nodeStream = fileHandle.createReadStream({ autoClose: true, start: 0 });
   const body = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
 
   return new Response(body, {
