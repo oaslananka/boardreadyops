@@ -39,6 +39,39 @@ describe("Review Detail Tabs", () => {
     expect(header).toContain("Request changes");
   });
 
+  it("keeps the mobile Review summary compact without hiding signoff or evidence-copy actions", () => {
+    const html = renderToStaticMarkup(
+      createElement(ReviewHeader, {
+        reviewId: review.id,
+        title: review.title,
+        repositoryName: review.repositoryName,
+        pullRequestNumber: review.pullRequestNumber,
+        status: review.status,
+        decision: review.decision,
+        currentRevisionSequence: review.currentRevisionSequence,
+        baseCommitSha: review.baseCommitSha,
+        headCommitSha: review.headCommitSha,
+        evidenceDigest: review.evidenceDigest,
+        evidenceState: review.evidenceState,
+      }),
+    );
+    expect(html).toContain("line-clamp-2");
+    expect(html).toContain("sm:line-clamp-none");
+    expect(html).toContain("overflow-x-auto whitespace-nowrap");
+    expect(html).toContain('class="sm:hidden"');
+    expect(html).toContain("Copy digest");
+    expect(html).toContain("Approve review");
+    expect(html).toContain("Request changes");
+  });
+
+  it("keeps all Review tabs keyboard accessible on a single mobile scroll row", () => {
+    const html = renderToStaticMarkup(createElement(ReviewView, { initialReview: review }));
+    expect(html).toContain("min-w-0 flex-nowrap gap-1 overflow-x-auto border-b");
+    expect(html).toContain('id="tab-changes" role="tab"');
+    expect(html).toContain('id="tab-evidence" role="tab"');
+    expect(html).toContain("min-h-11 shrink-0 items-center");
+  });
+
   it("labels a manual Review without inventing a PR number or base commit", () => {
     const manual = { ...review, pullRequestNumber: 0, baseCommitSha: "0".repeat(40) };
     const header = renderToStaticMarkup(

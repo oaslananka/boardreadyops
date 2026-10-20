@@ -69,7 +69,11 @@ function ReviewNavigationTabs({
   }
 
   return (
-    <div className="flex flex-wrap gap-1 border-b border-border" aria-label="Review workspace" role="tablist">
+    <div
+      className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto border-b border-border sm:flex-wrap sm:overflow-visible"
+      aria-label="Review workspace"
+      role="tablist"
+    >
       <button
         id="tab-overview"
         role="tab"
@@ -77,7 +81,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-overview"
         tabIndex={activeTab === "overview" ? 0 : -1}
         type="button"
-        className={`flex min-h-11 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "overview" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        className={`flex min-h-11 shrink-0 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "overview" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("overview")}
         onKeyDown={(e) => handleTabKeyDown(e, "overview")}
       >
@@ -90,7 +94,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-changes"
         tabIndex={activeTab === "changes" ? 0 : -1}
         type="button"
-        className={`flex min-h-11 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "changes" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        className={`flex min-h-11 shrink-0 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "changes" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("changes")}
         onKeyDown={(e) => handleTabKeyDown(e, "changes")}
       >
@@ -103,7 +107,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-findings"
         tabIndex={activeTab === "findings" ? 0 : -1}
         type="button"
-        className={`flex min-h-11 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "findings" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        className={`flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "findings" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("findings")}
         onKeyDown={(e) => handleTabKeyDown(e, "findings")}
       >
@@ -122,7 +126,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-discussion"
         tabIndex={activeTab === "discussion" ? 0 : -1}
         type="button"
-        className={`flex min-h-11 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "discussion" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        className={`flex min-h-11 shrink-0 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "discussion" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("discussion")}
         onKeyDown={(e) => handleTabKeyDown(e, "discussion")}
       >
@@ -135,7 +139,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-checklist"
         tabIndex={activeTab === "checklist" ? 0 : -1}
         type="button"
-        className={`flex min-h-11 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "checklist" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        className={`flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "checklist" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("checklist")}
         onKeyDown={(e) => handleTabKeyDown(e, "checklist")}
       >
@@ -154,7 +158,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-evidence"
         tabIndex={activeTab === "evidence" ? 0 : -1}
         type="button"
-        className={`flex min-h-11 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "evidence" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        className={`flex min-h-11 shrink-0 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "evidence" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("evidence")}
         onKeyDown={(e) => handleTabKeyDown(e, "evidence")}
       >
