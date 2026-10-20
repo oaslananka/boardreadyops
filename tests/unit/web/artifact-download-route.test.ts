@@ -184,7 +184,7 @@ describe("artifact download audit database operations", () => {
     const parameters = call?.[1];
     expect(sql).toContain("insert into audit_events");
     expect(sql).toContain("'artifact.download.started'");
-    expect(sql).toContain("'signed_url'");
+    expect(sql).toContain("$6");
     expect(sql).toContain("'artifact'");
     expect(parameters).toEqual([
       "installation-789",
@@ -197,8 +197,9 @@ describe("artifact download audit database operations", () => {
         itemType: "release-archive",
         scope: "primary",
       }),
+      "signed_url",
     ]);
-    expect(JSON.stringify(parameters)).not.toContain("sig");
+    expect(JSON.stringify(parameters?.slice(0, 5))).not.toContain("sig");
     expect(JSON.stringify(parameters)).not.toContain("authorization");
   });
 });

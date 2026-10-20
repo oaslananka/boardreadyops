@@ -17,7 +17,7 @@ import { createDeliveryLinkAction, registerValidatedRevisionAction, revokeDelive
 
 export const metadata: Metadata = {
   title: "Release Deliveries & Fabrication Packages",
-  description: "Cryptographically signed manufacturing release deliveries and guest links.",
+  description: "Token-bound guest access to stored manufacturing release artifacts and integrity checks.",
 };
 
 // Scoped to the viewer's workspace memberships, so it can never be prerendered.
@@ -111,7 +111,7 @@ function deliveryColumns(canRevoke: boolean): readonly DataColumn<WorkspaceDeliv
     },
     {
       id: "archive",
-      header: "Archive",
+      header: "Legacy reference",
       cell: (delivery) => <span className="font-mono text-meta break-all">{delivery.signedArchiveUrl}</span>,
     },
     {
@@ -177,8 +177,8 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
         <header>
           <h1 className="text-2xl font-bold text-foreground">Release Deliveries</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Guest links that let a manufacturing partner download a signed package without an account. Anyone holding
-            one can open it until it expires, so this is the list of what is currently outstanding.
+            Guest links that let a manufacturing partner download the stored evidence-backed package without an account.
+            Anyone holding one can open it until it expires, so this is the list of what is currently outstanding.
           </p>
         </header>
 

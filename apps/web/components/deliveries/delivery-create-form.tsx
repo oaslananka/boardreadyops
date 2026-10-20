@@ -74,7 +74,7 @@ export function DeliveryCreateForm({
 
             <div className="flex flex-col gap-1.5">
               <label className="text-meta font-medium text-foreground" htmlFor={urlId}>
-                Signed archive URL
+                Legacy external archive reference
               </label>
               <Input
                 id={urlId}
@@ -86,7 +86,8 @@ export function DeliveryCreateForm({
                 aria-describedby={`${urlId}-hint`}
               />
               <p id={`${urlId}-hint`} className="text-meta text-muted-foreground">
-                Where the recipient downloads the package. The link below grants access to this URL.
+                Compatibility reference only. Guest downloads are served from the stored BoardReadyOps manufacturing
+                artifact, never this external address.
               </p>
               {fieldError(state, "signedArchiveUrl") ? (
                 <p className="text-meta text-danger">{fieldError(state, "signedArchiveUrl")}</p>

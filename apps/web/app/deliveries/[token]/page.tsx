@@ -63,7 +63,7 @@ export default async function DeliveryPage({ params }: Readonly<DeliveryPageProp
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
         <DeliverySignoffCard
           revisionId={delivery.revisionId}
-          signedArchiveUrl={delivery.signedArchiveUrl}
+          signedArchiveUrl={`/api/v2/deliveries/${encodeURIComponent(token)}/archive`}
           recipientNotes={delivery.recipientNotes ?? undefined}
           expiresAt={new Date(delivery.expiresAt).toISOString()}
         />

@@ -127,13 +127,14 @@ export async function lookupArtifactDownload(
 export async function recordArtifactDownloadStarted(
   artifact: ArtifactDownloadRecord,
   executor: ArtifactDownloadQueryExecutor,
+  actorType: "signed_url" | "guest_token" = "signed_url",
 ): Promise<void> {
   await executor.query(
     `insert into audit_events (
        installation_id, event_type, actor_type, subject_type, subject_id,
        repository_id, release_run_id, artifact_id, metadata
      ) values (
-       $1, 'artifact.download.started', 'signed_url', 'artifact', $4,
+       $1, 'artifact.download.started', $6, 'artifact', $4,
        $2, $3, $4, $5::jsonb
      )`,
     [
@@ -147,6 +148,7 @@ export async function recordArtifactDownloadStarted(
         itemType: artifact.kind,
         scope: artifact.role,
       }),
+      actorType,
     ],
   );
 }
@@ -265,6 +267,18 @@ export async function handleArtifactDownloadRequest(
     return jsonError("artifact not found", 404);
   }
 
+  return await streamVerifiedArtifactDownload(lookup.artifact, dependencies);
+}
+
+/**
+ * Common first-party file delivery: authentication happens in the caller.
+ * The signed run URL and guest delivery token both reach the exact same
+ * on-disk digest, audit and streaming implementation.
+ */
+export async function streamVerifiedArtifactDownload(
+  artifact: ArtifactDownloadRecord,
+  dependencies: Pick<ArtifactDownloadRouteDependencies, "environment" | "recordDownloadStarted">,
+): Promise<Response> {
   const driver = dependencies.environment.ARTIFACT_STORAGE_DRIVER ?? "local";
   if (driver !== "local") {
     return jsonError("artifact storage driver is not supported by this route", 501);
@@ -275,7 +289,7 @@ export async function handleArtifactDownloadRequest(
     return jsonError("artifact storage root is not configured", 503);
   }
 
-  const resolution = await resolveLocalArtifactFile(storageRoot, lookup.artifact.storagePath);
+  const resolution = await resolveLocalArtifactFile(storageRoot, artifact.storagePath);
   if (resolution.state === "outside-root") {
     return jsonError("artifact path is outside the storage root", 403);
   }
@@ -299,7 +313,7 @@ export async function handleArtifactDownloadRequest(
     return jsonError("artifact file is not available", 404);
   }
 
-  if (fileStat.size !== lookup.artifact.bytes) {
+  if (fileStat.size !== artifact.bytes) {
     await fileHandle.close();
     return jsonError("artifact metadata does not match the stored file", 409);
   }
@@ -308,15 +322,15 @@ export async function handleArtifactDownloadRequest(
   // storage bytes. Do not distribute a manufacturing archive when its content no
   // longer matches the SHA-256 persisted at upload time.
   if (
-    isManufacturingArchive(lookup.artifact) &&
-    !(await verifyOpenArchiveDigest(fileHandle, fileStat.size, lookup.artifact.sha256))
+    isManufacturingArchive(artifact) &&
+    !(await verifyOpenArchiveDigest(fileHandle, fileStat.size, artifact.sha256))
   ) {
     await fileHandle.close();
     return jsonError("manufacturing archive content does not match its verified digest", 409);
   }
 
   try {
-    await dependencies.recordDownloadStarted(lookup.artifact);
+    await dependencies.recordDownloadStarted(artifact);
   } catch {
     await fileHandle.close().catch(() => undefined);
     return jsonError("artifact access audit is temporarily unavailable", 503);
@@ -328,13 +342,13 @@ export async function handleArtifactDownloadRequest(
   return new Response(body, {
     headers: {
       "cache-control": "private, no-store",
-      "content-disposition": artifactAttachmentHeader(lookup.artifact.name),
+      "content-disposition": artifactAttachmentHeader(artifact.name),
       "content-length": String(fileStat.size),
       "content-type": "application/octet-stream",
-      "x-boardreadyops-artifact-id": safeHeaderValue(lookup.artifact.id),
-      "x-boardreadyops-artifact-kind": safeHeaderValue(lookup.artifact.kind),
-      "x-boardreadyops-artifact-role": safeHeaderValue(lookup.artifact.role),
-      "x-boardreadyops-artifact-sha256": safeHeaderValue(lookup.artifact.sha256),
+      "x-boardreadyops-artifact-id": safeHeaderValue(artifact.id),
+      "x-boardreadyops-artifact-kind": safeHeaderValue(artifact.kind),
+      "x-boardreadyops-artifact-role": safeHeaderValue(artifact.role),
+      "x-boardreadyops-artifact-sha256": safeHeaderValue(artifact.sha256),
       "x-content-type-options": "nosniff",
     },
   });
