@@ -279,6 +279,18 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("Ready to fabricate");
   });
 
+  it("does not show a fabrication-ready headline when a passed run lacks a signed result", () => {
+    const run = sampleRun();
+    run.investigationState = "partial_data";
+    const html = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "summary" }, createElement(SummaryView, { run })),
+    );
+    expect(html).toContain("Readiness not verified");
+    expect(html).toContain("This run has partial data");
+    expect(html).toContain("Inspect missing result");
+    expect(html).not.toContain("Ready to fabricate");
+  });
+
   it("renders storage-neutral release lineage with explicit missing governance context", () => {
     const run = sampleRun();
     run.reviewId = "review-123";

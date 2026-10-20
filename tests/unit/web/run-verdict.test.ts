@@ -27,6 +27,21 @@ describe("run verdict", () => {
     expect(verdict.detail).toContain("abc1234");
   });
 
+  it.each(["pass", "fail"])("never calls a partial run with a %s decision fabrication-ready", (decision) => {
+    const verdict = runVerdict(
+      run({
+        investigationState: "partial_data",
+        decision,
+        conclusion: decision === "pass" ? "success" : "failure",
+        findings: [finding("high", "R1 has no MPN")],
+      }),
+    );
+    expect(verdict.tone).toBe("warning");
+    expect(verdict.headline).toBe("Readiness not verified");
+    expect(verdict.detail).toContain("without a signed result");
+    expect(verdict.action?.href).toBe("/runs/run-1/publication");
+  });
+
   it("names the blocking finding rather than counting rows", () => {
     const verdict = runVerdict(
       run({
