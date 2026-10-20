@@ -58782,14 +58782,23 @@ var defaultDependencies2 = {
   sleep: abortableSleep,
   log: () => void 0
 };
+function validateManufacturingDraftWorkerOptions(options) {
+  if (!options.manufacturingDraftUpload) return;
+  if ((options.artifactMode ?? "control-plane") !== "control-plane" || options.requireKicad === false) {
+    throw new Error("Manufacturing draft upload requires control-plane artifacts and KiCad enforcement");
+  }
+}
+async function validateManufacturingDraftJob(client, job, enabled2) {
+  if (!enabled2 || !job.safeMode.enabled && !job.repository.private) return;
+  await bestEffortRelinquish(client, job, "job_error", "Draft cloud upload is refused for private or safe-mode jobs.");
+  throw new Error("Manufacturing draft upload is refused for private or safe-mode jobs");
+}
 function defaultRunnerWorkspaceRoot() {
   return import_node_path79.default.join(import_node_os7.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
 }
 async function runRunnerWorkerOnce(options, overrides = {}) {
   const dependencies = { ...defaultDependencies2, ...overrides };
-  if (options.manufacturingDraftUpload && ((options.artifactMode ?? "control-plane") !== "control-plane" || options.requireKicad === false)) {
-    throw new Error("Manufacturing draft upload requires control-plane artifacts and KiCad enforcement");
-  }
+  validateManufacturingDraftWorkerOptions(options);
   if (options.artifactMode === "customer-managed" !== (options.customerArtifactRoot !== void 0)) {
     throw new Error(
       "customer-managed artifact mode requires --customer-artifact-root, which cannot be used with other modes"
@@ -58822,15 +58831,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     source_mode: job.sourceMode
   });
   await validateClaimedRunnerJob(client, job, options.signal);
-  if (options.manufacturingDraftUpload && (job.safeMode.enabled || job.repository.private)) {
-    await bestEffortRelinquish(
-      client,
-      job,
-      "job_error",
-      "Draft cloud upload is refused for private or safe-mode jobs."
-    );
-    throw new Error("Manufacturing draft upload is refused for private or safe-mode jobs");
-  }
+  await validateManufacturingDraftJob(client, job, options.manufacturingDraftUpload);
   let workspace;
   let terminalPublished = false;
   const heartbeat = createHeartbeatController(client, job, heartbeatSeconds, dependencies.log);

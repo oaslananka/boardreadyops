@@ -127,6 +127,23 @@ const defaultDependencies: RunnerWorkerDependencies = {
   log: () => undefined,
 };
 
+function validateManufacturingDraftWorkerOptions(options: RunnerWorkerOptions): void {
+  if (!options.manufacturingDraftUpload) return;
+  if ((options.artifactMode ?? "control-plane") !== "control-plane" || options.requireKicad === false) {
+    throw new Error("Manufacturing draft upload requires control-plane artifacts and KiCad enforcement");
+  }
+}
+
+async function validateManufacturingDraftJob(
+  client: RunnerWorkerClient,
+  job: RunnerClaimedJob,
+  enabled: boolean | undefined,
+): Promise<void> {
+  if (!enabled || (!job.safeMode.enabled && !job.repository.private)) return;
+  await bestEffortRelinquish(client, job, "job_error", "Draft cloud upload is refused for private or safe-mode jobs.");
+  throw new Error("Manufacturing draft upload is refused for private or safe-mode jobs");
+}
+
 export function defaultRunnerWorkspaceRoot(): string {
   return path.join(os.homedir(), ".cache", "boardreadyops", "runner-workspaces");
 }
@@ -136,12 +153,7 @@ export async function runRunnerWorkerOnce(
   overrides: Partial<RunnerWorkerDependencies> = {},
 ): Promise<RunnerWorkerResult> {
   const dependencies = { ...defaultDependencies, ...overrides };
-  if (
-    options.manufacturingDraftUpload &&
-    ((options.artifactMode ?? "control-plane") !== "control-plane" || options.requireKicad === false)
-  ) {
-    throw new Error("Manufacturing draft upload requires control-plane artifacts and KiCad enforcement");
-  }
+  validateManufacturingDraftWorkerOptions(options);
   if ((options.artifactMode === "customer-managed") !== (options.customerArtifactRoot !== undefined)) {
     throw new Error(
       "customer-managed artifact mode requires --customer-artifact-root, which cannot be used with other modes",
@@ -176,15 +188,7 @@ export async function runRunnerWorkerOnce(
   });
 
   await validateClaimedRunnerJob(client, job, options.signal);
-  if (options.manufacturingDraftUpload && (job.safeMode.enabled || job.repository.private)) {
-    await bestEffortRelinquish(
-      client,
-      job,
-      "job_error",
-      "Draft cloud upload is refused for private or safe-mode jobs.",
-    );
-    throw new Error("Manufacturing draft upload is refused for private or safe-mode jobs");
-  }
+  await validateManufacturingDraftJob(client, job, options.manufacturingDraftUpload);
 
   let workspace: string | undefined;
   let terminalPublished = false;
