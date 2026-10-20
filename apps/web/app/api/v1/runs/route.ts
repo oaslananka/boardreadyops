@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   findingSchema,
+  isUnattestedManufacturingArchive,
   releaseRunArtifactSchema,
   snapshotArtifactSchema,
   triggerKindSchema,
@@ -25,7 +26,14 @@ export const ingestRunRequestSchema = z.object({
   decision: z.enum(["pass", "fail", "error"]).optional(),
   title: z.string().max(256).optional(),
   findings: z.array(findingSchema).default([]),
-  artifacts: z.array(releaseRunArtifactSchema).default([]),
+  artifacts: z
+    .array(
+      releaseRunArtifactSchema.refine(
+        (artifact) => !isUnattestedManufacturingArchive(artifact),
+        "unattested manufacturing archives cannot be published as approved",
+      ),
+    )
+    .default([]),
   // Review-canvas snapshots (rendered SVG + finding anchors) from `boardreadyops review publish`;
   // see src/kicad/snapshots.ts::generateSnapshots. Content is inline SVG text, so these ride the
   // same JSON payload as findings rather than going through the binary artifact upload protocol.

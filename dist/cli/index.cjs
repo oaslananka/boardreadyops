@@ -31126,6 +31126,16 @@ var init_json = __esm({
   }
 });
 
+// packages/contracts/src/manufacturing-archive-trust.ts
+function isUnattestedManufacturingArchive(input) {
+  return input.kind.trim().toLowerCase() === "archive" && input.role.trim().toLowerCase() === "manufacturing";
+}
+var init_manufacturing_archive_trust = __esm({
+  "packages/contracts/src/manufacturing-archive-trust.ts"() {
+    "use strict";
+  }
+});
+
 // packages/contracts/src/runner-protocol.ts
 function validArtifactStoragePath(value) {
   const segments = value.split("/");
@@ -31139,6 +31149,7 @@ var init_runner_protocol = __esm({
   "packages/contracts/src/runner-protocol.ts"() {
     "use strict";
     init_zod();
+    init_manufacturing_archive_trust();
     lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
     base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
     capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
@@ -31292,7 +31303,10 @@ var init_runner_protocol = __esm({
       bytes: external_exports.number().int().nonnegative().max(2147483647),
       sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u).optional(),
       contentType: artifactContentTypeSchema.optional()
-    }).strict();
+    }).strict().refine(
+      (artifact) => !isUnattestedManufacturingArchive(artifact),
+      "runner cannot declare an approved manufacturing archive without an independent attestation"
+    );
     runnerArtifactCapabilityRequestSchema = runnerLeaseContextSchema.extend({
       artifacts: external_exports.array(runnerArtifactDeclarationSchema).min(1).max(100)
     }).strict();
@@ -32166,10 +32180,12 @@ var init_src = __esm({
   "packages/contracts/src/index.ts"() {
     "use strict";
     init_zod();
+    init_manufacturing_archive_trust();
     init_runner_protocol();
     init_billing();
     init_evidence_ledger();
     init_external_review();
+    init_manufacturing_archive_trust();
     init_multicad();
     init_policy();
     init_review();
@@ -32380,7 +32396,12 @@ var init_src = __esm({
       conclusion: releaseRunConclusionSchema.optional(),
       decision: releaseDecisionSchema.nullable(),
       findings: external_exports.array(findingSchema).max(500).default([]),
-      artifacts: external_exports.array(releaseRunArtifactSchema).max(100).default([]),
+      artifacts: external_exports.array(
+        releaseRunArtifactSchema.refine(
+          (artifact) => !isUnattestedManufacturingArchive(artifact),
+          "runner cannot declare an approved manufacturing archive without an independent attestation"
+        )
+      ).max(100).default([]),
       metrics: releaseRunMetricsSchema.default({}),
       // Optional producer-observed versions; older v1 results have no such metadata.
       toolVersions: external_exports.object({

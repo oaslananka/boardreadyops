@@ -97585,6 +97585,11 @@ var DEFAULT_MAX_COMPRESSED_SIZE = 50 * 1024 * 1024;
 var DEFAULT_MAX_TOTAL_EXTRACTED_BYTES = 250 * 1024 * 1024;
 var DEFAULT_MAX_SINGLE_FILE_BYTES = 50 * 1024 * 1024;
 
+// packages/contracts/src/manufacturing-archive-trust.ts
+function isUnattestedManufacturingArchive(input) {
+  return input.kind.trim().toLowerCase() === "archive" && input.role.trim().toLowerCase() === "manufacturing";
+}
+
 // packages/contracts/src/runner-protocol.ts
 var lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 var base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
@@ -97739,7 +97744,10 @@ var runnerArtifactDeclarationSchema = external_exports.object({
   bytes: external_exports.number().int().nonnegative().max(2147483647),
   sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u).optional(),
   contentType: artifactContentTypeSchema.optional()
-}).strict();
+}).strict().refine(
+  (artifact) => !isUnattestedManufacturingArchive(artifact),
+  "runner cannot declare an approved manufacturing archive without an independent attestation"
+);
 var runnerArtifactCapabilityRequestSchema = runnerLeaseContextSchema.extend({
   artifacts: external_exports.array(runnerArtifactDeclarationSchema).min(1).max(100)
 }).strict();
@@ -98550,7 +98558,12 @@ var releaseRunResultBaseSchema = external_exports.object({
   conclusion: releaseRunConclusionSchema.optional(),
   decision: releaseDecisionSchema.nullable(),
   findings: external_exports.array(findingSchema).max(500).default([]),
-  artifacts: external_exports.array(releaseRunArtifactSchema).max(100).default([]),
+  artifacts: external_exports.array(
+    releaseRunArtifactSchema.refine(
+      (artifact) => !isUnattestedManufacturingArchive(artifact),
+      "runner cannot declare an approved manufacturing archive without an independent attestation"
+    )
+  ).max(100).default([]),
   metrics: releaseRunMetricsSchema.default({}),
   // Optional producer-observed versions; older v1 results have no such metadata.
   toolVersions: external_exports.object({

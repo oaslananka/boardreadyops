@@ -568,7 +568,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
         executionAttemptId: fixture.attemptId,
         leaseId: fixture.leaseId,
         leaseToken: fixture.leaseToken,
-        artifacts: [{ kind: "archive", name: "gerbers.zip", role: "manufacturing", bytes: 512 }],
+        artifacts: [{ kind: "archive", name: "gerbers.zip", role: "draft-manufacturing", bytes: 512 }],
       });
       expect(issued.status).toBe("accepted");
 

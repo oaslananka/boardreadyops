@@ -155,6 +155,28 @@ afterEach(() => {
 });
 
 describe("readiness result route authentication and publication", () => {
+  it("does not accept a self-declared approved manufacturing ZIP from a signed runner result", async () => {
+    const body = JSON.stringify({
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      artifacts: [
+        {
+          kind: "archive",
+          name: "board.zip",
+          storagePath: "run/board.zip",
+          role: "manufacturing",
+          sha256: "a".repeat(64),
+          bytes: 1024,
+        },
+      ],
+    });
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+    expect(response.status).toBe(400);
+    expect(query).not.toHaveBeenCalled();
+    expect(completeCheckRun).not.toHaveBeenCalled();
+  });
+
   it("accepts a fresh body-bound signature and publishes check-run and PR output", async () => {
     const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
     query

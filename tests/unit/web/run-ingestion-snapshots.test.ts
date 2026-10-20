@@ -52,6 +52,31 @@ describe("POST /api/v1/runs persists review-canvas snapshots", () => {
     vi.restoreAllMocks();
   });
 
+  it("refuses a self-declared approved manufacturing archive before writing a run", async () => {
+    const request = new Request("https://boardreadyops.test/api/v1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        repositoryId: "oaslananka/hardware",
+        commitSha: "a".repeat(40),
+        ref: "refs/heads/main",
+        artifacts: [
+          {
+            kind: "archive",
+            name: "board.zip",
+            storagePath: "run/board.zip",
+            role: "manufacturing",
+            sha256: "b".repeat(64),
+            bytes: 512,
+          },
+        ],
+      }),
+    });
+    const response = await postRun(request);
+    expect(response.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   it("inserts a run_snapshots row for each published review-canvas snapshot", async () => {
     const request = new Request("https://boardreadyops.test/api/v1/runs", {
       method: "POST",
