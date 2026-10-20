@@ -113,7 +113,13 @@ boardreadyops release prepare . --profile jlcpcb --output build/release
 # Verify a release bundle and create a vendor handoff package
 boardreadyops release verify build/release
 boardreadyops handoff create build/release --profile jlcpcb
+
+# Optional: export actual Gerber/Excellon bytes as an unsigned, locally verified ZIP
+# Requires KiCad CLI 10, exactly one PCB project and a clean checkout; ignore build/ in Git
+boardreadyops release archive . --reviewed-source-sha "$(git rev-parse HEAD)"
 ```
+
+The `release archive` command verifies local source and output bytes and reports the resulting ZIP checksum. It does **not** produce a trusted workflow attestation, a cryptographic signature, vendor sign-off, or a cloud delivery link.
 
 `npx boardreadyops --help` also works when npm can resolve the package.
 

@@ -3,10 +3,12 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
+import { releaseArchiveCommand } from "../../src/cli/commands/manufacturing-archive.js";
 import { detectKicadCli } from "../../src/kicad/cli.js";
 import { createKicadCliRunner, runGenerate } from "../../src/release/generate.js";
-import { createVerifiedManufacturingZip } from "../../src/runner/manufacturing-archive.js";
+import { createVerifiedManufacturingZip } from "../../src/release/manufacturing-archive.js";
 
 describe("real KiCad manufacturing ZIP (local proof; not a signed release)", () => {
   it("packages actual Gerber/Excellon bytes bound to one source commit, rejecting modified exports", async (context) => {
@@ -49,6 +51,28 @@ describe("real KiCad manufacturing ZIP (local proof; not a signed release)", () 
       expect(contents.includes(Buffer.from("export-provenance.json"))).toBe(true);
       expect(contents.includes(Buffer.from("outputs/gerbers/"))).toBe(true);
       expect(contents.includes(Buffer.from("outputs/drill/"))).toBe(true);
+
+      const messages: string[] = [];
+      const stream = new Writable({
+        write(chunk, _encoding, callback) {
+          messages.push(String(chunk));
+          callback();
+        },
+      });
+      const cliStatus = await releaseArchiveCommand(
+        root,
+        {
+          reviewedSourceSha: sourceCommitSha,
+          generated: "build/cli-generated",
+          output: "build/cli-manufacturing.zip",
+        },
+        { stdout: stream, stderr: stream },
+      );
+      expect(cliStatus).toBe(0);
+      expect(messages.join("")).toContain("unsigned; no release approval");
+      const cliZip = await fs.readFile(path.join(root, "build", "cli-manufacturing.zip"));
+      expect(cliZip.subarray(0, 2).toString()).toBe("PK");
+
       await expect(
         createVerifiedManufacturingZip({
           root,
@@ -57,6 +81,23 @@ describe("real KiCad manufacturing ZIP (local proof; not a signed release)", () 
           destination: path.join(root, "build", "wrong-sha.zip"),
         }),
       ).rejects.toThrow(/proof|source|commit/u);
+
+      const gerbers = generated.artifacts.filter((item) => item.kind === "gerber");
+      const first = gerbers[0];
+      const second = gerbers[1];
+      if (!first || !second) throw new Error("Real output did not generate multiple Gerber layers");
+      const duplicatedOutput = {
+        ...generated,
+        artifacts: generated.artifacts.map((item) => (item.path === second.path ? first : item)),
+      };
+      await expect(
+        createVerifiedManufacturingZip({
+          root,
+          generated: duplicatedOutput,
+          sourceCommitSha,
+          destination: path.join(root, "build", "duplicated-output.zip"),
+        }),
+      ).rejects.toThrow("inventory differs from verified proof");
 
       const missingDrill = {
         ...generated,

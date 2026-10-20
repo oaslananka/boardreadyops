@@ -14,6 +14,7 @@ import { type ExportChecksumsCliOptions, exportChecksumsCommand } from "./comman
 import { type FixCliOptions, fixCommand } from "./commands/fix.js";
 import { type GenerateCliOptions, generateCommand } from "./commands/generate.js";
 import { type InitCommandOptions, initCommand } from "./commands/init.js";
+import { type ReleaseArchiveOptions, releaseArchiveCommand } from "./commands/manufacturing-archive.js";
 import { type PlanCliOptions, planCommand } from "./commands/plan.js";
 import { type PolicyCommandOptions, policyCommand } from "./commands/policy.js";
 import {
@@ -149,6 +150,16 @@ export function registerAllCommands(
     .option("--skip-generate", "skip the artifact generation stage")
     .action(async (pathInput: string | undefined, options: ReleasePrepareOptions) => {
       process.exitCode = await releasePrepareCommand(pathInput, options, streams);
+    });
+  release
+    .command("archive")
+    .description("generate an unsigned, locally source-verified KiCad fabrication ZIP")
+    .argument("[path]", "clean KiCad Git checkout")
+    .requiredOption("--reviewed-source-sha <sha>", "exact reviewed Git commit SHA")
+    .option("--generated <path>", "directory for KiCad output files", "build/boardreadyops-manufacturing/outputs")
+    .option("--output <path>", "unsigned manufacturing ZIP path", "build/boardreadyops-manufacturing.zip")
+    .action(async (pathInput: string | undefined, options: ReleaseArchiveOptions) => {
+      process.exitCode = await releaseArchiveCommand(pathInput, options, streams);
     });
   registerHandoffCommand(release.command("handoff").argument("[path]", "directory to scan"));
   addCommonOptions(
