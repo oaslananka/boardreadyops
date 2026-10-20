@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
-import { WorkspaceStore } from "../../../packages/db/src/workspace-store.js";
+import { isHttpsDeliveryArchiveUrl, WorkspaceStore } from "../../../packages/db/src/workspace-store.js";
 
 class MockWorkspaceDb implements SqlQueryExecutor {
   workspaces: Record<string, unknown>[] = [];
@@ -239,6 +239,19 @@ class MockWorkspaceDb implements SqlQueryExecutor {
 }
 
 describe("WorkspaceStore", () => {
+  it("accepts only credential-free HTTPS manufacturing archive locations", () => {
+    expect(isHttpsDeliveryArchiveUrl("https://storage.example.com/bundle.zip?signature=abc")).toBe(true);
+    for (const url of [
+      "javascript:alert(1)",
+      "data:text/plain,untrusted",
+      "file:///etc/passwd",
+      "http://storage.example.com/bundle.zip",
+      "https://user:secret@storage.example.com/bundle.zip",
+      "not-a-url",
+    ]) {
+      expect(isHttpsDeliveryArchiveUrl(url)).toBe(false);
+    }
+  });
   it("creates and retrieves workspaces by slug and id", async () => {
     const db = new MockWorkspaceDb();
     const store = new WorkspaceStore(db);
@@ -411,6 +424,19 @@ describe("WorkspaceStore", () => {
     expect(sql).toContain("revisions.bundle_sha256 = artifacts.sha256");
     expect(sql).toContain("revisions.commit_sha = release_runs.commit_sha");
     expect(sql).toContain("artifacts.role = 'manufacturing'");
+  });
+
+  it("rejects unsafe archive URLs before a delivery is persisted", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    await expect(
+      store.createDeliveryLink({
+        revisionId: "rev_test",
+        expiresAt: new Date(Date.now() + 60_000),
+        signedArchiveUrl: "javascript:alert(1)",
+      }),
+    ).rejects.toThrow("credential-free HTTPS");
+    expect(db.deliveries).toHaveLength(0);
   });
 
   it("creates and retrieves delivery links with token hashing and expiration", async () => {

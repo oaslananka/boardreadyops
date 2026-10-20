@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { DeliveryRecord, SqlQueryExecutor } from "@boardreadyops/db";
+import { type DeliveryRecord, isHttpsDeliveryArchiveUrl, type SqlQueryExecutor } from "@boardreadyops/db";
 
 export interface DeliveryAuthResult {
   ok: boolean;
@@ -61,8 +61,8 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
 
   // A guest token can outlive its originating run. Never disclose an archive URL after the
   // manufacturing evidence loses the passing verdict, artifact, digest or commit binding.
-  if (row.evidence_valid !== true) {
-    return { ok: false, status: 404, error: "Delivery manufacturing evidence is no longer valid" };
+  if (row.evidence_valid !== true || !isHttpsDeliveryArchiveUrl(row.signed_archive_url)) {
+    return { ok: false, status: 404, error: "Delivery manufacturing evidence or archive URL is no longer valid" };
   }
 
   return {

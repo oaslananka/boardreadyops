@@ -83,6 +83,24 @@ describe("verifyDeliveryToken", () => {
     expect(result.delivery).toBeUndefined();
   });
 
+  it("does not expose a previously stored executable URL even with passing evidence", async () => {
+    const db = new MockDeliveryDb();
+    const rawToken = "unsafe_stored_url";
+    db.deliveries.push({
+      id: "del_unsafe_url",
+      revision_id: "rev_valid",
+      access_token_hash: createHash("sha256").update(rawToken).digest("hex"),
+      expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+      signed_archive_url: "javascript:alert(1)",
+      recipient_notes: null,
+      created_at: new Date().toISOString(),
+      evidence_valid: true,
+    });
+    const result = await verifyDeliveryToken(rawToken, db);
+    expect(result.status).toBe(404);
+    expect(result.delivery).toBeUndefined();
+  });
+
   it("returns 404 for unknown token", async () => {
     const db = new MockDeliveryDb();
     const result = await verifyDeliveryToken("non_existent_token", db);

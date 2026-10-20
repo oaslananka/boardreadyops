@@ -132,6 +132,16 @@ describe("validated delivery revision actions", () => {
     expect(store.createDeliveryLink).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects unsafe archive schemes before creating a public guest link", async () => {
+    for (const unsafe of ["javascript:alert(1)", "data:text/plain,untrusted", "http://storage.example.com/a.zip"]) {
+      const values = delivery();
+      values.set("signedArchiveUrl", unsafe);
+      const result = await createDeliveryLinkAction(idle, values);
+      expect(result).toMatchObject({ status: "error" });
+    }
+    expect(store.createDeliveryLink).not.toHaveBeenCalled();
+  });
+
   it("refuses delivery when a previously recorded revision no longer has live trusted evidence", async () => {
     store.revisionHasValidatedManufacturingEvidence.mockResolvedValue(false);
 

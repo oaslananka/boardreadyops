@@ -1,5 +1,6 @@
 "use server";
 
+import { isHttpsDeliveryArchiveUrl } from "@boardreadyops/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { fail, ok } from "../../lib/action-result.js";
@@ -74,7 +75,8 @@ const createSchema = z.object({
     .trim()
     .min(1, "Give the archive URL the recipient should download.")
     .max(2048)
-    .url("That is not a valid URL."),
+    .url("That is not a valid URL.")
+    .refine(isHttpsDeliveryArchiveUrl, "Use an HTTPS archive URL without embedded credentials."),
   recipientNotes: z.string().trim().max(2048).optional(),
   expiresInDays: z
     .string()

@@ -1,4 +1,4 @@
-import { WorkspaceStore } from "@boardreadyops/db";
+import { isHttpsDeliveryArchiveUrl, WorkspaceStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest } from "../../../../lib/api-auth.js";
@@ -14,7 +14,10 @@ const createDeliverySchema = z.object({
     .datetime()
     .optional()
     .default(() => new Date(Date.now() + 7 * 86400 * 1000).toISOString()),
-  signedArchiveUrl: z.string().url(),
+  signedArchiveUrl: z
+    .string()
+    .url()
+    .refine(isHttpsDeliveryArchiveUrl, "Use an HTTPS archive URL without embedded credentials."),
   recipientNotes: z.string().max(2048).optional(),
 });
 

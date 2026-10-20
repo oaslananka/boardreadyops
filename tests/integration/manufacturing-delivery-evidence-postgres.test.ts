@@ -133,6 +133,17 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(404);
 
     await executor.query("update artifacts set sha256 = $2 where id = $1", [artifactId, archiveSha256]);
+    await executor.query("update deliveries set signed_archive_url = $2 where id = $1", [
+      delivery.id,
+      "javascript:alert(1)",
+    ]);
+    expect(await store.getDeliveryByToken(rawToken)).toBeNull();
+    expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(404);
+
+    await executor.query("update deliveries set signed_archive_url = $2 where id = $1", [
+      delivery.id,
+      "https://example.invalid/isolated-fixture.zip",
+    ]);
     await executor.query("update deliveries set expires_at = now() - interval '1 second' where id = $1", [delivery.id]);
     expect(await store.getDeliveryByToken(rawToken)).toBeNull();
     expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(410);

@@ -1,6 +1,16 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
+/** Only HTTPS, credential-free external archive locations may be exposed to guest recipients. */
+export function isHttpsDeliveryArchiveUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.username.length === 0 && url.password.length === 0;
+  } catch {
+    return false;
+  }
+}
+
 export type WorkspacePlanTier = "community" | "team" | "business" | "pilot";
 
 /** Matches the `workspace_members.role` check constraint in migration 0064. */
@@ -910,6 +920,9 @@ export class WorkspaceStore {
     recipientNotes?: string | undefined;
     rawToken?: string | undefined;
   }): Promise<{ delivery: DeliveryRecord; rawToken: string }> {
+    if (!isHttpsDeliveryArchiveUrl(input.signedArchiveUrl)) {
+      throw new Error("Signed archive URL must be credential-free HTTPS");
+    }
     const id = input.id ?? `del_${randomUUID()}`;
     const rawToken = input.rawToken ?? randomBytes(32).toString("hex");
     const accessTokenHash = createHash("sha256").update(rawToken).digest("hex");
@@ -1065,6 +1078,6 @@ export class WorkspaceStore {
     )) as { rows?: DeliveryRow[] };
 
     const row = result?.rows?.[0];
-    return row ? mapDelivery(row) : null;
+    return row && isHttpsDeliveryArchiveUrl(row.signed_archive_url) ? mapDelivery(row) : null;
   }
 }

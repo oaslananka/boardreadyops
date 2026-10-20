@@ -359,6 +359,25 @@ describe("API v2 Routes", () => {
       expect(await res.text()).toContain("validated manufacturing evidence");
     });
 
+    it("rejects non-HTTPS archive URLs rather than issuing public guest links", async () => {
+      for (const signedArchiveUrl of [
+        "javascript:alert(1)",
+        "data:text/plain,untrusted",
+        "http://storage.example.com/bundle.zip",
+        "https://user:secret@storage.example.com/bundle.zip",
+      ]) {
+        const response = await createDelivery(
+          new Request("https://boardreadyops.test/api/v2/deliveries", {
+            method: "POST",
+            headers: { "content-type": "application/json", origin: "https://boardreadyops.test" },
+            body: JSON.stringify({ revisionId: "rev_001", signedArchiveUrl }),
+          }),
+        );
+        expect(response.status).toBe(400);
+      }
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
     it("retrieves delivery by token", async () => {
       mockQuery.mockResolvedValueOnce({
         rows: [
