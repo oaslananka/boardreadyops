@@ -44,16 +44,17 @@ export async function revokeManufacturingShare(
   revisionId: string,
   principal: ManufacturingSharePrincipal,
 ): Promise<boolean> {
-  if (!Number.isSafeInteger(principal.githubUserId) || principal.githubUserId <= 0) return false;
+  if (!Number.isSafeInteger(principal.githubUserId) || principal.githubUserId <= 0 || !principal.login) return false;
   const result = (await executor.query(
     [
-      "update manufacturing_share_authorizations as share set revoked_at = now()",
+      "update manufacturing_share_authorizations as share set revoked_at = now(),",
+      "revoked_by_github_user_id = $2, revoked_by_login = $3",
       "from workspace_members as member",
       "where share.revision_id = $1 and share.workspace_id = member.workspace_id",
       "and member.github_user_id = $2 and member.role in ('owner','admin')",
       "and share.revoked_at is null returning share.revision_id",
     ].join(" "),
-    [revisionId, principal.githubUserId],
+    [revisionId, principal.githubUserId, principal.login],
   )) as { rows?: unknown[] };
   return (result.rows?.length ?? 0) === 1;
 }

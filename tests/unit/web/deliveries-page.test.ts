@@ -146,6 +146,7 @@ describe("DeliveriesListPage", () => {
       state: "ok",
       workspaces: [workspace],
       selected: workspace,
+      authorizedRevisionIds: ["rev_a"],
       revisionCandidates: [],
       revisions: [{ id: "rev_a", projectName: "Gateway board", revisionLabel: "rev C" }],
       deliveries: [
@@ -168,6 +169,31 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("gateway.zip");
     expect(markup).toContain("Panelised, 2oz copper");
     expect(markup).toContain("Live");
+  });
+
+  it("does not show an unexpired delivery as Live after sharing authorization is revoked", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      authorizedRevisionIds: [],
+      revisionCandidates: [],
+      revisions: [],
+      deliveries: [
+        {
+          id: "del_revoked",
+          revisionId: "rev_revoked",
+          revisionLabel: "rev D",
+          projectId: "prj_revoked",
+          projectName: "Gateway board",
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          createdAt: "2026-10-20T00:00:00.000Z",
+        },
+      ],
+    });
+    const markup = await render();
+    expect(markup).toContain("Sharing not authorized");
+    expect(markup).not.toContain(">Live<");
   });
 
   it("renders first-party artifact status for deliveries without a legacy external URL", async () => {

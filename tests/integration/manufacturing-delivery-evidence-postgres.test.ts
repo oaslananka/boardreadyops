@@ -214,5 +214,24 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     ).rejects.toThrow("Failed to insert delivery");
     await executor.query("update deliveries set expires_at = now() - interval '1 second' where id = $1", [delivery.id]);
     expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(410);
+    const beforeDeletion = (await executor.query(
+      "select revoked_by_github_user_id, revoked_by_login, artifact_id from manufacturing_share_authorizations where revision_id = $1",
+      [revision?.id],
+    )) as { rows: Array<{ revoked_by_github_user_id: string; revoked_by_login: string; artifact_id: string }> };
+    expect(beforeDeletion.rows[0]).toMatchObject({
+      revoked_by_github_user_id: "4711",
+      revoked_by_login: "fixture-owner",
+      artifact_id: artifactId,
+    });
+    // Artifact retirement must not erase the owner authorization/revocation audit.
+    await executor.query("delete from artifacts where id = $1", [artifactId]);
+    const afterDeletion = (await executor.query(
+      "select artifact_id, revoked_at, revoked_by_login from manufacturing_share_authorizations where revision_id = $1",
+      [revision?.id],
+    )) as { rows: Array<{ artifact_id: string | null; revoked_at: Date | null; revoked_by_login: string }> };
+    expect(afterDeletion.rows[0]?.artifact_id).toBeNull();
+    expect(afterDeletion.rows[0]?.revoked_at).not.toBeNull();
+    expect(afterDeletion.rows[0]?.revoked_by_login).toBe("fixture-owner");
+    expect(await lookupGuestManufacturingArtifact(rawToken, executor)).toBeNull();
   });
 });

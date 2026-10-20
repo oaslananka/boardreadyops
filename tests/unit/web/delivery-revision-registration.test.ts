@@ -177,6 +177,7 @@ describe("validated delivery revision actions", () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining("update manufacturing_share_authorizations"), [
       "rev-1",
       4711,
+      "owner-person",
     ]);
   });
 

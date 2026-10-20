@@ -93,7 +93,10 @@ function revisionColumns(): readonly DataColumn<WorkspaceRevisionRecord>[] {
   ];
 }
 
-function deliveryColumns(canRevoke: boolean): readonly DataColumn<WorkspaceDeliveryRecord>[] {
+function deliveryColumns(
+  canRevoke: boolean,
+  authorizedRevisionIds: readonly string[],
+): readonly DataColumn<WorkspaceDeliveryRecord>[] {
   return [
     {
       id: "revision",
@@ -112,6 +115,8 @@ function deliveryColumns(canRevoke: boolean): readonly DataColumn<WorkspaceDeliv
       cell: (delivery) =>
         deliveryExpired(delivery) ? (
           <StatusBadge value="neutral" label="Expired" />
+        ) : !authorizedRevisionIds.includes(delivery.revisionId) ? (
+          <StatusBadge value="warning" label="Sharing not authorized" />
         ) : (
           <StatusBadge value="success" label="Live" />
         ),
@@ -259,7 +264,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
             <Panel title={result.selected.name} description="Newest first. An expired link stops working on its own.">
               <DataTable
                 caption={`Guest delivery links in ${result.selected.name}`}
-                columns={deliveryColumns(result.selected.role !== "viewer")}
+                columns={deliveryColumns(result.selected.role !== "viewer", result.authorizedRevisionIds ?? [])}
                 rows={result.deliveries}
                 rowKey={(delivery) => delivery.id}
                 empty={
