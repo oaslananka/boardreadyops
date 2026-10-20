@@ -42,7 +42,6 @@ describe("explicit runner manufacturing draft upload", () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "bro-runner-manufacturing-"));
     try {
       await cp(path.resolve("tests/fixtures/projects/safe-basic"), root, { recursive: true });
-      await writeFile(path.join(root, ".gitignore"), ".boardreadyops-runner/\nbuild/\n");
       execFileSync("git", ["init", "--quiet"], { cwd: root });
       execFileSync("git", ["add", "."], { cwd: root });
       execFileSync(
@@ -71,6 +70,12 @@ describe("explicit runner manufacturing draft upload", () => {
       expect(createHash("sha256").update(bytes).digest("hex")).toBe(archives[0]?.sha256);
       // A non-approving draft cannot satisfy the DB's exact role=manufacturing gate.
       expect(archives[0]?.role).not.toBe("manufacturing");
+      // A customer checkout does not need a tracked .gitignore for generated files,
+      // but genuinely new untracked files must remain visible to source checks.
+      await writeFile(path.join(root, "untracked-customer-file.txt"), "not part of the reviewed commit");
+      await expect(prepareRunnerManufacturingDraft(root, fakeJob(sha), { requireKicad: true })).rejects.toThrow(
+        /clean Git checkout/,
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
