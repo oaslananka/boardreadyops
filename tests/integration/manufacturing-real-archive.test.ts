@@ -7,8 +7,76 @@ import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { releaseArchiveCommand } from "../../src/cli/commands/manufacturing-archive.js";
 import { detectKicadCli } from "../../src/kicad/cli.js";
-import { createKicadCliRunner, runGenerate } from "../../src/release/generate.js";
+import { createKicadCliRunner, type GenerateResult, runGenerate } from "../../src/release/generate.js";
 import { createVerifiedManufacturingZip } from "../../src/release/manufacturing-archive.js";
+
+async function verifyRejectedArchiveCases(root: string, generated: GenerateResult, sourceCommitSha: string) {
+  await expect(
+    createVerifiedManufacturingZip({
+      root,
+      generated,
+      sourceCommitSha: "f".repeat(40),
+      destination: path.join(root, "build", "wrong-sha.zip"),
+    }),
+  ).rejects.toThrow(/proof|source|commit/u);
+
+  const gerbers = generated.artifacts.filter((item) => item.kind === "gerber");
+  const first = gerbers[0];
+  const second = gerbers[1];
+  if (!first || !second) throw new Error("Real output did not generate multiple Gerber layers");
+  const duplicatedOutput = {
+    ...generated,
+    artifacts: generated.artifacts.map((item) => (item.path === second.path ? first : item)),
+  };
+  await expect(
+    createVerifiedManufacturingZip({
+      root,
+      generated: duplicatedOutput,
+      sourceCommitSha,
+      destination: path.join(root, "build", "duplicated-output.zip"),
+    }),
+  ).rejects.toThrow("inventory differs from verified proof");
+
+  const missingDrill = {
+    ...generated,
+    artifacts: generated.artifacts.filter((artifact) => artifact.kind !== "drill"),
+  };
+  await expect(
+    createVerifiedManufacturingZip({
+      root,
+      generated: missingDrill,
+      sourceCommitSha,
+      destination: path.join(root, "build", "missing-drill.zip"),
+    }),
+  ).rejects.toThrow("requires generated Gerber and Excellon drill files");
+
+  const drill = generated.artifacts.find((artifact) => artifact.kind === "drill");
+  if (!drill) throw new Error("Real Excellon output was not generated");
+  const drillFile = path.join(generated.outputDir, drill.path);
+  const drillContents = await fs.readFile(drillFile);
+  await fs.rm(drillFile);
+  await expect(
+    createVerifiedManufacturingZip({
+      root,
+      generated,
+      sourceCommitSha,
+      destination: path.join(root, "build", "removed-drill.zip"),
+    }),
+  ).rejects.toThrow("Manufacturing export proof");
+  await fs.writeFile(drillFile, drillContents);
+
+  const original = generated.artifacts.find((artifact) => artifact.kind === "gerber");
+  if (!original) throw new Error("Real Gerber export was not generated");
+  await fs.appendFile(path.join(generated.outputDir, original.path), "\nG04 CHANGED*\n");
+  await expect(
+    createVerifiedManufacturingZip({
+      root,
+      generated,
+      sourceCommitSha,
+      destination: path.join(root, "build", "tampered.zip"),
+    }),
+  ).rejects.toThrow(/proof|byte|inventory/u);
+}
 
 describe("real KiCad manufacturing ZIP (local proof; not a signed release)", () => {
   it("packages actual Gerber/Excellon bytes bound to one source commit, rejecting modified exports", async (context) => {
@@ -73,71 +141,7 @@ describe("real KiCad manufacturing ZIP (local proof; not a signed release)", () 
       const cliZip = await fs.readFile(path.join(root, "build", "cli-manufacturing.zip"));
       expect(cliZip.subarray(0, 2).toString()).toBe("PK");
 
-      await expect(
-        createVerifiedManufacturingZip({
-          root,
-          generated,
-          sourceCommitSha: "f".repeat(40),
-          destination: path.join(root, "build", "wrong-sha.zip"),
-        }),
-      ).rejects.toThrow(/proof|source|commit/u);
-
-      const gerbers = generated.artifacts.filter((item) => item.kind === "gerber");
-      const first = gerbers[0];
-      const second = gerbers[1];
-      if (!first || !second) throw new Error("Real output did not generate multiple Gerber layers");
-      const duplicatedOutput = {
-        ...generated,
-        artifacts: generated.artifacts.map((item) => (item.path === second.path ? first : item)),
-      };
-      await expect(
-        createVerifiedManufacturingZip({
-          root,
-          generated: duplicatedOutput,
-          sourceCommitSha,
-          destination: path.join(root, "build", "duplicated-output.zip"),
-        }),
-      ).rejects.toThrow("inventory differs from verified proof");
-
-      const missingDrill = {
-        ...generated,
-        artifacts: generated.artifacts.filter((artifact) => artifact.kind !== "drill"),
-      };
-      await expect(
-        createVerifiedManufacturingZip({
-          root,
-          generated: missingDrill,
-          sourceCommitSha,
-          destination: path.join(root, "build", "missing-drill.zip"),
-        }),
-      ).rejects.toThrow("requires generated Gerber and Excellon drill files");
-
-      const drill = generated.artifacts.find((artifact) => artifact.kind === "drill");
-      if (!drill) throw new Error("Real Excellon output was not generated");
-      const drillFile = path.join(generated.outputDir, drill.path);
-      const drillContents = await fs.readFile(drillFile);
-      await fs.rm(drillFile);
-      await expect(
-        createVerifiedManufacturingZip({
-          root,
-          generated,
-          sourceCommitSha,
-          destination: path.join(root, "build", "removed-drill.zip"),
-        }),
-      ).rejects.toThrow("Manufacturing export proof");
-      await fs.writeFile(drillFile, drillContents);
-
-      const original = generated.artifacts.find((artifact) => artifact.kind === "gerber");
-      if (!original) throw new Error("Real Gerber export was not generated");
-      await fs.appendFile(path.join(generated.outputDir, original.path), "\nG04 CHANGED*\n");
-      await expect(
-        createVerifiedManufacturingZip({
-          root,
-          generated,
-          sourceCommitSha,
-          destination: path.join(root, "build", "tampered.zip"),
-        }),
-      ).rejects.toThrow(/proof|byte|inventory/u);
+      await verifyRejectedArchiveCases(root, generated, sourceCommitSha);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
