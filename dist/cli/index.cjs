@@ -58727,14 +58727,15 @@ async function createManufacturingDraftReceiptArtifact(input) {
       runnerId: input.runnerId,
       runId: job.runId,
       executionAttemptId: job.executionAttemptId,
-      repository: job.repository.owner + "/" + job.repository.name,
+      repository: `${job.repository.owner}/${job.repository.name}`,
       sourceCommitSha: job.repository.commitSha,
       archiveSha256: archive.sha256,
       archiveBytes: archive.bytes
     },
     input.privateKey
   );
-  const content = Buffer.from(JSON.stringify(receipt) + "\n", "utf8");
+  const content = Buffer.from(`${JSON.stringify(receipt)}
+`, "utf8");
   const filePath = import_node_path78.default.join(import_node_path78.default.dirname(archivePath), "manufacturing-draft-receipt.json");
   await (0, import_promises35.writeFile)(filePath, content, { flag: "wx", mode: 384 });
   return {

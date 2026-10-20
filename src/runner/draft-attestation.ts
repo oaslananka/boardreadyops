@@ -121,14 +121,14 @@ export async function createManufacturingDraftReceiptArtifact(input: {
       runnerId: input.runnerId,
       runId: job.runId,
       executionAttemptId: job.executionAttemptId,
-      repository: job.repository.owner + "/" + job.repository.name,
+      repository: `${job.repository.owner}/${job.repository.name}`,
       sourceCommitSha: job.repository.commitSha,
       archiveSha256: archive.sha256,
       archiveBytes: archive.bytes,
     },
     input.privateKey,
   );
-  const content = Buffer.from(JSON.stringify(receipt) + "\n", "utf8");
+  const content = Buffer.from(`${JSON.stringify(receipt)}\n`, "utf8");
   const filePath = path.join(path.dirname(archivePath), "manufacturing-draft-receipt.json");
   await writeFile(filePath, content, { flag: "wx", mode: 0o600 });
   return {
