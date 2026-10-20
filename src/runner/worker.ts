@@ -12,6 +12,7 @@ import {
 } from "../../packages/contracts/src/index.js";
 import { loadRunnerPrivateKey, RunnerControlPlaneClient } from "./client.js";
 import { persistCustomerRunnerArtifacts } from "./customer-artifacts.js";
+import { createManufacturingDraftReceiptArtifact } from "./draft-attestation.js";
 import { type LoadedRunnerIdentity, loadRunnerIdentity } from "./identity.js";
 import { checkoutRunnerSource } from "./source.js";
 
@@ -214,6 +215,32 @@ export async function runRunnerWorkerOnce(
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
+
+    // A detached runner claim, NOT a fabricated-goods approval.
+    const drafts = execution.artifacts.filter(
+      (artifact) => artifact.kind === "archive" && artifact.role === "draft-manufacturing",
+    );
+    if (drafts.length > 0) {
+      if (
+        !options.manufacturingDraftUpload ||
+        execution.exitCode !== 0 ||
+        execution.report?.readiness?.status !== "ready" ||
+        drafts.length !== 1
+      ) {
+        throw new Error("draft receipt requires one explicitly enabled, passing KiCad readiness result");
+      }
+      const draft = drafts[0];
+      if (!draft) throw new Error("draft archive was not found");
+      execution.artifacts.push(
+        await createManufacturingDraftReceiptArtifact({
+          workspace,
+          job,
+          runnerId: identity.runnerId,
+          privateKey,
+          archive: draft,
+        }),
+      );
+    }
 
     const artifactMode = options.artifactMode ?? "control-plane";
     const customerStored =

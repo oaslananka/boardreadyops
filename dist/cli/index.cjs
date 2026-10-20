@@ -677,11 +677,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants3);
+          this.rhs = optimizeExpr(this.rhs, names, constants4);
         return this;
       }
       get names() {
@@ -698,10 +698,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants3);
+        this.rhs = optimizeExpr(this.rhs, names, constants4);
         return this;
       }
       get names() {
@@ -762,8 +762,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants3) {
-        this.code = optimizeExpr(this.code, names, constants3);
+      optimizeNames(names, constants4) {
+        this.code = optimizeExpr(this.code, names, constants4);
         return this;
       }
       get names() {
@@ -792,12 +792,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants3))
+          if (n.optimizeNames(names, constants4))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -850,12 +850,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         var _a3;
-        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants3);
-        if (!(super.optimizeNames(names, constants3) || this.else))
+        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants4);
+        if (!(super.optimizeNames(names, constants4) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants3);
+        this.condition = optimizeExpr(this.condition, names, constants4);
         return this;
       }
       get names() {
@@ -878,10 +878,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants3) {
-        if (!super.optimizeNames(names, constants3))
+      optimizeNames(names, constants4) {
+        if (!super.optimizeNames(names, constants4))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants3);
+        this.iteration = optimizeExpr(this.iteration, names, constants4);
         return this;
       }
       get names() {
@@ -917,10 +917,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants3) {
-        if (!super.optimizeNames(names, constants3))
+      optimizeNames(names, constants4) {
+        if (!super.optimizeNames(names, constants4))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants3);
+        this.iterable = optimizeExpr(this.iterable, names, constants4);
         return this;
       }
       get names() {
@@ -962,11 +962,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         var _a3, _b;
-        super.optimizeNames(names, constants3);
-        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants3);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants3);
+        super.optimizeNames(names, constants4);
+        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants4);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants4);
         return this;
       }
       get names() {
@@ -1267,7 +1267,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants3) {
+    function optimizeExpr(expr, names, constants4) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1282,14 +1282,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants3[n.str];
+        const c = constants4[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants3[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants4[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -3529,8 +3529,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path84) {
-      let input = path84;
+    function removeDotSegments(path85) {
+      let input = path85;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3939,8 +3939,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path84 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path84 && path84 !== "/" ? path84 : void 0;
+        const path85 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path85 && path85 !== "/" ? path85 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -8294,7 +8294,7 @@ var require_dist = __commonJS({
 var require_resolve_from = __commonJS({
   "node_modules/resolve-from/index.js"(exports2, module2) {
     "use strict";
-    var path84 = require("path");
+    var path85 = require("path");
     var Module = require("module");
     var fs32 = require("fs");
     var resolveFrom = (fromDir, moduleId, silent) => {
@@ -8308,14 +8308,14 @@ var require_resolve_from = __commonJS({
         fromDir = fs32.realpathSync(fromDir);
       } catch (err) {
         if (err.code === "ENOENT") {
-          fromDir = path84.resolve(fromDir);
+          fromDir = path85.resolve(fromDir);
         } else if (silent) {
           return null;
         } else {
           throw err;
         }
       }
-      const fromFile = path84.join(fromDir, "noop.js");
+      const fromFile = path85.join(fromDir, "noop.js");
       const resolveFileName = () => Module._resolveFilename(moduleId, {
         id: fromFile,
         filename: fromFile,
@@ -8387,7 +8387,7 @@ var require_parent_module = __commonJS({
 var require_import_fresh = __commonJS({
   "node_modules/import-fresh/index.js"(exports2, module2) {
     "use strict";
-    var path84 = require("path");
+    var path85 = require("path");
     var resolveFrom = require_resolve_from();
     var parentModule = require_parent_module();
     module2.exports = (moduleId) => {
@@ -8395,7 +8395,7 @@ var require_import_fresh = __commonJS({
         throw new TypeError("Expected a string");
       }
       const parentPath = parentModule(__filename);
-      const cwd = parentPath ? path84.dirname(parentPath) : __dirname;
+      const cwd = parentPath ? path85.dirname(parentPath) : __dirname;
       const filePath = resolveFrom(cwd, moduleId);
       const oldModule = require.cache[filePath];
       if (oldModule && oldModule.parent) {
@@ -8705,9 +8705,9 @@ var require_picocolors = __commonJS({
     var argv = p.argv || [];
     var env = p.env || {};
     var isColorSupported = !(!!env.NO_COLOR || argv.includes("--no-color")) && (!!env.FORCE_COLOR || argv.includes("--color") || p.platform === "win32" || (p.stdout || {}).isTTY && env.TERM !== "dumb" || !!env.CI);
-    var formatter = (open3, close, replace = open3) => (input) => {
-      let string4 = "" + input, index = string4.indexOf(close, open3.length);
-      return ~index ? open3 + replaceClose(string4, close, replace, index) + close : open3 + string4 + close;
+    var formatter = (open4, close, replace = open4) => (input) => {
+      let string4 = "" + input, index = string4.indexOf(close, open4.length);
+      return ~index ? open4 + replaceClose(string4, close, replace, index) + close : open4 + string4 + close;
     };
     var replaceClose = (string4, close, replace, index) => {
       let result = "", cursor = 0;
@@ -9746,20 +9746,20 @@ var require_int = __commonJS({
     }
     function parseYamlInteger2(data) {
       let value = data;
-      let sign = 1;
+      let sign2 = 1;
       let ch = value[0];
       if (ch === "-" || ch === "+") {
-        if (ch === "-") sign = -1;
+        if (ch === "-") sign2 = -1;
         value = value.slice(1);
         ch = value[0];
       }
       if (value === "0") return 0;
       if (ch === "0") {
-        if (value[1] === "b") return sign * parseInt(value.slice(2), 2);
-        if (value[1] === "x") return sign * parseInt(value.slice(2), 16);
-        if (value[1] === "o") return sign * parseInt(value.slice(2), 8);
+        if (value[1] === "b") return sign2 * parseInt(value.slice(2), 2);
+        if (value[1] === "x") return sign2 * parseInt(value.slice(2), 16);
+        if (value[1] === "o") return sign2 * parseInt(value.slice(2), 8);
       }
-      return sign * parseInt(value, 10);
+      return sign2 * parseInt(value, 10);
     }
     function constructYamlInteger(data) {
       return parseYamlInteger2(data);
@@ -9822,16 +9822,16 @@ var require_float = __commonJS({
     }
     function constructYamlFloat(data) {
       let value = data.toLowerCase();
-      const sign = value[0] === "-" ? -1 : 1;
+      const sign2 = value[0] === "-" ? -1 : 1;
       if ("+-".indexOf(value[0]) >= 0) {
         value = value.slice(1);
       }
       if (value === ".inf") {
-        return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+        return sign2 === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
       } else if (value === ".nan") {
         return NaN;
       }
-      return sign * parseFloat(value, 10);
+      return sign2 * parseFloat(value, 10);
     }
     var SCIENTIFIC_WITHOUT_DOT = /^[-+]?[0-9]+e/;
     function representYamlFloat2(object2, style) {
@@ -12403,7 +12403,7 @@ ${error51.message}`;
         return typescript.sys.fileExists(fileName);
       });
       if (filePath !== void 0) {
-        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path84) => typescript.sys.readFile(path84));
+        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path85) => typescript.sys.readFile(path85));
         if (error51) {
           throw new Error(`Error in ${filePath}: ${error51.messageText.toString()}`);
         }
@@ -12526,42 +12526,42 @@ var require_defaults2 = __commonJS({
 var require_env_paths = __commonJS({
   "node_modules/env-paths/index.js"(exports2, module2) {
     "use strict";
-    var path84 = require("path");
+    var path85 = require("path");
     var os8 = require("os");
     var homedir = os8.homedir();
     var tmpdir = os8.tmpdir();
     var { env } = process;
     var macos = (name) => {
-      const library = path84.join(homedir, "Library");
+      const library = path85.join(homedir, "Library");
       return {
-        data: path84.join(library, "Application Support", name),
-        config: path84.join(library, "Preferences", name),
-        cache: path84.join(library, "Caches", name),
-        log: path84.join(library, "Logs", name),
-        temp: path84.join(tmpdir, name)
+        data: path85.join(library, "Application Support", name),
+        config: path85.join(library, "Preferences", name),
+        cache: path85.join(library, "Caches", name),
+        log: path85.join(library, "Logs", name),
+        temp: path85.join(tmpdir, name)
       };
     };
     var windows = (name) => {
-      const appData = env.APPDATA || path84.join(homedir, "AppData", "Roaming");
-      const localAppData = env.LOCALAPPDATA || path84.join(homedir, "AppData", "Local");
+      const appData = env.APPDATA || path85.join(homedir, "AppData", "Roaming");
+      const localAppData = env.LOCALAPPDATA || path85.join(homedir, "AppData", "Local");
       return {
         // Data/config/cache/log are invented by me as Windows isn't opinionated about this
-        data: path84.join(localAppData, name, "Data"),
-        config: path84.join(appData, name, "Config"),
-        cache: path84.join(localAppData, name, "Cache"),
-        log: path84.join(localAppData, name, "Log"),
-        temp: path84.join(tmpdir, name)
+        data: path85.join(localAppData, name, "Data"),
+        config: path85.join(appData, name, "Config"),
+        cache: path85.join(localAppData, name, "Cache"),
+        log: path85.join(localAppData, name, "Log"),
+        temp: path85.join(tmpdir, name)
       };
     };
     var linux = (name) => {
-      const username = path84.basename(homedir);
+      const username = path85.basename(homedir);
       return {
-        data: path84.join(env.XDG_DATA_HOME || path84.join(homedir, ".local", "share"), name),
-        config: path84.join(env.XDG_CONFIG_HOME || path84.join(homedir, ".config"), name),
-        cache: path84.join(env.XDG_CACHE_HOME || path84.join(homedir, ".cache"), name),
+        data: path85.join(env.XDG_DATA_HOME || path85.join(homedir, ".local", "share"), name),
+        config: path85.join(env.XDG_CONFIG_HOME || path85.join(homedir, ".config"), name),
+        cache: path85.join(env.XDG_CACHE_HOME || path85.join(homedir, ".cache"), name),
         // https://wiki.debian.org/XDGBaseDirectorySpecification#state
-        log: path84.join(env.XDG_STATE_HOME || path84.join(homedir, ".local", "state"), name),
-        temp: path84.join(tmpdir, username, name)
+        log: path85.join(env.XDG_STATE_HOME || path85.join(homedir, ".local", "state"), name),
+        temp: path85.join(tmpdir, username, name)
       };
     };
     var envPaths = (name, options) => {
@@ -12642,11 +12642,11 @@ var require_util2 = __commonJS({
       map2.set(key, result);
       return result;
     }
-    function getPropertyByPath(source, path84) {
-      if (typeof path84 === "string" && Object.prototype.hasOwnProperty.call(source, path84)) {
-        return source[path84];
+    function getPropertyByPath(source, path85) {
+      if (typeof path85 === "string" && Object.prototype.hasOwnProperty.call(source, path85)) {
+        return source[path85];
       }
-      const parsedPath = typeof path84 === "string" ? path84.split(".") : path84;
+      const parsedPath = typeof path85 === "string" ? path85.split(".") : path85;
       return parsedPath.reduce((previous, key) => {
         if (previous === void 0) {
           return previous;
@@ -12657,9 +12657,9 @@ var require_util2 = __commonJS({
     function removeUndefinedValuesFromObject(options) {
       return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== void 0));
     }
-    async function isDirectory(path84) {
+    async function isDirectory(path85) {
       try {
-        const stat3 = await fs_1.promises.stat(path84);
+        const stat3 = await fs_1.promises.stat(path85);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -12668,9 +12668,9 @@ var require_util2 = __commonJS({
         throw e;
       }
     }
-    function isDirectorySync(path84) {
+    function isDirectorySync(path85) {
       try {
-        const stat3 = fs_1.default.statSync(path84);
+        const stat3 = fs_1.default.statSync(path85);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -12768,7 +12768,7 @@ var require_ExplorerBase = __commonJS({
           const idx = importStack.indexOf(fullPath);
           if (idx !== -1) {
             throw new Error(`Circular import detected:
-${[...importStack, fullPath].map((path84, i) => `${i + 1}. ${path84}`).join("\n")} (same as ${idx + 1}.)`);
+${[...importStack, fullPath].map((path85, i) => `${i + 1}. ${path85}`).join("\n")} (same as ${idx + 1}.)`);
           }
         }
       }
@@ -12955,9 +12955,9 @@ var require_Explorer = __commonJS({
           throw error51;
         }
       }
-      async #fileExists(path84) {
+      async #fileExists(path85) {
         try {
-          await promises_1.default.stat(path84);
+          await promises_1.default.stat(path85);
           return true;
         } catch (e) {
           return false;
@@ -13117,9 +13117,9 @@ var require_ExplorerSync = __commonJS({
           throw error51;
         }
       }
-      #fileExists(path84) {
+      #fileExists(path85) {
         try {
-          fs_1.default.statSync(path84);
+          fs_1.default.statSync(path85);
           return true;
         } catch (e) {
           return false;
@@ -13245,7 +13245,7 @@ var require_dist2 = __commonJS({
       };
     }
     function getResolvedSearchPlaces(moduleName, toolDefinedSearchPlaces, userConfiguredOptions) {
-      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path84) => path84.replace("{name}", moduleName));
+      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path85) => path85.replace("{name}", moduleName));
       if (userConfiguredOptions.mergeSearchPlaces) {
         return [...userConfiguredSearchPlaces ?? [], ...toolDefinedSearchPlaces];
       }
@@ -13656,8 +13656,8 @@ var require_utils2 = __commonJS({
       }
       return output;
     };
-    exports2.basename = (path84, { windows } = {}) => {
-      const segs = path84.split(windows ? /[\\/]/ : "/");
+    exports2.basename = (path85, { windows } = {}) => {
+      const segs = path85.split(windows ? /[\\/]/ : "/");
       const last = segs[segs.length - 1];
       if (last === "") {
         return segs[segs.length - 2];
@@ -14009,7 +14009,7 @@ var require_scan = __commonJS({
 var require_parse = __commonJS({
   "node_modules/picomatch/lib/parse.js"(exports2, module2) {
     "use strict";
-    var constants3 = require_constants();
+    var constants4 = require_constants();
     var utils = require_utils2();
     var {
       MAX_LENGTH,
@@ -14017,7 +14017,7 @@ var require_parse = __commonJS({
       REGEX_NON_SPECIAL_CHARS,
       REGEX_SPECIAL_CHARS_BACKREF,
       REPLACEMENTS
-    } = constants3;
+    } = constants4;
     var expandRange = (args, options) => {
       if (typeof options.expandRange === "function") {
         return options.expandRange(...args, options);
@@ -14226,7 +14226,7 @@ var require_parse = __commonJS({
       if (options.maxExtglobRecursion === false) {
         return { risky: false };
       }
-      const max = typeof options.maxExtglobRecursion === "number" ? options.maxExtglobRecursion : constants3.DEFAULT_MAX_EXTGLOB_RECURSION;
+      const max = typeof options.maxExtglobRecursion === "number" ? options.maxExtglobRecursion : constants4.DEFAULT_MAX_EXTGLOB_RECURSION;
       const branches = splitTopLevel(body).map((branch) => branch.trim());
       if (branches.length > 1) {
         if (branches.some((branch) => branch === "") || branches.some((branch) => /^[*?]+$/.test(branch)) || hasRepeatedCharPrefixOverlap(branches)) {
@@ -14272,8 +14272,8 @@ var require_parse = __commonJS({
       const bos = { type: "bos", value: "", output: opts.prepend || "" };
       const tokens = [bos];
       const capture = opts.capture ? "" : "?:";
-      const PLATFORM_CHARS = constants3.globChars(opts.windows);
-      const EXTGLOB_CHARS = constants3.extglobChars(PLATFORM_CHARS);
+      const PLATFORM_CHARS = constants4.globChars(opts.windows);
+      const EXTGLOB_CHARS = constants4.extglobChars(PLATFORM_CHARS);
       const {
         DOT_LITERAL,
         PLUS_LITERAL,
@@ -14402,16 +14402,16 @@ var require_parse = __commonJS({
         const analysis = analyzeRepeatedExtglob(body, opts);
         if ((token.type === "plus" || token.type === "star") && analysis.risky) {
           const safeOutput = analysis.safeOutput ? (token.output ? "" : ONE_CHAR) + (opts.capture ? `(${analysis.safeOutput})` : analysis.safeOutput) : void 0;
-          const open3 = tokens[token.tokensIndex];
-          open3.type = "text";
-          open3.value = literal2;
-          open3.output = safeOutput || utils.escapeRegex(literal2);
+          const open4 = tokens[token.tokensIndex];
+          open4.type = "text";
+          open4.value = literal2;
+          open4.output = safeOutput || utils.escapeRegex(literal2);
           for (let i = token.tokensIndex + 1; i < tokens.length; i++) {
             tokens[i].value = "";
             tokens[i].output = "";
             delete tokens[i].suffix;
           }
-          state.output = token.output + open3.output;
+          state.output = token.output + open4.output;
           state.backtrack = true;
           push2({ type: "paren", extglob: true, value, output: "" });
           decrement("parens");
@@ -14631,15 +14631,15 @@ var require_parse = __commonJS({
         }
         if (value === "{" && opts.nobrace !== true) {
           increment("braces");
-          const open3 = {
+          const open4 = {
             type: "brace",
             value,
             output: "(",
             outputIndex: state.output.length,
             tokensIndex: state.tokens.length
           };
-          braces.push(open3);
-          push2(open3);
+          braces.push(open4);
+          push2(open4);
           continue;
         }
         if (value === "}") {
@@ -14969,7 +14969,7 @@ var require_parse = __commonJS({
         NO_DOTS_SLASH,
         STAR,
         START_ANCHOR
-      } = constants3.globChars(opts.windows);
+      } = constants4.globChars(opts.windows);
       const nodot = opts.dot ? NO_DOTS : NO_DOT;
       const slashDot = opts.dot ? NO_DOTS_SLASH : NO_DOT;
       const capture = opts.capture ? "" : "?:";
@@ -15027,7 +15027,7 @@ var require_picomatch = __commonJS({
     var scan2 = require_scan();
     var parse5 = require_parse();
     var utils = require_utils2();
-    var constants3 = require_constants();
+    var constants4 = require_constants();
     var isObject2 = (val) => val && typeof val === "object" && !Array.isArray(val);
     var picomatch2 = (glob, options, returnState = false) => {
       if (Array.isArray(glob)) {
@@ -15155,7 +15155,7 @@ var require_picomatch = __commonJS({
         return /$^/;
       }
     };
-    picomatch2.constants = constants3;
+    picomatch2.constants = constants4;
     module2.exports = picomatch2;
   }
 });
@@ -15424,10 +15424,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path84) {
-  if (!path84)
+function getElementAtPath(obj, path85) {
+  if (!path85)
     return obj;
-  return path84.reduce((acc, key) => acc?.[key], obj);
+  return path85.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -15755,11 +15755,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path84, issues) {
+function prefixIssues(path85, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path84);
+    iss.path.unshift(path85);
     return iss;
   });
 }
@@ -15976,16 +15976,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError2(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path84 = []) => {
+  const processError = (error52, path85 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path84, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path85, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path84, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path85, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path84, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path85, ...issue2.path]);
       } else {
-        const fullpath = [...path84, ...issue2.path];
+        const fullpath = [...path85, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -16012,17 +16012,17 @@ function formatError2(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path84 = []) => {
+  const processError = (error52, path85 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path84, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path85, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path84, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path85, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path84, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path85, ...issue2.path]);
       } else {
-        const fullpath = [...path84, ...issue2.path];
+        const fullpath = [...path85, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -16054,8 +16054,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path84 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path84) {
+  const path85 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path85) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -29485,13 +29485,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path84 = ref.slice(1).split("/").filter(Boolean);
-  if (path84.length === 0) {
+  const path85 = ref.slice(1).split("/").filter(Boolean);
+  if (path85.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path84[0] === defsKey) {
-    const key = path84[1];
+  if (path85[0] === defsKey) {
+    const key = path85[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -32984,7 +32984,7 @@ __export(index_exports, {
   runCli: () => runCli
 });
 module.exports = __toCommonJS(index_exports);
-var import_node_path85 = __toESM(require("node:path"), 1);
+var import_node_path86 = __toESM(require("node:path"), 1);
 
 // node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
@@ -36097,9 +36097,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [path]
    * @return {(string|null|Command)}
    */
-  executableDir(path84) {
-    if (path84 === void 0) return this._executableDir;
-    this._executableDir = path84;
+  executableDir(path85) {
+    if (path85 === void 0) return this._executableDir;
+    this._executableDir = path85;
     return this;
   }
   /**
@@ -36671,15 +36671,15 @@ var YAML_INTEGER_IMPLICIT_PATTERN$1 = /* @__PURE__ */ new RegExp("^(?:0o[0-7]+|0
 var YAML_INTEGER_EXPLICIT_PATTERN$1 = /* @__PURE__ */ new RegExp("^(?:[-+]?0b[0-1]+|[-+]?0o[0-7]+|[-+]?0x[0-9a-fA-F]+|[-+]?[0-9]+)$");
 function parseYamlInteger$2(source) {
   let value = source;
-  let sign = 1;
+  let sign2 = 1;
   if (value[0] === "-" || value[0] === "+") {
-    if (value[0] === "-") sign = -1;
+    if (value[0] === "-") sign2 = -1;
     value = value.slice(1);
   }
-  if (value.startsWith("0b")) return sign * parseInt(value.slice(2), 2);
-  if (value.startsWith("0o")) return sign * parseInt(value.slice(2), 8);
-  if (value.startsWith("0x")) return sign * parseInt(value.slice(2), 16);
-  return sign * parseInt(value, 10);
+  if (value.startsWith("0b")) return sign2 * parseInt(value.slice(2), 2);
+  if (value.startsWith("0o")) return sign2 * parseInt(value.slice(2), 8);
+  if (value.startsWith("0x")) return sign2 * parseInt(value.slice(2), 16);
+  return sign2 * parseInt(value, 10);
 }
 function resolveYamlInteger$2(source, isExplicit) {
   if (isExplicit) {
@@ -36703,15 +36703,15 @@ var YAML_INTEGER_IMPLICIT_PATTERN = /* @__PURE__ */ new RegExp("^-?(?:0|[1-9][0-
 var YAML_INTEGER_EXPLICIT_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?0b[0-1]+|[-+]?0o[0-7]+|[-+]?0x[0-9a-fA-F]+|[-+]?[0-9]+)$");
 function parseYamlInteger$1(source) {
   let value = source;
-  let sign = 1;
+  let sign2 = 1;
   if (value[0] === "-" || value[0] === "+") {
-    if (value[0] === "-") sign = -1;
+    if (value[0] === "-") sign2 = -1;
     value = value.slice(1);
   }
-  if (value.startsWith("0b")) return sign * parseInt(value.slice(2), 2);
-  if (value.startsWith("0o")) return sign * parseInt(value.slice(2), 8);
-  if (value.startsWith("0x")) return sign * parseInt(value.slice(2), 16);
-  return sign * parseInt(value, 10);
+  if (value.startsWith("0b")) return sign2 * parseInt(value.slice(2), 2);
+  if (value.startsWith("0o")) return sign2 * parseInt(value.slice(2), 8);
+  if (value.startsWith("0x")) return sign2 * parseInt(value.slice(2), 16);
+  return sign2 * parseInt(value, 10);
 }
 function resolveYamlInteger$1(source, isExplicit) {
   if (isExplicit) {
@@ -36730,20 +36730,20 @@ var intJsonTag = defineScalarTag("tag:yaml.org,2002:int", {
 var YAML_INTEGER_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?0x[0-9a-fA-F_]+|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+|[-+]?(?:0|[1-9][0-9_]*))$");
 function parseYamlInteger(source) {
   let value = source.replace(/_/g, "");
-  let sign = 1;
+  let sign2 = 1;
   if (value[0] === "-" || value[0] === "+") {
-    if (value[0] === "-") sign = -1;
+    if (value[0] === "-") sign2 = -1;
     value = value.slice(1);
   }
-  if (value.startsWith("0b")) return sign * parseInt(value.slice(2), 2);
-  if (value.startsWith("0x")) return sign * parseInt(value.slice(2), 16);
+  if (value.startsWith("0b")) return sign2 * parseInt(value.slice(2), 2);
+  if (value.startsWith("0x")) return sign2 * parseInt(value.slice(2), 16);
   if (value.includes(":")) {
     let result = 0;
     for (const part of value.split(":")) result = result * 60 + Number(part);
-    return sign * result;
+    return sign2 * result;
   }
-  if (value !== "0" && value[0] === "0") return sign * parseInt(value, 8);
-  return sign * parseInt(value, 10);
+  if (value !== "0" && value[0] === "0") return sign2 * parseInt(value, 8);
+  return sign2 * parseInt(value, 10);
 }
 function resolveYamlInteger(source) {
   if (!YAML_INTEGER_PATTERN.test(source)) return NOT_RESOLVED;
@@ -36766,11 +36766,11 @@ var YAML_FLOAT_SPECIAL_PATTERN$1 = /* @__PURE__ */ new RegExp("^(?:[-+]?\\.(?:in
 function resolveYamlFloat$2(source) {
   if (!YAML_FLOAT_PATTERN$1.test(source)) return NOT_RESOLVED;
   let value = source.toLowerCase();
-  const sign = value[0] === "-" ? -1 : 1;
+  const sign2 = value[0] === "-" ? -1 : 1;
   if ("+-".includes(value[0])) value = value.slice(1);
-  if (value === ".inf") return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+  if (value === ".inf") return sign2 === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
   if (value === ".nan") return NaN;
-  const result = sign * parseFloat(value);
+  const result = sign2 * parseFloat(value);
   if (Number.isFinite(result) || YAML_FLOAT_SPECIAL_PATTERN$1.test(source)) return result;
   return NOT_RESOLVED;
 }
@@ -36800,11 +36800,11 @@ function resolveYamlFloat$1(source, isExplicit) {
   if (isExplicit) {
     if (!YAML_FLOAT_EXPLICIT_PATTERN.test(source)) return NOT_RESOLVED;
     let value = source.toLowerCase();
-    const sign = value[0] === "-" ? -1 : 1;
+    const sign2 = value[0] === "-" ? -1 : 1;
     if ("+-".includes(value[0])) value = value.slice(1);
-    if (value === ".inf") return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+    if (value === ".inf") return sign2 === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
     if (value === ".nan") return NaN;
-    const result2 = sign * parseFloat(value);
+    const result2 = sign2 * parseFloat(value);
     return Number.isFinite(result2) ? result2 : NOT_RESOLVED;
   }
   if (!YAML_FLOAT_IMPLICIT_PATTERN.test(source)) return NOT_RESOLVED;
@@ -36832,15 +36832,15 @@ var YAML_FLOAT_SPECIAL_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?\\.(?:inf|
 function resolveYamlFloat(source) {
   if (!YAML_FLOAT_PATTERN.test(source)) return NOT_RESOLVED;
   let value = source.toLowerCase().replace(/_/g, "");
-  const sign = value[0] === "-" ? -1 : 1;
+  const sign2 = value[0] === "-" ? -1 : 1;
   if ("+-".includes(value[0])) value = value.slice(1);
-  if (value === ".inf") return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+  if (value === ".inf") return sign2 === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
   if (value === ".nan") return NaN;
   let result = 0;
   if (value.includes(":")) {
     for (const part of value.split(":")) result = result * 60 + Number(part);
-    result *= sign;
-  } else result = sign * parseFloat(value);
+    result *= sign2;
+  } else result = sign2 * parseFloat(value);
   if (Number.isFinite(result) || YAML_FLOAT_SPECIAL_PATTERN.test(source)) return result;
   return NOT_RESOLVED;
 }
@@ -43563,10 +43563,10 @@ function dependencyFrom(key, value, warnings) {
   const table = value;
   const versionSpec = stringField(table.version);
   const git = stringField(table.git);
-  const path84 = stringField(table.path);
+  const path85 = stringField(table.path);
   const overridePath = stringField(table.override_path);
   if (git) {
-    const subPath = path84;
+    const subPath = path85;
     return {
       declaredName: key,
       source: subPath === void 0 ? { kind: "git", url: git } : { kind: "git", url: git, path: subPath },
@@ -43578,8 +43578,8 @@ function dependencyFrom(key, value, warnings) {
     warnings.push(`Dependency "${key}" is overridden by local source at "${overridePath}".`);
     return { declaredName: key, source: { kind: "local", path: overridePath }, versionSpec, pinned: false };
   }
-  if (path84) {
-    return { declaredName: key, source: { kind: "local", path: path84 }, versionSpec, pinned: false };
+  if (path85) {
+    return { declaredName: key, source: { kind: "local", path: path85 }, versionSpec, pinned: false };
   }
   return {
     declaredName: key,
@@ -43588,7 +43588,7 @@ function dependencyFrom(key, value, warnings) {
     pinned: isPinned(versionSpec)
   };
 }
-function parseIdfManifest(content, path84) {
+function parseIdfManifest(content, path85) {
   const warnings = [];
   let document;
   try {
@@ -43597,12 +43597,12 @@ function parseIdfManifest(content, path84) {
     return {
       dependencies: [],
       warnings: [
-        `${path84 ?? "idf_component.yml"} is not valid YAML: ${error51 instanceof Error ? error51.message : "unknown"}`
+        `${path85 ?? "idf_component.yml"} is not valid YAML: ${error51 instanceof Error ? error51.message : "unknown"}`
       ]
     };
   }
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
-    return { dependencies: [], warnings: [`${path84 ?? "idf_component.yml"} does not contain a mapping.`] };
+    return { dependencies: [], warnings: [`${path85 ?? "idf_component.yml"} does not contain a mapping.`] };
   }
   const root = document;
   const raw = root.dependencies;
@@ -43617,7 +43617,7 @@ function parseIdfManifest(content, path84) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return {
       dependencies: [],
-      warnings: [`${path84 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
+      warnings: [`${path85 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
     };
   }
   const dependencies = [];
@@ -43962,8 +43962,8 @@ init_path();
 var assumedMetricFormat = { integerDigits: 3, decimalDigits: 3 };
 var assumedInchFormat = { integerDigits: 2, decimalDigits: 4 };
 var inchToMm = 25.4;
-function warning(code, message, path84) {
-  return path84 === void 0 ? { code, message } : { code, message, path: path84 };
+function warning(code, message, path85) {
+  return path85 === void 0 ? { code, message } : { code, message, path: path85 };
 }
 function attributeBody(line) {
   const match = /^;\s*#@!\s*(.+)$/u.exec(line.trim());
@@ -43988,7 +43988,7 @@ function coordinateValue(raw, format) {
   const parsed = Number.parseFloat(`${integerPart}.${decimalPart || "0"}`);
   return negative ? -parsed : parsed;
 }
-function parseHeaderLine(line, state, warnings, path84) {
+function parseHeaderLine(line, state, warnings, path85) {
   const trimmed = line.trim();
   const attribute = attributeBody(trimmed);
   if (attribute) {
@@ -44025,14 +44025,14 @@ function parseHeaderLine(line, state, warnings, path84) {
           state.decimalDigits = mask[2].length;
         } else if (modifier !== "000.000") {
           warnings.push(
-            warning("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path84)
+            warning("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path85)
           );
         }
       }
     }
   }
 }
-function parseExcellon(content, path84) {
+function parseExcellon(content, path85) {
   const warnings = [];
   const state = {
     units: void 0,
@@ -44066,7 +44066,7 @@ function parseExcellon(content, path84) {
         warning(
           "excellon.assumed-coordinate-format",
           `No coordinate format declared; assumed ${format.integerDigits}.${format.decimalDigits} for ${units}. Coordinates from this file are an assumption, not a measurement.`,
-          path84
+          path85
         )
       );
     }
@@ -44097,7 +44097,7 @@ function parseExcellon(content, path84) {
       const diameterMm = (state.units ?? "mm") === "inch" ? rawDiameter * inchToMm : rawDiameter;
       if (!Number.isFinite(diameterMm) || diameterMm <= 0) {
         warnings.push(
-          warning("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path84)
+          warning("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path85)
         );
       } else {
         toolsByCode.set(code, { code, diameterMm, plated: pendingToolPlated ?? state.filePlated });
@@ -44106,7 +44106,7 @@ function parseExcellon(content, path84) {
       continue;
     }
     if (inHeader && !bodyStarted) {
-      parseHeaderLine(trimmed, state, warnings, path84);
+      parseHeaderLine(trimmed, state, warnings, path85);
       continue;
     }
     const toolSelect = /^T(\d+)\s*$/u.exec(trimmed);
@@ -44117,7 +44117,7 @@ function parseExcellon(content, path84) {
           warning(
             "excellon.undefined-tool",
             `The body selects tool T${toolSelect[1]}, which the header never defines. Its holes are not counted.`,
-            path84
+            path85
           )
         );
       }
@@ -44126,7 +44126,7 @@ function parseExcellon(content, path84) {
     const coordinate = /^(?:G0[05]\s*)?X([+-]?[\d.]+)Y([+-]?[\d.]+)(.*)$/u.exec(trimmed);
     if (!coordinate?.[1] || !coordinate[2]) continue;
     if (!currentTool) {
-      warnings.push(warning("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path84));
+      warnings.push(warning("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path85));
       continue;
     }
     const active = resolvedFormat();
@@ -44145,19 +44145,19 @@ function parseExcellon(content, path84) {
       warning(
         "excellon.assumed-plating",
         "Nothing in this file states whether its holes are plated; treated as plated. A rule must not block a release on this.",
-        path84
+        path85
       )
     );
   }
   if (state.units === void 0) {
-    warnings.push(warning("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path84));
+    warnings.push(warning("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path85));
   }
   if (slotCount > 0) {
     warnings.push(
       warning(
         "excellon.slots-collapsed",
         `${slotCount} slot(s) recorded at their start point only; slot length is not represented.`,
-        path84
+        path85
       )
     );
   }
@@ -44244,13 +44244,13 @@ function applyApertureBlockWord(ledger, compact) {
   if (ledger.block !== void 0) ledger.block.selected = code;
   referenceBlockAperture(ledger, code);
 }
-function readApertureEvidence(ledger, scale, path84) {
+function readApertureEvidence(ledger, scale, path85) {
   return {
     apertures: [...ledger.file].map(([code, definition]) => inMillimetres(code, definition, scale)),
     warnings: [
-      ...definitionWarnings(ledger, path84),
-      ...undefinedApertureWarnings(ledger, path84),
-      ...placementWarnings(ledger, path84)
+      ...definitionWarnings(ledger, path85),
+      ...undefinedApertureWarnings(ledger, path85),
+      ...placementWarnings(ledger, path85)
     ]
   };
 }
@@ -44496,13 +44496,13 @@ function inMillimetres(code, definition, scale) {
 function holeInMillimetres(hole, scale) {
   return hole === void 0 ? void 0 : { kind: "diameter", diameterMm: hole.diameter * scale };
 }
-function definitionWarnings(ledger, path84) {
+function definitionWarnings(ledger, path85) {
   const shown = ledger.problems.slice(0, maxDefinitionWarnings);
   const warnings = shown.map(
     (problem) => warning2(
       problem.kind === "malformed" ? "gerber.malformed-aperture-definition" : "gerber.unsupported-aperture-definition",
       `${problemSubject(problem)}, but ${problem.detail}; ${problem.kind === "malformed" ? "nothing is read from that definition." : "its shape is not read from this file. The numbers are the file's own, in whatever units it declares."}`,
-      path84
+      path85
     )
   );
   const rest = ledger.problems.length - shown.length;
@@ -44511,7 +44511,7 @@ function definitionWarnings(ledger, path84) {
       warning2(
         "gerber.unreadable-aperture-definition",
         `There ${rest === 1 ? "is 1 further definition" : `are ${rest} further definitions`} this reader could not use, which ${rest === 1 ? "is" : "are"} not listed here.`,
-        path84
+        path85
       )
     );
   }
@@ -44522,14 +44522,14 @@ function problemSubject(problem) {
   const block = problem.blockCode === void 0 ? "An unnamed aperture block" : `Aperture block D${problem.blockCode}`;
   return `${block} defines aperture D${problem.code}`;
 }
-function undefinedApertureWarnings(ledger, path84) {
+function undefinedApertureWarnings(ledger, path85) {
   const warnings = [];
   if (ledger.undefinedInFileScope.length > 0) {
     warnings.push(
       warning2(
         "gerber.undefined-aperture",
         `The file selects ${listApertureCodes(ledger.undefinedInFileScope.map((code) => ({ code })))}, which it never defines; what is plotted with it cannot be read from this file.`,
-        path84
+        path85
       )
     );
   }
@@ -44543,20 +44543,20 @@ function undefinedApertureWarnings(ledger, path84) {
             qualifier: entry.blockCode === void 0 ? void 0 : `(in block D${entry.blockCode})`
           }))
         )}, which the block never defines; what those blocks draw cannot be read from this file.`,
-        path84
+        path85
       )
     );
   }
   return warnings;
 }
-function placementWarnings(ledger, path84) {
+function placementWarnings(ledger, path85) {
   if (ledger.placements.count === 0) return [];
   const codes = listApertureCodes(ledger.placements.codes.map((code) => ({ code })));
   return [
     warning2(
       "gerber.unmodelled-aperture-block",
       `Aperture block ${codes} is placed ${ledger.placements.count === 1 ? "once" : `${ledger.placements.count} times`}. A block's own shape is not modelled, so each placement contributes its flash point only and the geometry read from this file is incomplete.`,
-      path84
+      path85
     )
   ];
 }
@@ -44565,8 +44565,8 @@ function listApertureCodes(codes) {
   const rest = codes.length - maxListedApertureCodes;
   return rest > 0 ? `${shown} and ${rest} more` : shown;
 }
-function warning2(code, message, path84) {
-  return path84 === void 0 ? { code, message } : { code, message, path: path84 };
+function warning2(code, message, path85) {
+  return path85 === void 0 ? { code, message } : { code, message, path: path85 };
 }
 
 // src/multicad/gerber-geometry.ts
@@ -44824,7 +44824,7 @@ function recordUnterminated(evidence, body) {
   if (evidence.count === 0) evidence.excerpt = boundedExcerpt(body);
   evidence.count += 1;
 }
-function unterminatedWarnings(unterminated, path84) {
+function unterminatedWarnings(unterminated, path85) {
   const warnings = [];
   const extended = unterminated.extended;
   if (extended.count > 0) {
@@ -44832,7 +44832,7 @@ function unterminatedWarnings(unterminated, path84) {
       warning3(
         "gerber.unterminated-extended-command",
         `An extended command is not closed by "%". There ${extended.count === 1 ? "is 1" : `are ${extended.count}`} of them, the first reading "${extended.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path84
+        path85
       )
     );
   }
@@ -44842,7 +44842,7 @@ function unterminatedWarnings(unterminated, path84) {
       warning3(
         "gerber.unterminated-word-command",
         `A command is not terminated by "*". There ${word.count === 1 ? "is 1" : `are ${word.count}`} of them, the first reading "${word.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path84
+        path85
       )
     );
   }
@@ -44876,8 +44876,8 @@ function samePoint2(a, b) {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
 }
 var plottedOperation = /^(?:G\d+)?(?:X([+-]?\d+))?(?:Y([+-]?\d+))?(?:I[+-]?\d+)?(?:J[+-]?\d+)?D(0?[123])$/u;
-function warning3(code, message, path84) {
-  return path84 === void 0 ? { code, message } : { code, message, path: path84 };
+function warning3(code, message, path85) {
+  return path85 === void 0 ? { code, message } : { code, message, path: path85 };
 }
 function snapshotFileState(state, apertures) {
   return {
@@ -44967,7 +44967,7 @@ function readFileState(commands, unterminated) {
   }
   return snapshotFileState(state, apertures);
 }
-function parseGerber(content, path84) {
+function parseGerber(content, path85) {
   const commands = tokenizeGerber(content);
   const unterminated = {
     extended: { count: 0, excerpt: void 0 },
@@ -44986,14 +44986,14 @@ function parseGerber(content, path84) {
   const identity = state.fileFunction ? identityFromFileFunction(state.fileFunction) : void 0;
   const warnings = [];
   if (units === void 0) {
-    warnings.push(warning3("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path84));
+    warnings.push(warning3("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path85));
   }
   if (!declaredFormat) {
     warnings.push(
       warning3(
         "gerber.assumed-coordinate-format",
         "No %FS% format specification; assumed 3.5 with leading zeros omitted. Coordinates from this file are an assumption, not a measurement.",
-        path84
+        path85
       )
     );
   }
@@ -45002,7 +45002,7 @@ function parseGerber(content, path84) {
       warning3(
         "gerber.incremental-coordinates",
         "This file uses incremental coordinates, which are not interpreted; no geometry was read from it.",
-        path84
+        path85
       )
     );
   }
@@ -45011,13 +45011,13 @@ function parseGerber(content, path84) {
       warning3(
         "gerber.unmodelled-file-function",
         `The file declares TF.FileFunction "${state.fileFunction}", which is not a stackup layer; its role comes from the filename.`,
-        path84
+        path85
       )
     );
   }
-  warnings.push(...unterminatedWarnings(unterminated, path84));
+  warnings.push(...unterminatedWarnings(unterminated, path85));
   const scale = units === "inch" ? inchToMm2 : 1;
-  const apertureEvidence = readApertureEvidence(state.apertures, scale, path84);
+  const apertureEvidence = readApertureEvidence(state.apertures, scale, path85);
   warnings.push(...apertureEvidence.warnings);
   const collector = createGerberGeometryCollector({
     apertures: apertureEvidence.apertures,
@@ -56840,11 +56840,11 @@ function assertNonce(value) {
 function runnerRequestBodyDigest(body) {
   return (0, import_node_crypto17.createHash)("sha256").update(body).digest("hex");
 }
-function normalizeRunnerRequestPath(path84) {
-  if (!path84.startsWith("/") || path84.startsWith("//") || path84.includes("#") || path84.includes("\\")) {
+function normalizeRunnerRequestPath(path85) {
+  if (!path85.startsWith("/") || path85.startsWith("//") || path85.includes("#") || path85.includes("\\")) {
     throw new Error("runner request path must be an absolute application path without a fragment");
   }
-  const rawPath = path84.split("?", 1)[0] ?? path84;
+  const rawPath = path85.split("?", 1)[0] ?? path85;
   if (/%2f|%5c/iu.test(rawPath)) {
     throw new Error("runner request path cannot contain encoded path separators");
   }
@@ -56859,7 +56859,7 @@ function normalizeRunnerRequestPath(path84) {
       throw new Error("runner request path cannot contain dot segments");
     }
   }
-  const url2 = new URL(path84, canonicalBaseUrl);
+  const url2 = new URL(path85, canonicalBaseUrl);
   if (url2.origin !== canonicalBaseUrl) {
     throw new Error("runner request path must remain within the application origin");
   }
@@ -56990,21 +56990,21 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
       if (!item2 || typeof item2 !== "object") continue;
       const candidate = item2;
       const description = candidate.description;
-      const uuid3 = candidate.uuid;
+      const uuid5 = candidate.uuid;
       const pos = candidate.pos;
-      if (typeof description !== "string" || !description.trim().endsWith(` on ${layer}`) || typeof uuid3 !== "string" || !/^[a-f0-9-]{36}$/iu.test(uuid3) || !pos || typeof pos !== "object")
+      if (typeof description !== "string" || !description.trim().endsWith(` on ${layer}`) || typeof uuid5 !== "string" || !/^[a-f0-9-]{36}$/iu.test(uuid5) || !pos || typeof pos !== "object")
         continue;
       const { x, y } = pos;
       if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) continue;
       const xx = (x - bounds.minX) / boardWidth;
       const yy = (y - bounds.minY) / boardHeight;
       if (xx < 0 || xx > 1 || yy < 0 || yy > 1) continue;
-      const key = `${finding2.fingerprint}:${uuid3}`;
+      const key = `${finding2.fingerprint}:${uuid5}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const name = /\bof ([#A-Za-z0-9_]+) on (?:F|B)\.Cu$/iu.exec(description)?.[1] ?? "Item";
       result.push({
-        id: `kicad_item_${finding2.fingerprint.slice(0, 12)}_${uuid3.slice(0, 8)}`,
+        id: `kicad_item_${finding2.fingerprint.slice(0, 12)}_${uuid5.slice(0, 8)}`,
         kind: "finding",
         targetRef: name,
         x: xx,
@@ -57015,7 +57015,7 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
           ruleId: finding2.ruleId,
           severity: finding2.severity,
           message: finding2.message.slice(0, 500),
-          sourceUuid: uuid3,
+          sourceUuid: uuid5,
           provenance: "kicad-json-object-position",
           locationMeaning: "Referenced source object, not verified violation center"
         }
@@ -57142,7 +57142,7 @@ async function renderSchematicFile(file2, findings) {
       Array.from(parsed.netLabels)
     );
     const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-    const sha2562 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
+    const sha2563 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
     return {
       id: `snap_sch_${sheetName}`,
       name: `schematic_${sheetName}.svg`,
@@ -57152,7 +57152,7 @@ async function renderSchematicFile(file2, findings) {
       width: 1200,
       height: 800,
       content: svg,
-      sha256: sha2562,
+      sha256: sha2563,
       anchors: linkedAnchors
     };
   } catch {
@@ -57170,7 +57170,7 @@ async function renderPcbFile(file2, findings) {
         parsed.footprints.map((fp) => ({ reference: fp.reference, footprint: fp.footprint, at: fp.at }))
       );
       const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-      const sha2562 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
+      const sha2563 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
       artifacts.push({
         id: `snap_pcb_${layer.replaceAll(".", "_")}`,
         name: `pcb_${layer.replaceAll(".", "_")}.svg`,
@@ -57180,7 +57180,7 @@ async function renderPcbFile(file2, findings) {
         width: 1e3,
         height: 800,
         content: svg,
-        sha256: sha2562,
+        sha256: sha2563,
         anchors: linkedAnchors
       });
     }
@@ -57542,7 +57542,7 @@ async function reviewVerifyCommand(target, options, streams) {
 }
 
 // src/cli/commands/runner.ts
-var import_node_path82 = __toESM(require("node:path"), 1);
+var import_node_path83 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-enrollment-admin.ts
 var import_node_child_process5 = require("node:child_process");
@@ -58189,8 +58189,8 @@ var RunnerControlPlaneClient = class {
       throw new RunnerControlPlaneError(`artifact upload failed with HTTP ${response.status}`, response.status, body);
     }
   }
-  async signedJson(path84, value, context = {}) {
-    const target = new URL(path84, this.baseUrl);
+  async signedJson(path85, value, context = {}) {
+    const target = new URL(path85, this.baseUrl);
     if (target.origin !== this.baseUrl.origin) {
       throw new Error("runner request path escaped the configured control-plane origin");
     }
@@ -58536,9 +58536,9 @@ async function writeExclusive(filePath, content, mode) {
 }
 
 // src/runner/worker.ts
-var import_promises36 = require("node:fs/promises");
+var import_promises37 = require("node:fs/promises");
 var import_node_os7 = __toESM(require("node:os"), 1);
-var import_node_path79 = __toESM(require("node:path"), 1);
+var import_node_path80 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/customer-artifacts.ts
@@ -58656,10 +58656,102 @@ async function persistCustomerRunnerArtifacts(input) {
   }
 }
 
-// src/runner/source.ts
-var import_node_child_process6 = require("node:child_process");
+// src/runner/draft-attestation.ts
+var import_node_crypto26 = require("node:crypto");
+var import_node_fs12 = require("node:fs");
 var import_promises35 = require("node:fs/promises");
 var import_node_path78 = __toESM(require("node:path"), 1);
+init_zod();
+var domain2 = "boardreadyops-runner-draft-receipt-v1\n";
+var uuid3 = external_exports.string().uuid();
+var sha2562 = external_exports.string().regex(/^[0-9a-f]{64}$/u);
+var payloadSchema = external_exports.object({
+  version: external_exports.literal(1),
+  purpose: external_exports.literal("manufacturing-draft"),
+  runnerId: uuid3,
+  runId: uuid3,
+  executionAttemptId: uuid3,
+  repository: external_exports.string().min(3).max(300).regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
+  sourceCommitSha: external_exports.string().regex(/^[0-9a-f]{40}$/u),
+  archiveSha256: sha2562,
+  archiveBytes: external_exports.number().int().positive().max(64 * 1024 * 1024)
+}).strict();
+var signedSchema = external_exports.object({
+  payload: payloadSchema,
+  algorithm: external_exports.literal("Ed25519"),
+  signature: external_exports.string().regex(/^[A-Za-z0-9_-]{86}$/u)
+}).strict();
+function signedBytes(payload) {
+  return Buffer.from(domain2 + JSON.stringify(payload), "utf8");
+}
+function signManufacturingDraftReceipt(payload, privateKey) {
+  const normalized = payloadSchema.parse(payload);
+  return signedSchema.parse({
+    payload: normalized,
+    algorithm: "Ed25519",
+    signature: (0, import_node_crypto26.sign)(null, signedBytes(normalized), privateKey).toString("base64url")
+  });
+}
+async function createManufacturingDraftReceiptArtifact(input) {
+  const { archive, job } = input;
+  if (job.safeMode.enabled || job.repository.private || job.sourceMode !== "customer_checkout") {
+    throw new Error("draft provenance requires an authorized public source checkout");
+  }
+  if (archive.kind !== "archive" || archive.role !== "draft-manufacturing" || archive.contentType !== "application/zip") {
+    throw new Error("draft provenance must reference a draft manufacturing ZIP");
+  }
+  const workspace = await (0, import_promises35.realpath)(import_node_path78.default.resolve(input.workspace));
+  const archivePath = await (0, import_promises35.realpath)(import_node_path78.default.resolve(archive.filePath));
+  const relative = import_node_path78.default.relative(workspace, archivePath);
+  if (!relative || relative.startsWith("..") || import_node_path78.default.isAbsolute(relative) || relative.split(import_node_path78.default.sep).includes("..")) {
+    throw new Error("draft archive escaped the disposable runner checkout");
+  }
+  const handle = await (0, import_promises35.open)(archivePath, import_node_fs12.constants.O_RDONLY | (import_node_fs12.constants.O_NOFOLLOW ?? 0));
+  let data;
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile() || stats.size === 0 || stats.size > 64 * 1024 * 1024) {
+      throw new Error("draft archive must be a bounded regular file");
+    }
+    data = await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+  if (data.byteLength !== archive.bytes || (0, import_node_crypto26.createHash)("sha256").update(data).digest("hex") !== archive.sha256) {
+    throw new Error("draft archive digest changed before runner signing");
+  }
+  const receipt = signManufacturingDraftReceipt(
+    {
+      version: 1,
+      purpose: "manufacturing-draft",
+      runnerId: input.runnerId,
+      runId: job.runId,
+      executionAttemptId: job.executionAttemptId,
+      repository: job.repository.owner + "/" + job.repository.name,
+      sourceCommitSha: job.repository.commitSha,
+      archiveSha256: archive.sha256,
+      archiveBytes: archive.bytes
+    },
+    input.privateKey
+  );
+  const content = Buffer.from(JSON.stringify(receipt) + "\n", "utf8");
+  const filePath = import_node_path78.default.join(import_node_path78.default.dirname(archivePath), "manufacturing-draft-receipt.json");
+  await (0, import_promises35.writeFile)(filePath, content, { flag: "wx", mode: 384 });
+  return {
+    kind: "attestation",
+    role: "draft-provenance",
+    name: "boardreadyops-manufacturing-draft-receipt.json",
+    contentType: "application/json",
+    filePath,
+    bytes: content.byteLength,
+    sha256: (0, import_node_crypto26.createHash)("sha256").update(content).digest("hex")
+  };
+}
+
+// src/runner/source.ts
+var import_node_child_process6 = require("node:child_process");
+var import_promises36 = require("node:fs/promises");
+var import_node_path79 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
 async function checkoutRunnerSource(options) {
   options.signal?.throwIfAborted();
@@ -58667,10 +58759,10 @@ async function checkoutRunnerSource(options) {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
   const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
-  const workspaceRoot = import_node_path78.default.resolve(options.workspaceRoot);
-  await (0, import_promises35.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
-  if (process.platform !== "win32") await (0, import_promises35.chmod)(workspaceRoot, 448);
-  const workspace = await (0, import_promises35.mkdtemp)(import_node_path78.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
+  const workspaceRoot = import_node_path79.default.resolve(options.workspaceRoot);
+  await (0, import_promises36.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
+  if (process.platform !== "win32") await (0, import_promises36.chmod)(workspaceRoot, 448);
+  const workspace = await (0, import_promises36.mkdtemp)(import_node_path79.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
   const git = async (args) => {
@@ -58682,7 +58774,7 @@ async function checkoutRunnerSource(options) {
     });
   };
   try {
-    if (process.platform !== "win32") await (0, import_promises35.chmod)(workspace, 448);
+    if (process.platform !== "win32") await (0, import_promises36.chmod)(workspace, 448);
     await git(["init", "--quiet"]);
     await git(["remote", "add", "origin", repository]);
     await git(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
@@ -58695,7 +58787,7 @@ async function checkoutRunnerSource(options) {
     options.signal?.throwIfAborted();
     return workspace;
   } catch (error51) {
-    await (0, import_promises35.rm)(workspace, { recursive: true, force: true });
+    await (0, import_promises36.rm)(workspace, { recursive: true, force: true });
     throw error51;
   }
 }
@@ -58762,9 +58854,9 @@ function repositoryRemote(job, repositoryMirrorRoot) {
   if (!repositoryMirrorRoot) {
     return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
   }
-  const root = import_node_path78.default.resolve(repositoryMirrorRoot);
-  const candidate = import_node_path78.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
-  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path78.default.sep}`)) {
+  const root = import_node_path79.default.resolve(repositoryMirrorRoot);
+  const candidate = import_node_path79.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
+  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path79.default.sep}`)) {
     throw new Error("repository mirror path escaped the configured mirror root");
   }
   return candidate;
@@ -58798,7 +58890,7 @@ var defaultDependencies2 = {
   executePipeline: async () => {
     throw new Error("runner execution pipeline adapter is not configured");
   },
-  removeWorkspace: async (workspace) => await (0, import_promises36.rm)(workspace, { recursive: true, force: true }),
+  removeWorkspace: async (workspace) => await (0, import_promises37.rm)(workspace, { recursive: true, force: true }),
   recoverCrashWorkspaces: recoverRunnerCrashWorkspaces,
   sleep: abortableSleep,
   log: () => void 0
@@ -58815,7 +58907,7 @@ async function validateManufacturingDraftJob(client, job, enabled2) {
   throw new Error("Manufacturing draft upload is refused for private or safe-mode jobs");
 }
 function defaultRunnerWorkspaceRoot() {
-  return import_node_path79.default.join(import_node_os7.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
+  return import_node_path80.default.join(import_node_os7.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
 }
 async function runRunnerWorkerOnce(options, overrides = {}) {
   const dependencies = { ...defaultDependencies2, ...overrides };
@@ -58830,7 +58922,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
   const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
   const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
   const workspaceRoot = runnerActiveWorkspaceRoot(
-    import_node_path79.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path80.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   const claim = await client.claim({
@@ -58876,6 +58968,25 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
+    const drafts = execution.artifacts.filter(
+      (artifact) => artifact.kind === "archive" && artifact.role === "draft-manufacturing"
+    );
+    if (drafts.length > 0) {
+      if (!options.manufacturingDraftUpload || execution.exitCode !== 0 || execution.report?.readiness?.status !== "ready" || drafts.length !== 1) {
+        throw new Error("draft receipt requires one explicitly enabled, passing KiCad readiness result");
+      }
+      const draft = drafts[0];
+      if (!draft) throw new Error("draft archive was not found");
+      execution.artifacts.push(
+        await createManufacturingDraftReceiptArtifact({
+          workspace,
+          job,
+          runnerId: identity.runnerId,
+          privateKey,
+          archive: draft
+        })
+      );
+    }
     const artifactMode = options.artifactMode ?? "control-plane";
     const customerStored = execution.report && artifactMode === "customer-managed" ? await persistCustomerRunnerArtifacts({
       root: options.customerArtifactRoot ?? "",
@@ -58984,7 +59095,7 @@ async function serveRunnerWorker(options, overrides = {}) {
   const identity = await dependencies.loadIdentity(options.identityFile);
   if (options.signal?.aborted) return;
   const recovered = await dependencies.recoverCrashWorkspaces(
-    import_node_path79.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path80.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   if (recovered > 0) {
@@ -59185,12 +59296,12 @@ async function bestEffortRelinquish(client, job, reason, message) {
   }).catch(() => void 0);
 }
 function runnerActiveWorkspaceRoot(workspaceRoot, runnerId) {
-  return import_node_path79.default.join(import_node_path79.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
+  return import_node_path80.default.join(import_node_path80.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
 }
 async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
-  const root = import_node_path79.default.resolve(workspaceRoot);
-  const namespace = import_node_path79.default.join(root, ".boardreadyops-active");
-  const namespaceInfo = await (0, import_promises36.lstat)(namespace).catch((error51) => {
+  const root = import_node_path80.default.resolve(workspaceRoot);
+  const namespace = import_node_path80.default.join(root, ".boardreadyops-active");
+  const namespaceInfo = await (0, import_promises37.lstat)(namespace).catch((error51) => {
     if (error51.code === "ENOENT") return void 0;
     throw error51;
   });
@@ -59199,7 +59310,7 @@ async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
     throw new Error("runner active workspace namespace is not a regular directory");
   }
   const activeRoot = runnerActiveWorkspaceRoot(root, runnerId);
-  const activeInfo = await (0, import_promises36.lstat)(activeRoot).catch((error51) => {
+  const activeInfo = await (0, import_promises37.lstat)(activeRoot).catch((error51) => {
     if (error51.code === "ENOENT") return void 0;
     throw error51;
   });
@@ -59207,8 +59318,8 @@ async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
   if (activeInfo.isSymbolicLink() || !activeInfo.isDirectory()) {
     throw new Error("runner identity workspace namespace is not a regular directory");
   }
-  const entries = await (0, import_promises36.readdir)(activeRoot);
-  await (0, import_promises36.rm)(activeRoot, { recursive: true, force: true });
+  const entries = await (0, import_promises37.readdir)(activeRoot);
+  await (0, import_promises37.rm)(activeRoot, { recursive: true, force: true });
   return entries.length;
 }
 function boundedSeconds(value, name, minimum, maximum) {
@@ -59254,14 +59365,14 @@ var RunnerShutdownError = class extends Error {
 };
 
 // src/cli/runner-pipeline.ts
-var import_node_crypto26 = require("node:crypto");
-var import_promises38 = require("node:fs/promises");
-var import_node_path81 = __toESM(require("node:path"), 1);
+var import_node_crypto27 = require("node:crypto");
+var import_promises39 = require("node:fs/promises");
+var import_node_path82 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
 
 // src/cli/runner-manufacturing-draft.ts
-var import_promises37 = require("node:fs/promises");
-var import_node_path80 = __toESM(require("node:path"), 1);
+var import_promises38 = require("node:fs/promises");
+var import_node_path81 = __toESM(require("node:path"), 1);
 async function prepareRunnerManufacturingDraft(workspace, job, options) {
   options.signal?.throwIfAborted();
   if (job.safeMode.enabled || job.repository.private || job.sourceMode !== "customer_checkout" || !options.requireKicad) {
@@ -59276,12 +59387,12 @@ async function prepareRunnerManufacturingDraft(workspace, job, options) {
     throw new Error("Manufacturing draft requires KiCad CLI version 10.0.x");
   }
   options.signal?.throwIfAborted();
-  await (0, import_promises37.appendFile)(import_node_path80.default.join(workspace, ".git", "info", "exclude"), "\n/.boardreadyops-runner/\n");
+  await (0, import_promises38.appendFile)(import_node_path81.default.join(workspace, ".git", "info", "exclude"), "\n/.boardreadyops-runner/\n");
   const generated = await runGenerate(
     { schemaVersion: 1, steps: [{ kind: "gerbers" }, { kind: "drill" }] },
     {
-      outputDir: import_node_path80.default.join(workspace, ".boardreadyops-runner", job.executionAttemptId, "manufacturing", "outputs"),
-      boardFile: import_node_path80.default.resolve(workspace, projects[0].boardFiles[0]),
+      outputDir: import_node_path81.default.join(workspace, ".boardreadyops-runner", job.executionAttemptId, "manufacturing", "outputs"),
+      boardFile: import_node_path81.default.resolve(workspace, projects[0].boardFiles[0]),
       gitRoot: workspace,
       reviewedSourceSha: job.repository.commitSha,
       kicadVersion: cli.version,
@@ -59294,7 +59405,7 @@ async function prepareRunnerManufacturingDraft(workspace, job, options) {
     root: workspace,
     generated,
     sourceCommitSha: job.repository.commitSha,
-    destination: import_node_path80.default.join(workspace, ".boardreadyops-runner", job.executionAttemptId, "manufacturing-draft.zip")
+    destination: import_node_path81.default.join(workspace, ".boardreadyops-runner", job.executionAttemptId, "manufacturing-draft.zip")
   });
   return {
     kind: "archive",
@@ -59312,27 +59423,27 @@ async function prepareRunnerManufacturingDraft(workspace, job, options) {
 async function executeRunnerPipeline(workspace, job, options) {
   options.signal?.throwIfAborted();
   const manufacturingDraft = options.manufacturingDraftUpload ? await prepareRunnerManufacturingDraft(workspace, job, options) : void 0;
-  const relativeOutputDirectory = import_node_path81.default.join(".boardreadyops-runner", job.executionAttemptId);
-  const outputDirectory2 = import_node_path81.default.join(workspace, relativeOutputDirectory);
-  await (0, import_promises38.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
+  const relativeOutputDirectory = import_node_path82.default.join(".boardreadyops-runner", job.executionAttemptId);
+  const outputDirectory2 = import_node_path82.default.join(workspace, relativeOutputDirectory);
+  await (0, import_promises39.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
   const targets = [
     {
       kind: "report/json",
       name: "boardreadyops-result.json",
       role: "primary",
-      relative: import_node_path81.default.join(relativeOutputDirectory, "result.json")
+      relative: import_node_path82.default.join(relativeOutputDirectory, "result.json")
     },
     {
       kind: "report/sarif",
       name: "boardreadyops-result.sarif",
       role: "sarif",
-      relative: import_node_path81.default.join(relativeOutputDirectory, "result.sarif")
+      relative: import_node_path82.default.join(relativeOutputDirectory, "result.sarif")
     },
     {
       kind: "report/markdown",
       name: "boardreadyops-result.md",
       role: "summary",
-      relative: import_node_path81.default.join(relativeOutputDirectory, "result.md")
+      relative: import_node_path82.default.join(relativeOutputDirectory, "result.md")
     }
   ];
   const output = new import_node_stream.Writable({ write: (_chunk, _encoding, callback) => callback() });
@@ -59356,11 +59467,11 @@ async function executeRunnerPipeline(workspace, job, options) {
     options.signal ? { signal: options.signal } : {}
   );
   options.signal?.throwIfAborted();
-  const report = await readRunReport(import_node_path81.default.join(workspace, targets[0].relative));
+  const report = await readRunReport(import_node_path82.default.join(workspace, targets[0].relative));
   const runnerReport = report ? runnerReportFromResult(report) : void 0;
   const artifacts = [];
   for (const target of targets) {
-    const filePath = import_node_path81.default.join(workspace, target.relative);
+    const filePath = import_node_path82.default.join(workspace, target.relative);
     const artifact = await runnerArtifact(filePath, target.kind, target.name, target.role).catch(() => void 0);
     if (artifact) artifacts.push(artifact);
   }
@@ -59374,16 +59485,16 @@ async function executeRunnerPipeline(workspace, job, options) {
   };
 }
 async function runnerArtifact(filePath, kind, name, role) {
-  const info = await (0, import_promises38.stat)(filePath);
+  const info = await (0, import_promises39.stat)(filePath);
   if (!info.isFile() || info.size > 2147483647) throw new Error(`runner artifact is invalid: ${filePath}`);
-  const content = await (0, import_promises38.readFile)(filePath);
+  const content = await (0, import_promises39.readFile)(filePath);
   return {
     kind,
     name,
     role,
     filePath,
     bytes: content.byteLength,
-    sha256: (0, import_node_crypto26.createHash)("sha256").update(content).digest("hex")
+    sha256: (0, import_node_crypto27.createHash)("sha256").update(content).digest("hex")
   };
 }
 function runnerReportFromResult(report) {
@@ -59436,7 +59547,7 @@ function runnerReportFromResult(report) {
 }
 async function readRunReport(filePath) {
   try {
-    const value = JSON.parse(await (0, import_promises38.readFile)(filePath, "utf8"));
+    const value = JSON.parse(await (0, import_promises39.readFile)(filePath, "utf8"));
     return value.schemaVersion === 1 && value.tool?.name === "boardreadyops" && Array.isArray(value.findings) ? value : void 0;
   } catch {
     return void 0;
@@ -59447,12 +59558,12 @@ async function readRunReport(filePath) {
 async function runnerIssueEnrollmentCommand(options, streams) {
   try {
     const issued = await issueRunnerEnrollment({
-      databaseUrlFile: import_node_path82.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path83.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       name: options.name,
       scope: options.scope,
       allowedRepositories: options.repository ?? [],
-      tokenOutputFile: import_node_path82.default.resolve(options.tokenOutput),
+      tokenOutputFile: import_node_path83.default.resolve(options.tokenOutput),
       ...options.ttlSeconds === void 0 ? {} : { ttlSeconds: options.ttlSeconds }
     });
     writeRunnerOutput(
@@ -59476,7 +59587,7 @@ async function runnerIssueEnrollmentCommand(options, streams) {
 async function runnerRevokeRegistrationCommand(options, streams) {
   try {
     const revoked = await revokeRunnerRegistration({
-      databaseUrlFile: import_node_path82.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path83.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       registrationId: options.registrationId,
       actorId: options.actorId,
@@ -59499,8 +59610,8 @@ async function runnerActivateCommand(options, streams) {
   try {
     const activated = await activateRunnerIdentity({
       controlPlaneUrl: options.url,
-      enrollmentTokenFile: import_node_path82.default.resolve(options.enrollmentTokenFile),
-      identityDirectory: import_node_path82.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
+      enrollmentTokenFile: import_node_path83.default.resolve(options.enrollmentTokenFile),
+      identityDirectory: import_node_path83.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
       capabilities: options.capability ?? [],
       labels: options.label ?? []
     });
@@ -59580,21 +59691,21 @@ function workerOptions(options) {
     identityFile: identityPath(options),
     runnerVersion: boardReadyVersion,
     workspaceRoot: workspacePath(options),
-    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path82.default.resolve(options.repositoryMirrorRoot) },
+    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path83.default.resolve(options.repositoryMirrorRoot) },
     ...options.heartbeatSeconds === void 0 ? {} : { heartbeatSeconds: options.heartbeatSeconds },
     ...options.pollSeconds === void 0 ? {} : { pollSeconds: options.pollSeconds },
     requireKicad: options.requireKicad ?? true,
     keepWorkspace: options.keepWorkspace ?? false,
     ...options.manufacturingDraftUpload ? { manufacturingDraftUpload: true } : {},
     artifactMode: options.artifactMode ?? "control-plane",
-    ...options.customerArtifactRoot ? { customerArtifactRoot: import_node_path82.default.resolve(options.customerArtifactRoot) } : {}
+    ...options.customerArtifactRoot ? { customerArtifactRoot: import_node_path83.default.resolve(options.customerArtifactRoot) } : {}
   };
 }
 function identityPath(options) {
-  return import_node_path82.default.resolve(options.identity ?? import_node_path82.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
+  return import_node_path83.default.resolve(options.identity ?? import_node_path83.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
 }
 function workspacePath(options) {
-  return import_node_path82.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
+  return import_node_path83.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
 }
 function createRunnerLogger(stream, format) {
   return (event, fields = {}) => {
@@ -59622,7 +59733,7 @@ function safeMessage(error51) {
 }
 
 // src/cli/commands/sbom.ts
-var import_node_path83 = __toESM(require("node:path"), 1);
+var import_node_path84 = __toESM(require("node:path"), 1);
 init_t();
 
 // src/report/component-identity.ts
@@ -59885,7 +59996,7 @@ async function sbomCommand(pathInput, options, streams) {
     return 2;
   }
   const locale = resolveLocale();
-  const root = await canonicalRoot(import_node_path83.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path84.default.resolve(normalizePathInput(pathInput ?? ".")));
   const loaded = await loadConfig(root, options.config);
   if (loaded.errors.length > 0) {
     for (const error51 of loaded.errors) {
@@ -59919,7 +60030,7 @@ async function writeHbom(root, output, content, stdout) {
     stdout.write(content);
     return;
   }
-  await writeTextFile(import_node_path83.default.resolve(root, normalizePathInput(output)), content);
+  await writeTextFile(import_node_path84.default.resolve(root, normalizePathInput(output)), content);
 }
 
 // schemas/agent-plan.schema.json
@@ -61636,12 +61747,12 @@ function assuranceLine(profile) {
 }
 
 // src/cli/commands/verify-export-attestation.ts
-var import_promises39 = __toESM(require("node:fs/promises"), 1);
-var import_node_path84 = __toESM(require("node:path"), 1);
+var import_promises40 = __toESM(require("node:fs/promises"), 1);
+var import_node_path85 = __toESM(require("node:path"), 1);
 init_path();
 async function exportVerifyCommand(pathInput, options, streams) {
   try {
-    const root = await import_promises39.default.realpath(import_node_path84.default.resolve(normalizePathInput(pathInput)));
+    const root = await import_promises40.default.realpath(import_node_path85.default.resolve(normalizePathInput(pathInput)));
     const attempt = Number(options.runAttempt);
     const result = await verifyReviewedExportAttestation({
       root,
@@ -61944,7 +62055,7 @@ function isCommanderDisplay(error51) {
   return error51 instanceof Error && "code" in error51 && (error51.code === "commander.helpDisplayed" || error51.code === "commander.version");
 }
 var cliEntry = process.argv.at(1);
-var cliEntryName = cliEntry ? import_node_path85.default.basename(cliEntry) : "";
+var cliEntryName = cliEntry ? import_node_path86.default.basename(cliEntry) : "";
 if (cliEntry && !process.env.VITEST && (cliEntryName === "boardreadyops" || cliEntryName === "index.ts" || cliEntryName === "index.js" || cliEntryName === "index.cjs")) {
   void runCli(process.argv.slice(2)).then((code) => {
     process.exitCode = code;

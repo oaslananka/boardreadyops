@@ -10,6 +10,7 @@ import type {
   RunnerTerminalResultRequest,
 } from "../../../packages/contracts/src/index.js";
 import { executeRunnerPipeline } from "../../../src/cli/runner-pipeline.js";
+import { verifyManufacturingDraftReceipt } from "../../../src/runner/draft-attestation.js";
 import type { LoadedRunnerIdentity } from "../../../src/runner/identity.js";
 import {
   type RunnerExecutionOutput,
@@ -509,7 +510,19 @@ describe("runRunnerWorkerOnce", () => {
     }));
     const pipeline = vi.fn(async () => ({
       exitCode: 0,
-      report: { summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 }, findings: [] },
+      report: {
+        summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+        findings: [],
+        readiness: {
+          score: 100,
+          status: "ready",
+          blocking: 0,
+          nonBlocking: 0,
+          missingRequired: [],
+          missingRecommended: [],
+          warnings: [],
+        },
+      },
       artifacts: [
         {
           kind: "archive",
@@ -533,15 +546,27 @@ describe("runRunnerWorkerOnce", () => {
       expect.anything(),
       expect.objectContaining({ manufacturingDraftUpload: true }),
     );
-    expect(runnerClient.value.uploadArtifact).toHaveBeenCalledTimes(1);
+    expect(runnerClient.value.uploadArtifact).toHaveBeenCalledTimes(2);
+    const receipt = JSON.parse(await readFile(path.join(workspace, "manufacturing-draft-receipt.json"), "utf8"));
+    expect(verifyManufacturingDraftReceipt(receipt, keys.publicKey)).toBe(true);
+    expect(receipt.payload).toMatchObject({
+      runnerId,
+      runId,
+      executionAttemptId: attemptId,
+      archiveSha256: sha256,
+    });
     const request = (runnerClient.value.issueArtifactCapabilities as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect(request.artifacts).toEqual([
       expect.objectContaining({ kind: "archive", role: "draft-manufacturing", contentType: "application/zip", sha256 }),
+      expect.objectContaining({ kind: "attestation", role: "draft-provenance", contentType: "application/json" }),
     ]);
     const terminal = (
       runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
     )[0]?.[0];
-    expect(terminal?.result.artifacts).toEqual([expect.objectContaining({ role: "draft-manufacturing" })]);
+    expect(terminal?.result.artifacts).toEqual([
+      expect.objectContaining({ role: "draft-manufacturing" }),
+      expect.objectContaining({ role: "draft-provenance" }),
+    ]);
   });
 
   it("rejects customer-managed mode without its artifact root before claiming work", async () => {
