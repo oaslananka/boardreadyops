@@ -4,7 +4,17 @@ import { open, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
-import type { RunnerExecutionArtifact } from "./worker.js";
+
+// Keep the signer independent of worker.ts so runtime architecture stays acyclic.
+type DraftArchiveArtifact = {
+  kind: string;
+  name: string;
+  role: string;
+  contentType?: string;
+  filePath: string;
+  bytes: number;
+  sha256: string;
+};
 
 const domain = "boardreadyops-runner-draft-receipt-v1\n";
 const uuid = z.string().uuid();
@@ -81,8 +91,8 @@ export async function createManufacturingDraftReceiptArtifact(input: {
   job: RunnerClaimedJob;
   runnerId: string;
   privateKey: KeyLike;
-  archive: RunnerExecutionArtifact;
-}): Promise<RunnerExecutionArtifact> {
+  archive: DraftArchiveArtifact;
+}): Promise<DraftArchiveArtifact> {
   const { archive, job } = input;
   if (job.safeMode.enabled || job.repository.private || job.sourceMode !== "customer_checkout") {
     throw new Error("draft provenance requires an authorized public source checkout");
