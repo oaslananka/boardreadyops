@@ -263,18 +263,19 @@ interface SplitViewportProps extends Omit<CanvasMarkersProps, "markerCanvas"> {
  * Each split pane contains its own object-fit viewport. The head marker coordinates
  * must be fitted to that pane, never the full canvas or the base revision.
  */
-export function SplitViewport({
-  baseSrc,
-  headSrc,
-  imageWidth,
-  imageHeight,
-  sheetAnchors,
-  relevantFindings,
-  comments,
-  selectedFindingFingerprint,
-  onSelectFinding,
-  onSelectComment,
-}: Readonly<SplitViewportProps>) {
+export function SplitViewport(props: Readonly<SplitViewportProps>) {
+  const {
+    baseSrc,
+    headSrc,
+    imageWidth,
+    imageHeight,
+    sheetAnchors,
+    relevantFindings,
+    comments,
+    selectedFindingFingerprint,
+    onSelectFinding,
+    onSelectComment,
+  } = props;
   const headPaneRef = useRef<HTMLDivElement | null>(null);
   const [headPaneSize, setHeadPaneSize] = useState({ width: 0, height: 0 });
 
