@@ -74,6 +74,12 @@ export function ReviewHeader({
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <StatusBadge value={decisionTone} label={decisionLabel} />
+          <span
+            role="img"
+            aria-label={`Evidence is ${evidenceState}`}
+            title={`Evidence is ${evidenceState}`}
+            className={`inline-block size-2 sm:hidden ${evidenceState === "current" ? "bg-success" : "bg-warning"}`}
+          />
           <div className="sm:hidden">
             <CopyButton value={evidenceDigest} label="Copy digest" />
           </div>

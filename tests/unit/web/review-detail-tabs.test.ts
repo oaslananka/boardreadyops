@@ -60,8 +60,25 @@ describe("Review Detail Tabs", () => {
     expect(html).toContain("overflow-x-auto whitespace-nowrap");
     expect(html).toContain('class="sm:hidden"');
     expect(html).toContain("Copy digest");
+    expect(html).toContain('role="img" aria-label="Evidence is current"');
     expect(html).toContain("Approve review");
     expect(html).toContain("Request changes");
+    const stale = renderToStaticMarkup(
+      createElement(ReviewHeader, {
+        reviewId: review.id,
+        title: review.title,
+        repositoryName: review.repositoryName,
+        pullRequestNumber: review.pullRequestNumber,
+        status: review.status,
+        decision: review.decision,
+        currentRevisionSequence: review.currentRevisionSequence,
+        baseCommitSha: review.baseCommitSha,
+        headCommitSha: review.headCommitSha,
+        evidenceDigest: review.evidenceDigest,
+        evidenceState: "stale",
+      }),
+    );
+    expect(stale).toContain('role="img" aria-label="Evidence is stale"');
   });
 
   it("keeps all Review tabs keyboard accessible on a single mobile scroll row", () => {
