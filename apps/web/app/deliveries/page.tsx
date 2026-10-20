@@ -340,14 +340,39 @@ function DeliveriesUnavailable({ state }: Readonly<{ state: "signed-out" | "not-
     );
   }
 
+  // Existing GitHub reviews do not imply a workspace or a verified manufacturing package.
+  // Keep both journeys accessible without fabricating delivery eligibility.
   return (
-    <Panel title="Deliveries">
-      <EmptyState title="Create a workspace first">
-        <p>Deliveries hang off a project revision, and projects live in a workspace.</p>
-        <Button asChild className="mt-3">
-          <Link href="/projects">Go to Projects</Link>
+    <section className="grid min-w-0 gap-4 lg:grid-cols-2" aria-label="Choose your next delivery step">
+      <Panel
+        title="Review your boards"
+        description="Existing GitHub readiness runs and published Reviews remain available without a CAD workspace."
+      >
+        <p className="text-sm text-muted-foreground">
+          Work through findings and pending decisions before preparing a manufacturing handoff. A Review is not a signed
+          delivery package.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button asChild>
+            <Link href="/reviews">Open Reviews</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/runs">Browse runs</Link>
+          </Button>
+        </div>
+      </Panel>
+      <Panel
+        title="Prepare a manufacturing delivery"
+        description="Delivery links require a CAD workspace project revision and a validated manufacturing archive from a passing run."
+      >
+        <p className="text-sm text-muted-foreground">
+          Creating a workspace alone does not approve a design or issue a guest link. Register eligible evidence before
+          sharing a package with a manufacturing partner.
+        </p>
+        <Button asChild className="mt-4">
+          <Link href="/projects">Set up a CAD workspace</Link>
         </Button>
-      </EmptyState>
-    </Panel>
+      </Panel>
+    </section>
   );
 }

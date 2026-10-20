@@ -258,6 +258,23 @@ describe("DeliveriesListPage", () => {
     expect(markup).not.toContain("No guest links yet");
   });
 
+  it("offers a review path and an optional workspace path without inventing a delivery", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({ state: "no-workspaces" });
+    const markup = await render();
+
+    expect(markup).toContain("Review your boards");
+    expect(markup).toContain("Prepare a manufacturing delivery");
+    expect(markup).toContain("A Review is not a");
+    expect(markup).toContain("validated manufacturing archive from a passing run");
+    expect(markup).toContain("Creating a workspace alone does not approve");
+    expect(markup).toContain('href="/reviews"');
+    expect(markup).toContain('href="/runs"');
+    expect(markup).toContain('href="/projects"');
+    expect(markup).not.toContain("Create guest link");
+    expect(markup).not.toContain("Create a workspace first");
+    expect(markup).not.toContain("Sign in with GitHub");
+  });
+
   it("says the deployment has no database rather than implying nothing was shared", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({ state: "not-configured" });
     const markup = await render();
