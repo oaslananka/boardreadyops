@@ -7,6 +7,7 @@ import {
   nextSourceFindingFingerprint,
   positionContainedImageAnchor,
   ReviewCanvas,
+  SplitViewport,
 } from "../../../apps/web/components/review/review-canvas.js";
 import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
 import { buildDemoSnapshots } from "../../../apps/web/lib/demo-snapshots.js";
@@ -32,9 +33,11 @@ describe("ReviewCanvas", () => {
 
   it("keeps long native sheet names inside the viewport on narrow screens", () => {
     const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
-    expect(markup).toContain('class="flex min-w-0 max-w-full flex-wrap items-center gap-3"');
     expect(markup).toContain(
-      'class="min-w-0 max-w-full rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground"',
+      'class="flex min-w-0 max-w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3"',
+    );
+    expect(markup).toContain(
+      'class="w-full min-w-0 max-w-full rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground sm:w-auto"',
     );
   });
 
@@ -126,6 +129,48 @@ describe("ReviewCanvas", () => {
     expect(
       groupNativeSourceAnchors([{ ...first, metadata: { ...first.metadata, provenance: "unverified" } }]).size,
     ).toBe(0);
+  });
+
+  it("keeps split-view source markers confined to the head image and its own letterboxing", () => {
+    const base = `data:image/svg+xml;utf8,${encodeURIComponent('<svg viewBox="0 0 25.4 25.4"></svg>')}`;
+    const head = base;
+    const sourceAnchor = {
+      id: "sw2-short",
+      kind: "finding" as const,
+      targetRef: "SW2",
+      x: 0.408131811,
+      y: 0.591868189,
+      layer: "F.Cu",
+      metadata: {
+        fingerprint: "short",
+        provenance: "kicad-json-object-position",
+        sourceUuid: "bf7f5122-bc89-413e-aa3e-f19064ff92f7",
+        ruleId: "drc.shorting_items",
+        severity: "error",
+        message: "Two nets shorted",
+      },
+    };
+    const markup = renderToStaticMarkup(
+      createElement(SplitViewport, {
+        baseSrc: base,
+        headSrc: head,
+        imageWidth: 25.4,
+        imageHeight: 25.4,
+        sheetAnchors: [sourceAnchor],
+        relevantFindings: [],
+        comments: [],
+      }),
+    );
+    expect(markup).toContain('alt="Base Revision Snapshot"');
+    expect(markup).toContain('alt="Head Revision Snapshot"');
+    expect(markup).toContain('aria-label="Head revision source markers"');
+    // The source marker requires the head pane's measured size before it is positioned.
+    expect(markup).not.toContain("SW2,");
+    const splitHead = positionContainedImageAnchor(sourceAnchor.x, sourceAnchor.y, 170, 304, 25.4, 25.4);
+    const fullCanvas = positionContainedImageAnchor(sourceAnchor.x, sourceAnchor.y, 390, 304, 25.4, 25.4);
+    expect(splitHead?.x).toBeCloseTo(sourceAnchor.x, 9);
+    expect(splitHead?.y).toBeCloseTo((67 + sourceAnchor.y * 170) / 304, 9);
+    expect(splitHead?.y).not.toBeCloseTo(fullCanvas?.y ?? 0, 3);
   });
 
   it("renders a finding marker for each anchor linked to a finding", () => {

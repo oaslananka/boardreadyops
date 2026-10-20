@@ -80,19 +80,21 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
 
   return (
     <section aria-label="Hardware design inspection workspace" className="space-y-3">
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 sm:p-4">
+      <header className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 sm:gap-3 sm:p-4">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Hardware design review</p>
-          <h2 className="text-lg font-semibold text-foreground">See the evidence, then decide</h2>
+          <p className="hidden text-xs font-semibold uppercase tracking-wide text-primary sm:block">
+            Hardware design review
+          </p>
+          <h2 className="text-base font-semibold text-foreground sm:text-lg">See the evidence, then decide</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-md bg-danger-surface px-2 py-1 font-semibold text-danger">
             {blocking} open critical/error
           </span>
-          <span className="rounded-md border border-border px-2 py-1 text-muted-foreground">
+          <span className="hidden rounded-md border border-border px-2 py-1 text-muted-foreground sm:inline">
             {snapshots.length} published views
           </span>
-          <span className="rounded-md border border-border px-2 py-1 text-muted-foreground">
+          <span className="hidden rounded-md border border-border px-2 py-1 text-muted-foreground sm:inline">
             Decision: {review.decision.replaceAll("_", " ")}
           </span>
         </div>

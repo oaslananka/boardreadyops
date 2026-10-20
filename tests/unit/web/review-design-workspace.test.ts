@@ -78,6 +78,8 @@ describe("Zaptrace-inspired BoardReadyOps review workspace", () => {
     expect(html).toContain("xl:grid-cols-[minmax(275px,1.05fr)_minmax(0,1.9fr)_minmax(235px,0.95fr)]");
     expect(html).toContain("line-clamp-2");
     expect(html).toContain("h-[19rem]");
+    expect(html).toContain("px-3 py-2 sm:gap-3 sm:p-4");
+    expect(html).toContain("hidden text-xs font-semibold uppercase tracking-wide text-primary sm:block");
     // Engineering detail remains fully present in the inspector even when the list preview is clamped.
     expect(html).toContain('class="mt-1 break-words">Insufficient clearance on U1');
   });

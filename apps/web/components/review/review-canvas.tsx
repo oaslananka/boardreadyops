@@ -252,11 +252,57 @@ function CanvasMarkersLayer({
   );
 }
 
-function SplitViewport({ baseSrc, headSrc }: Readonly<{ baseSrc: string; headSrc: string }>) {
+interface SplitViewportProps extends Omit<CanvasMarkersProps, "markerCanvas"> {
+  baseSrc: string;
+  headSrc: string;
+  imageWidth?: number | undefined;
+  imageHeight?: number | undefined;
+}
+
+/**
+ * Each split pane contains its own object-fit viewport. The head marker coordinates
+ * must be fitted to that pane, never the full canvas or the base revision.
+ */
+export function SplitViewport({
+  baseSrc,
+  headSrc,
+  imageWidth,
+  imageHeight,
+  sheetAnchors,
+  relevantFindings,
+  comments,
+  selectedFindingFingerprint,
+  onSelectFinding,
+  onSelectComment,
+}: Readonly<SplitViewportProps>) {
+  const headPaneRef = useRef<HTMLDivElement | null>(null);
+  const [headPaneSize, setHeadPaneSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const pane = headPaneRef.current;
+    if (!pane || typeof ResizeObserver === "undefined") return;
+    const update = () => {
+      const width = pane.clientWidth;
+      const height = pane.clientHeight;
+      setHeadPaneSize((previous) =>
+        previous.width === width && previous.height === height ? previous : { width, height },
+      );
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, []);
+
+  const markerCanvas =
+    imageWidth && imageHeight && headPaneSize.width && headPaneSize.height
+      ? { canvasWidth: headPaneSize.width, canvasHeight: headPaneSize.height, imageWidth, imageHeight }
+      : undefined;
+
   return (
-    <div className="grid h-full grid-cols-2 gap-2">
-      <div className="relative overflow-hidden rounded-md border border-border bg-muted">
-        <span className="absolute left-2 top-2 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
+    <div className="grid h-full min-w-0 grid-cols-2 gap-2">
+      <div className="relative min-w-0 overflow-hidden rounded-md border border-border bg-muted">
+        <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
           Base Revision
         </span>
         {baseSrc ? (
@@ -267,16 +313,31 @@ function SplitViewport({ baseSrc, headSrc }: Readonly<{ baseSrc: string; headSrc
         )}
       </div>
 
-      <div className="relative overflow-hidden rounded-md border border-border bg-muted">
-        <span className="absolute left-2 top-2 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
+      <div className="relative min-w-0 overflow-hidden rounded-md border border-border bg-muted">
+        <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
           Head Revision
         </span>
-        {headSrc ? (
-          // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
-          <img src={headSrc} alt="Head Revision Snapshot" className="size-full object-contain" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No head snapshot</div>
-        )}
+        <section ref={headPaneRef} className="relative size-full" aria-label="Head revision source markers">
+          {headSrc ? (
+            // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
+            <img src={headSrc} alt="Head Revision Snapshot" className="size-full object-contain" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              No head snapshot
+            </div>
+          )}
+          {headSrc ? (
+            <CanvasMarkersLayer
+              sheetAnchors={sheetAnchors}
+              relevantFindings={relevantFindings}
+              comments={comments}
+              markerCanvas={markerCanvas}
+              selectedFindingFingerprint={selectedFindingFingerprint}
+              onSelectFinding={onSelectFinding}
+              onSelectComment={onSelectComment}
+            />
+          ) : null}
+        </section>
       </div>
     </div>
   );
@@ -495,20 +556,23 @@ export function ReviewCanvas({
       : viewMode;
 
   const modeButtonClass = (active: boolean) =>
-    `rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
+    `shrink-0 rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
-      <section className="flex flex-wrap items-center justify-between gap-3" aria-label="Canvas instruments">
-        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
-          <label htmlFor="sheet-select" className="text-xs text-muted-foreground">
+      <section
+        className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3"
+        aria-label="Canvas instruments"
+      >
+        <div className="flex min-w-0 max-w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+          <label htmlFor="sheet-select" className="sr-only sm:not-sr-only sm:text-xs sm:text-muted-foreground">
             Layer / Sheet:
           </label>
           <select
             id="sheet-select"
             value={selectedSheetOrLayer}
             onChange={(e) => setSelectedSheetOrLayer(e.currentTarget.value)}
-            className="min-w-0 max-w-full rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground"
+            className="w-full min-w-0 max-w-full rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground sm:w-auto"
           >
             {availableSheets.map((name) => (
               <option key={name} value={name}>
@@ -517,7 +581,10 @@ export function ReviewCanvas({
             ))}
           </select>
 
-          <div className="flex flex-wrap gap-1">
+          <section
+            className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0"
+            aria-label="Revision comparison modes"
+          >
             <button
               type="button"
               className={modeButtonClass(viewMode === "overlay")}
@@ -562,10 +629,10 @@ export function ReviewCanvas({
             >
               Base Only
             </button>
-          </div>
+          </section>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-start sm:gap-3">
           {effectiveViewMode === "overlay" ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Base</span>
@@ -639,7 +706,18 @@ export function ReviewCanvas({
           }}
         >
           {effectiveViewMode === "split" ? (
-            <SplitViewport baseSrc={baseSrc} headSrc={headSrc} />
+            <SplitViewport
+              baseSrc={baseSrc}
+              headSrc={headSrc}
+              imageWidth={imageWidth}
+              imageHeight={imageHeight}
+              sheetAnchors={sheetAnchors}
+              relevantFindings={relevantFindings}
+              comments={comments}
+              selectedFindingFingerprint={selectedFindingFingerprint}
+              onSelectFinding={onSelectFinding}
+              onSelectComment={onSelectComment}
+            />
           ) : (
             <StackedLayersView
               viewMode={effectiveViewMode}
