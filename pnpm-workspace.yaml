@@ -24,7 +24,7 @@ minimumReleaseAgeExclude:
   - 'proxy-addr@2.0.8'
   - 'source-map-js@1.2.2'
   - '@modelcontextprotocol/sdk@1.32.0'
-  - 'vite@8.2.1'
+  - 'vite@8.2.4'
   # Renovate security update: fast-uri@3.1.8
   - 'fast-uri@3.1.8'
   - 'qs@6.16.0'
@@ -74,7 +74,7 @@ overrides:
   'qs@>=6.11.1 <6.16.0': 6.16.0
   'undici@>=8.0.0 <8.11.0': 8.11.2
   vite@<=6.4.1: '>=6.4.2'
-  vite@^8.0.0: '8.2.1'
+  vite@^8.0.0: '8.2.4'
   '@babel/core@>=7.0.0 <7.29.1': '>=7.29.1'
   'brace-expansion@>=5 <5.0.12': 5.0.12
   'fast-uri@>=3 <3.1.8': 3.1.8
