@@ -1,5 +1,6 @@
 import { createHash, randomInt, randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
+import { verifyDeliveryToken } from "../../apps/web/lib/delivery-auth.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { WorkspaceStore } from "../../packages/db/src/workspace-store.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
@@ -115,8 +116,25 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
       signedArchiveUrl: "https://example.invalid/isolated-fixture.zip",
     });
     expect((await store.getDeliveryByToken(rawToken))?.id).toBe(delivery.id);
+    expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(200);
 
     await executor.query("update release_runs set decision = 'fail' where id = $1", [runId]);
     expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(false);
+    expect(await store.getDeliveryByToken(rawToken)).toBeNull();
+    const stalePageToken = await verifyDeliveryToken(rawToken, executor);
+    expect(stalePageToken.status).toBe(404);
+    expect(stalePageToken.delivery).toBeUndefined();
+
+    await executor.query("update release_runs set decision = 'pass' where id = $1", [runId]);
+    expect((await store.getDeliveryByToken(rawToken))?.id).toBe(delivery.id);
+
+    await executor.query("update artifacts set sha256 = $2 where id = $1", [artifactId, "f".repeat(64)]);
+    expect(await store.getDeliveryByToken(rawToken)).toBeNull();
+    expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(404);
+
+    await executor.query("update artifacts set sha256 = $2 where id = $1", [artifactId, archiveSha256]);
+    await executor.query("update deliveries set expires_at = now() - interval '1 second' where id = $1", [delivery.id]);
+    expect(await store.getDeliveryByToken(rawToken)).toBeNull();
+    expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(410);
   });
 });

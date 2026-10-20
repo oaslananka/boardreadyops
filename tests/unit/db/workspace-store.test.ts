@@ -185,7 +185,7 @@ class MockWorkspaceDb implements SqlQueryExecutor {
       return { rows };
     }
 
-    if (s.includes("from deliveries") && s.includes("join revisions")) {
+    if (s.includes("from deliveries") && s.includes("join revisions") && !s.includes("access_token_hash = $1")) {
       const workspaceId = params[0];
       const rows = this.deliveries.flatMap((d) => {
         const revision = this.revisions.find((r) => r.id === d.revision_id);
@@ -226,7 +226,10 @@ class MockWorkspaceDb implements SqlQueryExecutor {
     if (s.includes("from deliveries") && s.includes("access_token_hash = $1")) {
       const hash = params[0] as string;
       const match = this.deliveries.find(
-        (d) => d.access_token_hash === hash && new Date(String(d.expires_at)).getTime() > Date.now(),
+        (d) =>
+          d.access_token_hash === hash &&
+          d.evidence_valid === true &&
+          new Date(String(d.expires_at)).getTime() > Date.now(),
       );
       return { rows: match ? [match] : [] };
     }
@@ -426,6 +429,11 @@ describe("WorkspaceStore", () => {
     expect(delivery.accessTokenHash).toBe(createHash("sha256").update(rawToken).digest("hex"));
     expect(delivery.signedArchiveUrl).toBe("https://storage.example.com/archive.zip");
 
+    // A freshly created delivery without validated manufacturing evidence stays inaccessible.
+    expect(await store.getDeliveryByToken(rawToken)).toBeNull();
+    const persisted = db.deliveries.at(0);
+    if (!persisted) throw new Error("Mock delivery was not inserted");
+    persisted.evidence_valid = true; // Simulate validated proof in this SQL stub.
     const resolved = await store.getDeliveryByToken(rawToken);
     expect(resolved).toEqual(delivery);
 

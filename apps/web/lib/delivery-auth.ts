@@ -16,6 +16,7 @@ type DeliveryRow = {
   signed_archive_url: string;
   recipient_notes: string | null;
   created_at: string | Date;
+  evidence_valid: boolean;
 };
 
 export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryExecutor): Promise<DeliveryAuthResult> {
@@ -25,9 +26,26 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
 
   const tokenHash = createHash("sha256").update(rawToken.trim()).digest("hex");
   const result = (await executor.query(
-    `select id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes, created_at
-     from deliveries
-     where access_token_hash = $1`,
+    `select deliveries.id, deliveries.revision_id, deliveries.access_token_hash, deliveries.expires_at,
+            deliveries.signed_archive_url, deliveries.recipient_notes, deliveries.created_at,
+            exists (
+              select 1 from revisions
+              join release_runs on release_runs.id = revisions.validation_run_id
+                and release_runs.status = 'completed'
+                and release_runs.decision = 'pass'
+                and release_runs.completed_at is not null
+              join artifacts on artifacts.id = revisions.validation_artifact_id
+                and artifacts.run_id = release_runs.id
+                and artifacts.role = 'manufacturing'
+                and artifacts.kind = 'archive'
+                and artifacts.bytes > 0
+                and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+              where revisions.id = deliveries.revision_id
+                and revisions.bundle_sha256 = artifacts.sha256
+                and revisions.commit_sha = release_runs.commit_sha
+            ) as evidence_valid
+       from deliveries
+      where deliveries.access_token_hash = $1`,
     [tokenHash],
   )) as { rows?: DeliveryRow[] };
 
@@ -39,6 +57,12 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
   const expiresAt = new Date(row.expires_at).getTime();
   if (expiresAt <= Date.now()) {
     return { ok: false, status: 410, error: "Delivery token has expired" };
+  }
+
+  // A guest token can outlive its originating run. Never disclose an archive URL after the
+  // manufacturing evidence loses the passing verdict, artifact, digest or commit binding.
+  if (row.evidence_valid !== true) {
+    return { ok: false, status: 404, error: "Delivery manufacturing evidence is no longer valid" };
   }
 
   return {

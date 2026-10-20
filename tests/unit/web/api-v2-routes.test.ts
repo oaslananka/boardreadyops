@@ -26,7 +26,12 @@ vi.mock("../../../packages/db/src/pg-executor.js", () => ({
   createPgQueryExecutor: vi.fn(() => ({
     query: (sql: string, params: readonly unknown[]) => {
       if (sql.includes("from workspace_members")) return mockMembershipQuery(sql, params);
-      if (sql.includes("from revisions") && sql.includes("join release_runs") && sql.includes("validation_run_id")) {
+      if (
+        sql.includes("from revisions") &&
+        sql.includes("join release_runs") &&
+        sql.includes("validation_run_id") &&
+        !sql.includes("from deliveries")
+      ) {
         return mockValidatedEvidenceQuery(sql, params);
       }
       if (sql.includes("from revisions") && sql.includes("join projects")) {
@@ -374,6 +379,18 @@ describe("API v2 Routes", () => {
       expect(res.status).toBe(200);
       const data = (await res.json()) as { ok: boolean; delivery: { id: string } };
       expect(data.delivery.id).toBe("del_001");
+      const sql = String(mockQuery.mock.calls[0]?.[0]);
+      expect(sql).toContain("release_runs.decision = 'pass'");
+      expect(sql).toContain("revisions.bundle_sha256 = artifacts.sha256");
+    });
+
+    it("does not resolve a guest token with invalidated manufacturing evidence", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      const response = await getDeliveries(
+        new Request("https://boardreadyops.test/api/v2/deliveries?token=stale_guest_token"),
+      );
+      expect(response.status).toBe(404);
+      expect((await response.json()).ok).toBe(false);
     });
   });
   /**

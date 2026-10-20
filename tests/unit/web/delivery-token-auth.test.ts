@@ -31,6 +31,7 @@ describe("verifyDeliveryToken", () => {
       signed_archive_url: "https://storage.example.com/bundle.zip",
       recipient_notes: "Review package for JLCPCB",
       created_at: new Date().toISOString(),
+      evidence_valid: true,
     });
 
     const result = await verifyDeliveryToken(rawToken, db);
@@ -53,12 +54,33 @@ describe("verifyDeliveryToken", () => {
       signed_archive_url: "https://storage.example.com/expired.zip",
       recipient_notes: null,
       created_at: new Date().toISOString(),
+      evidence_valid: true,
     });
 
     const result = await verifyDeliveryToken(rawToken, db);
     expect(result.ok).toBe(false);
     expect(result.status).toBe(410);
     expect(result.error).toBe("Delivery token has expired");
+  });
+
+  it("does not disclose an archive URL when a previously valid token has stale evidence", async () => {
+    const db = new MockDeliveryDb();
+    const rawToken = "formerly_valid_guest_token";
+    db.deliveries.push({
+      id: "del_stale",
+      revision_id: "rev_stale",
+      access_token_hash: createHash("sha256").update(rawToken).digest("hex"),
+      expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+      signed_archive_url: "https://example.invalid/should-not-be-disclosed.zip",
+      recipient_notes: null,
+      created_at: new Date().toISOString(),
+      evidence_valid: false,
+    });
+
+    const result = await verifyDeliveryToken(rawToken, db);
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(404);
+    expect(result.delivery).toBeUndefined();
   });
 
   it("returns 404 for unknown token", async () => {

@@ -67,7 +67,8 @@ describeDatabase("WorkspaceStore (PostgreSQL Integration)", () => {
     });
     expect(delivery.revisionId).toBe(rev.id);
 
+    // An uploaded revision alone has no validated manufacturing run or archive evidence.
     const retrievedDelivery = await store.getDeliveryByToken(rawToken);
-    expect(retrievedDelivery?.id).toBe(delivery.id);
+    expect(retrievedDelivery).toBeNull();
   });
 });

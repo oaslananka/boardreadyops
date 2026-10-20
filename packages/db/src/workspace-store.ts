@@ -1040,9 +1040,27 @@ export class WorkspaceStore {
   async getDeliveryByToken(rawToken: string): Promise<DeliveryRecord | null> {
     const accessTokenHash = createHash("sha256").update(rawToken).digest("hex");
     const result = (await this.executor.query(
-      `select id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes, created_at
-       from deliveries
-       where access_token_hash = $1 and expires_at > now()`,
+      `select deliveries.id, deliveries.revision_id, deliveries.access_token_hash, deliveries.expires_at,
+              deliveries.signed_archive_url, deliveries.recipient_notes, deliveries.created_at
+         from deliveries
+        where deliveries.access_token_hash = $1
+          and deliveries.expires_at > now()
+          and exists (
+            select 1 from revisions
+            join release_runs on release_runs.id = revisions.validation_run_id
+              and release_runs.status = 'completed'
+              and release_runs.decision = 'pass'
+              and release_runs.completed_at is not null
+            join artifacts on artifacts.id = revisions.validation_artifact_id
+              and artifacts.run_id = release_runs.id
+              and artifacts.role = 'manufacturing'
+              and artifacts.kind = 'archive'
+              and artifacts.bytes > 0
+              and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+            where revisions.id = deliveries.revision_id
+              and revisions.bundle_sha256 = artifacts.sha256
+              and revisions.commit_sha = release_runs.commit_sha
+          )`,
       [accessTokenHash],
     )) as { rows?: DeliveryRow[] };
 
