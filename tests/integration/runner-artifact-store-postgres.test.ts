@@ -265,7 +265,7 @@ async function persistRealDraftArtifact(
   expect(upload.status).toBe(201);
   const stored = rows(
     await requireExecutor().query(
-      "select run_id, kind, role, sha256, bytes, storage_path from artifacts where id = $1",
+      "select run_id, kind, role, content_type, sha256, bytes, storage_path from artifacts where id = $1",
       [artifactId],
     ),
   )[0];
@@ -273,6 +273,7 @@ async function persistRealDraftArtifact(
     run_id: fixture.runId,
     kind: "archive",
     role: "draft-manufacturing",
+    content_type: "application/zip",
     sha256: digest,
     bytes: data.byteLength,
   });
