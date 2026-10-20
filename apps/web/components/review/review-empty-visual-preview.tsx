@@ -16,6 +16,17 @@ export function ReviewEmptyVisualPreview({
   const onboarding = mode === "onboarding";
   const actionClassName =
     "inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-primary-foreground hover:opacity-90";
+  const onboardingAction =
+    actionHref === "/api/auth/github/login" ? (
+      // OAuth starts with a server redirect, not an App Router client navigation.
+      <a href={actionHref} className={actionClassName}>
+        {actionLabel} →
+      </a>
+    ) : (
+      <Link href={actionHref} className={actionClassName}>
+        {actionLabel} →
+      </Link>
+    );
   return (
     <section
       aria-label="Example PCB and schematic design views"
@@ -88,16 +99,7 @@ export function ReviewEmptyVisualPreview({
         </p>
         <div className="flex flex-wrap items-center gap-4 text-sm font-medium">
           {onboarding ? (
-            actionHref === "/api/auth/github/login" ? (
-              // OAuth starts with a server redirect, not an App Router client navigation.
-              <a href={actionHref} className={actionClassName}>
-                {actionLabel} →
-              </a>
-            ) : (
-              <Link href={actionHref} className={actionClassName}>
-                {actionLabel} →
-              </Link>
-            )
+            onboardingAction
           ) : (
             <Link href="/reviews#publish-review" className="text-primary underline-offset-4 hover:underline">
               Publish your first Review →
