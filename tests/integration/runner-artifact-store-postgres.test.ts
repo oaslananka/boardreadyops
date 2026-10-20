@@ -1,10 +1,19 @@
+import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { handleRunnerArtifactUploadRequest } from "../../apps/web/lib/runner-artifact-routes.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { createSqlRetentionMaintenanceStore } from "../../packages/db/src/retention-maintenance-store.js";
 import { createSqlRunnerArtifactStore } from "../../packages/db/src/runner-artifact-store.js";
 import { createSqlRunnerLeaseStore } from "../../packages/db/src/runner-lease-store.js";
+import { WorkspaceStore } from "../../packages/db/src/workspace-store.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
+import { detectKicadCli } from "../../src/kicad/cli.js";
+import { createKicadCliRunner, runGenerate } from "../../src/release/generate.js";
+import { createVerifiedManufacturingZip } from "../../src/release/manufacturing-archive.js";
 
 const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
@@ -164,6 +173,118 @@ afterAll(async () => {
   await executor.query("delete from managed_runner_identities where name like 'managed-artifact-test-%'");
 });
 
+async function realManufacturingZip(): Promise<Uint8Array> {
+  const cli = await detectKicadCli();
+  if (!cli.path || !cli.found) throw new Error("KiCad 10 CLI is required for this real-archive test");
+  const root = await mkdtemp(path.join(os.tmpdir(), "bro-draft-sql-zip-"));
+  try {
+    await cp(path.resolve("tests/fixtures/projects/safe-basic"), root, { recursive: true });
+    await writeFile(path.join(root, ".gitignore"), "build/\n");
+    execFileSync("git", ["init", "--quiet"], { cwd: root });
+    execFileSync("git", ["add", "."], { cwd: root });
+    execFileSync(
+      "git",
+      ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "fixture"],
+      { cwd: root },
+    );
+    const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const result = await runGenerate(
+      { schemaVersion: 1, steps: [{ kind: "gerbers" }, { kind: "drill" }] },
+      {
+        outputDir: path.join(root, "build", "outputs"),
+        boardFile: path.join(root, "safe-basic.kicad_pcb"),
+        gitRoot: root,
+        reviewedSourceSha: sha,
+        kicadVersion: cli.version,
+        runner: createKicadCliRunner(cli.path),
+      },
+    );
+    expect(result.failures).toBe(0);
+    const archive = await createVerifiedManufacturingZip({
+      root,
+      generated: result,
+      sourceCommitSha: sha,
+      destination: path.join(root, "build", "manufacturing-draft.zip"),
+    });
+    expect(archive.files).toBeGreaterThan(0);
+    return await readFile(archive.path);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+async function persistRealDraftArtifact(
+  fixture: Awaited<ReturnType<typeof setup>>,
+  storageRoot: string,
+): Promise<string> {
+  const data = await realManufacturingZip();
+  const digest = createHash("sha256").update(data).digest("hex");
+  const artifactId = randomUUID();
+  const uploadToken = token(`draft-upload-${artifactId}`);
+  const issued = await createSqlRunnerArtifactStore(requireExecutor(), {
+    now: () => at(fixture.base, 10),
+    id: () => artifactId,
+    uploadToken: () => uploadToken,
+  }).issueCapabilities({
+    workerClass: "managed",
+    managedRunnerIdentityId: fixture.managedIdentityId,
+    requestTimestamp: requestTimestamp(at(fixture.base, 10)),
+    requestNonce: nonce(`issue-draft-${artifactId}`),
+    runId: fixture.runId,
+    executionAttemptId: fixture.attemptId,
+    leaseId: fixture.leaseId,
+    leaseToken: fixture.leaseToken,
+    artifacts: [
+      {
+        kind: "archive",
+        name: "boardreadyops-manufacturing-draft.zip",
+        role: "draft-manufacturing",
+        contentType: "application/zip",
+        bytes: data.byteLength,
+        sha256: digest,
+      },
+    ],
+  });
+  expect(issued.status).toBe("accepted");
+  const upload = await handleRunnerArtifactUploadRequest(
+    new Request(`https://boardreadyops.test/upload?cap=${uploadToken}`, {
+      method: "PUT",
+      body: new Blob([new Uint8Array(data)]),
+    }),
+    artifactId,
+    {
+      environment: { ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot },
+      now: () => at(fixture.base, 20),
+      queryExecutor: requireExecutor,
+      createArtifactStore: (database) =>
+        createSqlRunnerArtifactStore(database, {
+          now: () => at(fixture.base, 20),
+        }),
+    },
+  );
+  expect(upload.status).toBe(201);
+  const stored = rows(
+    await requireExecutor().query(
+      "select run_id, kind, role, content_type, sha256, bytes, storage_path from artifacts where id = $1",
+      [artifactId],
+    ),
+  )[0];
+  expect(stored).toMatchObject({
+    run_id: fixture.runId,
+    kind: "archive",
+    role: "draft-manufacturing",
+    content_type: "application/zip",
+    sha256: digest,
+    bytes: data.byteLength,
+  });
+  expect(
+    createHash("sha256")
+      .update(await readFile(path.join(storageRoot, String(stored?.storage_path))))
+      .digest("hex"),
+  ).toBe(digest);
+  return artifactId;
+}
+
 describeDatabase("runner artifact capability PostgreSQL store", () => {
   it("issues digest-only capabilities and completes an artifact exactly once", async () => {
     const fixture = await setup("artifact-test-complete");
@@ -271,6 +392,54 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       await cleanupTenant(fixture.tenant, fixture.managedIdentityId);
     }
   });
+
+  it("persists a real KiCad draft through HTTP and PostgreSQL without enabling fabrication delivery", async (context) => {
+    const cli = await detectKicadCli();
+    if (!cli.found || !/^10[.]0[.]/u.test(cli.version ?? "")) {
+      if (process.env.CI) throw new Error("KiCad 10 CLI required in CI");
+      context.skip();
+    }
+    const fixture = await setup("artifact-test-real-draft");
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "bro-draft-upload-store-"));
+    const workspaceId = `ws_draft_${randomUUID()}`;
+    try {
+      const artifactId = await persistRealDraftArtifact(fixture, storageRoot);
+      // A passing release run and matching repository still cannot promote an unsigned draft.
+      await requireExecutor().query("update repositories set private = false where id = $1", [
+        fixture.tenant.repositoryId,
+      ]);
+      await requireExecutor().query(
+        "update release_runs set status = 'completed', decision = 'pass', completed_at = $2::timestamptz where id = $1",
+        [fixture.runId, at(fixture.base, 40).toISOString()],
+      );
+      const store = new WorkspaceStore(requireExecutor());
+      await store.createWorkspace({
+        id: workspaceId,
+        name: "Draft must not become production",
+        slug: `draft-fixture-${randomUUID().slice(0, 8)}`,
+        ownerUserId: "fixture-owner",
+      });
+      const project = await store.createProject({
+        workspaceId,
+        name: "Draft board",
+        githubRepoFullName: `${fixture.tenant.owner}/${fixture.tenant.name}`,
+      });
+      expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+      expect(
+        await store.registerValidatedRevisionFromArtifact({
+          workspaceId,
+          projectId: project.id,
+          runId: fixture.runId,
+          artifactId,
+          revisionLabel: "Cannot approve draft",
+        }),
+      ).toBeNull();
+    } finally {
+      await requireExecutor().query("delete from workspaces where id = $1", [workspaceId]);
+      await cleanupTenant(fixture.tenant, fixture.managedIdentityId);
+      await rm(storageRoot, { recursive: true, force: true });
+    }
+  }, 180_000);
 
   it("expires a pending capability in bounded retention maintenance", async () => {
     const fixture = await setup("artifact-test-maintenance-expiry");
