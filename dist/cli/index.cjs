@@ -59234,11 +59234,12 @@ var RunnerShutdownError = class extends Error {
 
 // src/cli/runner-pipeline.ts
 var import_node_crypto26 = require("node:crypto");
-var import_promises37 = require("node:fs/promises");
+var import_promises38 = require("node:fs/promises");
 var import_node_path81 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
 
 // src/cli/runner-manufacturing-draft.ts
+var import_promises37 = require("node:fs/promises");
 var import_node_path80 = __toESM(require("node:path"), 1);
 async function prepareRunnerManufacturingDraft(workspace, job, options) {
   options.signal?.throwIfAborted();
@@ -59254,6 +59255,7 @@ async function prepareRunnerManufacturingDraft(workspace, job, options) {
     throw new Error("Manufacturing draft requires KiCad CLI version 10.0.x");
   }
   options.signal?.throwIfAborted();
+  await (0, import_promises37.appendFile)(import_node_path80.default.join(workspace, ".git", "info", "exclude"), "\n/.boardreadyops-runner/\n");
   const generated = await runGenerate(
     { schemaVersion: 1, steps: [{ kind: "gerbers" }, { kind: "drill" }] },
     {
@@ -59291,7 +59293,7 @@ async function executeRunnerPipeline(workspace, job, options) {
   const manufacturingDraft = options.manufacturingDraftUpload ? await prepareRunnerManufacturingDraft(workspace, job, options) : void 0;
   const relativeOutputDirectory = import_node_path81.default.join(".boardreadyops-runner", job.executionAttemptId);
   const outputDirectory2 = import_node_path81.default.join(workspace, relativeOutputDirectory);
-  await (0, import_promises37.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
+  await (0, import_promises38.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
   const targets = [
     {
       kind: "report/json",
@@ -59351,9 +59353,9 @@ async function executeRunnerPipeline(workspace, job, options) {
   };
 }
 async function runnerArtifact(filePath, kind, name, role) {
-  const info = await (0, import_promises37.stat)(filePath);
+  const info = await (0, import_promises38.stat)(filePath);
   if (!info.isFile() || info.size > 2147483647) throw new Error(`runner artifact is invalid: ${filePath}`);
-  const content = await (0, import_promises37.readFile)(filePath);
+  const content = await (0, import_promises38.readFile)(filePath);
   return {
     kind,
     name,
@@ -59413,7 +59415,7 @@ function runnerReportFromResult(report) {
 }
 async function readRunReport(filePath) {
   try {
-    const value = JSON.parse(await (0, import_promises37.readFile)(filePath, "utf8"));
+    const value = JSON.parse(await (0, import_promises38.readFile)(filePath, "utf8"));
     return value.schemaVersion === 1 && value.tool?.name === "boardreadyops" && Array.isArray(value.findings) ? value : void 0;
   } catch {
     return void 0;
@@ -61613,12 +61615,12 @@ function assuranceLine(profile) {
 }
 
 // src/cli/commands/verify-export-attestation.ts
-var import_promises38 = __toESM(require("node:fs/promises"), 1);
+var import_promises39 = __toESM(require("node:fs/promises"), 1);
 var import_node_path84 = __toESM(require("node:path"), 1);
 init_path();
 async function exportVerifyCommand(pathInput, options, streams) {
   try {
-    const root = await import_promises38.default.realpath(import_node_path84.default.resolve(normalizePathInput(pathInput)));
+    const root = await import_promises39.default.realpath(import_node_path84.default.resolve(normalizePathInput(pathInput)));
     const attempt = Number(options.runAttempt);
     const result = await verifyReviewedExportAttestation({
       root,

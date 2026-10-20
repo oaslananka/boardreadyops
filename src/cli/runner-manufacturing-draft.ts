@@ -1,3 +1,4 @@
+import { appendFile } from "node:fs/promises";
 import path from "node:path";
 import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
 import { discoverProjects } from "../core/discovery.js";
@@ -33,6 +34,12 @@ export async function prepareRunnerManufacturingDraft(
     throw new Error("Manufacturing draft requires KiCad CLI version 10.0.x");
   }
   options.signal?.throwIfAborted();
+  // The runner owns this disposable checkout, created with git init. Keep *only*
+  // its generated output outside Git status without changing the customer's
+  // tracked .gitignore or excluding any source files. Tracked file edits remain
+  // visible to reviewed-source checks. This is needed even when the source
+  // repository has no .gitignore.
+  await appendFile(path.join(workspace, ".git", "info", "exclude"), "\n/.boardreadyops-runner/\n");
   // This runs BEFORE analysis creates an untracked report. The reviewed-source
   // preflight rejects stale, altered and otherwise dirty checkouts.
   const generated = await runGenerate(
