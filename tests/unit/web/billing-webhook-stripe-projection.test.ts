@@ -114,9 +114,14 @@ describe("verified Stripe inbox HTTP boundary", () => {
   it("does not acknowledge a failed durable insert", async () => {
     const query = db();
     query.mockRejectedValueOnce(new Error("synthetic database outage"));
-    await expect(webhookPost(signedRequest(event("evt_outage", "invoice.paid", {})))).rejects.toThrow(
-      "synthetic database outage",
-    );
+    const response = await webhookPost(signedRequest(event("evt_outage", "invoice.paid", {})));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "Billing inbox temporarily unavailable",
+    });
+    expect(query).toHaveBeenCalledTimes(1);
   });
 });
 

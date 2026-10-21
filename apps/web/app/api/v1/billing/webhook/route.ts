@@ -86,6 +86,13 @@ export async function POST(request: Request): Promise<Response> {
       { ok: true, received: true, duplicate: !inserted },
       { status: 200, headers: { "cache-control": "private, no-store" } },
     );
+  } catch {
+    // Stripe must retry a signed event that could not be durably recorded.
+    // Return a retryable status without exposing connection details or the event body.
+    return Response.json(
+      { ok: false, error: "Billing inbox temporarily unavailable" },
+      { status: 503, headers: { "cache-control": "private, no-store" } },
+    );
   } finally {
     await executor.close();
   }
