@@ -167,7 +167,10 @@ export function CursorPagination({
     <nav aria-label={label} className="flex items-center justify-end gap-2">
       {previousCursor || previousHref ? (
         <Button asChild variant="outline" size="sm">
-          <Link href={previousHref ?? hrefWith(basePath, searchParameters, { [cursorParameter]: previousCursor })} rel="prev">
+          <Link
+              href={previousHref ?? hrefWith(basePath, searchParameters, { [cursorParameter]: previousCursor })}
+              rel="prev"
+            >
             Previous
           </Link>
         </Button>
