@@ -456,7 +456,8 @@ describe("compatibility matrix", () => {
     // Guard the discovered PostgreSQL suites BEFORE appending the two
     // always-present auxiliary tests, otherwise an empty discovery passes.
     const discoverIndex = integrationRuns.indexOf("mapfile -t db_suites");
-    const emptyGuardIndex = integrationRuns.indexOf("if [[ ${#db_suites[@]} -eq 0 ]]");
+    const bashArraySize = "$" + "{#db_suites[@]}";
+    const emptyGuardIndex = integrationRuns.indexOf(`if [[ ${bashArraySize} -eq 0 ]]`);
     const appendIndex = integrationRuns.indexOf("db_suites+=(");
     expect(discoverIndex).toBeGreaterThanOrEqual(0);
     expect(emptyGuardIndex).toBeGreaterThan(discoverIndex);
