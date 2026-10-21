@@ -39,8 +39,11 @@ Operational guarantees and limits:
   subscription changes are now likewise quarantined as
   "ambiguous_subscription_order" rather than permitting a same-second overwrite;
   they still require independently verified provider-state comparison before
-  production billing acceptance. Multi-subscription precedence remains a
-  separate provider-state acceptance gap.
+  production billing acceptance. If an already-linked tenant has another
+  nonterminal Stripe subscription, the competing event is quarantined as
+  `ambiguous_multi_subscription` before mutating customer or installation plans.
+  This guard does not establish multi-subscription precedence; authorized
+  provider-state reconciliation is still required before releasing the event.
 - Unmapped subscription prices remain pending, not silently acknowledged as
   applied. Fix the mapping first; monitor the pending queue for accumulation.
 - A successful transaction is an internal atomicity guarantee, **not** proof

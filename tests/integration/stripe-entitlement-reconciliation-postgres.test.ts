@@ -274,6 +274,35 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     expect(afterOld).toMatchObject({ tier: "team", status: "active" });
   });
 
+  it("quarantines a second active subscription without overwriting the customer's plan", async () => {
+    const first = rows(await database().query("SELECT tier FROM billing_customers WHERE tenant_id=$1", [tenant]))[0];
+    expect(first?.tier).toBe("team");
+
+    const additional = await enqueue(
+      "parallel_business_subscription",
+      "customer.subscription.created",
+      {
+        ...subscription(),
+        id: `sub_additional_${suffix}`,
+        items: { data: [{ price: { id: "price_business_month" } }] },
+      },
+      1_700_003_100,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(additional))?.last_error_class).toBe("ambiguous_multi_subscription");
+    expect((await row(additional))?.processed_at).toBeNull();
+    expect(
+      rows(await database().query("SELECT tier FROM billing_customers WHERE tenant_id=$1", [tenant]))[0]?.tier,
+    ).toBe("team");
+    expect(
+      rows(
+        await database().query("SELECT id FROM billing_subscriptions WHERE stripe_subscription_id=$1", [
+          `sub_additional_${suffix}`,
+        ]),
+      ),
+    ).toHaveLength(0);
+  });
+
   it("rolls back a failed transaction then retries without marking processed", async () => {
     const failure = await enqueue("failed_then_retry", "invoice.payment_failed", { customer }, 1_700_001_200);
     await database().query(

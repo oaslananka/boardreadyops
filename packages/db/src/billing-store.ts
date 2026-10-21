@@ -137,10 +137,22 @@ export class BillingStore {
     cancelAtPeriodEnd: boolean;
     trialEndsAt: string | null;
     eventCreatedAt: string;
-  }): Promise<{ tenantId: string | null; applied: boolean; conflict?: boolean }> {
+  }): Promise<{
+    tenantId: string | null;
+    applied: boolean;
+    conflict?: boolean;
+    conflictReason?: "ambiguous_multi_subscription";
+  }> {
     const q = `
       WITH target_customer AS (
         SELECT tenant_id FROM billing_customers WHERE stripe_customer_id = $1
+      ),
+      conflicting_subscription AS (
+        SELECT 1 FROM billing_subscriptions AS existing
+        JOIN target_customer ON existing.tenant_id = target_customer.tenant_id
+        WHERE existing.stripe_subscription_id <> $3
+          AND existing.status NOT IN ('canceled', 'incomplete_expired')
+        LIMIT 1
       ),
       upserted_subscription AS (
         INSERT INTO billing_subscriptions (
@@ -150,6 +162,7 @@ export class BillingStore {
         )
         SELECT $2, target_customer.tenant_id, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10::timestamptz, $11, $12::timestamptz, NOW(), NOW()
         FROM target_customer
+        WHERE NOT EXISTS (SELECT 1 FROM conflicting_subscription)
         ON CONFLICT (stripe_subscription_id) DO UPDATE SET
           stripe_price_id = EXCLUDED.stripe_price_id,
           tier = EXCLUDED.tier,
@@ -182,7 +195,8 @@ export class BillingStore {
       )
       SELECT
         (SELECT tenant_id FROM target_customer) AS tenant_id,
-        EXISTS (SELECT 1 FROM upserted_subscription) AS applied
+        EXISTS (SELECT 1 FROM upserted_subscription) AS applied,
+        EXISTS (SELECT 1 FROM conflicting_subscription) AS ambiguous_multi_subscription
     `;
     const r = (await this.db.query(q, [
       input.stripeCustomerId,
@@ -199,8 +213,16 @@ export class BillingStore {
       input.eventCreatedAt,
       input.customerStatus,
       input.trialEndsAt,
-    ])) as { rows?: Array<{ tenant_id: string | null; applied: boolean }> };
+    ])) as { rows?: Array<{ tenant_id: string | null; applied: boolean; ambiguous_multi_subscription: boolean }> };
     const row = r.rows?.[0];
+    if (row?.ambiguous_multi_subscription) {
+      return {
+        tenantId: row.tenant_id,
+        applied: false,
+        conflict: true,
+        conflictReason: "ambiguous_multi_subscription",
+      };
+    }
     if (row?.applied || !row?.tenant_id) {
       return { tenantId: row?.tenant_id ?? null, applied: row?.applied ?? false };
     }
