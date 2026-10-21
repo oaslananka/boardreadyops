@@ -692,6 +692,71 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     expect(settled).toMatchObject({ status: "active", last_invoice_event_outcome: "paid" });
   });
 
+  it("rejects foreign paid invoices even when only canceled subscriptions remain", async () => {
+    const canceled = await enqueue(
+      "canceled_before_foreign_invoice",
+      "customer.subscription.deleted",
+      { ...subscription(), status: "canceled" },
+      1_700_009_000,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(canceled))?.processed_at).not.toBeNull();
+    const before = rows(
+      await database().query(
+        "SELECT tier, status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1",
+        [tenant],
+      ),
+    )[0];
+    expect(before).toMatchObject({ tier: "free", status: "canceled" });
+    const foreign = await enqueue(
+      "foreign_invoice_after_cancel",
+      "invoice.payment_failed",
+      { customer, subscription: `sub_unknown_${suffix}` },
+      1_700_009_100,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(foreign))?.last_error_class).toBe("ambiguous_invoice_subscription");
+    const after = rows(
+      await database().query(
+        "SELECT tier, status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1",
+        [tenant],
+      ),
+    )[0];
+    expect(after).toEqual(before);
+  });
+
+  it("defers a source-bound invoice until its first subscription record arrives", async () => {
+    await database().query("DELETE FROM billing_subscriptions WHERE tenant_id=$1", [tenant]);
+    const invoice = await enqueue(
+      "invoice_before_any_subscription_record",
+      "invoice.paid",
+      { customer, subscription: subscription().id },
+      1_700_009_200,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).deferred).toBe(1);
+    expect((await row(invoice))?.last_error_class).toBe("subscription_not_linked");
+    expect((await row(invoice))?.processed_at).toBeNull();
+
+    const later = await enqueue(
+      "subscription_for_deferred_invoice",
+      "customer.subscription.created",
+      subscription(),
+      1_700_009_250,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(later))?.processed_at).not.toBeNull();
+    await database().query("UPDATE billing_events SET available_at=NOW() WHERE stripe_event_id=$1", [invoice]);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(invoice))?.processed_at).not.toBeNull();
+    const customerRecord = rows(
+      await database().query(
+        "SELECT tier, status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1",
+        [tenant],
+      ),
+    )[0];
+    expect(customerRecord).toMatchObject({ tier: "team", status: "active", last_invoice_event_outcome: "paid" });
+  });
+
   it("quarantines a corrupt persisted event without mutating entitlements", async () => {
     const invalid = `evt_corrupt_${suffix}`;
     ids.push(invalid);

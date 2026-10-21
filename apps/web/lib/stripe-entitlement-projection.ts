@@ -121,6 +121,9 @@ async function projectInvoiceEvent(
   if (outcomeResult === "subscription_conflict") {
     return { entitlement: "conflict", reason: "ambiguous_invoice_subscription", tenantId };
   }
+  if (outcomeResult === "subscription_not_linked") {
+    return { entitlement: "deferred", reason: "subscription_not_linked", tenantId };
+  }
   if (outcomeResult === "applied") {
     return { entitlement: outcome === "paid" ? "grace_cleared" : "grace_applied", tenantId };
   }

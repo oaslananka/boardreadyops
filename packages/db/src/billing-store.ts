@@ -289,7 +289,9 @@ export class BillingStore {
     stripeSubscriptionId?: string | undefined;
     eventCreatedAt: string;
     outcome: "paid" | "failed";
-  }): Promise<"applied" | "stale" | "conflict" | "subscription_conflict" | "missing_customer"> {
+  }): Promise<
+    "applied" | "stale" | "conflict" | "subscription_conflict" | "subscription_not_linked" | "missing_customer"
+  > {
     const paid = input.outcome === "paid";
     const graceEnds = new Date(Date.now() + 14 * 86_400_000).toISOString();
     const result = (await this.db.query(
@@ -303,6 +305,10 @@ export class BillingStore {
            last_invoice_event_outcome=$5::text, updated_at=NOW()
        WHERE tenant_id=$1
          AND $6::text IS NOT NULL
+         AND EXISTS (
+           SELECT 1 FROM billing_subscriptions
+           WHERE tenant_id=$1 AND stripe_subscription_id=$6::text
+         )
          AND NOT EXISTS (
            SELECT 1 FROM billing_subscriptions
            WHERE tenant_id=$1 AND status IN ('active','trialing','past_due')
@@ -317,6 +323,13 @@ export class BillingStore {
     const current = (await this.db.query(
       `SELECT last_invoice_event_created_at = $2::timestamptz AS same_second,
               last_invoice_event_outcome,
+              EXISTS (
+                SELECT 1 FROM billing_subscriptions WHERE tenant_id=$1
+              ) AS has_subscription,
+              EXISTS (
+                SELECT 1 FROM billing_subscriptions
+                WHERE tenant_id=$1 AND stripe_subscription_id=$3::text
+              ) AS linked_subscription,
               ($3::text IS NULL OR EXISTS (
                 SELECT 1 FROM billing_subscriptions
                 WHERE tenant_id=$1 AND status IN ('active','trialing','past_due')
@@ -328,11 +341,15 @@ export class BillingStore {
       rows?: Array<{
         same_second: boolean | null;
         last_invoice_event_outcome: string | null;
+        has_subscription: boolean;
+        linked_subscription: boolean;
         subscription_conflict: boolean;
       }>;
     };
     const existing = current.rows?.[0];
     if (!existing) return "missing_customer";
+    if (!existing.linked_subscription)
+      return existing.has_subscription ? "subscription_conflict" : "subscription_not_linked";
     if (existing.subscription_conflict) return "subscription_conflict";
     if (existing.same_second && existing.last_invoice_event_outcome !== input.outcome) return "conflict";
     return "stale";

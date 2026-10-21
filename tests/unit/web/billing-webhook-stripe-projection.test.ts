@@ -216,7 +216,17 @@ describe("transactional Stripe projection units", () => {
       .fn()
       .mockResolvedValueOnce({ rows: [{ tenant_id: "tenant_1" }] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ same_second: true, last_invoice_event_outcome: "failed" }] });
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            same_second: true,
+            last_invoice_event_outcome: "failed",
+            has_subscription: true,
+            linked_subscription: true,
+            subscription_conflict: false,
+          },
+        ],
+      });
     const result = await projectEntitlement(
       new BillingStore({ query }),
       event("evt_ambiguous_paid", "invoice.paid", { customer: "cus_synthetic", subscription: "sub_synthetic" }),

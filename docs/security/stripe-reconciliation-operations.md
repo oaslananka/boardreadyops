@@ -56,8 +56,13 @@ Operational guarantees and limits:
   legacy `subscription` field or `parent.subscription_details.subscription`.
   An invoice with no source, contradictory source fields, or a source conflicting
   with the tenant's current eligible subscription must not change grace or
-  billing status. It is quarantined as `ambiguous_invoice_subscription` (or
+  billing status. Source identity must also match a subscription persisted for
+  that tenant even when no active subscription remains. A different source is
+  quarantined as `ambiguous_invoice_subscription` (or
   `unrecognized_stripe_payload` for mutually contradictory references).
+  If no subscription has been recorded yet, a source-bound invoice is deferred
+  as `subscription_not_linked` for bounded retries; it is never granted access
+  based on customer identity alone.
   Investigate subscription ownership and current Stripe provider truth before
   any explicit single-event recovery; a paid invoice from a canceled/other
   subscription does not grant current plan entitlement.
