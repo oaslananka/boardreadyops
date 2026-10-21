@@ -57,7 +57,8 @@ const KICAD_PATTERNS = [
 // unfamiliar integration surface fails closed into the KiCad job, rather than
 // silently dropping manufacturing/export coverage.
 const DATABASE_ONLY_INTEGRATION_PATTERNS = [
-  /^packages\/db\//,
+  /^packages\/db\/src\/billing-store\.ts$/,
+  /^packages\/db\/migrations\/\d{4}_(?:stripe_|pending_stripe_)[^/]+\.sql$/,
   /^packages\/cloud-core\/src\/stripe-/,
   /^apps\/web\/lib\/stripe-/,
   /^apps\/web\/app\/api\/v1\/billing\//,

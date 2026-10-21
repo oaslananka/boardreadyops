@@ -99,6 +99,7 @@ describe("ci-risk-profile", () => {
     for (const file of [
       "packages/db/src/billing-store.ts",
       "packages/db/migrations/0096_stripe_reconciliation_claims.sql",
+      "packages/db/migrations/0095_pending_stripe_customer_events_index.sql",
       "packages/cloud-core/src/stripe-service.ts",
       "apps/web/lib/stripe-entitlement-worker.ts",
       "apps/web/app/api/v1/billing/webhook/route.ts",
@@ -116,6 +117,9 @@ describe("ci-risk-profile", () => {
       "packages/contracts/src/index.ts",
       "packages/cloud-core/src/lifecycle-executor.ts",
       "tests/integration/runner-artifact-store-postgres.test.ts",
+      "packages/db/src/runner-artifact-store.ts",
+      "packages/db/src/lifecycle-store.ts",
+      "packages/db/migrations/0099_manufacturing_output_control.sql",
       "tests/integration/new-unknown-postgres.test.ts",
       "tests/integration/manufacturing-real-archive.test.ts",
       "tests/fixtures/projects/safe-basic/safe-basic.kicad_pcb",
@@ -127,6 +131,15 @@ describe("ci-risk-profile", () => {
       expect(profile.needs_integration, file).toBe(true);
       expect(profile.needs_kicad, file).toBe(true);
     }
+  });
+
+  it("does not exempt mixed billing and manufacturing/database changes", () => {
+    const profile = classifyChangedFiles(
+      ["packages/db/src/billing-store.ts", "packages/db/src/runner-artifact-store.ts"],
+      { eventName: "pull_request" },
+    );
+    expect(profile.needs_integration).toBe(true);
+    expect(profile.needs_kicad).toBe(true);
   });
 
   it("keeps the full real KiCad suite on main pushes and manual workflows", () => {
