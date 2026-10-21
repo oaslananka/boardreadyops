@@ -162,7 +162,7 @@ export function classifyChangedFiles(files, options = {}) {
   const actionChanged = forceFull || changedFiles.some((file) => matchesAny(file, ACTION_PATTERNS));
   const kicadChanged = forceFull || changedFiles.some((file) => matchesAny(file, KICAD_PATTERNS));
   const integrationChanged = forceFull || changedFiles.some((file) => matchesAny(file, INTEGRATION_PATTERNS));
-  const needsIntegration = forceFull || integrationChanged || kicadChanged || dependencyChanged;
+  const needsIntegration = forceFull || integrationChanged || kicadChanged || dependencyChanged || workflowChanged;
   const needsKiCad =
     needsIntegration &&
     (forceFull ||

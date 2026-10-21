@@ -453,6 +453,15 @@ describe("compatibility matrix", () => {
     expect(integrationRuns).toContain("pnpm exec vitest run");
     expect(integrationRuns).toContain("runner-artifact-store-postgres.test.ts");
     expect(integrationRuns).toContain("--no-file-parallelism");
+    // Guard the discovered PostgreSQL suites BEFORE appending the two
+    // always-present auxiliary tests, otherwise an empty discovery passes.
+    const discoverIndex = integrationRuns.indexOf("mapfile -t db_suites");
+    const emptyGuardIndex = integrationRuns.indexOf("if [[ ${#db_suites[@]} -eq 0 ]]");
+    const appendIndex = integrationRuns.indexOf("db_suites+=(");
+    expect(discoverIndex).toBeGreaterThanOrEqual(0);
+    expect(emptyGuardIndex).toBeGreaterThan(discoverIndex);
+    expect(appendIndex).toBeGreaterThan(emptyGuardIndex);
+
     expect(integrationRuns).toContain("needs.risk-profile.outputs.needs_kicad");
     const kicadInstall = integration?.steps?.find((step) => step.name?.startsWith("Install KiCad"));
     expect(kicadInstall?.if).toContain("needs.risk-profile.outputs.needs_kicad == 'true'");

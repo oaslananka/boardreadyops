@@ -142,6 +142,15 @@ describe("ci-risk-profile", () => {
     expect(profile.needs_kicad).toBe(true);
   });
 
+  it("requires real KiCad integration for workflow-only changes outside ci.yml", () => {
+    const profile = classifyChangedFiles([".github/workflows/publish-npm.yml"], {
+      eventName: "pull_request",
+    });
+    expect(profile.workflow_changed).toBe(true);
+    expect(profile.needs_integration).toBe(true);
+    expect(profile.needs_kicad).toBe(true);
+  });
+
   it("keeps the full real KiCad suite on main pushes and manual workflows", () => {
     for (const eventName of ["push", "workflow_dispatch"]) {
       const profile = classifyChangedFiles(["docs/README.md"], { eventName });

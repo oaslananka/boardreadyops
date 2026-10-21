@@ -434,11 +434,11 @@ jobs:
             # PostgreSQL lanes run all database suites except the one that
             # generates a REAL KiCad ZIP. It stays in the full KiCad lane.
             mapfile -t db_suites < <(find tests/integration -maxdepth 1 -type f -name '*-postgres.test.ts' ! -name 'runner-artifact-store-postgres.test.ts' | LC_ALL=C sort)
-            db_suites+=(tests/integration/postgres-backup-restore.test.ts tests/integration/runner-enrollment-admin-psql.test.ts)
             if [[ ${#db_suites[@]} -eq 0 ]]; then
               echo "::error::No database integration test files found."
               exit 1
             fi
+            db_suites+=(tests/integration/postgres-backup-restore.test.ts tests/integration/runner-enrollment-admin-psql.test.ts)
             pnpm exec vitest run "${db_suites[@]}" --no-file-parallelism --reporter=default --reporter=junit --outputFile.junit=junit.xml
           fi
         continue-on-error: true
