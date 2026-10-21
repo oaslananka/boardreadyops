@@ -58,7 +58,7 @@ export function ProductNavigation() {
 
       const drawer = document.getElementById("product-navigation-drawer");
       if (!drawer) return;
-      const linksAndControls = drawer.querySelectorAll<HTMLElement>('a[href], button:not([disabled])');
+      const linksAndControls = drawer.querySelectorAll<HTMLElement>("a[href], button:not([disabled])");
       const first = linksAndControls.item(0);
       const last = linksAndControls.item(linksAndControls.length - 1);
       if (!first || !last) return;
@@ -136,6 +136,7 @@ export function ProductNavigation() {
         />
       ) : null}
 
+      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: the responsive role is dialog whenever aria-modal is enabled */}
       <aside
         id="product-navigation-drawer"
         className={cn(
