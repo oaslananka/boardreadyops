@@ -1,0 +1,187 @@
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+const installScript = path.resolve("scripts/install-kicad-ci.sh");
+
+const sudoMock = [
+  "#!/usr/bin/env bash",
+  "set -euo pipefail",
+  'if [[ "$1" == "add-apt-repository" ]]; then exit 0; fi',
+  'if [[ "$1" == "apt-get" && "$2" == "update" ]]; then',
+  '  case "$BRO_MOCK_APT_MODE" in',
+  '    outage) echo "E: Failed to fetch https://ppa.launchpadcontent.net/kicad/kicad-10.0-releases/ubuntu/dists/noble/InRelease 503 Service Unavailable" >&2; exit 100;;',
+  '    signature) echo "GPG error: NO_PUBKEY for KiCad 10 PPA" >&2; exit 100;;',
+  '    unrelated) echo "E: Failed to fetch https://packages.example.net/not-kicad/InRelease 503 Service Unavailable" >&2; exit 100;;',
+  "  esac",
+  "fi",
+  'if [[ "$1" == "apt-get" && "$2" == "install" && "$BRO_MOCK_APT_MODE" == "deb_outage" ]]; then',
+  '  echo "E: Failed to fetch https://ppa.launchpadcontent.net/kicad/kicad-10.0-releases/ubuntu/pool/main/k/kicad/kicad.deb 503 Service Unavailable" >&2',
+  "  exit 100",
+  "fi",
+  "exit 0",
+].join("\n");
+
+const dockerMock = [
+  "#!/usr/bin/env bash",
+  "set -euo pipefail",
+  'printf "%s\\n" "$*" >> "$BRO_MOCK_DOCKER_LOG"',
+  'case "$1" in',
+  "  pull) exit 0;;",
+  '  image) echo "$BRO_MOCK_VENDOR";;',
+  '  run) echo "$BRO_MOCK_OCI_VERSION";;',
+  "  *) exit 50;;",
+  "esac",
+].join("\n");
+
+async function fixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bro-kicad-ci-script-"));
+  const bin = path.join(root, "bin");
+  await import("node:fs/promises").then(({ mkdir }) => mkdir(bin));
+  const programs: Record<string, string> = {
+    sudo: sudoMock,
+    docker: dockerMock,
+    sleep: "#!/usr/bin/env bash\nexit 0\n",
+    "apt-cache": '#!/usr/bin/env bash\nprintf "kicad:\\n  Candidate: %s\\n" "$BRO_MOCK_CANDIDATE"\n',
+    "kicad-cli":
+      '#!/usr/bin/env bash\nif [[ "$1" == "version" ]]; then echo "$BRO_MOCK_NATIVE_VERSION"; else exit 40; fi\n',
+  };
+  await Promise.all(
+    Object.entries(programs).map(async ([name, body]) => {
+      const file = path.join(bin, name);
+      await writeFile(file, body);
+      await chmod(file, 0o755);
+    }),
+  );
+  const githubPath = path.join(root, "github-path.txt");
+  await writeFile(githubPath, "");
+  const env = {
+    ...process.env,
+    PATH: bin + path.delimiter + process.env.PATH,
+    BRO_KICAD_VERSION: "10.0",
+    BRO_KICAD_PPA_SERIES: "10.0",
+    RUNNER_TEMP: root,
+    GITHUB_PATH: githubPath,
+    GITHUB_WORKSPACE: process.cwd(),
+    BRO_MOCK_APT_MODE: "signed",
+    BRO_MOCK_CANDIDATE: "10.0.7~ubuntu24.04.1",
+    BRO_MOCK_NATIVE_VERSION: "10.0.7",
+    BRO_MOCK_OCI_VERSION: "10.0.7",
+    BRO_MOCK_VENDOR: "KiCad",
+    BRO_MOCK_DOCKER_LOG: path.join(root, "docker.log"),
+  };
+  return { root, env, githubPath };
+}
+
+function execute(env: NodeJS.ProcessEnv) {
+  return spawnSync("bash", [installScript], { encoding: "utf8", env, timeout: 12000 });
+}
+
+describe("KiCad 10 signed PPA with official OCI outage fallback", () => {
+  it("keeps the signed PPA and native KiCad CLI as the primary path", async () => {
+    const f = await fixture();
+    try {
+      const result = execute(f.env);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
+      expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+      expect(await readFile(f.githubPath, "utf8")).toBe("");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses only the immutable official image after an explicit KiCad PPA 503", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_APT_MODE: "outage" });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
+      const log = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
+      expect(log).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
+      const installed = (await readFile(f.githubPath, "utf8")).trim();
+      expect(installed).toBe(path.join(f.root, "kicad-oci-bin"));
+      const shim = await readFile(path.join(installed, "kicad-cli"), "utf8");
+      expect(shim).toContain("--network none");
+      expect(shim).toContain("--read-only");
+      expect(shim).toContain("--pull=never");
+      expect(shim).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts only a transient signed KiCad package download outage", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_APT_MODE: "deb_outage" });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
+      const log = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
+      expect(log).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("never substitutes OCI for a different APT repository's HTTP 503", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_APT_MODE: "unrelated" });
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toContain("non-KiCad source failed");
+      expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed on APT signature errors rather than switching distributions", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_APT_MODE: "signature" });
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toContain("non-KiCad source failed");
+      expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a KiCad candidate from an old or unrelated Ubuntu package", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_CANDIDATE: "9.0.8" });
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toContain("unexpected candidate");
+      expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a wrong OCI runtime version even when its download succeeds", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_APT_MODE: "outage", BRO_MOCK_OCI_VERSION: "9.0.8" });
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toContain("Expected real KiCad 10.0.*");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an OCI image lacking the expected official KiCad vendor metadata", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_APT_MODE: "outage", BRO_MOCK_VENDOR: "unexpected" });
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toContain("Unexpected OCI image publisher metadata");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+});

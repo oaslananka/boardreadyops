@@ -348,37 +348,10 @@ jobs:
       # without a dependency on Launchpad KiCad package availability.
       - name: Install KiCad ${{ matrix.kicad-version }}
         if: ${{ needs.risk-profile.outputs.needs_kicad == 'true' && matrix.node-version == 24 && matrix.postgres-version == '17' }}
-        run: |
-          set -euo pipefail
-          # Suppress the implicit update; translation indexes are optional.
-          # Launchpad may also return transient HTTP 503 for signed InRelease.
-          # Retry boundedly and never fall back to Ubuntu's older KiCad.
-          sudo add-apt-repository --yes --no-update "ppa:kicad/kicad-${{ matrix.kicad-ppa-series }}-releases"
-          kicad_candidate=""
-          for attempt in 1 2 3 4; do
-            if sudo apt-get update -o Acquire::Languages=none -o APT::Update::Error-Mode=any -o Acquire::Retries=2 -qq; then
-              kicad_candidate="$(apt-cache policy kicad | awk '/Candidate:/ {print $2; exit}')"
-              if [[ "${kicad_candidate}" == "${{ matrix.kicad-version }}".* ]]; then
-                break
-              fi
-            fi
-            if [[ "${attempt}" = 4 ]]; then
-              echo "::error::Signed KiCad ${{ matrix.kicad-version }} package index unavailable (candidate: ${kicad_candidate:-none})"
-              exit 1
-            fi
-            echo "::warning::KiCad ${{ matrix.kicad-version }} package index not ready (attempt ${attempt}/4); retrying"
-            sleep 15
-          done
-          # Integration jobs require kicad-cli, not desktop demos/docs/3D models.
-          # Skip recommended multi-hundred-MB assets to minimize flaky PPA fetches.
-          # Required dependencies and APT signature/hash verification stay enabled.
-          sudo apt-get install --yes --no-install-recommends -o Acquire::Retries=5 kicad
-          version="$(kicad-cli version)"
-          echo "kicad-cli ${version}"
-          if [[ "${version}" != "${{ matrix.kicad-version }}".* ]]; then
-            echo "::error::Expected KiCad ${{ matrix.kicad-version }}.*, got ${version}"
-            exit 1
-          fi
+        env:
+          BRO_KICAD_VERSION: ${{ matrix.kicad-version }}
+          BRO_KICAD_PPA_SERIES: ${{ matrix.kicad-ppa-series }}
+        run: bash scripts/install-kicad-ci.sh
       - name: Install PostgreSQL 16 client
         if: matrix.postgres-version == '16'
         run: sudo apt-get install --yes postgresql-client
