@@ -39,9 +39,9 @@ async function projectCheckoutSessionCompleted(
 /** Resolves the tier + billing interval a subscription event maps to, or why it can't. */
 function resolveSubscriptionTier(
   stripePriceId: string,
-  canceled: boolean,
+  noPaidEntitlement: boolean,
 ): { tier: "free" | "team" | "business"; interval: "month" | "year" } | { ignoredReason: string } {
-  if (canceled) return { tier: "free", interval: "month" };
+  if (noPaidEntitlement) return { tier: "free", interval: "month" };
   const priceConfig = getStripePriceConfig();
   const tier = priceConfig ? resolveTierFromPriceId(stripePriceId, priceConfig) : null;
   if (!priceConfig || !tier) {
@@ -61,14 +61,16 @@ async function projectSubscriptionEvent(
   const parsed = parseStripeSubscriptionEvent(payload);
   if (!parsed) return { entitlement: "ignored", reason: "unrecognized_subscription_payload" };
 
-  const canceled = eventType === "customer.subscription.deleted";
-  const resolved = resolveSubscriptionTier(parsed.stripePriceId, canceled);
+  const customerStatus =
+    eventType === "customer.subscription.deleted" ? "canceled" : billingCustomerStatusFromStripeStatus(parsed.status);
+  // Only active, trialing or grace-eligible past_due subscriptions have a paid plan.
+  // Incomplete, canceled and unknown statuses fail closed regardless of webhook type.
+  const paidEligible = customerStatus === "active" || customerStatus === "trialing" || customerStatus === "past_due";
+  const resolved = resolveSubscriptionTier(parsed.stripePriceId, !paidEligible);
   if ("ignoredReason" in resolved) {
     // Missing configuration can be repaired later; never terminalize this event.
     return { entitlement: "deferred", reason: resolved.ignoredReason, stripePriceId: parsed.stripePriceId };
   }
-  const customerStatus = canceled ? "canceled" : billingCustomerStatusFromStripeStatus(parsed.status);
-
   const result = await store.applyStripeSubscriptionEvent({
     stripeCustomerId: parsed.stripeCustomerId,
     stripeSubscriptionId: parsed.stripeSubscriptionId,

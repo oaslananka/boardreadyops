@@ -509,6 +509,40 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     ).toMatchObject({ status: "canceled", tier: "free" });
   });
 
+  it("does not grant paid plans for terminal subscription.updated statuses", async () => {
+    // A terminal status can arrive in subscription.updated, not only deleted.
+    // Even a historically paid invoice must never grant entitlement on these states.
+    const statuses = [
+      { status: "canceled", customerStatus: "canceled" },
+      { status: "unpaid", customerStatus: "canceled" },
+      { status: "incomplete_expired", customerStatus: "canceled" },
+      { status: "paused", customerStatus: "canceled" },
+      { status: "unexpected_future_state", customerStatus: "canceled" },
+      { status: "incomplete", customerStatus: "incomplete" },
+    ] as const;
+    for (const [index, { status, customerStatus }] of statuses.entries()) {
+      const event = await enqueue(
+        `terminal_update_${index}`,
+        "customer.subscription.updated",
+        { ...subscription(), status },
+        1_700_006_000 + index,
+      );
+      const result = await processStripeEntitlementPass(database(), { limit: 1 });
+      expect(result.processed).toBe(1);
+      expect((await row(event))?.processed_at).not.toBeNull();
+      const current = rows(
+        await database().query("SELECT tier, status FROM billing_customers WHERE tenant_id=$1", [tenant]),
+      )[0];
+      expect(current).toMatchObject({ tier: "free", status: customerStatus });
+      const stored = rows(
+        await database().query("SELECT tier, status FROM billing_subscriptions WHERE stripe_subscription_id=$1", [
+          subscription().id,
+        ]),
+      )[0];
+      expect(stored).toMatchObject({ tier: "free", status });
+    }
+  });
+
   it("quarantines a corrupt persisted event without mutating entitlements", async () => {
     const invalid = `evt_corrupt_${suffix}`;
     ids.push(invalid);
