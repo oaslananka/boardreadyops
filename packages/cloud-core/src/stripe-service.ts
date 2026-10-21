@@ -145,8 +145,12 @@ export function parseStripeSubscriptionEvent(data: unknown): StripeSubscriptionE
   const firstItem = Array.isArray(items?.data) ? record(items.data[0]) : undefined;
   const price = record(firstItem?.price);
   const stripePriceId = nonEmptyString(price?.id);
-  const currentPeriodStart = isoFromUnixSeconds(subscription?.current_period_start);
-  const currentPeriodEnd = isoFromUnixSeconds(subscription?.current_period_end);
+  // API-versioned 2024 webhook snapshots carry period dates at subscription
+  // level. Modern Stripe subscription API objects carry them on each item.
+  // Checkout in this app creates exactly one item; fall back to its cycle
+  // dates when the subscription-level fields are absent.
+  const currentPeriodStart = isoFromUnixSeconds(subscription?.current_period_start ?? firstItem?.current_period_start);
+  const currentPeriodEnd = isoFromUnixSeconds(subscription?.current_period_end ?? firstItem?.current_period_end);
   if (
     !stripeCustomerId ||
     !stripeSubscriptionId ||
@@ -157,7 +161,12 @@ export function parseStripeSubscriptionEvent(data: unknown): StripeSubscriptionE
   ) {
     return undefined;
   }
-  const quantity = typeof subscription?.quantity === "number" && subscription.quantity > 0 ? subscription.quantity : 1;
+  const quantity =
+    typeof firstItem?.quantity === "number" && firstItem.quantity > 0
+      ? firstItem.quantity
+      : typeof subscription?.quantity === "number" && subscription.quantity > 0
+        ? subscription.quantity
+        : 1;
   return {
     stripeCustomerId,
     stripeSubscriptionId,

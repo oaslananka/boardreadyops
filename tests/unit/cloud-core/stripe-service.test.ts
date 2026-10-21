@@ -168,6 +168,50 @@ describe("parseStripeSubscriptionEvent", () => {
     });
   });
 
+  it("accepts the item-scoped billing periods returned by the Stripe sandbox API", () => {
+    // Stripe's current subscription API returns period dates and quantity
+    // on items.data[0], while 2024-06-20 webhook event snapshots retain
+    // current_period_start/end at subscription level.
+    const parsed = parseStripeSubscriptionEvent(
+      sampleSubscriptionObject({
+        status: "trialing",
+        current_period_start: undefined,
+        current_period_end: undefined,
+        quantity: undefined,
+        trial_end: 1_702_592_000,
+        items: {
+          data: [
+            {
+              quantity: 2,
+              current_period_start: 1_700_000_000,
+              current_period_end: 1_702_592_000,
+              price: { id: "price_team_month" },
+            },
+          ],
+        },
+      }),
+    );
+    expect(parsed).toMatchObject({
+      status: "trialing",
+      stripePriceId: "price_team_month",
+      quantity: 2,
+      currentPeriodStart: new Date(1_700_000_000 * 1000).toISOString(),
+      currentPeriodEnd: new Date(1_702_592_000 * 1000).toISOString(),
+      trialEndsAt: new Date(1_702_592_000 * 1000).toISOString(),
+    });
+  });
+
+  it("does not use incomplete item dates when the subscription-level period is missing", () => {
+    expect(
+      parseStripeSubscriptionEvent(
+        sampleSubscriptionObject({
+          current_period_start: undefined,
+          items: { data: [{ price: { id: "price_team_month" }, current_period_end: 1_702_592_000 }] },
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
   it("parses trial_end into trialEndsAt when present", () => {
     const parsed = parseStripeSubscriptionEvent(sampleSubscriptionObject({ trial_end: 1_701_000_000 }));
     expect(parsed?.trialEndsAt).toBe(new Date(1_701_000_000 * 1000).toISOString());

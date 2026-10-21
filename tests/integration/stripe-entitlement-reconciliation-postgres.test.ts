@@ -314,7 +314,22 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
       {
         ...subscription(),
         id: `sub_additional_${suffix}`,
-        items: { data: [{ price: { id: "price_business_month" } }] },
+        status: "trialing",
+        // Current Stripe API response shape (verified in test-mode sandbox):
+        // periods are on the subscription item, not the subscription root.
+        current_period_start: undefined,
+        current_period_end: undefined,
+        quantity: undefined,
+        items: {
+          data: [
+            {
+              price: { id: "price_business_month" },
+              quantity: 1,
+              current_period_start: 1_700_000_000,
+              current_period_end: 1_702_592_000,
+            },
+          ],
+        },
       },
       1_700_003_100,
     );
