@@ -1,0 +1,7 @@
+name: BoardReadyOps source-first CodeQL
+# Tracked dist/ bundles authored code plus vendored Undici WebSocket logic.
+# RFC 6455 mandates SHA-1 ONLY for Sec-WebSocket-Accept protocol handshake;
+# replacing that handshake with SHA-256 would break WebSocket interoperability.
+# CodeQL scans authored JS/TS source; OSV/Dependabot check resolved libraries.
+paths-ignore:
+  - dist/**
