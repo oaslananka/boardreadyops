@@ -460,6 +460,55 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     expect(after).toEqual(before);
   });
 
+  it("preserves a canceled free entitlement against historical and newer invoice events", async () => {
+    // Stripe sandbox provider truth can have paid invoices while the subscription
+    // is now canceled. Invoice replay must never reactivate or mark it past_due.
+    const failure = await enqueue("failure_before_cancel", "invoice.payment_failed", { customer }, 1_700_005_300);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(failure))?.processed_at).not.toBeNull();
+
+    const canceled = await enqueue(
+      "canceled_after_invoice",
+      "customer.subscription.deleted",
+      { ...subscription(), status: "canceled" },
+      1_700_005_200,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(canceled))?.processed_at).not.toBeNull();
+    expect(
+      rows(
+        await database().query("SELECT tier, status, grace_ends_at FROM billing_customers WHERE tenant_id=$1", [
+          tenant,
+        ]),
+      )[0],
+    ).toMatchObject({ tier: "free", status: "canceled", grace_ends_at: null });
+
+    const paid = await enqueue("paid_after_cancel", "invoice.paid", { customer }, 1_700_005_400);
+    const laterFailed = await enqueue("failed_after_cancel", "invoice.payment_failed", { customer }, 1_700_005_500);
+    expect((await processStripeEntitlementPass(database(), { limit: 2 })).processed).toBe(2);
+    expect((await row(paid))?.processed_at).not.toBeNull();
+    expect((await row(laterFailed))?.processed_at).not.toBeNull();
+    const current = rows(
+      await database().query(
+        "SELECT tier, status, grace_ends_at, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1",
+        [tenant],
+      ),
+    )[0];
+    expect(current).toMatchObject({
+      tier: "free",
+      status: "canceled",
+      grace_ends_at: null,
+      last_invoice_event_outcome: "failed",
+    });
+    expect(
+      rows(
+        await database().query("SELECT status, tier FROM billing_subscriptions WHERE stripe_subscription_id=$1", [
+          subscription().id,
+        ]),
+      )[0],
+    ).toMatchObject({ status: "canceled", tier: "free" });
+  });
+
   it("quarantines a corrupt persisted event without mutating entitlements", async () => {
     const invalid = `evt_corrupt_${suffix}`;
     ids.push(invalid);

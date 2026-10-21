@@ -194,9 +194,12 @@ export class BillingStore {
       updated_customer AS (
         UPDATE billing_customers
         SET tier = $5,
-            status = CASE WHEN last_invoice_event_created_at IS NULL
-                           OR last_invoice_event_created_at < $12::timestamptz
-                          THEN $13 ELSE status END,
+            status = CASE
+                       WHEN $13::text = 'canceled' THEN 'canceled'
+                       WHEN last_invoice_event_created_at IS NULL
+                         OR last_invoice_event_created_at < $12::timestamptz THEN $13
+                       ELSE status END,
+            grace_ends_at = CASE WHEN $13::text = 'canceled' THEN NULL ELSE grace_ends_at END,
             trial_ends_at = $14::timestamptz, current_period_end = $10::timestamptz, updated_at = NOW()
         WHERE tenant_id IN (SELECT tenant_id FROM upserted_subscription)
         RETURNING tenant_id
@@ -290,9 +293,9 @@ export class BillingStore {
       `UPDATE billing_customers
        SET status = CASE
              WHEN $3::boolean AND status='past_due' THEN 'active'
-             WHEN NOT $3::boolean THEN 'past_due'
+             WHEN NOT $3::boolean AND status <> 'canceled' THEN 'past_due'
              ELSE status END,
-           grace_ends_at = CASE WHEN $3::boolean THEN NULL ELSE $4::timestamptz END,
+           grace_ends_at = CASE WHEN $3::boolean OR status = 'canceled' THEN NULL ELSE $4::timestamptz END,
            last_invoice_event_created_at=$2::timestamptz,
            last_invoice_event_outcome=$5::text, updated_at=NOW()
        WHERE tenant_id=$1 AND
