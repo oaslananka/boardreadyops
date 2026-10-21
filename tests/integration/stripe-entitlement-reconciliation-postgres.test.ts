@@ -30,10 +30,16 @@ function rows(result: unknown): Array<Record<string, unknown>> {
 async function enqueue(name: string, type: string, object: Record<string, unknown>, created: number) {
   const id = `evt_${name}_${suffix}`;
   ids.push(id);
+  // The legacy compact invoice fixture assumes the same Stripe subscription.
+  // Explicit foreign and source-less invoice fixtures bypass this default.
+  const eventObject =
+    type.startsWith("invoice.") && !("subscription" in object) && !("parent" in object)
+      ? { ...object, subscription: subscription().id }
+      : object;
   await new BillingStore(database()).recordEvent({
     stripeEventId: id,
     type,
-    payload: { id, type, created, data: { object } },
+    payload: { id, type, created, data: { object: eventObject } },
   });
   return id;
 }
@@ -586,6 +592,104 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
       ]),
     )[0];
     expect(afterFailure).toMatchObject({ status: "past_due", last_invoice_event_outcome: "failed" });
+  });
+
+  it("does not clear grace from a different Stripe subscription's paid invoice", async () => {
+    // Stripe invoices have a source subscription. A customer's unrelated
+    // subscription payment must not settle the tracked subscription's grace.
+    const active = await enqueue(
+      "tracked_sub_before_foreign_invoice",
+      "customer.subscription.updated",
+      subscription(),
+      1_700_008_000,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(active))?.processed_at).not.toBeNull();
+    const failure = await enqueue(
+      "tracked_sub_failed_payment",
+      "invoice.payment_failed",
+      { customer, subscription: subscription().id },
+      1_700_008_050,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(failure))?.processed_at).not.toBeNull();
+    const before = rows(
+      await database().query(
+        "SELECT tier, status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1",
+        [tenant],
+      ),
+    )[0];
+    expect(before).toMatchObject({ tier: "team", status: "past_due", last_invoice_event_outcome: "failed" });
+
+    const foreignInvoice = await enqueue(
+      "different_subscription_paid",
+      "invoice.paid",
+      {
+        customer,
+        subscription: `sub_foreign_${suffix}`,
+        parent: { type: "subscription_details", subscription_details: { subscription: `sub_foreign_${suffix}` } },
+      },
+      1_700_008_100,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(foreignInvoice))?.last_error_class).toBe("ambiguous_invoice_subscription");
+    expect((await row(foreignInvoice))?.processed_at).toBeNull();
+    const after = rows(
+      await database().query(
+        "SELECT tier, status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1",
+        [tenant],
+      ),
+    )[0];
+    expect(after).toEqual(before);
+  });
+
+  it("quarantines source-less and contradictory invoices before accepting a parent-linked payment", async () => {
+    const sourceLess = await enqueue(
+      "invoice_without_subscription_source",
+      "invoice.paid",
+      { customer, subscription: null },
+      1_700_008_110,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(sourceLess))?.last_error_class).toBe("ambiguous_invoice_subscription");
+
+    const contradictory = await enqueue(
+      "invoice_mismatched_references",
+      "invoice.paid",
+      {
+        customer,
+        subscription: subscription().id,
+        parent: { type: "subscription_details", subscription_details: { subscription: `sub_foreign_${suffix}` } },
+      },
+      1_700_008_120,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(contradictory))?.last_error_class).toBe("unrecognized_stripe_payload");
+    const unchanged = rows(
+      await database().query("SELECT status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1", [
+        tenant,
+      ]),
+    )[0];
+    expect(unchanged).toMatchObject({ status: "past_due", last_invoice_event_outcome: "failed" });
+
+    const validParent = await enqueue(
+      "invoice_parent_only_valid",
+      "invoice.paid",
+      {
+        customer,
+        subscription: null,
+        parent: { type: "subscription_details", subscription_details: { subscription: subscription().id } },
+      },
+      1_700_008_130,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(validParent))?.processed_at).not.toBeNull();
+    const settled = rows(
+      await database().query("SELECT status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1", [
+        tenant,
+      ]),
+    )[0];
+    expect(settled).toMatchObject({ status: "active", last_invoice_event_outcome: "paid" });
   });
 
   it("quarantines a corrupt persisted event without mutating entitlements", async () => {

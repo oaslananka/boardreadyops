@@ -182,6 +182,7 @@ export function parseStripeSubscriptionEvent(data: unknown): StripeSubscriptionE
 
 export type StripeInvoiceEvent = {
   stripeCustomerId: string;
+  stripeSubscriptionId?: string;
 };
 
 /** Parses an `invoice.paid` / `invoice.payment_failed` event's `data.object`. */
@@ -189,5 +190,10 @@ export function parseStripeInvoiceEvent(data: unknown): StripeInvoiceEvent | und
   const invoice = record(data);
   const stripeCustomerId = nonEmptyString(invoice?.customer);
   if (!stripeCustomerId) return undefined;
-  return { stripeCustomerId };
+  const legacySubscription = nonEmptyString(invoice?.subscription);
+  const details = record(record(invoice?.parent)?.subscription_details);
+  const parentSubscription = nonEmptyString(details?.subscription);
+  if (legacySubscription && parentSubscription && legacySubscription !== parentSubscription) return undefined;
+  const stripeSubscriptionId = parentSubscription ?? legacySubscription;
+  return stripeSubscriptionId ? { stripeCustomerId, stripeSubscriptionId } : { stripeCustomerId };
 }

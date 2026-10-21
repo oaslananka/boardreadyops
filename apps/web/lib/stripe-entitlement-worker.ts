@@ -25,6 +25,7 @@ function conflictErrorClass(reason: unknown): string {
   if (
     reason === "ambiguous_multi_subscription" ||
     reason === "ambiguous_customer_linkage" ||
+    reason === "ambiguous_invoice_subscription" ||
     reason === "ambiguous_subscription_order"
   ) {
     return reason;

@@ -237,6 +237,25 @@ describe("parseStripeInvoiceEvent", () => {
     expect(parseStripeInvoiceEvent({ customer: "cus_123" })).toEqual({ stripeCustomerId: "cus_123" });
   });
 
+  it("extracts the associated subscription from actual Stripe invoice shapes", () => {
+    expect(
+      parseStripeInvoiceEvent({
+        customer: "cus_123",
+        subscription: "sub_123",
+        parent: { type: "subscription_details", subscription_details: { subscription: "sub_123" } },
+      }),
+    ).toEqual({ stripeCustomerId: "cus_123", stripeSubscriptionId: "sub_123" });
+  });
+  it("fails closed on contradictory Stripe invoice subscription sources", () => {
+    expect(
+      parseStripeInvoiceEvent({
+        customer: "cus_123",
+        subscription: "sub_123",
+        parent: { subscription_details: { subscription: "sub_OTHER" } },
+      }),
+    ).toBeUndefined();
+  });
+
   it("returns undefined without a customer id", () => {
     expect(parseStripeInvoiceEvent({})).toBeUndefined();
     expect(parseStripeInvoiceEvent(null)).toBeUndefined();

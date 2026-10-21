@@ -205,7 +205,7 @@ describe("transactional Stripe projection units", () => {
       .mockResolvedValueOnce({ rows: [{ id: "cust_1" }] });
     const result = await projectEntitlement(
       new BillingStore({ query }),
-      event("evt_invoice", "invoice.payment_failed", { customer: "cus_synthetic" }),
+      event("evt_invoice", "invoice.payment_failed", { customer: "cus_synthetic", subscription: "sub_synthetic" }),
     );
     expect(result).toMatchObject({ entitlement: "grace_applied", tenantId: "tenant_1" });
     expect(String(query.mock.calls[1]?.[0])).toContain("last_invoice_event_created_at");
@@ -219,7 +219,7 @@ describe("transactional Stripe projection units", () => {
       .mockResolvedValueOnce({ rows: [{ same_second: true, last_invoice_event_outcome: "failed" }] });
     const result = await projectEntitlement(
       new BillingStore({ query }),
-      event("evt_ambiguous_paid", "invoice.paid", { customer: "cus_synthetic" }),
+      event("evt_ambiguous_paid", "invoice.paid", { customer: "cus_synthetic", subscription: "sub_synthetic" }),
     );
     expect(result).toMatchObject({
       entitlement: "conflict",
@@ -227,6 +227,20 @@ describe("transactional Stripe projection units", () => {
       tenantId: "tenant_1",
     });
     expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not reconcile a linked customer's source-less invoice", async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{ tenant_id: "tenant_1" }] });
+    const result = await projectEntitlement(
+      new BillingStore({ query }),
+      event("evt_no_source", "invoice.paid", { customer: "cus_synthetic" }),
+    );
+    expect(result).toMatchObject({
+      entitlement: "conflict",
+      reason: "ambiguous_invoice_subscription",
+      tenantId: "tenant_1",
+    });
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it("leaves unlinked invoice events pending for later checkout", async () => {

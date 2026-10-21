@@ -286,9 +286,10 @@ export class BillingStore {
    */
   async applyStripeInvoiceEvent(input: {
     tenantId: string;
+    stripeSubscriptionId?: string | undefined;
     eventCreatedAt: string;
     outcome: "paid" | "failed";
-  }): Promise<"applied" | "stale" | "conflict" | "missing_customer"> {
+  }): Promise<"applied" | "stale" | "conflict" | "subscription_conflict" | "missing_customer"> {
     const paid = input.outcome === "paid";
     const graceEnds = new Date(Date.now() + 14 * 86_400_000).toISOString();
     const result = (await this.db.query(
@@ -300,21 +301,39 @@ export class BillingStore {
            grace_ends_at = CASE WHEN $3::boolean OR status = 'canceled' THEN NULL ELSE $4::timestamptz END,
            last_invoice_event_created_at=$2::timestamptz,
            last_invoice_event_outcome=$5::text, updated_at=NOW()
-       WHERE tenant_id=$1 AND
-         (last_invoice_event_created_at IS NULL OR last_invoice_event_created_at < $2::timestamptz)
+       WHERE tenant_id=$1
+         AND $6::text IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM billing_subscriptions
+           WHERE tenant_id=$1 AND status IN ('active','trialing','past_due')
+             AND ($6::text IS NULL OR stripe_subscription_id <> $6::text)
+         )
+         AND (last_invoice_event_created_at IS NULL OR last_invoice_event_created_at < $2::timestamptz)
        RETURNING id`,
-      [input.tenantId, input.eventCreatedAt, paid, graceEnds, input.outcome],
+      [input.tenantId, input.eventCreatedAt, paid, graceEnds, input.outcome, input.stripeSubscriptionId ?? null],
     )) as { rows?: Array<{ id: string }> };
     if ((result.rows?.length ?? 0) > 0) return "applied";
 
     const current = (await this.db.query(
       `SELECT last_invoice_event_created_at = $2::timestamptz AS same_second,
-              last_invoice_event_outcome
+              last_invoice_event_outcome,
+              ($3::text IS NULL OR EXISTS (
+                SELECT 1 FROM billing_subscriptions
+                WHERE tenant_id=$1 AND status IN ('active','trialing','past_due')
+                  AND stripe_subscription_id <> $3::text
+              )) AS subscription_conflict
        FROM billing_customers WHERE tenant_id=$1`,
-      [input.tenantId, input.eventCreatedAt],
-    )) as { rows?: Array<{ same_second: boolean | null; last_invoice_event_outcome: string | null }> };
+      [input.tenantId, input.eventCreatedAt, input.stripeSubscriptionId ?? null],
+    )) as {
+      rows?: Array<{
+        same_second: boolean | null;
+        last_invoice_event_outcome: string | null;
+        subscription_conflict: boolean;
+      }>;
+    };
     const existing = current.rows?.[0];
     if (!existing) return "missing_customer";
+    if (existing.subscription_conflict) return "subscription_conflict";
     if (existing.same_second && existing.last_invoice_event_outcome !== input.outcome) return "conflict";
     return "stale";
   }

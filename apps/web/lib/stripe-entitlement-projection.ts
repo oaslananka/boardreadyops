@@ -109,7 +109,18 @@ async function projectInvoiceEvent(
   if (!parsed) return { entitlement: "ignored", reason: "unrecognized_invoice_payload" };
   const tenantId = await store.resolveTenantIdByStripeCustomerId(parsed.stripeCustomerId);
   if (!tenantId) return { entitlement: "deferred", reason: "customer_not_linked" };
-  const outcomeResult = await store.applyStripeInvoiceEvent({ tenantId, eventCreatedAt, outcome });
+  // A customer-scoped or one-time invoice is not proof of a subscription payment.
+  if (!parsed.stripeSubscriptionId)
+    return { entitlement: "conflict", reason: "ambiguous_invoice_subscription", tenantId };
+  const outcomeResult = await store.applyStripeInvoiceEvent({
+    tenantId,
+    stripeSubscriptionId: parsed.stripeSubscriptionId,
+    eventCreatedAt,
+    outcome,
+  });
+  if (outcomeResult === "subscription_conflict") {
+    return { entitlement: "conflict", reason: "ambiguous_invoice_subscription", tenantId };
+  }
   if (outcomeResult === "applied") {
     return { entitlement: outcome === "paid" ? "grace_cleared" : "grace_applied", tenantId };
   }

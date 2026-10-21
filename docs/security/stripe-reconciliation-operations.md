@@ -52,6 +52,15 @@ Operational guarantees and limits:
   `ambiguous_multi_subscription` before mutating customer or installation plans.
   This guard does not establish multi-subscription precedence; authorized
   provider-state reconciliation is still required before releasing the event.
+  An invoice must identify its source Stripe subscription, either through the
+  legacy `subscription` field or `parent.subscription_details.subscription`.
+  An invoice with no source, contradictory source fields, or a source conflicting
+  with the tenant's current eligible subscription must not change grace or
+  billing status. It is quarantined as `ambiguous_invoice_subscription` (or
+  `unrecognized_stripe_payload` for mutually contradictory references).
+  Investigate subscription ownership and current Stripe provider truth before
+  any explicit single-event recovery; a paid invoice from a canceled/other
+  subscription does not grant current plan entitlement.
   A checkout also cannot silently rebind an existing tenant to another Stripe
   customer or link one Stripe customer to a second tenant: both attempts are
   quarantined as `ambiguous_customer_linkage` for manual provider/ownership
