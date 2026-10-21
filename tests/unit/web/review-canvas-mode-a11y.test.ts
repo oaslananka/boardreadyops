@@ -32,7 +32,7 @@ describe("revision comparison mode accessibility", () => {
           createElement(ReviewCanvas, { headSnapshots: [head], baseSnapshots: [base], findings: [], comments: [] }),
         );
       });
-      const group = container.querySelector('[role="group"][aria-label="Revision comparison modes"]');
+      const group = container.querySelector('fieldset[aria-label="Revision comparison modes"]');
       expect(group).not.toBeNull();
 
       const mode = (name: string) =>
@@ -72,7 +72,7 @@ describe("revision comparison mode accessibility", () => {
       await act(async () => {
         root.render(createElement(ReviewCanvas, { headSnapshots: [head], findings: [], comments: [] }));
       });
-      const group = container.querySelector('[role="group"][aria-label="Revision comparison modes"]');
+      const group = container.querySelector('fieldset[aria-label="Revision comparison modes"]');
       expect(group?.querySelector('button[aria-pressed="true"]')?.textContent?.trim()).toBe("Head Only");
       expect(group?.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
     } finally {
