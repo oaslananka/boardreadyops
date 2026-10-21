@@ -57,8 +57,13 @@ Operational guarantees and limits:
   quarantined as `ambiguous_customer_linkage` for manual provider/ownership
   verification. An identical tenant/customer replay remains idempotent.
 
-- Unmapped subscription prices remain pending, not silently acknowledged as
-  applied. Fix the mapping first; monitor the pending queue for accumulation.
+- Unmapped subscription prices are retried with exponential backoff and
+  quarantined after 12 attempts as `unmapped_stripe_price` (or
+  `stripe_price_config_missing`); they are never silently acknowledged as
+  applied. Correcting the price mapping alone does **not** replay a dead letter.
+  Review the current provider state and operator authorization, then follow the
+  explicit single-event requeue procedure below. Monitor **both** pending and
+  dead-letter counts rather than assuming a mapping change drains the queue.
 - A successful transaction is an internal atomicity guarantee, **not** proof
   of provider consistency, paid-plan acceptance, or customer compliance.
 

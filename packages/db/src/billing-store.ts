@@ -197,7 +197,9 @@ export class BillingStore {
             status = CASE
                        WHEN $13::text = 'canceled' THEN 'canceled'
                        WHEN last_invoice_event_created_at IS NULL
-                         OR last_invoice_event_created_at < $12::timestamptz THEN $13
+                         OR last_invoice_event_created_at < $12::timestamptz
+                         OR (last_invoice_event_created_at = $12::timestamptz
+                             AND last_invoice_event_outcome = 'paid') THEN $13
                        ELSE status END,
             grace_ends_at = CASE WHEN $13::text = 'canceled' THEN NULL ELSE grace_ends_at END,
             trial_ends_at = $14::timestamptz, current_period_end = $10::timestamptz, updated_at = NOW()

@@ -543,6 +543,51 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     }
   });
 
+  it("applies a same-second subscription state after paid invoice but preserves failed invoice state", async () => {
+    const timestamp = 1_700_007_100;
+    const invoice = await enqueue("paid_before_same_second_subscription", "invoice.paid", { customer }, timestamp);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(invoice))?.processed_at).not.toBeNull();
+
+    const trial = await enqueue(
+      "trial_after_same_second_paid",
+      "customer.subscription.created",
+      { ...subscription(), status: "trialing" },
+      timestamp,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(trial))?.processed_at).not.toBeNull();
+    const afterTrial = rows(
+      await database().query("SELECT status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1", [
+        tenant,
+      ]),
+    )[0];
+    expect(afterTrial).toMatchObject({ status: "trialing", last_invoice_event_outcome: "paid" });
+
+    const failed = await enqueue(
+      "failed_before_same_second_subscription",
+      "invoice.payment_failed",
+      { customer },
+      timestamp + 100,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    const active = await enqueue(
+      "active_after_same_second_failed",
+      "customer.subscription.updated",
+      subscription(),
+      timestamp + 100,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(failed))?.processed_at).not.toBeNull();
+    expect((await row(active))?.processed_at).not.toBeNull();
+    const afterFailure = rows(
+      await database().query("SELECT status, last_invoice_event_outcome FROM billing_customers WHERE tenant_id=$1", [
+        tenant,
+      ]),
+    )[0];
+    expect(afterFailure).toMatchObject({ status: "past_due", last_invoice_event_outcome: "failed" });
+  });
+
   it("quarantines a corrupt persisted event without mutating entitlements", async () => {
     const invalid = `evt_corrupt_${suffix}`;
     ids.push(invalid);
