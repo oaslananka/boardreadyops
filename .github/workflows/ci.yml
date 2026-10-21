@@ -31,6 +31,7 @@ jobs:
       needs_unit: ${{ steps.classify.outputs.needs_unit }}
       needs_unit_matrix: ${{ steps.classify.outputs.needs_unit_matrix }}
       needs_integration: ${{ steps.classify.outputs.needs_integration }}
+      needs_kicad: ${{ steps.classify.outputs.needs_kicad }}
       needs_cross_platform: ${{ steps.classify.outputs.needs_cross_platform }}
       needs_action_smoke: ${{ steps.classify.outputs.needs_action_smoke }}
       needs_accessibility: ${{ steps.classify.outputs.needs_accessibility }}
@@ -297,7 +298,7 @@ jobs:
   test-int:
     needs: risk-profile
     if: needs.risk-profile.outputs.needs_integration == 'true'
-    name: ci / test-int (KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }}, PG ${{ matrix.postgres-version }})
+    name: ci / test-int (Node ${{ matrix.node-version }}, PG ${{ matrix.postgres-version }})
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -330,11 +331,6 @@ jobs:
           - kicad-version: "10.0"
             kicad-ppa-series: "10.0"
             node-version: 24
-            postgres-version: "16"
-            postgres-image: "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
-          - kicad-version: "10.0"
-            kicad-ppa-series: "10.0"
-            node-version: 24
             postgres-version: "17"
             postgres-image: "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
     steps:
@@ -347,7 +343,11 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
+      # Only production's Node 24/PG 17 lane installs KiCad when required.
+      # PG-backed billing PRs still exercise Node 22/24 and PostgreSQL 16/17
+      # without a dependency on Launchpad KiCad package availability.
       - name: Install KiCad ${{ matrix.kicad-version }}
+        if: ${{ needs.risk-profile.outputs.needs_kicad == 'true' && matrix.node-version == 24 && matrix.postgres-version == '17' }}
         run: |
           set -euo pipefail
           # Suppress the implicit update; translation indexes are optional.
@@ -427,7 +427,20 @@ jobs:
           if [[ "${{ matrix.postgres-version }}" == "17" ]]; then
             export PATH="$RUNNER_TEMP/pg17-client:$PATH"
           fi
-          pnpm run test:int --reporter=default --reporter=junit --outputFile.junit=junit.xml
+          if [[ "${{ needs.risk-profile.outputs.needs_kicad }}" == "true" && "${{ matrix.node-version }}" == "24" && "${{ matrix.postgres-version }}" == "17" ]]; then
+            # Main and KiCad/manufacturing PRs run the complete real-CLI suite.
+            pnpm run test:int --reporter=default --reporter=junit --outputFile.junit=junit.xml
+          else
+            # PostgreSQL lanes run all database suites except the one that
+            # generates a REAL KiCad ZIP. It stays in the full KiCad lane.
+            mapfile -t db_suites < <(find tests/integration -maxdepth 1 -type f -name '*-postgres.test.ts' ! -name 'runner-artifact-store-postgres.test.ts' | LC_ALL=C sort)
+            if [[ ${#db_suites[@]} -eq 0 ]]; then
+              echo "::error::No database integration test files found."
+              exit 1
+            fi
+            db_suites+=(tests/integration/postgres-backup-restore.test.ts tests/integration/runner-enrollment-admin-psql.test.ts)
+            pnpm exec vitest run "${db_suites[@]}" --no-file-parallelism --reporter=default --reporter=junit --outputFile.junit=junit.xml
+          fi
         continue-on-error: true
       - name: Upload test results to Mergify CI Insights
         if: ${{ always() && steps.mergify-token.outputs.enabled == 'true' }}
@@ -437,7 +450,7 @@ jobs:
           action: junit-process
           report_path: junit.xml
           token: ${{ secrets.MERGIFY_TOKEN }}
-          job_name: ci / test-int (KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }}, PG ${{ matrix.postgres-version }})
+          job_name: ci / test-int (Node ${{ matrix.node-version }}, PG ${{ matrix.postgres-version }})
           test_step_outcome: ${{ steps.tests.outcome }}
       - name: Enforce test result
         if: ${{ always() && steps.tests.outcome != 'success' }}

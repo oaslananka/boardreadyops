@@ -23,6 +23,7 @@ export interface CiRiskProfile {
   readonly needs_unit: boolean;
   readonly needs_unit_matrix: boolean;
   readonly needs_integration: boolean;
+  readonly needs_kicad: boolean;
   readonly needs_cross_platform: boolean;
   readonly needs_action_smoke: boolean;
   readonly needs_accessibility: boolean;
