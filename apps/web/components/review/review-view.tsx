@@ -100,6 +100,7 @@ function ReviewNavigationTabs({
       >
         Changes{changedFilesCount !== undefined ? ` (${changedFilesCount})` : ""}
       </button>
+      {/* Keep the absolute-positioned sr-only counts inside their tab buttons, not the mobile document. */}
       <button
         id="tab-findings"
         role="tab"
@@ -107,7 +108,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-findings"
         tabIndex={activeTab === "findings" ? 0 : -1}
         type="button"
-        className={`flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "findings" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        className={`relative flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "findings" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("findings")}
         onKeyDown={(e) => handleTabKeyDown(e, "findings")}
       >
@@ -139,7 +140,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-checklist"
         tabIndex={activeTab === "checklist" ? 0 : -1}
         type="button"
-        className={`flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "checklist" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        className={`relative flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${activeTab === "checklist" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("checklist")}
         onKeyDown={(e) => handleTabKeyDown(e, "checklist")}
       >

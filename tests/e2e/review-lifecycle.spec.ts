@@ -46,10 +46,13 @@ test.describe("Review lifecycle", () => {
     await openReviewAndWaitForHydration(page);
     await openTab(page, "Changes (4)");
 
-    await expect(page.getByRole("heading", { name: "Schematic & PCB Canvas" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "See the evidence, then decide" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Schematic and PCB Review Canvas" })).toBeVisible();
     // The canvas renders a generated SVG snapshot as a data URI, not a fixed placeholder image.
     await expect(page.locator("img[src^='data:image/svg+xml']").first()).toBeVisible();
-    // BOM delta rows come from the review's actual bomChanges, keyed by component reference.
+    // Technical BOM rows are intentionally collapsed in the visual-first workflow.
+    // A real review remains available after explicitly expanding the details.
+    await page.getByText("Technical change details · PCB changes and BOM").click();
     await expect(page.getByRole("cell", { name: "U12" })).toBeVisible();
     await expect(page.getByText("ISO1042BDWR")).toBeVisible();
   });
@@ -223,5 +226,14 @@ test.describe("Review lifecycle", () => {
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     );
     expect(overflow).toBe(false);
+    // The tab strip should scroll inside its own viewport, not grow the page.
+    const strip = page.getByRole("tablist", { name: "Review workspace" });
+    expect(await strip.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    const checklist = page.getByRole("tab", { name: /Checklist & Approvals/ });
+    await checklist.click();
+    await expect(checklist).toHaveAttribute("aria-selected", "true");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(
+      false,
+    );
   });
 });
