@@ -31,6 +31,8 @@ boardreadyops schema review-publish > review-publish-result.schema.json
 
 Successful JSON stdout is one schema-versioned document containing the BoardReadyOps tool name/version, `success`, `dryRun`, the full `evidenceDigest`, the resolved same-origin `reviewUrl` for live publishes, and `runId` when the service supplies one. Dry runs omit `reviewUrl` and `runId`. Human diagnostics and failures are written to stderr; failed JSON-mode publishes leave stdout empty. Validate consumers against `schemas/review-publish-result.schema.json` or `boardreadyops schema review-publish`.
 
+**Native PCB and schematic visuals require explicit opt-in.** Use boardreadyops review publish . --native-visuals only when your organization permits detailed source-derived design geometry to be stored by the configured BoardReadyOps server. The option changes the effective upload mode to snapshots when it would otherwise be metadata; the exported SVG can reveal copper routing, component arrangement, net labels, and schematics even though raw KiCad source files are not uploaded. Without the flag, Review publishing retains the existing lightweight summary snapshots and does **not** upload native design artwork. This option neither certifies manufacturing readiness nor links plotted geometry independently to the reviewed commit.
+
 The result intentionally excludes API tokens, authorization headers, uploaded source contents, internal trace fields, and unrelated service response data. A successful service response must contain either a same-origin `reviewUrl` or a `runId`; otherwise the command fails closed.
 
 ## Self-hosted runner operations
@@ -89,6 +91,8 @@ boardreadyops runner serve \
   --artifact-mode metadata-only \
   --format json
 ```
+
+The optional `--manufacturing-draft-upload` flag additionally transfers a locally verified but **unsigned and non-approving** Gerber/Excellon ZIP through scoped cloud artifact capabilities, only for public, non-safe-mode, KiCad-required runs using `control-plane` mode. This is disabled by default; it is not a signed manufacturing delivery. See the privacy constraints in [Self-hosted runner mode](deployment/self-hosted-runner.md).
 
 The worker accepts only `customer_checkout` assignments, fetches the exact server-assigned SHA with customer-controlled Git credentials or a local mirror, and removes the temporary workspace by default. Artifact mode defaults to `control-plane`, which uploads only generated reports through attempt-bound capabilities. `--artifact-mode metadata-only` sends the bounded terminal findings/metrics/readiness result without requesting artifact capabilities or transferring report artifact bytes. See [Self-hosted runner mode](deployment/self-hosted-runner.md) for the trust boundary, permissions, network policy, service configuration, private-repository evidence, updates, and rollback.
 

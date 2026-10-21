@@ -164,10 +164,11 @@ function LedgerEmptyState({ state }: Readonly<{ state: "signed-out" | "not-confi
     <EmptyState title="No evidence recorded yet">
       <p>
         A revision is recorded the first time a review is opened against a readiness run. Open a pull request on a
-        linked repository to produce one.
+        linked repository to produce one. Start by inspecting a readiness run; Reviews and their evidence are explicitly
+        published, not automatically created for every run.
       </p>
       <Button asChild variant="outline" className="mt-3">
-        <Link href="/reviews">Go to Reviews</Link>
+        <Link href="/runs">Inspect runs</Link>
       </Button>
     </EmptyState>
   );

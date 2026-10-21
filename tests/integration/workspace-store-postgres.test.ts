@@ -60,14 +60,14 @@ describeDatabase("WorkspaceStore (PostgreSQL Integration)", () => {
     });
     expect(rev.id).toBe(revisionId);
 
-    const { delivery, rawToken } = await store.createDeliveryLink({
-      revisionId: rev.id,
-      expiresAt: new Date(Date.now() + 3600 * 1000),
-      signedArchiveUrl: "https://storage.example.com/bundle.zip",
-    });
-    expect(delivery.revisionId).toBe(rev.id);
-
-    const retrievedDelivery = await store.getDeliveryByToken(rawToken);
-    expect(retrievedDelivery?.id).toBe(delivery.id);
+    // A mere uploaded revision cannot mint a guest link without reviewed
+    // manufacturing evidence AND separate owner/admin sharing authorization.
+    await expect(
+      store.createDeliveryLink({
+        revisionId: rev.id,
+        expiresAt: new Date(Date.now() + 3600 * 1000),
+      }),
+    ).rejects.toThrow("Failed to insert delivery");
+    expect(await store.listDeliveriesByWorkspace(workspaceId)).toEqual([]);
   });
 });

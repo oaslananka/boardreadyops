@@ -12,6 +12,7 @@ const mockMembershipQuery = vi.fn();
 const mockProjectQuery = vi.fn();
 const mockRevisionWorkspaceQuery = vi.fn();
 const mockValidatedEvidenceQuery = vi.fn();
+const mockShareAuthorizationQuery = vi.fn();
 
 /**
  * The authorization lookups are routed to their own mocks so `mockQuery` keeps carrying only the
@@ -25,8 +26,16 @@ const mockValidatedEvidenceQuery = vi.fn();
 vi.mock("../../../packages/db/src/pg-executor.js", () => ({
   createPgQueryExecutor: vi.fn(() => ({
     query: (sql: string, params: readonly unknown[]) => {
+      if (sql.startsWith("insert into deliveries")) return mockQuery(sql, params);
+      if (sql.includes("from manufacturing_share_authorizations as share"))
+        return mockShareAuthorizationQuery(sql, params);
       if (sql.includes("from workspace_members")) return mockMembershipQuery(sql, params);
-      if (sql.includes("from revisions") && sql.includes("join release_runs") && sql.includes("validation_run_id")) {
+      if (
+        sql.includes("from revisions") &&
+        sql.includes("join release_runs") &&
+        sql.includes("validation_run_id") &&
+        !sql.includes("from deliveries")
+      ) {
         return mockValidatedEvidenceQuery(sql, params);
       }
       if (sql.includes("from revisions") && sql.includes("join projects")) {
@@ -46,6 +55,7 @@ describe("API v2 Routes", () => {
     mockMembershipQuery.mockReset().mockResolvedValue({ rows: [{ role: "owner" }] });
     mockRevisionWorkspaceQuery.mockReset().mockResolvedValue({ rows: [{ workspace_id: "ws_123" }] });
     mockValidatedEvidenceQuery.mockReset().mockResolvedValue({ rows: [{}] });
+    mockShareAuthorizationQuery.mockReset().mockResolvedValue({ rows: [{}] });
     mockProjectQuery.mockReset().mockResolvedValue({
       rows: [
         {
@@ -354,6 +364,25 @@ describe("API v2 Routes", () => {
       expect(await res.text()).toContain("validated manufacturing evidence");
     });
 
+    it("rejects non-HTTPS archive URLs rather than issuing public guest links", async () => {
+      for (const signedArchiveUrl of [
+        "javascript:alert(1)",
+        "data:text/plain,untrusted",
+        "http://storage.example.com/bundle.zip",
+        "https://user:secret@storage.example.com/bundle.zip",
+      ]) {
+        const response = await createDelivery(
+          new Request("https://boardreadyops.test/api/v2/deliveries", {
+            method: "POST",
+            headers: { "content-type": "application/json", origin: "https://boardreadyops.test" },
+            body: JSON.stringify({ revisionId: "rev_001", signedArchiveUrl }),
+          }),
+        );
+        expect(response.status).toBe(400);
+      }
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
     it("retrieves delivery by token", async () => {
       mockQuery.mockResolvedValueOnce({
         rows: [
@@ -374,6 +403,18 @@ describe("API v2 Routes", () => {
       expect(res.status).toBe(200);
       const data = (await res.json()) as { ok: boolean; delivery: { id: string } };
       expect(data.delivery.id).toBe("del_001");
+      const sql = String(mockQuery.mock.calls[0]?.[0]);
+      expect(sql).toContain("release_runs.decision = 'pass'");
+      expect(sql).toContain("revisions.bundle_sha256 = artifacts.sha256");
+    });
+
+    it("does not resolve a guest token with invalidated manufacturing evidence", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      const response = await getDeliveries(
+        new Request("https://boardreadyops.test/api/v2/deliveries?token=stale_guest_token"),
+      );
+      expect(response.status).toBe(404);
+      expect((await response.json()).ok).toBe(false);
     });
   });
   /**

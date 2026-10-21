@@ -186,16 +186,23 @@ function hardwareImpactSection(impact: NonNullable<RunResult["hardwareImpact"]>)
 function hardwareImpactFactLines(impact: NonNullable<RunResult["hardwareImpact"]>): string[] {
   const lines: string[] = [];
   const readiness = impact.facts.readiness;
+  if (readiness.conclusion?.changed) {
+    lines.push(`- Release conclusion: ${readiness.conclusion.previous} → ${readiness.conclusion.current}`);
+  }
   if (readiness.scoreDelta !== 0 || readiness.statusChanged) {
     lines.push(
       `- Readiness: ${score(readiness.previousScore)} → ${score(readiness.currentScore)} (${delta(readiness.scoreDelta)})`,
     );
   }
   const findings = impact.facts.findings;
-  if (findings.added > 0 || findings.resolved > 0) {
+  if (findings.added > 0 || findings.resolved > 0 || (findings.worsened ?? 0) > 0 || (findings.improved ?? 0) > 0) {
     const blocker = blockerSuffix(findings.addedBlocking, "new");
     const resolved = blockerSuffix(findings.resolvedBlocking, "resolved");
-    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}`);
+    const severityChanges =
+      (findings.worsened ?? 0) > 0 || (findings.improved ?? 0) > 0
+        ? `; severity ↑${findings.worsened ?? 0} / ↓${findings.improved ?? 0}`
+        : "";
+    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}${severityChanges}`);
   }
   const bomChanged = impact.facts.bom.added + impact.facts.bom.removed + impact.facts.bom.changed;
   if (bomChanged > 0) {

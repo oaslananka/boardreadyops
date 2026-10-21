@@ -152,6 +152,19 @@ async function prepareInventory(root: string, manifestPath: string, reviewedSha:
     names.set(relative, actual);
   }
   if (names.size > 1024) throw new Error("GitHub attestations support at most 1024 subjects.");
+
+  // The source and output tree may have changed after the initial inventory
+  // check but before every signing checksum was computed. A second complete
+  // validation is required at this signing boundary, including undeclared
+  // files and source fingerprints, not just hashes of listed outputs.
+  const finalLocal = await verifyExportProvenance(absoluteRoot, relativeManifest, { currentGitSha: reviewedSha });
+  if (finalLocal.status !== "verified" || finalLocal.gitShaMatch !== true) {
+    throw new Error("Export source or output inventory changed while preparing signing checksums.");
+  }
+  if ((await fileSha256(absoluteManifest)) !== names.get(relativeManifest)) {
+    throw new Error("Export manifest changed while preparing signing checksums.");
+  }
+
   const checksums = `${[...names]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, digest]) => `${digest}  ${name}`)

@@ -66,7 +66,7 @@ then re-enable only that single row within a controlled transaction. Never
 blindly replay large batches or manually change customer entitlements. Keep the
 audit trail of the original event and incident outside the public issue/PR.
 
-**Deployment HOLD:** migration 0090 depends on 0089. Before deploying, reconcile
+**Deployment HOLD:** migration 0096 depends on 0095. Before deploying, reconcile
 with the separate, still-Draft legal-hold migration 0088. Stop all legacy
 inline entitlement-mutating webhook instances before enabling the new worker;
 a mixed-version rollout bypasses the new transactional protocol. Verify schema,

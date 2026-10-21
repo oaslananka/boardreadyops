@@ -48,7 +48,7 @@ const emptyDraft: DraftPolicyState = {
 
 function formatScopeLabel(scope: PolicyRecord["scope"]): string {
   if (scope === "organization") return "Organization Global";
-  if (scope === "team") return "Team Scope";
+  if (scope === "team") return "Team Scope (Not enforced)";
   return "Repository Scope";
 }
 
@@ -60,18 +60,20 @@ function mapGateTone(gate: "error" | "high" | "medium"): "danger" | "warning" | 
 
 function summarizeScope(policies: readonly PolicyRecord[]): string {
   if (policies.length === 0) return "Default baseline";
-  const scopes = new Set(policies.map((p) => p.scope));
-  if (scopes.size > 1) return "Multi-Tenant Hierarchical";
+  const scopes = new Set(policies.filter((p) => p.scope !== "team").map((p) => p.scope));
+  if (scopes.size > 1) return "Organization + Repository";
   const [onlyScope] = scopes;
   if (onlyScope === "organization") return "Organization-Only";
-  if (onlyScope === "team") return "Team-Only";
+  if (onlyScope === "team") return "Not enforced";
   if (onlyScope === "repository") return "Repository-Only";
   return "Default baseline";
 }
 
 function summarizeEnforcement(policies: readonly PolicyRecord[]): string {
   if (policies.length === 0) return "Default open review";
-  return policies.some((p) => p.severityGate !== null) ? "Pre-Fabrication Gates Active" : "Advisory Only";
+  return policies.some((p) => p.scope !== "team" && p.severityGate !== null)
+    ? "Review severity gate configured"
+    : "No review severity gate configured";
 }
 
 interface PolicyCardProps {
@@ -90,7 +92,7 @@ function PolicyCard({ policy, onEdit, onDelete }: PolicyCardProps) {
           <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs uppercase text-muted-foreground">
             {scopeLabel}
           </span>
-          {policy.scopeId ? <code className="text-xs">{policy.scopeId}</code> : null}
+          {policy.scopeId ? <code className="break-all text-xs">{policy.scopeId}</code> : null}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -117,24 +119,32 @@ function PolicyCard({ policy, onEdit, onDelete }: PolicyCardProps) {
       </header>
 
       <div>
+        {policy.scope === "team" ? (
+          <p className="mb-2 text-sm text-warning" role="status">
+            Team policy saved but not enforced in hosted reviews. Organization and repository policies are the supported
+            layers.
+          </p>
+        ) : null}
         <h3 className="text-base font-bold text-foreground">{policy.name}</h3>
         {policy.description ? <p className="mt-1 text-sm text-muted-foreground">{policy.description}</p> : null}
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Severity Gate:</span>
           {policy.severityGate ? (
-            <StatusBadge value={mapGateTone(policy.severityGate)} label={`Block on ${policy.severityGate}`} />
+            <StatusBadge value={mapGateTone(policy.severityGate)} label={`Review gate: ${policy.severityGate}`} />
           ) : (
             <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">Advisory Only</span>
           )}
 
           {policy.requireEvidencePack ? (
-            <span className="rounded-sm bg-info-surface px-1.5 py-0.5 text-xs text-info">Evidence Pack Enforced</span>
+            <span className="rounded-sm bg-info-surface px-1.5 py-0.5 text-xs text-info">
+              Evidence pack required (configured)
+            </span>
           ) : null}
 
           {policy.requireExternalReview ? (
             <span className="rounded-sm bg-warning-surface px-1.5 py-0.5 text-xs text-warning">
-              External Sign-Off Required
+              External review required (configured)
             </span>
           ) : null}
         </div>
@@ -199,7 +209,7 @@ function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, o
   return (
     <Panel
       title={editingId ? "Edit Governance Policy" : "Create Governance Policy"}
-      description="Define release blocking criteria, required approvers, and verification checks."
+      description="Configure hosted review-readiness criteria. This does not authorize manufacturing release or create historical run evidence."
       tone="raised"
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -217,7 +227,9 @@ function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, o
                 className="mt-1"
               >
                 <option value="organization">Organization (Global baseline for all repositories)</option>
-                <option value="team">Team (Applies to all repositories owned by a team)</option>
+                <option value="team" disabled>
+                  Team (not enforced in hosted reviews)
+                </option>
                 <option value="repository">Repository (Specific hardware board repository)</option>
               </NativeSelect>
             </div>
@@ -225,24 +237,30 @@ function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, o
             {draft.scope !== "organization" ? (
               <div>
                 <label htmlFor="policy-scope-id" className={labelClass}>
-                  {draft.scope === "team" ? "Team Identifier *" : "Repository Path / ID *"}
+                  {draft.scope === "team" ? "Team Identifier *" : "Repository UUID *"}
                 </label>
                 <Input
                   id="policy-scope-id"
                   value={draft.scopeId}
                   onChange={(e) => onChange({ ...draft, scopeId: e.target.value })}
-                  placeholder={draft.scope === "team" ? "e.g. rf-engineering" : "e.g. acme/power-distribution"}
+                  placeholder={draft.scope === "team" ? "e.g. rf-engineering" : "Internal repository UUID"}
                   className="mt-1"
                   required
                 />
                 <span className="mt-1 block text-xs text-muted-foreground">
                   {draft.scope === "team"
                     ? "Slug or name of the engineering team"
-                    : "Full repository name or identifier"}
+                    : "Use the internal repository UUID, not an owner/repo GitHub path."}
                 </span>
               </div>
             ) : null}
 
+            {draft.scope === "team" ? (
+              <p className="text-sm text-warning" role="alert">
+                Team policies are not enforced in hosted reviews. This saved scope cannot currently become an effective
+                review gate.
+              </p>
+            ) : null}
             <div>
               <label htmlFor="policy-name" className={labelClass}>
                 Policy Name *
@@ -278,7 +296,7 @@ function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, o
             </legend>
             <div>
               <label htmlFor="policy-gate" className={labelClass}>
-                Minimum Severity Gate (Blocks Release)
+                Minimum Severity Gate (Blocks Review Approval)
               </label>
               <NativeSelect
                 id="policy-gate"
@@ -369,8 +387,8 @@ function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, o
                 <label htmlFor="chk-require-evidence-pack" className="text-sm">
                   <strong className="font-medium text-foreground">Require Verified Evidence Pack</strong>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Mandates verified evidence digests bound to CAD DRC/ERC reports, BOM snapshots, and release
-                    manifests.
+                    Stores the evidence-pack requirement in policy configuration; this field is not yet a standalone
+                    hosted review approval gate.
                   </p>
                 </label>
               </div>
@@ -388,7 +406,8 @@ function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, o
                 <label htmlFor="chk-require-external-review" className="text-sm">
                   <strong className="font-medium text-foreground">Require External / Third-Party Review</strong>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Mandates external partner, lab, or customer sign-off before manufacturing gate is unlocked.
+                    Stores the external-review requirement; do not assume hosted approval independently enforces this
+                    field.
                   </p>
                 </label>
               </div>
@@ -400,7 +419,7 @@ function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, o
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={submitting}>
+          <Button type="submit" disabled={submitting || draft.scope === "team"}>
             {submitting ? "Saving Policy…" : submitLabel}
           </Button>
         </footer>
@@ -413,46 +432,49 @@ function PolicyInheritanceDiagram() {
   return (
     <section className="rounded-md border border-border bg-muted p-4" aria-label="Policy inheritance hierarchy">
       <h3 className="text-base font-bold text-foreground">Policy Hierarchy & Scope Resolution</h3>
+      <p className="mt-1 text-xs font-medium text-primary">Hosted review enforcement: Organization + Repository only</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        BoardReadyOps resolves governance rules top-down with strict inheritance. Repositories inherit organization and
-        team baselines. Stricter rules apply automatically; exceptions require formal review waivers.
+        Hosted review enforcement resolves the organization baseline and then repository overrides. Checklist and role
+        overrides replace inherited nonempty lists; a repository override can relax the organization severity gate.
+        Evidence-pack and external-review true values are monotonic in the policy resolver, but are not independently
+        enforced by the hosted review approval gate. Team and exception layers are not enforced in hosted reviews.
       </p>
       <div className="mt-4 grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
         <div className="rounded-md border border-border bg-card p-3">
-          <div className="text-xs uppercase text-muted-foreground">Level 1: Global</div>
-          <h4 className="text-sm font-bold text-foreground">Organization</h4>
+          <div className="text-xs uppercase text-muted-foreground">Applied first</div>
+          <h4 className="text-sm font-bold text-foreground">Organization baseline</h4>
           <p className="mt-1 text-xs text-muted-foreground">
-            Baseline severity gates, mandatory DFM checks, and global sign-off requirements.
+            Organization-level review checklist, roles and severity defaults (subject to repository overrides).
           </p>
         </div>
         <div className="hidden text-center text-muted-foreground sm:block" aria-hidden="true">
           →
         </div>
-        <div className="rounded-md border border-border bg-card p-3">
-          <div className="text-xs uppercase text-muted-foreground">Level 2: Domain</div>
+        <div className="rounded-md border border-dashed border-border bg-card/60 p-3">
+          <div className="text-xs uppercase text-warning">Reserved — not enforced</div>
           <h4 className="text-sm font-bold text-foreground">Team Scope</h4>
           <p className="mt-1 text-xs text-muted-foreground">
-            Domain-specific criteria (e.g. RF impedance, automotive isolation, power rail integrity).
+            Team-level rules can be saved but do not affect hosted approval.
           </p>
         </div>
         <div className="hidden text-center text-muted-foreground sm:block" aria-hidden="true">
           →
         </div>
         <div className="rounded-md border border-border bg-card p-3">
-          <div className="text-xs uppercase text-muted-foreground">Level 3: Project</div>
-          <h4 className="text-sm font-bold text-foreground">Repository</h4>
+          <div className="text-xs uppercase text-muted-foreground">Applied after organization</div>
+          <h4 className="text-sm font-bold text-foreground">Repository overrides</h4>
           <p className="mt-1 text-xs text-muted-foreground">
-            Per-board tighter tolerances, stackup layer count rules, and custom verification checklists.
+            Repository checklist/role lists replace inherited ones; severity can be more or less restrictive.
           </p>
         </div>
         <div className="hidden text-center text-muted-foreground sm:block" aria-hidden="true">
           →
         </div>
-        <div className="rounded-md border border-border bg-card p-3">
-          <div className="text-xs uppercase text-muted-foreground">Level 4: Waiver</div>
+        <div className="rounded-md border border-dashed border-border bg-card/60 p-3">
+          <div className="text-xs uppercase text-warning">Reserved — not enforced</div>
           <h4 className="text-sm font-bold text-foreground">Review Exception</h4>
           <p className="mt-1 text-xs text-muted-foreground">
-            Time-bound, break-glass sign-offs and auditable risk acceptances.
+            Exceptions are modeled in the resolver but not loaded into hosted review readiness.
           </p>
         </div>
       </div>
@@ -512,8 +534,8 @@ function policyRequest(
 }
 
 function policyOutcomeMessage(draft: DraftPolicyState, editingId: string | null): string {
-  if (editingId) return `Policy "${draft.name}" updated.`;
-  if (draft.severityGate) return `Policy "${draft.name}" created and enforced.`;
+  if (editingId) return `Policy "${draft.name}" saved. Check the effective review policy before relying on it.`;
+  if (draft.severityGate) return `Policy "${draft.name}" saved. Review gate configuration does not authorize release.`;
   return `Policy "${draft.name}" created (advisory only — no severity gate configured).`;
 }
 
@@ -581,7 +603,7 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!draft.name.trim() || submitting) return;
+    if (!draft.name.trim() || submitting || draft.scope === "team") return;
 
     setSubmitting(true);
     setError(null);
@@ -625,7 +647,7 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
         setError(describeApiFailure(res.status, body.error, "this policy"));
         return;
       }
-      setSuccessMessage(`Policy "${name}" removed from enforcement.`);
+      setSuccessMessage(`Policy "${name}" deleted from configuration.`);
       await loadPolicies();
     } catch {
       setError(describeNetworkFailure());
@@ -700,7 +722,7 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
       >
         <div className="flex flex-wrap gap-4 text-sm">
           <span>
-            <strong>{policies?.length ?? 0}</strong> Active Policies
+            <strong>{policies?.length ?? 0}</strong> Saved Policies
           </span>
           <span>
             Scope: <strong>{scopeSummary}</strong>
@@ -757,11 +779,12 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
         />
       ) : null}
 
-      <section aria-label="Active governance policies">
+      <section aria-label="Configured governance policies">
         <header>
-          <h2 className="text-lg font-bold text-foreground">Active Governance Policies</h2>
+          <h2 className="text-lg font-bold text-foreground">Configured Governance Policies</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Rules currently enforced on all hardware pull requests and release sign-offs.
+            Organization and repository policies contribute to hosted review readiness. Team records are stored but not
+            applied; no policy here authorizes fabrication release.
           </p>
         </header>
 

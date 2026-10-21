@@ -26,6 +26,7 @@ export interface CiRiskProfile {
   readonly needs_cross_platform: boolean;
   readonly needs_action_smoke: boolean;
   readonly needs_accessibility: boolean;
+  readonly needs_visual: boolean;
   readonly needs_build: boolean;
   readonly needs_dist: boolean;
   readonly needs_coverage: boolean;

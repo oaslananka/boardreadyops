@@ -196,6 +196,28 @@ describe("PoliciesClient interactions (delete confirmation, cancel draft reset)"
     expect(container.textContent).not.toContain("Pre-Fabrication Gates Active");
   });
 
+  it("prevents selecting a non-enforced Team scope in the create policy builder", async () => {
+    await act(async () => {
+      root.render(createElement(PoliciesClient));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const open = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "+ New Governance Policy",
+    );
+    if (!open) throw new Error("open policy action missing");
+    await act(async () => {
+      open.click();
+    });
+    const selector = container.querySelector("#policy-scope") as unknown as HTMLSelectElement;
+    const team = selector.querySelector('option[value="team"]');
+    expect(team).not.toBeNull();
+    expect(team?.disabled).toBe(true);
+    expect(container.textContent).toContain("Team and exception layers are not enforced");
+    expect(container.textContent).toContain("Repository (Specific hardware board repository)");
+  });
+
   it("prefills the builder from an existing policy and PATCHes it instead of creating a second one", async () => {
     await act(async () => {
       root.render(createElement(PoliciesClient));

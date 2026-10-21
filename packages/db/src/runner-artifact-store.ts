@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { isUnattestedManufacturingArchive } from "@boardreadyops/contracts";
 import type { SqlQueryExecutor, SqlQueryResult } from "./lifecycle-store.js";
 import type { RunnerLeaseMutationContext, RunnerWorkerIdentity } from "./runner-lease-store.js";
 
@@ -166,6 +167,8 @@ function normalizeDeclaration(input: RunnerArtifactDeclaration): RunnerArtifactD
   if (kind.length < 1 || kind.length > 128) return undefined;
   if (name.length < 1 || name.length > 256) return undefined;
   if (role.length < 1 || role.length > 128) return undefined;
+  // The SQL-facing store must not trust callers that bypass the wire schema.
+  if (isUnattestedManufacturingArchive({ kind, role })) return undefined;
   if (!Number.isSafeInteger(input.bytes) || input.bytes < 0 || input.bytes > 2_147_483_647) return undefined;
   if (input.sha256 !== undefined && !sha256Pattern.test(input.sha256)) return undefined;
   const contentType = input.contentType?.trim().toLowerCase() ?? defaultArtifactContentType;

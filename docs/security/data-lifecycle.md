@@ -17,6 +17,8 @@ normalized run results, findings, metadata, report links, and any report artifac
 that the runner explicitly uploads. It does not automatically upload a source
 archive.
 
+**Native review visuals:** The CLI option review publish --native-visuals can send KiCad-generated PCB and schematic SVGs to the configured BoardReadyOps server. These derived images can expose substantial customer design IP and are stored as run snapshots. This is disabled by default: metadata-only Review publishing does not turn it on. Enable it only for a trusted self-hosted server or a hosted environment approved to receive proprietary design visuals. Existing run-snapshot retention is not a guarantee of immediate deletion.
+
 ### BoardReadyOps control-plane boundary
 
 The control plane stores tenant-scoped metadata in PostgreSQL. Optional managed

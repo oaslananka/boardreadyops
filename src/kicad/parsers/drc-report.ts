@@ -43,10 +43,17 @@ export function parseKicadDiagnostics(reportText: string, fallbackRule: string):
   const diagnostics: KicadDiagnostic[] = [];
   const report = kicadReportSchema.safeParse(parsed);
   if (report.success) {
+    // KiCad 10 declares physical units at report root, not per violation.
+    const coordinateUnits =
+      parsed && typeof parsed === "object" && "coordinate_units" in parsed
+        ? (parsed as { coordinate_units?: unknown }).coordinate_units
+        : undefined;
     for (const key of ["violations", "diagnostics", "errors", "warnings"] as const) {
       for (const diagnostic of report.data[key] ?? []) {
         const normalized = normalizeDiagnostic(diagnostic, fallbackRule);
         if (normalized) {
+          // Only explicit millimeter metadata qualifies for real PCB object anchors.
+          if (coordinateUnits === "mm") normalized.raw.coordinate_units = "mm";
           diagnostics.push(normalized);
         }
       }

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DELETE as deletePolicy } from "../../../apps/web/app/api/v1/policies/[id]/route.js";
 import { POST as createPolicy, GET as getPolicies } from "../../../apps/web/app/api/v1/policies/route.js";
-import PoliciesPage from "../../../apps/web/app/policies/page.js";
+import PoliciesPage, { metadata as policiesMetadata } from "../../../apps/web/app/policies/page.js";
 import PoliciesClient from "../../../apps/web/app/policies/policies-client.js";
 import * as cloudConfig from "../../../apps/web/lib/cloud-runtime-config.js";
 import * as viewerAuth from "../../../apps/web/lib/viewer-authorization.js";
@@ -138,8 +138,14 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
     expect(markup).toContain("Organization Governance &amp; Release Policies");
     expect(markup).toContain("policies-page-frame");
     expect(markup).toContain("Policies");
-    expect(markup).toContain("Release gates and verification rules bound to SHA-256 evidence digests.");
+    expect(markup).toContain("Hosted reviews enforce organization and repository policies.");
     expect(markup).not.toContain("Cryptographic release gates");
+    expect(markup).toContain("Hosted reviews enforce organization and repository policies.");
+    expect(markup).toContain("Team and review exceptions are not enforced;");
+    expect(markup).toContain("repository overrides can relax rules.");
+    expect(markup).not.toContain("Inheritance: Organization");
+    expect(policiesMetadata.description).toContain("Team and review exceptions are not enforced");
+    expect(policiesMetadata.description).not.toContain("Organization → Team");
   });
 
   it("renders PoliciesClient with hierarchy diagram, metrics toolbar, and action CTA", () => {
@@ -148,6 +154,18 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
     expect(markup).toContain("Default baseline");
     expect(markup).toContain("Default open review");
     expect(markup).toContain("+ New Governance Policy");
+  });
+
+  it("describes only the two hosted-enforced policy layers and discloses override relaxations", () => {
+    const markup = renderToStaticMarkup(createElement(PoliciesClient));
+    expect(markup).toContain("Hosted review enforcement");
+    expect(markup).toContain("Organization baseline");
+    expect(markup).toContain("Repository overrides");
+    expect(markup).toContain("Team and exception layers are not enforced");
+    expect(markup).toContain("can relax the organization severity gate");
+    expect(markup).not.toContain("Stricter rules apply automatically");
+    expect(markup).not.toContain("Repositories inherit organization and team baselines");
+    expect(markup).not.toContain("Rules currently enforced on all hardware pull requests");
   });
 
   it("GET /api/v1/policies returns list of tenant policies", async () => {

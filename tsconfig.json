@@ -34,6 +34,7 @@
     "tests/integration/security-adversarial.test.ts",
     "tests/integration/me-work-postgres.test.ts",
     "tests/integration/external-review-links-postgres.test.ts",
+    "tests/integration/run-ingestion-atomic-postgres.test.ts",
     "tests/unit/contracts/cli-cloud-forward-compat.test.ts",
     "tests/unit/contracts/action-cloud-forward-compat.test.ts"
   ]

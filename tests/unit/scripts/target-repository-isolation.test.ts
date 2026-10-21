@@ -13,12 +13,21 @@ function evidence(overrides: Record<string, unknown> = {}) {
     independentCheckRunsPublished: 2,
     crossInstallationCallbacksRejected: 2,
     staleAttemptCallbacksRejected: 1,
+    exactSignedJwtReplaysAccepted: 1,
+    persistedSupersededAttemptRacesRejected: 1,
     claimMutationCallbacksRejected: 7,
     trustSnapshotCallbacksRejected: 2,
     rejectedCallbackMutations: 0,
     rejectedCallbackPublications: 0,
     optionalCommentWarnings: 1,
     responseLeakageFindings: 0,
+    scopedAuditExports: 2,
+    deniedForeignAuditReads: 2,
+    auditCanaryLeakageFindings: 0,
+    checkRunPublicationLeakageFindings: 0,
+    restrictedAppCheckRunUpdates: 1,
+    restrictedAppCommentDenials: 1,
+    restrictedAppWarningPersistence: 1,
     ...overrides,
   };
 }
@@ -38,15 +47,17 @@ describe("target-repository two-installation isolation evidence", () => {
         installations: 2,
         repositories: 2,
         runs: 2,
-        executionAttempts: 2,
+        executionAttempts: 3,
       },
       accepted: {
         independentCallbacks: 2,
         independentCheckRuns: 2,
+        exactSignedJwtReplays: 1,
       },
       rejected: {
         crossInstallationCallbacks: 2,
         staleAttemptCallbacks: 1,
+        persistedSupersededAttemptRaces: 1,
         claimMutationCallbacks: 7,
         trustSnapshotCallbacks: 2,
       },
@@ -55,6 +66,13 @@ describe("target-repository two-installation isolation evidence", () => {
         rejectedCallbackPublications: 0,
         optionalCommentWarnings: 1,
         responseLeakageFindings: 0,
+        scopedAuditExports: 2,
+        deniedForeignAuditReads: 2,
+        auditCanaryLeakageFindings: 0,
+        checkRunPublicationLeakageFindings: 0,
+        restrictedAppCheckRunUpdates: 1,
+        restrictedAppCommentDenials: 1,
+        restrictedAppWarningPersistence: 1,
       },
     });
   });
@@ -80,6 +98,24 @@ describe("target-repository two-installation isolation evidence", () => {
     expect(() => validateTargetRepositoryIsolationEvidence(evidence({ responseLeakageFindings: 1 }))).toThrow(
       "response leakage",
     );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ scopedAuditExports: 1 }))).toThrow(
+      "scoped audit exports",
+    );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ restrictedAppCheckRunUpdates: 0 }))).toThrow(
+      "restricted App Check Run updates",
+    );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ restrictedAppCommentDenials: 0 }))).toThrow(
+      "restricted App comment denials",
+    );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ restrictedAppWarningPersistence: 0 }))).toThrow(
+      "restricted App warning persistence",
+    );
+    expect(() => validateTargetRepositoryIsolationEvidence(evidence({ auditCanaryLeakageFindings: 1 }))).toThrow(
+      "audit canary leakage",
+    );
+    expect(() =>
+      validateTargetRepositoryIsolationEvidence(evidence({ checkRunPublicationLeakageFindings: 1 })),
+    ).toThrow("Check Run publication leakage");
   });
 
   it("rejects non-exact source revisions", () => {

@@ -378,13 +378,22 @@ export function RepositorySetupInteractive({
 
       <Panel
         id="automated-setup"
-        title="3. Open the setup pull request"
-        description="Commits the two files above to a new branch and opens a pull request, without a terminal or a local clone."
+        title={
+          displayedRepository && deriveRepositorySetupState(displayedRepository).id === "ready"
+            ? "3. Setup is already verified"
+            : "3. Open the setup pull request"
+        }
+        description={
+          displayedRepository && deriveRepositorySetupState(displayedRepository).id === "ready"
+            ? "Continue to your runs, or explicitly choose to update the verified repository configuration."
+            : "Commits the two files above to a new branch and opens a pull request, without a terminal or a local clone."
+        }
       >
         <OneClickSetup
           signedIn={signedIn}
           repositories={repositories}
           repositoryId={repositoryId}
+          {...(displayedRepository ? { repository: displayedRepository } : {})}
           onSelectRepository={handleSelectRepository}
           onCreate={handleCreateSetupPr}
           isCreating={isCreatingPr}
@@ -770,6 +779,7 @@ type OneClickSetupProps = {
   signedIn: boolean;
   repositories: readonly SetupTargetRepository[];
   repositoryId: string;
+  repository?: SetupTargetRepository;
   onSelectRepository: (id: string) => void;
   onCreate: () => void;
   isCreating: boolean;
@@ -791,6 +801,7 @@ function OneClickSetup({
   signedIn,
   repositories,
   repositoryId,
+  repository,
   onSelectRepository,
   onCreate,
   isCreating,
@@ -800,6 +811,7 @@ function OneClickSetup({
   result,
 }: Readonly<OneClickSetupProps>) {
   const selectId = "one-click-setup-repository";
+  const setupVerified = repository !== undefined && deriveRepositorySetupState(repository).id === "ready";
 
   if (!signedIn) {
     return (
@@ -858,20 +870,53 @@ function OneClickSetup({
             ))}
           </select>
           <p className="mt-1.5 text-meta text-muted-foreground">
-            Creates branch <code>boardreadyops/setup</code> with <code>boardreadyops.yml</code> and{" "}
-            <code>.github/workflows/{workflowPath}</code>, then opens a pull request. Nothing reaches your default
-            branch until you merge it.
+            {setupVerified ? (
+              "No new setup pull request is needed. The repository workflow and configuration are already verified."
+            ) : (
+              <>
+                Creates branch <code>boardreadyops/setup</code> with <code>boardreadyops.yml</code> and{" "}
+                <code>.github/workflows/{workflowPath}</code>, then opens a pull request. Nothing reaches your default
+                branch until you merge it.
+              </>
+            )}
           </p>
         </div>
-        <button
-          type="button"
-          disabled={isCreating || blockedReason !== undefined || !repositoryId}
-          onClick={onCreate}
-          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
-        >
-          {isCreating ? "Opening pull request…" : "Open setup pull request"}
-        </button>
+        {setupVerified ? (
+          <Link
+            href="/runs"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90"
+          >
+            View runs →
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled={isCreating || blockedReason !== undefined || !repositoryId}
+            onClick={onCreate}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+          >
+            {isCreating ? "Opening pull request…" : "Open setup pull request"}
+          </button>
+        )}
       </div>
+
+      {setupVerified ? (
+        <details className="rounded-md border border-border p-3">
+          <summary className="cursor-pointer text-sm font-medium text-foreground">Change verified setup</summary>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Reconfiguration creates a reviewed pull request for the policy and workflow files above. It does not change
+            your default branch until you merge it.
+          </p>
+          <button
+            type="button"
+            disabled={isCreating || blockedReason !== undefined || !repositoryId}
+            onClick={onCreate}
+            className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50"
+          >
+            {isCreating ? "Opening pull request…" : "Open configuration update PR"}
+          </button>
+        </details>
+      ) : null}
 
       {blockedReason ? (
         <p className="rounded-md border border-warning/40 bg-warning-surface p-3 text-sm text-foreground">

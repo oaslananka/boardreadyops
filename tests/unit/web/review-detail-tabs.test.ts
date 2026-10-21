@@ -39,6 +39,82 @@ describe("Review Detail Tabs", () => {
     expect(header).toContain("Request changes");
   });
 
+  it("keeps the mobile Review summary compact without hiding signoff or evidence-copy actions", () => {
+    const html = renderToStaticMarkup(
+      createElement(ReviewHeader, {
+        reviewId: review.id,
+        title: review.title,
+        repositoryName: review.repositoryName,
+        pullRequestNumber: review.pullRequestNumber,
+        status: review.status,
+        decision: review.decision,
+        currentRevisionSequence: review.currentRevisionSequence,
+        baseCommitSha: review.baseCommitSha,
+        headCommitSha: review.headCommitSha,
+        evidenceDigest: review.evidenceDigest,
+        evidenceState: review.evidenceState,
+      }),
+    );
+    expect(html).toContain("line-clamp-2");
+    expect(html).toContain("sm:line-clamp-none");
+    expect(html).toContain("overflow-x-auto whitespace-nowrap");
+    expect(html).toContain('class="sm:hidden"');
+    expect(html).toContain("Copy digest");
+    expect(html).toContain('role="img" aria-label="Evidence is current"');
+    expect(html).toContain("Approve review");
+    expect(html).toContain("Request changes");
+    const stale = renderToStaticMarkup(
+      createElement(ReviewHeader, {
+        reviewId: review.id,
+        title: review.title,
+        repositoryName: review.repositoryName,
+        pullRequestNumber: review.pullRequestNumber,
+        status: review.status,
+        decision: review.decision,
+        currentRevisionSequence: review.currentRevisionSequence,
+        baseCommitSha: review.baseCommitSha,
+        headCommitSha: review.headCommitSha,
+        evidenceDigest: review.evidenceDigest,
+        evidenceState: "stale",
+      }),
+    );
+    expect(stale).toContain('role="img" aria-label="Evidence is stale"');
+  });
+
+  it("keeps all Review tabs keyboard accessible on a single mobile scroll row", () => {
+    const html = renderToStaticMarkup(createElement(ReviewView, { initialReview: review }));
+    expect(html).toContain("min-w-0 flex-nowrap gap-1 overflow-x-auto border-b");
+    expect(html).toContain('id="tab-changes" role="tab"');
+    expect(html).toContain('id="tab-evidence" role="tab"');
+    expect(html).toContain("min-h-11 shrink-0 items-center");
+  });
+
+  it("labels a manual Review without inventing a PR number or base commit", () => {
+    const manual = { ...review, pullRequestNumber: 0, baseCommitSha: "0".repeat(40) };
+    const header = renderToStaticMarkup(
+      createElement(ReviewHeader, {
+        reviewId: manual.id,
+        title: manual.title,
+        repositoryName: manual.repositoryName,
+        pullRequestNumber: manual.pullRequestNumber,
+        status: manual.status,
+        decision: manual.decision,
+        currentRevisionSequence: manual.currentRevisionSequence,
+        baseCommitSha: manual.baseCommitSha,
+        headCommitSha: manual.headCommitSha,
+        evidenceDigest: manual.evidenceDigest,
+        evidenceState: manual.evidenceState,
+      }),
+    );
+    expect(header).toContain("Manual review");
+    expect(header).toContain("No base");
+    expect(header).not.toContain("PR #0");
+    expect(header).not.toContain("0000000");
+    const overview = renderToStaticMarkup(createElement(OverviewTab, { review: manual }));
+    expect(overview).toContain("Not recorded");
+    expect(overview).not.toContain("Open the visual diff");
+  });
+
   it("shows authorized persisted Review revision run links, but no invented fixture source run", () => {
     const persisted = renderToStaticMarkup(
       createElement(ReviewView, {
@@ -166,7 +242,11 @@ describe("Review Detail Tabs", () => {
 
     const overview = renderToStaticMarkup(createElement(OverviewTab, { review: policyReview }));
 
-    expect(overview).toContain("Effective Policy &amp; Inheritance");
+    expect(overview).not.toContain("Effective Policy &amp; Inheritance");
+    expect(overview).toContain("Current configured policy (not a run snapshot)");
+    expect(overview).toContain("resolved from the current organization and repository settings");
+    expect(overview).toContain("not historical evidence of the policy used for this review revision");
+
     expect(overview).toContain("Org baseline");
     expect(overview).toContain("Repository · Repo override");
     expect(overview).toContain("Organization · Org baseline");

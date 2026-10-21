@@ -15,6 +15,8 @@ export interface ReviewPublishOptions extends CommonCliOptions {
   base?: string;
   head?: string;
   upload?: UploadMode;
+  /** Informed opt-in to publishing source-derived PCB/schematic geometry. */
+  nativeVisuals?: boolean;
   dryRun?: boolean;
   token?: string;
   server?: string;
@@ -90,6 +92,24 @@ function getGitCommitSha(ref = "HEAD"): string {
   }
 }
 
+/** A branch is only provenance for the checked-out commit; never fabricate `main`. */
+export function resolveReviewPublishRef(sourceRoot: string, headSha: string): string {
+  try {
+    const gitExec = resolveGitExecutable();
+    const run = (args: string[]) =>
+      execFileSync(gitExec, ["-C", sourceRoot, ...args], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    const actualSha = run(["rev-parse", "HEAD"]);
+    if (actualSha !== headSha) return headSha;
+    const branch = run(["symbolic-ref", "--quiet", "--short", "HEAD"]);
+    return branch && !branch.startsWith("-") ? `refs/heads/${branch}` : headSha;
+  } catch {
+    return headSha;
+  }
+}
+
 function getGitOriginRepo(): string | undefined {
   try {
     const gitExec = resolveGitExecutable();
@@ -116,7 +136,12 @@ export async function reviewPublishCommand(
   const headSha = options.head ?? getGitCommitSha("HEAD");
   const baseSha = options.base ? getGitCommitSha(options.base) : undefined;
   const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
-  const uploadMode: UploadMode = options.upload ?? "metadata";
+  // Native artwork contains source-derived design IP even though it is SVG, not
+  // a KiCad source file. Never send it under the default metadata-only mode.
+  const uploadMode: UploadMode =
+    options.nativeVisuals && (!options.upload || options.upload === "metadata")
+      ? "snapshots"
+      : (options.upload ?? "metadata");
   const server = (options.server ?? process.env.BOARDREADYOPS_SERVER_URL ?? "https://app.boardreadyops.com").replace(
     /\/$/,
     "",
@@ -178,13 +203,17 @@ export async function reviewPublishCommand(
   }
 
   const snapshots: SnapshotArtifact[] = await generateSnapshots({
+    ...(options.nativeVisuals ? {} : { nativeCli: false }),
     schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => path.resolve(root, f))),
     pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => path.resolve(root, f))),
-    findings: findings.map((f) => ({
+    // The Cloud wire format intentionally omits native KiCad diagnostic details.
+    // Snapshot linking needs the original trusted run findings before that projection.
+    findings: result.findings.map((f) => ({
       fingerprint: f.fingerprint,
       ruleId: f.ruleId,
       severity: f.severity,
       message: f.message,
+      ...(f.details ? { details: f.details } : {}),
     })),
   });
 
@@ -201,7 +230,7 @@ export async function reviewPublishCommand(
       body: JSON.stringify({
         repositoryId,
         commitSha: headSha,
-        ref: "refs/heads/main",
+        ref: resolveReviewPublishRef(root, headSha),
         pullRequestNumber: options.pr,
         triggerKind: "manual",
         findings,

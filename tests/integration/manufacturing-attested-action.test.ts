@@ -113,6 +113,43 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"))).toBe(true);
   });
 
+  it("provides an isolated GitHub-internal signed bundle path without API or public transparency-log storage", async () => {
+    const raw = await fs.readFile("examples/github/workflows/boardreadyops-manufacturing-internal.yml", "utf8");
+    const template = load(raw) as TargetSpec;
+    expect(Object.keys(template.on)).toEqual(["workflow_dispatch"]);
+    const job = template.jobs["attest-manufacturing-export"];
+    expect(job).toBeDefined();
+    expect(job?.if).toBeUndefined();
+    expect(job?.permissions).toEqual({ contents: "read", "id-token": "write" });
+    const steps = job?.steps ?? [];
+    const exportIndex = steps.findIndex((step) => step.id === "export");
+    const signIndex = steps.findIndex((step) => step.id === "internal");
+    expect(exportIndex).toBeGreaterThan(0);
+    expect(signIndex).toBeGreaterThan(exportIndex);
+    expect(steps[exportIndex]?.uses).toMatch(
+      /^oaslananka\/boardreadyops\/\.github\/actions\/manufacturing-attested-export@[a-f0-9]{40}$/u,
+    );
+    const sign = String(steps[signIndex]?.run ?? "");
+    expect(sign).toContain("github.ref_protected");
+    expect(sign).toContain("github.event.repository.fork");
+    expect(sign).toContain("git status --porcelain");
+    expect(sign).toContain("attestProvenance");
+    expect(sign).toContain("sigstore:'github'");
+    expect(sign).toContain("skipWrite:true");
+    expect(sign).toContain("result.attestationID||result.tlogID");
+    expect(sign).toContain("verificationMaterial?.tlogEntries");
+    expect(sign).toContain("rfc3161Timestamps");
+    expect(sign).toContain("Unsafe subject checksum list");
+    expect(raw).toContain("@actions/attest@3.2.0");
+    expect(raw).toContain("--ignore-scripts");
+    expect(steps.some((step) => /^actions\/attest@/u.test(String(step.uses ?? "")))).toBe(false);
+    expect(steps.filter((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"))).toHaveLength(2);
+    expect(raw).toContain("reviewed-manufacturing-internal-attestation");
+    expect(raw).toContain("reviewed-manufacturing-export");
+    expect(raw).not.toContain("attestations: write");
+    expect(raw).not.toContain("artifact-metadata: write");
+  });
+
   it("exports REAL KiCad Gerbers and drill from the exact clean SHA and inventories all bytes", async (ctx) => {
     const cli = await detectKicadCli();
     if (!process.env.CI) ctx.skip(!cli.found || !/^10\.0\./u.test(cli.version ?? ""), "Requires KiCad 10");

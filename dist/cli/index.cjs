@@ -48,7 +48,7 @@ var boardReadyVersion;
 var init_version = __esm({
   "src/generated/version.ts"() {
     "use strict";
-    boardReadyVersion = "1.68.3";
+    boardReadyVersion = "1.69.0";
   }
 });
 
@@ -677,11 +677,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants4) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants);
+          this.rhs = optimizeExpr(this.rhs, names, constants4);
         return this;
       }
       get names() {
@@ -698,10 +698,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants4) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants);
+        this.rhs = optimizeExpr(this.rhs, names, constants4);
         return this;
       }
       get names() {
@@ -762,8 +762,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants) {
-        this.code = optimizeExpr(this.code, names, constants);
+      optimizeNames(names, constants4) {
+        this.code = optimizeExpr(this.code, names, constants4);
         return this;
       }
       get names() {
@@ -792,12 +792,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants4) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants))
+          if (n.optimizeNames(names, constants4))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -850,12 +850,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants4) {
         var _a3;
-        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants);
-        if (!(super.optimizeNames(names, constants) || this.else))
+        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants4);
+        if (!(super.optimizeNames(names, constants4) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants);
+        this.condition = optimizeExpr(this.condition, names, constants4);
         return this;
       }
       get names() {
@@ -878,10 +878,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants) {
-        if (!super.optimizeNames(names, constants))
+      optimizeNames(names, constants4) {
+        if (!super.optimizeNames(names, constants4))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants);
+        this.iteration = optimizeExpr(this.iteration, names, constants4);
         return this;
       }
       get names() {
@@ -917,10 +917,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants) {
-        if (!super.optimizeNames(names, constants))
+      optimizeNames(names, constants4) {
+        if (!super.optimizeNames(names, constants4))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants);
+        this.iterable = optimizeExpr(this.iterable, names, constants4);
         return this;
       }
       get names() {
@@ -962,11 +962,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants4) {
         var _a3, _b;
-        super.optimizeNames(names, constants);
-        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants);
+        super.optimizeNames(names, constants4);
+        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants4);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants4);
         return this;
       }
       get names() {
@@ -1267,7 +1267,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants) {
+    function optimizeExpr(expr, names, constants4) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1282,14 +1282,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants[n.str];
+        const c = constants4[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants4[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -3529,8 +3529,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path79) {
-      let input = path79;
+    function removeDotSegments(path85) {
+      let input = path85;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3939,8 +3939,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path79 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path79 && path79 !== "/" ? path79 : void 0;
+        const path85 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path85 && path85 !== "/" ? path85 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -8277,12 +8277,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats2(ajv3, list, fs31, exportName) {
+    function addFormats2(ajv3, list, fs32, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv3.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv3.addFormat(f, fs31[f]);
+        ajv3.addFormat(f, fs32[f]);
     }
     module2.exports = exports2 = formatsPlugin;
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -8294,9 +8294,9 @@ var require_dist = __commonJS({
 var require_resolve_from = __commonJS({
   "node_modules/resolve-from/index.js"(exports2, module2) {
     "use strict";
-    var path79 = require("path");
+    var path85 = require("path");
     var Module = require("module");
-    var fs31 = require("fs");
+    var fs32 = require("fs");
     var resolveFrom = (fromDir, moduleId, silent) => {
       if (typeof fromDir !== "string") {
         throw new TypeError(`Expected \`fromDir\` to be of type \`string\`, got \`${typeof fromDir}\``);
@@ -8305,17 +8305,17 @@ var require_resolve_from = __commonJS({
         throw new TypeError(`Expected \`moduleId\` to be of type \`string\`, got \`${typeof moduleId}\``);
       }
       try {
-        fromDir = fs31.realpathSync(fromDir);
+        fromDir = fs32.realpathSync(fromDir);
       } catch (err) {
         if (err.code === "ENOENT") {
-          fromDir = path79.resolve(fromDir);
+          fromDir = path85.resolve(fromDir);
         } else if (silent) {
           return null;
         } else {
           throw err;
         }
       }
-      const fromFile = path79.join(fromDir, "noop.js");
+      const fromFile = path85.join(fromDir, "noop.js");
       const resolveFileName = () => Module._resolveFilename(moduleId, {
         id: fromFile,
         filename: fromFile,
@@ -8387,7 +8387,7 @@ var require_parent_module = __commonJS({
 var require_import_fresh = __commonJS({
   "node_modules/import-fresh/index.js"(exports2, module2) {
     "use strict";
-    var path79 = require("path");
+    var path85 = require("path");
     var resolveFrom = require_resolve_from();
     var parentModule = require_parent_module();
     module2.exports = (moduleId) => {
@@ -8395,7 +8395,7 @@ var require_import_fresh = __commonJS({
         throw new TypeError("Expected a string");
       }
       const parentPath = parentModule(__filename);
-      const cwd = parentPath ? path79.dirname(parentPath) : __dirname;
+      const cwd = parentPath ? path85.dirname(parentPath) : __dirname;
       const filePath = resolveFrom(cwd, moduleId);
       const oldModule = require.cache[filePath];
       if (oldModule && oldModule.parent) {
@@ -8705,9 +8705,9 @@ var require_picocolors = __commonJS({
     var argv = p.argv || [];
     var env = p.env || {};
     var isColorSupported = !(!!env.NO_COLOR || argv.includes("--no-color")) && (!!env.FORCE_COLOR || argv.includes("--color") || p.platform === "win32" || (p.stdout || {}).isTTY && env.TERM !== "dumb" || !!env.CI);
-    var formatter = (open, close, replace = open) => (input) => {
-      let string4 = "" + input, index = string4.indexOf(close, open.length);
-      return ~index ? open + replaceClose(string4, close, replace, index) + close : open + string4 + close;
+    var formatter = (open4, close, replace = open4) => (input) => {
+      let string4 = "" + input, index = string4.indexOf(close, open4.length);
+      return ~index ? open4 + replaceClose(string4, close, replace, index) + close : open4 + string4 + close;
     };
     var replaceClose = (string4, close, replace, index) => {
       let result = "", cursor = 0;
@@ -9746,20 +9746,20 @@ var require_int = __commonJS({
     }
     function parseYamlInteger2(data) {
       let value = data;
-      let sign = 1;
+      let sign2 = 1;
       let ch = value[0];
       if (ch === "-" || ch === "+") {
-        if (ch === "-") sign = -1;
+        if (ch === "-") sign2 = -1;
         value = value.slice(1);
         ch = value[0];
       }
       if (value === "0") return 0;
       if (ch === "0") {
-        if (value[1] === "b") return sign * parseInt(value.slice(2), 2);
-        if (value[1] === "x") return sign * parseInt(value.slice(2), 16);
-        if (value[1] === "o") return sign * parseInt(value.slice(2), 8);
+        if (value[1] === "b") return sign2 * parseInt(value.slice(2), 2);
+        if (value[1] === "x") return sign2 * parseInt(value.slice(2), 16);
+        if (value[1] === "o") return sign2 * parseInt(value.slice(2), 8);
       }
-      return sign * parseInt(value, 10);
+      return sign2 * parseInt(value, 10);
     }
     function constructYamlInteger(data) {
       return parseYamlInteger2(data);
@@ -9822,16 +9822,16 @@ var require_float = __commonJS({
     }
     function constructYamlFloat(data) {
       let value = data.toLowerCase();
-      const sign = value[0] === "-" ? -1 : 1;
+      const sign2 = value[0] === "-" ? -1 : 1;
       if ("+-".indexOf(value[0]) >= 0) {
         value = value.slice(1);
       }
       if (value === ".inf") {
-        return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+        return sign2 === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
       } else if (value === ".nan") {
         return NaN;
       }
-      return sign * parseFloat(value, 10);
+      return sign2 * parseFloat(value, 10);
     }
     var SCIENTIFIC_WITHOUT_DOT = /^[-+]?[0-9]+e/;
     function representYamlFloat2(object2, style) {
@@ -12403,7 +12403,7 @@ ${error51.message}`;
         return typescript.sys.fileExists(fileName);
       });
       if (filePath !== void 0) {
-        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path79) => typescript.sys.readFile(path79));
+        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path85) => typescript.sys.readFile(path85));
         if (error51) {
           throw new Error(`Error in ${filePath}: ${error51.messageText.toString()}`);
         }
@@ -12526,42 +12526,42 @@ var require_defaults2 = __commonJS({
 var require_env_paths = __commonJS({
   "node_modules/env-paths/index.js"(exports2, module2) {
     "use strict";
-    var path79 = require("path");
-    var os7 = require("os");
-    var homedir = os7.homedir();
-    var tmpdir = os7.tmpdir();
+    var path85 = require("path");
+    var os8 = require("os");
+    var homedir = os8.homedir();
+    var tmpdir = os8.tmpdir();
     var { env } = process;
     var macos = (name) => {
-      const library = path79.join(homedir, "Library");
+      const library = path85.join(homedir, "Library");
       return {
-        data: path79.join(library, "Application Support", name),
-        config: path79.join(library, "Preferences", name),
-        cache: path79.join(library, "Caches", name),
-        log: path79.join(library, "Logs", name),
-        temp: path79.join(tmpdir, name)
+        data: path85.join(library, "Application Support", name),
+        config: path85.join(library, "Preferences", name),
+        cache: path85.join(library, "Caches", name),
+        log: path85.join(library, "Logs", name),
+        temp: path85.join(tmpdir, name)
       };
     };
     var windows = (name) => {
-      const appData = env.APPDATA || path79.join(homedir, "AppData", "Roaming");
-      const localAppData = env.LOCALAPPDATA || path79.join(homedir, "AppData", "Local");
+      const appData = env.APPDATA || path85.join(homedir, "AppData", "Roaming");
+      const localAppData = env.LOCALAPPDATA || path85.join(homedir, "AppData", "Local");
       return {
         // Data/config/cache/log are invented by me as Windows isn't opinionated about this
-        data: path79.join(localAppData, name, "Data"),
-        config: path79.join(appData, name, "Config"),
-        cache: path79.join(localAppData, name, "Cache"),
-        log: path79.join(localAppData, name, "Log"),
-        temp: path79.join(tmpdir, name)
+        data: path85.join(localAppData, name, "Data"),
+        config: path85.join(appData, name, "Config"),
+        cache: path85.join(localAppData, name, "Cache"),
+        log: path85.join(localAppData, name, "Log"),
+        temp: path85.join(tmpdir, name)
       };
     };
     var linux = (name) => {
-      const username = path79.basename(homedir);
+      const username = path85.basename(homedir);
       return {
-        data: path79.join(env.XDG_DATA_HOME || path79.join(homedir, ".local", "share"), name),
-        config: path79.join(env.XDG_CONFIG_HOME || path79.join(homedir, ".config"), name),
-        cache: path79.join(env.XDG_CACHE_HOME || path79.join(homedir, ".cache"), name),
+        data: path85.join(env.XDG_DATA_HOME || path85.join(homedir, ".local", "share"), name),
+        config: path85.join(env.XDG_CONFIG_HOME || path85.join(homedir, ".config"), name),
+        cache: path85.join(env.XDG_CACHE_HOME || path85.join(homedir, ".cache"), name),
         // https://wiki.debian.org/XDGBaseDirectorySpecification#state
-        log: path79.join(env.XDG_STATE_HOME || path79.join(homedir, ".local", "state"), name),
-        temp: path79.join(tmpdir, username, name)
+        log: path85.join(env.XDG_STATE_HOME || path85.join(homedir, ".local", "state"), name),
+        temp: path85.join(tmpdir, username, name)
       };
     };
     var envPaths = (name, options) => {
@@ -12642,11 +12642,11 @@ var require_util2 = __commonJS({
       map2.set(key, result);
       return result;
     }
-    function getPropertyByPath(source, path79) {
-      if (typeof path79 === "string" && Object.prototype.hasOwnProperty.call(source, path79)) {
-        return source[path79];
+    function getPropertyByPath(source, path85) {
+      if (typeof path85 === "string" && Object.prototype.hasOwnProperty.call(source, path85)) {
+        return source[path85];
       }
-      const parsedPath = typeof path79 === "string" ? path79.split(".") : path79;
+      const parsedPath = typeof path85 === "string" ? path85.split(".") : path85;
       return parsedPath.reduce((previous, key) => {
         if (previous === void 0) {
           return previous;
@@ -12657,9 +12657,9 @@ var require_util2 = __commonJS({
     function removeUndefinedValuesFromObject(options) {
       return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== void 0));
     }
-    async function isDirectory(path79) {
+    async function isDirectory(path85) {
       try {
-        const stat3 = await fs_1.promises.stat(path79);
+        const stat3 = await fs_1.promises.stat(path85);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -12668,9 +12668,9 @@ var require_util2 = __commonJS({
         throw e;
       }
     }
-    function isDirectorySync(path79) {
+    function isDirectorySync(path85) {
       try {
-        const stat3 = fs_1.default.statSync(path79);
+        const stat3 = fs_1.default.statSync(path85);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -12768,7 +12768,7 @@ var require_ExplorerBase = __commonJS({
           const idx = importStack.indexOf(fullPath);
           if (idx !== -1) {
             throw new Error(`Circular import detected:
-${[...importStack, fullPath].map((path79, i) => `${i + 1}. ${path79}`).join("\n")} (same as ${idx + 1}.)`);
+${[...importStack, fullPath].map((path85, i) => `${i + 1}. ${path85}`).join("\n")} (same as ${idx + 1}.)`);
           }
         }
       }
@@ -12955,9 +12955,9 @@ var require_Explorer = __commonJS({
           throw error51;
         }
       }
-      async #fileExists(path79) {
+      async #fileExists(path85) {
         try {
-          await promises_1.default.stat(path79);
+          await promises_1.default.stat(path85);
           return true;
         } catch (e) {
           return false;
@@ -13117,9 +13117,9 @@ var require_ExplorerSync = __commonJS({
           throw error51;
         }
       }
-      #fileExists(path79) {
+      #fileExists(path85) {
         try {
-          fs_1.default.statSync(path79);
+          fs_1.default.statSync(path85);
           return true;
         } catch (e) {
           return false;
@@ -13245,7 +13245,7 @@ var require_dist2 = __commonJS({
       };
     }
     function getResolvedSearchPlaces(moduleName, toolDefinedSearchPlaces, userConfiguredOptions) {
-      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path79) => path79.replace("{name}", moduleName));
+      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path85) => path85.replace("{name}", moduleName));
       if (userConfiguredOptions.mergeSearchPlaces) {
         return [...userConfiguredSearchPlaces ?? [], ...toolDefinedSearchPlaces];
       }
@@ -13656,8 +13656,8 @@ var require_utils2 = __commonJS({
       }
       return output;
     };
-    exports2.basename = (path79, { windows } = {}) => {
-      const segs = path79.split(windows ? /[\\/]/ : "/");
+    exports2.basename = (path85, { windows } = {}) => {
+      const segs = path85.split(windows ? /[\\/]/ : "/");
       const last = segs[segs.length - 1];
       if (last === "") {
         return segs[segs.length - 2];
@@ -14009,7 +14009,7 @@ var require_scan = __commonJS({
 var require_parse = __commonJS({
   "node_modules/picomatch/lib/parse.js"(exports2, module2) {
     "use strict";
-    var constants = require_constants();
+    var constants4 = require_constants();
     var utils = require_utils2();
     var {
       MAX_LENGTH,
@@ -14017,7 +14017,7 @@ var require_parse = __commonJS({
       REGEX_NON_SPECIAL_CHARS,
       REGEX_SPECIAL_CHARS_BACKREF,
       REPLACEMENTS
-    } = constants;
+    } = constants4;
     var expandRange = (args, options) => {
       if (typeof options.expandRange === "function") {
         return options.expandRange(...args, options);
@@ -14226,7 +14226,7 @@ var require_parse = __commonJS({
       if (options.maxExtglobRecursion === false) {
         return { risky: false };
       }
-      const max = typeof options.maxExtglobRecursion === "number" ? options.maxExtglobRecursion : constants.DEFAULT_MAX_EXTGLOB_RECURSION;
+      const max = typeof options.maxExtglobRecursion === "number" ? options.maxExtglobRecursion : constants4.DEFAULT_MAX_EXTGLOB_RECURSION;
       const branches = splitTopLevel(body).map((branch) => branch.trim());
       if (branches.length > 1) {
         if (branches.some((branch) => branch === "") || branches.some((branch) => /^[*?]+$/.test(branch)) || hasRepeatedCharPrefixOverlap(branches)) {
@@ -14272,8 +14272,8 @@ var require_parse = __commonJS({
       const bos = { type: "bos", value: "", output: opts.prepend || "" };
       const tokens = [bos];
       const capture = opts.capture ? "" : "?:";
-      const PLATFORM_CHARS = constants.globChars(opts.windows);
-      const EXTGLOB_CHARS = constants.extglobChars(PLATFORM_CHARS);
+      const PLATFORM_CHARS = constants4.globChars(opts.windows);
+      const EXTGLOB_CHARS = constants4.extglobChars(PLATFORM_CHARS);
       const {
         DOT_LITERAL,
         PLUS_LITERAL,
@@ -14402,16 +14402,16 @@ var require_parse = __commonJS({
         const analysis = analyzeRepeatedExtglob(body, opts);
         if ((token.type === "plus" || token.type === "star") && analysis.risky) {
           const safeOutput = analysis.safeOutput ? (token.output ? "" : ONE_CHAR) + (opts.capture ? `(${analysis.safeOutput})` : analysis.safeOutput) : void 0;
-          const open = tokens[token.tokensIndex];
-          open.type = "text";
-          open.value = literal2;
-          open.output = safeOutput || utils.escapeRegex(literal2);
+          const open4 = tokens[token.tokensIndex];
+          open4.type = "text";
+          open4.value = literal2;
+          open4.output = safeOutput || utils.escapeRegex(literal2);
           for (let i = token.tokensIndex + 1; i < tokens.length; i++) {
             tokens[i].value = "";
             tokens[i].output = "";
             delete tokens[i].suffix;
           }
-          state.output = token.output + open.output;
+          state.output = token.output + open4.output;
           state.backtrack = true;
           push2({ type: "paren", extglob: true, value, output: "" });
           decrement("parens");
@@ -14631,15 +14631,15 @@ var require_parse = __commonJS({
         }
         if (value === "{" && opts.nobrace !== true) {
           increment("braces");
-          const open = {
+          const open4 = {
             type: "brace",
             value,
             output: "(",
             outputIndex: state.output.length,
             tokensIndex: state.tokens.length
           };
-          braces.push(open);
-          push2(open);
+          braces.push(open4);
+          push2(open4);
           continue;
         }
         if (value === "}") {
@@ -14969,7 +14969,7 @@ var require_parse = __commonJS({
         NO_DOTS_SLASH,
         STAR,
         START_ANCHOR
-      } = constants.globChars(opts.windows);
+      } = constants4.globChars(opts.windows);
       const nodot = opts.dot ? NO_DOTS : NO_DOT;
       const slashDot = opts.dot ? NO_DOTS_SLASH : NO_DOT;
       const capture = opts.capture ? "" : "?:";
@@ -15027,7 +15027,7 @@ var require_picomatch = __commonJS({
     var scan2 = require_scan();
     var parse5 = require_parse();
     var utils = require_utils2();
-    var constants = require_constants();
+    var constants4 = require_constants();
     var isObject2 = (val) => val && typeof val === "object" && !Array.isArray(val);
     var picomatch2 = (glob, options, returnState = false) => {
       if (Array.isArray(glob)) {
@@ -15155,7 +15155,7 @@ var require_picomatch = __commonJS({
         return /$^/;
       }
     };
-    picomatch2.constants = constants;
+    picomatch2.constants = constants4;
     module2.exports = picomatch2;
   }
 });
@@ -15424,10 +15424,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path79) {
-  if (!path79)
+function getElementAtPath(obj, path85) {
+  if (!path85)
     return obj;
-  return path79.reduce((acc, key) => acc?.[key], obj);
+  return path85.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -15755,11 +15755,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path79, issues) {
+function prefixIssues(path85, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path79);
+    iss.path.unshift(path85);
     return iss;
   });
 }
@@ -15976,16 +15976,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError2(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path79 = []) => {
+  const processError = (error52, path85 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path79, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path85, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path79, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path85, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path79, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path85, ...issue2.path]);
       } else {
-        const fullpath = [...path79, ...issue2.path];
+        const fullpath = [...path85, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -16012,17 +16012,17 @@ function formatError2(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path79 = []) => {
+  const processError = (error52, path85 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path79, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path85, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path79, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path85, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path79, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path85, ...issue2.path]);
       } else {
-        const fullpath = [...path79, ...issue2.path];
+        const fullpath = [...path85, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -16054,8 +16054,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path79 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path79) {
+  const path85 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path85) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -29485,13 +29485,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path79 = ref.slice(1).split("/").filter(Boolean);
-  if (path79.length === 0) {
+  const path85 = ref.slice(1).split("/").filter(Boolean);
+  if (path85.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path79[0] === defsKey) {
-    const key = path79[1];
+  if (path85[0] === defsKey) {
+    const key = path85[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -30920,7 +30920,7 @@ var init_finding_context = __esm({
 var pr_comment_default;
 var init_pr_comment = __esm({
   "src/report/templates/pr-comment.mustache"() {
-    pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasEvidence}}\n\n## {{labels.evidenceTitle}}\n\n{{evidence.exact}} {{labels.evidenceMeasured}}, {{evidence.heuristic}} {{labels.evidenceInferred}}.\n\n{{#evidence.hasBlockingOnInference}}\n{{labels.evidenceBlocking}}\n\n{{#evidence.blockingOnInference}}\n- `{{.}}`\n{{/evidence.blockingOnInference}}\n{{/evidence.hasBlockingOnInference}}\n{{/hasEvidence}}\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
+    pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasHardwareImpact}}\n\n## Hardware Change Impact\n\n- Base commit: `{{hardwareImpact.baseSha}}`\n- Candidate commit: `{{hardwareImpact.candidateSha}}`\n{{#hardwareImpact.baselineAvailable}}\n\n### Observed changes\n\n{{#hardwareImpact.conclusionChanged}}\n- Release conclusion: {{hardwareImpact.previousConclusion}} \u2192 {{hardwareImpact.currentConclusion}}\n{{/hardwareImpact.conclusionChanged}}\n- Readiness score: {{hardwareImpact.previousScore}} \u2192 {{hardwareImpact.currentScore}} ({{hardwareImpact.scoreDelta}})\n- Findings: {{hardwareImpact.findings.added}} added, {{hardwareImpact.findings.resolved}} resolved ({{hardwareImpact.findings.addedBlocking}} new blockers, {{hardwareImpact.findings.resolvedBlocking}} resolved blockers)\n{{#hardwareImpact.hasSeverityChanges}}\n- Severity changes: {{hardwareImpact.severityWorsened}} worsened, {{hardwareImpact.severityImproved}} improved\n{{/hardwareImpact.hasSeverityChanges}}\n- BOM: {{hardwareImpact.bom.added}} added, {{hardwareImpact.bom.removed}} removed, {{hardwareImpact.bom.changed}} changed\n- Manufacturing outputs: {{hardwareImpact.manufacturing.outputsAdded}} added, {{hardwareImpact.manufacturing.outputsRemoved}} removed, {{hardwareImpact.manufacturing.outputsChanged}} changed\n\n### Derived impact\n\n- Risk direction: {{hardwareImpact.riskDirection}}\n- Material change: {{hardwareImpact.materialChange}}\n- Affected domains: {{hardwareImpact.affectedDomains}}\n\n_This is a deterministic PR impact summary, not fabrication authorization._\n{{/hardwareImpact.baselineAvailable}}\n{{^hardwareImpact.baselineAvailable}}\n\n**Exact-base comparison unavailable.** A trustworthy material-change or risk delta cannot be inferred without an eligible baseline.\n{{/hardwareImpact.baselineAvailable}}\n{{/hasHardwareImpact}}\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasEvidence}}\n\n## {{labels.evidenceTitle}}\n\n{{evidence.exact}} {{labels.evidenceMeasured}}, {{evidence.heuristic}} {{labels.evidenceInferred}}.\n\n{{#evidence.hasBlockingOnInference}}\n{{labels.evidenceBlocking}}\n\n{{#evidence.blockingOnInference}}\n- `{{.}}`\n{{/evidence.blockingOnInference}}\n{{/evidence.hasBlockingOnInference}}\n{{/hasEvidence}}\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
   }
 });
 
@@ -30934,7 +30934,7 @@ var init_summary = __esm({
 
 // src/report/markdown.ts
 function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
-  const fabricationView = fabrication ? formatFabricationDiff(fabrication, locale) : void 0;
+  const fabricationView = fabrication && !result.hardwareImpact ? formatFabricationDiff(fabrication, locale) : void 0;
   const topFindings2 = result.findings.slice(0, 10).map(markdownFinding);
   const fixFindings = result.findings.filter((finding2) => finding2.fix).slice(0, 10).map(markdownFinding);
   const plugins = (result.plugins ?? []).map((plugin) => ({
@@ -30942,6 +30942,7 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none"
   }));
   const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : void 0;
+  const hardwareImpactView = result.hardwareImpact ? formatHardwareImpact(result.hardwareImpact) : void 0;
   const evidenceView = result.evidence && result.evidence.exact + result.evidence.heuristic + result.evidence.unclassified > 0 ? { ...result.evidence, hasBlockingOnInference: result.evidence.blockingOnInference.length > 0 } : void 0;
   const releaseModeView = result.releaseMode ? formatReleaseMode(result.releaseMode, locale) : void 0;
   return mustache_default.render(
@@ -30958,6 +30959,8 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
       artifacts,
       hasFabricationDiff: Boolean(fabricationView),
       fabrication: fabricationView,
+      hasHardwareImpact: Boolean(hardwareImpactView),
+      hardwareImpact: hardwareImpactView,
       hasEvidence: Boolean(evidenceView),
       evidence: evidenceView,
       hasBomRisk: Boolean(bomRiskView),
@@ -31035,6 +31038,35 @@ function markdownLabels(locale) {
     total: t("report.total", {}, locale)
   };
 }
+function formatHardwareImpact(impact) {
+  const readiness = impact.facts.readiness;
+  const conclusion = readiness.conclusion;
+  return {
+    baseSha: impact.baseline.sha,
+    candidateSha: impact.candidate.sha,
+    baselineAvailable: impact.baseline.status === "available",
+    conclusionChanged: conclusion?.changed === true,
+    previousConclusion: conclusion?.previous ?? "n/a",
+    currentConclusion: conclusion?.current ?? "n/a",
+    previousScore: readiness.previousScore ?? "n/a",
+    currentScore: readiness.currentScore ?? "n/a",
+    scoreDelta: formatScoreDelta(readiness.scoreDelta),
+    findings: impact.facts.findings,
+    bom: impact.facts.bom,
+    manufacturing: impact.facts.manufacturing,
+    hasSeverityChanges: (impact.facts.findings.worsened ?? 0) + (impact.facts.findings.improved ?? 0) > 0,
+    severityWorsened: impact.facts.findings.worsened ?? 0,
+    severityImproved: impact.facts.findings.improved ?? 0,
+    materialChange: impact.assessment.materialChange ? "yes" : "no",
+    riskDirection: impact.assessment.riskDirection,
+    affectedDomains: impact.assessment.affectedDomains.length > 0 ? impact.assessment.affectedDomains.join(", ") : "none"
+  };
+}
+function formatScoreDelta(value) {
+  if (value === null) return "n/a";
+  if (value > 0) return `+${value}`;
+  return String(value);
+}
 function formatBomRisk(risk) {
   const atRiskComponents = risk.components.filter((c) => c.riskLevel !== "none").map((c) => {
     const parts = [];
@@ -31094,6 +31126,16 @@ var init_json = __esm({
   }
 });
 
+// packages/contracts/src/manufacturing-archive-trust.ts
+function isUnattestedManufacturingArchive(input) {
+  return input.kind.trim().toLowerCase() === "archive" && input.role.trim().toLowerCase() === "manufacturing";
+}
+var init_manufacturing_archive_trust = __esm({
+  "packages/contracts/src/manufacturing-archive-trust.ts"() {
+    "use strict";
+  }
+});
+
 // packages/contracts/src/runner-protocol.ts
 function validArtifactStoragePath(value) {
   const segments = value.split("/");
@@ -31107,6 +31149,7 @@ var init_runner_protocol = __esm({
   "packages/contracts/src/runner-protocol.ts"() {
     "use strict";
     init_zod();
+    init_manufacturing_archive_trust();
     lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
     base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
     capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
@@ -31260,7 +31303,10 @@ var init_runner_protocol = __esm({
       bytes: external_exports.number().int().nonnegative().max(2147483647),
       sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u).optional(),
       contentType: artifactContentTypeSchema.optional()
-    }).strict();
+    }).strict().refine(
+      (artifact) => !isUnattestedManufacturingArchive(artifact),
+      "runner cannot declare an approved manufacturing archive without an independent attestation"
+    );
     runnerArtifactCapabilityRequestSchema = runnerLeaseContextSchema.extend({
       artifacts: external_exports.array(runnerArtifactDeclarationSchema).min(1).max(100)
     }).strict();
@@ -31627,13 +31673,13 @@ function calculateEvidenceDigest(params) {
     }))
   };
   const canonical = canonicalJsonStringify(composite);
-  return (0, import_node_crypto11.createHash)("sha256").update(canonical, "utf8").digest("hex");
+  return (0, import_node_crypto12.createHash)("sha256").update(canonical, "utf8").digest("hex");
 }
-var import_node_crypto11, evidenceItemSchema, ledgerDecisionRecordSchema, ledgerApprovalRecordSchema, ledgerChecklistRecordSchema, evidenceLedgerDocumentSchema, ledgerVerificationResultSchema;
+var import_node_crypto12, evidenceItemSchema, ledgerDecisionRecordSchema, ledgerApprovalRecordSchema, ledgerChecklistRecordSchema, evidenceLedgerDocumentSchema, ledgerVerificationResultSchema;
 var init_evidence_ledger = __esm({
   "packages/contracts/src/evidence-ledger.ts"() {
     "use strict";
-    import_node_crypto11 = require("node:crypto");
+    import_node_crypto12 = require("node:crypto");
     init_zod();
     init_review();
     evidenceItemSchema = external_exports.object({
@@ -32134,10 +32180,12 @@ var init_src = __esm({
   "packages/contracts/src/index.ts"() {
     "use strict";
     init_zod();
+    init_manufacturing_archive_trust();
     init_runner_protocol();
     init_billing();
     init_evidence_ledger();
     init_external_review();
+    init_manufacturing_archive_trust();
     init_multicad();
     init_policy();
     init_review();
@@ -32305,13 +32353,22 @@ var init_src = __esm({
           scoreDelta: external_exports.number().int().min(-100).max(100).nullable(),
           previousStatus: hardwareImpactReadinessStatusSchema.nullable(),
           currentStatus: hardwareImpactReadinessStatusSchema.nullable(),
-          statusChanged: external_exports.boolean()
+          statusChanged: external_exports.boolean(),
+          // Optional without a default so parsing legacy signed results preserves their digest.
+          conclusion: external_exports.object({
+            previous: external_exports.enum(["passed", "failed"]).nullable(),
+            current: external_exports.enum(["passed", "failed"]).nullable(),
+            changed: external_exports.boolean()
+          }).strict().optional()
         }).strict(),
         findings: external_exports.object({
           added: hardwareImpactCountSchema,
           resolved: hardwareImpactCountSchema,
           addedBlocking: hardwareImpactCountSchema,
-          resolvedBlocking: hardwareImpactCountSchema
+          resolvedBlocking: hardwareImpactCountSchema,
+          // Optional without a default: legacy signed results must retain their original digest.
+          worsened: hardwareImpactCountSchema.optional(),
+          improved: hardwareImpactCountSchema.optional()
         }).strict(),
         bom: external_exports.object({
           added: hardwareImpactCountSchema,
@@ -32339,7 +32396,12 @@ var init_src = __esm({
       conclusion: releaseRunConclusionSchema.optional(),
       decision: releaseDecisionSchema.nullable(),
       findings: external_exports.array(findingSchema).max(500).default([]),
-      artifacts: external_exports.array(releaseRunArtifactSchema).max(100).default([]),
+      artifacts: external_exports.array(
+        releaseRunArtifactSchema.refine(
+          (artifact) => !isUnattestedManufacturingArchive(artifact),
+          "runner cannot declare an approved manufacturing archive without an independent attestation"
+        )
+      ).max(100).default([]),
       metrics: releaseRunMetricsSchema.default({}),
       // Optional producer-observed versions; older v1 results have no such metadata.
       toolVersions: external_exports.object({
@@ -32390,17 +32452,17 @@ function isExpectedArtifact(value) {
   return typeof item2.sha256 === "string" && /^[a-f0-9]{64}$/iu.test(item2.sha256) && typeof item2.bytes === "number" && Number.isSafeInteger(item2.bytes) && item2.bytes >= 0;
 }
 async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
-  const output = import_node_path67.default.resolve(outputDirectory2);
-  const realRoot = await resolveExistingPathAlias(import_node_path67.default.resolve(root));
+  const output = import_node_path69.default.resolve(outputDirectory2);
+  const realRoot = await resolveExistingPathAlias(import_node_path69.default.resolve(root));
   const realOutput = await resolveExistingPathAlias(output);
-  if (isInside(realOutput, realRoot) || output.split(import_node_path67.default.sep).some((segment2) => segment2.toLowerCase() === ".git") || realOutput.split(import_node_path67.default.sep).some((segment2) => segment2.toLowerCase() === ".git")) {
+  if (isInside(realOutput, realRoot) || output.split(import_node_path69.default.sep).some((segment2) => segment2.toLowerCase() === ".git") || realOutput.split(import_node_path69.default.sep).some((segment2) => segment2.toLowerCase() === ".git")) {
     throw new Error(
       "Release output overlaps a project, Git metadata, or a filesystem ancestor; choose a safe --output path."
     );
   }
   let stat3;
   try {
-    stat3 = await import_promises25.default.lstat(output);
+    stat3 = await import_promises26.default.lstat(output);
   } catch (error51) {
     if (error51.code === "ENOENT") return;
     throw error51;
@@ -32408,14 +32470,14 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
   if (!stat3.isDirectory() || stat3.isSymbolicLink()) {
     throw new Error("Release output must be a real directory, not a file or symlink.");
   }
-  if ((await import_promises25.default.readdir(output)).length === 0) return;
+  if ((await import_promises26.default.readdir(output)).length === 0) return;
   const manifestName = kind === "evidence" ? "manifest.json" : "handoff-manifest.json";
-  const manifestPath = import_node_path67.default.join(output, manifestName);
+  const manifestPath = import_node_path69.default.join(output, manifestName);
   let record2;
   try {
-    const info = await import_promises25.default.lstat(manifestPath);
+    const info = await import_promises26.default.lstat(manifestPath);
     if (!info.isFile() || info.size > 8 * 1024 * 1024) throw new Error("unsafe manifest");
-    record2 = JSON.parse(await import_promises25.default.readFile(manifestPath, "utf8"));
+    record2 = JSON.parse(await import_promises26.default.readFile(manifestPath, "utf8"));
     if (!record2 || typeof record2 !== "object" || Array.isArray(record2)) throw new Error("invalid manifest");
   } catch {
     throw new Error("Existing output is not a valid BoardReadyOps release package; choose a fresh --output path.");
@@ -32438,7 +32500,7 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
   const extras = kind === "evidence" ? ["checksums.txt"] : ["README.md"];
   if (kind === "evidence") {
     try {
-      await import_promises25.default.lstat(import_node_path67.default.join(output, "manifest.sig"));
+      await import_promises26.default.lstat(import_node_path69.default.join(output, "manifest.sig"));
       throw new Error("Signed release evidence is immutable; choose a fresh --output path.");
     } catch (error51) {
       if (error51.code !== "ENOENT") throw error51;
@@ -32452,13 +32514,13 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
     throw new Error("Existing release output contains unsafe or undeclared files; choose a fresh --output path.");
   }
   for (const entry of fileEntries) {
-    const filename = import_node_path67.default.resolve(output, entry.path);
+    const filename = import_node_path69.default.resolve(output, entry.path);
     if (filename === output || !isInside(output, filename)) {
       throw new Error("Release artifact escaped output directory; choose a safe --output path.");
     }
-    const hash2 = (0, import_node_crypto12.createHash)("sha256");
+    const hash2 = (0, import_node_crypto13.createHash)("sha256");
     let bytes = 0;
-    for await (const chunk of (0, import_node_fs9.createReadStream)(filename)) {
+    for await (const chunk of (0, import_node_fs10.createReadStream)(filename)) {
       hash2.update(chunk);
       bytes += chunk.byteLength;
     }
@@ -32467,14 +32529,14 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
     }
   }
 }
-var import_node_crypto12, import_node_fs9, import_promises25, import_node_path67, maximumReleaseArtifacts;
+var import_node_crypto13, import_node_fs10, import_promises26, import_node_path69, maximumReleaseArtifacts;
 var init_release_output_cleanup = __esm({
   "src/release/release-output-cleanup.ts"() {
     "use strict";
-    import_node_crypto12 = require("node:crypto");
-    import_node_fs9 = require("node:fs");
-    import_promises25 = __toESM(require("node:fs/promises"), 1);
-    import_node_path67 = __toESM(require("node:path"), 1);
+    import_node_crypto13 = require("node:crypto");
+    import_node_fs10 = require("node:fs");
+    import_promises26 = __toESM(require("node:fs/promises"), 1);
+    import_node_path69 = __toESM(require("node:path"), 1);
     init_generated_output_inventory();
     init_path();
     maximumReleaseArtifacts = 4096;
@@ -32492,11 +32554,11 @@ __export(evidence_exports, {
   writeReviewEvidenceLedger: () => writeReviewEvidenceLedger
 });
 async function writeReleaseEvidenceBundle(root, result, options) {
-  const outputDir = import_node_path68.default.resolve(root, options.outputDir);
+  const outputDir = import_node_path70.default.resolve(root, options.outputDir);
   await assertSafeReleaseOutputCleanup(root, outputDir, "evidence");
-  await import_promises26.default.rm(outputDir, { recursive: true, force: true });
-  await import_promises26.default.mkdir(import_node_path68.default.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
-  await import_promises26.default.mkdir(import_node_path68.default.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
+  await import_promises27.default.rm(outputDir, { recursive: true, force: true });
+  await import_promises27.default.mkdir(import_node_path70.default.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
+  await import_promises27.default.mkdir(import_node_path70.default.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
   const artifacts = [];
   artifacts.push(
     await writeReport(outputDir, "reports/boardreadyops-report.json", formatJson(result)),
@@ -32524,11 +32586,11 @@ async function writeReleaseEvidenceBundle(root, result, options) {
     provenance: cleanObject(options.provenance ?? {}),
     verification: { algorithm: "sha256", artifactCount: artifacts.length }
   };
-  const manifestPath = import_node_path68.default.join(outputDir, "manifest.json");
-  await import_promises26.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
+  const manifestPath = import_node_path70.default.join(outputDir, "manifest.json");
+  await import_promises27.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
-  const checksumsPath = import_node_path68.default.join(outputDir, "checksums.txt");
-  await import_promises26.default.writeFile(checksumsPath, formatChecksumsTxt(artifacts), "utf8");
+  const checksumsPath = import_node_path70.default.join(outputDir, "checksums.txt");
+  await import_promises27.default.writeFile(checksumsPath, formatChecksumsTxt(artifacts), "utf8");
   return { outputDir, manifestPath, checksumsPath, manifest };
 }
 function evidenceDecision(result, gaps) {
@@ -32547,14 +32609,14 @@ function formatChecksumsTxt(artifacts) {
 `;
 }
 async function verifyManifestCoverage(bundleDir) {
-  const outputDir = import_node_path68.default.resolve(bundleDir);
-  const manifestPath = import_node_path68.default.join(outputDir, "manifest.json");
+  const outputDir = import_node_path70.default.resolve(bundleDir);
+  const manifestPath = import_node_path70.default.join(outputDir, "manifest.json");
   const readResult = await readBundleManifest(manifestPath);
   if (!readResult.ok) {
     return { ok: false, manifestPath, uncovered: [], errors: readResult.errors };
   }
   const manifest = readResult.manifest;
-  const covered = new Set((manifest.artifacts ?? []).map((artifact) => import_node_path68.default.resolve(outputDir, artifact.path)));
+  const covered = new Set((manifest.artifacts ?? []).map((artifact) => import_node_path70.default.resolve(outputDir, artifact.path)));
   const rootSidecars = /* @__PURE__ */ new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
   const allFiles = [];
   const symlinks = /* @__PURE__ */ new Set();
@@ -32569,14 +32631,14 @@ async function verifyManifestCoverage(bundleDir) {
     };
   }
   const uncovered = allFiles.filter((file2) => {
-    const relative = import_node_path68.default.relative(outputDir, file2).split(import_node_path68.default.sep).join("/");
+    const relative = import_node_path70.default.relative(outputDir, file2).split(import_node_path70.default.sep).join("/");
     return symlinks.has(file2) || !rootSidecars.has(relative) && !covered.has(file2);
-  }).map((file2) => import_node_path68.default.relative(outputDir, file2).split(import_node_path68.default.sep).join("/")).sort((left, right) => left.localeCompare(right));
+  }).map((file2) => import_node_path70.default.relative(outputDir, file2).split(import_node_path70.default.sep).join("/")).sort((left, right) => left.localeCompare(right));
   return { ok: uncovered.length === 0, manifestPath, uncovered, errors: [] };
 }
 async function verifyReleaseEvidenceBundle(bundleDir) {
-  const outputDir = import_node_path68.default.resolve(bundleDir);
-  const manifestPath = import_node_path68.default.join(outputDir, "manifest.json");
+  const outputDir = import_node_path70.default.resolve(bundleDir);
+  const manifestPath = import_node_path70.default.join(outputDir, "manifest.json");
   const readResult = await readBundleManifest(manifestPath);
   if (!readResult.ok) {
     return { ok: false, manifestPath, checked: 0, errors: readResult.errors };
@@ -32584,7 +32646,7 @@ async function verifyReleaseEvidenceBundle(bundleDir) {
   const manifest = readResult.manifest;
   const errors = [];
   for (const artifact of manifest.artifacts ?? []) {
-    const artifactPath = import_node_path68.default.resolve(outputDir, artifact.path);
+    const artifactPath = import_node_path70.default.resolve(outputDir, artifact.path);
     if (!isInside2(outputDir, artifactPath)) {
       errors.push(`${artifact.path}: path escapes bundle directory`);
       continue;
@@ -32634,7 +32696,7 @@ function isManifestArtifact(value) {
 }
 async function readBundleManifest(manifestPath) {
   try {
-    const value = JSON.parse(await import_promises26.default.readFile(manifestPath, "utf8"));
+    const value = JSON.parse(await import_promises27.default.readFile(manifestPath, "utf8"));
     if (!value || typeof value !== "object" || !Array.isArray(value.artifacts) || !value.artifacts.every(isManifestArtifact)) {
       return { ok: false, errors: ["manifest has invalid artifact inventory"] };
     }
@@ -32647,28 +32709,28 @@ async function readBundleManifest(manifestPath) {
   }
 }
 async function writeReport(outputDir, relativePath, content) {
-  const target = import_node_path68.default.join(outputDir, relativePath);
-  await import_promises26.default.mkdir(import_node_path68.default.dirname(target), { recursive: true });
-  await import_promises26.default.writeFile(target, content, "utf8");
-  const digest2 = await fileDigest2(target);
-  return { path: relativePath, kind: "report", ...digest2 };
+  const target = import_node_path70.default.join(outputDir, relativePath);
+  await import_promises27.default.mkdir(import_node_path70.default.dirname(target), { recursive: true });
+  await import_promises27.default.writeFile(target, content, "utf8");
+  const digest3 = await fileDigest2(target);
+  return { path: relativePath, kind: "report", ...digest3 };
 }
 async function copyManufacturingArtifacts(root, outputDir) {
   const files = await discoverManufacturingArtifacts(root);
   const artifacts = [];
   for (const source of files) {
     const relativeSource = normalizeRelative(root, source);
-    const targetRelative = import_node_path68.default.join("artifacts", relativeSource).split(import_node_path68.default.sep).join("/");
-    const target = import_node_path68.default.join(outputDir, targetRelative);
-    await import_promises26.default.mkdir(import_node_path68.default.dirname(target), { recursive: true });
-    await import_promises26.default.copyFile(source, target);
-    const digest2 = await fileDigest2(target);
-    artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest2 });
+    const targetRelative = import_node_path70.default.join("artifacts", relativeSource).split(import_node_path70.default.sep).join("/");
+    const target = import_node_path70.default.join(outputDir, targetRelative);
+    await import_promises27.default.mkdir(import_node_path70.default.dirname(target), { recursive: true });
+    await import_promises27.default.copyFile(source, target);
+    const digest3 = await fileDigest2(target);
+    artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest3 });
   }
   return artifacts;
 }
 async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
-  const sourceDir = import_node_path68.default.resolve(root, includeGenerated);
+  const sourceDir = import_node_path70.default.resolve(root, includeGenerated);
   if (sourceDir === outputDir || isInside2(outputDir, sourceDir) || isInside2(sourceDir, outputDir)) {
     return [];
   }
@@ -32678,16 +32740,16 @@ async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
   const artifacts = [];
   for (const source of files) {
     const relativeSource = normalizeRelative(sourceDir, source);
-    const targetRelative = import_node_path68.default.join(BUNDLE_LAYOUT.generated, relativeSource).split(import_node_path68.default.sep).join("/");
-    const target = import_node_path68.default.join(outputDir, targetRelative);
-    await import_promises26.default.mkdir(import_node_path68.default.dirname(target), { recursive: true });
-    await import_promises26.default.copyFile(source, target);
-    const digest2 = await fileDigest2(target);
+    const targetRelative = import_node_path70.default.join(BUNDLE_LAYOUT.generated, relativeSource).split(import_node_path70.default.sep).join("/");
+    const target = import_node_path70.default.join(outputDir, targetRelative);
+    await import_promises27.default.mkdir(import_node_path70.default.dirname(target), { recursive: true });
+    await import_promises27.default.copyFile(source, target);
+    const digest3 = await fileDigest2(target);
     artifacts.push({
       path: targetRelative,
       sourcePath: normalizeRelative(root, source),
       kind: "generated",
-      ...digest2
+      ...digest3
     });
   }
   return artifacts;
@@ -32695,22 +32757,22 @@ async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
 async function discoverManufacturingArtifacts(root) {
   const discovered = [];
   for (const directory of FABRICATION_DIRS) {
-    await collectFiles2(import_node_path68.default.join(root, directory), discovered);
+    await collectFiles2(import_node_path70.default.join(root, directory), discovered);
   }
   return [...new Set(discovered)].filter(
-    (file2) => MANUFACTURING_EXTENSIONS.has(import_node_path68.default.extname(file2).toLowerCase()) || import_node_path68.default.basename(file2).toLowerCase().includes("readme")
+    (file2) => MANUFACTURING_EXTENSIONS.has(import_node_path70.default.extname(file2).toLowerCase()) || import_node_path70.default.basename(file2).toLowerCase().includes("readme")
   ).sort((left, right) => left.localeCompare(right));
 }
 async function collectFiles2(directory, output, symlinks = /* @__PURE__ */ new Set(), strict = false) {
   let entries;
   try {
-    entries = await import_promises26.default.readdir(directory, { withFileTypes: true });
+    entries = await import_promises27.default.readdir(directory, { withFileTypes: true });
   } catch (error51) {
     if (strict) throw error51;
     return;
   }
   for (const entry of entries) {
-    const target = import_node_path68.default.join(directory, entry.name);
+    const target = import_node_path70.default.join(directory, entry.name);
     if (entry.isDirectory()) {
       await collectFiles2(target, output, symlinks, strict);
     } else if (entry.isFile() || entry.isSymbolicLink()) {
@@ -32751,8 +32813,8 @@ function evidenceGaps(root, result, artifacts) {
   return gaps;
 }
 function artifactKind(file2) {
-  const lower = import_node_path68.default.basename(file2).toLowerCase();
-  const extension = import_node_path68.default.extname(lower);
+  const lower = import_node_path70.default.basename(file2).toLowerCase();
+  const extension = import_node_path70.default.extname(lower);
   if (extension === ".drl" || extension === ".xln") {
     return "drill";
   }
@@ -32765,24 +32827,24 @@ function artifactKind(file2) {
   if (lower.includes("cpl") || lower.includes("pos") || lower.includes("centroid")) {
     return "cpl";
   }
-  if (FABRICATION_DIRS.some((name) => file2.split(import_node_path68.default.sep).includes(name))) {
+  if (FABRICATION_DIRS.some((name) => file2.split(import_node_path70.default.sep).includes(name))) {
     return "fabrication";
   }
   return "other";
 }
 async function fileDigest2(file2) {
-  const content = await import_promises26.default.readFile(file2);
-  return { sha256: (0, import_node_crypto13.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
+  const content = await import_promises27.default.readFile(file2);
+  return { sha256: (0, import_node_crypto14.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
 }
 function cleanObject(value) {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== void 0));
 }
 function isInside2(root, target) {
-  const relative = import_node_path68.default.relative(root, target);
-  return Boolean(relative) && !relative.startsWith("..") && !import_node_path68.default.isAbsolute(relative);
+  const relative = import_node_path70.default.relative(root, target);
+  return Boolean(relative) && !relative.startsWith("..") && !import_node_path70.default.isAbsolute(relative);
 }
 async function writeReviewEvidenceLedger(options) {
-  await import_promises26.default.mkdir(options.outputDir, { recursive: true });
+  await import_promises27.default.mkdir(options.outputDir, { recursive: true });
   const evidenceDigest = calculateEvidenceDigest({
     manifest: options.manifest,
     decisions: options.decisions,
@@ -32802,33 +32864,33 @@ async function writeReviewEvidenceLedger(options) {
     checklist: options.checklist,
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
-  const ledgerPath = import_node_path68.default.join(options.outputDir, "evidence-ledger.json");
-  const manifestPath = import_node_path68.default.join(options.outputDir, "manifest.json");
-  await import_promises26.default.writeFile(ledgerPath, JSON.stringify(ledgerDoc, null, 2), "utf8");
-  await import_promises26.default.writeFile(manifestPath, JSON.stringify(options.manifest, null, 2), "utf8");
+  const ledgerPath = import_node_path70.default.join(options.outputDir, "evidence-ledger.json");
+  const manifestPath = import_node_path70.default.join(options.outputDir, "manifest.json");
+  await import_promises27.default.writeFile(ledgerPath, JSON.stringify(ledgerDoc, null, 2), "utf8");
+  await import_promises27.default.writeFile(manifestPath, JSON.stringify(options.manifest, null, 2), "utf8");
   return { ledgerPath, manifestPath, evidenceDigest };
 }
 async function resolveFileHash(item2, baseDir) {
   const candidatePaths = [
-    import_node_path68.default.resolve(baseDir, item2.path),
-    import_node_path68.default.resolve(baseDir, item2.name),
-    import_node_path68.default.resolve(baseDir, "artifacts", item2.name),
-    import_node_path68.default.resolve(baseDir, "artifacts", item2.path)
+    import_node_path70.default.resolve(baseDir, item2.path),
+    import_node_path70.default.resolve(baseDir, item2.name),
+    import_node_path70.default.resolve(baseDir, "artifacts", item2.name),
+    import_node_path70.default.resolve(baseDir, "artifacts", item2.path)
   ];
   for (const candidate of candidatePaths) {
     try {
-      const fileContent = await import_promises26.default.readFile(candidate);
-      return (0, import_node_crypto13.createHash)("sha256").update(fileContent).digest("hex");
+      const fileContent = await import_promises27.default.readFile(candidate);
+      return (0, import_node_crypto14.createHash)("sha256").update(fileContent).digest("hex");
     } catch {
     }
   }
   return void 0;
 }
 async function verifyReviewEvidenceOffline(ledgerFilePath, artifactsRootDir) {
-  const content = await import_promises26.default.readFile(ledgerFilePath, "utf8");
+  const content = await import_promises27.default.readFile(ledgerFilePath, "utf8");
   const ledgerDoc = JSON.parse(content);
   const fileHashes = {};
-  const baseDir = artifactsRootDir ?? import_node_path68.default.dirname(ledgerFilePath);
+  const baseDir = artifactsRootDir ?? import_node_path70.default.dirname(ledgerFilePath);
   for (const item2 of ledgerDoc.manifest) {
     const hash2 = await resolveFileHash(item2, baseDir);
     if (hash2) {
@@ -32877,13 +32939,13 @@ async function verifyReviewEvidenceOffline(ledgerFilePath, artifactsRootDir) {
     errors
   };
 }
-var import_node_crypto13, import_promises26, import_node_path68, FABRICATION_DIRS, MANUFACTURING_EXTENSIONS, BUNDLE_LAYOUT;
+var import_node_crypto14, import_promises27, import_node_path70, FABRICATION_DIRS, MANUFACTURING_EXTENSIONS, BUNDLE_LAYOUT;
 var init_evidence = __esm({
   "src/release/evidence.ts"() {
     "use strict";
-    import_node_crypto13 = require("node:crypto");
-    import_promises26 = __toESM(require("node:fs/promises"), 1);
-    import_node_path68 = __toESM(require("node:path"), 1);
+    import_node_crypto14 = require("node:crypto");
+    import_promises27 = __toESM(require("node:fs/promises"), 1);
+    import_node_path70 = __toESM(require("node:path"), 1);
     init_src();
     init_version();
     init_json();
@@ -32922,7 +32984,7 @@ __export(index_exports, {
   runCli: () => runCli
 });
 module.exports = __toCommonJS(index_exports);
-var import_node_path80 = __toESM(require("node:path"), 1);
+var import_node_path86 = __toESM(require("node:path"), 1);
 
 // node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
@@ -36035,9 +36097,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [path]
    * @return {(string|null|Command)}
    */
-  executableDir(path79) {
-    if (path79 === void 0) return this._executableDir;
-    this._executableDir = path79;
+  executableDir(path85) {
+    if (path85 === void 0) return this._executableDir;
+    this._executableDir = path85;
     return this;
   }
   /**
@@ -36609,15 +36671,15 @@ var YAML_INTEGER_IMPLICIT_PATTERN$1 = /* @__PURE__ */ new RegExp("^(?:0o[0-7]+|0
 var YAML_INTEGER_EXPLICIT_PATTERN$1 = /* @__PURE__ */ new RegExp("^(?:[-+]?0b[0-1]+|[-+]?0o[0-7]+|[-+]?0x[0-9a-fA-F]+|[-+]?[0-9]+)$");
 function parseYamlInteger$2(source) {
   let value = source;
-  let sign = 1;
+  let sign2 = 1;
   if (value[0] === "-" || value[0] === "+") {
-    if (value[0] === "-") sign = -1;
+    if (value[0] === "-") sign2 = -1;
     value = value.slice(1);
   }
-  if (value.startsWith("0b")) return sign * parseInt(value.slice(2), 2);
-  if (value.startsWith("0o")) return sign * parseInt(value.slice(2), 8);
-  if (value.startsWith("0x")) return sign * parseInt(value.slice(2), 16);
-  return sign * parseInt(value, 10);
+  if (value.startsWith("0b")) return sign2 * parseInt(value.slice(2), 2);
+  if (value.startsWith("0o")) return sign2 * parseInt(value.slice(2), 8);
+  if (value.startsWith("0x")) return sign2 * parseInt(value.slice(2), 16);
+  return sign2 * parseInt(value, 10);
 }
 function resolveYamlInteger$2(source, isExplicit) {
   if (isExplicit) {
@@ -36641,15 +36703,15 @@ var YAML_INTEGER_IMPLICIT_PATTERN = /* @__PURE__ */ new RegExp("^-?(?:0|[1-9][0-
 var YAML_INTEGER_EXPLICIT_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?0b[0-1]+|[-+]?0o[0-7]+|[-+]?0x[0-9a-fA-F]+|[-+]?[0-9]+)$");
 function parseYamlInteger$1(source) {
   let value = source;
-  let sign = 1;
+  let sign2 = 1;
   if (value[0] === "-" || value[0] === "+") {
-    if (value[0] === "-") sign = -1;
+    if (value[0] === "-") sign2 = -1;
     value = value.slice(1);
   }
-  if (value.startsWith("0b")) return sign * parseInt(value.slice(2), 2);
-  if (value.startsWith("0o")) return sign * parseInt(value.slice(2), 8);
-  if (value.startsWith("0x")) return sign * parseInt(value.slice(2), 16);
-  return sign * parseInt(value, 10);
+  if (value.startsWith("0b")) return sign2 * parseInt(value.slice(2), 2);
+  if (value.startsWith("0o")) return sign2 * parseInt(value.slice(2), 8);
+  if (value.startsWith("0x")) return sign2 * parseInt(value.slice(2), 16);
+  return sign2 * parseInt(value, 10);
 }
 function resolveYamlInteger$1(source, isExplicit) {
   if (isExplicit) {
@@ -36668,20 +36730,20 @@ var intJsonTag = defineScalarTag("tag:yaml.org,2002:int", {
 var YAML_INTEGER_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?0x[0-9a-fA-F_]+|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+|[-+]?(?:0|[1-9][0-9_]*))$");
 function parseYamlInteger(source) {
   let value = source.replace(/_/g, "");
-  let sign = 1;
+  let sign2 = 1;
   if (value[0] === "-" || value[0] === "+") {
-    if (value[0] === "-") sign = -1;
+    if (value[0] === "-") sign2 = -1;
     value = value.slice(1);
   }
-  if (value.startsWith("0b")) return sign * parseInt(value.slice(2), 2);
-  if (value.startsWith("0x")) return sign * parseInt(value.slice(2), 16);
+  if (value.startsWith("0b")) return sign2 * parseInt(value.slice(2), 2);
+  if (value.startsWith("0x")) return sign2 * parseInt(value.slice(2), 16);
   if (value.includes(":")) {
     let result = 0;
     for (const part of value.split(":")) result = result * 60 + Number(part);
-    return sign * result;
+    return sign2 * result;
   }
-  if (value !== "0" && value[0] === "0") return sign * parseInt(value, 8);
-  return sign * parseInt(value, 10);
+  if (value !== "0" && value[0] === "0") return sign2 * parseInt(value, 8);
+  return sign2 * parseInt(value, 10);
 }
 function resolveYamlInteger(source) {
   if (!YAML_INTEGER_PATTERN.test(source)) return NOT_RESOLVED;
@@ -36704,11 +36766,11 @@ var YAML_FLOAT_SPECIAL_PATTERN$1 = /* @__PURE__ */ new RegExp("^(?:[-+]?\\.(?:in
 function resolveYamlFloat$2(source) {
   if (!YAML_FLOAT_PATTERN$1.test(source)) return NOT_RESOLVED;
   let value = source.toLowerCase();
-  const sign = value[0] === "-" ? -1 : 1;
+  const sign2 = value[0] === "-" ? -1 : 1;
   if ("+-".includes(value[0])) value = value.slice(1);
-  if (value === ".inf") return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+  if (value === ".inf") return sign2 === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
   if (value === ".nan") return NaN;
-  const result = sign * parseFloat(value);
+  const result = sign2 * parseFloat(value);
   if (Number.isFinite(result) || YAML_FLOAT_SPECIAL_PATTERN$1.test(source)) return result;
   return NOT_RESOLVED;
 }
@@ -36738,11 +36800,11 @@ function resolveYamlFloat$1(source, isExplicit) {
   if (isExplicit) {
     if (!YAML_FLOAT_EXPLICIT_PATTERN.test(source)) return NOT_RESOLVED;
     let value = source.toLowerCase();
-    const sign = value[0] === "-" ? -1 : 1;
+    const sign2 = value[0] === "-" ? -1 : 1;
     if ("+-".includes(value[0])) value = value.slice(1);
-    if (value === ".inf") return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+    if (value === ".inf") return sign2 === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
     if (value === ".nan") return NaN;
-    const result2 = sign * parseFloat(value);
+    const result2 = sign2 * parseFloat(value);
     return Number.isFinite(result2) ? result2 : NOT_RESOLVED;
   }
   if (!YAML_FLOAT_IMPLICIT_PATTERN.test(source)) return NOT_RESOLVED;
@@ -36770,15 +36832,15 @@ var YAML_FLOAT_SPECIAL_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?\\.(?:inf|
 function resolveYamlFloat(source) {
   if (!YAML_FLOAT_PATTERN.test(source)) return NOT_RESOLVED;
   let value = source.toLowerCase().replace(/_/g, "");
-  const sign = value[0] === "-" ? -1 : 1;
+  const sign2 = value[0] === "-" ? -1 : 1;
   if ("+-".includes(value[0])) value = value.slice(1);
-  if (value === ".inf") return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+  if (value === ".inf") return sign2 === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
   if (value === ".nan") return NaN;
   let result = 0;
   if (value.includes(":")) {
     for (const part of value.split(":")) result = result * 60 + Number(part);
-    result *= sign;
-  } else result = sign * parseFloat(value);
+    result *= sign2;
+  } else result = sign2 * parseFloat(value);
   if (Number.isFinite(result) || YAML_FLOAT_SPECIAL_PATTERN.test(source)) return result;
   return NOT_RESOLVED;
 }
@@ -41139,13 +41201,16 @@ async function parsePcb(file2) {
   const text = await readDesignFile(file2) ?? "";
   const model = parseKicadDocument(text, "pcb");
   const copperLayerNames = copperLayers(model);
+  const outlineBounds = rectangularOutlineBounds(model);
   return {
     footprints: footprints(model),
     revision: revision(model),
     drillSizes: drillSizes(model),
     copperLayers: copperLayerNames,
+    plotCopperLayers: pcbPlotLayers(model),
     copperAreas: copperAreas(model),
     boardArea: boardArea(model),
+    ...outlineBounds ? { outlineBounds } : {},
     outlineClosed: isOutlineClosed(model),
     copperLayerCount: copperLayerNames.length,
     stackupLayerCount: stackupLayerCount(model),
@@ -41211,6 +41276,12 @@ function revision(model) {
 function drillSizes(model) {
   return findKiCadLists(model, "drill").map((drill) => listValue(drill)).filter((value) => Boolean(value && Number.isFinite(Number(value))));
 }
+function pcbPlotLayers(model) {
+  const definitions = findKiCadLists(model, "layers")[0];
+  if (!definitions) return copperLayers(model);
+  const layers = directChildLists(definitions).filter((layer) => ["signal", "power", "jumper"].includes(listValue(layer, 2) ?? "")).map((layer) => listValue(layer, 1) ?? "").filter((layer) => /^(?:F|B|In\d+)\.Cu$/u.test(layer));
+  return layers.length ? [...new Set(layers)] : copperLayers(model);
+}
 function copperLayers(model) {
   const layerBlock = findKiCadLists(model, "layers")[0];
   if (layerBlock) {
@@ -41240,6 +41311,18 @@ function copperAreas(model) {
     }
   }
   return areas;
+}
+function rectangularOutlineBounds(model) {
+  const rectangles = edgePrimitiveLists(model, "gr_rect");
+  if (rectangles.length !== 1 || ["gr_line", "gr_arc", "gr_circle", "gr_poly", "gr_curve"].some((name) => edgePrimitiveLists(model, name).length > 0))
+    return void 0;
+  const rect = rectangles[0] && startEndFromList(rectangles[0]);
+  if (!rect) return void 0;
+  const minX = Math.min(rect.start.x, rect.end.x);
+  const minY = Math.min(rect.start.y, rect.end.y);
+  const maxX = Math.max(rect.start.x, rect.end.x);
+  const maxY = Math.max(rect.start.y, rect.end.y);
+  return maxX > minX && maxY > minY ? { minX, minY, maxX, maxY } : void 0;
 }
 function boardArea(model) {
   const rect = edgePrimitiveLists(model, "gr_rect").map((block) => startEndFromList(block)).find((segment2) => Boolean(segment2));
@@ -42594,10 +42677,12 @@ function parseKicadDiagnostics(reportText, fallbackRule) {
   const diagnostics = [];
   const report = kicadReportSchema.safeParse(parsed);
   if (report.success) {
+    const coordinateUnits = parsed && typeof parsed === "object" && "coordinate_units" in parsed ? parsed.coordinate_units : void 0;
     for (const key of ["violations", "diagnostics", "errors", "warnings"]) {
       for (const diagnostic of report.data[key] ?? []) {
         const normalized = normalizeDiagnostic(diagnostic, fallbackRule);
         if (normalized) {
+          if (coordinateUnits === "mm") normalized.raw.coordinate_units = "mm";
           diagnostics.push(normalized);
         }
       }
@@ -43478,10 +43563,10 @@ function dependencyFrom(key, value, warnings) {
   const table = value;
   const versionSpec = stringField(table.version);
   const git = stringField(table.git);
-  const path79 = stringField(table.path);
+  const path85 = stringField(table.path);
   const overridePath = stringField(table.override_path);
   if (git) {
-    const subPath = path79;
+    const subPath = path85;
     return {
       declaredName: key,
       source: subPath === void 0 ? { kind: "git", url: git } : { kind: "git", url: git, path: subPath },
@@ -43493,8 +43578,8 @@ function dependencyFrom(key, value, warnings) {
     warnings.push(`Dependency "${key}" is overridden by local source at "${overridePath}".`);
     return { declaredName: key, source: { kind: "local", path: overridePath }, versionSpec, pinned: false };
   }
-  if (path79) {
-    return { declaredName: key, source: { kind: "local", path: path79 }, versionSpec, pinned: false };
+  if (path85) {
+    return { declaredName: key, source: { kind: "local", path: path85 }, versionSpec, pinned: false };
   }
   return {
     declaredName: key,
@@ -43503,7 +43588,7 @@ function dependencyFrom(key, value, warnings) {
     pinned: isPinned(versionSpec)
   };
 }
-function parseIdfManifest(content, path79) {
+function parseIdfManifest(content, path85) {
   const warnings = [];
   let document;
   try {
@@ -43512,12 +43597,12 @@ function parseIdfManifest(content, path79) {
     return {
       dependencies: [],
       warnings: [
-        `${path79 ?? "idf_component.yml"} is not valid YAML: ${error51 instanceof Error ? error51.message : "unknown"}`
+        `${path85 ?? "idf_component.yml"} is not valid YAML: ${error51 instanceof Error ? error51.message : "unknown"}`
       ]
     };
   }
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
-    return { dependencies: [], warnings: [`${path79 ?? "idf_component.yml"} does not contain a mapping.`] };
+    return { dependencies: [], warnings: [`${path85 ?? "idf_component.yml"} does not contain a mapping.`] };
   }
   const root = document;
   const raw = root.dependencies;
@@ -43532,7 +43617,7 @@ function parseIdfManifest(content, path79) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return {
       dependencies: [],
-      warnings: [`${path79 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
+      warnings: [`${path85 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
     };
   }
   const dependencies = [];
@@ -43877,8 +43962,8 @@ init_path();
 var assumedMetricFormat = { integerDigits: 3, decimalDigits: 3 };
 var assumedInchFormat = { integerDigits: 2, decimalDigits: 4 };
 var inchToMm = 25.4;
-function warning(code, message, path79) {
-  return path79 === void 0 ? { code, message } : { code, message, path: path79 };
+function warning(code, message, path85) {
+  return path85 === void 0 ? { code, message } : { code, message, path: path85 };
 }
 function attributeBody(line) {
   const match = /^;\s*#@!\s*(.+)$/u.exec(line.trim());
@@ -43903,7 +43988,7 @@ function coordinateValue(raw, format) {
   const parsed = Number.parseFloat(`${integerPart}.${decimalPart || "0"}`);
   return negative ? -parsed : parsed;
 }
-function parseHeaderLine(line, state, warnings, path79) {
+function parseHeaderLine(line, state, warnings, path85) {
   const trimmed = line.trim();
   const attribute = attributeBody(trimmed);
   if (attribute) {
@@ -43940,14 +44025,14 @@ function parseHeaderLine(line, state, warnings, path79) {
           state.decimalDigits = mask[2].length;
         } else if (modifier !== "000.000") {
           warnings.push(
-            warning("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path79)
+            warning("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path85)
           );
         }
       }
     }
   }
 }
-function parseExcellon(content, path79) {
+function parseExcellon(content, path85) {
   const warnings = [];
   const state = {
     units: void 0,
@@ -43981,7 +44066,7 @@ function parseExcellon(content, path79) {
         warning(
           "excellon.assumed-coordinate-format",
           `No coordinate format declared; assumed ${format.integerDigits}.${format.decimalDigits} for ${units}. Coordinates from this file are an assumption, not a measurement.`,
-          path79
+          path85
         )
       );
     }
@@ -44012,7 +44097,7 @@ function parseExcellon(content, path79) {
       const diameterMm = (state.units ?? "mm") === "inch" ? rawDiameter * inchToMm : rawDiameter;
       if (!Number.isFinite(diameterMm) || diameterMm <= 0) {
         warnings.push(
-          warning("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path79)
+          warning("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path85)
         );
       } else {
         toolsByCode.set(code, { code, diameterMm, plated: pendingToolPlated ?? state.filePlated });
@@ -44021,7 +44106,7 @@ function parseExcellon(content, path79) {
       continue;
     }
     if (inHeader && !bodyStarted) {
-      parseHeaderLine(trimmed, state, warnings, path79);
+      parseHeaderLine(trimmed, state, warnings, path85);
       continue;
     }
     const toolSelect = /^T(\d+)\s*$/u.exec(trimmed);
@@ -44032,7 +44117,7 @@ function parseExcellon(content, path79) {
           warning(
             "excellon.undefined-tool",
             `The body selects tool T${toolSelect[1]}, which the header never defines. Its holes are not counted.`,
-            path79
+            path85
           )
         );
       }
@@ -44041,7 +44126,7 @@ function parseExcellon(content, path79) {
     const coordinate = /^(?:G0[05]\s*)?X([+-]?[\d.]+)Y([+-]?[\d.]+)(.*)$/u.exec(trimmed);
     if (!coordinate?.[1] || !coordinate[2]) continue;
     if (!currentTool) {
-      warnings.push(warning("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path79));
+      warnings.push(warning("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path85));
       continue;
     }
     const active = resolvedFormat();
@@ -44060,19 +44145,19 @@ function parseExcellon(content, path79) {
       warning(
         "excellon.assumed-plating",
         "Nothing in this file states whether its holes are plated; treated as plated. A rule must not block a release on this.",
-        path79
+        path85
       )
     );
   }
   if (state.units === void 0) {
-    warnings.push(warning("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path79));
+    warnings.push(warning("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path85));
   }
   if (slotCount > 0) {
     warnings.push(
       warning(
         "excellon.slots-collapsed",
         `${slotCount} slot(s) recorded at their start point only; slot length is not represented.`,
-        path79
+        path85
       )
     );
   }
@@ -44159,13 +44244,13 @@ function applyApertureBlockWord(ledger, compact) {
   if (ledger.block !== void 0) ledger.block.selected = code;
   referenceBlockAperture(ledger, code);
 }
-function readApertureEvidence(ledger, scale, path79) {
+function readApertureEvidence(ledger, scale, path85) {
   return {
     apertures: [...ledger.file].map(([code, definition]) => inMillimetres(code, definition, scale)),
     warnings: [
-      ...definitionWarnings(ledger, path79),
-      ...undefinedApertureWarnings(ledger, path79),
-      ...placementWarnings(ledger, path79)
+      ...definitionWarnings(ledger, path85),
+      ...undefinedApertureWarnings(ledger, path85),
+      ...placementWarnings(ledger, path85)
     ]
   };
 }
@@ -44411,13 +44496,13 @@ function inMillimetres(code, definition, scale) {
 function holeInMillimetres(hole, scale) {
   return hole === void 0 ? void 0 : { kind: "diameter", diameterMm: hole.diameter * scale };
 }
-function definitionWarnings(ledger, path79) {
+function definitionWarnings(ledger, path85) {
   const shown = ledger.problems.slice(0, maxDefinitionWarnings);
   const warnings = shown.map(
     (problem) => warning2(
       problem.kind === "malformed" ? "gerber.malformed-aperture-definition" : "gerber.unsupported-aperture-definition",
       `${problemSubject(problem)}, but ${problem.detail}; ${problem.kind === "malformed" ? "nothing is read from that definition." : "its shape is not read from this file. The numbers are the file's own, in whatever units it declares."}`,
-      path79
+      path85
     )
   );
   const rest = ledger.problems.length - shown.length;
@@ -44426,7 +44511,7 @@ function definitionWarnings(ledger, path79) {
       warning2(
         "gerber.unreadable-aperture-definition",
         `There ${rest === 1 ? "is 1 further definition" : `are ${rest} further definitions`} this reader could not use, which ${rest === 1 ? "is" : "are"} not listed here.`,
-        path79
+        path85
       )
     );
   }
@@ -44437,14 +44522,14 @@ function problemSubject(problem) {
   const block = problem.blockCode === void 0 ? "An unnamed aperture block" : `Aperture block D${problem.blockCode}`;
   return `${block} defines aperture D${problem.code}`;
 }
-function undefinedApertureWarnings(ledger, path79) {
+function undefinedApertureWarnings(ledger, path85) {
   const warnings = [];
   if (ledger.undefinedInFileScope.length > 0) {
     warnings.push(
       warning2(
         "gerber.undefined-aperture",
         `The file selects ${listApertureCodes(ledger.undefinedInFileScope.map((code) => ({ code })))}, which it never defines; what is plotted with it cannot be read from this file.`,
-        path79
+        path85
       )
     );
   }
@@ -44458,20 +44543,20 @@ function undefinedApertureWarnings(ledger, path79) {
             qualifier: entry.blockCode === void 0 ? void 0 : `(in block D${entry.blockCode})`
           }))
         )}, which the block never defines; what those blocks draw cannot be read from this file.`,
-        path79
+        path85
       )
     );
   }
   return warnings;
 }
-function placementWarnings(ledger, path79) {
+function placementWarnings(ledger, path85) {
   if (ledger.placements.count === 0) return [];
   const codes = listApertureCodes(ledger.placements.codes.map((code) => ({ code })));
   return [
     warning2(
       "gerber.unmodelled-aperture-block",
       `Aperture block ${codes} is placed ${ledger.placements.count === 1 ? "once" : `${ledger.placements.count} times`}. A block's own shape is not modelled, so each placement contributes its flash point only and the geometry read from this file is incomplete.`,
-      path79
+      path85
     )
   ];
 }
@@ -44480,8 +44565,8 @@ function listApertureCodes(codes) {
   const rest = codes.length - maxListedApertureCodes;
   return rest > 0 ? `${shown} and ${rest} more` : shown;
 }
-function warning2(code, message, path79) {
-  return path79 === void 0 ? { code, message } : { code, message, path: path79 };
+function warning2(code, message, path85) {
+  return path85 === void 0 ? { code, message } : { code, message, path: path85 };
 }
 
 // src/multicad/gerber-geometry.ts
@@ -44739,7 +44824,7 @@ function recordUnterminated(evidence, body) {
   if (evidence.count === 0) evidence.excerpt = boundedExcerpt(body);
   evidence.count += 1;
 }
-function unterminatedWarnings(unterminated, path79) {
+function unterminatedWarnings(unterminated, path85) {
   const warnings = [];
   const extended = unterminated.extended;
   if (extended.count > 0) {
@@ -44747,7 +44832,7 @@ function unterminatedWarnings(unterminated, path79) {
       warning3(
         "gerber.unterminated-extended-command",
         `An extended command is not closed by "%". There ${extended.count === 1 ? "is 1" : `are ${extended.count}`} of them, the first reading "${extended.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path79
+        path85
       )
     );
   }
@@ -44757,7 +44842,7 @@ function unterminatedWarnings(unterminated, path79) {
       warning3(
         "gerber.unterminated-word-command",
         `A command is not terminated by "*". There ${word.count === 1 ? "is 1" : `are ${word.count}`} of them, the first reading "${word.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
-        path79
+        path85
       )
     );
   }
@@ -44791,8 +44876,8 @@ function samePoint2(a, b) {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
 }
 var plottedOperation = /^(?:G\d+)?(?:X([+-]?\d+))?(?:Y([+-]?\d+))?(?:I[+-]?\d+)?(?:J[+-]?\d+)?D(0?[123])$/u;
-function warning3(code, message, path79) {
-  return path79 === void 0 ? { code, message } : { code, message, path: path79 };
+function warning3(code, message, path85) {
+  return path85 === void 0 ? { code, message } : { code, message, path: path85 };
 }
 function snapshotFileState(state, apertures) {
   return {
@@ -44882,7 +44967,7 @@ function readFileState(commands, unterminated) {
   }
   return snapshotFileState(state, apertures);
 }
-function parseGerber(content, path79) {
+function parseGerber(content, path85) {
   const commands = tokenizeGerber(content);
   const unterminated = {
     extended: { count: 0, excerpt: void 0 },
@@ -44901,14 +44986,14 @@ function parseGerber(content, path79) {
   const identity = state.fileFunction ? identityFromFileFunction(state.fileFunction) : void 0;
   const warnings = [];
   if (units === void 0) {
-    warnings.push(warning3("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path79));
+    warnings.push(warning3("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path85));
   }
   if (!declaredFormat) {
     warnings.push(
       warning3(
         "gerber.assumed-coordinate-format",
         "No %FS% format specification; assumed 3.5 with leading zeros omitted. Coordinates from this file are an assumption, not a measurement.",
-        path79
+        path85
       )
     );
   }
@@ -44917,7 +45002,7 @@ function parseGerber(content, path79) {
       warning3(
         "gerber.incremental-coordinates",
         "This file uses incremental coordinates, which are not interpreted; no geometry was read from it.",
-        path79
+        path85
       )
     );
   }
@@ -44926,13 +45011,13 @@ function parseGerber(content, path79) {
       warning3(
         "gerber.unmodelled-file-function",
         `The file declares TF.FileFunction "${state.fileFunction}", which is not a stackup layer; its role comes from the filename.`,
-        path79
+        path85
       )
     );
   }
-  warnings.push(...unterminatedWarnings(unterminated, path79));
+  warnings.push(...unterminatedWarnings(unterminated, path85));
   const scale = units === "inch" ? inchToMm2 : 1;
-  const apertureEvidence = readApertureEvidence(state.apertures, scale, path79);
+  const apertureEvidence = readApertureEvidence(state.apertures, scale, path85);
   warnings.push(...apertureEvidence.warnings);
   const collector = createGerberGeometryCollector({
     apertures: apertureEvidence.apertures,
@@ -46292,18 +46377,18 @@ function splitRegionContours(segments) {
   return { contours, exact };
 }
 function pointInContour(point, contour) {
-  let inside = false;
+  let inside2 = false;
   for (const edge of contour) {
     if (pointOnSegment(point, edge)) return true;
     const crossesY = edge.from.y > point.y !== edge.to.y > point.y;
     if (!crossesY) continue;
     const intersectionX = edge.from.x + (point.y - edge.from.y) * (edge.to.x - edge.from.x) / (edge.to.y - edge.from.y);
-    if (intersectionX > point.x) inside = !inside;
+    if (intersectionX > point.x) inside2 = !inside2;
   }
-  return inside;
+  return inside2;
 }
 function pointInPolygon(point, polygon) {
-  let inside = false;
+  let inside2 = false;
   for (let index = 0; index < polygon.length; index += 1) {
     const from = polygon[index];
     const to = polygon[(index + 1) % polygon.length];
@@ -46312,9 +46397,9 @@ function pointInPolygon(point, polygon) {
     const crossesY = from.y > point.y !== to.y > point.y;
     if (!crossesY) continue;
     const intersectionX = from.x + (point.y - from.y) * (to.x - from.x) / (to.y - from.y);
-    if (intersectionX > point.x) inside = !inside;
+    if (intersectionX > point.x) inside2 = !inside2;
   }
-  return inside;
+  return inside2;
 }
 function pointOnSegment(point, edge) {
   const cross2 = (edge.to.x - edge.from.x) * (point.y - edge.from.y) - (edge.to.y - edge.from.y) * (point.x - edge.from.x);
@@ -49583,7 +49668,10 @@ function checkReadinessStatus(allowed, readiness) {
   };
 }
 function checkRequiredOutputs(readiness) {
-  const missing = readiness?.missingRequired ?? [];
+  if (!readiness) {
+    return { ok: false, message: "Required output presence cannot be verified without readiness data." };
+  }
+  const missing = readiness.missingRequired;
   return {
     ok: missing.length === 0,
     message: missing.length === 0 ? "All required outputs are present." : `Missing required outputs: ${missing.join(", ")}.`
@@ -52926,7 +53014,14 @@ async function prepareInventory(root, manifestPath, reviewedSha) {
     names.set(relative, actual);
   }
   if (names.size > 1024) throw new Error("GitHub attestations support at most 1024 subjects.");
-  const checksums = `${[...names].sort(([a], [b]) => a.localeCompare(b)).map(([name, digest2]) => `${digest2}  ${name}`).join("\n")}
+  const finalLocal = await verifyExportProvenance(absoluteRoot, relativeManifest, { currentGitSha: reviewedSha });
+  if (finalLocal.status !== "verified" || finalLocal.gitShaMatch !== true) {
+    throw new Error("Export source or output inventory changed while preparing signing checksums.");
+  }
+  if (await fileSha256(absoluteManifest) !== names.get(relativeManifest)) {
+    throw new Error("Export manifest changed while preparing signing checksums.");
+  }
+  const checksums = `${[...names].sort(([a], [b]) => a.localeCompare(b)).map(([name, digest3]) => `${digest3}  ${name}`).join("\n")}
 `;
   return { names, checksums, manifestPath: absoluteManifest };
 }
@@ -52961,8 +53056,8 @@ function matchesVerifiedResult(value, e, inventory) {
   const remaining = new Map(inventory.names);
   for (const subject of subjects) {
     if (!isRecord(subject) || typeof subject.name !== "string") return false;
-    const digest2 = recordAt(subject, "digest")?.sha256;
-    if (remaining.get(subject.name) !== digest2) return false;
+    const digest3 = recordAt(subject, "digest")?.sha256;
+    if (remaining.get(subject.name) !== digest3) return false;
     remaining.delete(subject.name);
   }
   return remaining.size === 0;
@@ -53348,20 +53443,20 @@ async function isGitWorktreeDirty(root) {
         return false;
       }
     }
-    const inside = await runProcess("git", ["rev-parse", "--is-inside-work-tree"], {
+    const inside2 = await runProcess("git", ["rev-parse", "--is-inside-work-tree"], {
       cwd: root,
       timeoutMs: 1e4,
       maxStdoutBytes: 8 * 1024,
       maxStderrBytes: 32 * 1024
     });
-    if (inside.code !== 0) {
-      const message = [inside.stderr.trim(), inside.error].filter(Boolean).join("\n");
-      if (inside.error?.includes("ENOENT") || /not a git (repository|work tree)/i.test(message)) {
+    if (inside2.code !== 0) {
+      const message = [inside2.stderr.trim(), inside2.error].filter(Boolean).join("\n");
+      if (inside2.error?.includes("ENOENT") || /not a git (repository|work tree)/i.test(message)) {
         return false;
       }
       throw new Error(message || "git rev-parse failed");
     }
-    if (inside.stdout.trim() !== "true") {
+    if (inside2.stdout.trim() !== "true") {
       return false;
     }
     const result = await runProcess("git", ["status", "--porcelain=v1"], {
@@ -54600,8 +54695,8 @@ async function collectStepArtifacts(outputDir, absoluteOutput, step) {
   const artifacts = [];
   for (const file2 of files) {
     const relativePath = toPosix(import_node_path62.default.relative(outputDir, file2));
-    const digest2 = await fileDigest(file2);
-    artifacts.push({ path: relativePath, kind: step.artifactKind, ...digest2 });
+    const digest3 = await fileDigest(file2);
+    artifacts.push({ path: relativePath, kind: step.artifactKind, ...digest3 });
   }
   return artifacts;
 }
@@ -54975,12 +55070,280 @@ async function runInteractiveWizard(streams) {
   }
 }
 
-// src/cli/commands/plan.ts
+// src/cli/commands/manufacturing-archive.ts
+var import_node_path66 = __toESM(require("node:path"), 1);
+
+// src/release/manufacturing-archive.ts
+var import_node_crypto10 = require("node:crypto");
+var import_node_fs9 = require("node:fs");
+var import_promises25 = require("node:fs/promises");
 var import_node_path65 = __toESM(require("node:path"), 1);
+
+// src/util/zip.ts
+var import_node_zlib = require("node:zlib");
+function crc32(data) {
+  const table = crc32Table();
+  let crc = 4294967295;
+  for (const byte of data) {
+    crc = crc >>> 8 ^ (table[(crc ^ byte) & 255] ?? 0);
+  }
+  return (crc ^ 4294967295) >>> 0;
+}
+var _crc32Table;
+function crc32Table() {
+  if (_crc32Table) {
+    return _crc32Table;
+  }
+  _crc32Table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) {
+      c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+    }
+    _crc32Table[i] = c;
+  }
+  return _crc32Table;
+}
+function dosDateTime(date5) {
+  const dosTime = (date5.getHours() << 11 | date5.getMinutes() << 5 | Math.floor(date5.getSeconds() / 2)) & 65535;
+  const dosDate = (date5.getFullYear() - 1980 << 9 | date5.getMonth() + 1 << 5 | date5.getDate()) & 65535;
+  return { dosDate, dosTime };
+}
+function createZipBuffer(entries, date5 = /* @__PURE__ */ new Date()) {
+  const { dosDate, dosTime } = dosDateTime(date5);
+  const centralEntries = [];
+  const parts = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const nameBytes = Buffer.from(entry.name, "utf8");
+    const checksum = crc32(entry.data);
+    const deflated = (0, import_node_zlib.deflateRawSync)(entry.data, { level: 6 });
+    const useDeflate = deflated.length < entry.data.length;
+    const compressedData = useDeflate ? deflated : entry.data;
+    const method = useDeflate ? 8 : 0;
+    const localHeader = Buffer.allocUnsafe(30 + nameBytes.length);
+    localHeader.writeUInt32LE(67324752, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0, 6);
+    localHeader.writeUInt16LE(method, 8);
+    localHeader.writeUInt16LE(dosTime, 10);
+    localHeader.writeUInt16LE(dosDate, 12);
+    localHeader.writeUInt32LE(checksum, 14);
+    localHeader.writeUInt32LE(compressedData.length, 18);
+    localHeader.writeUInt32LE(entry.data.length, 22);
+    localHeader.writeUInt16LE(nameBytes.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+    nameBytes.copy(localHeader, 30);
+    parts.push(localHeader, compressedData);
+    centralEntries.push({
+      name: nameBytes,
+      crc32: checksum,
+      compressedSize: compressedData.length,
+      uncompressedSize: entry.data.length,
+      compressedData,
+      offset,
+      dosDate,
+      dosTime
+    });
+    offset += localHeader.length + compressedData.length;
+  }
+  const centralStart = offset;
+  for (const entry of centralEntries) {
+    const centralHeader = Buffer.allocUnsafe(46 + entry.name.length);
+    centralHeader.writeUInt32LE(33639248, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0, 8);
+    centralHeader.writeUInt16LE(entry.compressedSize < entry.uncompressedSize ? 8 : 0, 10);
+    centralHeader.writeUInt16LE(entry.dosTime, 12);
+    centralHeader.writeUInt16LE(entry.dosDate, 14);
+    centralHeader.writeUInt32LE(entry.crc32, 16);
+    centralHeader.writeUInt32LE(entry.compressedSize, 20);
+    centralHeader.writeUInt32LE(entry.uncompressedSize, 24);
+    centralHeader.writeUInt16LE(entry.name.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(entry.offset, 42);
+    entry.name.copy(centralHeader, 46);
+    parts.push(centralHeader);
+    offset += centralHeader.length;
+  }
+  const centralSize = offset - centralStart;
+  const eocd = Buffer.allocUnsafe(22);
+  eocd.writeUInt32LE(101010256, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(centralEntries.length, 8);
+  eocd.writeUInt16LE(centralEntries.length, 10);
+  eocd.writeUInt32LE(centralSize, 12);
+  eocd.writeUInt32LE(centralStart, 16);
+  eocd.writeUInt16LE(0, 20);
+  parts.push(eocd);
+  return Buffer.concat(parts);
+}
+
+// src/release/manufacturing-archive.ts
+var maxSourceBytes = 32 * 1024 * 1024;
+var maxArchiveBytes = 64 * 1024 * 1024;
+async function readMatchingManifest(manifestPath, verified) {
+  const data = await (0, import_promises25.readFile)(manifestPath);
+  let parsed;
+  try {
+    parsed = JSON.parse(data.toString("utf8"));
+  } catch {
+    throw new Error("Manufacturing export manifest changed after verification");
+  }
+  if (JSON.stringify(parsed) !== JSON.stringify(verified)) {
+    throw new Error("Manufacturing export manifest changed after verification");
+  }
+  return data;
+}
+async function readVerifiedOutput(outputDir, item2) {
+  const sourcePath2 = import_node_path65.default.resolve(outputDir, item2.path);
+  const relative = import_node_path65.default.relative(outputDir, sourcePath2);
+  if (!relative || relative.startsWith("..") || import_node_path65.default.isAbsolute(relative) || relative.split(import_node_path65.default.sep).includes("..")) {
+    throw new Error("Manufacturing archive file escaped the verified output directory");
+  }
+  const handle = await (0, import_promises25.open)(sourcePath2, import_node_fs9.constants.O_RDONLY | (import_node_fs9.constants.O_NOFOLLOW ?? 0));
+  let bytes;
+  try {
+    const info = await handle.stat();
+    if (!info.isFile() || info.size > maxSourceBytes) {
+      throw new Error("Manufacturing output is not a bounded regular file");
+    }
+    bytes = await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+  if (bytes.length !== item2.bytes || (0, import_node_crypto10.createHash)("sha256").update(bytes).digest("hex") !== item2.sha256) {
+    throw new Error("Manufacturing archive file changed after verification");
+  }
+  return { name: `outputs/${item2.path.replaceAll(import_node_path65.default.sep, "/")}`, data: bytes };
+}
+async function createVerifiedManufacturingZip(input) {
+  if (!/^[0-9a-f]{40}$/u.test(input.sourceCommitSha)) {
+    throw new Error("Manufacturing archive requires a pinned Git commit");
+  }
+  const root = import_node_path65.default.resolve(input.root);
+  const manifestPath = import_node_path65.default.resolve(input.generated.manifestPath);
+  const outputDir = import_node_path65.default.resolve(input.generated.outputDir);
+  const manifestRelative = import_node_path65.default.relative(root, manifestPath);
+  if (manifestRelative.startsWith("..") || import_node_path65.default.isAbsolute(manifestRelative)) {
+    throw new Error("Export manifest must be inside the checkout");
+  }
+  const proof = await verifyExportProvenance(root, manifestRelative, { currentGitSha: input.sourceCommitSha });
+  if (proof.status !== "verified" || !proof.manifest || proof.gitShaMatch !== true) {
+    throw new Error("Manufacturing export proof does not match its source or output bytes");
+  }
+  if (input.generated.failures !== 0 || input.generated.artifacts.length === 0) {
+    throw new Error("Manufacturing archive requires a successful real KiCad export");
+  }
+  const generated = input.generated.artifacts;
+  const types = new Set(generated.map((item2) => item2.kind));
+  if (!types.has("gerber") || !types.has("drill")) {
+    throw new Error("Manufacturing archive requires generated Gerber and Excellon drill files");
+  }
+  const attested = new Map(proof.manifest.artifacts.map((item2) => [item2.path, item2]));
+  const paths = new Set(generated.map((item2) => item2.path));
+  if (paths.size !== generated.length || attested.size !== generated.length || generated.length > 256) {
+    throw new Error("Manufacturing archive output inventory differs from verified proof");
+  }
+  if (generated.reduce((total, item2) => total + item2.bytes, 0) > maxSourceBytes) {
+    throw new Error("Manufacturing archive exceeds the 32 MiB source limit");
+  }
+  for (const item2 of generated) {
+    const expected = attested.get(item2.path);
+    if (expected?.sha256 !== item2.sha256 || expected?.bytes !== item2.bytes) {
+      throw new Error("Manufacturing archive source file was not in the verified export inventory");
+    }
+  }
+  const entries = await Promise.all(generated.map((item2) => readVerifiedOutput(outputDir, item2)));
+  const manifest = await readMatchingManifest(manifestPath, proof.manifest);
+  entries.push({ name: "export-provenance.json", data: manifest });
+  entries.sort((left, right) => left.name.localeCompare(right.name));
+  const archive = createZipBuffer(entries);
+  if (archive.length > maxArchiveBytes) throw new Error("Manufacturing ZIP exceeds the 64 MiB archive limit");
+  const destination = import_node_path65.default.resolve(input.destination);
+  if (destination === manifestPath || destination.startsWith(outputDir + import_node_path65.default.sep)) {
+    throw new Error("Manufacturing ZIP destination must be outside the verified output inventory");
+  }
+  await (0, import_promises25.mkdir)(import_node_path65.default.dirname(destination), { recursive: true, mode: 448 });
+  await (0, import_promises25.writeFile)(destination, archive, { flag: "wx", mode: 384 });
+  return {
+    path: destination,
+    sha256: (0, import_node_crypto10.createHash)("sha256").update(archive).digest("hex"),
+    bytes: archive.length,
+    files: generated.length
+  };
+}
+
+// src/cli/commands/manufacturing-archive.ts
+init_path();
+async function releaseArchiveCommand(pathInput, options, streams) {
+  try {
+    if (!/^[0-9a-f]{40}$/u.test(options.reviewedSourceSha)) {
+      streams.stderr.write("A full lowercase reviewed source commit SHA is required.\n");
+      return 2;
+    }
+    const root = await canonicalRoot(import_node_path66.default.resolve(normalizePathInput(pathInput ?? ".")));
+    const projects = await discoverProjects(root);
+    if (projects.length !== 1 || !projects[0]?.boardFiles[0]) {
+      streams.stderr.write("Exactly one KiCad project with a PCB is required for this local fabrication ZIP.\n");
+      return 2;
+    }
+    const cli = await detectKicadCli();
+    if (!cli.found || !cli.path || !/^10[.]0[.]/u.test(cli.version ?? "")) {
+      streams.stderr.write("KiCad CLI version 10.0.x is required for this manufacturing export.\n");
+      return 3;
+    }
+    const generated = await runGenerate(
+      { schemaVersion: 1, steps: [{ kind: "gerbers" }, { kind: "drill" }] },
+      {
+        outputDir: import_node_path66.default.resolve(
+          root,
+          normalizePathInput(options.generated ?? "build/boardreadyops-manufacturing/outputs")
+        ),
+        boardFile: import_node_path66.default.resolve(root, projects[0].boardFiles[0]),
+        gitRoot: root,
+        reviewedSourceSha: options.reviewedSourceSha,
+        kicadVersion: cli.version,
+        runner: createKicadCliRunner(cli.path)
+      }
+    );
+    if (generated.failures !== 0) {
+      streams.stderr.write("KiCad fabrication output generation failed; no manufacturing ZIP was created.\n");
+      return 1;
+    }
+    const result = await createVerifiedManufacturingZip({
+      root,
+      generated,
+      sourceCommitSha: options.reviewedSourceSha,
+      destination: import_node_path66.default.resolve(root, normalizePathInput(options.output ?? "build/boardreadyops-manufacturing.zip"))
+    });
+    streams.stdout.write("Locally verified manufacturing ZIP created (unsigned; no release approval).\n");
+    streams.stdout.write(`Archive: ${result.path}
+`);
+    streams.stdout.write(`SHA-256: ${result.sha256}
+`);
+    streams.stdout.write(`Bytes: ${result.bytes}; generated files: ${result.files}
+`);
+    return 0;
+  } catch (error51) {
+    streams.stderr.write(`Manufacturing ZIP not created: ${error51 instanceof Error ? error51.message : String(error51)}
+`);
+    return 1;
+  }
+}
+
+// src/cli/commands/plan.ts
+var import_node_path67 = __toESM(require("node:path"), 1);
 init_version();
 init_path();
 async function planCommand(pathInput, options, streams) {
-  const root = await canonicalRoot(import_node_path65.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path67.default.resolve(normalizePathInput(pathInput ?? ".")));
   const loaded = await loadConfig(root, options.config);
   if (loaded.errors.length > 0) {
     const findings = loaded.errors.map(
@@ -55135,7 +55498,7 @@ function shellToken(value) {
 }
 
 // src/cli/commands/policy.ts
-var import_node_path66 = __toESM(require("node:path"), 1);
+var import_node_path68 = __toESM(require("node:path"), 1);
 init_path();
 async function sourceBoundEvidence(root, options) {
   const manifest = options.manifest;
@@ -55185,7 +55548,7 @@ async function sourceBoundEvidence(root, options) {
   return { status: "unverified", reason: "No independently verified source-to-export evidence is available." };
 }
 async function policyCommand(pathInput, options, streams) {
-  const root = await canonicalRoot(import_node_path66.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path68.default.resolve(normalizePathInput(pathInput ?? ".")));
   const result = await runPipeline(pipelineInputFromCli(root, options, false));
   let policy = result.policy;
   if (policy?.rules.some((rule2) => rule2.type === "require-source-bound-export")) {
@@ -55228,17 +55591,17 @@ async function policyCommand(pathInput, options, streams) {
 
 // src/cli/commands/release.ts
 var import_node_child_process3 = require("node:child_process");
-var import_promises28 = __toESM(require("node:fs/promises"), 1);
-var import_node_path70 = __toESM(require("node:path"), 1);
+var import_promises29 = __toESM(require("node:fs/promises"), 1);
+var import_node_path72 = __toESM(require("node:path"), 1);
 var import_node_util3 = require("node:util");
 init_t();
 
 // src/release/passport.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 init_version();
 function computePassportDigest(passport) {
   const canonical = canonicalizeJson(passport);
-  return (0, import_node_crypto10.createHash)("sha256").update(canonical, "utf8").digest("hex");
+  return (0, import_node_crypto11.createHash)("sha256").update(canonical, "utf8").digest("hex");
 }
 function verifyPassportDigest(passport) {
   const errors = [];
@@ -55747,9 +56110,9 @@ function releasePrepareExitCode(summary) {
 init_release_output_cleanup();
 
 // src/release/signing.ts
-var import_node_crypto14 = require("node:crypto");
-var import_promises27 = __toESM(require("node:fs/promises"), 1);
-var import_node_path69 = __toESM(require("node:path"), 1);
+var import_node_crypto15 = require("node:crypto");
+var import_promises28 = __toESM(require("node:fs/promises"), 1);
+var import_node_path71 = __toESM(require("node:path"), 1);
 var SIGNATURE_FILE = "manifest.sig";
 var MANIFEST_FILE = "manifest.json";
 function signManifestBytes(bytes, privateKeyPem, signedAt) {
@@ -55759,12 +56122,12 @@ function signManifestBytes(bytes, privateKeyPem, signedAt) {
       `release signing requires an Ed25519 private key, received ${privateKey.asymmetricKeyType ?? "unknown"}`
     );
   }
-  const signature = (0, import_node_crypto14.sign)(null, bytes, privateKey);
-  const publicKey = (0, import_node_crypto14.createPublicKey)(privateKey).export({ type: "spki", format: "pem" }).toString();
+  const signature = (0, import_node_crypto15.sign)(null, bytes, privateKey);
+  const publicKey = (0, import_node_crypto15.createPublicKey)(privateKey).export({ type: "spki", format: "pem" }).toString();
   return {
     schemaVersion: 1,
     algorithm: "ed25519",
-    manifestDigest: (0, import_node_crypto14.createHash)("sha256").update(bytes).digest("hex"),
+    manifestDigest: (0, import_node_crypto15.createHash)("sha256").update(bytes).digest("hex"),
     signature: signature.toString("base64"),
     publicKey,
     signedAt
@@ -55780,8 +56143,8 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
       errorCodes: ["UNSUPPORTED_ALGORITHM"]
     };
   }
-  const digest2 = (0, import_node_crypto14.createHash)("sha256").update(bytes).digest("hex");
-  if (signature.manifestDigest && signature.manifestDigest !== digest2) {
+  const digest3 = (0, import_node_crypto15.createHash)("sha256").update(bytes).digest("hex");
+  if (signature.manifestDigest && signature.manifestDigest !== digest3) {
     errors.push("manifest digest in signature does not match manifest contents");
     errorCodes.push("DIGEST_MISMATCH");
   }
@@ -55793,7 +56156,7 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   }
   let valid = false;
   try {
-    valid = (0, import_node_crypto14.verify)(null, bytes, publicKey, Buffer.from(signature.signature, "base64"));
+    valid = (0, import_node_crypto15.verify)(null, bytes, publicKey, Buffer.from(signature.signature, "base64"));
   } catch {
     valid = false;
   }
@@ -55810,18 +56173,18 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   return { ok: errors.length === 0, errors, errorCodes };
 }
 async function signReleaseBundle(bundleDir, privateKeyPem, signedAt) {
-  const bytes = await import_promises27.default.readFile(import_node_path69.default.join(bundleDir, MANIFEST_FILE));
+  const bytes = await import_promises28.default.readFile(import_node_path71.default.join(bundleDir, MANIFEST_FILE));
   const signature = signManifestBytes(bytes, privateKeyPem, signedAt);
-  const signaturePath = import_node_path69.default.join(bundleDir, SIGNATURE_FILE);
-  await import_promises27.default.writeFile(signaturePath, `${JSON.stringify(signature, null, 2)}
+  const signaturePath = import_node_path71.default.join(bundleDir, SIGNATURE_FILE);
+  await import_promises28.default.writeFile(signaturePath, `${JSON.stringify(signature, null, 2)}
 `, "utf8");
   return { signaturePath, signature };
 }
 async function readBundleManifestAndSignature(bundleDir) {
-  const signaturePath = import_node_path69.default.join(bundleDir, SIGNATURE_FILE);
+  const signaturePath = import_node_path71.default.join(bundleDir, SIGNATURE_FILE);
   let signatureRaw;
   try {
-    signatureRaw = await import_promises27.default.readFile(signaturePath, "utf8");
+    signatureRaw = await import_promises28.default.readFile(signaturePath, "utf8");
   } catch {
     return { present: false };
   }
@@ -55836,7 +56199,7 @@ async function readBundleManifestAndSignature(bundleDir) {
   }
   let bytes;
   try {
-    bytes = await import_promises27.default.readFile(import_node_path69.default.join(bundleDir, MANIFEST_FILE));
+    bytes = await import_promises28.default.readFile(import_node_path71.default.join(bundleDir, MANIFEST_FILE));
   } catch (error51) {
     return {
       present: true,
@@ -55856,12 +56219,12 @@ async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
   return { present: true, ...verifyManifestSignature(read.bytes, read.signature, trustedPublicKeyPem) };
 }
 function loadKey(pem, kind) {
-  return kind === "private" ? (0, import_node_crypto14.createPrivateKey)(pem) : (0, import_node_crypto14.createPublicKey)(pem);
+  return kind === "private" ? (0, import_node_crypto15.createPrivateKey)(pem) : (0, import_node_crypto15.createPublicKey)(pem);
 }
 function publicKeysMatch(publicKey, trustedPublicKeyPem) {
   let trusted;
   try {
-    trusted = (0, import_node_crypto14.createPublicKey)(trustedPublicKeyPem);
+    trusted = (0, import_node_crypto15.createPublicKey)(trustedPublicKeyPem);
   } catch {
     return false;
   }
@@ -55879,7 +56242,7 @@ function verifyManifestSignatureAgainstTrustStore(bytes, signature, trustStore, 
   }
   let embeddedPublicKey;
   try {
-    embeddedPublicKey = (0, import_node_crypto14.createPublicKey)(signature.publicKey);
+    embeddedPublicKey = (0, import_node_crypto15.createPublicKey)(signature.publicKey);
   } catch {
     return { ok: false, errors: ["signature public key could not be parsed"], errorCodes: ["INVALID_PUBLIC_KEY"] };
   }
@@ -55906,7 +56269,7 @@ function verifyManifestSignatureAgainstTrustStore(bytes, signature, trustStore, 
   return { ok: true, errors: [], matchedKeyId: match.keyId };
 }
 async function loadTrustStore(filePath) {
-  const raw = await import_promises27.default.readFile(filePath, "utf8");
+  const raw = await import_promises28.default.readFile(filePath, "utf8");
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed)) {
     throw new TypeError(`trust store at ${filePath} must be a JSON array`);
@@ -55934,124 +56297,16 @@ async function verifyReleaseBundleSignatureAgainstTrustStore(bundleDir, trustSto
 
 // src/cli/commands/release.ts
 init_path();
-
-// src/util/zip.ts
-var import_node_zlib = require("node:zlib");
-function crc32(data) {
-  const table = crc32Table();
-  let crc = 4294967295;
-  for (const byte of data) {
-    crc = crc >>> 8 ^ (table[(crc ^ byte) & 255] ?? 0);
-  }
-  return (crc ^ 4294967295) >>> 0;
-}
-var _crc32Table;
-function crc32Table() {
-  if (_crc32Table) {
-    return _crc32Table;
-  }
-  _crc32Table = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let j = 0; j < 8; j++) {
-      c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
-    }
-    _crc32Table[i] = c;
-  }
-  return _crc32Table;
-}
-function dosDateTime(date5) {
-  const dosTime = (date5.getHours() << 11 | date5.getMinutes() << 5 | Math.floor(date5.getSeconds() / 2)) & 65535;
-  const dosDate = (date5.getFullYear() - 1980 << 9 | date5.getMonth() + 1 << 5 | date5.getDate()) & 65535;
-  return { dosDate, dosTime };
-}
-function createZipBuffer(entries, date5 = /* @__PURE__ */ new Date()) {
-  const { dosDate, dosTime } = dosDateTime(date5);
-  const centralEntries = [];
-  const parts = [];
-  let offset = 0;
-  for (const entry of entries) {
-    const nameBytes = Buffer.from(entry.name, "utf8");
-    const checksum = crc32(entry.data);
-    const deflated = (0, import_node_zlib.deflateRawSync)(entry.data, { level: 6 });
-    const useDeflate = deflated.length < entry.data.length;
-    const compressedData = useDeflate ? deflated : entry.data;
-    const method = useDeflate ? 8 : 0;
-    const localHeader = Buffer.allocUnsafe(30 + nameBytes.length);
-    localHeader.writeUInt32LE(67324752, 0);
-    localHeader.writeUInt16LE(20, 4);
-    localHeader.writeUInt16LE(0, 6);
-    localHeader.writeUInt16LE(method, 8);
-    localHeader.writeUInt16LE(dosTime, 10);
-    localHeader.writeUInt16LE(dosDate, 12);
-    localHeader.writeUInt32LE(checksum, 14);
-    localHeader.writeUInt32LE(compressedData.length, 18);
-    localHeader.writeUInt32LE(entry.data.length, 22);
-    localHeader.writeUInt16LE(nameBytes.length, 26);
-    localHeader.writeUInt16LE(0, 28);
-    nameBytes.copy(localHeader, 30);
-    parts.push(localHeader, compressedData);
-    centralEntries.push({
-      name: nameBytes,
-      crc32: checksum,
-      compressedSize: compressedData.length,
-      uncompressedSize: entry.data.length,
-      compressedData,
-      offset,
-      dosDate,
-      dosTime
-    });
-    offset += localHeader.length + compressedData.length;
-  }
-  const centralStart = offset;
-  for (const entry of centralEntries) {
-    const centralHeader = Buffer.allocUnsafe(46 + entry.name.length);
-    centralHeader.writeUInt32LE(33639248, 0);
-    centralHeader.writeUInt16LE(20, 4);
-    centralHeader.writeUInt16LE(20, 6);
-    centralHeader.writeUInt16LE(0, 8);
-    centralHeader.writeUInt16LE(entry.compressedSize < entry.uncompressedSize ? 8 : 0, 10);
-    centralHeader.writeUInt16LE(entry.dosTime, 12);
-    centralHeader.writeUInt16LE(entry.dosDate, 14);
-    centralHeader.writeUInt32LE(entry.crc32, 16);
-    centralHeader.writeUInt32LE(entry.compressedSize, 20);
-    centralHeader.writeUInt32LE(entry.uncompressedSize, 24);
-    centralHeader.writeUInt16LE(entry.name.length, 28);
-    centralHeader.writeUInt16LE(0, 30);
-    centralHeader.writeUInt16LE(0, 32);
-    centralHeader.writeUInt16LE(0, 34);
-    centralHeader.writeUInt16LE(0, 36);
-    centralHeader.writeUInt32LE(0, 38);
-    centralHeader.writeUInt32LE(entry.offset, 42);
-    entry.name.copy(centralHeader, 46);
-    parts.push(centralHeader);
-    offset += centralHeader.length;
-  }
-  const centralSize = offset - centralStart;
-  const eocd = Buffer.allocUnsafe(22);
-  eocd.writeUInt32LE(101010256, 0);
-  eocd.writeUInt16LE(0, 4);
-  eocd.writeUInt16LE(0, 6);
-  eocd.writeUInt16LE(centralEntries.length, 8);
-  eocd.writeUInt16LE(centralEntries.length, 10);
-  eocd.writeUInt32LE(centralSize, 12);
-  eocd.writeUInt32LE(centralStart, 16);
-  eocd.writeUInt16LE(0, 20);
-  parts.push(eocd);
-  return Buffer.concat(parts);
-}
-
-// src/cli/commands/release.ts
 var execFileAsync = (0, import_node_util3.promisify)(import_node_child_process3.execFile);
 async function releaseAuditClausesCommand(passportFile, options, streams) {
   const maxInputBytes = 1024 * 1024;
   async function readJsonFile(file2) {
-    const source = import_node_path70.default.resolve(normalizePathInput(file2));
-    const stat3 = await import_promises28.default.stat(source);
+    const source = import_node_path72.default.resolve(normalizePathInput(file2));
+    const stat3 = await import_promises29.default.stat(source);
     if (!stat3.isFile() || stat3.size > maxInputBytes) {
       throw new Error("Audit clause input must be a regular JSON file no larger than 1 MiB.");
     }
-    return JSON.parse(await import_promises28.default.readFile(source, "utf8"));
+    return JSON.parse(await import_promises29.default.readFile(source, "utf8"));
   }
   try {
     const passport = await readJsonFile(passportFile);
@@ -56070,7 +56325,7 @@ async function releaseAuditClausesCommand(passportFile, options, streams) {
   }
 }
 async function releasePackCommand(pathInput, options, streams) {
-  const root = await canonicalRoot(import_node_path70.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path72.default.resolve(normalizePathInput(pathInput ?? ".")));
   const git = await gitState2(root);
   const result = await runPipeline(pipelineInputFromCli(root, options, false));
   const bundle = await writeReleaseEvidenceBundle(root, result, {
@@ -56097,7 +56352,7 @@ async function releasePackCommand(pathInput, options, streams) {
 }
 async function releasePrepareCommand(pathInput, options, streams) {
   const locale = resolveLocale();
-  const root = await canonicalRoot(import_node_path70.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path72.default.resolve(normalizePathInput(pathInput ?? ".")));
   if (!await loadConfigOrReportErrors(root, options.config, streams, locale)) {
     return 2;
   }
@@ -56112,7 +56367,7 @@ async function releasePrepareCommand(pathInput, options, streams) {
     summary: result.summary
   };
   const summary = buildReleasePrepareSummary({ generate: generation.stage, validate: validate2 });
-  await writeTextFile(import_node_path70.default.resolve(root, outputDir, "release-prepare.json"), `${JSON.stringify(summary, null, 2)}
+  await writeTextFile(import_node_path72.default.resolve(root, outputDir, "release-prepare.json"), `${JSON.stringify(summary, null, 2)}
 `);
   if (options.format === "json") {
     streams.stdout.write(`${JSON.stringify(summary, null, 2)}
@@ -56140,14 +56395,14 @@ async function runGenerationStage(root, outputDir, options, streams, locale) {
   if (!project) {
     return { kind: "stage", stage: { status: "skipped", reason: "no KiCad project found" } };
   }
-  const generateOutputDir = import_node_path70.default.resolve(root, outputDir, "outputs");
+  const generateOutputDir = import_node_path72.default.resolve(root, outputDir, "outputs");
   const generated = await runGenerate(DEFAULT_GENERATE_RECIPE, {
-    outputDir: import_node_path70.default.join(generateOutputDir, "default"),
-    boardFile: project.boardFiles[0] ? import_node_path70.default.resolve(root, project.boardFiles[0]) : void 0,
-    schematicFile: project.schematicFiles[0] ? import_node_path70.default.resolve(root, project.schematicFiles[0]) : void 0,
+    outputDir: import_node_path72.default.join(generateOutputDir, "default"),
+    boardFile: project.boardFiles[0] ? import_node_path72.default.resolve(root, project.boardFiles[0]) : void 0,
+    schematicFile: project.schematicFiles[0] ? import_node_path72.default.resolve(root, project.schematicFiles[0]) : void 0,
     variant: options.variant,
     runner: createKicadCliRunner(cli.path),
-    projectName: import_node_path70.default.basename(project.projectFile, ".kicad_pro")
+    projectName: import_node_path72.default.basename(project.projectFile, ".kicad_pro")
   });
   const jobsetRun = await runProjectJobsets(root, project, cli.path, generateOutputDir);
   const failures = generated.failures + jobsetRun.failures;
@@ -56165,11 +56420,11 @@ async function runProjectJobsets(root, project, cliPath, outputDir) {
   if (project.jobsetFiles.length === 0) {
     return { artifacts: 0, failures: 0 };
   }
-  const jobsetOutputDir = import_node_path70.default.join(outputDir, "jobsets");
-  await import_promises28.default.mkdir(jobsetOutputDir, { recursive: true });
-  const result = await runJobset(cliPath, import_node_path70.default.resolve(root, project.projectFile), jobsetOutputDir);
+  const jobsetOutputDir = import_node_path72.default.join(outputDir, "jobsets");
+  await import_promises29.default.mkdir(jobsetOutputDir, { recursive: true });
+  const result = await runJobset(cliPath, import_node_path72.default.resolve(root, project.projectFile), jobsetOutputDir);
   await writeTextFile(
-    import_node_path70.default.join(jobsetOutputDir, "boardreadyops-jobset-run.json"),
+    import_node_path72.default.join(jobsetOutputDir, "boardreadyops-jobset-run.json"),
     `${JSON.stringify(
       {
         schemaVersion: 1,
@@ -56205,7 +56460,7 @@ function writePrepareSummary(summary, outputDir, stdout) {
     stdout.write(`  - ${reason}
 `);
   }
-  stdout.write(`Summary written to ${import_node_path70.default.join(outputDir, "release-prepare.json")}
+  stdout.write(`Summary written to ${import_node_path72.default.join(outputDir, "release-prepare.json")}
 `);
 }
 async function resolveReleaseVerifySignature(bundleDir, options, stderr) {
@@ -56216,7 +56471,7 @@ async function resolveReleaseVerifySignature(bundleDir, options, stderr) {
   const signatureRequired = Boolean(options.publicKey || options.trustStore);
   if (options.trustStore) {
     try {
-      const trustStore = await loadTrustStore(import_node_path70.default.resolve(normalizePathInput(options.trustStore)));
+      const trustStore = await loadTrustStore(import_node_path72.default.resolve(normalizePathInput(options.trustStore)));
       const signature2 = await verifyReleaseBundleSignatureAgainstTrustStore(
         bundleDir,
         trustStore,
@@ -56232,7 +56487,7 @@ async function resolveReleaseVerifySignature(bundleDir, options, stderr) {
   let trustedKey;
   if (options.publicKey) {
     try {
-      trustedKey = await readTextFile(import_node_path70.default.resolve(normalizePathInput(options.publicKey)));
+      trustedKey = await readTextFile(import_node_path72.default.resolve(normalizePathInput(options.publicKey)));
     } catch {
       stderr.write(`Public key not found: ${options.publicKey}
 `);
@@ -56294,7 +56549,7 @@ function writeReleaseVerifyOutcome(verification, coverage, signature, signatureR
   return ok ? 0 : 1;
 }
 async function releaseVerifyCommand(bundleInput, options, streams) {
-  const bundleDir = import_node_path70.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
+  const bundleDir = import_node_path72.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
   const verification = await verifyReleaseEvidenceBundle(bundleDir);
   const coverage = await verifyManifestCoverage(bundleDir);
   const signatureResolution = await resolveReleaseVerifySignature(bundleDir, options, streams.stderr);
@@ -56309,19 +56564,19 @@ async function releaseVerifyCommand(bundleInput, options, streams) {
   );
 }
 async function releaseSignCommand(bundleInput, options, streams) {
-  const bundleDir = import_node_path70.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
+  const bundleDir = import_node_path72.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
   if (!options.key) {
     streams.stderr.write("A private key is required: pass --key <path to an Ed25519 private key PEM>.\n");
     return 2;
   }
-  if (!await pathExists(import_node_path70.default.join(bundleDir, "manifest.json"))) {
+  if (!await pathExists(import_node_path72.default.join(bundleDir, "manifest.json"))) {
     streams.stderr.write(`No manifest.json found in ${bundleDir}. Run \`release pack\` first.
 `);
     return 2;
   }
   let privateKeyPem;
   try {
-    privateKeyPem = await readTextFile(import_node_path70.default.resolve(normalizePathInput(options.key)));
+    privateKeyPem = await readTextFile(import_node_path72.default.resolve(normalizePathInput(options.key)));
   } catch {
     streams.stderr.write(`Private key not found: ${options.key}
 `);
@@ -56331,7 +56586,7 @@ async function releaseSignCommand(bundleInput, options, streams) {
     const result = await signReleaseBundle(bundleDir, privateKeyPem, (/* @__PURE__ */ new Date()).toISOString());
     streams.stdout.write(`Signed release manifest with an Ed25519 key.
 `);
-    streams.stdout.write(`Signature written to ${import_node_path70.default.relative(process.cwd(), result.signaturePath)}
+    streams.stdout.write(`Signature written to ${import_node_path72.default.relative(process.cwd(), result.signaturePath)}
 `);
     return 0;
   } catch (error51) {
@@ -56341,7 +56596,7 @@ async function releaseSignCommand(bundleInput, options, streams) {
   }
 }
 async function releaseHandoffCommand(pathInput, options, streams) {
-  const root = await canonicalRoot(import_node_path70.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path72.default.resolve(normalizePathInput(pathInput ?? ".")));
   const profileId = options.profile ?? "jlcpcb";
   const resolved = resolveVendorProfile({
     profile: profileId,
@@ -56361,7 +56616,7 @@ async function releaseHandoffCommand(pathInput, options, streams) {
     assumptions: resolved.assumptions,
     caveats: resolved.profile.caveats
   };
-  const outputDir = import_node_path70.default.resolve(root, normalizePathInput(options.output ?? "build/boardreadyops-handoff"));
+  const outputDir = import_node_path72.default.resolve(root, normalizePathInput(options.output ?? "build/boardreadyops-handoff"));
   const outputDirPrefix = `${normalizeRelative(root, outputDir)}/`;
   const outputs = {};
   for (const kind of VENDOR_OUTPUT_KINDS) {
@@ -56370,27 +56625,27 @@ async function releaseHandoffCommand(pathInput, options, streams) {
   }
   const plan = planHandoffPackage(outputs, summary);
   await assertSafeReleaseOutputCleanup(root, outputDir, "handoff");
-  await import_promises28.default.rm(outputDir, { recursive: true, force: true });
-  await import_promises28.default.mkdir(outputDir, { recursive: true });
+  await import_promises29.default.rm(outputDir, { recursive: true, force: true });
+  await import_promises29.default.mkdir(outputDir, { recursive: true });
   const manifestFiles = [];
   for (const file2 of plan.files) {
-    const target = import_node_path70.default.join(outputDir, file2.target);
-    await import_promises28.default.mkdir(import_node_path70.default.dirname(target), { recursive: true });
-    await import_promises28.default.copyFile(import_node_path70.default.resolve(root, file2.source), target);
-    const digest2 = await sha256File(target);
-    manifestFiles.push({ ...file2, ...digest2 });
+    const target = import_node_path72.default.join(outputDir, file2.target);
+    await import_promises29.default.mkdir(import_node_path72.default.dirname(target), { recursive: true });
+    await import_promises29.default.copyFile(import_node_path72.default.resolve(root, file2.source), target);
+    const digest3 = await sha256File(target);
+    manifestFiles.push({ ...file2, ...digest3 });
   }
   const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
   const manifest = buildHandoffManifest(summary, plan, manifestFiles, generatedAt);
-  await writeTextFile(import_node_path70.default.join(outputDir, "handoff-manifest.json"), `${JSON.stringify(manifest, null, 2)}
+  await writeTextFile(import_node_path72.default.join(outputDir, "handoff-manifest.json"), `${JSON.stringify(manifest, null, 2)}
 `);
-  await writeTextFile(import_node_path70.default.join(outputDir, "README.md"), renderHandoffReadme(summary, plan, generatedAt));
+  await writeTextFile(import_node_path72.default.join(outputDir, "README.md"), renderHandoffReadme(summary, plan, generatedAt));
   let zipPath;
   if (options.zip !== false) {
     zipPath = `${outputDir}.zip`;
     const allFiles = await collectDirEntries(outputDir, outputDir);
     const zipBuffer = createZipBuffer(allFiles, new Date(generatedAt));
-    await import_promises28.default.writeFile(zipPath, zipBuffer);
+    await import_promises29.default.writeFile(zipPath, zipBuffer);
   }
   if (options.format === "json") {
     streams.stdout.write(`${JSON.stringify(manifest, null, 2)}
@@ -56418,8 +56673,8 @@ async function releaseDiffCommand(previousInput, pathInput, options, streams) {
     streams.stderr.write("A previous release report or evidence bundle is required.\n");
     return 2;
   }
-  const root = await canonicalRoot(import_node_path70.default.resolve(normalizePathInput(pathInput ?? ".")));
-  const previous = await loadReleaseSnapshot(import_node_path70.default.resolve(normalizePathInput(previousInput)));
+  const root = await canonicalRoot(import_node_path72.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const previous = await loadReleaseSnapshot(import_node_path72.default.resolve(normalizePathInput(previousInput)));
   if (!previous) {
     streams.stderr.write(`Could not read a previous release report from ${previousInput}.
 `);
@@ -56433,12 +56688,12 @@ async function releaseDiffCommand(previousInput, pathInput, options, streams) {
   };
   const diff = diffReleases(previous, current);
   if (options.output) {
-    await writeTextFile(import_node_path70.default.resolve(root, normalizePathInput(options.output)), `${JSON.stringify(diff, null, 2)}
+    await writeTextFile(import_node_path72.default.resolve(root, normalizePathInput(options.output)), `${JSON.stringify(diff, null, 2)}
 `);
   }
   if (options.html) {
     await writeTextFile(
-      import_node_path70.default.resolve(root, normalizePathInput(options.html)),
+      import_node_path72.default.resolve(root, normalizePathInput(options.html)),
       formatHtml(result, resolveLocale(), [], diff.fabrication)
     );
   }
@@ -56453,8 +56708,8 @@ async function releaseDiffCommand(previousInput, pathInput, options, streams) {
 async function loadReleaseSnapshot(input) {
   const candidates = [
     input,
-    import_node_path70.default.join(input, "reports", "boardreadyops-report.json"),
-    import_node_path70.default.join(input, "manifest.json")
+    import_node_path72.default.join(input, "reports", "boardreadyops-report.json"),
+    import_node_path72.default.join(input, "manifest.json")
   ];
   for (const candidate of candidates) {
     if (!await pathExists(candidate)) {
@@ -56476,14 +56731,14 @@ async function loadReleaseSnapshot(input) {
 }
 async function collectDirEntries(dir, baseDir) {
   const entries = [];
-  const items = await import_promises28.default.readdir(dir, { withFileTypes: true });
+  const items = await import_promises29.default.readdir(dir, { withFileTypes: true });
   for (const item2 of items) {
-    const full = import_node_path70.default.join(dir, item2.name);
+    const full = import_node_path72.default.join(dir, item2.name);
     if (item2.isDirectory()) {
       entries.push(...await collectDirEntries(full, baseDir));
     } else if (item2.isFile()) {
-      const rel = import_node_path70.default.relative(baseDir, full).replaceAll("\\", "/");
-      entries.push({ name: rel, data: await import_promises28.default.readFile(full) });
+      const rel = import_node_path72.default.relative(baseDir, full).replaceAll("\\", "/");
+      entries.push({ name: rel, data: await import_promises29.default.readFile(full) });
     }
   }
   return entries;
@@ -56503,8 +56758,8 @@ async function gitState2(root) {
 
 // src/cli/commands/review.ts
 var import_node_child_process4 = require("node:child_process");
-var import_node_crypto18 = require("node:crypto");
-var import_node_path71 = __toESM(require("node:path"), 1);
+var import_node_crypto20 = require("node:crypto");
+var import_node_path74 = __toESM(require("node:path"), 1);
 
 // packages/cloud-core/src/archive-sanitizer.ts
 var DEFAULT_MAX_COMPRESSED_SIZE = 50 * 1024 * 1024;
@@ -56518,7 +56773,7 @@ init_src();
 var maximumCsvBytes = 2 * 1024 * 1024;
 
 // packages/cloud-core/src/review-diff.ts
-var import_node_crypto15 = require("node:crypto");
+var import_node_crypto16 = require("node:crypto");
 function ordinalCompare(a, b) {
   if (a === b) return 0;
   return a < b ? -1 : 1;
@@ -56536,11 +56791,11 @@ function computeEvidenceDigest(input) {
     findings: sortedFingerprints,
     artifacts: sortedArtifacts
   });
-  return (0, import_node_crypto15.createHash)("sha256").update(canonicalPayload).digest("hex");
+  return (0, import_node_crypto16.createHash)("sha256").update(canonicalPayload).digest("hex");
 }
 
 // packages/cloud-core/src/runner-request-signature.ts
-var import_node_crypto16 = require("node:crypto");
+var import_node_crypto17 = require("node:crypto");
 var canonicalPrefix = "boardreadyops-runner-request-v1";
 var canonicalBaseUrl = "https://boardreadyops.invalid";
 var lowercaseUuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -56583,13 +56838,13 @@ function assertNonce(value) {
   return value;
 }
 function runnerRequestBodyDigest(body) {
-  return (0, import_node_crypto16.createHash)("sha256").update(body).digest("hex");
+  return (0, import_node_crypto17.createHash)("sha256").update(body).digest("hex");
 }
-function normalizeRunnerRequestPath(path79) {
-  if (!path79.startsWith("/") || path79.startsWith("//") || path79.includes("#") || path79.includes("\\")) {
+function normalizeRunnerRequestPath(path85) {
+  if (!path85.startsWith("/") || path85.startsWith("//") || path85.includes("#") || path85.includes("\\")) {
     throw new Error("runner request path must be an absolute application path without a fragment");
   }
-  const rawPath = path79.split("?", 1)[0] ?? path79;
+  const rawPath = path85.split("?", 1)[0] ?? path85;
   if (/%2f|%5c/iu.test(rawPath)) {
     throw new Error("runner request path cannot contain encoded path separators");
   }
@@ -56604,7 +56859,7 @@ function normalizeRunnerRequestPath(path79) {
       throw new Error("runner request path cannot contain dot segments");
     }
   }
-  const url2 = new URL(path79, canonicalBaseUrl);
+  const url2 = new URL(path85, canonicalBaseUrl);
   if (url2.origin !== canonicalBaseUrl) {
     throw new Error("runner request path must remain within the application origin");
   }
@@ -56644,7 +56899,7 @@ function canonicalRunnerRequest(input) {
   return fields.join("\n");
 }
 function signRunnerRequest(input) {
-  return (0, import_node_crypto16.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
+  return (0, import_node_crypto17.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
 }
 
 // packages/cloud-core/src/xml-sanitizer.ts
@@ -56678,8 +56933,205 @@ function mapFindingsForCloud(findings) {
 init_version();
 
 // src/kicad/snapshots.ts
-var import_node_crypto17 = require("node:crypto");
+var import_node_crypto19 = require("node:crypto");
 init_src();
+
+// src/kicad/native-snapshots.ts
+var import_node_crypto18 = require("node:crypto");
+var import_promises30 = __toESM(require("node:fs/promises"), 1);
+var import_node_os4 = __toESM(require("node:os"), 1);
+var import_node_path73 = __toESM(require("node:path"), 1);
+var MAX_SVG_BYTES = 2 * 1024 * 1024;
+var MAX_SHEETS = 16;
+var EXPORT_TIMEOUT_MS = 45e3;
+var PROCESS_LIMITS = { timeoutMs: EXPORT_TIMEOUT_MS, maxStdoutBytes: 8192, maxStderrBytes: 8192 };
+function digest(value) {
+  return (0, import_node_crypto18.createHash)("sha256").update(value).digest("hex");
+}
+function sourceDigest(file2) {
+  return import_promises30.default.readFile(file2).then(digest);
+}
+function normalizeKicadSvg(raw) {
+  const svg = raw.replace(/<\?xml[^?]*\?>/giu, "").replace(/<!DOCTYPE\s+svg\s+PUBLIC\s+["'][^"']+["']\s+["'][^"']+["']\s*>/giu, "").trim();
+  if (Buffer.byteLength(svg, "utf8") > MAX_SVG_BYTES || !svg.includes("</svg>")) return void 0;
+  const opening = /<svg\b[^>]*>/isu.exec(svg)?.[0];
+  const coordinates = opening?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]?.trim().split(/\s+/u).map(Number);
+  if (coordinates?.length !== 4) return void 0;
+  const width = coordinates[2];
+  const height = coordinates[3];
+  if (!width || !height || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+    return void 0;
+  if (/<(?:script|foreignObject|iframe|object|embed|animate|set)\b|<!ENTITY\b|@import\b/iu.test(svg)) return void 0;
+  if (/\son[a-z]+\s*=/iu.test(svg)) return void 0;
+  if ([...svg.matchAll(/\b(?:xlink:)?href\s*=\s*["']([^"']+)["']/giu)].some((match) => !match[1]?.startsWith("#")))
+    return void 0;
+  if ([...svg.matchAll(/url\(\s*["']?([^)"']+)/giu)].some((match) => !match[1]?.trim().startsWith("#")))
+    return void 0;
+  return { svg, width, height };
+}
+function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
+  const layer = snapshot.sheetOrLayer.endsWith(" / F.Cu") ? "F.Cu" : snapshot.sheetOrLayer.endsWith(" / B.Cu") ? "B.Cu" : void 0;
+  if (snapshot.kind !== "pcb_layer" || !snapshot.name.startsWith("kicad_native_") || !layer || snapshot.format !== "svg" || !snapshot.content)
+    return [];
+  const opening = /<svg\b[^>]*>/isu.exec(snapshot.content)?.[0];
+  const box = opening?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]?.trim().split(/\s+/u).map(Number);
+  if (box?.length !== 4 || box.some((value) => !Number.isFinite(value))) return [];
+  const [originX, originY, width, height] = box;
+  const boardWidth = bounds.maxX - bounds.minX;
+  const boardHeight = bounds.maxY - bounds.minY;
+  if (originX === void 0 || originY === void 0 || width === void 0 || height === void 0 || Math.abs(originX) > 1e-4 || Math.abs(originY) > 1e-4 || Math.abs(width - boardWidth) > 1e-3 || Math.abs(height - boardHeight) > 1e-3 || boardWidth <= 0 || boardHeight <= 0)
+    return [];
+  const result = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const finding2 of findings) {
+    if (!finding2.ruleId.startsWith("drc.") || !finding2.fingerprint || !finding2.details || finding2.details.coordinate_units !== "mm" || !Array.isArray(finding2.details.items))
+      continue;
+    for (const item2 of finding2.details.items) {
+      if (!item2 || typeof item2 !== "object") continue;
+      const candidate = item2;
+      const description = candidate.description;
+      const uuid5 = candidate.uuid;
+      const pos = candidate.pos;
+      if (typeof description !== "string" || !description.trim().endsWith(` on ${layer}`) || typeof uuid5 !== "string" || !/^[a-f0-9-]{36}$/iu.test(uuid5) || !pos || typeof pos !== "object")
+        continue;
+      const { x, y } = pos;
+      if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const xx = (x - bounds.minX) / boardWidth;
+      const yy = (y - bounds.minY) / boardHeight;
+      if (xx < 0 || xx > 1 || yy < 0 || yy > 1) continue;
+      const key = `${finding2.fingerprint}:${uuid5}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const name = /\bof ([#A-Za-z0-9_]+) on (?:F|B)\.Cu$/iu.exec(description)?.[1] ?? "Item";
+      result.push({
+        id: `kicad_item_${finding2.fingerprint.slice(0, 12)}_${uuid5.slice(0, 8)}`,
+        kind: "finding",
+        targetRef: name,
+        x: xx,
+        y: yy,
+        layer,
+        metadata: {
+          fingerprint: finding2.fingerprint,
+          ruleId: finding2.ruleId,
+          severity: finding2.severity,
+          message: finding2.message.slice(0, 500),
+          sourceUuid: uuid5,
+          provenance: "kicad-json-object-position",
+          locationMeaning: "Referenced source object, not verified violation center"
+        }
+      });
+      if (result.length >= 48) return result;
+    }
+  }
+  return result;
+}
+async function collectSvg(output, beforeSha, sourceFile, kind, label) {
+  const buffer = await import_promises30.default.readFile(output);
+  if (!buffer.length || buffer.length > MAX_SVG_BYTES) return void 0;
+  const normalized = normalizeKicadSvg(buffer.toString("utf8"));
+  if (!normalized || await sourceDigest(sourceFile) !== beforeSha) return void 0;
+  const id = digest([beforeSha, label].join(":")).slice(0, 16);
+  return {
+    id: `snap_native_${id}`,
+    name: `kicad_native_${label.replace(/[^a-zA-Z0-9_.-]/gu, "_")}.svg`,
+    kind,
+    format: "svg",
+    sheetOrLayer: label,
+    // PostgreSQL run_snapshots stores INTEGER dimensions. Preserve the exact
+    // SVG viewBox in `content`; only round up the display metadata.
+    width: Math.ceil(normalized.width),
+    height: Math.ceil(normalized.height),
+    content: normalized.svg,
+    sha256: digest(normalized.svg),
+    // Summary anchors cannot be mapped to genuine KiCad coordinates.
+    anchors: []
+  };
+}
+async function stageSource(sourceFile, tempRoot, sourceSha) {
+  const stage = import_node_path73.default.join(tempRoot, "source");
+  await import_promises30.default.mkdir(stage);
+  const input = import_node_path73.default.join(stage, import_node_path73.default.basename(sourceFile));
+  await import_promises30.default.copyFile(sourceFile, input);
+  const adjacent = (await import_promises30.default.readdir(import_node_path73.default.dirname(sourceFile), { withFileTypes: true })).filter(
+    (entry) => entry.isFile() && /\.(kicad_sch|kicad_pro)$/iu.test(entry.name) && entry.name !== import_node_path73.default.basename(sourceFile)
+  ).slice(0, 32);
+  await Promise.all(
+    adjacent.map(async ({ name }) => {
+      const from = import_node_path73.default.join(import_node_path73.default.dirname(sourceFile), name);
+      if ((await import_promises30.default.stat(from)).size <= MAX_SVG_BYTES * 4) await import_promises30.default.copyFile(from, import_node_path73.default.join(stage, name));
+    })
+  );
+  return await sourceDigest(input) === sourceSha ? input : void 0;
+}
+async function pcbLayer(cliPath, input, original, beforeSha, tempRoot, label, layer) {
+  if (!/^(?:F|B|In\d+)\.Cu$/u.test(layer)) return void 0;
+  const extras = [];
+  if (layer === "F.Cu") extras.push("F.SilkS");
+  if (layer === "B.Cu") extras.push("B.SilkS");
+  const output = import_node_path73.default.join(tempRoot, `pcb-${layer.replaceAll(".", "_")}.svg`);
+  const result = await runProcess(
+    cliPath,
+    [
+      "pcb",
+      "export",
+      "svg",
+      "--layers",
+      [layer, ...extras, "Edge.Cuts"].join(","),
+      "--mode-single",
+      "--fit-page-to-board",
+      "--output",
+      output,
+      input
+    ],
+    PROCESS_LIMITS
+  );
+  if (result.code !== 0 || result.timedOut) return void 0;
+  return collectSvg(output, beforeSha, original, "pcb_layer", `${label} / ${layer}`).catch(() => void 0);
+}
+async function pcbSnapshots(cliPath, input, original, beforeSha, tempRoot, label, layers) {
+  const found = await Promise.all(
+    [...new Set(layers)].slice(0, MAX_SHEETS).map((layer) => pcbLayer(cliPath, input, original, beforeSha, tempRoot, label, layer))
+  );
+  return found.filter((artifact) => artifact !== void 0);
+}
+async function schematicSnapshots(cliPath, input, original, beforeSha, tempRoot, label) {
+  const outputDirectory2 = import_node_path73.default.join(tempRoot, "sheets");
+  await import_promises30.default.mkdir(outputDirectory2, { recursive: true });
+  const result = await runProcess(
+    cliPath,
+    ["sch", "export", "svg", "--output", outputDirectory2, input],
+    PROCESS_LIMITS
+  );
+  if (result.code !== 0 || result.timedOut) return [];
+  const names = (await import_promises30.default.readdir(outputDirectory2)).filter((name) => name.endsWith(".svg")).sort().slice(0, MAX_SHEETS);
+  const found = await Promise.all(
+    names.map(
+      (name) => collectSvg(
+        import_node_path73.default.join(outputDirectory2, name),
+        beforeSha,
+        original,
+        "schematic",
+        `${label} / ${name.replace(/\.svg$/iu, "")}`
+      ).catch(() => void 0)
+    )
+  );
+  return found.filter((artifact) => artifact !== void 0);
+}
+async function exportNativeKicadSnapshots(cliPath, sourceFile, kind, layers = []) {
+  const beforeSha = await sourceDigest(sourceFile).catch(() => void 0);
+  if (!beforeSha) return [];
+  const directory = await import_promises30.default.mkdtemp(import_node_path73.default.join(import_node_os4.default.tmpdir(), "boardreadyops-native-svg-"));
+  const label = import_node_path73.default.basename(sourceFile).replace(/\.(kicad_sch|kicad_pcb)$/iu, "");
+  try {
+    const staged = await stageSource(sourceFile, directory, beforeSha);
+    if (!staged) return [];
+    return kind === "pcb_layer" ? await pcbSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label, layers) : await schematicSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label);
+  } finally {
+    await import_promises30.default.rm(directory, { recursive: true, force: true });
+  }
+}
+
+// src/kicad/snapshots.ts
 async function renderSchematicFile(file2, findings) {
   try {
     const parsed = await parseSchematic(file2);
@@ -56690,7 +57142,7 @@ async function renderSchematicFile(file2, findings) {
       Array.from(parsed.netLabels)
     );
     const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-    const sha2562 = (0, import_node_crypto17.createHash)("sha256").update(svg).digest("hex");
+    const sha2563 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
     return {
       id: `snap_sch_${sheetName}`,
       name: `schematic_${sheetName}.svg`,
@@ -56700,7 +57152,7 @@ async function renderSchematicFile(file2, findings) {
       width: 1200,
       height: 800,
       content: svg,
-      sha256: sha2562,
+      sha256: sha2563,
       anchors: linkedAnchors
     };
   } catch {
@@ -56718,7 +57170,7 @@ async function renderPcbFile(file2, findings) {
         parsed.footprints.map((fp) => ({ reference: fp.reference, footprint: fp.footprint, at: fp.at }))
       );
       const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-      const sha2562 = (0, import_node_crypto17.createHash)("sha256").update(svg).digest("hex");
+      const sha2563 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
       artifacts.push({
         id: `snap_pcb_${layer.replaceAll(".", "_")}`,
         name: `pcb_${layer.replaceAll(".", "_")}.svg`,
@@ -56728,7 +57180,7 @@ async function renderPcbFile(file2, findings) {
         width: 1e3,
         height: 800,
         content: svg,
-        sha256: sha2562,
+        sha256: sha2563,
         anchors: linkedAnchors
       });
     }
@@ -56736,17 +57188,42 @@ async function renderPcbFile(file2, findings) {
   }
   return artifacts;
 }
+async function schematicOrSummary(file2, cliPath, findings) {
+  const native = cliPath ? await exportNativeKicadSnapshots(cliPath, file2, "schematic").catch(() => []) : [];
+  if (native.length) return native;
+  const summary = await renderSchematicFile(file2, findings);
+  return summary ? [summary] : [];
+}
+async function pcbOrSummary(file2, cliPath, findings) {
+  if (cliPath) {
+    const pcb = await parsePcb(file2).catch(() => void 0);
+    const layers = pcb?.plotCopperLayers ?? [];
+    const native = await exportNativeKicadSnapshots(
+      cliPath,
+      file2,
+      "pcb_layer",
+      layers.length ? layers : ["F.Cu", "B.Cu"]
+    ).catch(() => []);
+    if (native.length) {
+      const bounds = pcb?.outlineBounds;
+      return bounds && findings?.length ? native.map((snapshot) => ({
+        ...snapshot,
+        anchors: verifiedNativePcbItemAnchors(snapshot, bounds, findings)
+      })) : native;
+    }
+  }
+  return renderPcbFile(file2, findings);
+}
 async function generateSnapshots(options) {
-  const artifacts = [];
-  for (const file2 of options.schematicFiles ?? []) {
-    const artifact = await renderSchematicFile(file2, options.findings);
-    if (artifact) artifacts.push(artifact);
-  }
-  for (const file2 of options.pcbFiles ?? []) {
-    const pcbArtifacts = await renderPcbFile(file2, options.findings);
-    artifacts.push(...pcbArtifacts);
-  }
-  return artifacts;
+  const cliPath = typeof options.nativeCli === "string" ? options.nativeCli : void 0;
+  const cli = options.nativeCli === false ? void 0 : await detectKicadCli(cliPath);
+  const nativeCliPath = cli?.found ? cli.path : void 0;
+  const schematics = (options.schematicFiles ?? []).map(
+    (file2) => schematicOrSummary(file2, nativeCliPath, options.findings)
+  );
+  const boards = (options.pcbFiles ?? []).map((file2) => pcbOrSummary(file2, nativeCliPath, options.findings));
+  const rendered = await Promise.all([...schematics, ...boards]);
+  return rendered.flat().slice(0, 64);
 }
 
 // src/cli/commands/review.ts
@@ -56798,6 +57275,21 @@ function getGitCommitSha(ref = "HEAD") {
     return "0".repeat(40);
   }
 }
+function resolveReviewPublishRef(sourceRoot, headSha) {
+  try {
+    const gitExec = resolveGitExecutable();
+    const run = (args) => (0, import_node_child_process4.execFileSync)(gitExec, ["-C", sourceRoot, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    const actualSha = run(["rev-parse", "HEAD"]);
+    if (actualSha !== headSha) return headSha;
+    const branch = run(["symbolic-ref", "--quiet", "--short", "HEAD"]);
+    return branch && !branch.startsWith("-") ? `refs/heads/${branch}` : headSha;
+  } catch {
+    return headSha;
+  }
+}
 function getGitOriginRepo() {
   try {
     const gitExec = resolveGitExecutable();
@@ -56819,7 +57311,7 @@ async function reviewPublishCommand(target, options, streams) {
   const headSha = options.head ?? getGitCommitSha("HEAD");
   const baseSha = options.base ? getGitCommitSha(options.base) : void 0;
   const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
-  const uploadMode = options.upload ?? "metadata";
+  const uploadMode = options.nativeVisuals && (!options.upload || options.upload === "metadata") ? "snapshots" : options.upload ?? "metadata";
   const server = (options.server ?? process.env.BOARDREADYOPS_SERVER_URL ?? "https://app.boardreadyops.com").replace(
     /\/$/,
     ""
@@ -56838,8 +57330,8 @@ async function reviewPublishCommand(target, options, streams) {
     failOn: "never"
   });
   const findings = mapFindingsForCloud(result.findings);
-  const rulePackDigest = (0, import_node_crypto18.createHash)("sha256").update("boardreadyops-v1").digest("hex");
-  const configDigest = (0, import_node_crypto18.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
+  const rulePackDigest = (0, import_node_crypto20.createHash)("sha256").update("boardreadyops-v1").digest("hex");
+  const configDigest = (0, import_node_crypto20.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
   const evidenceDigest = computeEvidenceDigest({
     toolVersion: boardReadyVersion,
     rulePackDigest,
@@ -56885,13 +57377,17 @@ async function reviewPublishCommand(target, options, streams) {
     return 1;
   }
   const snapshots = await generateSnapshots({
-    schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => import_node_path71.default.resolve(root, f))),
-    pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => import_node_path71.default.resolve(root, f))),
-    findings: findings.map((f) => ({
+    ...options.nativeVisuals ? {} : { nativeCli: false },
+    schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => import_node_path74.default.resolve(root, f))),
+    pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => import_node_path74.default.resolve(root, f))),
+    // The Cloud wire format intentionally omits native KiCad diagnostic details.
+    // Snapshot linking needs the original trusted run findings before that projection.
+    findings: result.findings.map((f) => ({
       fingerprint: f.fingerprint,
       ruleId: f.ruleId,
       severity: f.severity,
-      message: f.message
+      message: f.message,
+      ...f.details ? { details: f.details } : {}
     }))
   });
   if (!jsonOutput) streams.stdout.write(`\u{1F680} Publishing review to ${server}...
@@ -56907,7 +57403,7 @@ async function reviewPublishCommand(target, options, streams) {
       body: JSON.stringify({
         repositoryId,
         commitSha: headSha,
-        ref: "refs/heads/main",
+        ref: resolveReviewPublishRef(root, headSha),
         pullRequestNumber: options.pr,
         triggerKind: "manual",
         findings,
@@ -57046,17 +57542,17 @@ async function reviewVerifyCommand(target, options, streams) {
 }
 
 // src/cli/commands/runner.ts
-var import_node_path77 = __toESM(require("node:path"), 1);
+var import_node_path83 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-enrollment-admin.ts
 var import_node_child_process5 = require("node:child_process");
-var import_node_crypto20 = require("node:crypto");
-var import_promises29 = require("node:fs/promises");
-var import_node_os4 = __toESM(require("node:os"), 1);
-var import_node_path72 = __toESM(require("node:path"), 1);
+var import_node_crypto22 = require("node:crypto");
+var import_promises31 = require("node:fs/promises");
+var import_node_os5 = __toESM(require("node:os"), 1);
+var import_node_path75 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-registration-enrollment-store.ts
-var import_node_crypto19 = require("node:crypto");
+var import_node_crypto21 = require("node:crypto");
 var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
 var repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
@@ -57083,8 +57579,8 @@ function isoColumn(row, key) {
   const parsed = new Date(value);
   return Number.isNaN(parsed.valueOf()) ? void 0 : parsed.toISOString();
 }
-function digest(value) {
-  return (0, import_node_crypto19.createHash)("sha256").update(value, "utf8").digest("hex");
+function digest2(value) {
+  return (0, import_node_crypto21.createHash)("sha256").update(value, "utf8").digest("hex");
 }
 function positiveInteger3(value, fallback, name, maximum) {
   const selected = value ?? fallback;
@@ -57118,8 +57614,8 @@ function validActorId(value) {
 }
 function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
   const now = options.now ?? (() => /* @__PURE__ */ new Date());
-  const id = options.id ?? import_node_crypto19.randomUUID;
-  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto19.randomBytes)(32).toString("base64url"));
+  const id = options.id ?? import_node_crypto21.randomUUID;
+  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto21.randomBytes)(32).toString("base64url"));
   const enrollmentTtlSeconds = positiveInteger3(options.enrollmentTtlSeconds, 15 * 60, "enrollmentTtlSeconds", 60 * 60);
   return {
     async issueEnrollment(input) {
@@ -57160,7 +57656,7 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
           name,
           input.scope,
           allowedRepositories,
-          digest(token),
+          digest2(token),
           expiresAt.toISOString()
         ]
       );
@@ -57202,7 +57698,7 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
            $4,
            $5::jsonb
          )`,
-        [at.toISOString(), digest(input.enrollmentToken), publicKey, digest(publicKey), JSON.stringify(capabilities)]
+        [at.toISOString(), digest2(input.enrollmentToken), publicKey, digest2(publicKey), JSON.stringify(capabilities)]
       );
       const row = rows(result)[0];
       const outcome = stringColumn(row, "outcome");
@@ -57249,15 +57745,15 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
 var maximumPsqlOutputBytes = 1024 * 1024;
 var defaultDependencies = {
   query: executePsqlQuery,
-  token: () => (0, import_node_crypto20.randomBytes)(32).toString("base64url")
+  token: () => (0, import_node_crypto22.randomBytes)(32).toString("base64url")
 };
 async function issueRunnerEnrollment(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
-  const databaseUrlFile = import_node_path72.default.resolve(options.databaseUrlFile);
-  const tokenOutputFile = import_node_path72.default.resolve(options.tokenOutputFile);
+  const databaseUrlFile = import_node_path75.default.resolve(options.databaseUrlFile);
+  const tokenOutputFile = import_node_path75.default.resolve(options.tokenOutputFile);
   await assertPrivateFile(databaseUrlFile, "database URL file");
   await prepareTokenOutput(tokenOutputFile);
-  const databaseUrl = (await (0, import_promises29.readFile)(databaseUrlFile, "utf8")).trim();
+  const databaseUrl = (await (0, import_promises31.readFile)(databaseUrlFile, "utf8")).trim();
   validateDatabaseUrl(databaseUrl);
   const enrollmentToken = dependencies.token();
   validateEnrollmentToken(enrollmentToken);
@@ -57294,14 +57790,14 @@ async function issueRunnerEnrollment(options, overrides = {}) {
       tokenOutputFile
     };
   } finally {
-    if (!accepted) await (0, import_promises29.unlink)(tokenOutputFile).catch(() => void 0);
+    if (!accepted) await (0, import_promises31.unlink)(tokenOutputFile).catch(() => void 0);
   }
 }
 async function revokeRunnerRegistration(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
-  const databaseUrlFile = import_node_path72.default.resolve(options.databaseUrlFile);
+  const databaseUrlFile = import_node_path75.default.resolve(options.databaseUrlFile);
   await assertPrivateFile(databaseUrlFile, "database URL file");
-  const databaseUrl = (await (0, import_promises29.readFile)(databaseUrlFile, "utf8")).trim();
+  const databaseUrl = (await (0, import_promises31.readFile)(databaseUrlFile, "utf8")).trim();
   validateDatabaseUrl(databaseUrl);
   const executor = {
     query: async (sql, params = []) => await dependencies.query(databaseUrl, sql, params)
@@ -57320,11 +57816,11 @@ async function revokeRunnerRegistration(options, overrides = {}) {
 async function executePsqlQuery(databaseUrl, sql, params) {
   const invocation = psqlInvocation(sql, params);
   const connection = parseDatabaseConnection(databaseUrl);
-  const secretDirectory = await (0, import_promises29.mkdtemp)(import_node_path72.default.join(import_node_os4.default.tmpdir(), "boardreadyops-psql-"));
-  const passwordFile = import_node_path72.default.join(secretDirectory, "pgpass");
+  const secretDirectory = await (0, import_promises31.mkdtemp)(import_node_path75.default.join(import_node_os5.default.tmpdir(), "boardreadyops-psql-"));
+  const passwordFile = import_node_path75.default.join(secretDirectory, "pgpass");
   try {
-    if (process.platform !== "win32") await (0, import_promises29.chmod)(secretDirectory, 448);
-    await (0, import_promises29.writeFile)(
+    if (process.platform !== "win32") await (0, import_promises31.chmod)(secretDirectory, 448);
+    await (0, import_promises31.writeFile)(
       passwordFile,
       `${pgpassField(connection.host)}:${pgpassField(connection.port)}:${pgpassField(connection.database)}:${pgpassField(connection.user)}:${pgpassField(connection.password)}
 `,
@@ -57334,7 +57830,7 @@ async function executePsqlQuery(databaseUrl, sql, params) {
         flag: "wx"
       }
     );
-    if (process.platform !== "win32") await (0, import_promises29.chmod)(passwordFile, 384);
+    if (process.platform !== "win32") await (0, import_promises31.chmod)(passwordFile, 384);
     const result = await runPsql({
       environment: {
         ...process.env,
@@ -57359,7 +57855,7 @@ async function executePsqlQuery(databaseUrl, sql, params) {
     }
     return { rows: [row] };
   } finally {
-    await (0, import_promises29.rm)(secretDirectory, { recursive: true, force: true });
+    await (0, import_promises31.rm)(secretDirectory, { recursive: true, force: true });
   }
 }
 async function runPsql(input) {
@@ -57433,8 +57929,8 @@ function psqlInvocation(sql, params) {
   throw new Error("runner enrollment administration received an unsupported database query");
 }
 function issuePsqlInvocation(params) {
-  const [issuedAt, installationId, registrationId, enrollmentId, name, scope, repositories, digest2, expiresAt] = params;
-  if (typeof issuedAt !== "string" || typeof installationId !== "string" || typeof registrationId !== "string" || typeof enrollmentId !== "string" || typeof name !== "string" || typeof scope !== "string" || !Array.isArray(repositories) || repositories.some((repository) => typeof repository !== "string") || typeof digest2 !== "string" || typeof expiresAt !== "string") {
+  const [issuedAt, installationId, registrationId, enrollmentId, name, scope, repositories, digest3, expiresAt] = params;
+  if (typeof issuedAt !== "string" || typeof installationId !== "string" || typeof registrationId !== "string" || typeof enrollmentId !== "string" || typeof name !== "string" || typeof scope !== "string" || !Array.isArray(repositories) || repositories.some((repository) => typeof repository !== "string") || typeof digest3 !== "string" || typeof expiresAt !== "string") {
     throw new Error("runner enrollment database parameters were invalid");
   }
   return {
@@ -57446,7 +57942,7 @@ function issuePsqlInvocation(params) {
       registration_name: name,
       registration_scope: scope,
       allowed_repositories: JSON.stringify(repositories),
-      token_digest: digest2,
+      token_digest: digest3,
       expires_at: expiresAt
     },
     statement: `
@@ -57562,28 +58058,28 @@ function validateEnrollmentToken(value) {
   }
 }
 async function prepareTokenOutput(filePath) {
-  if (await (0, import_promises29.stat)(filePath).catch(() => void 0)) {
+  if (await (0, import_promises31.stat)(filePath).catch(() => void 0)) {
     throw new Error(`refusing to overwrite an existing enrollment token file: ${filePath}`);
   }
-  const directory = import_node_path72.default.dirname(filePath);
-  const existing = await (0, import_promises29.stat)(directory).catch(() => void 0);
+  const directory = import_node_path75.default.dirname(filePath);
+  const existing = await (0, import_promises31.stat)(directory).catch(() => void 0);
   if (existing && !existing.isDirectory()) {
     throw new Error(`enrollment token output parent is not a directory: ${directory}`);
   }
-  if (!existing) await (0, import_promises29.mkdir)(directory, { recursive: true, mode: 448 });
-  if (process.platform !== "win32") await (0, import_promises29.chmod)(directory, 448);
+  if (!existing) await (0, import_promises31.mkdir)(directory, { recursive: true, mode: 448 });
+  if (process.platform !== "win32") await (0, import_promises31.chmod)(directory, 448);
 }
 async function writeSecretFile(filePath, enrollmentToken) {
-  await (0, import_promises29.writeFile)(filePath, `${enrollmentToken}
+  await (0, import_promises31.writeFile)(filePath, `${enrollmentToken}
 `, {
     encoding: "utf8",
     flag: "wx",
     mode: 384
   });
-  if (process.platform !== "win32") await (0, import_promises29.chmod)(filePath, 384);
+  if (process.platform !== "win32") await (0, import_promises31.chmod)(filePath, 384);
 }
 async function assertPrivateFile(filePath, label) {
-  const info = await (0, import_promises29.stat)(filePath).catch(() => void 0);
+  const info = await (0, import_promises31.stat)(filePath).catch(() => void 0);
   if (!info?.isFile()) throw new Error(`${label} does not exist or is not a regular file`);
   if (process.platform !== "win32" && (info.mode & 63) !== 0) {
     throw new Error(`${label} must not be readable or writable by group or other users`);
@@ -57594,15 +58090,15 @@ async function assertPrivateFile(filePath, label) {
 init_version();
 
 // src/runner/identity.ts
-var import_node_crypto22 = require("node:crypto");
-var import_promises31 = require("node:fs/promises");
-var import_node_os5 = __toESM(require("node:os"), 1);
-var import_node_path73 = __toESM(require("node:path"), 1);
+var import_node_crypto24 = require("node:crypto");
+var import_promises33 = require("node:fs/promises");
+var import_node_os6 = __toESM(require("node:os"), 1);
+var import_node_path76 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/client.ts
-var import_node_crypto21 = require("node:crypto");
-var import_promises30 = require("node:fs/promises");
+var import_node_crypto23 = require("node:crypto");
+var import_promises32 = require("node:fs/promises");
 init_src();
 var responseBodyLimitBytes = 1024 * 1024;
 var runnerProtocolHeaderNames = {
@@ -57642,7 +58138,7 @@ var RunnerControlPlaneClient = class {
     this.privateKey = options.privateKey;
     this.fetchImpl = options.fetch ?? fetch;
     this.now = options.now ?? (() => /* @__PURE__ */ new Date());
-    this.nonce = options.nonce ?? (() => (0, import_node_crypto21.randomBytes)(24).toString("base64url"));
+    this.nonce = options.nonce ?? (() => (0, import_node_crypto23.randomBytes)(24).toString("base64url"));
     this.requestTimeoutMs = positiveInteger4(options.requestTimeoutMs ?? 3e4, "requestTimeoutMs");
   }
   async claim(input) {
@@ -57671,11 +58167,11 @@ var RunnerControlPlaneClient = class {
     if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
       throw new Error("artifact upload SHA-256 declaration is invalid");
     }
-    const content = await (0, import_promises30.readFile)(filePath);
+    const content = await (0, import_promises32.readFile)(filePath);
     if (content.byteLength !== maximumBytes) {
       throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${content.byteLength}`);
     }
-    if ((0, import_node_crypto21.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
+    if ((0, import_node_crypto23.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
       throw new Error("artifact digest changed before upload");
     }
     const response = await this.fetchImpl(url2, {
@@ -57693,8 +58189,8 @@ var RunnerControlPlaneClient = class {
       throw new RunnerControlPlaneError(`artifact upload failed with HTTP ${response.status}`, response.status, body);
     }
   }
-  async signedJson(path79, value, context = {}) {
-    const target = new URL(path79, this.baseUrl);
+  async signedJson(path85, value, context = {}) {
+    const target = new URL(path85, this.baseUrl);
     if (target.origin !== this.baseUrl.origin) {
       throw new Error("runner request path escaped the configured control-plane origin");
     }
@@ -57793,7 +58289,7 @@ async function activateRunner(input) {
   }
 }
 async function loadRunnerPrivateKey(filePath) {
-  return (0, import_node_crypto21.createPrivateKey)(await (0, import_promises30.readFile)(filePath, "utf8"));
+  return (0, import_node_crypto23.createPrivateKey)(await (0, import_promises32.readFile)(filePath, "utf8"));
 }
 function normalizeControlPlaneUrl(value) {
   let url2;
@@ -57859,25 +58355,25 @@ var privateKeyName = "runner-private-key.pem";
 var publicKeyName = "runner-public-key.pem";
 var identityFileName = "runner.json";
 function defaultRunnerIdentityDirectory() {
-  return import_node_path73.default.join(import_node_os5.default.homedir(), ".config", "boardreadyops", "runner");
+  return import_node_path76.default.join(import_node_os6.default.homedir(), ".config", "boardreadyops", "runner");
 }
 async function activateRunnerIdentity(options) {
   const controlPlaneUrl = normalizeControlPlaneUrl(options.controlPlaneUrl).origin;
-  const enrollmentTokenFile = import_node_path73.default.resolve(options.enrollmentTokenFile);
+  const enrollmentTokenFile = import_node_path76.default.resolve(options.enrollmentTokenFile);
   await assertPrivateFile2(enrollmentTokenFile, "runner enrollment token file");
-  const enrollmentToken = (await (0, import_promises31.readFile)(enrollmentTokenFile, "utf8")).trim();
+  const enrollmentToken = (await (0, import_promises33.readFile)(enrollmentTokenFile, "utf8")).trim();
   if (enrollmentToken.length < 43 || enrollmentToken.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(enrollmentToken)) {
     throw new Error("runner enrollment token file does not contain a valid enrollment token");
   }
   const capabilities = normalizeCapabilities(options.capabilities ?? []);
   const labels = normalizeCapabilities(options.labels ?? []);
-  const identityDirectory = import_node_path73.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
+  const identityDirectory = import_node_path76.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
   await prepareIdentityDirectory(identityDirectory);
-  const identityFile = import_node_path73.default.join(identityDirectory, identityFileName);
-  const privateKeyFile = import_node_path73.default.join(identityDirectory, privateKeyName);
-  const publicKeyFile = import_node_path73.default.join(identityDirectory, publicKeyName);
+  const identityFile = import_node_path76.default.join(identityDirectory, identityFileName);
+  const privateKeyFile = import_node_path76.default.join(identityDirectory, privateKeyName);
+  const publicKeyFile = import_node_path76.default.join(identityDirectory, publicKeyName);
   await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
-  const generated = (0, import_node_crypto22.generateKeyPairSync)("ed25519");
+  const generated = (0, import_node_crypto24.generateKeyPairSync)("ed25519");
   const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
   const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
   const activated = await activateRunner({
@@ -57909,7 +58405,7 @@ async function activateRunnerIdentity(options) {
 `, 384);
     written.push(identityFile);
   } catch (error51) {
-    await Promise.all(written.map((file2) => (0, import_promises31.unlink)(file2).catch(() => void 0)));
+    await Promise.all(written.map((file2) => (0, import_promises33.unlink)(file2).catch(() => void 0)));
     throw error51;
   }
   return {
@@ -57921,17 +58417,17 @@ async function activateRunnerIdentity(options) {
   };
 }
 async function loadRunnerIdentity(identityFileInput) {
-  const identityFile = import_node_path73.default.resolve(identityFileInput);
-  await assertPrivateDirectory(import_node_path73.default.dirname(identityFile), "runner identity directory");
+  const identityFile = import_node_path76.default.resolve(identityFileInput);
+  await assertPrivateDirectory(import_node_path76.default.dirname(identityFile), "runner identity directory");
   await assertPrivateFile2(identityFile, "runner identity file");
   let value;
   try {
-    value = JSON.parse(await (0, import_promises31.readFile)(identityFile, "utf8"));
+    value = JSON.parse(await (0, import_promises33.readFile)(identityFile, "utf8"));
   } catch {
     throw new Error("runner identity file is not valid JSON");
   }
   const identity = parseIdentity(value);
-  const directory = import_node_path73.default.dirname(identityFile);
+  const directory = import_node_path76.default.dirname(identityFile);
   const privateKeyPath = resolveIdentityChild(directory, identity.privateKeyFile, "privateKeyFile");
   const publicKeyPath = resolveIdentityChild(directory, identity.publicKeyFile, "publicKeyFile");
   await assertPrivateFile2(privateKeyPath, "runner private key file");
@@ -57989,30 +58485,30 @@ function normalizeCapabilities(values) {
   return normalized;
 }
 function relativeFile(value, name) {
-  if (typeof value !== "string" || value.length < 1 || import_node_path73.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
+  if (typeof value !== "string" || value.length < 1 || import_node_path76.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
     throw new Error(`runner identity ${name} must be a relative file within the identity directory`);
   }
   return value;
 }
 function resolveIdentityChild(directory, relative, name) {
-  const resolved = import_node_path73.default.resolve(directory, relative);
-  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path73.default.sep}`)) {
+  const resolved = import_node_path76.default.resolve(directory, relative);
+  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path76.default.sep}`)) {
     throw new Error(`runner identity ${name} escapes the identity directory`);
   }
   return resolved;
 }
 async function prepareIdentityDirectory(directory) {
-  const existing = await (0, import_promises31.lstat)(directory).catch(() => void 0);
+  const existing = await (0, import_promises33.lstat)(directory).catch(() => void 0);
   if (existing && (existing.isSymbolicLink() || !existing.isDirectory())) {
     throw new Error(`runner identity directory is not a directory: ${directory}`);
   }
   if (!existing) {
-    await (0, import_promises31.mkdir)(directory, { recursive: true, mode: 448 });
+    await (0, import_promises33.mkdir)(directory, { recursive: true, mode: 448 });
   }
-  if (process.platform !== "win32") await (0, import_promises31.chmod)(directory, 448);
+  if (process.platform !== "win32") await (0, import_promises33.chmod)(directory, 448);
 }
 async function assertPrivateDirectory(directory, label) {
-  const info = await (0, import_promises31.lstat)(directory).catch(() => void 0);
+  const info = await (0, import_promises33.lstat)(directory).catch(() => void 0);
   if (!info?.isDirectory() || info.isSymbolicLink()) {
     throw new Error(`${label} does not exist or is not a regular directory`);
   }
@@ -58021,7 +58517,7 @@ async function assertPrivateDirectory(directory, label) {
   }
 }
 async function assertPrivateFile2(filePath, label) {
-  const info = await (0, import_promises31.lstat)(filePath).catch(() => void 0);
+  const info = await (0, import_promises33.lstat)(filePath).catch(() => void 0);
   if (!info?.isFile() || info.isSymbolicLink()) throw new Error(`${label} does not exist or is not a regular file`);
   if (process.platform !== "win32" && (info.mode & 63) !== 0) {
     throw new Error(`${label} must not be readable or writable by group or other users`);
@@ -58029,44 +58525,257 @@ async function assertPrivateFile2(filePath, label) {
 }
 async function assertTargetsDoNotExist(files) {
   for (const file2 of files) {
-    if (await (0, import_promises31.lstat)(file2).catch(() => void 0)) {
+    if (await (0, import_promises33.lstat)(file2).catch(() => void 0)) {
       throw new Error(`refusing to overwrite existing runner identity material: ${file2}`);
     }
   }
 }
 async function writeExclusive(filePath, content, mode) {
-  await (0, import_promises31.writeFile)(filePath, content, { encoding: "utf8", flag: "wx", mode });
-  if (process.platform !== "win32") await (0, import_promises31.chmod)(filePath, mode);
+  await (0, import_promises33.writeFile)(filePath, content, { encoding: "utf8", flag: "wx", mode });
+  if (process.platform !== "win32") await (0, import_promises33.chmod)(filePath, mode);
 }
 
 // src/runner/worker.ts
-var import_promises33 = require("node:fs/promises");
-var import_node_os6 = __toESM(require("node:os"), 1);
-var import_node_path75 = __toESM(require("node:path"), 1);
+var import_promises37 = require("node:fs/promises");
+var import_node_os7 = __toESM(require("node:os"), 1);
+var import_node_path80 = __toESM(require("node:path"), 1);
 init_src();
+
+// src/runner/customer-artifacts.ts
+var import_node_crypto25 = require("node:crypto");
+var import_node_fs11 = require("node:fs");
+var import_promises34 = require("node:fs/promises");
+var import_node_path77 = __toESM(require("node:path"), 1);
+var maximumLocalArtifactBytes = 64 * 1024 * 1024;
+var uuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+function inside(parent, candidate) {
+  const relative = import_node_path77.default.relative(parent, candidate);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${import_node_path77.default.sep}`) && !import_node_path77.default.isAbsolute(relative);
+}
+async function privateDirectory(directory) {
+  const info = await (0, import_promises34.lstat)(directory);
+  if (!info.isDirectory() || info.isSymbolicLink()) {
+    throw new Error("customer artifact directory is not a regular directory");
+  }
+  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
+    throw new Error("customer artifact directory must not be accessible by group or others");
+  }
+}
+async function persistCustomerRunnerArtifacts(input) {
+  input.signal?.throwIfAborted();
+  if (!uuidPattern2.test(input.job.runId) || !uuidPattern2.test(input.job.executionAttemptId)) {
+    throw new Error("customer artifact destination requires canonical run and attempt UUIDs");
+  }
+  if (input.artifacts.length > 100) throw new Error("too many customer artifacts");
+  const root = import_node_path77.default.resolve(input.root);
+  const workspace = await (0, import_promises34.realpath)(input.workspace);
+  await (0, import_promises34.mkdir)(root, { recursive: true, mode: 448 });
+  await privateDirectory(root);
+  const realRoot = await (0, import_promises34.realpath)(root);
+  if (inside(realRoot, workspace) || inside(workspace, realRoot)) {
+    throw new Error("customer artifact root must not overlap the temporary source workspace");
+  }
+  const runRoot = import_node_path77.default.join(root, input.job.runId);
+  await (0, import_promises34.mkdir)(runRoot, { mode: 448 }).catch((error51) => {
+    if (error51.code !== "EEXIST") throw error51;
+  });
+  await privateDirectory(runRoot);
+  const claimPath = import_node_path77.default.join(runRoot, `.claim-${input.job.executionAttemptId}`);
+  let claim;
+  try {
+    claim = await (0, import_promises34.open)(claimPath, "wx", 384);
+  } catch (error51) {
+    if (error51.code === "EEXIST") {
+      throw new Error("customer artifact attempt is already claimed; inspect before retrying");
+    }
+    throw error51;
+  }
+  try {
+    await claim.close();
+    const destination = import_node_path77.default.join(runRoot, input.job.executionAttemptId);
+    const existing = await (0, import_promises34.lstat)(destination).catch((error51) => {
+      if (error51.code === "ENOENT") return void 0;
+      throw error51;
+    });
+    if (existing) throw new Error("customer artifacts for this run attempt already exist");
+    const staging = await (0, import_promises34.mkdtemp)(import_node_path77.default.join(runRoot, ".pending-"));
+    try {
+      const manifestArtifacts = [];
+      for (const [index, artifact] of input.artifacts.entries()) {
+        input.signal?.throwIfAborted();
+        const realSource = await (0, import_promises34.realpath)(artifact.filePath);
+        if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
+        const handle = await (0, import_promises34.open)(artifact.filePath, import_node_fs11.constants.O_RDONLY | (import_node_fs11.constants.O_NOFOLLOW ?? 0));
+        let content;
+        try {
+          const stats = await handle.stat();
+          if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
+            throw new Error("runner artifact is not a bounded regular file");
+          }
+          content = await handle.readFile();
+        } finally {
+          await handle.close();
+        }
+        const digest3 = (0, import_node_crypto25.createHash)("sha256").update(content).digest("hex");
+        if (content.length !== artifact.bytes || digest3 !== artifact.sha256) {
+          throw new Error("runner artifact bytes do not match its declaration");
+        }
+        const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
+        await (0, import_promises34.writeFile)(import_node_path77.default.join(staging, filename), content, { flag: "wx", mode: 384 });
+        manifestArtifacts.push({
+          filename,
+          kind: artifact.kind,
+          name: artifact.name,
+          role: artifact.role,
+          bytes: artifact.bytes,
+          sha256: artifact.sha256
+        });
+      }
+      const manifest = {
+        version: 1,
+        repository: `${input.job.repository.owner}/${input.job.repository.name}`,
+        commitSha: input.job.repository.commitSha,
+        runId: input.job.runId,
+        executionAttemptId: input.job.executionAttemptId,
+        artifacts: manifestArtifacts
+      };
+      await (0, import_promises34.writeFile)(import_node_path77.default.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}
+`, {
+        flag: "wx",
+        mode: 384
+      });
+      input.signal?.throwIfAborted();
+      await (0, import_promises34.rename)(staging, destination);
+      return input.artifacts.length;
+    } catch (error51) {
+      await (0, import_promises34.rm)(staging, { recursive: true, force: true });
+      throw error51;
+    }
+  } finally {
+    await (0, import_promises34.rm)(claimPath, { force: true });
+  }
+}
+
+// src/runner/draft-attestation.ts
+var import_node_crypto26 = require("node:crypto");
+var import_node_fs12 = require("node:fs");
+var import_promises35 = require("node:fs/promises");
+var import_node_path78 = __toESM(require("node:path"), 1);
+init_zod();
+var domain2 = "boardreadyops-runner-draft-receipt-v1\n";
+var uuid3 = external_exports.string().uuid();
+var sha2562 = external_exports.string().regex(/^[0-9a-f]{64}$/u);
+var payloadSchema = external_exports.object({
+  version: external_exports.literal(1),
+  purpose: external_exports.literal("manufacturing-draft"),
+  runnerId: uuid3,
+  runId: uuid3,
+  executionAttemptId: uuid3,
+  repository: external_exports.string().min(3).max(300).regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
+  sourceCommitSha: external_exports.string().regex(/^[0-9a-f]{40}$/u),
+  archiveSha256: sha2562,
+  archiveBytes: external_exports.number().int().positive().max(64 * 1024 * 1024)
+}).strict();
+var signedSchema = external_exports.object({
+  payload: payloadSchema,
+  algorithm: external_exports.literal("Ed25519"),
+  signature: external_exports.string().regex(/^[A-Za-z0-9_-]{86}$/u)
+}).strict();
+function signedBytes(payload) {
+  return Buffer.from(domain2 + JSON.stringify(payload), "utf8");
+}
+function signManufacturingDraftReceipt(payload, privateKey) {
+  const normalized = payloadSchema.parse(payload);
+  return signedSchema.parse({
+    payload: normalized,
+    algorithm: "Ed25519",
+    signature: (0, import_node_crypto26.sign)(null, signedBytes(normalized), privateKey).toString("base64url")
+  });
+}
+async function createManufacturingDraftReceiptArtifact(input) {
+  const { archive, job } = input;
+  if (job.safeMode.enabled || job.repository.private || job.sourceMode !== "customer_checkout") {
+    throw new Error("draft provenance requires an authorized public source checkout");
+  }
+  if (archive.kind !== "archive" || archive.role !== "draft-manufacturing" || archive.contentType !== "application/zip") {
+    throw new Error("draft provenance must reference a draft manufacturing ZIP");
+  }
+  const workspace = await (0, import_promises35.realpath)(import_node_path78.default.resolve(input.workspace));
+  const archivePath = await (0, import_promises35.realpath)(import_node_path78.default.resolve(archive.filePath));
+  const relative = import_node_path78.default.relative(workspace, archivePath);
+  if (!relative || relative.startsWith("..") || import_node_path78.default.isAbsolute(relative) || relative.split(import_node_path78.default.sep).includes("..")) {
+    throw new Error("draft archive escaped the disposable runner checkout");
+  }
+  const handle = await (0, import_promises35.open)(archivePath, import_node_fs12.constants.O_RDONLY | (import_node_fs12.constants.O_NOFOLLOW ?? 0));
+  let data;
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile() || stats.size === 0 || stats.size > 64 * 1024 * 1024) {
+      throw new Error("draft archive must be a bounded regular file");
+    }
+    data = await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+  if (data.byteLength !== archive.bytes || (0, import_node_crypto26.createHash)("sha256").update(data).digest("hex") !== archive.sha256) {
+    throw new Error("draft archive digest changed before runner signing");
+  }
+  const receipt = signManufacturingDraftReceipt(
+    {
+      version: 1,
+      purpose: "manufacturing-draft",
+      runnerId: input.runnerId,
+      runId: job.runId,
+      executionAttemptId: job.executionAttemptId,
+      repository: `${job.repository.owner}/${job.repository.name}`,
+      sourceCommitSha: job.repository.commitSha,
+      archiveSha256: archive.sha256,
+      archiveBytes: archive.bytes
+    },
+    input.privateKey
+  );
+  const content = Buffer.from(`${JSON.stringify(receipt)}
+`, "utf8");
+  const filePath = import_node_path78.default.join(import_node_path78.default.dirname(archivePath), "manufacturing-draft-receipt.json");
+  await (0, import_promises35.writeFile)(filePath, content, { flag: "wx", mode: 384 });
+  return {
+    kind: "attestation",
+    role: "draft-provenance",
+    name: "boardreadyops-manufacturing-draft-receipt.json",
+    contentType: "application/json",
+    filePath,
+    bytes: content.byteLength,
+    sha256: (0, import_node_crypto26.createHash)("sha256").update(content).digest("hex")
+  };
+}
 
 // src/runner/source.ts
 var import_node_child_process6 = require("node:child_process");
-var import_promises32 = require("node:fs/promises");
-var import_node_path74 = __toESM(require("node:path"), 1);
+var import_promises36 = require("node:fs/promises");
+var import_node_path79 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
 async function checkoutRunnerSource(options) {
+  options.signal?.throwIfAborted();
   if (options.job.sourceMode !== "customer_checkout") {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
   const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
-  const workspaceRoot = import_node_path74.default.resolve(options.workspaceRoot);
-  await (0, import_promises32.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
-  if (process.platform !== "win32") await (0, import_promises32.chmod)(workspaceRoot, 448);
-  const workspace = await (0, import_promises32.mkdtemp)(import_node_path74.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
+  const workspaceRoot = import_node_path79.default.resolve(options.workspaceRoot);
+  await (0, import_promises36.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
+  if (process.platform !== "win32") await (0, import_promises36.chmod)(workspaceRoot, 448);
+  const workspace = await (0, import_promises36.mkdtemp)(import_node_path79.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
-  const git = async (args) => await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
-    cwd: workspace,
-    env: environment
-  });
+  const git = async (args) => {
+    options.signal?.throwIfAborted();
+    return await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
+      cwd: workspace,
+      env: environment,
+      ...options.signal ? { signal: options.signal } : {}
+    });
+  };
   try {
-    if (process.platform !== "win32") await (0, import_promises32.chmod)(workspace, 448);
+    if (process.platform !== "win32") await (0, import_promises36.chmod)(workspace, 448);
     await git(["init", "--quiet"]);
     await git(["remote", "add", "origin", repository]);
     await git(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
@@ -58076,9 +58785,10 @@ async function checkoutRunnerSource(options) {
       throw new Error(`checked-out commit did not match the assigned commit: ${resolved}`);
     }
     await git(["remote", "remove", "origin"]);
+    options.signal?.throwIfAborted();
     return workspace;
   } catch (error51) {
-    await (0, import_promises32.rm)(workspace, { recursive: true, force: true });
+    await (0, import_promises36.rm)(workspace, { recursive: true, force: true });
     throw error51;
   }
 }
@@ -58088,12 +58798,14 @@ async function executeRunnerCommand(command, args, options) {
       cwd: options.cwd,
       env: options.env,
       stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true
+      windowsHide: true,
+      ...options.signal ? { signal: options.signal } : {}
     });
     let stdout = "";
     let stderr = "";
     let outputBytes = 0;
     let outputExceeded = false;
+    let abortError;
     const collect3 = (current, chunk) => {
       outputBytes += Buffer.byteLength(chunk, "utf8");
       if (outputBytes > maximumCommandOutputBytes) {
@@ -58111,8 +58823,18 @@ async function executeRunnerCommand(command, args, options) {
     child.stderr.on("data", (chunk) => {
       stderr = collect3(stderr, chunk);
     });
-    child.once("error", reject);
+    child.once("error", (error51) => {
+      if (options.signal?.aborted) {
+        abortError = error51;
+      } else {
+        reject(error51);
+      }
+    });
     child.once("close", (code, signal) => {
+      if (abortError) {
+        reject(abortError);
+        return;
+      }
       const result = { stdout, stderr };
       if (outputExceeded) {
         reject(new Error(`${command} output exceeded ${maximumCommandOutputBytes} bytes`));
@@ -58133,9 +58855,9 @@ function repositoryRemote(job, repositoryMirrorRoot) {
   if (!repositoryMirrorRoot) {
     return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
   }
-  const root = import_node_path74.default.resolve(repositoryMirrorRoot);
-  const candidate = import_node_path74.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
-  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path74.default.sep}`)) {
+  const root = import_node_path79.default.resolve(repositoryMirrorRoot);
+  const candidate = import_node_path79.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
+  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path79.default.sep}`)) {
     throw new Error("repository mirror path escaped the configured mirror root");
   }
   return candidate;
@@ -58169,22 +58891,39 @@ var defaultDependencies2 = {
   executePipeline: async () => {
     throw new Error("runner execution pipeline adapter is not configured");
   },
-  removeWorkspace: async (workspace) => await (0, import_promises33.rm)(workspace, { recursive: true, force: true }),
+  removeWorkspace: async (workspace) => await (0, import_promises37.rm)(workspace, { recursive: true, force: true }),
   recoverCrashWorkspaces: recoverRunnerCrashWorkspaces,
   sleep: abortableSleep,
   log: () => void 0
 };
+function validateManufacturingDraftWorkerOptions(options) {
+  if (!options.manufacturingDraftUpload) return;
+  if ((options.artifactMode ?? "control-plane") !== "control-plane" || options.requireKicad === false) {
+    throw new Error("Manufacturing draft upload requires control-plane artifacts and KiCad enforcement");
+  }
+}
+async function validateManufacturingDraftJob(client, job, enabled2) {
+  if (!enabled2 || !job.safeMode.enabled && !job.repository.private) return;
+  await bestEffortRelinquish(client, job, "job_error", "Draft cloud upload is refused for private or safe-mode jobs.");
+  throw new Error("Manufacturing draft upload is refused for private or safe-mode jobs");
+}
 function defaultRunnerWorkspaceRoot() {
-  return import_node_path75.default.join(import_node_os6.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
+  return import_node_path80.default.join(import_node_os7.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
 }
 async function runRunnerWorkerOnce(options, overrides = {}) {
   const dependencies = { ...defaultDependencies2, ...overrides };
+  validateManufacturingDraftWorkerOptions(options);
+  if (options.artifactMode === "customer-managed" !== (options.customerArtifactRoot !== void 0)) {
+    throw new Error(
+      "customer-managed artifact mode requires --customer-artifact-root, which cannot be used with other modes"
+    );
+  }
   const identity = await dependencies.loadIdentity(options.identityFile);
   const privateKey = await dependencies.loadPrivateKey(identity.privateKeyPath);
   const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
   const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
   const workspaceRoot = runnerActiveWorkspaceRoot(
-    import_node_path75.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path80.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   const claim = await client.claim({
@@ -58206,6 +58945,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     source_mode: job.sourceMode
   });
   await validateClaimedRunnerJob(client, job, options.signal);
+  await validateManufacturingDraftJob(client, job, options.manufacturingDraftUpload);
   let workspace;
   let terminalPublished = false;
   const heartbeat = createHeartbeatController(client, job, heartbeatSeconds, dependencies.log);
@@ -58215,7 +58955,8 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     workspace = await dependencies.checkoutSource({
       job,
       workspaceRoot,
-      ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: options.repositoryMirrorRoot }
+      ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: options.repositoryMirrorRoot },
+      ...options.signal ? { signal: options.signal } : {}
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.setStage("running");
@@ -58223,22 +58964,49 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     heartbeat.start();
     const execution = await dependencies.executePipeline(workspace, job, {
       requireKicad: options.requireKicad ?? true,
+      ...options.manufacturingDraftUpload ? { manufacturingDraftUpload: true } : {},
       ...options.signal ? { signal: options.signal } : {}
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
-    const artifactMode = options.artifactMode ?? "control-plane";
-    const uploadedArtifacts = await resolveExecutionArtifacts(
-      dependencies,
-      client,
-      job,
-      execution,
-      artifactMode,
-      heartbeat
+    const drafts = execution.artifacts.filter(
+      (artifact) => artifact.kind === "archive" && artifact.role === "draft-manufacturing"
     );
+    if (drafts.length > 0) {
+      if (!options.manufacturingDraftUpload || execution.exitCode !== 0 || execution.report?.readiness?.status !== "ready" || drafts.length !== 1) {
+        throw new Error("draft receipt requires one explicitly enabled, passing KiCad readiness result");
+      }
+      const draft = drafts[0];
+      if (!draft) throw new Error("draft archive was not found");
+      execution.artifacts.push(
+        await createManufacturingDraftReceiptArtifact({
+          workspace,
+          job,
+          runnerId: identity.runnerId,
+          privateKey,
+          archive: draft
+        })
+      );
+    }
+    const artifactMode = options.artifactMode ?? "control-plane";
+    const customerStored = execution.report && artifactMode === "customer-managed" ? await persistCustomerRunnerArtifacts({
+      root: options.customerArtifactRoot ?? "",
+      workspace,
+      job,
+      artifacts: execution.artifacts,
+      ...options.signal ? { signal: options.signal } : {}
+    }) : 0;
+    if (artifactMode === "customer-managed") {
+      dependencies.log("runner.artifacts.customer_stored", {
+        run_id: job.runId,
+        execution_attempt_id: job.executionAttemptId,
+        artifacts: customerStored
+      });
+    }
+    const uploadedArtifacts = execution.report ? await resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat) : [];
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
-    const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode);
+    const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode, customerStored);
     const request = {
       protocolVersion: 1,
       runId: job.runId,
@@ -58285,7 +59053,7 @@ async function validateClaimedRunnerJob(client, job, signal) {
   }
 }
 async function resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat) {
-  if (job.safeMode.enabled || artifactMode === "metadata-only") {
+  if (job.safeMode.enabled || artifactMode !== "control-plane") {
     if (execution.artifacts.length > 0) {
       dependencies.log("runner.artifacts.suppressed", {
         run_id: job.runId,
@@ -58328,7 +59096,7 @@ async function serveRunnerWorker(options, overrides = {}) {
   const identity = await dependencies.loadIdentity(options.identityFile);
   if (options.signal?.aborted) return;
   const recovered = await dependencies.recoverCrashWorkspaces(
-    import_node_path75.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path80.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   if (recovered > 0) {
@@ -58458,9 +59226,9 @@ var wireFindingFingerprintPattern = /^[0-9a-f]{64}$/u;
 function wireFingerprint(fingerprint) {
   return wireFindingFingerprintPattern.test(fingerprint) ? fingerprint : void 0;
 }
-function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
-  const completed = execution.exitCode === 0 || execution.exitCode === 1;
-  const decision = decisionFromExitCode(execution.exitCode);
+function terminalResultFromExecution(job, execution, artifacts, artifactMode, customerStored = 0) {
+  const completed = execution.report !== void 0 && (execution.exitCode === 0 || execution.exitCode === 1);
+  const decision = execution.report ? decisionFromExitCode(execution.exitCode) : "error";
   const findings = execution.report ? execution.report.findings.slice(0, 500).map((finding2) => {
     const fingerprint = wireFingerprint(finding2.fingerprint);
     return {
@@ -58499,6 +59267,7 @@ function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
       findings_low: summary?.low ?? 0,
       findings_info: summary?.info ?? 0,
       artifact_mode_metadata_only: artifactMode === "metadata-only" ? 1 : 0,
+      ...artifactMode === "customer-managed" ? { artifact_mode_customer_managed: 1, artifacts_customer_stored: customerStored } : {},
       artifacts_generated: execution.artifacts.length,
       artifacts_uploaded: artifacts.length,
       artifacts_suppressed: Math.max(0, execution.artifacts.length - artifacts.length),
@@ -58528,12 +59297,12 @@ async function bestEffortRelinquish(client, job, reason, message) {
   }).catch(() => void 0);
 }
 function runnerActiveWorkspaceRoot(workspaceRoot, runnerId) {
-  return import_node_path75.default.join(import_node_path75.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
+  return import_node_path80.default.join(import_node_path80.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
 }
 async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
-  const root = import_node_path75.default.resolve(workspaceRoot);
-  const namespace = import_node_path75.default.join(root, ".boardreadyops-active");
-  const namespaceInfo = await (0, import_promises33.lstat)(namespace).catch((error51) => {
+  const root = import_node_path80.default.resolve(workspaceRoot);
+  const namespace = import_node_path80.default.join(root, ".boardreadyops-active");
+  const namespaceInfo = await (0, import_promises37.lstat)(namespace).catch((error51) => {
     if (error51.code === "ENOENT") return void 0;
     throw error51;
   });
@@ -58542,7 +59311,7 @@ async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
     throw new Error("runner active workspace namespace is not a regular directory");
   }
   const activeRoot = runnerActiveWorkspaceRoot(root, runnerId);
-  const activeInfo = await (0, import_promises33.lstat)(activeRoot).catch((error51) => {
+  const activeInfo = await (0, import_promises37.lstat)(activeRoot).catch((error51) => {
     if (error51.code === "ENOENT") return void 0;
     throw error51;
   });
@@ -58550,8 +59319,8 @@ async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
   if (activeInfo.isSymbolicLink() || !activeInfo.isDirectory()) {
     throw new Error("runner identity workspace namespace is not a regular directory");
   }
-  const entries = await (0, import_promises33.readdir)(activeRoot);
-  await (0, import_promises33.rm)(activeRoot, { recursive: true, force: true });
+  const entries = await (0, import_promises37.readdir)(activeRoot);
+  await (0, import_promises37.rm)(activeRoot, { recursive: true, force: true });
   return entries.length;
 }
 function boundedSeconds(value, name, minimum, maximum) {
@@ -58597,33 +59366,85 @@ var RunnerShutdownError = class extends Error {
 };
 
 // src/cli/runner-pipeline.ts
-var import_node_crypto23 = require("node:crypto");
-var import_promises34 = require("node:fs/promises");
-var import_node_path76 = __toESM(require("node:path"), 1);
+var import_node_crypto27 = require("node:crypto");
+var import_promises39 = require("node:fs/promises");
+var import_node_path82 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
+
+// src/cli/runner-manufacturing-draft.ts
+var import_promises38 = require("node:fs/promises");
+var import_node_path81 = __toESM(require("node:path"), 1);
+async function prepareRunnerManufacturingDraft(workspace, job, options) {
+  options.signal?.throwIfAborted();
+  if (job.safeMode.enabled || job.repository.private || job.sourceMode !== "customer_checkout" || !options.requireKicad) {
+    throw new Error("Manufacturing draft upload requires an authorized public, non-safe-mode KiCad checkout");
+  }
+  const projects = await discoverProjects(workspace);
+  if (projects.length !== 1 || !projects[0]?.boardFiles[0]) {
+    throw new Error("Manufacturing draft requires exactly one KiCad project with a PCB");
+  }
+  const cli = await detectKicadCli();
+  if (!cli.path || !cli.found || !/^10[.]0[.]/u.test(cli.version ?? "")) {
+    throw new Error("Manufacturing draft requires KiCad CLI version 10.0.x");
+  }
+  options.signal?.throwIfAborted();
+  await (0, import_promises38.appendFile)(import_node_path81.default.join(workspace, ".git", "info", "exclude"), "\n/.boardreadyops-runner/\n");
+  const generated = await runGenerate(
+    { schemaVersion: 1, steps: [{ kind: "gerbers" }, { kind: "drill" }] },
+    {
+      outputDir: import_node_path81.default.join(workspace, ".boardreadyops-runner", job.executionAttemptId, "manufacturing", "outputs"),
+      boardFile: import_node_path81.default.resolve(workspace, projects[0].boardFiles[0]),
+      gitRoot: workspace,
+      reviewedSourceSha: job.repository.commitSha,
+      kicadVersion: cli.version,
+      runner: createKicadCliRunner(cli.path)
+    }
+  );
+  options.signal?.throwIfAborted();
+  if (generated.failures !== 0) throw new Error("KiCad draft manufacturing export failed");
+  const zip = await createVerifiedManufacturingZip({
+    root: workspace,
+    generated,
+    sourceCommitSha: job.repository.commitSha,
+    destination: import_node_path81.default.join(workspace, ".boardreadyops-runner", job.executionAttemptId, "manufacturing-draft.zip")
+  });
+  return {
+    kind: "archive",
+    name: "boardreadyops-manufacturing-draft.zip",
+    role: "draft-manufacturing",
+    // Intentionally never "manufacturing" (which is a delivery-eligibility signal).
+    contentType: "application/zip",
+    filePath: zip.path,
+    bytes: zip.bytes,
+    sha256: zip.sha256
+  };
+}
+
+// src/cli/runner-pipeline.ts
 async function executeRunnerPipeline(workspace, job, options) {
   options.signal?.throwIfAborted();
-  const relativeOutputDirectory = import_node_path76.default.join(".boardreadyops-runner", job.executionAttemptId);
-  const outputDirectory2 = import_node_path76.default.join(workspace, relativeOutputDirectory);
-  await (0, import_promises34.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
+  const manufacturingDraft = options.manufacturingDraftUpload ? await prepareRunnerManufacturingDraft(workspace, job, options) : void 0;
+  const relativeOutputDirectory = import_node_path82.default.join(".boardreadyops-runner", job.executionAttemptId);
+  const outputDirectory2 = import_node_path82.default.join(workspace, relativeOutputDirectory);
+  await (0, import_promises39.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
   const targets = [
     {
       kind: "report/json",
       name: "boardreadyops-result.json",
       role: "primary",
-      relative: import_node_path76.default.join(relativeOutputDirectory, "result.json")
+      relative: import_node_path82.default.join(relativeOutputDirectory, "result.json")
     },
     {
       kind: "report/sarif",
       name: "boardreadyops-result.sarif",
       role: "sarif",
-      relative: import_node_path76.default.join(relativeOutputDirectory, "result.sarif")
+      relative: import_node_path82.default.join(relativeOutputDirectory, "result.sarif")
     },
     {
       kind: "report/markdown",
       name: "boardreadyops-result.md",
       role: "summary",
-      relative: import_node_path76.default.join(relativeOutputDirectory, "result.md")
+      relative: import_node_path82.default.join(relativeOutputDirectory, "result.md")
     }
   ];
   const output = new import_node_stream.Writable({ write: (_chunk, _encoding, callback) => callback() });
@@ -58647,13 +59468,16 @@ async function executeRunnerPipeline(workspace, job, options) {
     options.signal ? { signal: options.signal } : {}
   );
   options.signal?.throwIfAborted();
-  const report = await readRunReport(import_node_path76.default.join(workspace, targets[0].relative));
+  const report = await readRunReport(import_node_path82.default.join(workspace, targets[0].relative));
   const runnerReport = report ? runnerReportFromResult(report) : void 0;
   const artifacts = [];
   for (const target of targets) {
-    const filePath = import_node_path76.default.join(workspace, target.relative);
+    const filePath = import_node_path82.default.join(workspace, target.relative);
     const artifact = await runnerArtifact(filePath, target.kind, target.name, target.role).catch(() => void 0);
     if (artifact) artifacts.push(artifact);
+  }
+  if (manufacturingDraft && exitCode === 0 && report?.readiness?.status === "ready") {
+    artifacts.push(manufacturingDraft);
   }
   return {
     exitCode,
@@ -58662,16 +59486,16 @@ async function executeRunnerPipeline(workspace, job, options) {
   };
 }
 async function runnerArtifact(filePath, kind, name, role) {
-  const info = await (0, import_promises34.stat)(filePath);
+  const info = await (0, import_promises39.stat)(filePath);
   if (!info.isFile() || info.size > 2147483647) throw new Error(`runner artifact is invalid: ${filePath}`);
-  const content = await (0, import_promises34.readFile)(filePath);
+  const content = await (0, import_promises39.readFile)(filePath);
   return {
     kind,
     name,
     role,
     filePath,
     bytes: content.byteLength,
-    sha256: (0, import_node_crypto23.createHash)("sha256").update(content).digest("hex")
+    sha256: (0, import_node_crypto27.createHash)("sha256").update(content).digest("hex")
   };
 }
 function runnerReportFromResult(report) {
@@ -58724,7 +59548,7 @@ function runnerReportFromResult(report) {
 }
 async function readRunReport(filePath) {
   try {
-    const value = JSON.parse(await (0, import_promises34.readFile)(filePath, "utf8"));
+    const value = JSON.parse(await (0, import_promises39.readFile)(filePath, "utf8"));
     return value.schemaVersion === 1 && value.tool?.name === "boardreadyops" && Array.isArray(value.findings) ? value : void 0;
   } catch {
     return void 0;
@@ -58735,12 +59559,12 @@ async function readRunReport(filePath) {
 async function runnerIssueEnrollmentCommand(options, streams) {
   try {
     const issued = await issueRunnerEnrollment({
-      databaseUrlFile: import_node_path77.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path83.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       name: options.name,
       scope: options.scope,
       allowedRepositories: options.repository ?? [],
-      tokenOutputFile: import_node_path77.default.resolve(options.tokenOutput),
+      tokenOutputFile: import_node_path83.default.resolve(options.tokenOutput),
       ...options.ttlSeconds === void 0 ? {} : { ttlSeconds: options.ttlSeconds }
     });
     writeRunnerOutput(
@@ -58764,7 +59588,7 @@ async function runnerIssueEnrollmentCommand(options, streams) {
 async function runnerRevokeRegistrationCommand(options, streams) {
   try {
     const revoked = await revokeRunnerRegistration({
-      databaseUrlFile: import_node_path77.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path83.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       registrationId: options.registrationId,
       actorId: options.actorId,
@@ -58787,8 +59611,8 @@ async function runnerActivateCommand(options, streams) {
   try {
     const activated = await activateRunnerIdentity({
       controlPlaneUrl: options.url,
-      enrollmentTokenFile: import_node_path77.default.resolve(options.enrollmentTokenFile),
-      identityDirectory: import_node_path77.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
+      enrollmentTokenFile: import_node_path83.default.resolve(options.enrollmentTokenFile),
+      identityDirectory: import_node_path83.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
       capabilities: options.capability ?? [],
       labels: options.label ?? []
     });
@@ -58868,19 +59692,21 @@ function workerOptions(options) {
     identityFile: identityPath(options),
     runnerVersion: boardReadyVersion,
     workspaceRoot: workspacePath(options),
-    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path77.default.resolve(options.repositoryMirrorRoot) },
+    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path83.default.resolve(options.repositoryMirrorRoot) },
     ...options.heartbeatSeconds === void 0 ? {} : { heartbeatSeconds: options.heartbeatSeconds },
     ...options.pollSeconds === void 0 ? {} : { pollSeconds: options.pollSeconds },
     requireKicad: options.requireKicad ?? true,
     keepWorkspace: options.keepWorkspace ?? false,
-    artifactMode: options.artifactMode ?? "control-plane"
+    ...options.manufacturingDraftUpload ? { manufacturingDraftUpload: true } : {},
+    artifactMode: options.artifactMode ?? "control-plane",
+    ...options.customerArtifactRoot ? { customerArtifactRoot: import_node_path83.default.resolve(options.customerArtifactRoot) } : {}
   };
 }
 function identityPath(options) {
-  return import_node_path77.default.resolve(options.identity ?? import_node_path77.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
+  return import_node_path83.default.resolve(options.identity ?? import_node_path83.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
 }
 function workspacePath(options) {
-  return import_node_path77.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
+  return import_node_path83.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
 }
 function createRunnerLogger(stream, format) {
   return (event, fields = {}) => {
@@ -58908,7 +59734,7 @@ function safeMessage(error51) {
 }
 
 // src/cli/commands/sbom.ts
-var import_node_path78 = __toESM(require("node:path"), 1);
+var import_node_path84 = __toESM(require("node:path"), 1);
 init_t();
 
 // src/report/component-identity.ts
@@ -59171,7 +59997,7 @@ async function sbomCommand(pathInput, options, streams) {
     return 2;
   }
   const locale = resolveLocale();
-  const root = await canonicalRoot(import_node_path78.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path84.default.resolve(normalizePathInput(pathInput ?? ".")));
   const loaded = await loadConfig(root, options.config);
   if (loaded.errors.length > 0) {
     for (const error51 of loaded.errors) {
@@ -59205,7 +60031,7 @@ async function writeHbom(root, output, content, stdout) {
     stdout.write(content);
     return;
   }
-  await writeTextFile(import_node_path78.default.resolve(root, normalizePathInput(output)), content);
+  await writeTextFile(import_node_path84.default.resolve(root, normalizePathInput(output)), content);
 }
 
 // schemas/agent-plan.schema.json
@@ -60922,12 +61748,12 @@ function assuranceLine(profile) {
 }
 
 // src/cli/commands/verify-export-attestation.ts
-var import_promises35 = __toESM(require("node:fs/promises"), 1);
-var import_node_path79 = __toESM(require("node:path"), 1);
+var import_promises40 = __toESM(require("node:fs/promises"), 1);
+var import_node_path85 = __toESM(require("node:path"), 1);
 init_path();
 async function exportVerifyCommand(pathInput, options, streams) {
   try {
-    const root = await import_promises35.default.realpath(import_node_path79.default.resolve(normalizePathInput(pathInput)));
+    const root = await import_promises40.default.realpath(import_node_path85.default.resolve(normalizePathInput(pathInput)));
     const attempt = Number(options.runAttempt);
     const result = await verifyReviewedExportAttestation({
       root,
@@ -60998,6 +61824,9 @@ function registerAllCommands(program2, streams) {
   addCommonOptions(release.command("prepare").argument("[path]", "directory to scan")).option("--output <path>", "release output directory", "build/boardreadyops-release").option("--skip-generate", "skip the artifact generation stage").action(async (pathInput, options) => {
     process.exitCode = await releasePrepareCommand(pathInput, options, streams);
   });
+  release.command("archive").description("generate an unsigned, locally source-verified KiCad fabrication ZIP").argument("[path]", "clean KiCad Git checkout").requiredOption("--reviewed-source-sha <sha>", "exact reviewed Git commit SHA").option("--generated <path>", "directory for KiCad output files", "build/boardreadyops-manufacturing/outputs").option("--output <path>", "unsigned manufacturing ZIP path", "build/boardreadyops-manufacturing.zip").action(async (pathInput, options) => {
+    process.exitCode = await releaseArchiveCommand(pathInput, options, streams);
+  });
   registerHandoffCommand(release.command("handoff").argument("[path]", "directory to scan"));
   addCommonOptions(
     release.command("diff").argument("<previous>", "previous release report JSON or evidence bundle directory").argument("[path]", "directory to scan")
@@ -61055,12 +61884,15 @@ function registerAllCommands(program2, streams) {
   runner.command("activate").description("activate a runner identity using a one-time enrollment token file").requiredOption("--url <url>", "BoardReadyOps control-plane origin").requiredOption("--enrollment-token-file <path>", "root-readable file containing the one-time token").option("--identity-dir <path>", "directory for the runner identity and Ed25519 keypair").option("--capability <value>", "runner capability selector", collectOption, []).option("--label <value>", "runner claim label", collectOption, []).option("--format <format>", "text or json", runnerOutputFormat, "text").action(async (options) => {
     process.exitCode = await runnerActivateCommand(options, streams);
   });
-  const addRunnerWorkOptions = (command) => command.option("--identity <path>", "runner identity JSON file").option("--workspace-root <path>", "private root for ephemeral source workspaces").option("--repository-mirror-root <path>", "customer-controlled bare repository mirror root").option("--heartbeat-seconds <seconds>", "lease heartbeat interval", runnerSeconds, 30).option("--poll-seconds <seconds>", "empty-queue and failure retry interval", runnerSeconds, 15).option("--no-require-kicad", "allow execution without kicad-cli").option("--keep-workspace", "retain the checked-out workspace after completion").option(
+  const addRunnerWorkOptions = (command) => command.option("--identity <path>", "runner identity JSON file").option("--workspace-root <path>", "private root for ephemeral source workspaces").option("--repository-mirror-root <path>", "customer-controlled bare repository mirror root").option("--heartbeat-seconds <seconds>", "lease heartbeat interval", runnerSeconds, 30).option("--poll-seconds <seconds>", "empty-queue and failure retry interval", runnerSeconds, 15).option("--no-require-kicad", "allow execution without kicad-cli").option(
+    "--manufacturing-draft-upload",
+    "explicitly upload an unsigned, unapproved manufacturing draft for a public non-safe-mode run"
+  ).option("--keep-workspace", "retain the checked-out workspace after completion").option(
     "--artifact-mode <mode>",
-    "artifact handling: control-plane or metadata-only",
+    "artifact handling: control-plane, metadata-only or customer-managed",
     runnerArtifactMode,
     "control-plane"
-  ).option("--format <format>", "text or json", runnerOutputFormat, "text");
+  ).option("--customer-artifact-root <path>", "private customer-owned artifact directory (customer-managed mode)").option("--format <format>", "text or json", runnerOutputFormat, "text");
   addRunnerWorkOptions(runner.command("once").description("claim and process at most one runner job")).action(
     async (options) => {
       process.exitCode = await runnerOnceCommand(options, streams);
@@ -61099,7 +61931,10 @@ function registerAllCommands(program2, streams) {
   );
   const review = program2.command("review").description("manage and publish hardware reviews");
   addCommonOptions(
-    review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
+    review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option(
+      "--native-visuals",
+      "explicitly upload KiCad-native PCB/schematic artwork (may disclose detailed design IP)"
+    ).option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
   ).action(async (pathInput, options) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
   });
@@ -61133,8 +61968,8 @@ function runnerRevocationReason(value) {
   return value;
 }
 function runnerArtifactMode(value) {
-  if (value !== "control-plane" && value !== "metadata-only") {
-    throw new InvalidArgumentError("Runner artifact mode must be control-plane or metadata-only.");
+  if (value !== "control-plane" && value !== "metadata-only" && value !== "customer-managed") {
+    throw new InvalidArgumentError("Runner artifact mode must be control-plane, metadata-only or customer-managed.");
   }
   return value;
 }
@@ -61221,7 +62056,7 @@ function isCommanderDisplay(error51) {
   return error51 instanceof Error && "code" in error51 && (error51.code === "commander.helpDisplayed" || error51.code === "commander.version");
 }
 var cliEntry = process.argv.at(1);
-var cliEntryName = cliEntry ? import_node_path80.default.basename(cliEntry) : "";
+var cliEntryName = cliEntry ? import_node_path86.default.basename(cliEntry) : "";
 if (cliEntry && !process.env.VITEST && (cliEntryName === "boardreadyops" || cliEntryName === "index.ts" || cliEntryName === "index.js" || cliEntryName === "index.cjs")) {
   void runCli(process.argv.slice(2)).then((code) => {
     process.exitCode = code;

@@ -26,10 +26,15 @@ export async function upsertPullRequestComment(
     return "";
   }
   const octokit = github.getOctokit(token);
-  const body =
-    format === "review"
-      ? formatReviewComment(result, reviewReports(artifactName))
-      : formatMarkdown(result, [], await fabricationDiff(token, owner, repo, artifactName, pull, result));
+  let body: string;
+  if (format === "review") {
+    body = formatReviewComment(result, reviewReports(artifactName));
+  } else {
+    const legacyDiff = result.hardwareImpact
+      ? undefined
+      : await fabricationDiff(token, owner, repo, artifactName, pull, result);
+    body = formatMarkdown(result, [], legacyDiff);
+  }
   const comments = await octokit.paginate(octokit.rest.issues.listComments, {
     owner,
     repo,

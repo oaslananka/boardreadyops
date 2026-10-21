@@ -145,14 +145,14 @@ export function CommandPalette({ extraItems = [] }: Readonly<{ extraItems?: read
         <button
           type="button"
           data-command-trigger
-          aria-label="Search"
+          aria-label="Go to a page or command"
           aria-keyshortcuts="Meta+K Control+K"
           // Icon-only below sm so the topbar still fits a 375px viewport; the label and keycap
           // appear once there is room for them.
           className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-background text-sm text-muted-foreground outline-none transition-colors hover:border-border-strong hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:w-full sm:max-w-80 sm:justify-start sm:px-3 md:min-h-9"
         >
           <ProductIcon name="reviews" />
-          <span className="hidden flex-1 text-left sm:inline">Search</span>
+          <span className="hidden flex-1 text-left sm:inline">Go to page</span>
           <Keycap />
         </button>
       </Dialog.Trigger>
@@ -167,7 +167,7 @@ export function CommandPalette({ extraItems = [] }: Readonly<{ extraItems?: read
             inputRef.current?.focus();
           }}
         >
-          <Dialog.Title className="sr-only">Search and commands</Dialog.Title>
+          <Dialog.Title className="sr-only">Go to a page or command</Dialog.Title>
           <input
             ref={inputRef}
             type="text"
@@ -175,8 +175,8 @@ export function CommandPalette({ extraItems = [] }: Readonly<{ extraItems?: read
             aria-expanded="true"
             aria-controls={listId}
             aria-autocomplete="list"
-            aria-label="Search destinations and commands"
-            placeholder="Jump to a page or run a command..."
+            aria-label="Find a page or command"
+            placeholder="Find a page or command..."
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -185,6 +185,9 @@ export function CommandPalette({ extraItems = [] }: Readonly<{ extraItems?: read
             onKeyDown={onInputKeyDown}
             className="w-full border-b border-border bg-transparent px-4 py-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
+          <p className="border-b border-border px-4 py-2 text-meta text-muted-foreground">
+            Only pages and commands are searched, not repositories, runs, or findings.
+          </p>
           <ul id={listId} aria-label="Results" className="max-h-80 overflow-y-auto p-1.5">
             {matches.length === 0 ? (
               <li className="px-3 py-6 text-center text-sm text-muted-foreground">No matches for “{query}”</li>

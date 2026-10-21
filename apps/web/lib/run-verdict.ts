@@ -96,6 +96,16 @@ function handleMissingDecisionRun(run: VerdictRun): RunVerdict {
   };
 }
 
+function handlePartialDataRun(run: VerdictRun): RunVerdict {
+  return {
+    tone: "warning",
+    headline: "Readiness not verified",
+    detail:
+      "The run finished without a signed result. A stored decision cannot confirm fabrication readiness; check the execution and publication record.",
+    action: { label: "Inspect missing result", href: `/runs/${run.id}/publication` },
+  };
+}
+
 function handleFailedRun(
   run: VerdictRun,
   active: readonly VerdictFinding[],
@@ -136,6 +146,11 @@ export function runVerdict(run: VerdictRun): RunVerdict {
 
   if (settlingStates.has(run.status) || run.investigationState === "current") {
     return handleSettlingRun(run);
+  }
+
+  // Missing signed evidence must never be shown as a fabrication-ready result.
+  if (run.investigationState === "partial_data") {
+    return handlePartialDataRun(run);
   }
 
   if (run.decision === undefined && (run.status === "failed" || run.status === "timed_out")) {

@@ -6,13 +6,17 @@ import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
 import type { RunResult } from "../core/result.js";
 import type { RunnerExecutionArtifact, RunnerExecutionOutput } from "../runner/worker.js";
 import { runCommand } from "./commands/run.js";
+import { prepareRunnerManufacturingDraft } from "./runner-manufacturing-draft.js";
 
 export async function executeRunnerPipeline(
   workspace: string,
   job: RunnerClaimedJob,
-  options: { requireKicad: boolean; signal?: AbortSignal },
+  options: { requireKicad: boolean; manufacturingDraftUpload?: boolean; signal?: AbortSignal },
 ): Promise<RunnerExecutionOutput> {
   options.signal?.throwIfAborted();
+  const manufacturingDraft = options.manufacturingDraftUpload
+    ? await prepareRunnerManufacturingDraft(workspace, job, options)
+    : undefined;
   const relativeOutputDirectory = path.join(".boardreadyops-runner", job.executionAttemptId);
   const outputDirectory = path.join(workspace, relativeOutputDirectory);
   await mkdir(outputDirectory, { recursive: true, mode: 0o700 });
@@ -64,6 +68,11 @@ export async function executeRunnerPipeline(
     const filePath = path.join(workspace, target.relative);
     const artifact = await runnerArtifact(filePath, target.kind, target.name, target.role).catch(() => undefined);
     if (artifact) artifacts.push(artifact);
+  }
+  // A successful analysis is still NOT a fabrication approval. Upload the
+  // explicit opt-in draft only when the same run reports a passing readiness.
+  if (manufacturingDraft && exitCode === 0 && report?.readiness?.status === "ready") {
+    artifacts.push(manufacturingDraft);
   }
   return {
     exitCode,

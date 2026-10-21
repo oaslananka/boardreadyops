@@ -161,7 +161,10 @@ function checkReadinessStatus(
 }
 
 function checkRequiredOutputs(readiness: ReadinessScore | undefined): { ok: boolean; message: string } {
-  const missing = readiness?.missingRequired ?? [];
+  if (!readiness) {
+    return { ok: false, message: "Required output presence cannot be verified without readiness data." };
+  }
+  const missing = readiness.missingRequired;
   return {
     ok: missing.length === 0,
     message:

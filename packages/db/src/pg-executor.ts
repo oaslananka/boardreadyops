@@ -11,8 +11,11 @@ export type PgLifecycleExecutorOptions = {
 
 export type PgQueryExecutor = SqlQueryExecutor & {
   close(): Promise<void>;
-  /** Pinned PostgreSQL connection: DB mutations and event acknowledgement commit together. */
-  withTransaction<T>(operation: (transaction: SqlQueryExecutor) => Promise<T>): Promise<T>;
+  /** Pins every statement in one logical write to a single PG client. */
+  withTransaction<T>(
+    work: (transaction: SqlQueryExecutor) => Promise<T>,
+    options?: { statementTimeoutMs?: number },
+  ): Promise<T>;
 };
 
 export function createPgQueryExecutor(options: PgLifecycleExecutorOptions): PgQueryExecutor {
@@ -26,21 +29,38 @@ export function createPgQueryExecutor(options: PgLifecycleExecutorOptions): PgQu
     async query(sql, params = []) {
       return await pool.query(sql, [...params]);
     },
-    async withTransaction<T>(operation: (transaction: SqlQueryExecutor) => Promise<T>): Promise<T> {
+    async withTransaction<T>(
+      work: (transaction: SqlQueryExecutor) => Promise<T>,
+      options?: { statementTimeoutMs?: number },
+    ): Promise<T> {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        try {
-          // Billing projections must finish promptly; failed/crashed processes
-          // release their row locks and roll back before another worker retries.
-          await client.query("SET LOCAL statement_timeout = '15s'");
-          const result = await operation({ query: (sql, params = []) => client.query(sql, [...params]) });
-          await client.query("COMMIT");
-          return result;
-        } catch (error) {
-          await client.query("ROLLBACK");
-          throw error;
+        if (options?.statementTimeoutMs !== undefined) {
+          if (
+            !Number.isInteger(options.statementTimeoutMs) ||
+            options.statementTimeoutMs <= 0 ||
+            options.statementTimeoutMs > 60000
+          ) {
+            throw new Error("Invalid transaction statement timeout");
+          }
+          await client.query("SELECT set_config('statement_timeout', $1, true)", [String(options.statementTimeoutMs)]);
         }
+        const transaction: SqlQueryExecutor = {
+          async query(sql, params = []) {
+            return await client.query(sql, [...params]);
+          },
+        };
+        const result = await work(transaction);
+        await client.query("COMMIT");
+        return result;
+      } catch (error) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          // Preserve the original failure; the pool handles damaged clients.
+        }
+        throw error;
       } finally {
         client.release();
       }

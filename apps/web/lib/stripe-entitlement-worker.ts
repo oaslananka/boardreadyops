@@ -36,93 +36,97 @@ export async function processStripeEntitlementPass(
     let claimedId: string | undefined;
     let outcome: Result;
     try {
-      outcome = await executor.withTransaction(async (transaction) => {
-        const selected = records(
-          await transaction.query(
-            `SELECT id, stripe_event_id, type, payload FROM billing_events
+      outcome = await executor.withTransaction(
+        async (transaction) => {
+          const selected = records(
+            await transaction.query(
+              `SELECT id, stripe_event_id, type, payload FROM billing_events
            WHERE provider='stripe' AND processed_at IS NULL AND dead_letter_at IS NULL
              AND available_at <= now()
            ORDER BY available_at, created_at, id
            FOR UPDATE SKIP LOCKED LIMIT 1`,
-          ),
-        );
-        const record = selected[0] as StripeEventRow | undefined;
-        if (!record) return "idle";
-        claimedId = record.id;
-        const event = storedStripeEvent(record.payload);
-        if (
-          !event ||
-          event.id !== record.stripe_event_id ||
-          // Verify the immutable inbox metadata agrees with the persisted event body.
-          // A mismatch must not select a different entitlement transition.
-          event.type !== record.type ||
-          typeof event.created !== "number" ||
-          !Number.isSafeInteger(event.created) ||
-          event.created <= 0
-        ) {
-          await transaction.query(
-            `UPDATE billing_events SET dead_letter_at=NOW(), last_error_class='invalid_stored_event'
+            ),
+          );
+          const record = selected[0] as StripeEventRow | undefined;
+          if (!record) return "idle";
+          claimedId = record.id;
+          const event = storedStripeEvent(record.payload);
+          if (
+            !event ||
+            event.id !== record.stripe_event_id ||
+            // Verify the immutable inbox metadata agrees with the persisted event body.
+            // A mismatch must not select a different entitlement transition.
+            event.type !== record.type ||
+            typeof event.created !== "number" ||
+            !Number.isSafeInteger(event.created) ||
+            event.created <= 0
+          ) {
+            await transaction.query(
+              `UPDATE billing_events SET dead_letter_at=NOW(), last_error_class='invalid_stored_event'
              WHERE id=$1`,
-            [record.id],
-          );
-          return "dead_letter";
-        }
+              [record.id],
+            );
+            return "dead_letter";
+          }
 
-        const customer = eventCustomer(event);
-        if (customer) {
-          // Serializes different events for the same customer across all worker
-          // replicas, while the event row itself prevents duplicate processing.
-          const lock = records(
-            await transaction.query("SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0)) AS acquired", [
-              customer,
-            ]),
-          );
-          if (lock[0]?.acquired !== true) {
-            // Never wait for a customer mutex while holding an event row lock:
-            // checkout wakes other event rows while owning the same mutex.
-            await transaction.query("UPDATE billing_events SET available_at=NOW() + INTERVAL '1 second' WHERE id=$1", [
-              record.id,
-            ]);
+          const customer = eventCustomer(event);
+          if (customer) {
+            // Serializes different events for the same customer across all worker
+            // replicas, while the event row itself prevents duplicate processing.
+            const lock = records(
+              await transaction.query("SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0)) AS acquired", [
+                customer,
+              ]),
+            );
+            if (lock[0]?.acquired !== true) {
+              // Never wait for a customer mutex while holding an event row lock:
+              // checkout wakes other event rows while owning the same mutex.
+              await transaction.query(
+                "UPDATE billing_events SET available_at=NOW() + INTERVAL '1 second' WHERE id=$1",
+                [record.id],
+              );
+              return "deferred";
+            }
+          }
+          const projection = await projectEntitlement(new BillingStore(transaction), event);
+          if (
+            projection.entitlement === "ignored" &&
+            typeof projection.reason === "string" &&
+            projection.reason.startsWith("unrecognized_")
+          ) {
+            // A recognized event type with an invalid object must not be silently
+            // acknowledged as processed. Preserve it for operator reconciliation.
+            await transaction.query(
+              "UPDATE billing_events SET dead_letter_at=NOW(), last_error_class='unrecognized_stripe_payload' WHERE id=$1",
+              [record.id],
+            );
+            return "dead_letter";
+          }
+          if (projection.entitlement === "conflict") {
+            // Never convert ambiguous same-second invoice outcomes into a
+            // successful entitlement acknowledgement. Await provider-state review.
+            await transaction.query(
+              "UPDATE billing_events SET dead_letter_at=NOW(), last_error_class='ambiguous_invoice_order' WHERE id=$1",
+              [record.id],
+            );
+            return "dead_letter";
+          }
+          if (projection.entitlement === "deferred") {
+            await transaction.query(
+              `UPDATE billing_events SET available_at=NOW() + INTERVAL '60 seconds'
+             WHERE id=$1 AND processed_at IS NULL`,
+              [record.id],
+            );
             return "deferred";
           }
-        }
-        const projection = await projectEntitlement(new BillingStore(transaction), event);
-        if (
-          projection.entitlement === "ignored" &&
-          typeof projection.reason === "string" &&
-          projection.reason.startsWith("unrecognized_")
-        ) {
-          // A recognized event type with an invalid object must not be silently
-          // acknowledged as processed. Preserve it for operator reconciliation.
           await transaction.query(
-            "UPDATE billing_events SET dead_letter_at=NOW(), last_error_class='unrecognized_stripe_payload' WHERE id=$1",
+            "UPDATE billing_events SET processed_at=NOW(), last_error_class=NULL WHERE id=$1 AND processed_at IS NULL",
             [record.id],
           );
-          return "dead_letter";
-        }
-        if (projection.entitlement === "conflict") {
-          // Never convert ambiguous same-second invoice outcomes into a
-          // successful entitlement acknowledgement. Await provider-state review.
-          await transaction.query(
-            "UPDATE billing_events SET dead_letter_at=NOW(), last_error_class='ambiguous_invoice_order' WHERE id=$1",
-            [record.id],
-          );
-          return "dead_letter";
-        }
-        if (projection.entitlement === "deferred") {
-          await transaction.query(
-            `UPDATE billing_events SET available_at=NOW() + INTERVAL '60 seconds'
-             WHERE id=$1 AND processed_at IS NULL`,
-            [record.id],
-          );
-          return "deferred";
-        }
-        await transaction.query(
-          "UPDATE billing_events SET processed_at=NOW(), last_error_class=NULL WHERE id=$1 AND processed_at IS NULL",
-          [record.id],
-        );
-        return "processed";
-      });
+          return "processed";
+        },
+        { statementTimeoutMs: 15000 },
+      );
     } catch (error) {
       if (claimedId) {
         const errorName = error instanceof Error ? error.name.slice(0, 80) : "UnknownError";

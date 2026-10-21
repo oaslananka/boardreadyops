@@ -79,6 +79,77 @@ Policy mutations are separately recorded in the tenant-scoped, append-only `revi
 Historical **per-run effective-policy snapshots** are still separate work. The mutation audit proves how governance configuration changed over time; it does not by itself prove which effective policy a past release run evaluated. Do not treat the current-policy view as immutable historical run evidence until run-scoped policy snapshots are persisted.
 
 
+### Hosted policy usage: organization, repository, and enterprise review teams
+
+The hosted policy API requires an authenticated viewer and PostgreSQL-backed cloud persistence.
+These examples describe **review-readiness governance**, not the local
+`boardreadyops.yml` CLI release policy above. They do not start a manufacturing
+release, change the GitHub Actions execution authority, or authorize a deployment.
+
+**Organization defaults.** Create a tenant-scoped baseline using
+`POST /api/v1/policies` (the authenticated GitHub account/login supplies the
+tenant identity; callers cannot set another `tenantId`):
+
+```json
+{
+  "scope": "organization",
+  "name": "Hardware review baseline",
+  "requiredChecklist": ["pcb-reviewed", "fab-files-reviewed"],
+  "requiredRoles": ["hardware-lead"],
+  "severityGate": "high",
+  "requireEvidencePack": true
+}
+```
+
+A review in any repository under that tenant inherits the organization policy
+unless an effective repository policy overrides a field. A new baseline is
+**not retroactive proof** of which gates earlier runs evaluated.
+
+**Repository-specific process.** For a board requiring an extra controlled
+checklist, create a repository-scoped policy using the repository's **internal
+UUID**, not `owner/repo` or an arbitrary GitHub installation identifier:
+
+```json
+{
+  "scope": "repository",
+  "scopeId": "00000000-0000-4000-8000-000000000001",
+  "name": "Safety-critical board review",
+  "requiredChecklist": ["pcb-reviewed", "safety-review"],
+  "severityGate": "medium",
+  "requireExternalReview": true
+}
+```
+
+The `scopeId` above is **illustrative**; replace it with the actual authorized
+repository ID. Non-empty checklist and role arrays **replace**, rather than
+append to, inherited arrays. An empty array inherits the previous layer;
+an explicit `severityGate` replaces the earlier threshold and **can relax
+it**. The evidence-pack and external-review booleans, by contrast, are
+monotonic: a repository cannot turn off an inherited `true` with `false`.
+Do not assume organization checklist items or severity thresholds are
+non-overridable mandates under this current model. Review repository overrides
+before relying on organization-wide uniformity.
+
+**Review and audit.** Use `GET /api/v1/policies` to view your tenant's policies;
+`PATCH /api/v1/policies/:id` to update an owned policy; and
+`GET /api/v1/policies/:id/audit` to inspect its append-only mutation history,
+including after deletion. The review Overview displays **current**
+field-level provenance (organization versus repository) under **Effective
+Policy & Inheritance**. The review-readiness decision uses the same resolver
+for its checklist, reviewer-role, and severity inputs. The audit trail records
+*policy mutations*, not the exact effective policy that a historical run used.
+Approval and release authority remain separate from policy configuration.
+
+**Team and enterprise boundary.** The policy contract and creation endpoint
+reserve a `team` scope, and the resolver defines an `exception` layer, but
+the hosted review loader currently resolves **only organization and repository
+policies**. Creating a team policy does not make it effective in hosted review
+readiness. Until per-run immutable policy snapshots and the remaining #45
+acceptance are delivered, an exported run/evidence bundle must not be presented
+as reproducing its historical effective policy merely from today's Overview
+or the mutation log.
+
+
 ## Opt-in source-bound manufacturing export policy (#771)
 
 After reviewing the **target repository's** reviewed source, protected workflow and

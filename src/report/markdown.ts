@@ -23,7 +23,10 @@ export function formatMarkdown(
   fabrication?: FabricationDiff,
   locale: Locale = "en",
 ): string {
-  const fabricationView = fabrication ? formatFabricationDiff(fabrication, locale) : undefined;
+  // Canonical exact-PR-base impact and the legacy last-run comparison use different baselines.
+  // Never display both as though they describe the same change.
+  const fabricationView =
+    fabrication && !result.hardwareImpact ? formatFabricationDiff(fabrication, locale) : undefined;
   const topFindings = result.findings.slice(0, 10).map(markdownFinding);
   const fixFindings = result.findings
     .filter((finding) => finding.fix)
@@ -34,6 +37,7 @@ export function formatMarkdown(
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none",
   }));
   const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : undefined;
+  const hardwareImpactView = result.hardwareImpact ? formatHardwareImpact(result.hardwareImpact) : undefined;
   // Computed in the pipeline, where the failure threshold lives, and carried on the result the
   // same way `categoryBreakdown` is. Reported, never enforced: `shouldFail` remains the only
   // authority on the verdict, so showing this cannot move a board from failing to passing.
@@ -56,6 +60,8 @@ export function formatMarkdown(
       artifacts,
       hasFabricationDiff: Boolean(fabricationView),
       fabrication: fabricationView,
+      hasHardwareImpact: Boolean(hardwareImpactView),
+      hardwareImpact: hardwareImpactView,
       hasEvidence: Boolean(evidenceView),
       evidence: evidenceView,
       hasBomRisk: Boolean(bomRiskView),
@@ -136,6 +142,43 @@ function markdownLabels(locale: Locale): Record<string, string> {
     topFindings: t("report.topFindings", {}, locale),
     total: t("report.total", {}, locale),
   };
+}
+
+/**
+ * The default Action PR comment uses the full Markdown template, not the compact
+ * Review formatter. Present existing bounded v1 impact facts there as well.
+ * Unavailable exact-base comparisons must never imply a measured risk direction.
+ */
+function formatHardwareImpact(impact: NonNullable<RunResult["hardwareImpact"]>) {
+  const readiness = impact.facts.readiness;
+  const conclusion = readiness.conclusion;
+  return {
+    baseSha: impact.baseline.sha,
+    candidateSha: impact.candidate.sha,
+    baselineAvailable: impact.baseline.status === "available",
+    conclusionChanged: conclusion?.changed === true,
+    previousConclusion: conclusion?.previous ?? "n/a",
+    currentConclusion: conclusion?.current ?? "n/a",
+    previousScore: readiness.previousScore ?? "n/a",
+    currentScore: readiness.currentScore ?? "n/a",
+    scoreDelta: formatScoreDelta(readiness.scoreDelta),
+    findings: impact.facts.findings,
+    bom: impact.facts.bom,
+    manufacturing: impact.facts.manufacturing,
+    hasSeverityChanges: (impact.facts.findings.worsened ?? 0) + (impact.facts.findings.improved ?? 0) > 0,
+    severityWorsened: impact.facts.findings.worsened ?? 0,
+    severityImproved: impact.facts.findings.improved ?? 0,
+    materialChange: impact.assessment.materialChange ? "yes" : "no",
+    riskDirection: impact.assessment.riskDirection,
+    affectedDomains:
+      impact.assessment.affectedDomains.length > 0 ? impact.assessment.affectedDomains.join(", ") : "none",
+  };
+}
+
+function formatScoreDelta(value: number | null): string {
+  if (value === null) return "n/a";
+  if (value > 0) return `+${value}`;
+  return String(value);
 }
 
 function formatBomRisk(risk: BomRiskSummary) {

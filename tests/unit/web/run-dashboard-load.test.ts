@@ -92,6 +92,38 @@ describe("run dashboard environment loader", () => {
     expect(mocks.close).toHaveBeenCalledOnce();
   });
 
+  it("does not expose a foreign private run's metric keys, report links, or child records", async () => {
+    const authorizeRepository = vi.fn(async () => false);
+    const foreignMarker = "foreign-private-tenant-marker";
+    mocks.configuredArtifactDownloadSigningKey.mockReturnValue("k".repeat(32));
+    mocks.query.mockResolvedValueOnce({
+      rows: [
+        runRow({
+          private: true,
+          owner: "foreign-private-owner",
+          name: "private-board",
+          metrics: { [foreignMarker]: 42 },
+          report_links: [{ label: foreignMarker, url: `https://example.invalid/${foreignMarker}` }],
+        }),
+      ],
+    });
+
+    const result = await loadRunDashboard(
+      "run-load",
+      { DATABASE_URL: "postgresql://boardreadyops.test/database" },
+      {},
+      { ...dependencies, authorizeRepository },
+    );
+
+    expect(result).toEqual({ state: "not-found" });
+    expect(JSON.stringify(result)).not.toContain(foreignMarker);
+    expect(authorizeRepository).toHaveBeenCalledOnce();
+    expect(mocks.query).toHaveBeenCalledOnce();
+    expect(mocks.artifactDownloadExpiry).not.toHaveBeenCalled();
+    expect(mocks.artifactDownloadUrl).not.toHaveBeenCalled();
+    expect(mocks.close).toHaveBeenCalledOnce();
+  });
+
   it("passes an explicit repository authorization dependency to the dashboard lookup", async () => {
     const authorizeRepository = vi.fn(async () => true);
     mocks.configuredArtifactDownloadSigningKey.mockReturnValue(undefined);

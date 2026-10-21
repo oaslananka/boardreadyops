@@ -11,10 +11,12 @@ import {
   releaseRunResultSchema,
 } from "../../packages/contracts/src/index.js";
 import { loadRunnerPrivateKey, RunnerControlPlaneClient } from "./client.js";
+import { persistCustomerRunnerArtifacts } from "./customer-artifacts.js";
+import { createManufacturingDraftReceiptArtifact } from "./draft-attestation.js";
 import { type LoadedRunnerIdentity, loadRunnerIdentity } from "./identity.js";
 import { checkoutRunnerSource } from "./source.js";
 
-export type RunnerArtifactMode = "control-plane" | "metadata-only";
+type RunnerArtifactMode = "control-plane" | "metadata-only" | "customer-managed";
 
 export type RunnerWorkerOptions = {
   identityFile: string;
@@ -26,6 +28,8 @@ export type RunnerWorkerOptions = {
   requireKicad?: boolean;
   keepWorkspace?: boolean;
   artifactMode?: RunnerArtifactMode;
+  manufacturingDraftUpload?: boolean;
+  customerArtifactRoot?: string;
   signal?: AbortSignal;
 };
 
@@ -96,7 +100,7 @@ export type RunnerWorkerDependencies = {
   executePipeline: (
     workspace: string,
     job: RunnerClaimedJob,
-    options: { requireKicad: boolean; signal?: AbortSignal },
+    options: { requireKicad: boolean; manufacturingDraftUpload?: boolean; signal?: AbortSignal },
   ) => Promise<RunnerExecutionOutput>;
   removeWorkspace: (workspace: string) => Promise<void>;
   recoverCrashWorkspaces: (workspaceRoot: string, runnerId: string) => Promise<number>;
@@ -124,6 +128,23 @@ const defaultDependencies: RunnerWorkerDependencies = {
   log: () => undefined,
 };
 
+function validateManufacturingDraftWorkerOptions(options: RunnerWorkerOptions): void {
+  if (!options.manufacturingDraftUpload) return;
+  if ((options.artifactMode ?? "control-plane") !== "control-plane" || options.requireKicad === false) {
+    throw new Error("Manufacturing draft upload requires control-plane artifacts and KiCad enforcement");
+  }
+}
+
+async function validateManufacturingDraftJob(
+  client: RunnerWorkerClient,
+  job: RunnerClaimedJob,
+  enabled: boolean | undefined,
+): Promise<void> {
+  if (!enabled || (!job.safeMode.enabled && !job.repository.private)) return;
+  await bestEffortRelinquish(client, job, "job_error", "Draft cloud upload is refused for private or safe-mode jobs.");
+  throw new Error("Manufacturing draft upload is refused for private or safe-mode jobs");
+}
+
 export function defaultRunnerWorkspaceRoot(): string {
   return path.join(os.homedir(), ".cache", "boardreadyops", "runner-workspaces");
 }
@@ -133,6 +154,12 @@ export async function runRunnerWorkerOnce(
   overrides: Partial<RunnerWorkerDependencies> = {},
 ): Promise<RunnerWorkerResult> {
   const dependencies = { ...defaultDependencies, ...overrides };
+  validateManufacturingDraftWorkerOptions(options);
+  if ((options.artifactMode === "customer-managed") !== (options.customerArtifactRoot !== undefined)) {
+    throw new Error(
+      "customer-managed artifact mode requires --customer-artifact-root, which cannot be used with other modes",
+    );
+  }
   const identity = await dependencies.loadIdentity(options.identityFile);
   const privateKey = await dependencies.loadPrivateKey(identity.privateKeyPath);
   const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
@@ -162,6 +189,7 @@ export async function runRunnerWorkerOnce(
   });
 
   await validateClaimedRunnerJob(client, job, options.signal);
+  await validateManufacturingDraftJob(client, job, options.manufacturingDraftUpload);
 
   let workspace: string | undefined;
   let terminalPublished = false;
@@ -173,6 +201,7 @@ export async function runRunnerWorkerOnce(
       job,
       workspaceRoot,
       ...(options.repositoryMirrorRoot === undefined ? {} : { repositoryMirrorRoot: options.repositoryMirrorRoot }),
+      ...(options.signal ? { signal: options.signal } : {}),
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
 
@@ -181,24 +210,65 @@ export async function runRunnerWorkerOnce(
     heartbeat.start();
     const execution = await dependencies.executePipeline(workspace, job, {
       requireKicad: options.requireKicad ?? true,
+      ...(options.manufacturingDraftUpload ? { manufacturingDraftUpload: true } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
 
-    const artifactMode = options.artifactMode ?? "control-plane";
-    const uploadedArtifacts = await resolveExecutionArtifacts(
-      dependencies,
-      client,
-      job,
-      execution,
-      artifactMode,
-      heartbeat,
+    // A detached runner claim, NOT a fabricated-goods approval.
+    const drafts = execution.artifacts.filter(
+      (artifact) => artifact.kind === "archive" && artifact.role === "draft-manufacturing",
     );
+    if (drafts.length > 0) {
+      if (
+        !options.manufacturingDraftUpload ||
+        execution.exitCode !== 0 ||
+        execution.report?.readiness?.status !== "ready" ||
+        drafts.length !== 1
+      ) {
+        throw new Error("draft receipt requires one explicitly enabled, passing KiCad readiness result");
+      }
+      const draft = drafts[0];
+      if (!draft) throw new Error("draft archive was not found");
+      execution.artifacts.push(
+        await createManufacturingDraftReceiptArtifact({
+          workspace,
+          job,
+          runnerId: identity.runnerId,
+          privateKey,
+          archive: draft,
+        }),
+      );
+    }
+
+    const artifactMode = options.artifactMode ?? "control-plane";
+    const customerStored =
+      execution.report && artifactMode === "customer-managed"
+        ? await persistCustomerRunnerArtifacts({
+            root: options.customerArtifactRoot ?? "",
+            workspace,
+            job,
+            artifacts: execution.artifacts,
+            ...(options.signal ? { signal: options.signal } : {}),
+          })
+        : 0;
+    if (artifactMode === "customer-managed") {
+      dependencies.log("runner.artifacts.customer_stored", {
+        run_id: job.runId,
+        execution_attempt_id: job.executionAttemptId,
+        artifacts: customerStored,
+      });
+    }
+    // Without a valid result report, even a zero exit code cannot authorize
+    // uploading generated artifacts or publishing a successful release verdict.
+    const uploadedArtifacts = execution.report
+      ? await resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat)
+      : [];
 
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
-    const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode);
+    const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode, customerStored);
     const request: RunnerTerminalResultRequest = {
       protocolVersion: 1,
       runId: job.runId,
@@ -258,7 +328,7 @@ async function resolveExecutionArtifacts(
   artifactMode: RunnerArtifactMode,
   heartbeat: ReturnType<typeof createHeartbeatController>,
 ): Promise<ReleaseRunResult["artifacts"]> {
-  if (job.safeMode.enabled || artifactMode === "metadata-only") {
+  if (job.safeMode.enabled || artifactMode !== "control-plane") {
     if (execution.artifacts.length > 0) {
       dependencies.log("runner.artifacts.suppressed", {
         run_id: job.runId,
@@ -501,9 +571,10 @@ function terminalResultFromExecution(
   execution: RunnerExecutionOutput,
   artifacts: ReleaseRunResult["artifacts"],
   artifactMode: RunnerArtifactMode,
+  customerStored = 0,
 ): ReleaseRunResult {
-  const completed = execution.exitCode === 0 || execution.exitCode === 1;
-  const decision = decisionFromExitCode(execution.exitCode);
+  const completed = execution.report !== undefined && (execution.exitCode === 0 || execution.exitCode === 1);
+  const decision = execution.report ? decisionFromExitCode(execution.exitCode) : "error";
   const findings = execution.report
     ? execution.report.findings.slice(0, 500).map((finding) => {
         const fingerprint = wireFingerprint(finding.fingerprint);
@@ -544,6 +615,9 @@ function terminalResultFromExecution(
       findings_low: summary?.low ?? 0,
       findings_info: summary?.info ?? 0,
       artifact_mode_metadata_only: artifactMode === "metadata-only" ? 1 : 0,
+      ...(artifactMode === "customer-managed"
+        ? { artifact_mode_customer_managed: 1, artifacts_customer_stored: customerStored }
+        : {}),
       artifacts_generated: execution.artifacts.length,
       artifacts_uploaded: artifacts.length,
       artifacts_suppressed: Math.max(0, execution.artifacts.length - artifacts.length),

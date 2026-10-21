@@ -39,13 +39,13 @@ test.describe("Dialog contract", () => {
 
   test("CommandPalette satisfies the dialog contract", async ({ page }) => {
     await page.goto("/policies");
-    const trigger = page.getByRole("button", { name: "Search" });
+    const trigger = page.getByRole("button", { name: "Go to a page or command" });
     await trigger.waitFor({ state: "visible" });
 
     await expectDialogContract(page, {
       open: () => trigger.click(),
       triggerLocator: trigger,
-      accessibleName: /Search and commands/i,
+      accessibleName: /Go to a page or command/i,
     });
   });
 

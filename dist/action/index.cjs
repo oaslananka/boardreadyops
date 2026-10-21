@@ -67734,7 +67734,7 @@ var import_promises17 = __toESM(require("node:fs/promises"), 1);
 var import_node_path48 = __toESM(require("node:path"), 1);
 
 // src/generated/version.ts
-var boardReadyVersion = "1.68.3";
+var boardReadyVersion = "1.69.0";
 
 // src/core/findings.ts
 var import_node_crypto2 = __toESM(require("node:crypto"), 1);
@@ -72510,13 +72510,16 @@ async function parsePcb(file2) {
   const text = await readDesignFile(file2) ?? "";
   const model = parseKicadDocument(text, "pcb");
   const copperLayerNames = copperLayers(model);
+  const outlineBounds = rectangularOutlineBounds(model);
   return {
     footprints: footprints(model),
     revision: revision(model),
     drillSizes: drillSizes(model),
     copperLayers: copperLayerNames,
+    plotCopperLayers: pcbPlotLayers(model),
     copperAreas: copperAreas(model),
     boardArea: boardArea(model),
+    ...outlineBounds ? { outlineBounds } : {},
     outlineClosed: isOutlineClosed(model),
     copperLayerCount: copperLayerNames.length,
     stackupLayerCount: stackupLayerCount(model),
@@ -72582,6 +72585,12 @@ function revision(model) {
 function drillSizes(model) {
   return findKiCadLists(model, "drill").map((drill) => listValue(drill)).filter((value) => Boolean(value && Number.isFinite(Number(value))));
 }
+function pcbPlotLayers(model) {
+  const definitions = findKiCadLists(model, "layers")[0];
+  if (!definitions) return copperLayers(model);
+  const layers = directChildLists(definitions).filter((layer) => ["signal", "power", "jumper"].includes(listValue(layer, 2) ?? "")).map((layer) => listValue(layer, 1) ?? "").filter((layer) => /^(?:F|B|In\d+)\.Cu$/u.test(layer));
+  return layers.length ? [...new Set(layers)] : copperLayers(model);
+}
 function copperLayers(model) {
   const layerBlock = findKiCadLists(model, "layers")[0];
   if (layerBlock) {
@@ -72611,6 +72620,18 @@ function copperAreas(model) {
     }
   }
   return areas;
+}
+function rectangularOutlineBounds(model) {
+  const rectangles = edgePrimitiveLists(model, "gr_rect");
+  if (rectangles.length !== 1 || ["gr_line", "gr_arc", "gr_circle", "gr_poly", "gr_curve"].some((name) => edgePrimitiveLists(model, name).length > 0))
+    return void 0;
+  const rect = rectangles[0] && startEndFromList(rectangles[0]);
+  if (!rect) return void 0;
+  const minX = Math.min(rect.start.x, rect.end.x);
+  const minY = Math.min(rect.start.y, rect.end.y);
+  const maxX = Math.max(rect.start.x, rect.end.x);
+  const maxY = Math.max(rect.start.y, rect.end.y);
+  return maxX > minX && maxY > minY ? { minX, minY, maxX, maxY } : void 0;
 }
 function boardArea(model) {
   const rect = edgePrimitiveLists(model, "gr_rect").map((block) => startEndFromList(block)).find((segment2) => Boolean(segment2));
@@ -88477,10 +88498,12 @@ function parseKicadDiagnostics(reportText, fallbackRule) {
   const diagnostics = [];
   const report = kicadReportSchema.safeParse(parsed);
   if (report.success) {
+    const coordinateUnits = parsed && typeof parsed === "object" && "coordinate_units" in parsed ? parsed.coordinate_units : void 0;
     for (const key of ["violations", "diagnostics", "errors", "warnings"]) {
       for (const diagnostic of report.data[key] ?? []) {
         const normalized = normalizeDiagnostic(diagnostic, fallbackRule);
         if (normalized) {
+          if (coordinateUnits === "mm") normalized.raw.coordinate_units = "mm";
           diagnostics.push(normalized);
         }
       }
@@ -95363,7 +95386,10 @@ function checkReadinessStatus(allowed, readiness) {
   };
 }
 function checkRequiredOutputs(readiness) {
-  const missing = readiness?.missingRequired ?? [];
+  if (!readiness) {
+    return { ok: false, message: "Required output presence cannot be verified without readiness data." };
+  }
+  const missing = readiness.missingRequired;
   return {
     ok: missing.length === 0,
     message: missing.length === 0 ? "All required outputs are present." : `Missing required outputs: ${missing.join(", ")}.`
@@ -97251,7 +97277,7 @@ function reportCoordinateWithUnits(value, units) {
 }
 
 // src/report/templates/pr-comment.mustache
-var pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasEvidence}}\n\n## {{labels.evidenceTitle}}\n\n{{evidence.exact}} {{labels.evidenceMeasured}}, {{evidence.heuristic}} {{labels.evidenceInferred}}.\n\n{{#evidence.hasBlockingOnInference}}\n{{labels.evidenceBlocking}}\n\n{{#evidence.blockingOnInference}}\n- `{{.}}`\n{{/evidence.blockingOnInference}}\n{{/evidence.hasBlockingOnInference}}\n{{/hasEvidence}}\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
+var pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasHardwareImpact}}\n\n## Hardware Change Impact\n\n- Base commit: `{{hardwareImpact.baseSha}}`\n- Candidate commit: `{{hardwareImpact.candidateSha}}`\n{{#hardwareImpact.baselineAvailable}}\n\n### Observed changes\n\n{{#hardwareImpact.conclusionChanged}}\n- Release conclusion: {{hardwareImpact.previousConclusion}} \u2192 {{hardwareImpact.currentConclusion}}\n{{/hardwareImpact.conclusionChanged}}\n- Readiness score: {{hardwareImpact.previousScore}} \u2192 {{hardwareImpact.currentScore}} ({{hardwareImpact.scoreDelta}})\n- Findings: {{hardwareImpact.findings.added}} added, {{hardwareImpact.findings.resolved}} resolved ({{hardwareImpact.findings.addedBlocking}} new blockers, {{hardwareImpact.findings.resolvedBlocking}} resolved blockers)\n{{#hardwareImpact.hasSeverityChanges}}\n- Severity changes: {{hardwareImpact.severityWorsened}} worsened, {{hardwareImpact.severityImproved}} improved\n{{/hardwareImpact.hasSeverityChanges}}\n- BOM: {{hardwareImpact.bom.added}} added, {{hardwareImpact.bom.removed}} removed, {{hardwareImpact.bom.changed}} changed\n- Manufacturing outputs: {{hardwareImpact.manufacturing.outputsAdded}} added, {{hardwareImpact.manufacturing.outputsRemoved}} removed, {{hardwareImpact.manufacturing.outputsChanged}} changed\n\n### Derived impact\n\n- Risk direction: {{hardwareImpact.riskDirection}}\n- Material change: {{hardwareImpact.materialChange}}\n- Affected domains: {{hardwareImpact.affectedDomains}}\n\n_This is a deterministic PR impact summary, not fabrication authorization._\n{{/hardwareImpact.baselineAvailable}}\n{{^hardwareImpact.baselineAvailable}}\n\n**Exact-base comparison unavailable.** A trustworthy material-change or risk delta cannot be inferred without an eligible baseline.\n{{/hardwareImpact.baselineAvailable}}\n{{/hasHardwareImpact}}\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasEvidence}}\n\n## {{labels.evidenceTitle}}\n\n{{evidence.exact}} {{labels.evidenceMeasured}}, {{evidence.heuristic}} {{labels.evidenceInferred}}.\n\n{{#evidence.hasBlockingOnInference}}\n{{labels.evidenceBlocking}}\n\n{{#evidence.blockingOnInference}}\n- `{{.}}`\n{{/evidence.blockingOnInference}}\n{{/evidence.hasBlockingOnInference}}\n{{/hasEvidence}}\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
 
 // src/report/templates/summary.mustache
 var summary_default = "# {{labels.reportTitle}}\n\n| {{labels.metric}} | {{labels.count}} |\n| --- | ---: |\n| {{labels.total}} | {{summary.total}} |\n| {{labels.critical}} | {{summary.critical}} |\n| {{labels.high}} | {{summary.high}} |\n| {{labels.medium}} | {{summary.medium}} |\n| {{labels.low}} | {{summary.low}} |\n| {{labels.info}} | {{summary.info}} |\n";
@@ -97259,7 +97285,7 @@ var summary_default = "# {{labels.reportTitle}}\n\n| {{labels.metric}} | {{label
 // src/report/markdown.ts
 var stickyMarker = "<!-- boardreadyops:sticky:v1 -->";
 function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
-  const fabricationView = fabrication ? formatFabricationDiff(fabrication, locale) : void 0;
+  const fabricationView = fabrication && !result.hardwareImpact ? formatFabricationDiff(fabrication, locale) : void 0;
   const topFindings3 = result.findings.slice(0, 10).map(markdownFinding);
   const fixFindings = result.findings.filter((finding2) => finding2.fix).slice(0, 10).map(markdownFinding);
   const plugins = (result.plugins ?? []).map((plugin) => ({
@@ -97267,6 +97293,7 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none"
   }));
   const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : void 0;
+  const hardwareImpactView = result.hardwareImpact ? formatHardwareImpact(result.hardwareImpact) : void 0;
   const evidenceView = result.evidence && result.evidence.exact + result.evidence.heuristic + result.evidence.unclassified > 0 ? { ...result.evidence, hasBlockingOnInference: result.evidence.blockingOnInference.length > 0 } : void 0;
   const releaseModeView = result.releaseMode ? formatReleaseMode(result.releaseMode, locale) : void 0;
   return mustache_default.render(
@@ -97283,6 +97310,8 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
       artifacts,
       hasFabricationDiff: Boolean(fabricationView),
       fabrication: fabricationView,
+      hasHardwareImpact: Boolean(hardwareImpactView),
+      hardwareImpact: hardwareImpactView,
       hasEvidence: Boolean(evidenceView),
       evidence: evidenceView,
       hasBomRisk: Boolean(bomRiskView),
@@ -97359,6 +97388,35 @@ function markdownLabels(locale) {
     topFindings: t("report.topFindings", {}, locale),
     total: t("report.total", {}, locale)
   };
+}
+function formatHardwareImpact(impact) {
+  const readiness = impact.facts.readiness;
+  const conclusion = readiness.conclusion;
+  return {
+    baseSha: impact.baseline.sha,
+    candidateSha: impact.candidate.sha,
+    baselineAvailable: impact.baseline.status === "available",
+    conclusionChanged: conclusion?.changed === true,
+    previousConclusion: conclusion?.previous ?? "n/a",
+    currentConclusion: conclusion?.current ?? "n/a",
+    previousScore: readiness.previousScore ?? "n/a",
+    currentScore: readiness.currentScore ?? "n/a",
+    scoreDelta: formatScoreDelta(readiness.scoreDelta),
+    findings: impact.facts.findings,
+    bom: impact.facts.bom,
+    manufacturing: impact.facts.manufacturing,
+    hasSeverityChanges: (impact.facts.findings.worsened ?? 0) + (impact.facts.findings.improved ?? 0) > 0,
+    severityWorsened: impact.facts.findings.worsened ?? 0,
+    severityImproved: impact.facts.findings.improved ?? 0,
+    materialChange: impact.assessment.materialChange ? "yes" : "no",
+    riskDirection: impact.assessment.riskDirection,
+    affectedDomains: impact.assessment.affectedDomains.length > 0 ? impact.assessment.affectedDomains.join(", ") : "none"
+  };
+}
+function formatScoreDelta(value) {
+  if (value === null) return "n/a";
+  if (value > 0) return `+${value}`;
+  return String(value);
 }
 function formatBomRisk(risk) {
   const atRiskComponents = risk.components.filter((c) => c.riskLevel !== "none").map((c) => {
@@ -97527,6 +97585,11 @@ var DEFAULT_MAX_COMPRESSED_SIZE = 50 * 1024 * 1024;
 var DEFAULT_MAX_TOTAL_EXTRACTED_BYTES = 250 * 1024 * 1024;
 var DEFAULT_MAX_SINGLE_FILE_BYTES = 50 * 1024 * 1024;
 
+// packages/contracts/src/manufacturing-archive-trust.ts
+function isUnattestedManufacturingArchive(input) {
+  return input.kind.trim().toLowerCase() === "archive" && input.role.trim().toLowerCase() === "manufacturing";
+}
+
 // packages/contracts/src/runner-protocol.ts
 var lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 var base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
@@ -97681,7 +97744,10 @@ var runnerArtifactDeclarationSchema = external_exports.object({
   bytes: external_exports.number().int().nonnegative().max(2147483647),
   sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u).optional(),
   contentType: artifactContentTypeSchema.optional()
-}).strict();
+}).strict().refine(
+  (artifact) => !isUnattestedManufacturingArchive(artifact),
+  "runner cannot declare an approved manufacturing archive without an independent attestation"
+);
 var runnerArtifactCapabilityRequestSchema = runnerLeaseContextSchema.extend({
   artifacts: external_exports.array(runnerArtifactDeclarationSchema).min(1).max(100)
 }).strict();
@@ -98437,13 +98503,22 @@ var hardwareImpactV1Schema = external_exports.object({
       scoreDelta: external_exports.number().int().min(-100).max(100).nullable(),
       previousStatus: hardwareImpactReadinessStatusSchema.nullable(),
       currentStatus: hardwareImpactReadinessStatusSchema.nullable(),
-      statusChanged: external_exports.boolean()
+      statusChanged: external_exports.boolean(),
+      // Optional without a default so parsing legacy signed results preserves their digest.
+      conclusion: external_exports.object({
+        previous: external_exports.enum(["passed", "failed"]).nullable(),
+        current: external_exports.enum(["passed", "failed"]).nullable(),
+        changed: external_exports.boolean()
+      }).strict().optional()
     }).strict(),
     findings: external_exports.object({
       added: hardwareImpactCountSchema,
       resolved: hardwareImpactCountSchema,
       addedBlocking: hardwareImpactCountSchema,
-      resolvedBlocking: hardwareImpactCountSchema
+      resolvedBlocking: hardwareImpactCountSchema,
+      // Optional without a default: legacy signed results must retain their original digest.
+      worsened: hardwareImpactCountSchema.optional(),
+      improved: hardwareImpactCountSchema.optional()
     }).strict(),
     bom: external_exports.object({
       added: hardwareImpactCountSchema,
@@ -98483,7 +98558,12 @@ var releaseRunResultBaseSchema = external_exports.object({
   conclusion: releaseRunConclusionSchema.optional(),
   decision: releaseDecisionSchema.nullable(),
   findings: external_exports.array(findingSchema).max(500).default([]),
-  artifacts: external_exports.array(releaseRunArtifactSchema).max(100).default([]),
+  artifacts: external_exports.array(
+    releaseRunArtifactSchema.refine(
+      (artifact) => !isUnattestedManufacturingArchive(artifact),
+      "runner cannot declare an approved manufacturing archive without an independent attestation"
+    )
+  ).max(100).default([]),
   metrics: releaseRunMetricsSchema.default({}),
   // Optional producer-observed versions; older v1 results have no such metadata.
   toolVersions: external_exports.object({
@@ -102886,16 +102966,20 @@ function hardwareImpactSection(impact) {
 function hardwareImpactFactLines(impact) {
   const lines = [];
   const readiness = impact.facts.readiness;
+  if (readiness.conclusion?.changed) {
+    lines.push(`- Release conclusion: ${readiness.conclusion.previous} \u2192 ${readiness.conclusion.current}`);
+  }
   if (readiness.scoreDelta !== 0 || readiness.statusChanged) {
     lines.push(
       `- Readiness: ${score(readiness.previousScore)} \u2192 ${score(readiness.currentScore)} (${delta(readiness.scoreDelta)})`
     );
   }
   const findings = impact.facts.findings;
-  if (findings.added > 0 || findings.resolved > 0) {
+  if (findings.added > 0 || findings.resolved > 0 || (findings.worsened ?? 0) > 0 || (findings.improved ?? 0) > 0) {
     const blocker = blockerSuffix(findings.addedBlocking, "new");
     const resolved = blockerSuffix(findings.resolvedBlocking, "resolved");
-    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}`);
+    const severityChanges = (findings.worsened ?? 0) > 0 || (findings.improved ?? 0) > 0 ? `; severity \u2191${findings.worsened ?? 0} / \u2193${findings.improved ?? 0}` : "";
+    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}${severityChanges}`);
   }
   const bomChanged = impact.facts.bom.added + impact.facts.bom.removed + impact.facts.bom.changed;
   if (bomChanged > 0) {
@@ -138310,7 +138394,13 @@ async function upsertPullRequestComment(result, artifactName2, format = "report"
     return "";
   }
   const octokit = getOctokit(token);
-  const body2 = format === "review" ? formatReviewComment(result, reviewReports(artifactName2)) : formatMarkdown(result, [], await fabricationDiff(token, owner, repo, artifactName2, pull, result));
+  let body2;
+  if (format === "review") {
+    body2 = formatReviewComment(result, reviewReports(artifactName2));
+  } else {
+    const legacyDiff = result.hardwareImpact ? void 0 : await fabricationDiff(token, owner, repo, artifactName2, pull, result);
+    body2 = formatMarkdown(result, [], legacyDiff);
+  }
   const comments = await octokit.paginate(octokit.rest.issues.listComments, {
     owner,
     repo,
@@ -138433,14 +138523,14 @@ function buildHardwareImpact(input) {
     return unavailableImpact(input.baseline, input.candidate);
   }
   const diff = diffRuns(input.baseline.result, input.candidate.result);
-  const facts = factsFromDiff(diff);
+  const facts = factsFromDiff(diff, input.baseline.result, input.candidate.result);
   return {
     version: 1,
     baseline: { status: "available", sha: input.baseline.sha },
     candidate: { sha: input.candidate.sha },
     facts,
-    assessment: assessmentFromFacts(facts, input.baseline.result, input.candidate.result),
-    evidence: evidenceFromDiff(diff)
+    assessment: assessmentFromFacts(facts),
+    evidence: evidenceFromDiff(diff, facts.readiness.conclusion)
   };
 }
 function unavailableImpact(baseline, candidate) {
@@ -138458,7 +138548,7 @@ function unavailableImpact(baseline, candidate) {
         currentStatus: currentReadiness?.status ?? null,
         statusChanged: false
       },
-      findings: { added: 0, resolved: 0, addedBlocking: 0, resolvedBlocking: 0 },
+      findings: { added: 0, resolved: 0, addedBlocking: 0, resolvedBlocking: 0, worsened: 0, improved: 0 },
       bom: { added: 0, removed: 0, changed: 0, truncated: false },
       manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 0 }
     },
@@ -138466,7 +138556,9 @@ function unavailableImpact(baseline, candidate) {
     evidence: []
   };
 }
-function factsFromDiff(diff) {
+function factsFromDiff(diff, previous, current) {
+  const previousConclusion = previous.status ?? null;
+  const currentConclusion = current.status ?? null;
   return {
     readiness: {
       previousScore: diff.readiness.previousScore,
@@ -138474,13 +138566,20 @@ function factsFromDiff(diff) {
       scoreDelta: diff.readiness.scoreDelta,
       previousStatus: diff.readiness.previousStatus,
       currentStatus: diff.readiness.currentStatus,
-      statusChanged: diff.readiness.previousStatus !== diff.readiness.currentStatus
+      statusChanged: diff.readiness.previousStatus !== diff.readiness.currentStatus,
+      conclusion: {
+        previous: previousConclusion,
+        current: currentConclusion,
+        changed: previousConclusion !== null && currentConclusion !== null && previousConclusion !== currentConclusion
+      }
     },
     findings: {
       added: diff.findings.added.length,
       resolved: diff.findings.resolved.length,
       addedBlocking: diff.findings.added.filter((finding2) => blockingSeverity(finding2.severity)).length,
-      resolvedBlocking: diff.findings.resolved.filter((finding2) => blockingSeverity(finding2.severity)).length
+      resolvedBlocking: diff.findings.resolved.filter((finding2) => blockingSeverity(finding2.severity)).length,
+      worsened: diff.findings.worsened.length,
+      improved: diff.findings.improved.length
     },
     bom: {
       // diff.fabrication.bom.rows is capped for display (see FabricationDiffOptions.maxBomRows), so
@@ -138498,15 +138597,15 @@ function factsFromDiff(diff) {
     }
   };
 }
-function assessmentFromFacts(facts, previous, current) {
+function assessmentFromFacts(facts) {
   const affectedDomains = DOMAIN_ORDER.filter((domain2) => domainChanged(domain2, facts));
   const materialChange = affectedDomains.length > 0;
   const readinessWorsened = statusMoved(facts.readiness.previousStatus, facts.readiness.currentStatus, "worse");
   const readinessImproved = statusMoved(facts.readiness.previousStatus, facts.readiness.currentStatus, "better");
-  const conclusionWorsened = previous.status === "passed" && current.status === "failed";
-  const conclusionImproved = previous.status === "failed" && current.status === "passed";
-  const increased = readinessWorsened || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta < 0 || facts.findings.addedBlocking > 0 || conclusionWorsened;
-  const decreased = readinessImproved || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta > 0 || facts.findings.resolvedBlocking > 0 || conclusionImproved;
+  const conclusionWorsened = facts.readiness.conclusion?.previous === "passed" && facts.readiness.conclusion.current === "failed";
+  const conclusionImproved = facts.readiness.conclusion?.previous === "failed" && facts.readiness.conclusion.current === "passed";
+  const increased = readinessWorsened || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta < 0 || facts.findings.addedBlocking > 0 || (facts.findings.worsened ?? 0) > 0 || conclusionWorsened;
+  const decreased = readinessImproved || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta > 0 || facts.findings.resolvedBlocking > 0 || (facts.findings.improved ?? 0) > 0 || conclusionImproved;
   let riskDirection;
   if (increased) {
     riskDirection = "increased";
@@ -138522,9 +138621,9 @@ function assessmentFromFacts(facts, previous, current) {
 function domainChanged(domain2, facts) {
   switch (domain2) {
     case "readiness":
-      return facts.readiness.scoreDelta !== null ? facts.readiness.scoreDelta !== 0 || facts.readiness.statusChanged : facts.readiness.statusChanged;
+      return facts.readiness.conclusion?.changed === true || (facts.readiness.scoreDelta !== null ? facts.readiness.scoreDelta !== 0 || facts.readiness.statusChanged : facts.readiness.statusChanged);
     case "findings":
-      return facts.findings.added > 0 || facts.findings.resolved > 0;
+      return facts.findings.added > 0 || facts.findings.resolved > 0 || (facts.findings.worsened ?? 0) > 0 || (facts.findings.improved ?? 0) > 0;
     case "bom":
       return facts.bom.added > 0 || facts.bom.removed > 0 || facts.bom.changed > 0;
     case "manufacturing":
@@ -138542,8 +138641,15 @@ function blockingSeverity(severity) {
 function countByStatus(entries, status) {
   return entries.filter((entry) => entry.status === status).length;
 }
-function evidenceFromDiff(diff) {
+function evidenceFromDiff(diff, conclusion) {
   const evidence = [];
+  if (conclusion?.changed) {
+    evidence.push({
+      domain: "readiness",
+      kind: "readiness",
+      label: `Release conclusion ${conclusion.previous} \u2192 ${conclusion.current}`
+    });
+  }
   if (diff.readiness.scoreDelta !== 0 || diff.readiness.previousStatus !== diff.readiness.currentStatus) {
     evidence.push({
       domain: "readiness",
@@ -138558,6 +138664,12 @@ function evidenceFromDiff(diff) {
   }
   for (const finding2 of diff.findings.resolved) {
     evidence.push(findingEvidence("Resolved finding", finding2));
+  }
+  for (const { finding: finding2, previousSeverity } of diff.findings.worsened) {
+    evidence.push(findingEvidence(`Worsened finding (${previousSeverity} \u2192 ${finding2.severity})`, finding2));
+  }
+  for (const { finding: finding2, previousSeverity } of diff.findings.improved) {
+    evidence.push(findingEvidence(`Improved finding (${previousSeverity} \u2192 ${finding2.severity})`, finding2));
   }
   for (const row of diff.fabrication.bom.rows.filter((entry) => entry.status !== "unchanged")) {
     evidence.push({

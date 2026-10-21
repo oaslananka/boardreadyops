@@ -30,10 +30,11 @@ type ArtifactDetail = RunDetail["artifacts"][number];
 type AttemptDetail = RunDetail["attempts"][number];
 type FindingDetail = RunDetail["findings"][number];
 
-export type RunView = "artifacts" | "attempts" | "audit" | "findings" | "publication" | "summary";
+export type RunView = "artifacts" | "attempts" | "audit" | "design" | "findings" | "publication" | "summary";
 
 const navigationItems: ReadonlyArray<{ view: RunView; label: string; suffix: string }> = [
   { view: "summary", label: "Summary", suffix: "" },
+  { view: "design", label: "PCB / Schematic", suffix: "/design" },
   { view: "attempts", label: "Attempts", suffix: "/attempts" },
   { view: "findings", label: "Findings", suffix: "/findings" },
   { view: "artifacts", label: "Artifacts", suffix: "/artifacts" },
@@ -66,28 +67,32 @@ function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunV
 export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
   const dispatch = releaseRepositoryDispatchAvailability(run.repository);
   return (
-    <header className="flex flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-lg sm:flex-row sm:items-start sm:justify-between">
-      <div>
+    <header className="flex min-w-0 flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-lg lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0">
         <p className="text-sm font-medium text-primary">Release readiness</p>
-        <h1 className="text-xl font-bold text-foreground">{run.repository}</h1>
+        <h1 className="break-words text-xl font-bold text-foreground">{run.repository}</h1>
         <p className="run-identity-meta mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>{run.repositoryPrivate ? "Private repository" : "Public repository"}</span>
-          <span>
+          <span className="min-w-0 break-all">
             Run <code>{run.id}</code>
           </span>
           <span>
             Commit <code>{run.commitSha.slice(0, 12)}</code>
           </span>
-          <span>
+          <span className="min-w-0 break-all">
             <code>{run.ref}</code>
           </span>
         </p>
       </div>
-      <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
+      <div className="flex min-w-0 flex-col items-start gap-3 lg:max-w-sm lg:shrink lg:items-end">
         <fieldset>
           <legend className="sr-only">Readiness score</legend>
           <div className="run-readiness-signature flex flex-col items-center rounded-md border border-border bg-muted px-4 py-2">
-            <strong className="text-2xl font-bold text-foreground">{run.readinessScore ?? "—"}</strong>
+            <strong
+              className={`${run.readinessScore === undefined ? "text-sm" : "text-2xl"} font-bold text-foreground`}
+            >
+              {run.readinessScore ?? "Not reported"}
+            </strong>
             <span className="text-xs text-muted-foreground">Readiness score</span>
             <span className="sr-only">
               {run.readinessScore === undefined
@@ -716,7 +721,9 @@ function SourceRuntimePanel({ run }: Readonly<{ run: RunDetail }>) {
         </Definition>
         <Definition label="BoardReadyOps">{run.boardReadyOpsVersion ?? "Not reported"}</Definition>
         <Definition label="KiCad">{run.kicadVersion ?? "Not reported"}</Definition>
-        <Definition label="Trust mode">{humanize(run.trustMode)}</Definition>
+        <Definition label="Trust mode">
+          {run.trustMode === "safe" ? "Safe (restricted execution)" : humanize(run.trustMode)}
+        </Definition>
         <Definition label="Safe-mode reasons">
           {run.safeModeReasons.length > 0 ? run.safeModeReasons.map(humanize).join(" · ") : "None"}
         </Definition>
@@ -734,6 +741,9 @@ function SourceRuntimePanel({ run }: Readonly<{ run: RunDetail }>) {
           {run.setupWorkflowContractVersion ? `v${run.setupWorkflowContractVersion}` : "Not recorded"}
         </Definition>
       </DefinitionGrid>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Trust mode describes execution permissions, not whether fabrication checks passed.
+      </p>
       {/* The links are the only way out to GitHub from this page, so they get the touch
           minimum; `[&_a]` keeps it in one place rather than on each of the four. */}
       <nav

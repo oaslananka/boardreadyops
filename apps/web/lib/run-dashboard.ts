@@ -33,6 +33,8 @@ type ReportLinkDetail = {
 
 type FindingDetail = {
   id: string;
+  /** Recorded wire fingerprint linking a finding to published snapshot anchors. Not the database row ID. */
+  fingerprint?: string;
   ruleId: string;
   severity: string;
   message: string;
@@ -791,7 +793,7 @@ export async function lookupRunDashboard(
     productionBaselineResult,
   ] = await Promise.all([
     executor.query(
-      `select findings.id, findings.rule_id, findings.severity, findings.message,
+      `select findings.id, findings.fingerprint, findings.rule_id, findings.severity, findings.message,
               findings.path, findings.kind, findings.waived_at
        from findings
        where ${findingScope.sql}
@@ -973,6 +975,7 @@ export async function lookupRunDashboard(
   const findings = rows(findingsResult).map(
     (row): FindingDetail => ({
       id: requiredString(row, "id"),
+      ...(typeof row.fingerprint === "string" && row.fingerprint.length > 0 ? { fingerprint: row.fingerprint } : {}),
       ruleId: requiredString(row, "rule_id"),
       severity: requiredString(row, "severity"),
       message: requiredString(row, "message"),

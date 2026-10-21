@@ -18,12 +18,21 @@ export interface HardwareImpactV1 {
       previousStatus: "ready" | "at-risk" | "blocked" | null;
       currentStatus: "ready" | "at-risk" | "blocked" | null;
       statusChanged: boolean;
+      /** Additive v1 fact: an observed release verdict change is independent of readiness score. */
+      conclusion?: {
+        previous: "passed" | "failed" | null;
+        current: "passed" | "failed" | null;
+        changed: boolean;
+      };
     };
     findings: {
       added: number;
       resolved: number;
       addedBlocking: number;
       resolvedBlocking: number;
+      /** Optional for compatibility with v1 results emitted before severity-delta support. */
+      worsened?: number;
+      improved?: number;
     };
     bom: {
       added: number;

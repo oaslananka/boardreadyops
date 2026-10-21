@@ -10,7 +10,9 @@ import {
   resetGitHubActionsOidcJwksCache,
   verifyGitHubActionsOidcToken,
 } from "../../apps/web/lib/github-actions-oidc.js";
+import { completeGitHubCheckRun, upsertReadinessComment } from "../../apps/web/lib/github-app-check-run-client.js";
 import { resultOidcExpectations } from "../../apps/web/lib/result-oidc-expectations.js";
+import { createSqlAuditLogStore } from "../../packages/db/src/audit-log-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -31,6 +33,7 @@ const fixtures = {
   a: {
     installationId: "10000000-0000-4000-8000-000000000001",
     githubInstallationId: 9_100_001,
+    previousAttemptId: "10000000-0000-4000-8000-000000000005",
     repositoryId: "10000000-0000-4000-8000-000000000002",
     githubRepositoryId: "910000002",
     owner: "isolation-owner-a",
@@ -73,9 +76,9 @@ function rows(result: unknown): QueryRow[] {
   return Array.isArray(value) ? (value as QueryRow[]) : [];
 }
 
-function audience(fixture: Fixture, targetSha = fixture.commitSha): string {
+function audience(fixture: Fixture, targetSha = fixture.commitSha, attemptId = fixture.attemptId): string {
   const reasons = fixture.safeModeReasons.length > 0 ? fixture.safeModeReasons.join(",") : "none";
-  return `boardreadyops-cloud:${fixture.runId}:${fixture.attemptId}:${targetSha}:${fixture.trustMode}:${reasons}`;
+  return `boardreadyops-cloud:${fixture.runId}:${attemptId}:${targetSha}:${fixture.trustMode}:${reasons}`;
 }
 
 function workflowRef(fixture: Fixture): string {
@@ -140,6 +143,7 @@ function callbackRequest(
     attemptId?: string;
     trustMode?: string;
     safeModeReasons?: string;
+    body?: Record<string, unknown>;
   } = {},
 ): Request {
   const url = new URL("https://boardreadyops.test/api/v1/runs/github-actions-result");
@@ -153,7 +157,7 @@ function callbackRequest(
       "x-boardreadyops-trust-mode": options.trustMode ?? fixture.trustMode,
       "x-boardreadyops-safe-mode-reasons": options.safeModeReasons ?? fixture.safeModeReasons.join(","),
     },
-    body: JSON.stringify(resultBody(fixture)),
+    body: JSON.stringify(options.body ?? resultBody(fixture)),
   });
 }
 
@@ -182,6 +186,28 @@ async function stateSnapshot(): Promise<unknown> {
 }
 
 const checkRunPublications: QueryRow[] = [];
+const restrictedAppHttpCalls: Array<{ method: string; path: string; checksOnlyTokenUsed: boolean }> = [];
+const restrictedAppToken = "synthetic-fixture-token-checks-only";
+const restrictedAppHttp = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
+  const requestUrl = new URL(url instanceof Request ? url.url : url);
+  const method = options?.method ?? "GET";
+  const headers = options?.headers as Record<string, string>;
+  restrictedAppHttpCalls.push({
+    method,
+    path: requestUrl.pathname,
+    checksOnlyTokenUsed: headers.authorization === `Bearer ${restrictedAppToken}`,
+  });
+  const ownerA = `/repos/${fixtures.a.owner}/${fixtures.a.name}`;
+  if (requestUrl.pathname === `${ownerA}/check-runs/${fixtures.a.checkRunId}` && method === "PATCH") {
+    return new Response(JSON.stringify({ id: fixtures.a.checkRunId }), { status: 200 });
+  }
+  if (requestUrl.pathname === `${ownerA}/issues/${fixtures.a.pullRequestNumber}/comments` && method === "GET") {
+    // This simulates the API 403 observed with a real downscoped BoardReadyOps
+    // installation token. NEVER place real tokens in the CI environment.
+    return new Response(JSON.stringify({ message: "Resource not accessible by integration" }), { status: 403 });
+  }
+  throw new Error(`Unexpected private fixture GitHub request ${method} ${requestUrl.pathname}`);
+});
 const jwksFetch = vi.fn(
   async () =>
     new Response(JSON.stringify({ keys: [publicJwk] }), {
@@ -194,8 +220,30 @@ const resultDependencies: ResultRouteDependencies = {
   queryExecutor: () => executor,
   checkRunClient: () =>
     ({
-      completeCheckRun: async (input: QueryRow) => {
-        checkRunPublications.push(input);
+      completeCheckRun: async (input: Parameters<typeof completeGitHubCheckRun>[0]["input"]) => {
+        checkRunPublications.push(input as unknown as QueryRow);
+        if (input.repositoryOwner === fixtures.a.owner) {
+          await completeGitHubCheckRun({
+            apiBaseUrl: "https://api.github.test",
+            token: restrictedAppToken,
+            input,
+            request: restrictedAppHttp,
+          });
+        }
+      },
+      createPullRequestComment: async (input: QueryRow) => {
+        if (input.repositoryOwner !== fixtures.a.owner) {
+          throw new Error("Foreign installation must never publish a comment");
+        }
+        await upsertReadinessComment({
+          apiBaseUrl: "https://api.github.test",
+          token: restrictedAppToken,
+          repositoryOwner: String(input.repositoryOwner),
+          repositoryName: String(input.repositoryName),
+          pullRequestNumber: Number(input.pullRequestNumber),
+          body: String(input.body),
+          request: restrictedAppHttp,
+        });
       },
     }) as never,
   detailsUrl: (runId) => `https://boardreadyops.test/runs/${runId}`,
@@ -220,6 +268,8 @@ beforeAll(async () => {
   if (!executor) return;
   resetGitHubActionsOidcJwksCache();
   checkRunPublications.length = 0;
+  restrictedAppHttpCalls.length = 0;
+  restrictedAppHttp.mockClear();
   await executor.query("delete from installations where id = any($1::text[])", [
     [fixtures.a.installationId, fixtures.b.installationId],
   ]);
@@ -268,6 +318,20 @@ beforeAll(async () => {
                  $3::timestamptz, $3::timestamptz, $4)`,
       [fixture.attemptId, fixture.runId, "2026-08-02T04:29:00.000Z", `workflow-${fixture.owner}`],
     );
+    if ("previousAttemptId" in fixture) {
+      // The A run now points at attempt #2, while #1 is a genuinely persisted,
+      // superseded GitHub-dispatched attempt. A forged/nonexistent attempt UUID
+      // does not exercise this important historical-attempt boundary.
+      await executor.query(`update release_run_attempts set attempt_number = 2 where id = $1`, [fixture.attemptId]);
+      await executor.query(
+        `insert into release_run_attempts (
+           id, run_id, attempt_number, status, created_at,
+           dispatch_requested_at, dispatched_at, completed_at, github_workflow_dispatch_id
+         ) values ($1, $2, 1, 'superseded', $3::timestamptz,
+                   $3::timestamptz, $3::timestamptz, $3::timestamptz, $4)`,
+        [fixture.previousAttemptId, fixture.runId, "2026-08-02T04:28:00.000Z", "workflow-superseded-a"],
+      );
+    }
   }
 });
 
@@ -282,10 +346,21 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
   it("accepts independent callbacks and rejects cross-installation, stale, claim-mutated, and trust-mutated callbacks", async () => {
     if (!executor) throw new Error("DATABASE_URL is required");
 
-    const acceptedA = await handleGitHubActionsResultRequest(
-      callbackRequest(fixtures.a, token(fixtures.a)),
-      routeDependencies,
-    );
+    // Race a signed, once-dispatched but now superseded attempt against the
+    // valid current attempt. Both requests start without awaiting the other.
+    const signedCurrentToken = token(fixtures.a);
+    const staleAttemptToken = token(fixtures.a, {
+      aud: audience(fixtures.a, fixtures.a.commitSha, fixtures.a.previousAttemptId),
+    });
+    const [acceptedA, staleAttemptResponse] = await Promise.all([
+      handleGitHubActionsResultRequest(callbackRequest(fixtures.a, signedCurrentToken), routeDependencies),
+      handleGitHubActionsResultRequest(
+        callbackRequest(fixtures.a, staleAttemptToken, { attemptId: fixtures.a.previousAttemptId }),
+        routeDependencies,
+      ),
+    ]);
+    expect(staleAttemptResponse.status).toBe(401);
+    const staleAttemptDenial = JSON.stringify(await staleAttemptResponse.json());
     expect(acceptedA.status).toBe(202);
     const acceptedABody = (await acceptedA.json()) as {
       publicationWarnings?: string[];
@@ -296,7 +371,7 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       status: "accepted",
       checkRunUpdated: true,
       pullRequestCommentCreated: false,
-      publicationWarnings: ["GitHub pull-request comment publication is not configured"],
+      publicationWarnings: [expect.stringContaining("status 403")],
     });
 
     const acceptedB = await handleGitHubActionsResultRequest(
@@ -311,6 +386,35 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       pullRequestCommentCreated: false,
     });
 
+    expect(restrictedAppHttpCalls).toEqual([
+      {
+        method: "PATCH",
+        path: `/repos/${fixtures.a.owner}/${fixtures.a.name}/check-runs/${fixtures.a.checkRunId}`,
+        checksOnlyTokenUsed: true,
+      },
+      {
+        method: "GET",
+        path: `/repos/${fixtures.a.owner}/${fixtures.a.name}/issues/${fixtures.a.pullRequestNumber}/comments`,
+        checksOnlyTokenUsed: true,
+      },
+    ]);
+    // A later identical JWT replay legitimately tries publication again;
+    // count only this first accepted callback in the evidence summary.
+    const restrictedAppFirstAcceptanceCalls = [...restrictedAppHttpCalls];
+    const restrictedAppPublication = rows(
+      await executor.query(
+        `select github_check_published_at is not null as check_published,
+                github_comment_published_at is not null as comment_published,
+                last_publication_error
+           from release_run_results where run_id = $1`,
+        [fixtures.a.runId],
+      ),
+    )[0];
+    expect(restrictedAppPublication).toMatchObject({
+      check_published: true,
+      comment_published: false,
+      last_publication_error: expect.stringContaining("status 403"),
+    });
     expect(checkRunPublications).toEqual([
       expect.objectContaining({
         installationId: String(fixtures.a.githubInstallationId),
@@ -328,9 +432,133 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       }),
     ]);
 
+    // The same two installation fixtures must also have isolated audit exports
+    // and Check Run publication payloads. Synthetic canaries exercise the
+    // metadata scrubber without reading or exporting any production secrets.
+    const auditStore = createSqlAuditLogStore(executor);
+    const auditCanary = "Bearer synthetic-audit-canary-only";
+    // Audit events are append-only by contract; insert a separate synthetic
+    // record rather than weakening the immutability trigger or mutating history.
+    await executor.query(
+      `insert into audit_events (
+         id, installation_id, event_type, actor_type, subject_type,
+         subject_id, repository_id, release_run_id, metadata, created_at
+       ) values ($1, $2, 'issue154.synthetic_sensitive_canary', 'system',
+                 'release_run', $3, $4, $3,
+                 jsonb_build_object('reason', $5::text, 'internalTenantCanary', $6::text), now())`,
+      [
+        "10000000-0000-4000-8000-000000000006",
+        fixtures.a.installationId,
+        fixtures.a.runId,
+        fixtures.a.repositoryId,
+        auditCanary,
+        `${fixtures.b.owner}/${fixtures.b.name}`,
+      ],
+    );
+    let scopedAuditExports = 0;
+    let deniedForeignAuditReads = 0;
+    const auditCanaryLeakageFindings: string[] = [];
+    const checkRunPublicationLeakageFindings: string[] = [];
+    for (const [own, foreign, publication] of [
+      [fixtures.a, fixtures.b, checkRunPublications[0]],
+      [fixtures.b, fixtures.a, checkRunPublications[1]],
+    ] as const) {
+      const ownAudit = await auditStore.listAuditEvents({
+        installationId: own.installationId,
+        repositoryId: own.repositoryId,
+        releaseRunId: own.runId,
+      });
+      expect(ownAudit.length).toBeGreaterThan(0);
+      expect(ownAudit.every((event) => event.installationId === own.installationId)).toBe(true);
+      const exported = JSON.stringify(ownAudit);
+      if (
+        exported.includes(auditCanary) ||
+        exported.includes("internalTenantCanary") ||
+        exported.includes(foreign.owner)
+      ) {
+        auditCanaryLeakageFindings.push(own.owner);
+      }
+      const foreignAudit = await auditStore.listAuditEvents({
+        installationId: foreign.installationId,
+        repositoryId: own.repositoryId,
+        releaseRunId: own.runId,
+      });
+      expect(foreignAudit).toEqual([]);
+      scopedAuditExports += 1;
+      deniedForeignAuditReads += 1;
+
+      const serializedPublication = JSON.stringify(publication);
+      if (
+        serializedPublication.includes(foreign.owner) ||
+        serializedPublication.includes(foreign.repositoryId) ||
+        serializedPublication.includes(foreign.runId) ||
+        serializedPublication.includes(foreign.attemptId)
+      ) {
+        checkRunPublicationLeakageFindings.push(own.owner);
+      }
+    }
+    expect(auditCanaryLeakageFindings).toEqual([]);
+    expect(checkRunPublicationLeakageFindings).toEqual([]);
+
+    // A signed repeat for the SAME completed run/attempt must remain idempotent
+    // at the domain-result boundary. Check Run publication may be retried: its
+    // delivery is intentionally separate from the immutable terminal result.
+    const preReplay = rows(
+      await executor.query(
+        `select id, version, terminal_result_digest,
+              (select count(*)::int from findings where run_id = release_runs.id) as findings,
+              (select count(*)::int from release_run_results where run_id = release_runs.id) as results
+         from release_runs where id = any($1::text[]) order by id`,
+        [[fixtures.a.runId, fixtures.b.runId]],
+      ),
+    );
+    // Reuse the EXACT signed JWT string and identical request body, not a
+    // newly minted equivalent identity. The immutable result must replay.
+    const replay = await handleGitHubActionsResultRequest(
+      callbackRequest(fixtures.a, signedCurrentToken),
+      routeDependencies,
+    );
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({
+      ok: true,
+      status: "replayed",
+      runId: fixtures.a.runId,
+      executionAttemptId: fixtures.a.attemptId,
+    });
+    expect(
+      rows(
+        await executor.query(
+          `select id, version, terminal_result_digest,
+              (select count(*)::int from findings where run_id = release_runs.id) as findings,
+              (select count(*)::int from release_run_results where run_id = release_runs.id) as results
+         from release_runs where id = any($1::text[]) order by id`,
+          [[fixtures.a.runId, fixtures.b.runId]],
+        ),
+      ),
+    ).toEqual(preReplay);
+
+    // A VALID signed OIDC identity cannot overwrite a different terminal
+    // digest, even on the same legitimate run/attempt. Unlike modified-claim
+    // negatives, this exercises the persisted terminal conflict path (409).
+    const beforeConflict = await stateSnapshot();
+    const publicationsBeforeConflict = checkRunPublications.length;
+    const conflict = await handleGitHubActionsResultRequest(
+      callbackRequest(fixtures.b, token(fixtures.b), {
+        body: { ...resultBody(fixtures.b), decision: "fail", conclusion: "failure" },
+      }),
+      routeDependencies,
+    );
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toMatchObject({
+      ok: false,
+      error: "terminal result conflicts with the persisted result",
+    });
+    expect(await stateSnapshot()).toEqual(beforeConflict);
+    expect(checkRunPublications).toHaveLength(publicationsBeforeConflict);
+
     const acceptedState = await stateSnapshot();
     const acceptedPublicationCount = checkRunPublications.length;
-    const rejectedResponses: string[] = [];
+    const rejectedResponses: string[] = [staleAttemptDenial];
 
     for (const [requestFixture, bearerFixture] of [
       [fixtures.b, fixtures.a],
@@ -343,15 +571,6 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       expect(response.status).toBe(401);
       rejectedResponses.push(JSON.stringify(await response.json()));
     }
-
-    const staleResponse = await handleGitHubActionsResultRequest(
-      callbackRequest(fixtures.a, token(fixtures.a), {
-        attemptId: "30000000-0000-4000-8000-000000000004",
-      }),
-      routeDependencies,
-    );
-    expect(staleResponse.status).toBe(401);
-    rejectedResponses.push(JSON.stringify(await staleResponse.json()));
 
     const claimMutations = [
       { repository: `${fixtures.b.owner}/${fixtures.b.name}` },
@@ -395,6 +614,7 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       String(fixture.githubInstallationId),
       fixture.runId,
       fixture.attemptId,
+      ...(fixture.owner === fixtures.a.owner ? [fixtures.a.previousAttemptId] : []),
     ]);
     const leakageFindings = rejectedResponses.filter((body) => forbidden.some((value) => body.includes(value)));
     expect(leakageFindings).toEqual([]);
@@ -408,12 +628,26 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
         independentCheckRunsPublished: 2,
         crossInstallationCallbacksRejected: 2,
         staleAttemptCallbacksRejected: 1,
+        exactSignedJwtReplaysAccepted: 1,
+        persistedSupersededAttemptRacesRejected: 1,
         claimMutationCallbacksRejected: claimMutations.length,
         trustSnapshotCallbacksRejected: 2,
         rejectedCallbackMutations: 0,
         rejectedCallbackPublications: 0,
         optionalCommentWarnings: acceptedABody.publicationWarnings?.length ?? 0,
         responseLeakageFindings: leakageFindings.length,
+        scopedAuditExports,
+        deniedForeignAuditReads,
+        auditCanaryLeakageFindings: auditCanaryLeakageFindings.length,
+        checkRunPublicationLeakageFindings: checkRunPublicationLeakageFindings.length,
+        restrictedAppCheckRunUpdates: restrictedAppFirstAcceptanceCalls.filter((call) => call.method === "PATCH")
+          .length,
+        restrictedAppCommentDenials: restrictedAppFirstAcceptanceCalls.filter((call) => call.method === "GET").length,
+        restrictedAppWarningPersistence: Number(
+          restrictedAppPublication?.check_published === true &&
+            restrictedAppPublication?.comment_published === false &&
+            String(restrictedAppPublication?.last_publication_error).includes("status 403"),
+        ),
       };
       await fs.writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
       await fs.chmod(evidencePath, 0o600);

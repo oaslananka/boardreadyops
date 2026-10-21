@@ -91,6 +91,12 @@ const PATH_PATTERNS = [
 ];
 const REPORT_PATTERNS = [/^src\/report\//, /^tests\/unit\/report\//, /^docs\//, /^mkdocs\.yml$/];
 const WEB_UI_PATTERNS = [/^apps\/web\/(?:app|components)\//, /^tests\/e2e\//];
+const VISUAL_PATTERNS = [
+  ...WEB_UI_PATTERNS,
+  // Tenant-scoped web route behavior may also depend on its server-side view models.
+  /^apps\/web\/lib\//,
+  /^src\/report\/(?:html(?:-|\.)|templates\/html)/,
+];
 // Mirrors the vitest coverage `include` set so the coverage gate runs whenever a
 // measured source file (or any test/config that affects it) changes.
 const COVERAGE_PATTERNS = [
@@ -174,6 +180,10 @@ export function classifyChangedFiles(files, options = {}) {
     needs_cross_platform: forceFull || pathSensitiveChanged || dependencyChanged,
     needs_action_smoke: forceFull || actionChanged || packageChanged,
     needs_accessibility: forceFull || reportChanged || docsChanged || webUiChanged,
+    // Screenshot regression tests verify UI rendering, not PR-comment or JSON-only reports.
+    // Keep a11y/coverage on report changes, but do not make a non-UI change depend on
+    // font/network-sensitive baselines from unrelated pages.
+    needs_visual: forceFull || changedFiles.some((file) => matchesAny(file, VISUAL_PATTERNS)),
     needs_build: buildChanged || dependencyChanged || packageChanged,
     needs_dist: packageChanged || actionChanged || buildChanged,
     needs_coverage: coverageCritical,

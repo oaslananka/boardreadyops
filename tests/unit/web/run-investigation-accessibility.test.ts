@@ -203,6 +203,15 @@ describe("run investigation accessibility", () => {
     vi.unstubAllEnvs();
   });
 
+  it("keeps the run header stacked through tablet widths and wraps long source identities", () => {
+    const html = viewMarkup("findings");
+    expect(html).toContain("lg:flex-row lg:items-start lg:justify-between");
+    expect(html).toContain('class="min-w-0"');
+    expect(html).toContain("break-words text-xl font-bold");
+    expect(html).toContain("min-w-0 break-all");
+    expect(html).not.toContain("sm:flex-row sm:items-start sm:justify-between");
+  });
+
   it("links GitHub Actions logs and repository-owned artifacts from the authoritative workflow run", () => {
     const run = sampleRun();
     run.attempts = [
@@ -256,6 +265,30 @@ describe("run investigation accessibility", () => {
     // The header states which run this is; the verdict states the outcome. Repeating the
     // outcome in both is what made the page read as a status dump.
     expect(markup).not.toContain("Decision: Pass");
+  });
+
+  it("does not present an absent score or safe execution mode as a fabrication pass", () => {
+    const run = sampleRun();
+    run.readinessScore = undefined;
+    const children = createElement(SummaryView, { run });
+    const markup = renderToStaticMarkup(createElement(RunPageFrame, { run, active: "summary", children }));
+    expect(markup).toContain("Not reported");
+    expect(markup).toContain("Readiness score unavailable");
+    expect(markup).toContain("Safe (restricted execution)");
+    expect(markup).toContain("Trust mode describes execution permissions, not whether fabrication checks passed.");
+    expect(markup).toContain("Ready to fabricate");
+  });
+
+  it("does not show a fabrication-ready headline when a passed run lacks a signed result", () => {
+    const run = sampleRun();
+    run.investigationState = "partial_data";
+    const html = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "summary" }, createElement(SummaryView, { run })),
+    );
+    expect(html).toContain("Readiness not verified");
+    expect(html).toContain("This run has partial data");
+    expect(html).toContain("Inspect missing result");
+    expect(html).not.toContain("Ready to fabricate");
   });
 
   it("renders storage-neutral release lineage with explicit missing governance context", () => {

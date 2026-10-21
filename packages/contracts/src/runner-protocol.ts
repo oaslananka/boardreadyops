@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isUnattestedManufacturingArchive } from "./manufacturing-archive-trust.js";
 
 const lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
@@ -216,7 +217,11 @@ export const runnerArtifactDeclarationSchema = z
       .optional(),
     contentType: artifactContentTypeSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (artifact) => !isUnattestedManufacturingArchive(artifact),
+    "runner cannot declare an approved manufacturing archive without an independent attestation",
+  );
 
 export const runnerArtifactCapabilityRequestSchema = runnerLeaseContextSchema
   .extend({

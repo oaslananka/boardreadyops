@@ -27,6 +27,40 @@
 {{/fixFindings}}
 {{/hasFixes}}
 
+{{#hasHardwareImpact}}
+
+## Hardware Change Impact
+
+- Base commit: `{{hardwareImpact.baseSha}}`
+- Candidate commit: `{{hardwareImpact.candidateSha}}`
+{{#hardwareImpact.baselineAvailable}}
+
+### Observed changes
+
+{{#hardwareImpact.conclusionChanged}}
+- Release conclusion: {{hardwareImpact.previousConclusion}} → {{hardwareImpact.currentConclusion}}
+{{/hardwareImpact.conclusionChanged}}
+- Readiness score: {{hardwareImpact.previousScore}} → {{hardwareImpact.currentScore}} ({{hardwareImpact.scoreDelta}})
+- Findings: {{hardwareImpact.findings.added}} added, {{hardwareImpact.findings.resolved}} resolved ({{hardwareImpact.findings.addedBlocking}} new blockers, {{hardwareImpact.findings.resolvedBlocking}} resolved blockers)
+{{#hardwareImpact.hasSeverityChanges}}
+- Severity changes: {{hardwareImpact.severityWorsened}} worsened, {{hardwareImpact.severityImproved}} improved
+{{/hardwareImpact.hasSeverityChanges}}
+- BOM: {{hardwareImpact.bom.added}} added, {{hardwareImpact.bom.removed}} removed, {{hardwareImpact.bom.changed}} changed
+- Manufacturing outputs: {{hardwareImpact.manufacturing.outputsAdded}} added, {{hardwareImpact.manufacturing.outputsRemoved}} removed, {{hardwareImpact.manufacturing.outputsChanged}} changed
+
+### Derived impact
+
+- Risk direction: {{hardwareImpact.riskDirection}}
+- Material change: {{hardwareImpact.materialChange}}
+- Affected domains: {{hardwareImpact.affectedDomains}}
+
+_This is a deterministic PR impact summary, not fabrication authorization._
+{{/hardwareImpact.baselineAvailable}}
+{{^hardwareImpact.baselineAvailable}}
+
+**Exact-base comparison unavailable.** A trustworthy material-change or risk delta cannot be inferred without an eligible baseline.
+{{/hardwareImpact.baselineAvailable}}
+{{/hasHardwareImpact}}
 {{#hasFabricationDiff}}
 ## {{labels.fabricationChanges}}
 

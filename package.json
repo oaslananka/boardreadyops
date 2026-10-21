@@ -1,6 +1,6 @@
 {
   "name": "boardreadyops",
-  "version": "1.68.3",
+  "version": "1.69.0",
   "description": "BoardReadyOps checks KiCad hardware repositories for production readiness before fabrication.",
   "type": "module",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -165,9 +165,10 @@
     "@boardreadyops/contracts": "workspace:*",
     "@boardreadyops/db": "workspace:*",
     "@codecov/bundler-plugin-core": "2.0.1",
+    "@codspeed/vitest-plugin": "^5.7.1",
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
-    "@modelcontextprotocol/sdk": "1.31.0",
+    "@modelcontextprotocol/sdk": "1.32.0",
     "@playwright/test": "1.55.1",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/vitest-runner": "9.6.1",
@@ -204,7 +205,7 @@
     "typedoc": "0.28.20",
     "typedoc-plugin-markdown": "4.12.0",
     "typescript": "6.0.3",
-    "vite": "8.2.1",
+    "vite": "8.2.4",
     "vitest": "4.1.11",
     "zod": "4.4.3"
   },

@@ -95,6 +95,21 @@ describe("ci-risk-profile", () => {
     }
   });
 
+  it("runs visual snapshots only for UI-facing changes while preserving report accessibility", () => {
+    const report = classifyChangedFiles(["src/report/review-comment.ts", "packages/contracts/src/index.ts"], {
+      eventName: "pull_request",
+    });
+    expect(report.needs_accessibility).toBe(true);
+    expect(report.needs_coverage).toBe(true);
+    expect(report.needs_visual).toBe(false);
+
+    for (const file of ["apps/web/app/page.tsx", "apps/web/components/review-detail.tsx", "tests/e2e/visual.spec.ts"]) {
+      expect(classifyChangedFiles([file], { eventName: "pull_request" }).needs_visual, file).toBe(true);
+    }
+    expect(classifyChangedFiles(["src/report/html-render.ts"], { eventName: "pull_request" }).needs_visual).toBe(true);
+    expect(classifyChangedFiles(["docs/readme.md"], { eventName: "push" }).needs_visual).toBe(true);
+  });
+
   it("runs browser and accessibility gates for web UI and e2e changes", () => {
     for (const file of [
       "apps/web/app/setup/page.tsx",

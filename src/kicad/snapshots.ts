@@ -6,6 +6,8 @@ import {
   type SnapshotArtifact,
   type SnapshotFinding,
 } from "@boardreadyops/contracts";
+import { detectKicadCli } from "./cli.js";
+import { exportNativeKicadSnapshots, verifiedNativePcbItemAnchors } from "./native-snapshots.js";
 import { parsePcb } from "./pcb.js";
 import { parseSchematic } from "./schematic.js";
 
@@ -15,6 +17,8 @@ export interface GenerateSnapshotsOptions {
   schematicFiles?: string[];
   pcbFiles?: string[];
   findings?: SnapshotFinding[];
+  /** Explicitly disable native plotting for non-native fixtures or compatibility. */
+  nativeCli?: string | false;
 }
 
 async function renderSchematicFile(file: string, findings?: SnapshotFinding[]): Promise<SnapshotArtifact | undefined> {
@@ -83,18 +87,52 @@ async function renderPcbFile(file: string, findings?: SnapshotFinding[]): Promis
   return artifacts;
 }
 
+async function schematicOrSummary(
+  file: string,
+  cliPath: string | undefined,
+  findings: SnapshotFinding[] | undefined,
+): Promise<SnapshotArtifact[]> {
+  const native = cliPath ? await exportNativeKicadSnapshots(cliPath, file, "schematic").catch(() => []) : [];
+  if (native.length) return native;
+  const summary = await renderSchematicFile(file, findings);
+  return summary ? [summary] : [];
+}
+
+async function pcbOrSummary(
+  file: string,
+  cliPath: string | undefined,
+  findings: SnapshotFinding[] | undefined,
+): Promise<SnapshotArtifact[]> {
+  if (cliPath) {
+    const pcb = await parsePcb(file).catch(() => undefined);
+    const layers = pcb?.plotCopperLayers ?? [];
+    const native = await exportNativeKicadSnapshots(
+      cliPath,
+      file,
+      "pcb_layer",
+      layers.length ? layers : ["F.Cu", "B.Cu"],
+    ).catch(() => []);
+    if (native.length) {
+      const bounds = pcb?.outlineBounds;
+      return bounds && findings?.length
+        ? native.map((snapshot) => ({
+            ...snapshot,
+            anchors: verifiedNativePcbItemAnchors(snapshot, bounds, findings),
+          }))
+        : native;
+    }
+  }
+  return renderPcbFile(file, findings);
+}
+
 export async function generateSnapshots(options: GenerateSnapshotsOptions): Promise<SnapshotArtifact[]> {
-  const artifacts: SnapshotArtifact[] = [];
-
-  for (const file of options.schematicFiles ?? []) {
-    const artifact = await renderSchematicFile(file, options.findings);
-    if (artifact) artifacts.push(artifact);
-  }
-
-  for (const file of options.pcbFiles ?? []) {
-    const pcbArtifacts = await renderPcbFile(file, options.findings);
-    artifacts.push(...pcbArtifacts);
-  }
-
-  return artifacts;
+  const cliPath = typeof options.nativeCli === "string" ? options.nativeCli : undefined;
+  const cli = options.nativeCli === false ? undefined : await detectKicadCli(cliPath);
+  const nativeCliPath = cli?.found ? cli.path : undefined;
+  const schematics = (options.schematicFiles ?? []).map((file) =>
+    schematicOrSummary(file, nativeCliPath, options.findings),
+  );
+  const boards = (options.pcbFiles ?? []).map((file) => pcbOrSummary(file, nativeCliPath, options.findings));
+  const rendered = await Promise.all([...schematics, ...boards]);
+  return rendered.flat().slice(0, 64);
 }

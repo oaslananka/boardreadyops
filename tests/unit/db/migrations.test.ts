@@ -138,8 +138,14 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0085_review_policy_audit_events.sql",
       "0086_github_app_uninstall_export.sql",
       "0087_signed_runner_tool_versions.sql",
-      "0089_pending_stripe_customer_events_index.sql",
-      "0090_stripe_reconciliation_claims.sql",
+      "0088_protected_release_intent_candidates.sql",
+      "0089_protected_release_execution_seals.sql",
+      "0090_protected_release_verified_owner_evidence.sql",
+      "0091_protected_release_seal_evidence_version_guard.sql",
+      "0092_optional_legacy_delivery_archive_url.sql",
+      "0093_explicit_manufacturing_share_authorizations.sql",
+      "0095_pending_stripe_customer_events_index.sql",
+      "0096_stripe_reconciliation_claims.sql",
     ]);
   });
 
