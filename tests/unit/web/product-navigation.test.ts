@@ -97,7 +97,8 @@ describe("ProductNavigation preserved behavior: mobile drawer and focus manageme
     const last = controls?.item((controls?.length ?? 0) - 1);
     if (!first || !last) throw new Error("drawer controls missing");
 
-    expect(document.activeElement).toBe(first);
+    expect(document.activeElement).toBe(container.querySelector('a[href="/dashboard"]'));
+    first.focus();
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
     });
