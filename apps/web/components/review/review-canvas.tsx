@@ -582,9 +582,8 @@ export function ReviewCanvas({
             ))}
           </select>
 
-          <section
+          <fieldset
             className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0"
-            role="group"
             aria-label="Revision comparison modes"
           >
             <button
@@ -636,7 +635,7 @@ export function ReviewCanvas({
             >
               Base Only
             </button>
-          </section>
+          </fieldset>
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-start sm:gap-3">
