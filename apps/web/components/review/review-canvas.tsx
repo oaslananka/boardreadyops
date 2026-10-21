@@ -584,11 +584,13 @@ export function ReviewCanvas({
 
           <section
             className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0"
+            role="group"
             aria-label="Revision comparison modes"
           >
             <button
               type="button"
-              className={modeButtonClass(viewMode === "overlay")}
+              className={modeButtonClass(effectiveViewMode === "overlay")}
+              aria-pressed={effectiveViewMode === "overlay"}
               disabled={!comparable}
               onClick={() => setViewMode("overlay")}
               title="Overlay with opacity slider"
@@ -597,7 +599,8 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={modeButtonClass(viewMode === "split")}
+              className={modeButtonClass(effectiveViewMode === "split")}
+              aria-pressed={effectiveViewMode === "split"}
               disabled={!comparable}
               onClick={() => setViewMode("split")}
               title="Side-by-side comparison"
@@ -606,7 +609,8 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={modeButtonClass(viewMode === "diff")}
+              className={modeButtonClass(effectiveViewMode === "diff")}
+              aria-pressed={effectiveViewMode === "diff"}
               disabled={!comparable}
               onClick={() => setViewMode("diff")}
               title="Difference highlight"
@@ -615,7 +619,8 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={modeButtonClass(viewMode === "head")}
+              className={modeButtonClass(effectiveViewMode === "head")}
+              aria-pressed={effectiveViewMode === "head"}
               onClick={() => setViewMode("head")}
               title="Head revision only"
             >
@@ -623,7 +628,8 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={modeButtonClass(viewMode === "base")}
+              className={modeButtonClass(effectiveViewMode === "base")}
+              aria-pressed={effectiveViewMode === "base"}
               disabled={!baseSrc}
               onClick={() => setViewMode("base")}
               title="Base revision only"
