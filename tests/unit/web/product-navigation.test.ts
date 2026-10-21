@@ -92,7 +92,7 @@ describe("ProductNavigation preserved behavior: mobile drawer and focus manageme
     await act(async () => trigger?.click());
 
     const drawer = container.querySelector("#product-navigation-drawer");
-    const controls = drawer?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])');
+    const controls = drawer?.querySelectorAll<HTMLElement>("a[href], button:not([disabled])");
     const first = controls?.item(0);
     const last = controls?.item((controls?.length ?? 0) - 1);
     if (!first || !last) throw new Error("drawer controls missing");
