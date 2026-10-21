@@ -169,6 +169,7 @@ jobs:
         with:
           languages: javascript-typescript
           build-mode: none
+          config-file: ./.github/codeql/config.yml
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -278,6 +279,30 @@ jobs:
           name: sbom
           path: sbom.cyclonedx.json
           retention-days: 7
+
+  dependency-graph:
+    name: security / dependency graph refresh
+    # Refresh a complete pnpm lock snapshot on main, not a curated CVE subset.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24.21.0"
+          package-manager-cache: false
+      - run: corepack enable
+      - run: node scripts/toolchain.mjs corepack-install
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Submit complete resolved pnpm dependency snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/submit-dependency-snapshot.mjs
 
   scorecard:
     name: security / scorecard advisory
