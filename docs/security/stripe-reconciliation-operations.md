@@ -36,9 +36,11 @@ Operational guarantees and limits:
   `ambiguous_invoice_order`, never silently acknowledged as processed.
   The earlier outcome may still be wrong: reconcile the live provider state
   before granting, revoking, or restoring an entitlement. Same-second
-  subscription changes and multi-subscription precedence still require
-  independently verified provider-state comparison before production billing
-  acceptance.
+  subscription changes are now likewise quarantined as
+  "ambiguous_subscription_order" rather than permitting a same-second overwrite;
+  they still require independently verified provider-state comparison before
+  production billing acceptance. Multi-subscription precedence remains a
+  separate provider-state acceptance gap.
 - Unmapped subscription prices remain pending, not silently acknowledged as
   applied. Fix the mapping first; monitor the pending queue for accumulation.
 - A successful transaction is an internal atomicity guarantee, **not** proof
@@ -67,7 +69,7 @@ blindly replay large batches or manually change customer entitlements. Keep the
 audit trail of the original event and incident outside the public issue/PR.
 
 **Deployment HOLD:** migration 0096 depends on 0095. Before deploying, reconcile
-with the separate, still-Draft legal-hold migration 0088. Stop all legacy
+with the separate, still-HOLD legal-hold migration 0094. Stop all legacy
 inline entitlement-mutating webhook instances before enabling the new worker;
 a mixed-version rollout bypasses the new transactional protocol. Verify schema,
 worker readiness, no legacy writers, replay isolation, alarms, and genuine

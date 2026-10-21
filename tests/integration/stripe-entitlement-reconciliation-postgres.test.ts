@@ -220,6 +220,60 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     expect((await row(paid))?.processed_at).not.toBeNull();
   });
 
+  it("quarantines contradictory same-second subscription updates without changing an entitlement", async () => {
+    const fresh = await enqueue(
+      "subscription_same_second_first",
+      "customer.subscription.updated",
+      subscription(),
+      1_700_003_000,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    const before = rows(
+      await database().query(
+        "SELECT tier, status, last_event_created_at FROM billing_subscriptions WHERE stripe_subscription_id=$1",
+        [subscription().id],
+      ),
+    )[0];
+    expect(before).toMatchObject({ tier: "team", status: "active" });
+
+    const contrary = await enqueue(
+      "subscription_same_second_cancel",
+      "customer.subscription.deleted",
+      { ...subscription(), status: "canceled" },
+      1_700_003_000,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(contrary))?.last_error_class).toBe("ambiguous_subscription_order");
+    expect((await row(contrary))?.processed_at).toBeNull();
+    const after = rows(
+      await database().query(
+        "SELECT tier, status, last_event_created_at FROM billing_subscriptions WHERE stripe_subscription_id=$1",
+        [subscription().id],
+      ),
+    )[0];
+    expect(after).toEqual(before);
+    const customerRows = rows(
+      await database().query("SELECT tier FROM billing_customers WHERE tenant_id=$1", [tenant]),
+    );
+    expect(customerRows[0]?.tier).toBe("team");
+    expect((await row(fresh))?.processed_at).not.toBeNull();
+
+    const old = await enqueue(
+      "subscription_stale_after_conflict",
+      "customer.subscription.deleted",
+      { ...subscription(), status: "canceled" },
+      1_700_002_999,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(old))?.dead_letter_at).toBeNull();
+    const afterOld = rows(
+      await database().query("SELECT tier, status FROM billing_subscriptions WHERE stripe_subscription_id=$1", [
+        subscription().id,
+      ]),
+    )[0];
+    expect(afterOld).toMatchObject({ tier: "team", status: "active" });
+  });
+
   it("rolls back a failed transaction then retries without marking processed", async () => {
     const failure = await enqueue("failed_then_retry", "invoice.payment_failed", { customer }, 1_700_001_200);
     await database().query(

@@ -115,7 +115,10 @@ export class BillingStore {
    *
    * Guarded against out-of-order delivery: `stripe_subscription_id` is the upsert conflict
    * target, and the write only applies when the incoming Stripe event's own `created` timestamp
-   * is at least as new as the last event already applied to that subscription. A tenant that
+   * is strictly newer than the last applied timestamp. Stripe timestamps have
+   * second precision: a second event in that same second has unknown ordering,
+   * so it is NOT applied until independent provider-state reconciliation.
+   * A tenant that
    * has not yet been linked via `linkStripeCustomer` (i.e. `checkout.session.completed` has not
    * been processed yet) yields `applied: false` rather than throwing -- the projection is
    * deferred, not lost, since the underlying event is already durably recorded by `recordEvent`.
@@ -134,7 +137,7 @@ export class BillingStore {
     cancelAtPeriodEnd: boolean;
     trialEndsAt: string | null;
     eventCreatedAt: string;
-  }): Promise<{ tenantId: string | null; applied: boolean }> {
+  }): Promise<{ tenantId: string | null; applied: boolean; conflict?: boolean }> {
     const q = `
       WITH target_customer AS (
         SELECT tenant_id FROM billing_customers WHERE stripe_customer_id = $1
@@ -159,7 +162,7 @@ export class BillingStore {
           last_event_created_at = EXCLUDED.last_event_created_at,
           updated_at = NOW()
         WHERE billing_subscriptions.last_event_created_at IS NULL
-           OR EXCLUDED.last_event_created_at >= billing_subscriptions.last_event_created_at
+           OR EXCLUDED.last_event_created_at > billing_subscriptions.last_event_created_at
         RETURNING tenant_id
       ),
       updated_customer AS (
@@ -198,7 +201,18 @@ export class BillingStore {
       input.trialEndsAt,
     ])) as { rows?: Array<{ tenant_id: string | null; applied: boolean }> };
     const row = r.rows?.[0];
-    return { tenantId: row?.tenant_id ?? null, applied: row?.applied ?? false };
+    if (row?.applied || !row?.tenant_id) {
+      return { tenantId: row?.tenant_id ?? null, applied: row?.applied ?? false };
+    }
+    const existing = (await this.db.query(
+      "SELECT last_event_created_at = $2::timestamptz AS same_second FROM billing_subscriptions WHERE stripe_subscription_id=$1",
+      [input.stripeSubscriptionId, input.eventCreatedAt],
+    )) as { rows?: Array<{ same_second: boolean }> };
+    return {
+      tenantId: row.tenant_id,
+      applied: false,
+      conflict: existing.rows?.[0]?.same_second === true,
+    };
   }
 
   /** Reverses `applyGraceOnPaymentFailure` once an `invoice.paid` event clears the grace period. */

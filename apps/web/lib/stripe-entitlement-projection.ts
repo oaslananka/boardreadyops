@@ -80,6 +80,9 @@ async function projectSubscriptionEvent(
     eventCreatedAt,
   });
   if (result.applied) return { entitlement: "applied", tenantId: result.tenantId, tier: resolved.tier };
+  if (result.conflict) {
+    return { entitlement: "conflict", reason: "ambiguous_subscription_order", tenantId: result.tenantId };
+  }
   return result.tenantId
     ? { entitlement: "ignored", reason: "stale_subscription_event" }
     : { entitlement: "deferred", reason: "customer_not_linked" };

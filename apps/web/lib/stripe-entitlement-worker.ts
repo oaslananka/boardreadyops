@@ -103,12 +103,16 @@ export async function processStripeEntitlementPass(
             return "dead_letter";
           }
           if (projection.entitlement === "conflict") {
-            // Never convert ambiguous same-second invoice outcomes into a
-            // successful entitlement acknowledgement. Await provider-state review.
-            await transaction.query(
-              "UPDATE billing_events SET dead_letter_at=NOW(), last_error_class='ambiguous_invoice_order' WHERE id=$1",
-              [record.id],
-            );
+            // Same-second Stripe subscription AND invoice updates have
+            // unprovable ordering without reading Stripe's current truth.
+            const errorClass =
+              projection.reason === "ambiguous_subscription_order"
+                ? "ambiguous_subscription_order"
+                : "ambiguous_invoice_order";
+            await transaction.query("UPDATE billing_events SET dead_letter_at=NOW(), last_error_class=$2 WHERE id=$1", [
+              record.id,
+              errorClass,
+            ]);
             return "dead_letter";
           }
           if (projection.entitlement === "deferred") {
