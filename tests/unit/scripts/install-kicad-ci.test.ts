@@ -16,6 +16,8 @@ const sudoMock = [
   '    outage) echo "E: Failed to fetch https://ppa.launchpadcontent.net/kicad/kicad-10.0-releases/ubuntu/dists/noble/InRelease 503 Service Unavailable" >&2; exit 100;;',
   '    signature) echo "GPG error: NO_PUBKEY for KiCad 10 PPA" >&2; exit 100;;',
   '    unrelated) echo "E: Failed to fetch https://packages.example.net/not-kicad/InRelease 503 Service Unavailable" >&2; exit 100;;',
+  '    mixed) echo "Hit:1 https://ppa.launchpadcontent.net/kicad/kicad-10.0-releases/ubuntu noble InRelease" >&2; echo "E: Failed to fetch https://packages.example.net/not-kicad/InRelease 503 Service Unavailable" >&2; exit 100;;',
+  '    multiline) printf "Err:4 https://ppa.launchpadcontent.net/kicad/kicad-10.0-releases/ubuntu noble InRelease\n  503 Service Unavailable\n" >&2; exit 100;;',
   "  esac",
   "fi",
   'if [[ "$1" == "apt-get" && "$2" == "install" && "$BRO_MOCK_APT_MODE" == "deb_outage" ]]; then',
@@ -132,10 +134,35 @@ describe.runIf(process.platform === "linux")("Linux KiCad 10 signed PPA with off
     }
   });
 
+  it("recognizes the KiCad PPA's multiline APT 503 error without weakening verification", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_APT_MODE: "multiline" });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
+      const log = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
+      expect(log).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
   it("never substitutes OCI for a different APT repository's HTTP 503", async () => {
     const f = await fixture();
     try {
       const result = execute({ ...f.env, BRO_MOCK_APT_MODE: "unrelated" });
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toContain("non-KiCad source failed");
+      expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a non-KiCad outage even if a successful KiCad PPA URL appears in the same APT log", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_APT_MODE: "mixed" });
       expect(result.status).not.toBe(0);
       expect(result.stdout).toContain("non-KiCad source failed");
       expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);

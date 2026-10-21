@@ -26,8 +26,17 @@ transient_ppa_outage() {
   if grep -Eiq 'NO_PUBKEY|BADSIG|EXPKEYSIG|KEYEXPIRED|GPG error|not signed|signature verification|Hash Sum mismatch|invalid signature' "$log"; then
     return 1
   fi
-  grep -Eq '(ppa\.launchpadcontent\.net|ppa\.launchpad\.net)/kicad/kicad-10\.0-releases' "$log" &&
-    grep -Eiq 'HTTP 5[0-9][0-9]|503|504|Service Unavailable|Gateway Timeout|Connection timed out|Connection failed|Could not connect' "$log"
+  local ppa='(ppa\.launchpadcontent\.net|ppa\.launchpad\.net)/kicad/kicad-10\.0-releases'
+  local transient='HTTP 5[0-9][0-9]|5[0-9][0-9] Service|Service Unavailable|Gateway Timeout|Connection timed out|Connection failed|Could not connect'
+  # Do not infer a KiCad outage from a successful PPA Hit plus another
+  # repository's 503 elsewhere in the same apt-get update output.
+  if grep -Ei "$ppa" "$log" | grep -Eiq "$transient"; then
+    return 0
+  fi
+  # APT also prints multiline errors: "Err:4 https://<PPA> ..." followed by
+  # an indented "503 Service Unavailable" line.
+  grep -E -A1 "^(Err|Ign):[0-9]+ https?://$ppa" "$log" |
+    grep -Eiq "^[[:space:]]+($transient)"
 }
 
 echo '::notice::Attempting signed KiCad 10.0 PPA installation'
