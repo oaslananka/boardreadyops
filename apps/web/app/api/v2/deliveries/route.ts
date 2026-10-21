@@ -1,4 +1,8 @@
-import { WorkspaceStore } from "@boardreadyops/db";
+import {
+  isHttpsDeliveryArchiveUrl,
+  revisionHasManufacturingShareAuthorization,
+  WorkspaceStore,
+} from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest } from "../../../../lib/api-auth.js";
@@ -14,7 +18,11 @@ const createDeliverySchema = z.object({
     .datetime()
     .optional()
     .default(() => new Date(Date.now() + 7 * 86400 * 1000).toISOString()),
-  signedArchiveUrl: z.string().url(),
+  signedArchiveUrl: z
+    .string()
+    .url()
+    .refine(isHttpsDeliveryArchiveUrl, "Use an HTTPS archive URL without embedded credentials.")
+    .optional(),
   recipientNotes: z.string().max(2048).optional(),
 });
 
@@ -68,10 +76,17 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    if (!(await revisionHasManufacturingShareAuthorization(executor, revision.id))) {
+      return Response.json(
+        { ok: false, error: "Explicit owner/admin sharing authorization is required" },
+        { status: 409 },
+      );
+    }
+
     const { delivery, rawToken } = await store.createDeliveryLink({
       revisionId: parsed.data.revisionId,
       expiresAt: parsed.data.expiresAt,
-      signedArchiveUrl: parsed.data.signedArchiveUrl,
+      ...(parsed.data.signedArchiveUrl ? { signedArchiveUrl: parsed.data.signedArchiveUrl } : {}),
       recipientNotes: parsed.data.recipientNotes,
     });
     return Response.json({ ok: true, delivery, rawToken }, { status: 201 });

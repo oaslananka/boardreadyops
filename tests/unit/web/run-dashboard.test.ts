@@ -495,6 +495,7 @@ describe("run dashboard data", () => {
         rows: [
           {
             id: "finding-error",
+            fingerprint: "wire-fingerprint-1",
             rule_id: "error.rule",
             severity: "error",
             message: "Blocking finding",
@@ -585,6 +586,7 @@ describe("run dashboard data", () => {
         findings: [
           {
             id: "finding-error",
+            fingerprint: "wire-fingerprint-1",
             ruleId: "error.rule",
             severity: "error",
             waivedAt: "2026-07-10T17:00:02.500Z",
@@ -630,6 +632,7 @@ describe("run dashboard data", () => {
     expect(runSql).toContain("last_activity_at");
     expect(findingCountSql).toContain("lower(findings.message)");
     expect(query.mock.calls[1]?.[1]).toEqual(["run-123", "%board\\_100\\%%", "error"]);
+    expect(findingSql).toContain("findings.fingerprint");
     expect(findingSql).toContain("findings.waived_at is not null");
     expect(findingSql).toContain("limit $4");
     expect(findingSql).toContain("offset $5");

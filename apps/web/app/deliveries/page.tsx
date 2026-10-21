@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppShell } from "../../components/app-shell.js";
 import { DeliveryCreateForm } from "../../components/deliveries/delivery-create-form.js";
 import { DeliveryRevokeButton } from "../../components/deliveries/delivery-revoke-button.js";
+import { ManufacturingShareAuthorizationForm } from "../../components/deliveries/manufacturing-share-authorization-form.js";
 import { ValidatedRevisionRegisterForm } from "../../components/deliveries/validated-revision-register-form.js";
 import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
@@ -13,11 +14,17 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../lib/delivery-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
-import { createDeliveryLinkAction, registerValidatedRevisionAction, revokeDeliveryLinkAction } from "./actions.js";
+import {
+  authorizeManufacturingShareAction,
+  createDeliveryLinkAction,
+  registerValidatedRevisionAction,
+  revokeDeliveryLinkAction,
+  revokeManufacturingShareAction,
+} from "./actions.js";
 
 export const metadata: Metadata = {
   title: "Release Deliveries & Fabrication Packages",
-  description: "Cryptographically signed manufacturing release deliveries and guest links.",
+  description: "Token-bound guest access to stored manufacturing release artifacts and integrity checks.",
 };
 
 // Scoped to the viewer's workspace memberships, so it can never be prerendered.
@@ -86,7 +93,10 @@ function revisionColumns(): readonly DataColumn<WorkspaceRevisionRecord>[] {
   ];
 }
 
-function deliveryColumns(canRevoke: boolean): readonly DataColumn<WorkspaceDeliveryRecord>[] {
+function deliveryColumns(
+  canRevoke: boolean,
+  authorizedRevisionIds: readonly string[],
+): readonly DataColumn<WorkspaceDeliveryRecord>[] {
   return [
     {
       id: "revision",
@@ -105,14 +115,21 @@ function deliveryColumns(canRevoke: boolean): readonly DataColumn<WorkspaceDeliv
       cell: (delivery) =>
         deliveryExpired(delivery) ? (
           <StatusBadge value="neutral" label="Expired" />
+        ) : !authorizedRevisionIds.includes(delivery.revisionId) ? (
+          <StatusBadge value="warning" label="Sharing not authorized" />
         ) : (
           <StatusBadge value="success" label="Live" />
         ),
     },
     {
       id: "archive",
-      header: "Archive",
-      cell: (delivery) => <span className="font-mono text-meta break-all">{delivery.signedArchiveUrl}</span>,
+      header: "Legacy reference",
+      cell: (delivery) =>
+        delivery.signedArchiveUrl ? (
+          <span className="font-mono text-meta break-all">{delivery.signedArchiveUrl}</span>
+        ) : (
+          <span className="text-meta text-muted-foreground">First-party artifact</span>
+        ),
     },
     {
       id: "notes",
@@ -177,8 +194,8 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
         <header>
           <h1 className="text-2xl font-bold text-foreground">Release Deliveries</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Guest links that let a manufacturing partner download a signed package without an account. Anyone holding
-            one can open it until it expires, so this is the list of what is currently outstanding.
+            Guest links that let a manufacturing partner download the stored evidence-backed package without an account.
+            Anyone holding one can open it until it expires, so this is the list of what is currently outstanding.
           </p>
         </header>
 
@@ -196,8 +213,18 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                 rows={result.revisions}
                 rowKey={(revision) => revision.id}
                 empty={
-                  <EmptyState title="No package revisions yet">
-                    <p>Register a validated manufacturing archive below when a passing run has produced one.</p>
+                  <EmptyState
+                    title="No package revisions yet"
+                    action={
+                      <Button asChild variant="outline">
+                        <Link href="/runs">Inspect runs</Link>
+                      </Button>
+                    }
+                  >
+                    <p>
+                      Start with a passing run that produced a manufacturing archive. Register its validated evidence
+                      here before sharing.
+                    </p>
                   </EmptyState>
                 }
               />
@@ -216,15 +243,43 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
               </Panel>
             ) : null}
 
+            {(result.selected.role === "owner" || result.selected.role === "admin") &&
+            result.revisions.some((revision) => revision.validationRunId && revision.validationArtifactId) ? (
+              <Panel
+                title="Explicit permission to share"
+                description="Readiness checks are not manufacturing approval. An owner/admin must separately permit
+                  guest sharing for one exact source commit and archive checksum."
+              >
+                <ManufacturingShareAuthorizationForm
+                  revisions={result.revisions.filter(
+                    (revision) => revision.validationRunId && revision.validationArtifactId,
+                  )}
+                  authorizedRevisionIds={result.authorizedRevisionIds ?? []}
+                  approveAction={authorizeManufacturingShareAction}
+                  revokeAction={revokeManufacturingShareAction}
+                />
+              </Panel>
+            ) : null}
+
             <Panel title={result.selected.name} description="Newest first. An expired link stops working on its own.">
               <DataTable
                 caption={`Guest delivery links in ${result.selected.name}`}
-                columns={deliveryColumns(result.selected.role !== "viewer")}
+                columns={deliveryColumns(result.selected.role !== "viewer", result.authorizedRevisionIds ?? [])}
                 rows={result.deliveries}
                 rowKey={(delivery) => delivery.id}
                 empty={
-                  <EmptyState title="No guest links yet">
-                    <p>Links you issue appear here until they expire, so nothing you have handed out is invisible.</p>
+                  <EmptyState
+                    title="No guest links yet"
+                    action={
+                      result.selected.role !== "viewer" &&
+                      result.revisions.some((revision) => revision.validationRunId && revision.validationArtifactId) ? (
+                        <Button asChild variant="outline">
+                          <a href="#share-package">Create a guest link</a>
+                        </Button>
+                      ) : null
+                    }
+                  >
+                    <p>Links you issue appear here until they expire. Only validated revisions can be shared.</p>
                   </EmptyState>
                 }
               />
@@ -258,16 +313,24 @@ function CreatePanel({
   origin: string;
 }>) {
   const validatedRevisions = result.revisions.filter(
-    (revision) => revision.validationRunId !== undefined && revision.validationArtifactId !== undefined,
+    (revision) =>
+      revision.validationRunId !== undefined &&
+      revision.validationArtifactId !== undefined &&
+      (result.authorizedRevisionIds ?? []).includes(revision.id),
   );
 
   if (validatedRevisions.length === 0) {
     return (
-      <Panel title="Share a package">
+      <Panel id="share-package" title="Share a package">
         <Alert tone="info" title="No validated revisions to share yet">
           Run BoardReadyOps on a connected GitHub project until it completes with a passing manufacturing archive, then
           register that artifact as a revision above. Guest links are not issued for revision records without live
           validation evidence.
+          <div className="mt-3">
+            <Button asChild variant="outline">
+              <Link href="/runs">Inspect runs</Link>
+            </Button>
+          </div>
         </Alert>
       </Panel>
     );
@@ -275,6 +338,7 @@ function CreatePanel({
 
   return (
     <Panel
+      id="share-package"
       title="Share a package"
       description="Only validated revisions are selectable. The guest link is shown once and only its hash is stored."
     >
@@ -314,14 +378,39 @@ function DeliveriesUnavailable({ state }: Readonly<{ state: "signed-out" | "not-
     );
   }
 
+  // Existing GitHub reviews do not imply a workspace or a verified manufacturing package.
+  // Keep both journeys accessible without fabricating delivery eligibility.
   return (
-    <Panel title="Deliveries">
-      <EmptyState title="Create a workspace first">
-        <p>Deliveries hang off a project revision, and projects live in a workspace.</p>
-        <Button asChild className="mt-3">
-          <Link href="/projects">Go to Projects</Link>
+    <section className="grid min-w-0 gap-4 lg:grid-cols-2" aria-label="Choose your next delivery step">
+      <Panel
+        title="Review your boards"
+        description="Existing GitHub readiness runs and published Reviews remain available without a CAD workspace."
+      >
+        <p className="text-sm text-muted-foreground">
+          Work through findings and pending decisions before preparing a manufacturing handoff. A Review is not a signed
+          delivery package.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button asChild>
+            <Link href="/reviews">Open Reviews</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/runs">Browse runs</Link>
+          </Button>
+        </div>
+      </Panel>
+      <Panel
+        title="Prepare a manufacturing delivery"
+        description="Delivery links require a CAD workspace project revision and a validated manufacturing archive from a passing run."
+      >
+        <p className="text-sm text-muted-foreground">
+          Creating a workspace alone does not approve a design or issue a guest link. Register eligible evidence before
+          sharing a package with a manufacturing partner.
+        </p>
+        <Button asChild className="mt-4">
+          <Link href="/projects">Set up a CAD workspace</Link>
         </Button>
-      </EmptyState>
-    </Panel>
+      </Panel>
+    </section>
   );
 }

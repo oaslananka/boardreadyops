@@ -114,6 +114,44 @@ describe("checkoutRunnerSource", () => {
     await expect(readdir(root)).resolves.toEqual([]);
   });
 
+  it("does not create a workspace or run Git for an already aborted checkout", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-preaborted-source-"));
+    roots.push(root);
+    const controller = new AbortController();
+    controller.abort();
+    const execute = vi.fn<RunnerCommandExecutor>();
+
+    await expect(
+      checkoutRunnerSource({ job: job(), workspaceRoot: root, execute, signal: controller.signal }),
+    ).rejects.toThrow();
+    expect(execute).not.toHaveBeenCalled();
+    await expect(readdir(root)).resolves.toEqual([]);
+  });
+
+  it("aborts an in-progress Git fetch and removes its workspace", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-aborted-fetch-"));
+    roots.push(root);
+    const controller = new AbortController();
+    const execute: RunnerCommandExecutor = vi.fn(async (_command, args, commandOptions) => {
+      if (args.includes("fetch")) {
+        expect(commandOptions.signal).toBe(controller.signal);
+        return await new Promise<never>((_resolve, reject) => {
+          commandOptions.signal?.addEventListener("abort", () => reject(new Error("git fetch aborted")), {
+            once: true,
+          });
+          queueMicrotask(() => controller.abort());
+        });
+      }
+      return { stdout: args.includes("rev-parse") ? commitSha : "", stderr: "" };
+    });
+
+    await expect(
+      checkoutRunnerSource({ job: job(), workspaceRoot: root, execute, signal: controller.signal }),
+    ).rejects.toThrow(/aborted/u);
+    expect(controller.signal.aborted).toBe(true);
+    await expect(readdir(root)).resolves.toEqual([]);
+  });
+
   it("fails closed when the checked-out SHA differs from the assignment", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-source-"));
     roots.push(root);

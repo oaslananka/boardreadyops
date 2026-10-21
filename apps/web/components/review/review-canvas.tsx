@@ -7,6 +7,8 @@ import type { DemoComment, DemoFinding } from "../../lib/demo-data.js";
 export interface ReviewCanvasProps {
   headSnapshots: SnapshotArtifact[];
   baseSnapshots?: SnapshotArtifact[];
+  /** Use a shorter preview before the finding list on narrow run-inspection screens. */
+  compactMobile?: boolean;
   findings?: DemoFinding[];
   comments?: DemoComment[];
   selectedFindingFingerprint?: string | undefined;
@@ -16,6 +18,64 @@ export interface ReviewCanvasProps {
 }
 
 export type ViewMode = "head" | "base" | "overlay" | "diff" | "split";
+
+function svgViewBox(snapshot: SnapshotArtifact): number[] | undefined {
+  if (snapshot.format !== "svg" || typeof snapshot.content !== "string") return undefined;
+  const opening = /<svg\b[^>]*>/isu.exec(snapshot.content)?.[0];
+  const values = opening
+    ?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]
+    ?.trim()
+    .split(/\s+/u)
+    .map(Number);
+  return values?.length === 4 && values.every(Number.isFinite) ? values : undefined;
+}
+
+/** Visual subtraction requires the same image coordinate frame. */
+export function comparableReviewSnapshots(base?: SnapshotArtifact, head?: SnapshotArtifact): boolean {
+  if (
+    !base ||
+    !head ||
+    base.kind !== head.kind ||
+    base.format !== head.format ||
+    base.sheetOrLayer !== head.sheetOrLayer
+  )
+    return false;
+  const before = svgViewBox(base);
+  const after = svgViewBox(head);
+  if (before || after)
+    return Boolean(before && after && before.every((value, i) => Math.abs(value - (after[i] ?? NaN)) < 0.000001));
+  return base.width === head.width && base.height === head.height;
+}
+
+/** Position an anchor on the rendered image after object-fit:contain letterboxing. */
+export function positionContainedImageAnchor(
+  x: number,
+  y: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+): { x: number; y: number } | undefined {
+  if (
+    [x, y, canvasWidth, canvasHeight, imageWidth, imageHeight].some((n) => !Number.isFinite(n)) ||
+    x < 0 ||
+    x > 1 ||
+    y < 0 ||
+    y > 1 ||
+    canvasWidth <= 0 ||
+    canvasHeight <= 0 ||
+    imageWidth <= 0 ||
+    imageHeight <= 0
+  )
+    return undefined;
+  const scale = Math.min(canvasWidth / imageWidth, canvasHeight / imageHeight);
+  const fittedWidth = imageWidth * scale;
+  const fittedHeight = imageHeight * scale;
+  return {
+    x: ((canvasWidth - fittedWidth) / 2 + x * fittedWidth) / canvasWidth,
+    y: ((canvasHeight - fittedHeight) / 2 + y * fittedHeight) / canvasHeight,
+  };
+}
 
 function toImageSrc(content?: string): string {
   if (!content) return "";
@@ -33,10 +93,50 @@ function markerSeverityClass(severity: string): string {
   return "bg-warning text-white";
 }
 
+/** Group native DRC references to the same physical object and image point. */
+export function groupNativeSourceAnchors(anchors: readonly CanvasAnchor[]): Map<string, CanvasAnchor[]> {
+  const grouped = new Map<string, CanvasAnchor[]>();
+  for (const anchor of anchors) {
+    const key = nativeAnchorKey(anchor);
+    if (!key) continue;
+    const group = grouped.get(key);
+    if (group) group.push(anchor);
+    else grouped.set(key, [anchor]);
+  }
+  return grouped;
+}
+
+/** A repeated click cycles through the distinct rule findings on one source object. */
+export function nextSourceFindingFingerprint(group: readonly CanvasAnchor[], selected?: string): string | undefined {
+  const options = [
+    ...new Set(
+      group
+        .map((anchor) => anchor.metadata?.fingerprint)
+        .filter((fingerprint): fingerprint is string => typeof fingerprint === "string" && fingerprint.length > 0),
+    ),
+  ];
+  if (!options.length) return undefined;
+  return options[(options.indexOf(selected ?? "") + 1) % options.length];
+}
+
+function nativeAnchorKey(anchor: CanvasAnchor): string | undefined {
+  const sourceUuid = anchor.metadata?.sourceUuid;
+  if (
+    anchor.kind !== "finding" ||
+    anchor.metadata?.provenance !== "kicad-json-object-position" ||
+    typeof sourceUuid !== "string" ||
+    !Number.isFinite(anchor.x) ||
+    !Number.isFinite(anchor.y)
+  )
+    return undefined;
+  return [sourceUuid, anchor.layer ?? "", anchor.x.toFixed(8), anchor.y.toFixed(8)].join(":");
+}
+
 interface CanvasMarkersProps {
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
   comments: DemoComment[];
+  markerCanvas?: { canvasWidth: number; canvasHeight: number; imageWidth: number; imageHeight: number } | undefined;
   selectedFindingFingerprint?: string | undefined;
   onSelectFinding?: ((fingerprint: string) => void) | undefined;
   onSelectComment?: ((commentId: string) => void) | undefined;
@@ -46,10 +146,23 @@ function CanvasMarkersLayer({
   sheetAnchors,
   relevantFindings,
   comments,
+  markerCanvas,
   selectedFindingFingerprint,
   onSelectFinding,
   onSelectComment,
 }: Readonly<CanvasMarkersProps>) {
+  const markerPosition = (anchor: CanvasAnchor) =>
+    markerCanvas
+      ? positionContainedImageAnchor(
+          anchor.x,
+          anchor.y,
+          markerCanvas.canvasWidth,
+          markerCanvas.canvasHeight,
+          markerCanvas.imageWidth,
+          markerCanvas.imageHeight,
+        )
+      : undefined;
+  const sourceGroups = groupNativeSourceAnchors(sheetAnchors);
   return (
     <div className="pointer-events-none absolute inset-0">
       {sheetAnchors.map((anchor) => {
@@ -57,20 +170,38 @@ function CanvasMarkersLayer({
           const fp = String(anchor.metadata.fingerprint);
           const isSelected = fp === selectedFindingFingerprint;
           const sev = String(anchor.metadata.severity ?? "warning");
-
+          const position = markerPosition(anchor);
+          const key = nativeAnchorKey(anchor);
+          const group = key ? sourceGroups.get(key) : undefined;
+          if (group && group.length > 1 && group[0]?.id !== anchor.id) return null;
+          const nextFp = nextSourceFindingFingerprint(group ?? [anchor], selectedFindingFingerprint) ?? fp;
+          // Until the real image viewport is measured, native markers are not positioned.
+          if (anchor.metadata.provenance === "kicad-json-object-position" && !position) return null;
           return (
             <button
               type="button"
               key={anchor.id}
+              aria-label={
+                group && group.length > 1
+                  ? (anchor.targetRef ?? "KiCad source object") +
+                    ", " +
+                    group.length +
+                    " source findings; click to cycle"
+                  : undefined
+              }
               className={`${markerBase} ${markerSeverityClass(sev)} pointer-events-auto ${isSelected ? "ring-2 ring-primary" : ""}`}
-              style={{ left: `${anchor.x * 100}%`, top: `${anchor.y * 100}%` }}
+              style={{ left: `${(position?.x ?? anchor.x) * 100}%`, top: `${(position?.y ?? anchor.y) * 100}%` }}
               onClick={(e) => {
                 e.stopPropagation();
-                onSelectFinding?.(fp);
+                onSelectFinding?.(nextFp);
               }}
-              title={`Finding: ${anchor.metadata.ruleId}\n${anchor.metadata.message}`}
+              title={
+                anchor.metadata.provenance === "kicad-json-object-position"
+                  ? `KiCad-reported source object position (not the precise violation): ${anchor.metadata.ruleId}\n${anchor.metadata.message}`
+                  : `Finding: ${anchor.metadata.ruleId}\n${anchor.metadata.message}`
+              }
             >
-              {anchor.targetRef}
+              {anchor.targetRef} {group && group.length > 1 ? <span>({group.length})</span> : null}
             </button>
           );
         }
@@ -79,12 +210,13 @@ function CanvasMarkersLayer({
           const compFinding = relevantFindings.find((f) => f.component === anchor.targetRef);
           if (compFinding) {
             const isSelected = compFinding.fingerprint === selectedFindingFingerprint;
+            const position = markerPosition(anchor);
             return (
               <button
                 type="button"
                 key={anchor.id}
                 className={`${markerBase} ${markerSeverityClass(compFinding.severity)} pointer-events-auto ${isSelected ? "ring-2 ring-primary" : ""}`}
-                style={{ left: `${anchor.x * 100}%`, top: `${anchor.y * 100}%` }}
+                style={{ left: `${(position?.x ?? anchor.x) * 100}%`, top: `${(position?.y ?? anchor.y) * 100}%` }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelectFinding?.(compFinding.fingerprint);
@@ -120,11 +252,58 @@ function CanvasMarkersLayer({
   );
 }
 
-function SplitViewport({ baseSrc, headSrc }: Readonly<{ baseSrc: string; headSrc: string }>) {
+interface SplitViewportProps extends Omit<CanvasMarkersProps, "markerCanvas"> {
+  baseSrc: string;
+  headSrc: string;
+  imageWidth?: number | undefined;
+  imageHeight?: number | undefined;
+}
+
+/**
+ * Each split pane contains its own object-fit viewport. The head marker coordinates
+ * must be fitted to that pane, never the full canvas or the base revision.
+ */
+export function SplitViewport(props: Readonly<SplitViewportProps>) {
+  const {
+    baseSrc,
+    headSrc,
+    imageWidth,
+    imageHeight,
+    sheetAnchors,
+    relevantFindings,
+    comments,
+    selectedFindingFingerprint,
+    onSelectFinding,
+    onSelectComment,
+  } = props;
+  const headPaneRef = useRef<HTMLDivElement | null>(null);
+  const [headPaneSize, setHeadPaneSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const pane = headPaneRef.current;
+    if (!pane || typeof ResizeObserver === "undefined") return;
+    const update = () => {
+      const width = pane.clientWidth;
+      const height = pane.clientHeight;
+      setHeadPaneSize((previous) =>
+        previous.width === width && previous.height === height ? previous : { width, height },
+      );
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, []);
+
+  const markerCanvas =
+    imageWidth && imageHeight && headPaneSize.width && headPaneSize.height
+      ? { canvasWidth: headPaneSize.width, canvasHeight: headPaneSize.height, imageWidth, imageHeight }
+      : undefined;
+
   return (
-    <div className="grid h-full grid-cols-2 gap-2">
-      <div className="relative overflow-hidden rounded-md border border-border bg-muted">
-        <span className="absolute left-2 top-2 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
+    <div className="grid h-full min-w-0 grid-cols-2 gap-2">
+      <div className="relative min-w-0 overflow-hidden rounded-md border border-border bg-muted">
+        <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
           Base Revision
         </span>
         {baseSrc ? (
@@ -135,16 +314,31 @@ function SplitViewport({ baseSrc, headSrc }: Readonly<{ baseSrc: string; headSrc
         )}
       </div>
 
-      <div className="relative overflow-hidden rounded-md border border-border bg-muted">
-        <span className="absolute left-2 top-2 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
+      <div className="relative min-w-0 overflow-hidden rounded-md border border-border bg-muted">
+        <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
           Head Revision
         </span>
-        {headSrc ? (
-          // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
-          <img src={headSrc} alt="Head Revision Snapshot" className="size-full object-contain" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No head snapshot</div>
-        )}
+        <section ref={headPaneRef} className="relative size-full" aria-label="Head revision source markers">
+          {headSrc ? (
+            // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
+            <img src={headSrc} alt="Head Revision Snapshot" className="size-full object-contain" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              No head snapshot
+            </div>
+          )}
+          {headSrc ? (
+            <CanvasMarkersLayer
+              sheetAnchors={sheetAnchors}
+              relevantFindings={relevantFindings}
+              comments={comments}
+              markerCanvas={markerCanvas}
+              selectedFindingFingerprint={selectedFindingFingerprint}
+              onSelectFinding={onSelectFinding}
+              onSelectComment={onSelectComment}
+            />
+          ) : null}
+        </section>
       </div>
     </div>
   );
@@ -158,6 +352,7 @@ function StackedLayersView({
   sheetAnchors,
   relevantFindings,
   comments,
+  markerCanvas,
   selectedFindingFingerprint,
   onSelectFinding,
   onSelectComment,
@@ -169,6 +364,7 @@ function StackedLayersView({
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
   comments: DemoComment[];
+  markerCanvas?: { canvasWidth: number; canvasHeight: number; imageWidth: number; imageHeight: number } | undefined;
   selectedFindingFingerprint?: string | undefined;
   onSelectFinding?: ((fingerprint: string) => void) | undefined;
   onSelectComment?: ((commentId: string) => void) | undefined;
@@ -183,7 +379,9 @@ function StackedLayersView({
           className="absolute inset-0 size-full object-contain"
           style={{
             opacity: viewMode === "overlay" ? 1 - opacity : 1,
-            filter: viewMode === "diff" ? "invert(1) grayscale(1)" : "none",
+            // Difference blending subtracts the original base pixels; inverting
+            // those pixels falsely highlights geometry that has not changed.
+            filter: "none",
           }}
         />
       ) : null}
@@ -202,9 +400,10 @@ function StackedLayersView({
       ) : null}
 
       <CanvasMarkersLayer
-        sheetAnchors={sheetAnchors}
+        sheetAnchors={viewMode === "base" ? [] : sheetAnchors}
         relevantFindings={relevantFindings}
         comments={comments}
+        markerCanvas={markerCanvas}
         selectedFindingFingerprint={selectedFindingFingerprint}
         onSelectFinding={onSelectFinding}
         onSelectComment={onSelectComment}
@@ -216,6 +415,7 @@ function StackedLayersView({
 export function ReviewCanvas({
   headSnapshots,
   baseSnapshots = [],
+  compactMobile = false,
   findings = [],
   comments = [],
   selectedFindingFingerprint,
@@ -224,7 +424,7 @@ export function ReviewCanvas({
   onAddCommentAtPoint,
 }: Readonly<ReviewCanvasProps>) {
   const [selectedSheetOrLayer, setSelectedSheetOrLayer] = useState<string>(headSnapshots[0]?.sheetOrLayer ?? "Main");
-  const [viewMode, setViewMode] = useState<ViewMode>("overlay");
+  const [viewMode, setViewMode] = useState<ViewMode>("head");
   const [opacity, setOpacity] = useState<number>(0.5);
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -233,9 +433,40 @@ export function ReviewCanvas({
   const [hasMoved, setHasMoved] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
-  const currentHeadSnapshot = headSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer) ?? headSnapshots[0];
-  const currentBaseSnapshot = baseSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer) ?? baseSnapshots[0];
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const update = () => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      setCanvasSize((previous) =>
+        previous.width === width && previous.height === height ? previous : { width, height },
+      );
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  // Only a published finding anchor selects a sheet; never infer a location from a
+  // rule message, source filename, or component label.
+  useEffect(() => {
+    if (!selectedFindingFingerprint) return;
+    const linked = headSnapshots.find((snapshot) =>
+      snapshot.anchors.some(
+        (anchor) => anchor.kind === "finding" && anchor.metadata?.fingerprint === selectedFindingFingerprint,
+      ),
+    );
+    if (linked) setSelectedSheetOrLayer(linked.sheetOrLayer);
+  }, [selectedFindingFingerprint, headSnapshots]);
+
+  // Never compare a head layer with an unrelated base layer just because it
+  // happens to be first. An unmatched sheet has no defensible visual diff.
+  const currentHeadSnapshot = headSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer);
+  const currentBaseSnapshot = baseSnapshots.find((s) => s.sheetOrLayer === selectedSheetOrLayer);
 
   const availableSheets = Array.from(
     new Set([...headSnapshots.map((s) => s.sheetOrLayer), ...baseSnapshots.map((s) => s.sheetOrLayer)]),
@@ -310,22 +541,39 @@ export function ReviewCanvas({
 
   const baseSrc = toImageSrc(currentBaseSnapshot?.content);
   const headSrc = toImageSrc(currentHeadSnapshot?.content);
+  const dimensions = currentHeadSnapshot ? svgViewBox(currentHeadSnapshot) : undefined;
+  const imageWidth = dimensions?.[2] ?? currentHeadSnapshot?.width;
+  const imageHeight = dimensions?.[3] ?? currentHeadSnapshot?.height;
+  const markerCanvas =
+    imageWidth && imageHeight && canvasSize.width && canvasSize.height
+      ? { canvasWidth: canvasSize.width, canvasHeight: canvasSize.height, imageWidth, imageHeight }
+      : undefined;
+
+  // Differing SVG viewBox origins and scales cannot be overlaid faithfully.
+  const comparable = comparableReviewSnapshots(currentBaseSnapshot, currentHeadSnapshot);
+  const effectiveViewMode =
+    !baseSrc || (!comparable && (viewMode === "overlay" || viewMode === "diff" || viewMode === "split"))
+      ? "head"
+      : viewMode;
 
   const modeButtonClass = (active: boolean) =>
-    `rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
+    `shrink-0 rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
-      <section className="flex flex-wrap items-center justify-between gap-3" aria-label="Canvas instruments">
-        <div className="flex flex-wrap items-center gap-3">
-          <label htmlFor="sheet-select" className="text-xs text-muted-foreground">
+      <section
+        className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3"
+        aria-label="Canvas instruments"
+      >
+        <div className="flex min-w-0 max-w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+          <label htmlFor="sheet-select" className="sr-only sm:not-sr-only sm:text-xs sm:text-muted-foreground">
             Layer / Sheet:
           </label>
           <select
             id="sheet-select"
             value={selectedSheetOrLayer}
             onChange={(e) => setSelectedSheetOrLayer(e.currentTarget.value)}
-            className="rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground"
+            className="w-full min-w-0 max-w-full rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground sm:w-auto"
           >
             {availableSheets.map((name) => (
               <option key={name} value={name}>
@@ -334,10 +582,14 @@ export function ReviewCanvas({
             ))}
           </select>
 
-          <div className="flex flex-wrap gap-1">
+          <section
+            className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0"
+            aria-label="Revision comparison modes"
+          >
             <button
               type="button"
               className={modeButtonClass(viewMode === "overlay")}
+              disabled={!comparable}
               onClick={() => setViewMode("overlay")}
               title="Overlay with opacity slider"
             >
@@ -346,6 +598,7 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "split")}
+              disabled={!comparable}
               onClick={() => setViewMode("split")}
               title="Side-by-side comparison"
             >
@@ -354,6 +607,7 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "diff")}
+              disabled={!comparable}
               onClick={() => setViewMode("diff")}
               title="Difference highlight"
             >
@@ -370,16 +624,17 @@ export function ReviewCanvas({
             <button
               type="button"
               className={modeButtonClass(viewMode === "base")}
+              disabled={!baseSrc}
               onClick={() => setViewMode("base")}
               title="Base revision only"
             >
               Base Only
             </button>
-          </div>
+          </section>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {viewMode === "overlay" ? (
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-start sm:gap-3">
+          {effectiveViewMode === "overlay" ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Base</span>
               <input
@@ -429,10 +684,17 @@ export function ReviewCanvas({
         </div>
       </section>
 
+      {baseSrc && headSrc && !comparable ? (
+        <p className="rounded-md border border-warning/40 bg-warning-surface p-2 text-xs text-warning" role="status">
+          These revisions have different canvas coordinates or image dimensions. Visual comparison is unavailable;
+          inspect each source revision separately.
+        </p>
+      ) : null}
+
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
-        className={`relative h-96 overflow-hidden rounded-md border border-border bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`relative ${compactMobile ? "h-[19rem]" : "h-[27rem]"} overflow-hidden rounded-md border border-border bg-muted md:h-[34rem] ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -444,17 +706,29 @@ export function ReviewCanvas({
             transformOrigin: "0 0",
           }}
         >
-          {viewMode === "split" ? (
-            <SplitViewport baseSrc={baseSrc} headSrc={headSrc} />
+          {effectiveViewMode === "split" ? (
+            <SplitViewport
+              baseSrc={baseSrc}
+              headSrc={headSrc}
+              imageWidth={imageWidth}
+              imageHeight={imageHeight}
+              sheetAnchors={sheetAnchors}
+              relevantFindings={relevantFindings}
+              comments={comments}
+              selectedFindingFingerprint={selectedFindingFingerprint}
+              onSelectFinding={onSelectFinding}
+              onSelectComment={onSelectComment}
+            />
           ) : (
             <StackedLayersView
-              viewMode={viewMode}
+              viewMode={effectiveViewMode}
               baseSrc={baseSrc}
               headSrc={headSrc}
               opacity={opacity}
               sheetAnchors={sheetAnchors}
               relevantFindings={relevantFindings}
               comments={comments}
+              markerCanvas={markerCanvas}
               selectedFindingFingerprint={selectedFindingFingerprint}
               onSelectFinding={onSelectFinding}
               onSelectComment={onSelectComment}

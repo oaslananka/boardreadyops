@@ -11,19 +11,21 @@ type RunnerCommandResult = {
 export type RunnerCommandExecutor = (
   command: string,
   args: readonly string[],
-  options: { cwd: string; env: NodeJS.ProcessEnv },
+  options: { cwd: string; env: NodeJS.ProcessEnv; signal?: AbortSignal },
 ) => Promise<RunnerCommandResult>;
 
 export type CheckoutRunnerSourceOptions = {
   job: RunnerClaimedJob;
   workspaceRoot: string;
   repositoryMirrorRoot?: string;
+  signal?: AbortSignal;
   execute?: RunnerCommandExecutor;
 };
 
 const maximumCommandOutputBytes = 1024 * 1024;
 
 export async function checkoutRunnerSource(options: CheckoutRunnerSourceOptions): Promise<string> {
+  options.signal?.throwIfAborted();
   if (options.job.sourceMode !== "customer_checkout") {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
@@ -35,11 +37,14 @@ export async function checkoutRunnerSource(options: CheckoutRunnerSourceOptions)
   const workspace = await mkdtemp(path.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
-  const git = async (args: readonly string[]) =>
-    await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
+  const git = async (args: readonly string[]) => {
+    options.signal?.throwIfAborted();
+    return await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
       cwd: workspace,
       env: environment,
+      ...(options.signal ? { signal: options.signal } : {}),
     });
+  };
 
   try {
     if (process.platform !== "win32") await chmod(workspace, 0o700);
@@ -52,6 +57,7 @@ export async function checkoutRunnerSource(options: CheckoutRunnerSourceOptions)
       throw new Error(`checked-out commit did not match the assigned commit: ${resolved}`);
     }
     await git(["remote", "remove", "origin"]);
+    options.signal?.throwIfAborted();
     return workspace;
   } catch (error) {
     await rm(workspace, { recursive: true, force: true });
@@ -62,7 +68,7 @@ export async function checkoutRunnerSource(options: CheckoutRunnerSourceOptions)
 async function executeRunnerCommand(
   command: string,
   args: readonly string[],
-  options: { cwd: string; env: NodeJS.ProcessEnv },
+  options: { cwd: string; env: NodeJS.ProcessEnv; signal?: AbortSignal },
 ): Promise<RunnerCommandResult> {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -70,11 +76,13 @@ async function executeRunnerCommand(
       env: options.env,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      ...(options.signal ? { signal: options.signal } : {}),
     });
     let stdout = "";
     let stderr = "";
     let outputBytes = 0;
     let outputExceeded = false;
+    let abortError: Error | undefined;
     const collect = (current: string, chunk: string): string => {
       outputBytes += Buffer.byteLength(chunk, "utf8");
       if (outputBytes > maximumCommandOutputBytes) {
@@ -92,8 +100,19 @@ async function executeRunnerCommand(
     child.stderr.on("data", (chunk: string) => {
       stderr = collect(stderr, chunk);
     });
-    child.once("error", reject);
+    child.once("error", (error: Error) => {
+      if (options.signal?.aborted) {
+        // Wait until the child has closed before the caller removes its workspace.
+        abortError = error;
+      } else {
+        reject(error);
+      }
+    });
     child.once("close", (code, signal) => {
+      if (abortError) {
+        reject(abortError);
+        return;
+      }
       const result = { stdout, stderr };
       if (outputExceeded) {
         reject(new Error(`${command} output exceeded ${maximumCommandOutputBytes} bytes`));

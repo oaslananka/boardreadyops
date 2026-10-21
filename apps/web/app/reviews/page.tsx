@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
 import { ReviewListFilterBar } from "../../components/review/review-list-filters.js";
 import { ReviewListItem } from "../../components/review/review-list-item.js";
+import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { AppShell, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
@@ -40,7 +42,7 @@ const columns: readonly DataColumn<ReviewListEntry>[] = [
         </Link>
         <div className="mt-0.5 text-meta text-muted-foreground">
           {review.repositoryName}
-          {review.pullRequestNumber === undefined ? "" : ` · PR #${review.pullRequestNumber}`}
+          {(review.pullRequestNumber ?? 0) > 0 ? ` · PR #${review.pullRequestNumber}` : " · Manual review"}
         </div>
       </>
     ),
@@ -82,12 +84,17 @@ function NoMatchingReviews() {
 function NoReviews() {
   return (
     <Panel title="No Reviews">
-      <EmptyState title="No hardware reviews found">
+      <EmptyState
+        title="No hardware reviews found"
+        action={
+          <Button asChild variant="outline">
+            <Link href="/runs">Browse run history</Link>
+          </Button>
+        }
+      >
         <p>Historical Runs remain in run history; this list contains only explicitly published Reviews.</p>
         <p>
-          <Link href="/runs" className="text-primary underline underline-offset-2">
-            Browse run history
-          </Link>
+          Start with a readiness run, then publish a Review from an authorized checkout when it is ready for sign-off.
         </p>
       </EmptyState>
     </Panel>
@@ -122,8 +129,16 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
           <header>
             <h1 className="text-2xl font-bold text-foreground">Hardware Reviews</h1>
           </header>
+          <ReviewEmptyVisualPreview />
           <Panel title="Sign in required">
-            <EmptyState title="Reviews are scoped to your installations">
+            <EmptyState
+              title="Reviews are scoped to your installations"
+              action={
+                <Button asChild>
+                  <a href="/api/auth/github/login">Sign in with GitHub</a>
+                </Button>
+              }
+            >
               <p>Sign in with GitHub so BoardReadyOps knows which repositories you can see.</p>
             </EmptyState>
           </Panel>
@@ -141,7 +156,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
   // The bundled demo reviews carry full finding detail, so they keep the richer card; database
   // rows only have what the listing query selects, which is a table's worth. Both go through the
   // same filter so the two shapes cannot diverge in what a filter means.
-  let reviewsBody = <NoReviews />;
+  let reviewsBody = <ReviewEmptyVisualPreview />;
   let shown = 0;
   if (listing.state === "fixtures") {
     const visible = applyReviewListFilters(listing.reviews, filters);
@@ -185,7 +200,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
           </p>
         </header>
 
-        <ReviewPublishingGuidance />
+        {total > 0 ? <ReviewPublishingGuidance /> : null}
 
         {total > 0 ? (
           <ReviewListFilterBar
@@ -201,6 +216,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
         ) : null}
 
         {reviewsBody}
+        {total === 0 ? <ReviewPublishingGuidance /> : null}
       </main>
     </AppShell>
   );

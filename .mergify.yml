@@ -15,6 +15,9 @@ queue_rules:
   - name: main
     merge_method: squash
     batch_size: 1
+    # Prevent CI-heavy, up-to-date branch refreshes from being dequeued after 1 minute.
+    # This limits waiting only; every existing merge/review check still applies.
+    checks_timeout: 30 min
     queue_conditions:
       - base = main
       - -draft

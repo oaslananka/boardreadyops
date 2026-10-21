@@ -110,6 +110,12 @@ Fixture expectations live under `tests/fixtures/projects/**/expected-findings.js
 When adding or changing a fixture, include the rule coverage reason, expected
 findings, and any generated outputs needed by the rule under test.
 
+Benchmarks live in `tests/benchmark/*.bench.ts`. The `codspeed` workflow runs
+them on every pull request and push to `main` with CodSpeed's CPU simulation
+instrument and reports regressions on the pull request. To measure locally with
+the same instrument, install the [CodSpeed CLI](https://codspeed.io/docs/cli)
+and run `codspeed run --mode simulation -- corepack pnpm exec vitest bench --run`.
+
 ## Adding A Rule
 
 Follow the closest `AGENTS.md` file before editing rule code. Rule changes

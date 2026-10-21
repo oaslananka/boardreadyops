@@ -8,6 +8,9 @@ const listDeliveriesByWorkspace = vi.fn();
 const listRevisionsByWorkspace = vi.fn();
 const listValidatedRevisionCandidatesByWorkspace = vi.fn();
 const close = vi.fn();
+// The listing also asks PostgreSQL for currently authorized revisions; keep
+// this tenant-scoped branch explicit rather than returning undefined rows.
+const authorizedRevisionsQuery = vi.fn(async () => ({ rows: [{ revision_id: "rev_1" }] }));
 
 vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -21,7 +24,15 @@ vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
 }));
 
 vi.mock("../../../packages/db/src/pg-executor.js", () => ({
-  createPgQueryExecutor: vi.fn(() => ({ query: vi.fn(), close })),
+  createPgQueryExecutor: vi.fn(() => ({
+    query: (sql: string, params: readonly unknown[]) => {
+      if (sql.includes("from manufacturing_share_authorizations as share")) {
+        return authorizedRevisionsQuery(sql, params);
+      }
+      throw new Error(`Unexpected delivery listing SQL: ${sql}`);
+    },
+    close,
+  })),
 }));
 
 const session: UserSession = {
@@ -78,6 +89,11 @@ describe("loadWorkspaceDeliveries", () => {
     expect(listDeliveriesByWorkspace).toHaveBeenCalledWith("ws_b", 25, 0);
     expect(listRevisionsByWorkspace).toHaveBeenCalledWith("ws_b");
     expect(listValidatedRevisionCandidatesByWorkspace).toHaveBeenCalledWith("ws_b");
+    expect(authorizedRevisionsQuery).toHaveBeenCalledWith(
+      expect.stringContaining("from manufacturing_share_authorizations as share"),
+      ["ws_b"],
+    );
+    expect(result.state === "ok" && result.authorizedRevisionIds).toEqual(["rev_1"]);
   });
 
   it("keys the workspace list on the viewer's login", async () => {

@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { isUnattestedManufacturingArchive } from "./manufacturing-archive-trust.js";
 import { artifactContentTypeSchema, runnerLeaseContextSchema } from "./runner-protocol.js";
 
 export * from "./billing.js";
 export * from "./evidence-ledger.js";
 export * from "./external-review.js";
+export * from "./manufacturing-archive-trust.js";
 export * from "./multicad.js";
 export * from "./policy.js";
 export * from "./review.js";
@@ -263,6 +265,15 @@ export const hardwareImpactV1Schema = z
             previousStatus: hardwareImpactReadinessStatusSchema.nullable(),
             currentStatus: hardwareImpactReadinessStatusSchema.nullable(),
             statusChanged: z.boolean(),
+            // Optional without a default so parsing legacy signed results preserves their digest.
+            conclusion: z
+              .object({
+                previous: z.enum(["passed", "failed"]).nullable(),
+                current: z.enum(["passed", "failed"]).nullable(),
+                changed: z.boolean(),
+              })
+              .strict()
+              .optional(),
           })
           .strict(),
         findings: z
@@ -271,6 +282,9 @@ export const hardwareImpactV1Schema = z
             resolved: hardwareImpactCountSchema,
             addedBlocking: hardwareImpactCountSchema,
             resolvedBlocking: hardwareImpactCountSchema,
+            // Optional without a default: legacy signed results must retain their original digest.
+            worsened: hardwareImpactCountSchema.optional(),
+            improved: hardwareImpactCountSchema.optional(),
           })
           .strict(),
         bom: z
@@ -328,7 +342,15 @@ const releaseRunResultBaseSchema = z
     conclusion: releaseRunConclusionSchema.optional(),
     decision: releaseDecisionSchema.nullable(),
     findings: z.array(findingSchema).max(500).default([]),
-    artifacts: z.array(releaseRunArtifactSchema).max(100).default([]),
+    artifacts: z
+      .array(
+        releaseRunArtifactSchema.refine(
+          (artifact) => !isUnattestedManufacturingArchive(artifact),
+          "runner cannot declare an approved manufacturing archive without an independent attestation",
+        ),
+      )
+      .max(100)
+      .default([]),
     metrics: releaseRunMetricsSchema.default({}),
     // Optional producer-observed versions; older v1 results have no such metadata.
     toolVersions: z

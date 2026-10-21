@@ -130,6 +130,14 @@ certificate also binds the expected repository ID, workflow, source commit,
 ref, event, run/attempt, and the signed statement includes **exactly** the
 manifest and every actual output hash, with no duplicates or extra subjects.
 
+Signing checksum preparation also re-verifies the complete source fingerprint
+and generated-output inventory **after hashing the subjects**, and re-hashes the
+manifest before returning. It refuses a source mutation, unlisted output, or
+manifest edit observed across the preparation window. This is a local
+pre-signing integrity check, **not** a workspace lock: the authorized runner
+must still keep its checkout and output directory quiescent through the actual
+OIDC signing call.
+
 After the external `gh attestation verify` process completes, the local
 verifier **re-reads the pinned source and full output inventory** and refuses an
 eligible result if files were added, removed, modified or replaced while the

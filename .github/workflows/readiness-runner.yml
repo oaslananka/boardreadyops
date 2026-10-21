@@ -352,9 +352,9 @@ jobs:
 
             const audience = `boardreadyops-cloud:${runId}:${executionAttemptId}:${targetSha}:${trustMode}:${safeModeReasons || "none"}`;
             const oidcToken = await core.getIDToken(audience);
-            let response;
-            for (let attempt = 1; attempt <= 3; attempt += 1) {
-              response = await fetch(resultUrl, {
+            // Keep the OIDC identity and all decision-bearing fields unchanged on retry.
+            const sendResult = () =>
+              fetch(resultUrl, {
                 method: "POST",
                 headers: {
                   authorization: `Bearer ${oidcToken}`,
@@ -364,7 +364,32 @@ jobs:
                 },
                 body: JSON.stringify(payload),
               });
+            let response;
+            for (let attempt = 1; attempt <= 3; attempt += 1) {
+              response = await sendResult();
               if (response.ok) break;
+              // During a rolling upgrade, an older strict v1 receiver does not know
+              // the optional toolVersions field. Retry once without that field only
+              // for its exact 400 validation error, never for authorization failures.
+              if (response.status === 400 && Object.hasOwn(payload, "toolVersions")) {
+                let legacyValidationError = false;
+                try {
+                  const rejection = await response.clone().json();
+                  legacyValidationError =
+                    rejection !== null &&
+                    typeof rejection === "object" &&
+                    !Array.isArray(rejection) &&
+                    Object.keys(rejection).length === 1 &&
+                    rejection.error === "invalid runner result";
+                } catch {
+                  // An unexpected response is never evidence of v1 incompatibility.
+                }
+                if (legacyValidationError) {
+                  delete payload.toolVersions;
+                  response = await sendResult();
+                  if (response.ok) break;
+                }
+              }
               if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
             }
             if (!response?.ok) {

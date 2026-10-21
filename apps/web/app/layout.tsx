@@ -1,26 +1,32 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "../components/theme-provider.js";
 import "./globals.css";
 
-const body = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+// Pinned OFL-licensed WOFF2 assets eliminate remote Google Fonts requests during builds.
+// The previous Inter 400/500/600/700 and JetBrains Mono 400/500/700 weights
+// remain within the variable font ranges; CSS variable names stay unchanged.
+const body = localFont({
+  src: "./fonts/inter-latin-variable-normal.woff2",
+  weight: "100 900",
+  style: "normal",
   variable: "--font-ui-loaded",
   display: "swap",
 });
 
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
+const mono = localFont({
+  src: "./fonts/jetbrains-mono-latin-variable-normal.woff2",
+  weight: "100 800",
+  style: "normal",
   variable: "--font-mono-loaded",
   display: "swap",
 });
 
 /** Reserved for page titles and the wordmark — the one editorial note in an otherwise neutral scale. */
-const display = Instrument_Serif({
-  subsets: ["latin"],
-  weight: ["400"],
+const display = localFont({
+  src: "./fonts/instrument-serif-latin-400-normal.woff2",
+  weight: "400",
+  style: "normal",
   variable: "--font-display-loaded",
   display: "swap",
 });

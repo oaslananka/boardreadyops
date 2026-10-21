@@ -1,4 +1,4 @@
-import type { WorkspaceStore } from "@boardreadyops/db";
+import type { SqlQueryExecutor, WorkspaceStore } from "@boardreadyops/db";
 
 /**
  * Opens a `WorkspaceStore` and its executor together.
@@ -12,7 +12,7 @@ import type { WorkspaceStore } from "@boardreadyops/db";
  */
 export async function openWorkspaceStore(
   connectionString: string,
-): Promise<{ store: WorkspaceStore; executor: { close(): Promise<void> } }> {
+): Promise<{ store: WorkspaceStore; executor: SqlQueryExecutor & { close(): Promise<void> } }> {
   const [{ WorkspaceStore: Store }, { createPgQueryExecutor }] = await Promise.all([
     import("@boardreadyops/db"),
     import("@boardreadyops/db/pg-executor"),

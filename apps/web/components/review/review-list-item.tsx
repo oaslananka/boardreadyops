@@ -40,7 +40,7 @@ export function ReviewListItem({
       <div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span>{review.repositoryName}</span>
-          <span>PR #{review.pullRequestNumber}</span>
+          <span>{review.pullRequestNumber > 0 ? `PR #${review.pullRequestNumber}` : "Manual review"}</span>
           <span>Rev {review.currentRevisionSequence}</span>
         </div>
         <h3 className="mt-1 text-sm font-bold text-foreground">{review.title}</h3>
@@ -53,7 +53,8 @@ export function ReviewListItem({
 
       <div className="flex flex-col gap-1 text-xs text-muted-foreground">
         <span>
-          <code>{review.baseCommitSha.slice(0, 7)}</code> → <code>{review.headCommitSha.slice(0, 7)}</code>
+          <code>{/^0+$/u.test(review.baseCommitSha) ? "No base" : review.baseCommitSha.slice(0, 7)}</code> →{" "}
+          <code>{review.headCommitSha.slice(0, 7)}</code>
         </span>
         <span>by {review.createdBy}</span>
       </div>

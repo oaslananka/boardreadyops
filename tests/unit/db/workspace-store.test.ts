@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
-import { WorkspaceStore } from "../../../packages/db/src/workspace-store.js";
+import { isHttpsDeliveryArchiveUrl, WorkspaceStore } from "../../../packages/db/src/workspace-store.js";
 
 class MockWorkspaceDb implements SqlQueryExecutor {
   workspaces: Record<string, unknown>[] = [];
@@ -174,6 +174,21 @@ class MockWorkspaceDb implements SqlQueryExecutor {
       return { rows: [row] };
     }
 
+    // Route the new INSERT .. SELECT through the delivery fixture, not the revision listing stub.
+    if (s.startsWith("insert into deliveries")) {
+      const row = {
+        id: params[0],
+        revision_id: params[1],
+        access_token_hash: params[2],
+        expires_at: params[3],
+        signed_archive_url: params[4],
+        recipient_notes: params[5],
+        created_at: new Date().toISOString(),
+      };
+      this.deliveries.push(row);
+      return { rows: [row] };
+    }
+
     if (s.includes("from revisions") && s.includes("join projects")) {
       const workspaceId = params[0];
       const rows = this.revisions
@@ -185,7 +200,7 @@ class MockWorkspaceDb implements SqlQueryExecutor {
       return { rows };
     }
 
-    if (s.includes("from deliveries") && s.includes("join revisions")) {
+    if (s.includes("from deliveries") && s.includes("join revisions") && !s.includes("access_token_hash = $1")) {
       const workspaceId = params[0];
       const rows = this.deliveries.flatMap((d) => {
         const revision = this.revisions.find((r) => r.id === d.revision_id);
@@ -209,24 +224,13 @@ class MockWorkspaceDb implements SqlQueryExecutor {
     }
 
     // Deliveries
-    if (s.includes("insert into deliveries")) {
-      const row = {
-        id: params[0],
-        revision_id: params[1],
-        access_token_hash: params[2],
-        expires_at: params[3],
-        signed_archive_url: params[4],
-        recipient_notes: params[5],
-        created_at: new Date().toISOString(),
-      };
-      this.deliveries.push(row);
-      return { rows: [row] };
-    }
-
     if (s.includes("from deliveries") && s.includes("access_token_hash = $1")) {
       const hash = params[0] as string;
       const match = this.deliveries.find(
-        (d) => d.access_token_hash === hash && new Date(String(d.expires_at)).getTime() > Date.now(),
+        (d) =>
+          d.access_token_hash === hash &&
+          d.evidence_valid === true &&
+          new Date(String(d.expires_at)).getTime() > Date.now(),
       );
       return { rows: match ? [match] : [] };
     }
@@ -236,6 +240,19 @@ class MockWorkspaceDb implements SqlQueryExecutor {
 }
 
 describe("WorkspaceStore", () => {
+  it("accepts only credential-free HTTPS manufacturing archive locations", () => {
+    expect(isHttpsDeliveryArchiveUrl("https://storage.example.com/bundle.zip?signature=abc")).toBe(true);
+    for (const url of [
+      "javascript:alert(1)",
+      "data:text/plain,untrusted",
+      "file:///etc/passwd",
+      "http://storage.example.com/bundle.zip",
+      "https://user:secret@storage.example.com/bundle.zip",
+      "not-a-url",
+    ]) {
+      expect(isHttpsDeliveryArchiveUrl(url)).toBe(false);
+    }
+  });
   it("creates and retrieves workspaces by slug and id", async () => {
     const db = new MockWorkspaceDb();
     const store = new WorkspaceStore(db);
@@ -410,6 +427,19 @@ describe("WorkspaceStore", () => {
     expect(sql).toContain("artifacts.role = 'manufacturing'");
   });
 
+  it("rejects unsafe archive URLs before a delivery is persisted", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    await expect(
+      store.createDeliveryLink({
+        revisionId: "rev_test",
+        expiresAt: new Date(Date.now() + 60_000),
+        signedArchiveUrl: "javascript:alert(1)",
+      }),
+    ).rejects.toThrow("credential-free HTTPS");
+    expect(db.deliveries).toHaveLength(0);
+  });
+
   it("creates and retrieves delivery links with token hashing and expiration", async () => {
     const db = new MockWorkspaceDb();
     const store = new WorkspaceStore(db);
@@ -426,6 +456,11 @@ describe("WorkspaceStore", () => {
     expect(delivery.accessTokenHash).toBe(createHash("sha256").update(rawToken).digest("hex"));
     expect(delivery.signedArchiveUrl).toBe("https://storage.example.com/archive.zip");
 
+    // A freshly created delivery without validated manufacturing evidence stays inaccessible.
+    expect(await store.getDeliveryByToken(rawToken)).toBeNull();
+    const persisted = db.deliveries.at(0);
+    if (!persisted) throw new Error("Mock delivery was not inserted");
+    persisted.evidence_valid = true; // Simulate validated proof in this SQL stub.
     const resolved = await store.getDeliveryByToken(rawToken);
     expect(resolved).toEqual(delivery);
 

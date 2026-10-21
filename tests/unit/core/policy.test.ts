@@ -184,9 +184,29 @@ describe("policy engine", () => {
     const statusRule = result.rules.find((rule) => rule.id === "status");
     expect(statusRule?.status).toBe("fail");
     expect(statusRule?.message).toContain("No readiness status");
-    // missing readiness => score treated as 0 (below 80) and no outputs known => required outputs pass
+    // Missing readiness means output presence cannot be established, so a required-output gate must fail.
     expect(result.rules.find((rule) => rule.id === "score")?.status).toBe("fail");
-    expect(result.rules.find((rule) => rule.id === "outputs")?.status).toBe("pass");
+    expect(result.rules.find((rule) => rule.id === "outputs")).toMatchObject({
+      status: "fail",
+      message: "Required output presence cannot be verified without readiness data.",
+    });
+  });
+
+  it("fails an enforced required-output policy when readiness evidence is absent", () => {
+    const policy: PolicyConfig = {
+      enforce: true,
+      rules: [{ id: "outputs", type: "require-required-outputs" }],
+    };
+    const result = evaluatePolicy(policy, { summary: summary(), ruleIds: [] });
+    expect(result.status).toBe("fail");
+    expect(result.rules).toEqual([
+      {
+        id: "outputs",
+        type: "require-required-outputs",
+        status: "fail",
+        message: "Required output presence cannot be verified without readiness data.",
+      },
+    ]);
   });
 
   it("uses rule defaults when optional fields are omitted", () => {

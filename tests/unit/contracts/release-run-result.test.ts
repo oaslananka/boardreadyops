@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { releaseRunResultSchema } from "../../../packages/contracts/src/index.js";
+import { hardwareImpactV1Schema, releaseRunResultSchema } from "../../../packages/contracts/src/index.js";
 
 function validHardwareImpact() {
   return {
@@ -38,6 +38,41 @@ function validHardwareImpact() {
 }
 
 describe("release run result contract", () => {
+  it("accepts severity-delta impact counters without rewriting legacy signed evidence", () => {
+    const legacy = validHardwareImpact();
+    const old = hardwareImpactV1Schema.parse(legacy);
+    expect(old.facts.findings).not.toHaveProperty("worsened");
+    const updated = hardwareImpactV1Schema.parse({
+      ...legacy,
+      facts: { ...legacy.facts, findings: { ...legacy.facts.findings, worsened: 1, improved: 0 } },
+    });
+    expect(updated.facts.findings).toMatchObject({ worsened: 1, improved: 0 });
+    expect(JSON.stringify(old)).toBe(JSON.stringify(legacy));
+  });
+
+  it("accepts conclusion-delta facts without materializing fields on legacy signed v1 data", () => {
+    const legacy = validHardwareImpact();
+    const parsedLegacy = hardwareImpactV1Schema.parse(legacy);
+    expect(parsedLegacy.facts.readiness).not.toHaveProperty("conclusion");
+    expect(JSON.stringify(parsedLegacy)).toBe(JSON.stringify(legacy));
+
+    const withConclusion = hardwareImpactV1Schema.parse({
+      ...legacy,
+      facts: {
+        ...legacy.facts,
+        readiness: {
+          ...legacy.facts.readiness,
+          conclusion: { previous: "passed", current: "failed", changed: true },
+        },
+      },
+    });
+    expect(withConclusion.facts.readiness.conclusion).toEqual({
+      previous: "passed",
+      current: "failed",
+      changed: true,
+    });
+  });
+
   it("normalizes the rolling-upgrade payload into contract v1", () => {
     expect(
       releaseRunResultSchema.parse({

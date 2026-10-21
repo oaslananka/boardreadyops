@@ -52,10 +52,14 @@ describe("runner CLI surface", () => {
     expect(await runCli(["runner", "once", "--help"], help)).toBe(0);
     expect(help.stdoutText()).toContain("--artifact-mode <mode>");
     expect(help.stdoutText()).toContain("metadata-only");
+    expect(help.stdoutText()).toContain("customer-managed");
+    expect(help.stdoutText()).toContain("--customer-artifact-root <path>");
 
     const invalid = captureStreams();
     expect(await runCli(["runner", "once", "--artifact-mode", "external-bucket"], invalid)).toBe(2);
-    expect(invalid.stderrText()).toContain("Runner artifact mode must be control-plane or metadata-only");
+    expect(invalid.stderrText()).toContain(
+      "Runner artifact mode must be control-plane, metadata-only or customer-managed",
+    );
   });
 
   it("does not rewrite runner as the default run command", async () => {

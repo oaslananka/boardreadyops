@@ -1,24 +1,10 @@
 import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoReview } from "../../lib/demo-data.js";
 import { Panel } from "../ui.js";
-import { ReviewCanvas } from "./review-canvas.js";
+import { ReviewDesignWorkspace } from "./review-design-workspace.js";
 
 export function ChangesTab({ review }: { readonly review: DemoReview }) {
   const pcbs = review.changedFiles?.filter((f) => f.path.endsWith(".kicad_pcb")) ?? [];
-
-  let canvasContent: React.ReactNode;
-  if (!review.headSnapshots || review.headSnapshots.length === 0) {
-    canvasContent = (
-      <p className="text-sm text-muted-foreground">No schematic or PCB snapshot is available for this revision.</p>
-    );
-  } else {
-    canvasContent = (
-      <ReviewCanvas
-        headSnapshots={review.headSnapshots}
-        {...(review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {})}
-      />
-    );
-  }
 
   let pcbContent: React.ReactNode;
   if (review.changedFiles === undefined) {
@@ -97,25 +83,26 @@ export function ChangesTab({ review }: { readonly review: DemoReview }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <Panel
-        title="Schematic & PCB Canvas"
-        description="Rendered from this revision's actual findings and changed sheets/layers. Pan, zoom, and open a finding marker for detail."
-        tone="raised"
-      >
-        {canvasContent}
-      </Panel>
+      <ReviewDesignWorkspace review={review} />
 
-      <Panel
-        title="PCB Layout & Stackup Changes"
-        description="Copper traces, via placements, and keepout boundary modifications."
-        tone="default"
-      >
-        {pcbContent}
-      </Panel>
+      <details className="rounded-lg border border-border bg-card">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-primary">
+          Technical change details · PCB changes and BOM
+        </summary>
+        <div className="flex flex-col gap-4 p-3">
+          <Panel
+            title="PCB Layout & Stackup Changes"
+            description="Copper traces, via placements, and keepout boundary modifications."
+            tone="default"
+          >
+            {pcbContent}
+          </Panel>
 
-      <Panel title="Bill of Materials (BOM) Delta" tone="default">
-        {bomContent}
-      </Panel>
+          <Panel title="Bill of Materials (BOM) Delta" tone="default">
+            {bomContent}
+          </Panel>
+        </div>
+      </details>
     </div>
   );
 }

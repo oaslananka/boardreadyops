@@ -17,6 +17,10 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(async () => new Map([["host", "boardreadyops.test"]])),
 }));
 
+vi.mock("../../../apps/web/components/deliveries/manufacturing-share-authorization-form.js", () => ({
+  ManufacturingShareAuthorizationForm: () => null,
+}));
+
 const loadWorkspaceDeliveries = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/web/lib/delivery-listing.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -142,6 +146,7 @@ describe("DeliveriesListPage", () => {
       state: "ok",
       workspaces: [workspace],
       selected: workspace,
+      authorizedRevisionIds: ["rev_a"],
       revisionCandidates: [],
       revisions: [{ id: "rev_a", projectName: "Gateway board", revisionLabel: "rev C" }],
       deliveries: [
@@ -164,6 +169,55 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("gateway.zip");
     expect(markup).toContain("Panelised, 2oz copper");
     expect(markup).toContain("Live");
+  });
+
+  it("does not show an unexpired delivery as Live after sharing authorization is revoked", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      authorizedRevisionIds: [],
+      revisionCandidates: [],
+      revisions: [],
+      deliveries: [
+        {
+          id: "del_revoked",
+          revisionId: "rev_revoked",
+          revisionLabel: "rev D",
+          projectId: "prj_revoked",
+          projectName: "Gateway board",
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          createdAt: "2026-10-20T00:00:00.000Z",
+        },
+      ],
+    });
+    const markup = await render();
+    expect(markup).toContain("Sharing not authorized");
+    expect(markup).not.toContain(">Live<");
+  });
+
+  it("renders first-party artifact status for deliveries without a legacy external URL", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [],
+      revisions: [],
+      deliveries: [
+        {
+          id: "del_first_party",
+          revisionId: "rev_ready",
+          revisionLabel: "rev C",
+          projectId: "prj_ready",
+          projectName: "Gateway board",
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          createdAt: "2026-09-07T00:00:00.000Z",
+        },
+      ],
+    });
+    const markup = await render();
+    expect(markup).toContain("First-party artifact");
+    expect(markup).not.toContain("https://storage.example.com");
   });
 
   it("marks a link whose window has closed rather than showing it as live", async () => {
@@ -203,8 +257,37 @@ describe("DeliveriesListPage", () => {
 
     const markup = await render();
     expect(markup).toContain("No validated revisions to share yet");
+    expect(markup).toContain('href="/runs"');
+    expect(markup).toContain("Inspect runs");
     // The form would be a control that cannot succeed, so it is absent rather than disabled.
     expect(markup).not.toContain("Create guest link");
+  });
+
+  it("links an editor with a validated revision to the authorized share form", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [],
+      revisions: [
+        {
+          id: "rev_ready",
+          projectName: "Gateway board",
+          revisionLabel: "rev C",
+          sourceKind: "github_commit",
+          bundleSha256: "a".repeat(64),
+          validationRunId: "run_good",
+          validationArtifactId: "artifact_good",
+        },
+      ],
+      deliveries: [],
+      authorizedRevisionIds: ["rev_ready"],
+    });
+
+    const markup = await render();
+    expect(markup).toContain('href="#share-package"');
+    expect(markup).toContain('id="share-package"');
+    expect(markup).toContain("Create a guest link");
   });
 
   it("offers no create form to a viewer, who is refused server-side anyway", async () => {
@@ -219,6 +302,7 @@ describe("DeliveriesListPage", () => {
 
     const markup = await render();
     expect(markup).not.toContain("Share a package");
+    expect(markup).not.toContain('href="#share-package"');
   });
 
   it("distinguishes signed out from empty", async () => {
@@ -227,6 +311,23 @@ describe("DeliveriesListPage", () => {
 
     expect(markup).toContain("Sign in to see your delivery links");
     expect(markup).not.toContain("No guest links yet");
+  });
+
+  it("offers a review path and an optional workspace path without inventing a delivery", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({ state: "no-workspaces" });
+    const markup = await render();
+
+    expect(markup).toContain("Review your boards");
+    expect(markup).toContain("Prepare a manufacturing delivery");
+    expect(markup).toContain("A Review is not a");
+    expect(markup).toContain("validated manufacturing archive from a passing run");
+    expect(markup).toContain("Creating a workspace alone does not approve");
+    expect(markup).toContain('href="/reviews"');
+    expect(markup).toContain('href="/runs"');
+    expect(markup).toContain('href="/projects"');
+    expect(markup).not.toContain("Create guest link");
+    expect(markup).not.toContain("Create a workspace first");
+    expect(markup).not.toContain("Sign in with GitHub");
   });
 
   it("says the deployment has no database rather than implying nothing was shared", async () => {

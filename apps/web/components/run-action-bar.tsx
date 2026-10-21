@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { Dialog } from "./dialog.js";
 import { Button } from "./ui/button.js";
 
 /**
@@ -64,9 +65,11 @@ export function RunActionBar({
   dispatchBlockedReason,
 }: Readonly<RunActionBarProps>) {
   const [state, setState] = useState<ActionState>({ status: "idle" });
+  const [confirmPreview, setConfirmPreview] = useState(false);
 
   const run = useCallback(
     async (action: "release-preview" | "rerun") => {
+      setConfirmPreview(false);
       setState({ status: "working", action });
       try {
         const response = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}/actions`, {
@@ -112,10 +115,38 @@ export function RunActionBar({
         <Button type="button" size="sm" disabled={disabled} onClick={() => run("rerun")}>
           {working && state.action === "rerun" ? labels.rerun?.pending : "Re-run readiness"}
         </Button>
-        <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => run("release-preview")}>
-          {working && state.action === "release-preview" ? labels["release-preview"]?.pending : "Preview release"}
+        <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => setConfirmPreview(true)}>
+          {working && state.action === "release-preview" ? labels["release-preview"]?.pending : "Queue release preview"}
         </Button>
       </div>
+
+      {hasPullRequest && !dispatchBlockedReason ? (
+        <p className="text-xs text-muted-foreground">
+          Queues a package draft and checklist on the pull request; it does not publish a release.
+        </p>
+      ) : null}
+
+      {confirmPreview ? (
+        <Dialog titleId="release-preview-confirm-title" onClose={() => setConfirmPreview(false)}>
+          <div className="space-y-3 p-5">
+            <h2 id="release-preview-confirm-title" className="text-lg font-semibold text-foreground">
+              Queue release preview on pull request?
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              This sends a request to GitHub Actions and creates a package draft on the pull request. It is not a
+              read-only preview and does not publish a manufacturing release.
+            </p>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+              <Button type="button" variant="secondary" onClick={() => setConfirmPreview(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={() => void run("release-preview")}>
+                Queue preview on pull request
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      ) : null}
 
       {!hasPullRequest ? (
         <p className="text-meta text-muted-foreground">

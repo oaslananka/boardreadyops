@@ -44,12 +44,36 @@ describe("dashboard operational hierarchy", () => {
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).toContain("Engineering status");
     expect(markup).toContain("Repositories with findings");
-    expect(markup).toContain("Supply alerts");
+    expect(markup).toContain("Supply alerts (recorded)");
+    expect(markup).toContain("No stored alerts does not prove that supply monitoring is enabled");
+    expect(markup).toContain("Recorded supply alerts only");
     expect(markup).toContain("No run yet");
     expect(markup).toContain("Supply-tracked boards");
     expect(markup).toContain("A zero does not mean your connected repositories have stopped being checked.");
     expect(markup).not.toContain("this week");
     expect(markup).not.toContain("trend");
+  });
+
+  it("leads with a clearly labeled PCB preview when most repositories have never run", async () => {
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 37,
+      repositoriesWithOpenFindings: 1,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 36,
+      watchedBoards: 0,
+    });
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("Your next hardware review starts with the board");
+    expect(markup).toContain("Example only");
+    expect(markup).toContain('href="/setup"');
+    expect(markup.indexOf("Your next hardware review starts with the board")).toBeLessThan(
+      markup.indexOf("Engineering status"),
+    );
+  });
+
+  it("does not interrupt experienced teams with onboarding visuals", async () => {
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).not.toContain("Your next hardware review starts with the board");
   });
 
   it("renders repository account groups as sections with a wide, scrollable table", async () => {

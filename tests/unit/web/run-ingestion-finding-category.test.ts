@@ -9,6 +9,8 @@ const mockClose = vi.fn();
 vi.mock("@boardreadyops/db/pg-executor", () => ({
   createPgQueryExecutor: vi.fn(() => ({
     query: mockQuery,
+    withTransaction: async (work: (transaction: { query: typeof mockQuery }) => Promise<unknown>) =>
+      await work({ query: mockQuery }),
     close: mockClose,
   })),
 }));
@@ -16,6 +18,8 @@ vi.mock("@boardreadyops/db/pg-executor", () => ({
 vi.mock("../../../packages/db/src/pg-executor.js", () => ({
   createPgQueryExecutor: vi.fn(() => ({
     query: mockQuery,
+    withTransaction: async (work: (transaction: { query: typeof mockQuery }) => Promise<unknown>) =>
+      await work({ query: mockQuery }),
     close: mockClose,
   })),
 }));

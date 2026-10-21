@@ -87,6 +87,40 @@ describe("formatReviewComment", () => {
     expect(body).toContain("[JSON report](https://example/run)");
   });
 
+  it("surfaces stable-fingerprint severity changes in the native PR impact section", () => {
+    const changedImpact = impact();
+    changedImpact.facts.findings = {
+      added: 0,
+      resolved: 0,
+      addedBlocking: 0,
+      resolvedBlocking: 0,
+      worsened: 1,
+      improved: 0,
+    };
+    changedImpact.assessment = { materialChange: true, riskDirection: "increased", affectedDomains: ["findings"] };
+    const body = formatReviewComment({ ...result([]), hardwareImpact: changedImpact });
+    expect(body).toContain("risk increased");
+    expect(body).toContain("severity ↑1 / ↓0");
+  });
+
+  it("shows an observed release conclusion change independently of the readiness score", () => {
+    const changedImpact = impact();
+    changedImpact.facts.readiness = {
+      previousScore: 80,
+      currentScore: 80,
+      scoreDelta: 0,
+      previousStatus: "ready",
+      currentStatus: "ready",
+      statusChanged: false,
+      conclusion: { previous: "passed", current: "failed", changed: true },
+    };
+    changedImpact.assessment = { materialChange: true, riskDirection: "increased", affectedDomains: ["readiness"] };
+    const body = formatReviewComment({ ...result([]), hardwareImpact: changedImpact });
+    expect(body).toContain("Release conclusion: passed → failed");
+    expect(body).toContain("Material change · risk increased · 1 affected domain");
+    expect(body).not.toContain("No supported v1 facts changed.");
+  });
+
   it("renders a by-domain breakdown table when the run result carries one", () => {
     const findings = [
       finding("drc.clearance", "critical", "Clearance violation.", "board.kicad_pcb"),

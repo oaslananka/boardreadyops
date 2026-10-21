@@ -9,6 +9,7 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 [![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
 [![Security](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
+[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/oaslananka/boardreadyops?utm_source=badge)
 
 [![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
 [![npm downloads](https://img.shields.io/npm/dt/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
@@ -41,7 +42,7 @@ Generate → Validate → Decide → Package → Optional Attestation → Review
 npm i -g boardreadyops
 ```
 
-**Repository-prepared version:** `boardreadyops@1.68.3`. This is the package version
+**Repository-prepared version:** `boardreadyops@1.69.0`. This is the package version
 in this source revision, **not evidence that it has been published**.
 Check [npm](https://www.npmjs.com/package/boardreadyops) and
 [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) for the
@@ -112,7 +113,13 @@ boardreadyops release prepare . --profile jlcpcb --output build/release
 # Verify a release bundle and create a vendor handoff package
 boardreadyops release verify build/release
 boardreadyops handoff create build/release --profile jlcpcb
+
+# Optional: export actual Gerber/Excellon bytes as an unsigned, locally verified ZIP
+# Requires KiCad CLI 10, exactly one PCB project and a clean checkout; ignore build/ in Git
+boardreadyops release archive . --reviewed-source-sha "$(git rev-parse HEAD)"
 ```
+
+The `release archive` command verifies local source and output bytes and reports the resulting ZIP checksum. It does **not** produce a trusted workflow attestation, a cryptographic signature, vendor sign-off, or a cloud delivery link.
 
 `npx boardreadyops --help` also works when npm can resolve the package.
 

@@ -1,6 +1,16 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
+/** Only HTTPS, credential-free external archive locations may be exposed to guest recipients. */
+export function isHttpsDeliveryArchiveUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.username.length === 0 && url.password.length === 0;
+  } catch {
+    return false;
+  }
+}
+
 export type WorkspacePlanTier = "community" | "team" | "business" | "pilot";
 
 /** Matches the `workspace_members.role` check constraint in migration 0064. */
@@ -100,7 +110,7 @@ export interface WorkspaceDeliveryRecord {
   projectId: string;
   projectName: string;
   expiresAt: string;
-  signedArchiveUrl: string;
+  signedArchiveUrl?: string | undefined;
   recipientNotes?: string | undefined;
   createdAt: string;
 }
@@ -110,7 +120,7 @@ export interface DeliveryRecord {
   revisionId: string;
   accessTokenHash: string;
   expiresAt: string;
-  signedArchiveUrl: string;
+  signedArchiveUrl?: string | undefined;
   recipientNotes?: string | undefined;
   createdAt: string;
 }
@@ -163,7 +173,7 @@ type DeliveryRow = {
   revision_id: string;
   access_token_hash: string;
   expires_at: string | Date;
-  signed_archive_url: string;
+  signed_archive_url: string | null;
   recipient_notes: string | null;
   created_at: string | Date;
 };
@@ -230,7 +240,7 @@ function mapDelivery(row: DeliveryRow): DeliveryRecord {
     revisionId: row.revision_id,
     accessTokenHash: row.access_token_hash,
     expiresAt: new Date(row.expires_at).toISOString(),
-    signedArchiveUrl: row.signed_archive_url,
+    ...(row.signed_archive_url !== null ? { signedArchiveUrl: row.signed_archive_url } : {}),
     ...(row.recipient_notes !== null ? { recipientNotes: row.recipient_notes } : {}),
     createdAt: new Date(row.created_at).toISOString(),
   };
@@ -851,7 +861,7 @@ export class WorkspaceStore {
         id: string;
         revision_id: string;
         expires_at: string | Date;
-        signed_archive_url: string;
+        signed_archive_url: string | null;
         recipient_notes: string | null;
         created_at: string | Date;
         revision_label: string;
@@ -867,7 +877,7 @@ export class WorkspaceStore {
       projectId: row.project_id,
       projectName: row.project_name,
       expiresAt: new Date(row.expires_at).toISOString(),
-      signedArchiveUrl: row.signed_archive_url,
+      ...(row.signed_archive_url !== null ? { signedArchiveUrl: row.signed_archive_url } : {}),
       ...(row.recipient_notes !== null ? { recipientNotes: row.recipient_notes } : {}),
       createdAt: new Date(row.created_at).toISOString(),
     }));
@@ -906,10 +916,13 @@ export class WorkspaceStore {
     id?: string | undefined;
     revisionId: string;
     expiresAt: Date | string;
-    signedArchiveUrl: string;
+    signedArchiveUrl?: string | undefined;
     recipientNotes?: string | undefined;
     rawToken?: string | undefined;
   }): Promise<{ delivery: DeliveryRecord; rawToken: string }> {
+    if (input.signedArchiveUrl !== undefined && !isHttpsDeliveryArchiveUrl(input.signedArchiveUrl)) {
+      throw new Error("Signed archive URL must be credential-free HTTPS");
+    }
     const id = input.id ?? `del_${randomUUID()}`;
     const rawToken = input.rawToken ?? randomBytes(32).toString("hex");
     const accessTokenHash = createHash("sha256").update(rawToken).digest("hex");
@@ -917,9 +930,29 @@ export class WorkspaceStore {
 
     const result = (await this.executor.query(
       `insert into deliveries (id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes)
-       values ($1, $2, $3, $4, $5, $6)
+       select $1, $2, $3, $4, $5, $6 from revisions as revision
+       join projects as project on project.id = revision.project_id
+       join repositories as repository on
+         lower(repository.owner || '/' || repository.name) = lower(project.github_repo_full_name)
+       join manufacturing_share_authorizations as share
+         on share.revision_id = revision.id
+        and share.revoked_at is null
+        and share.workspace_id = project.workspace_id
+        and share.run_id = revision.validation_run_id
+        and share.artifact_id = revision.validation_artifact_id
+        and share.commit_sha = revision.commit_sha
+        and share.archive_sha256 = revision.bundle_sha256
+       join release_runs as run on run.id = share.run_id
+         and run.repository_id = repository.id
+         and run.status = 'completed' and run.decision = 'pass'
+         and run.completed_at is not null and run.commit_sha = revision.commit_sha
+       join artifacts as artifact on artifact.id = share.artifact_id
+         and artifact.run_id = run.id and artifact.role = 'manufacturing'
+         and artifact.kind = 'archive' and artifact.bytes > 0
+         and artifact.sha256 = revision.bundle_sha256
+       where revision.id = $2
        returning id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes, created_at`,
-      [id, input.revisionId, accessTokenHash, expiresAt, input.signedArchiveUrl, input.recipientNotes ?? null],
+      [id, input.revisionId, accessTokenHash, expiresAt, input.signedArchiveUrl ?? null, input.recipientNotes ?? null],
     )) as { rows?: DeliveryRow[] };
 
     const row = result?.rows?.[0];
@@ -1040,13 +1073,40 @@ export class WorkspaceStore {
   async getDeliveryByToken(rawToken: string): Promise<DeliveryRecord | null> {
     const accessTokenHash = createHash("sha256").update(rawToken).digest("hex");
     const result = (await this.executor.query(
-      `select id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes, created_at
-       from deliveries
-       where access_token_hash = $1 and expires_at > now()`,
+      `select deliveries.id, deliveries.revision_id, deliveries.access_token_hash, deliveries.expires_at,
+              deliveries.signed_archive_url, deliveries.recipient_notes, deliveries.created_at
+         from deliveries
+        where deliveries.access_token_hash = $1
+          and deliveries.expires_at > now()
+          and exists (
+            select 1 from revisions
+            join release_runs on release_runs.id = revisions.validation_run_id
+              and release_runs.status = 'completed'
+              and release_runs.decision = 'pass'
+              and release_runs.completed_at is not null
+            join artifacts on artifacts.id = revisions.validation_artifact_id
+              and artifacts.run_id = release_runs.id
+              and artifacts.role = 'manufacturing'
+              and artifacts.kind = 'archive'
+              and artifacts.bytes > 0
+              and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+            join manufacturing_share_authorizations as share
+              on share.revision_id = revisions.id
+              and share.revoked_at is null
+              and share.run_id = release_runs.id
+              and share.artifact_id = artifacts.id
+              and share.commit_sha = release_runs.commit_sha
+              and share.archive_sha256 = artifacts.sha256
+            where revisions.id = deliveries.revision_id
+              and revisions.bundle_sha256 = artifacts.sha256
+              and revisions.commit_sha = release_runs.commit_sha
+          )`,
       [accessTokenHash],
     )) as { rows?: DeliveryRow[] };
 
     const row = result?.rows?.[0];
-    return row ? mapDelivery(row) : null;
+    return row && (row.signed_archive_url === null || isHttpsDeliveryArchiveUrl(row.signed_archive_url))
+      ? mapDelivery(row)
+      : null;
   }
 }

@@ -34,6 +34,7 @@ jobs:
       needs_cross_platform: ${{ steps.classify.outputs.needs_cross_platform }}
       needs_action_smoke: ${{ steps.classify.outputs.needs_action_smoke }}
       needs_accessibility: ${{ steps.classify.outputs.needs_accessibility }}
+      needs_visual: ${{ steps.classify.outputs.needs_visual }}
       needs_build: ${{ steps.classify.outputs.needs_build }}
       needs_dist: ${{ steps.classify.outputs.needs_dist }}
       needs_coverage: ${{ steps.classify.outputs.needs_coverage }}
@@ -349,9 +350,29 @@ jobs:
       - name: Install KiCad ${{ matrix.kicad-version }}
         run: |
           set -euo pipefail
-          sudo add-apt-repository --yes "ppa:kicad/kicad-${{ matrix.kicad-ppa-series }}-releases"
-          sudo apt-get update -qq
-          sudo apt-get install --yes kicad
+          # Suppress the implicit update; translation indexes are optional.
+          # Launchpad may also return transient HTTP 503 for signed InRelease.
+          # Retry boundedly and never fall back to Ubuntu's older KiCad.
+          sudo add-apt-repository --yes --no-update "ppa:kicad/kicad-${{ matrix.kicad-ppa-series }}-releases"
+          kicad_candidate=""
+          for attempt in 1 2 3 4; do
+            if sudo apt-get update -o Acquire::Languages=none -o APT::Update::Error-Mode=any -o Acquire::Retries=2 -qq; then
+              kicad_candidate="$(apt-cache policy kicad | awk '/Candidate:/ {print $2; exit}')"
+              if [[ "${kicad_candidate}" == "${{ matrix.kicad-version }}".* ]]; then
+                break
+              fi
+            fi
+            if [[ "${attempt}" = 4 ]]; then
+              echo "::error::Signed KiCad ${{ matrix.kicad-version }} package index unavailable (candidate: ${kicad_candidate:-none})"
+              exit 1
+            fi
+            echo "::warning::KiCad ${{ matrix.kicad-version }} package index not ready (attempt ${attempt}/4); retrying"
+            sleep 15
+          done
+          # Integration jobs require kicad-cli, not desktop demos/docs/3D models.
+          # Skip recommended multi-hundred-MB assets to minimize flaky PPA fetches.
+          # Required dependencies and APT signature/hash verification stay enabled.
+          sudo apt-get install --yes --no-install-recommends -o Acquire::Retries=5 kicad
           version="$(kicad-cli version)"
           echo "kicad-cli ${version}"
           if [[ "${version}" != "${{ matrix.kicad-version }}".* ]]; then
@@ -625,14 +646,16 @@ jobs:
   # Visual baselines used to be checked only by qa-nightly. A pull request could therefore
   # change the page and merge with a stale baseline, entirely green, and the failure surfaced
   # the next morning on a run nobody was watching - pointing at a page that was correct. This
-  # runs the same suite at review time, gated on the same signal as the accessibility and
-  # qa-e2e jobs, so it costs nothing on pull requests that do not touch the web UI.
+  # runs the same suite at review time for web-UI-affecting changes, independent
+  # of report-only accessibility checks. Report renderers and wire schemas keep
+  # lint, typecheck, unit, coverage and accessibility checks, but do not gate on
+  # unrelated website fonts/screenshots. Main pushes still run the full suite.
   #
   # Baselines are Linux-only by name (*-chromium-linux.png). Regenerate them with the
   # qa-visual-baselines workflow, never by committing whatever a local run produced.
   visual:
     needs: risk-profile
-    if: needs.risk-profile.outputs.needs_accessibility == 'true'
+    if: needs.risk-profile.outputs.needs_visual == 'true'
     name: ci / visual
     runs-on: ubuntu-24.04
     timeout-minutes: 20

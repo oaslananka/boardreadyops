@@ -1,5 +1,5 @@
-import { generateKeyPairSync } from "node:crypto";
-import { access, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +10,7 @@ import type {
   RunnerTerminalResultRequest,
 } from "../../../packages/contracts/src/index.js";
 import { executeRunnerPipeline } from "../../../src/cli/runner-pipeline.js";
+import { verifyManufacturingDraftReceipt } from "../../../src/runner/draft-attestation.js";
 import type { LoadedRunnerIdentity } from "../../../src/runner/identity.js";
 import {
   type RunnerExecutionOutput,
@@ -378,6 +379,253 @@ describe("runRunnerWorkerOnce", () => {
     );
   });
 
+  it.each([false, true])("stores customer artifacts locally without uploading (safe mode: %s)", async (safeMode) => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-customer-workspace-"));
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-customer-storage-"));
+    roots.push(workspace, storageRoot);
+    const filePath = path.join(workspace, "result.json");
+    await writeFile(filePath, "hello", "utf8");
+    const runnerClient = client(
+      claimedJob(
+        "customer_checkout",
+        safeMode ? { enabled: true, reasons: ["private-repository"] } : { enabled: false, reasons: [] },
+      ),
+    );
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(
+        async (): Promise<RunnerExecutionOutput> => ({
+          exitCode: 0,
+          report: { findings: [], summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 } },
+          artifacts: [
+            {
+              kind: "report/json",
+              name: "boardreadyops-result.json",
+              role: "primary",
+              filePath,
+              bytes: 5,
+              sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+            },
+          ],
+        }),
+      ),
+    });
+
+    const result = await runRunnerWorkerOnce(
+      {
+        identityFile: "/identity/runner.json",
+        runnerVersion: "1.26.1",
+        artifactMode: "customer-managed",
+        customerArtifactRoot: storageRoot,
+      },
+      overrides,
+    );
+    expect(result).toMatchObject({ status: "completed", decision: "pass" });
+    expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+    expect(runnerClient.uploadArtifact).not.toHaveBeenCalled();
+    const output = path.join(storageRoot, runId, attemptId);
+    const manifest = JSON.parse(await readFile(path.join(output, "manifest.json"), "utf8"));
+    expect(manifest).toMatchObject({
+      version: 1,
+      runId,
+      executionAttemptId: attemptId,
+      artifacts: [{ filename: "artifact-001.bin", bytes: 5 }],
+    });
+    await expect(readFile(path.join(output, "artifact-001.bin"), "utf8")).resolves.toBe("hello");
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result).toMatchObject({
+      artifacts: [],
+      metrics: {
+        artifact_mode_customer_managed: 1,
+        artifacts_customer_stored: 1,
+        artifacts_uploaded: 0,
+        artifacts_suppressed: 1,
+      },
+    });
+    expect(terminal?.result).not.toHaveProperty("storagePath");
+    expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
+  });
+
+  it("refuses draft cloud uploads in customer-managed or metadata-only modes before claiming", async () => {
+    for (const artifactMode of ["metadata-only", "customer-managed"] as const) {
+      const runnerClient = client();
+      await expect(
+        runRunnerWorkerOnce(
+          {
+            identityFile: "/identity/runner.json",
+            runnerVersion: "1.26.1",
+            artifactMode,
+            manufacturingDraftUpload: true,
+          },
+          dependencies(runnerClient.value),
+        ),
+      ).rejects.toThrow(/requires control-plane artifacts/);
+      expect(runnerClient.claim).not.toHaveBeenCalled();
+    }
+  });
+
+  it("refuses opt-in draft upload on private or safe-mode jobs before checking out customer sources", async () => {
+    const privateJob = { ...claimedJob(), repository: { ...claimedJob().repository, private: true } };
+    const unsafeJobs = [
+      privateJob,
+      claimedJob("customer_checkout", { enabled: true, reasons: ["draft-pull-request"] }),
+    ];
+    for (const job of unsafeJobs) {
+      const runnerClient = client(job);
+      const overrides = dependencies(runnerClient.value);
+      await expect(
+        runRunnerWorkerOnce(
+          { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", manufacturingDraftUpload: true },
+          overrides,
+        ),
+      ).rejects.toThrow(/refused for private or safe-mode/);
+      expect(overrides.checkoutSource).not.toHaveBeenCalled();
+      expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+      expect(runnerClient.relinquish).toHaveBeenCalledWith(expect.objectContaining({ reason: "job_error" }));
+    }
+  });
+
+  it("uploads an explicitly requested draft only under the draft role via scoped artifact capability", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "bro-runner-draft-publish-"));
+    roots.push(workspace);
+    const filePath = path.join(workspace, "draft.zip");
+    await writeFile(filePath, Buffer.from("PK\x03\x04real generated ZIP fixture"));
+    const bytes = (await readFile(filePath)).byteLength;
+    const sha256 = createHash("sha256")
+      .update(await readFile(filePath))
+      .digest("hex");
+    const runnerClient = client();
+    runnerClient.value.issueArtifactCapabilities = vi.fn(async (request: RunnerArtifactCapabilityRequest) => ({
+      protocolVersion: 1 as const,
+      uploads: request.artifacts.map((artifact, index) => ({
+        artifactId: `0000000${index + 1}-1111-4111-8111-111111111111`,
+        storagePath: `${runId}/${attemptId}/draft-${index}.bin`,
+        uploadUrl: `https://control.example/upload/${index}?cap=${"u".repeat(43)}`,
+        expiresAt: "2026-07-14T02:10:00.000Z",
+        maximumBytes: artifact.bytes,
+      })),
+    }));
+    const pipeline = vi.fn(async () => ({
+      exitCode: 0,
+      report: {
+        summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+        findings: [],
+        readiness: {
+          score: 100,
+          status: "ready",
+          blocking: 0,
+          nonBlocking: 0,
+          missingRequired: [],
+          missingRecommended: [],
+          warnings: [],
+        },
+      },
+      artifacts: [
+        {
+          kind: "archive",
+          name: "draft.zip",
+          role: "draft-manufacturing",
+          filePath,
+          bytes,
+          sha256,
+          contentType: "application/zip",
+        },
+      ],
+    }));
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, { checkoutSource: vi.fn(async () => workspace), executePipeline: pipeline });
+    await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", manufacturingDraftUpload: true },
+      overrides,
+    );
+    expect(pipeline).toHaveBeenCalledWith(
+      workspace,
+      expect.anything(),
+      expect.objectContaining({ manufacturingDraftUpload: true }),
+    );
+    expect(runnerClient.value.uploadArtifact).toHaveBeenCalledTimes(2);
+    const receipt = JSON.parse(await readFile(path.join(workspace, "manufacturing-draft-receipt.json"), "utf8"));
+    expect(verifyManufacturingDraftReceipt(receipt, keys.publicKey)).toBe(true);
+    expect(receipt.payload).toMatchObject({
+      runnerId,
+      runId,
+      executionAttemptId: attemptId,
+      archiveSha256: sha256,
+    });
+    const request = (runnerClient.value.issueArtifactCapabilities as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(request.artifacts).toEqual([
+      expect.objectContaining({ kind: "archive", role: "draft-manufacturing", contentType: "application/zip", sha256 }),
+      expect.objectContaining({ kind: "attestation", role: "draft-provenance", contentType: "application/json" }),
+    ]);
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result.artifacts).toEqual([
+      expect.objectContaining({ role: "draft-manufacturing" }),
+      expect.objectContaining({ role: "draft-provenance" }),
+    ]);
+  });
+
+  it("rejects customer-managed mode without its artifact root before claiming work", async () => {
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    await expect(
+      runRunnerWorkerOnce(
+        { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", artifactMode: "customer-managed" },
+        overrides,
+      ),
+    ).rejects.toThrow(/requires --customer-artifact-root/u);
+    expect(runnerClient.claim).not.toHaveBeenCalled();
+  });
+
+  it("fails closed if customer artifact bytes differ from the declaration", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-customer-tamper-"));
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-customer-tamper-root-"));
+    roots.push(workspace, storageRoot);
+    const filePath = path.join(workspace, "result.json");
+    await writeFile(filePath, "wrong");
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(
+        async (): Promise<RunnerExecutionOutput> => ({
+          exitCode: 0,
+          report: { findings: [] },
+          artifacts: [
+            {
+              kind: "report/json",
+              name: "result.json",
+              role: "primary",
+              filePath,
+              bytes: 5,
+              sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+            },
+          ],
+        }),
+      ),
+    });
+    await expect(
+      runRunnerWorkerOnce(
+        {
+          identityFile: "/identity/runner.json",
+          runnerVersion: "1.26.1",
+          artifactMode: "customer-managed",
+          customerArtifactRoot: storageRoot,
+        },
+        overrides,
+      ),
+    ).rejects.toThrow(/do not match/u);
+    expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+    expect(runnerClient.publishTerminalResult).not.toHaveBeenCalled();
+    expect(runnerClient.relinquish).toHaveBeenCalledWith(expect.objectContaining({ reason: "job_error" }));
+    expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
+    await expect(readdir(path.join(storageRoot, runId))).resolves.toEqual([]);
+  });
+
   it("records explicit metadata-only mode even when no artifacts were generated", async () => {
     const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-metadata-only-empty-"));
     roots.push(workspace);
@@ -620,6 +868,81 @@ notifiers:
     expect(runnerClient.publishTerminalResult).not.toHaveBeenCalled();
   });
 
+  it.each([0, 1])(
+    "never publishes a successful terminal decision without a parseable report (exit code %i)",
+    async (exitCode) => {
+      const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-no-report-"));
+      roots.push(workspace);
+      const runnerClient = client();
+      const overrides = dependencies(runnerClient.value);
+      Object.assign(overrides, {
+        checkoutSource: vi.fn(async () => workspace),
+        executePipeline: vi.fn(async (): Promise<RunnerExecutionOutput> => ({ exitCode, artifacts: [] })),
+      });
+
+      const result = await runRunnerWorkerOnce(
+        { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", artifactMode: "metadata-only" },
+        overrides,
+      );
+
+      expect(result).toMatchObject({ status: "completed", decision: "error" });
+      const terminal = (
+        runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+      )[0]?.[0];
+      expect(terminal?.result).toMatchObject({
+        status: "failed",
+        decision: "error",
+        findings: [{ ruleId: "runner.execution", severity: "error" }],
+      });
+      expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
+      expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not upload generated artifacts when the primary report is missing", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-invalid-report-artifact-"));
+    roots.push(workspace);
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(
+        async (): Promise<RunnerExecutionOutput> => ({
+          exitCode: 0,
+          artifacts: [
+            {
+              kind: "report/markdown",
+              name: "boardreadyops-result.md",
+              role: "summary",
+              filePath: path.join(workspace, "result.md"),
+              bytes: 5,
+              sha256: "a".repeat(64),
+            },
+          ],
+        }),
+      ),
+    });
+
+    const result = await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1" },
+      overrides,
+    );
+
+    expect(result).toMatchObject({ status: "completed", decision: "error" });
+    expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+    expect(runnerClient.uploadArtifact).not.toHaveBeenCalled();
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result).toMatchObject({
+      status: "failed",
+      decision: "error",
+      artifacts: [],
+      metrics: { artifacts_generated: 1, artifacts_uploaded: 0, artifacts_suppressed: 1 },
+    });
+    expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
+  });
+
   it("retains the workspace only when explicitly requested", async () => {
     const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-worker-"));
     roots.push(workspace);
@@ -663,6 +986,29 @@ notifiers:
       execution_attempt_id: attemptId,
       safe_mode_reasons: ["private-repository"],
     });
+  });
+
+  it("propagates shutdown to the source checkout and relinquishes the lease", async () => {
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    const controller = new AbortController();
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async (checkoutOptions: { signal?: AbortSignal }) => {
+        expect(checkoutOptions.signal).toBe(controller.signal);
+        controller.abort();
+        throw new Error("source checkout aborted");
+      }),
+    });
+
+    await expect(
+      runRunnerWorkerOnce(
+        { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", signal: controller.signal },
+        overrides,
+      ),
+    ).rejects.toThrow(/runner shutdown requested/u);
+    expect(runnerClient.relinquish).toHaveBeenCalledWith(expect.objectContaining({ reason: "shutdown" }));
+    expect(overrides.executePipeline).not.toHaveBeenCalled();
+    expect(runnerClient.publishTerminalResult).not.toHaveBeenCalled();
   });
 
   it("aborts in-flight execution, relinquishes the lease for shutdown, and cleans the workspace", async () => {

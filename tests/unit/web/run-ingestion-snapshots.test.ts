@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { POST as postRun } from "../../../apps/web/app/api/v1/runs/route.js";
+import { ingestRunRequestSchema, POST as postRun } from "../../../apps/web/app/api/v1/runs/route.js";
 import * as apiAuth from "../../../apps/web/lib/api-auth.js";
 import * as cloudConfig from "../../../apps/web/lib/cloud-runtime-config.js";
 
@@ -9,6 +9,8 @@ const mockClose = vi.fn();
 vi.mock("@boardreadyops/db/pg-executor", () => ({
   createPgQueryExecutor: vi.fn(() => ({
     query: mockQuery,
+    withTransaction: async (work: (transaction: { query: typeof mockQuery }) => Promise<unknown>) =>
+      await work({ query: mockQuery }),
     close: mockClose,
   })),
 }));
@@ -16,6 +18,8 @@ vi.mock("@boardreadyops/db/pg-executor", () => ({
 vi.mock("../../../packages/db/src/pg-executor.js", () => ({
   createPgQueryExecutor: vi.fn(() => ({
     query: mockQuery,
+    withTransaction: async (work: (transaction: { query: typeof mockQuery }) => Promise<unknown>) =>
+      await work({ query: mockQuery }),
     close: mockClose,
   })),
 }));
@@ -48,6 +52,56 @@ describe("POST /api/v1/runs persists review-canvas snapshots", () => {
     vi.restoreAllMocks();
   });
 
+  it("rejects a forged approved archive in the CLI/Action upload contract", () => {
+    const base = { repositoryId: "oaslananka/hardware", commitSha: "c".repeat(40), ref: "refs/heads/main" };
+    const artifact = {
+      kind: "archive",
+      name: "gerbers.zip",
+      storagePath: "run/gerbers.zip",
+      role: "manufacturing",
+      sha256: "a".repeat(64),
+      bytes: 152,
+    };
+    expect(ingestRunRequestSchema.safeParse({ ...base, artifacts: [artifact] }).success).toBe(false);
+    expect(
+      ingestRunRequestSchema.safeParse({
+        ...base,
+        artifacts: [{ ...artifact, role: "draft-manufacturing" }],
+      }).success,
+    ).toBe(true);
+    expect(
+      ingestRunRequestSchema.safeParse({
+        ...base,
+        artifacts: [{ ...artifact, kind: "bom" }],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("refuses a self-declared approved manufacturing archive before writing a run", async () => {
+    const request = new Request("https://boardreadyops.test/api/v1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        repositoryId: "oaslananka/hardware",
+        commitSha: "a".repeat(40),
+        ref: "refs/heads/main",
+        artifacts: [
+          {
+            kind: "archive",
+            name: "board.zip",
+            storagePath: "run/board.zip",
+            role: "manufacturing",
+            sha256: "b".repeat(64),
+            bytes: 512,
+          },
+        ],
+      }),
+    });
+    const response = await postRun(request);
+    expect(response.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   it("inserts a run_snapshots row for each published review-canvas snapshot", async () => {
     const request = new Request("https://boardreadyops.test/api/v1/runs", {
       method: "POST",
@@ -66,8 +120,8 @@ describe("POST /api/v1/runs persists review-canvas snapshots", () => {
             kind: "schematic",
             format: "svg",
             sheetOrLayer: "board",
-            width: 1200,
-            height: 800,
+            width: 279.4,
+            height: 115.6,
             content: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
             sha256: "f".repeat(64),
             anchors: [],
@@ -89,6 +143,40 @@ describe("POST /api/v1/runs persists review-canvas snapshots", () => {
     expect(params).toContain("schematic_board.svg");
     expect(params).toContain('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
     expect(params).toContain("f".repeat(64));
+    // KiCad SVG viewBox dimensions can be fractional; SQL int4 columns cannot.
+    // Stored dimensions round up without changing source SVG geometry.
+    expect(params[7]).toBe(280);
+    expect(params[8]).toBe(116);
+  });
+
+  it("rejects out-of-range SVG dimensions before inserting any run", async () => {
+    const request = new Request("https://boardreadyops.test/api/v1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        repositoryId: "repo-1",
+        commitSha: "a".repeat(40),
+        ref: "refs/heads/main",
+        triggerKind: "manual",
+        snapshots: [
+          {
+            id: "too-big",
+            name: "pcb.svg",
+            kind: "pcb_layer",
+            format: "svg",
+            sheetOrLayer: "F.Cu",
+            width: 2_147_483_648,
+            height: 100,
+            sha256: "f".repeat(64),
+            anchors: [],
+          },
+        ],
+      }),
+    });
+    const response = await postRun(request);
+    expect(response.status).toBe(400);
+    expect(mockQuery.mock.calls.some(([sql]) => String(sql).includes("insert into release_runs"))).toBe(false);
+    expect(mockQuery.mock.calls.some(([sql]) => String(sql).includes("insert into run_snapshots"))).toBe(false);
   });
 
   it("does not touch run_snapshots when no snapshots are published", async () => {

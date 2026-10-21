@@ -31,9 +31,9 @@ rollout, external object deletion or a compliance signoff.
 
 ## Rollout, rollback and operator recovery
 
-**Never hot-roll** a migration while pre-0088 workers can still physically
+**Never hot-roll** a migration while pre-0094 workers can still physically
 unlink. Quiesce and enumerate every worker/deployment first, including any
-out-of-band host. Verify no unlink remains in flight, apply migration 0088
+out-of-band host. Verify no unlink remains in flight, apply migration 0094
 and then start ONLY the new worker version. Get explicit owner/release and
 security acceptance; the source PR or green CI does not deploy anything.
 

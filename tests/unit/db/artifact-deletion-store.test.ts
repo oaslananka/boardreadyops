@@ -23,7 +23,7 @@ describe("artifact deletion store", () => {
     const sql = String(query.mock.calls[0]?.[0]);
     expect(sql).toContain("boardreadyops_begin_artifact_unlink($1, $2, $3::uuid)");
     const migration = readFileSync(
-      new URL("../../../packages/db/migrations/0088_durable_artifact_unlink_fences.sql", import.meta.url),
+      new URL("../../../packages/db/migrations/0094_durable_artifact_unlink_fences.sql", import.meta.url),
       "utf8",
     );
     expect(migration).toContain("lower(tenant_id) = v_tenant and active = true");

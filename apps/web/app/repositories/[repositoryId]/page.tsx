@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuidedChecklist } from "../../../components/guided-checklist.js";
+import { RunStateIndicators } from "../../../components/run-state-indicators.js";
 import { SupplyFindingAcknowledgeButton } from "../../../components/supply-finding-acknowledge-button.js";
 import { SupplyFindingSuppressionControl } from "../../../components/supply-finding-suppression-control.js";
 import { type DataColumn, DataTable } from "../../../components/ui/data-table.js";
@@ -52,7 +53,11 @@ const runColumns: readonly DataColumn<RunRow>[] = [
       </Link>
     ),
   },
-  { id: "outcome", header: "Outcome", cell: (run) => <StatusBadge value={run.decision ?? run.status} /> },
+  {
+    id: "outcome",
+    header: "Run state",
+    cell: (run) => <RunStateIndicators status={run.status} decision={run.decision} />,
+  },
   {
     id: "ref",
     header: "Ref",

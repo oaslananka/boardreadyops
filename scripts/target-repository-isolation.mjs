@@ -32,6 +32,13 @@ export function validateTargetRepositoryIsolationEvidence(input) {
       "cross-installation callbacks",
     ),
     staleAttemptCallbacksRejected: requiredCount(input, "staleAttemptCallbacksRejected", 1, "stale-attempt callbacks"),
+    exactSignedJwtReplaysAccepted: requiredCount(input, "exactSignedJwtReplaysAccepted", 1, "exact signed JWT replays"),
+    persistedSupersededAttemptRacesRejected: requiredCount(
+      input,
+      "persistedSupersededAttemptRacesRejected",
+      1,
+      "persisted superseded attempt races",
+    ),
     claimMutationCallbacksRejected: requiredCount(
       input,
       "claimMutationCallbacksRejected",
@@ -53,6 +60,33 @@ export function validateTargetRepositoryIsolationEvidence(input) {
     ),
     optionalCommentWarnings: requiredCount(input, "optionalCommentWarnings", 1, "optional comment warnings"),
     responseLeakageFindings: requiredCount(input, "responseLeakageFindings", 0, "response leakage findings"),
+    scopedAuditExports: requiredCount(input, "scopedAuditExports", 2, "scoped audit exports"),
+    deniedForeignAuditReads: requiredCount(input, "deniedForeignAuditReads", 2, "foreign audit reads denied"),
+    auditCanaryLeakageFindings: requiredCount(input, "auditCanaryLeakageFindings", 0, "audit canary leakage findings"),
+    checkRunPublicationLeakageFindings: requiredCount(
+      input,
+      "checkRunPublicationLeakageFindings",
+      0,
+      "Check Run publication leakage findings",
+    ),
+    restrictedAppCheckRunUpdates: requiredCount(
+      input,
+      "restrictedAppCheckRunUpdates",
+      1,
+      "restricted App Check Run updates",
+    ),
+    restrictedAppCommentDenials: requiredCount(
+      input,
+      "restrictedAppCommentDenials",
+      1,
+      "restricted App comment denials",
+    ),
+    restrictedAppWarningPersistence: requiredCount(
+      input,
+      "restrictedAppWarningPersistence",
+      1,
+      "restricted App warning persistence",
+    ),
   };
 }
 
@@ -73,15 +107,17 @@ export function buildTargetRepositoryIsolationReport(input) {
       installations: 2,
       repositories: 2,
       runs: 2,
-      executionAttempts: 2,
+      executionAttempts: 3,
     },
     accepted: {
       independentCallbacks: evidence.independentCallbacksAccepted,
       independentCheckRuns: evidence.independentCheckRunsPublished,
+      exactSignedJwtReplays: evidence.exactSignedJwtReplaysAccepted,
     },
     rejected: {
       crossInstallationCallbacks: evidence.crossInstallationCallbacksRejected,
       staleAttemptCallbacks: evidence.staleAttemptCallbacksRejected,
+      persistedSupersededAttemptRaces: evidence.persistedSupersededAttemptRacesRejected,
       claimMutationCallbacks: evidence.claimMutationCallbacksRejected,
       trustSnapshotCallbacks: evidence.trustSnapshotCallbacksRejected,
     },
@@ -90,6 +126,13 @@ export function buildTargetRepositoryIsolationReport(input) {
       rejectedCallbackPublications: evidence.rejectedCallbackPublications,
       optionalCommentWarnings: evidence.optionalCommentWarnings,
       responseLeakageFindings: evidence.responseLeakageFindings,
+      scopedAuditExports: evidence.scopedAuditExports,
+      deniedForeignAuditReads: evidence.deniedForeignAuditReads,
+      auditCanaryLeakageFindings: evidence.auditCanaryLeakageFindings,
+      checkRunPublicationLeakageFindings: evidence.checkRunPublicationLeakageFindings,
+      restrictedAppCheckRunUpdates: evidence.restrictedAppCheckRunUpdates,
+      restrictedAppCommentDenials: evidence.restrictedAppCommentDenials,
+      restrictedAppWarningPersistence: evidence.restrictedAppWarningPersistence,
     },
   };
 }

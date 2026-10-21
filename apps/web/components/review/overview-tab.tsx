@@ -227,8 +227,8 @@ export function OverviewTab({
 
       {review.effectivePolicy ? (
         <Panel
-          title="Effective Policy & Inheritance"
-          description="The release gate below is resolved from organization defaults plus any repository-level overrides. Each value names the policy layer that supplied it."
+          title="Current configured policy (not a run snapshot)"
+          description="The policy below is resolved from the current organization and repository settings. It is not historical evidence of the policy used for this review revision; a run-bound policy snapshot is not recorded. Sources identify the layer for each displayed field."
           tone="inset"
         >
           <DefinitionGrid>
@@ -281,7 +281,11 @@ export function OverviewTab({
         actions={
           onOpenChanges ? (
             <Button type="button" size="sm" variant="outline" onClick={onOpenChanges}>
-              {hasCanvas(review) ? "Open the visual diff" : "Open Changes"}
+              {hasCanvas(review)
+                ? (review.baseSnapshots?.length ?? 0) > 0
+                  ? "Compare source revisions"
+                  : "Inspect PCB & schematic"
+                : "Open Changes"}
             </Button>
           ) : undefined
         }
@@ -294,7 +298,7 @@ export function OverviewTab({
           <Definition label="Repository">{review.repositoryName}</Definition>
           <Definition label="Author">{review.createdBy}</Definition>
           <Definition label="Base Commit">
-            <code>{review.baseCommitSha}</code>
+            <code>{/^0+$/u.test(review.baseCommitSha) ? "Not recorded" : review.baseCommitSha}</code>
           </Definition>
           <Definition label="Head Commit">
             <code>{review.headCommitSha}</code>

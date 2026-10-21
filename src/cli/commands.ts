@@ -14,6 +14,7 @@ import { type ExportChecksumsCliOptions, exportChecksumsCommand } from "./comman
 import { type FixCliOptions, fixCommand } from "./commands/fix.js";
 import { type GenerateCliOptions, generateCommand } from "./commands/generate.js";
 import { type InitCommandOptions, initCommand } from "./commands/init.js";
+import { type ReleaseArchiveOptions, releaseArchiveCommand } from "./commands/manufacturing-archive.js";
 import { type PlanCliOptions, planCommand } from "./commands/plan.js";
 import { type PolicyCommandOptions, policyCommand } from "./commands/policy.js";
 import {
@@ -149,6 +150,16 @@ export function registerAllCommands(
     .option("--skip-generate", "skip the artifact generation stage")
     .action(async (pathInput: string | undefined, options: ReleasePrepareOptions) => {
       process.exitCode = await releasePrepareCommand(pathInput, options, streams);
+    });
+  release
+    .command("archive")
+    .description("generate an unsigned, locally source-verified KiCad fabrication ZIP")
+    .argument("[path]", "clean KiCad Git checkout")
+    .requiredOption("--reviewed-source-sha <sha>", "exact reviewed Git commit SHA")
+    .option("--generated <path>", "directory for KiCad output files", "build/boardreadyops-manufacturing/outputs")
+    .option("--output <path>", "unsigned manufacturing ZIP path", "build/boardreadyops-manufacturing.zip")
+    .action(async (pathInput: string | undefined, options: ReleaseArchiveOptions) => {
+      process.exitCode = await releaseArchiveCommand(pathInput, options, streams);
     });
   registerHandoffCommand(release.command("handoff").argument("[path]", "directory to scan"));
   addCommonOptions(
@@ -346,13 +357,18 @@ export function registerAllCommands(
       .option("--heartbeat-seconds <seconds>", "lease heartbeat interval", runnerSeconds, 30)
       .option("--poll-seconds <seconds>", "empty-queue and failure retry interval", runnerSeconds, 15)
       .option("--no-require-kicad", "allow execution without kicad-cli")
+      .option(
+        "--manufacturing-draft-upload",
+        "explicitly upload an unsigned, unapproved manufacturing draft for a public non-safe-mode run",
+      )
       .option("--keep-workspace", "retain the checked-out workspace after completion")
       .option(
         "--artifact-mode <mode>",
-        "artifact handling: control-plane or metadata-only",
+        "artifact handling: control-plane, metadata-only or customer-managed",
         runnerArtifactMode,
         "control-plane",
       )
+      .option("--customer-artifact-root <path>", "private customer-owned artifact directory (customer-managed mode)")
       .option("--format <format>", "text or json", runnerOutputFormat, "text");
   addRunnerWorkOptions(runner.command("once").description("claim and process at most one runner job")).action(
     async (options: RunnerWorkCliOptions) => {
@@ -401,6 +417,10 @@ export function registerAllCommands(
       .option("--base <commit>", "base git commit or run id for diff computation")
       .option("--head <commit>", "head git commit (defaults to HEAD)")
       .option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata")
+      .option(
+        "--native-visuals",
+        "explicitly upload KiCad-native PCB/schematic artwork (may disclose detailed design IP)",
+      )
       .option("--dry-run", "simulate review publish without uploading")
       .option("--token <token>", "workspace API token")
       .option("--server <url>", "BoardReadyOps cloud server URL")
@@ -450,8 +470,8 @@ function runnerRevocationReason(value: string): RunnerRevokeRegistrationCliOptio
 }
 
 function runnerArtifactMode(value: string): RunnerWorkCliOptions["artifactMode"] {
-  if (value !== "control-plane" && value !== "metadata-only") {
-    throw new InvalidArgumentError("Runner artifact mode must be control-plane or metadata-only.");
+  if (value !== "control-plane" && value !== "metadata-only" && value !== "customer-managed") {
+    throw new InvalidArgumentError("Runner artifact mode must be control-plane, metadata-only or customer-managed.");
   }
   return value;
 }

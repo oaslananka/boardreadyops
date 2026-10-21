@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   findingSchema,
+  isUnattestedManufacturingArchive,
   releaseRunArtifactSchema,
   snapshotArtifactSchema,
   triggerKindSchema,
@@ -25,11 +26,28 @@ export const ingestRunRequestSchema = z.object({
   decision: z.enum(["pass", "fail", "error"]).optional(),
   title: z.string().max(256).optional(),
   findings: z.array(findingSchema).default([]),
-  artifacts: z.array(releaseRunArtifactSchema).default([]),
+  artifacts: z
+    .array(
+      releaseRunArtifactSchema.refine(
+        (artifact) => !isUnattestedManufacturingArchive(artifact),
+        "unattested manufacturing archives cannot be published as approved",
+      ),
+    )
+    .default([]),
   // Review-canvas snapshots (rendered SVG + finding anchors) from `boardreadyops review publish`;
   // see src/kicad/snapshots.ts::generateSnapshots. Content is inline SVG text, so these ride the
   // same JSON payload as findings rather than going through the binary artifact upload protocol.
-  snapshots: z.array(snapshotArtifactSchema).max(64).default([]),
+  // The snapshot columns are PostgreSQL int4. Accept fractional SVG viewBox
+  // dimensions at the API edge but reject out-of-range values before any write.
+  snapshots: z
+    .array(
+      snapshotArtifactSchema.extend({
+        width: z.number().positive().max(2_147_483_647),
+        height: z.number().positive().max(2_147_483_647),
+      }),
+    )
+    .max(64)
+    .default([]),
   evidenceDigest: z
     .string()
     .regex(/^[0-9a-f]{64}$/u)
@@ -153,8 +171,8 @@ async function insertRunEntities(
         s.kind,
         s.format,
         s.sheetOrLayer,
-        s.width,
-        s.height,
+        Math.ceil(s.width),
+        Math.ceil(s.height),
         s.content ?? "",
         s.sha256,
         JSON.stringify(s.anchors),
@@ -214,26 +232,28 @@ export async function POST(request: Request): Promise<Response> {
 
   const idempotencyKey = request.headers.get("idempotency-key")?.trim() ?? undefined;
   try {
-    const existingResponse = await checkIdempotentRun(executor, repositoryId, idempotencyKey);
-    if (existingResponse) return existingResponse;
+    return await executor.withTransaction(async (transaction) => {
+      const existingResponse = await checkIdempotentRun(transaction, repositoryId, idempotencyKey);
+      if (existingResponse) return existingResponse;
 
-    const runId = randomUUID();
-    const now = new Date().toISOString();
-    const decision = payload.decision ?? (payload.findings.some((f) => f.severity === "error") ? "fail" : "pass");
+      const runId = randomUUID();
+      const now = new Date().toISOString();
+      const decision = payload.decision ?? (payload.findings.some((f) => f.severity === "error") ? "fail" : "pass");
 
-    await insertRunEntities(executor, runId, repositoryId, idempotencyKey, payload, now, decision);
-    const reviewUrl = await syncReviewForRun(executor, repositoryId, runId, payload, auth.actorId);
+      await insertRunEntities(transaction, runId, repositoryId, idempotencyKey, payload, now, decision);
+      const reviewUrl = await syncReviewForRun(transaction, repositoryId, runId, payload, auth.actorId);
 
-    return Response.json(
-      {
-        ok: true,
-        runId,
-        status: "completed",
-        decision,
-        ...(reviewUrl ? { reviewUrl } : {}),
-      },
-      { status: 201 },
-    );
+      return Response.json(
+        {
+          ok: true,
+          runId,
+          status: "completed",
+          decision,
+          ...(reviewUrl ? { reviewUrl } : {}),
+        },
+        { status: 201 },
+      );
+    });
   } finally {
     await executor.close();
   }

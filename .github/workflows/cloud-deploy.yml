@@ -111,7 +111,9 @@ jobs:
           set -euo pipefail
           deploy_root=/home/ubuntu/boardreadyops-cloud
           repo_dir="${deploy_root}/repo"
-          policy_file="/opt/boardreadyops-cloud/release-repositories"
+          legacy_policy_file="/opt/boardreadyops-cloud/release-repositories"
+          migrated_policy_file="${deploy_root}/release-repositories"
+          policy_file=""
           policy_override_file="${deploy_root}/compose.release-policy.yml"
           container_policy_path="/run/policies/repositories"
           deploy_args="$1"
@@ -132,6 +134,14 @@ jobs:
               printf '%s\n' 'cloud-deploy preflight: release-policy override is not a regular file' >&2
               exit 78
             }
+            # Read the exact override instead of guessing from staged file existence.
+            old_bindings="$(grep -Fc -- "${legacy_policy_file}:${container_policy_path}:ro" "${policy_override_file}" || true)"
+            new_bindings="$(grep -Fc -- "${migrated_policy_file}:${container_policy_path}:ro" "${policy_override_file}" || true)"
+            case "${old_bindings}:${new_bindings}" in
+              2:0) policy_file="${legacy_policy_file}" ;;
+              0:2) policy_file="${migrated_policy_file}" ;;
+              *) printf '%s\n' 'cloud-deploy preflight: release-policy override has ambiguous or unsupported policy mounts' >&2; exit 78 ;;
+            esac
             test -f "${policy_file}" && test ! -L "${policy_file}" || {
               printf '%s\n' 'cloud-deploy preflight: release-policy override exists but the policy file is missing or invalid' >&2
               exit 78

@@ -193,6 +193,7 @@ export function ProjectRowActions({
   canDelete,
   renameAction,
   deleteAction,
+  compact = false,
 }: Readonly<{
   projectId: string;
   projectName: string;
@@ -202,9 +203,10 @@ export function ProjectRowActions({
   canDelete: boolean;
   renameAction: typeof renameProjectAction;
   deleteAction: typeof deleteProjectAction;
+  compact?: boolean;
 }>) {
   if (!canRename && !canDelete) return null;
-  return (
+  const actions = (
     <div className="flex flex-wrap items-center justify-end gap-2">
       {canRename ? (
         <RenameInline
@@ -230,6 +232,18 @@ export function ProjectRowActions({
         />
       ) : null}
     </div>
+  );
+  if (!compact) return actions;
+  return (
+    <details className="inline-block max-w-full text-left">
+      <summary
+        aria-label={`Actions for ${projectName}`}
+        className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+      >
+        Actions <span aria-hidden="true">⋯</span>
+      </summary>
+      <div className="mt-2">{actions}</div>
+    </details>
   );
 }
 
