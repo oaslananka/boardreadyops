@@ -52,6 +52,11 @@ Operational guarantees and limits:
   `ambiguous_multi_subscription` before mutating customer or installation plans.
   This guard does not establish multi-subscription precedence; authorized
   provider-state reconciliation is still required before releasing the event.
+  A checkout also cannot silently rebind an existing tenant to another Stripe
+  customer or link one Stripe customer to a second tenant: both attempts are
+  quarantined as `ambiguous_customer_linkage` for manual provider/ownership
+  verification. An identical tenant/customer replay remains idempotent.
+
 - Unmapped subscription prices remain pending, not silently acknowledged as
   applied. Fix the mapping first; monitor the pending queue for accumulation.
 - A successful transaction is an internal atomicity guarantee, **not** proof

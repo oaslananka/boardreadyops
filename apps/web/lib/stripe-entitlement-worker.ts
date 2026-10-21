@@ -108,9 +108,11 @@ export async function processStripeEntitlementPass(
             const errorClass =
               projection.reason === "ambiguous_multi_subscription"
                 ? "ambiguous_multi_subscription"
-                : projection.reason === "ambiguous_subscription_order"
-                  ? "ambiguous_subscription_order"
-                  : "ambiguous_invoice_order";
+                : projection.reason === "ambiguous_customer_linkage"
+                  ? "ambiguous_customer_linkage"
+                  : projection.reason === "ambiguous_subscription_order"
+                    ? "ambiguous_subscription_order"
+                    : "ambiguous_invoice_order";
             await transaction.query("UPDATE billing_events SET dead_letter_at=NOW(), last_error_class=$2 WHERE id=$1", [
               record.id,
               errorClass,

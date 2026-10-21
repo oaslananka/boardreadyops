@@ -80,23 +80,36 @@ export class BillingStore {
    * is the sole place the mapping is established. Deliberately leaves tier/status untouched
    * when the row already exists: checkout completion does not by itself say which price was
    * selected, so it must not clobber a tier that a subscription event already set.
+   *
+   * A completed checkout is not authority to transfer an existing tenant to
+   * another Stripe customer, nor to attach one Stripe customer to two tenants.
+   * Both require provider-state/operator reconciliation. The worker holds the
+   * per-customer advisory lock, so competing checkout events for one Stripe
+   * customer cannot race this query; concurrent different-customer attempts
+   * against one tenant are guarded by the ON CONFLICT WHERE predicate.
    */
-  async linkStripeCustomer(input: { tenantId: string; stripeCustomerId: string }): Promise<BillingCustomer> {
+  async linkStripeCustomer(input: { tenantId: string; stripeCustomerId: string }): Promise<BillingCustomer | null> {
     const id = randomUUID();
     const q = `
+      WITH foreign_customer AS (
+        SELECT 1 FROM billing_customers
+        WHERE stripe_customer_id=$3 AND tenant_id<>$2
+      )
       INSERT INTO billing_customers (id, tenant_id, stripe_customer_id, tier, status, created_at, updated_at)
-      VALUES ($1, $2, $3, 'free', 'incomplete', NOW(), NOW())
+      SELECT $1, $2, $3, 'free', 'incomplete', NOW(), NOW()
+      WHERE NOT EXISTS (SELECT 1 FROM foreign_customer)
       ON CONFLICT (tenant_id) DO UPDATE SET
         stripe_customer_id = EXCLUDED.stripe_customer_id,
         updated_at = NOW()
+      WHERE billing_customers.stripe_customer_id IS NULL
+         OR billing_customers.stripe_customer_id = EXCLUDED.stripe_customer_id
       RETURNING *
     `;
     const r = (await this.db.query(q, [id, input.tenantId, input.stripeCustomerId])) as {
       rows?: StoredBillingCustomerRow[];
     };
     const row = r.rows?.[0];
-    if (!row) throw new Error("linkStripeCustomer upsert failed");
-    return mapCustomer(row);
+    return row ? mapCustomer(row) : null;
   }
 
   /** The tenant a Stripe customer id was linked to via `linkStripeCustomer`, if any. */

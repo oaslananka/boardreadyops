@@ -109,6 +109,62 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     expect(customerRows[0]?.tier).toBe("team");
   });
 
+  it("quarantines checkout rebinds without changing the existing tenant or giving another tenant the customer", async () => {
+    const store = new BillingStore(database());
+    const before = rows(
+      await database().query("SELECT stripe_customer_id, tier, status FROM billing_customers WHERE tenant_id=$1", [
+        tenant,
+      ]),
+    )[0];
+    expect(before?.stripe_customer_id).toBe(customer);
+
+    const unexpectedCustomer = `cus_rebinding_${suffix}`;
+    const rebind = await enqueue(
+      "checkout_wrong_customer",
+      "checkout.session.completed",
+      { customer: unexpectedCustomer, client_reference_id: tenant },
+      1_700_000_205,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(rebind))?.last_error_class).toBe("ambiguous_customer_linkage");
+    expect((await row(rebind))?.processed_at).toBeNull();
+    const after = rows(
+      await database().query("SELECT stripe_customer_id, tier, status FROM billing_customers WHERE tenant_id=$1", [
+        tenant,
+      ]),
+    )[0];
+    expect(after).toEqual(before);
+    expect(
+      rows(
+        await database().query("SELECT id FROM billing_customers WHERE stripe_customer_id=$1", [unexpectedCustomer]),
+      ),
+    ).toHaveLength(0);
+
+    const unrelatedTenant = `stripe-other-tenant-${suffix}`;
+    const hijack = await enqueue(
+      "checkout_foreign_tenant",
+      "checkout.session.completed",
+      { customer, client_reference_id: unrelatedTenant },
+      1_700_000_206,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(hijack))?.last_error_class).toBe("ambiguous_customer_linkage");
+    expect(
+      rows(await database().query("SELECT id FROM billing_customers WHERE tenant_id=$1", [unrelatedTenant])),
+    ).toHaveLength(0);
+    expect(
+      rows(await database().query("SELECT stripe_customer_id FROM billing_customers WHERE tenant_id=$1", [tenant]))[0]
+        ?.stripe_customer_id,
+    ).toBe(customer);
+
+    // Idempotent delivery for the original pairing remains accepted.
+    await expect(store.linkStripeCustomer({ tenantId: tenant, stripeCustomerId: customer })).resolves.toMatchObject({
+      tenantId: tenant,
+      stripeCustomerId: customer,
+      tier: "team",
+    });
+  });
+
   it("quarantines repeatably unmapped prices without starving later ready invoice events", async () => {
     const unmapped = await enqueue(
       "unmapped_price",

@@ -24,7 +24,12 @@ async function projectCheckoutSessionCompleted(
 ): Promise<Record<string, unknown>> {
   const parsed = parseStripeCheckoutSessionCompleted(payload);
   if (!parsed) return { entitlement: "ignored", reason: "unrecognized_checkout_session_payload" };
-  await store.linkStripeCustomer(parsed);
+  const linked = await store.linkStripeCustomer(parsed);
+  if (!linked) {
+    // A signed checkout is not proof that a prior customer-to-tenant binding
+    // may be changed. Fail closed until provider-state review resolves it.
+    return { entitlement: "conflict", reason: "ambiguous_customer_linkage", tenantId: parsed.tenantId };
+  }
   // Do not project pending events in the Stripe request thread. They are released
   // for bounded, transactional reconciliation by the existing cloud worker.
   await store.wakePendingStripeCustomerEvents(parsed.stripeCustomerId);
