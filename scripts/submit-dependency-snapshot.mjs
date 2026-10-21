@@ -4,13 +4,9 @@ import { pathToFileURL } from "node:url";
 import * as yaml from "js-yaml";
 import { createCycloneDxBom } from "./generate-sbom.mjs";
 
-// A complete graph, never a selective list of recently patched packages.
-export function snapshotFromResolvedBom(bom, { sha, ref, scanned, runId }) {
-  if (!/^[0-9a-f]{40}$/u.test(sha) || !/^refs\/heads\/[A-Za-z0-9/_-]+$/u.test(ref)) {
-    throw new Error("Dependency submission requires a commit SHA and branch ref");
-  }
+// Each step validates the complete lockfile, never selectively drops CVEs.
+function mapPackages(components) {
   const resolved = {};
-  const components = bom.components ?? [];
   for (const component of components) {
     const purl = component.purl;
     if (typeof purl !== "string" || !purl.startsWith("pkg:npm/") || !component.version) {
@@ -24,19 +20,31 @@ export function snapshotFromResolvedBom(bom, { sha, ref, scanned, runId }) {
       dependencies: [],
     };
   }
-  const rootRef = bom.metadata?.component?.["bom-ref"];
-  for (const node of bom.dependencies ?? []) {
-    for (const child of node.dependsOn ?? []) {
+  return resolved;
+}
+
+function linkDependencyGraph(resolved, dependencies, rootRef) {
+  for (const node of dependencies) {
+    const children = node.dependsOn ?? [];
+    for (const child of children) {
       if (!resolved[child]) throw new Error("Dependency graph child is missing");
     }
     if (node.ref === rootRef) {
-      for (const child of node.dependsOn ?? []) resolved[child].relationship = "direct";
+      for (const child of children) resolved[child].relationship = "direct";
     } else if (resolved[node.ref]) {
-      resolved[node.ref].dependencies = [...new Set(node.dependsOn ?? [])];
+      resolved[node.ref].dependencies = [...new Set(children)];
     } else {
       throw new Error("Dependency graph parent is missing");
     }
   }
+}
+
+export function snapshotFromResolvedBom(bom, { sha, ref, scanned, runId }) {
+  if (!/^[0-9a-f]{40}$/u.test(sha) || !/^refs\/heads\/[A-Za-z0-9/_-]+$/u.test(ref)) {
+    throw new Error("Dependency submission requires a commit SHA and branch ref");
+  }
+  const resolved = mapPackages(bom.components ?? []);
+  linkDependencyGraph(resolved, bom.dependencies ?? [], bom.metadata?.component?.["bom-ref"]);
   if (Object.keys(resolved).length < 100) throw new Error("Incomplete dependency snapshot");
   return {
     version: 0,
