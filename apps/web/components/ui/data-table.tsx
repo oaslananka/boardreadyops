@@ -168,9 +168,9 @@ export function CursorPagination({
       {previousCursor || previousHref ? (
         <Button asChild variant="outline" size="sm">
           <Link
-              href={previousHref ?? hrefWith(basePath, searchParameters, { [cursorParameter]: previousCursor })}
-              rel="prev"
-            >
+            href={previousHref ?? hrefWith(basePath, searchParameters, { [cursorParameter]: previousCursor })}
+            rel="prev"
+          >
             Previous
           </Link>
         </Button>
