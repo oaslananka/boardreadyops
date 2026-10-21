@@ -81,7 +81,13 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
   it("defers a subscription, links checkout and resumes the pending event", async () => {
     const sub = await enqueue("early_subscription", "customer.subscription.created", subscription(), 1_700_000_100);
     expect(await processStripeEntitlementPass(database(), { limit: 1 })).toMatchObject({ deferred: 1 });
+    expect((await row(sub))?.attempts).toBe(1);
     expect((await row(sub))?.processed_at).toBeNull();
+    // Simulate the final deferred retry without waiting hours for backoff.
+    await database().query("UPDATE billing_events SET attempts=11, available_at=NOW() WHERE stripe_event_id=$1", [sub]);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(sub))?.last_error_class).toBe("customer_not_linked");
+    expect((await row(sub))?.attempts).toBe(12);
     const checkout = await enqueue(
       "checkout",
       "checkout.session.completed",
@@ -94,11 +100,35 @@ describeDb("Stripe transactional reconciliation: PostgreSQL", () => {
     const processed = await processStripeEntitlementPass(database(), { limit: 2 });
     expect(processed.processed).toBe(2);
     expect((await row(sub))?.processed_at).not.toBeNull();
+    expect((await row(sub))?.attempts).toBe(0);
+    expect((await row(sub))?.dead_letter_at).toBeNull();
     expect((await row(checkout))?.processed_at).not.toBeNull();
     const customerRows = rows(
       await database().query("SELECT tier FROM billing_customers WHERE tenant_id=$1", [tenant]),
     );
     expect(customerRows[0]?.tier).toBe("team");
+  });
+
+  it("quarantines repeatably unmapped prices without starving later ready invoice events", async () => {
+    const unmapped = await enqueue(
+      "unmapped_price",
+      "customer.subscription.updated",
+      { ...subscription(), items: { data: [{ price: { id: "unmapped_price" } }] } },
+      1_700_000_210,
+    );
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).deferred).toBe(1);
+    expect((await row(unmapped))?.last_error_class).toBe("unmapped_stripe_price");
+    await database().query("UPDATE billing_events SET attempts=11, available_at=NOW() WHERE stripe_event_id=$1", [
+      unmapped,
+    ]);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).dead_letter).toBe(1);
+    expect((await row(unmapped))?.dead_letter_at).not.toBeNull();
+    expect((await row(unmapped))?.attempts).toBe(12);
+
+    const ready = await enqueue("ready_after_unmapped", "invoice.paid", { customer }, 1_700_000_220);
+    expect((await processStripeEntitlementPass(database(), { limit: 1 })).processed).toBe(1);
+    expect((await row(ready))?.processed_at).not.toBeNull();
+    expect((await row(unmapped))?.processed_at).toBeNull();
   });
 
   it("excludes already-locked rows across separate worker connections", async () => {

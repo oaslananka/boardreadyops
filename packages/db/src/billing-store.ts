@@ -245,11 +245,16 @@ export class BillingStore {
     );
   }
 
-  /** Customer linkage wakes pre-checkout events without processing them inline. */
+  /** Customer linkage also revives only customer_not_linked dead letters, never unrelated quarantines. */
   async wakePendingStripeCustomerEvents(stripeCustomerId: string): Promise<void> {
     await this.db.query(
-      `UPDATE billing_events SET available_at=NOW()
-       WHERE provider='stripe' AND processed_at IS NULL AND dead_letter_at IS NULL
+      `UPDATE billing_events
+       SET available_at=NOW(),
+           attempts=CASE WHEN dead_letter_at IS NOT NULL THEN 0 ELSE attempts END,
+           last_error_class=CASE WHEN dead_letter_at IS NOT NULL THEN NULL ELSE last_error_class END,
+           dead_letter_at=NULL
+       WHERE provider='stripe' AND processed_at IS NULL
+         AND (dead_letter_at IS NULL OR last_error_class='customer_not_linked')
          AND payload #>> '{data,object,customer}' = $1`,
       [stripeCustomerId],
     );

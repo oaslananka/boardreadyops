@@ -24,10 +24,18 @@ Operational guarantees and limits:
 - Normal throughput is handled automatically by the worker. A subscription or
   invoice event preceding checkout is postponed 60 seconds; linking the Stripe
   customer releases that customer's pending records immediately.
-- Failed SQL projections roll back before a bounded exponential retry. Twelve
-  failed attempts place the event in a durable dead-letter state. Invalid
-  persisted event metadata is quarantined immediately. No event payload,
-  customer identifier, payment detail, or webhook signature is logged.
+- Failed SQL projections roll back before a bounded exponential retry. Deferred
+  events (missing customer linkage or Stripe price mapping) also use the existing
+  durable attempt budget, with exponential delays from 60 seconds up to one hour.
+  Twelve attempts (including earlier SQL failures) quarantine the event rather
+  than repeatedly occupying the oldest due-queue slots. Checkout linkage
+  immediately wakes matching pending rows **and** matching quarantined
+  `customer_not_linked` rows, resetting the attempt budget; unrelated dead
+  letters remain quarantined. Correct price configuration and explicitly
+  requeue `unmapped_stripe_price` / `stripe_price_config_missing` events only
+  after provider-state/operator review. Invalid persisted event metadata is
+  quarantined immediately. No event payload, customer identifier, payment
+  detail, or webhook signature is logged.
 - Subscription updates guard against an older Stripe event timestamp.
   Invoice paid/failed updates have a separate customer-level monotonic guard;
   an earlier subscription must not undo a later invoice status.

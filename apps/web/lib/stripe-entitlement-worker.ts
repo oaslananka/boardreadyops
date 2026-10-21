@@ -2,7 +2,7 @@ import { BillingStore } from "@boardreadyops/db";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { projectEntitlement, storedStripeEvent } from "./stripe-entitlement-projection.js";
 
-type StripeEventRow = { id: string; stripe_event_id: string; type: string; payload: unknown };
+type StripeEventRow = { id: string; stripe_event_id: string; type: string; payload: unknown; attempts: number };
 type Result = "processed" | "deferred" | "dead_letter" | "failed" | "idle";
 
 function records(result: unknown): Array<Record<string, unknown>> {
@@ -40,7 +40,7 @@ export async function processStripeEntitlementPass(
         async (transaction) => {
           const selected = records(
             await transaction.query(
-              `SELECT id, stripe_event_id, type, payload FROM billing_events
+              `SELECT id, stripe_event_id, type, payload, attempts FROM billing_events
            WHERE provider='stripe' AND processed_at IS NULL AND dead_letter_at IS NULL
              AND available_at <= now()
            ORDER BY available_at, created_at, id
@@ -118,12 +118,20 @@ export async function processStripeEntitlementPass(
             return "dead_letter";
           }
           if (projection.entitlement === "deferred") {
+            // Repeatedly unprocessable events must not monopolize the due queue.
+            // Use the existing durable attempt budget, with bounded exponential
+            // backoff and a terminal operator-review state after 12 attempts.
+            // A later checkout can wake quarantined customer_not_linked events.
+            const reason = typeof projection.reason === "string" ? projection.reason : "unresolved_deferred_event";
             await transaction.query(
-              `UPDATE billing_events SET available_at=NOW() + INTERVAL '60 seconds'
-             WHERE id=$1 AND processed_at IS NULL`,
-              [record.id],
+              `UPDATE billing_events SET attempts=attempts+1,
+                 available_at=NOW() + make_interval(secs => LEAST(3600, (60 * power(2, LEAST(attempts, 6)))::integer)),
+                 dead_letter_at=CASE WHEN attempts + 1 >= 12 THEN NOW() ELSE NULL END,
+                 last_error_class=$2
+               WHERE id=$1 AND processed_at IS NULL AND dead_letter_at IS NULL`,
+              [record.id, reason],
             );
-            return "deferred";
+            return record.attempts + 1 >= 12 ? "dead_letter" : "deferred";
           }
           await transaction.query(
             "UPDATE billing_events SET processed_at=NOW(), last_error_class=NULL WHERE id=$1 AND processed_at IS NULL",
