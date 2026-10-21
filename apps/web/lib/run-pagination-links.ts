@@ -42,9 +42,9 @@ export function buildRunPaginationLinks({
   back,
   next,
   limit,
-}: Readonly<{ cursor?: string; back?: string; next?: string; limit: number }>): {
-  previousHref?: string;
-  nextHref?: string;
+}: Readonly<{ cursor?: string | undefined; back?: string | undefined; next?: string | undefined; limit: number }>): {
+  previousHref: string | undefined;
+  nextHref: string | undefined;
 } {
   const history = cursor ? decodeHistory(back) : [];
   const previousCursor = history.at(-1);
