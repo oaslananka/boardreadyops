@@ -7,13 +7,13 @@ import { CursorPagination, type DataColumn, DataTable } from "../../components/u
 import { AppShell, EmptyState, Panel } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { runCommitCopyAccessibleLabel } from "../../lib/accessibility-labels.js";
-import { buildRunPaginationLinks } from "../../lib/run-pagination-links.js";
 import {
   decodeRunListingCursor,
   loadViewerRuns,
   normalizedRunListingLimit,
   type RunListingEntry,
 } from "../../lib/run-listing.js";
+import { buildRunPaginationLinks } from "../../lib/run-pagination-links.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
 export const metadata = {
