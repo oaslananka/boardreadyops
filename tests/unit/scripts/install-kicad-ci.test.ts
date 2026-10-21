@@ -80,7 +80,12 @@ function execute(env: NodeJS.ProcessEnv) {
   return spawnSync("bash", [installScript], { encoding: "utf8", env, timeout: 12000 });
 }
 
-describe("KiCad 10 signed PPA with official OCI outage fallback", () => {
+// The installer runs only in an Ubuntu GitHub Actions job. Its executable
+// mock harness depends on Linux uname, GNU timeout, POSIX permissions and
+// Linux-style paths; executing these shell mocks on macOS/Windows would test
+// the host shell instead of the supported CI target. The portable structural
+// contracts below still run in every OS/Node matrix lane.
+describe.runIf(process.platform === "linux")("Linux KiCad 10 signed PPA with official OCI outage fallback", () => {
   it("keeps the signed PPA and native KiCad CLI as the primary path", async () => {
     const f = await fixture();
     try {
@@ -183,5 +188,30 @@ describe("KiCad 10 signed PPA with official OCI outage fallback", () => {
     } finally {
       await rm(f.root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("cross-platform KiCad CI installation invariants", () => {
+  it("pins a single official OCI digest and retains fail-closed signature and version gates", async () => {
+    const script = await readFile(installScript, "utf8");
+    const digest = "ghcr.io/kicad/kicad@sha256:3224d1bf143185ecc1bd3a1082a36f37f0f4e59d707983a16515a845e3737fc6";
+    expect(script.split(digest)).toHaveLength(3);
+    expect(script).toContain("NO_PUBKEY");
+    expect(script).toContain("BADSIG");
+    expect(script).toContain("Hash Sum mismatch");
+    expect(script).toContain("transient_ppa_outage");
+    expect(script).toContain("--network none");
+    expect(script).toContain("--read-only");
+    expect(script).toContain("--pull=never");
+    expect(script).toContain('[[ "$actual" != "$series".* ]]');
+  });
+
+  it("still runs the same KiCad-required Node24/PostgreSQL17 GitHub job", async () => {
+    const workflow = await readFile(path.resolve(".github/workflows/ci.yml"), "utf8");
+    expect(workflow).toContain("ci / test-int (Node ");
+    expect(workflow).toContain("matrix.node-version == 24 && matrix.postgres-version == '17'");
+    expect(workflow).toContain("run: bash scripts/install-kicad-ci.sh");
+    expect(workflow).toContain("Run integration tests with JUnit report");
+    expect(workflow).not.toContain("continue-on-error: true\n      - name: Install KiCad");
   });
 });
