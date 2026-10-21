@@ -1,6 +1,7 @@
 import { createHash, createPublicKey } from "node:crypto";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
+import { sanitizeAndExtractArchive } from "@boardreadyops/cloud-core/archive-sanitizer";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { verifyManufacturingDraftReceipt } from "../../../src/runner/draft-attestation.js";
 import { resolveLocalArtifactFile } from "./artifact-downloads.js";
@@ -107,77 +108,86 @@ const trustedArtifactsQuery = [
 ].join("\n");
 
 function validArtifact(value: RecordRow): value is ArtifactRecord {
-  return (
-    typeof value.artifact_id === "string" &&
-    uuidPattern.test(value.artifact_id) &&
-    typeof value.storage_path === "string" &&
-    typeof value.sha256 === "string" &&
-    sha256Pattern.test(value.sha256) &&
-    typeof value.bytes === "number" &&
-    Number.isSafeInteger(value.bytes) &&
-    value.bytes > 0 &&
-    typeof value.kind === "string" &&
-    typeof value.role === "string" &&
-    typeof value.name === "string" &&
-    typeof value.cap_kind === "string" &&
-    typeof value.cap_role === "string" &&
-    typeof value.cap_name === "string" &&
-    typeof value.cap_storage_path === "string" &&
-    typeof value.cap_content_type === "string" &&
-    typeof value.cap_declared_bytes === "number" &&
-    (value.cap_expected_sha256 === null || typeof value.cap_expected_sha256 === "string") &&
-    Array.isArray(value.registration_allowed_repositories) &&
-    value.registration_allowed_repositories.every((repo: unknown) => typeof repo === "string") &&
-    typeof value.content_type === "string" &&
-    typeof value.runner_id === "string" &&
-    typeof value.registered_key === "string" &&
-    typeof value.repository_owner === "string" &&
-    typeof value.repository_name === "string" &&
-    typeof value.commit_sha === "string" &&
-    /^[0-9a-f]{40}$/u.test(value.commit_sha)
-  );
+  const strings = [
+    "artifact_id",
+    "storage_path",
+    "sha256",
+    "kind",
+    "role",
+    "name",
+    "cap_kind",
+    "cap_role",
+    "cap_name",
+    "cap_storage_path",
+    "cap_content_type",
+    "content_type",
+    "runner_id",
+    "registered_key",
+    "repository_owner",
+    "repository_name",
+    "commit_sha",
+  ];
+  if (!strings.every((key) => typeof value[key] === "string")) return false;
+  const numeric = ["bytes", "cap_declared_bytes"];
+  if (!numeric.every((key) => typeof value[key] === "number" && Number.isSafeInteger(value[key]))) return false;
+  const scoped = value.registration_allowed_repositories;
+  if (!Array.isArray(scoped) || !scoped.every((repo: unknown) => typeof repo === "string")) return false;
+  return [
+    uuidPattern.test(value.artifact_id as string),
+    sha256Pattern.test(value.sha256 as string),
+    (value.bytes as number) > 0,
+    value.cap_expected_sha256 === null || typeof value.cap_expected_sha256 === "string",
+    /^[0-9a-f]{40}$/u.test(value.commit_sha as string),
+  ].every(Boolean);
 }
 
 function sameTrustedLease(record: ArtifactRecord, runId: string, attemptId: string): boolean {
-  if (
-    record.capability_status !== "uploaded" ||
-    record.cap_kind !== record.kind ||
-    record.cap_role !== record.role ||
-    record.cap_name !== record.name ||
-    record.cap_storage_path !== record.storage_path ||
-    record.cap_content_type !== record.content_type ||
-    record.cap_declared_bytes !== record.bytes ||
-    record.cap_expected_sha256 !== record.sha256 ||
-    record.run_id !== runId ||
-    record.execution_attempt_id !== attemptId ||
-    record.run_attempt_id !== attemptId ||
-    record.run_status !== "completed" ||
-    record.run_decision !== "pass" ||
-    record.attempt_status !== "completed" ||
-    record.lease_status !== "completed" ||
-    record.registered_status !== "active" ||
-    record.registered_algorithm !== "ed25519" ||
-    record.disabled_at !== null ||
-    record.repository_private ||
-    record.repository_disabled_at !== null ||
-    record.trust_mode !== "standard" ||
-    record.lease_worker_class !== record.worker_class ||
-    !uuidPattern.test(record.runner_id)
-  )
-    return false;
-  const currentRepository = (record.repository_owner + "/" + record.repository_name).toLowerCase();
-  return record.worker_class === "self_hosted"
-    ? (record.registration_allowed_repositories.length === 0 ||
-        record.registration_allowed_repositories.some((allowed) => allowed.toLowerCase() === currentRepository)) &&
-        record.registration_id === record.runner_id &&
-        record.managed_identity_id === null &&
-        record.lease_registration_id === record.runner_id &&
-        record.lease_managed_identity_id === null
-    : record.worker_class === "managed" &&
-        record.managed_identity_id === record.runner_id &&
-        record.registration_id === null &&
-        record.lease_managed_identity_id === record.runner_id &&
-        record.lease_registration_id === null;
+  const trusted = [
+    record.capability_status === "uploaded",
+    record.cap_kind === record.kind,
+    record.cap_role === record.role,
+    record.cap_name === record.name,
+    record.cap_storage_path === record.storage_path,
+    record.cap_content_type === record.content_type,
+    record.cap_declared_bytes === record.bytes,
+    record.cap_expected_sha256 === record.sha256,
+    record.run_id === runId,
+    record.execution_attempt_id === attemptId,
+    record.run_attempt_id === attemptId,
+    record.run_status === "completed",
+    record.run_decision === "pass",
+    record.attempt_status === "completed",
+    record.lease_status === "completed",
+    record.registered_status === "active",
+    record.registered_algorithm === "ed25519",
+    record.disabled_at === null,
+    record.repository_private === false,
+    record.repository_disabled_at === null,
+    record.trust_mode === "standard",
+    record.lease_worker_class === record.worker_class,
+    uuidPattern.test(record.runner_id),
+  ];
+  if (!trusted.every(Boolean)) return false;
+  const currentRepository = [record.repository_owner, record.repository_name].join("/").toLowerCase();
+  if (record.worker_class === "self_hosted") {
+    return [
+      record.registration_allowed_repositories.length === 0 ||
+        record.registration_allowed_repositories.some((allowed) => allowed.toLowerCase() === currentRepository),
+      record.registration_id === record.runner_id,
+      record.managed_identity_id === null,
+      record.lease_registration_id === record.runner_id,
+      record.lease_managed_identity_id === null,
+    ].every(Boolean);
+  }
+  if (record.worker_class === "managed") {
+    return [
+      record.managed_identity_id === record.runner_id,
+      record.registration_id === null,
+      record.lease_managed_identity_id === record.runner_id,
+      record.lease_registration_id === null,
+    ].every(Boolean);
+  }
+  return false;
 }
 
 async function checkedBytes(storageRoot: string, record: ArtifactRecord, limit: number): Promise<Buffer | undefined> {
@@ -203,6 +213,52 @@ async function checkedBytes(storageRoot: string, record: ArtifactRecord, limit: 
   }
 }
 
+function selectDraftPair(records: ArtifactRecord[]): { archive: ArtifactRecord; receipt: ArtifactRecord } | undefined {
+  const drafts = records.filter((row) => row.kind === "archive" && row.role === "draft-manufacturing");
+  const receipts = records.filter((row) => row.kind === "attestation" && row.role === "draft-provenance");
+  if (drafts.length !== 1 || receipts.length !== 1) return undefined;
+  const archive = drafts[0];
+  const receipt = receipts[0];
+  return archive && receipt ? { archive, receipt } : undefined;
+}
+
+function eligibleDraftPair(
+  archive: ArtifactRecord,
+  receipt: ArtifactRecord,
+  runId: string,
+  attemptId: string,
+): boolean {
+  return [
+    sameTrustedLease(archive, runId, attemptId),
+    sameTrustedLease(receipt, runId, attemptId),
+    archive.lease_id === receipt.lease_id,
+    archive.runner_id === receipt.runner_id,
+    archive.worker_class === receipt.worker_class,
+    archive.content_type === "application/zip",
+    receipt.content_type === "application/json",
+    archive.bytes <= maxArchiveBytes,
+    receipt.bytes <= maxReceiptBytes,
+  ].every(Boolean);
+}
+
+function signedPayloadMatchesSource(
+  claim: { payload: Record<string, unknown> },
+  archive: ArtifactRecord,
+  runId: string,
+  attemptId: string,
+): boolean {
+  const payload = claim.payload;
+  return [
+    payload.runnerId === archive.runner_id,
+    payload.runId === runId,
+    payload.executionAttemptId === attemptId,
+    payload.repository === [archive.repository_owner, archive.repository_name].join("/"),
+    payload.sourceCommitSha === archive.commit_sha,
+    payload.archiveSha256 === archive.sha256,
+    payload.archiveBytes === archive.bytes,
+  ].every(Boolean);
+}
+
 export async function verifyStoredManufacturingDraftClaim(input: {
   executor: SqlQueryExecutor;
   runId: string;
@@ -224,24 +280,10 @@ export async function verifyStoredManufacturingDraftClaim(input: {
     const records = (result as { rows: RecordRow[] }).rows;
     if (!records?.length) return fail("missing");
     if (!records.every(validArtifact)) return fail("ineligible");
-    const drafts = records.filter((row) => row.kind === "archive" && row.role === "draft-manufacturing");
-    const receipts = records.filter((row) => row.kind === "attestation" && row.role === "draft-provenance");
-    if (drafts.length !== 1 || receipts.length !== 1) return fail("ineligible");
-    const archive = drafts[0];
-    const receipt = receipts[0];
-    if (!archive || !receipt) return fail("ineligible");
-    if (
-      !sameTrustedLease(archive, input.runId, input.executionAttemptId) ||
-      !sameTrustedLease(receipt, input.runId, input.executionAttemptId) ||
-      archive.lease_id !== receipt.lease_id ||
-      archive.runner_id !== receipt.runner_id ||
-      archive.worker_class !== receipt.worker_class ||
-      archive.content_type !== "application/zip" ||
-      receipt.content_type !== "application/json" ||
-      archive.bytes > maxArchiveBytes ||
-      receipt.bytes > maxReceiptBytes
-    )
-      return fail("ineligible");
+    const pair = selectDraftPair(records);
+    if (!pair) return fail("ineligible");
+    const { archive, receipt } = pair;
+    if (!eligibleDraftPair(archive, receipt, input.runId, input.executionAttemptId)) return fail("ineligible");
     const publicKey = createPublicKey(archive.registered_key);
     if (publicKey.asymmetricKeyType !== "ed25519" || archive.registered_key !== receipt.registered_key) {
       return fail("identity");
@@ -255,19 +297,25 @@ export async function verifyStoredManufacturingDraftClaim(input: {
       return fail("signature");
     }
     if (!verifyManufacturingDraftReceipt(parsed, publicKey)) return fail("signature");
-    const candidate = parsed as { payload: Record<string, unknown> };
     if (
-      candidate.payload.runnerId !== archive.runner_id ||
-      candidate.payload.runId !== input.runId ||
-      candidate.payload.executionAttemptId !== input.executionAttemptId ||
-      candidate.payload.repository !== `${archive.repository_owner}/${archive.repository_name}` ||
-      candidate.payload.sourceCommitSha !== archive.commit_sha ||
-      candidate.payload.archiveSha256 !== archive.sha256 ||
-      candidate.payload.archiveBytes !== archive.bytes
+      !signedPayloadMatchesSource(
+        parsed as { payload: Record<string, unknown> },
+        archive,
+        input.runId,
+        input.executionAttemptId,
+      )
     )
       return fail("identity");
     const archiveBytes = await checkedBytes(input.storageRoot, archive, maxArchiveBytes);
-    if (archiveBytes?.subarray(0, 4).toString("hex") !== "504b0304") return fail("bytes");
+    if (!archiveBytes) return fail("bytes");
+    // A sound ZIP container is not engineering/fabrication sign-off.
+    const structure = sanitizeAndExtractArchive(archiveBytes, {
+      maxCompressedSizeBytes: maxArchiveBytes,
+      maxFiles: 500,
+      maxSingleFileBytes: 32 * 1024 * 1024,
+      maxTotalExtractedBytes: 128 * 1024 * 1024,
+    });
+    if (structure.fileCount === 0) return fail("bytes");
     return {
       status: "verified-runner-claim",
       archiveArtifactId: archive.artifact_id,

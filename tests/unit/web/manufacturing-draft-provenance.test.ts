@@ -47,7 +47,7 @@ async function fixture(): Promise<Fixture> {
     archiveSha256: sha(goodZip),
     archiveBytes: goodZip.length,
   };
-  const receiptBytes = Buffer.from(JSON.stringify(signManufacturingDraftReceipt(payload, keys.privateKey)) + "\n");
+  const receiptBytes = Buffer.from(`${JSON.stringify(signManufacturingDraftReceipt(payload, keys.privateKey))}\n`);
   await writeFile(path.join(root, "archive.zip"), goodZip);
   await writeFile(path.join(root, "receipt.json"), receiptBytes);
   const base: Row = {
