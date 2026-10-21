@@ -21,6 +21,17 @@ function eventCustomer(payload: unknown): string | undefined {
   return typeof customer === "string" && customer.length > 0 ? customer : undefined;
 }
 
+function conflictErrorClass(reason: unknown): string {
+  if (
+    reason === "ambiguous_multi_subscription" ||
+    reason === "ambiguous_customer_linkage" ||
+    reason === "ambiguous_subscription_order"
+  ) {
+    return reason;
+  }
+  return "ambiguous_invoice_order";
+}
+
 /**
  * Process a small batch in the existing cloud worker, with no Stripe network calls.
  * Each event's entitlement changes and processed_at commit atomically on the same
@@ -105,14 +116,7 @@ export async function processStripeEntitlementPass(
           if (projection.entitlement === "conflict") {
             // Same-second Stripe subscription AND invoice updates have
             // unprovable ordering without reading Stripe's current truth.
-            const errorClass =
-              projection.reason === "ambiguous_multi_subscription"
-                ? "ambiguous_multi_subscription"
-                : projection.reason === "ambiguous_customer_linkage"
-                  ? "ambiguous_customer_linkage"
-                  : projection.reason === "ambiguous_subscription_order"
-                    ? "ambiguous_subscription_order"
-                    : "ambiguous_invoice_order";
+            const errorClass = conflictErrorClass(projection.reason);
             await transaction.query("UPDATE billing_events SET dead_letter_at=NOW(), last_error_class=$2 WHERE id=$1", [
               record.id,
               errorClass,
