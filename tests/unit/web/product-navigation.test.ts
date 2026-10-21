@@ -61,6 +61,61 @@ describe("ProductNavigation preserved behavior: mobile drawer and focus manageme
     expect(trigger?.getAttribute("aria-label")).toBe("Open navigation");
   });
 
+  it("hides off-screen navigation from keyboard and assistive technology on mobile", async () => {
+    await act(async () => {
+      root.render(createElement(ProductNavigation, {}));
+    });
+
+    const closedDrawer = container.querySelector("#product-navigation-drawer");
+    expect(closedDrawer?.classList.contains("invisible")).toBe(true);
+    expect(closedDrawer?.getAttribute("role")).toBeNull();
+    expect(closedDrawer?.getAttribute("aria-modal")).toBeNull();
+
+    const trigger = container.querySelector<HTMLButtonElement>('button[aria-controls="product-navigation-drawer"]');
+    await act(async () => trigger?.click());
+    expect(closedDrawer?.classList.contains("invisible")).toBe(false);
+    expect(closedDrawer?.getAttribute("role")).toBe("dialog");
+    expect(closedDrawer?.getAttribute("aria-modal")).toBe("true");
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(closedDrawer?.classList.contains("invisible")).toBe(true);
+  });
+
+  it("contains forward and backward keyboard focus within the open mobile drawer", async () => {
+    await act(async () => {
+      root.render(createElement(ProductNavigation, {}));
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>('button[aria-controls="product-navigation-drawer"]');
+    await act(async () => trigger?.click());
+
+    const drawer = container.querySelector("#product-navigation-drawer");
+    const controls = drawer?.querySelectorAll<HTMLElement>("a[href], button:not([disabled])");
+    const first = controls?.item(0);
+    const last = controls?.item((controls?.length ?? 0) - 1);
+    if (!first || !last) throw new Error("drawer controls missing");
+
+    expect(document.activeElement).toBe(container.querySelector('a[href="/dashboard"]'));
+    first.focus();
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
+    });
+    expect(document.activeElement).toBe(last);
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    });
+    expect(document.activeElement).toBe(first);
+
+    trigger?.focus(); // Simulate focus being programmatically moved outside the open drawer.
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    });
+    expect(document.activeElement).toBe(first);
+  });
+
   it("moves focus to the first link on open and back to the trigger on Escape close", async () => {
     await act(async () => {
       root.render(createElement(ProductNavigation, {}));
