@@ -7,6 +7,7 @@ import { CursorPagination, type DataColumn, DataTable } from "../../components/u
 import { AppShell, EmptyState, Panel } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { runCommitCopyAccessibleLabel } from "../../lib/accessibility-labels.js";
+import { buildRunPaginationLinks } from "../../lib/run-pagination-links.js";
 import {
   decodeRunListingCursor,
   loadViewerRuns,
@@ -99,12 +100,19 @@ const columns: readonly DataColumn<RunListingEntry>[] = [
 export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>) {
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
-  const cursor = decodeRunListingCursor(first(parameters.cursor) ?? null);
+  const cursorValue = first(parameters.cursor);
+  const cursor = decodeRunListingCursor(cursorValue ?? null);
   const limit = normalizedRunListingLimit(Number(first(parameters.limit)) || undefined);
   const listing = await loadViewerRuns(viewer.session, { ...(cursor ? { cursor } : {}), limit });
 
   const runs = listing.state === "ok" ? listing.runs : [];
   const next = listing.state === "ok" ? listing.next : undefined;
+  const { previousHref, nextHref } = buildRunPaginationLinks({
+    cursor: cursor ? cursorValue : undefined,
+    back: first(parameters.back),
+    next,
+    limit,
+  });
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/dashboard", label: "Dashboard" }, { label: "Runs" }]}>
@@ -157,8 +165,8 @@ export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>
         <CursorPagination
           basePath="/runs"
           searchParameters={{ limit: first(parameters.limit) }}
-          {...(next ? { nextCursor: next } : {})}
-          {...(cursor ? { previousCursor: undefined } : {})}
+          {...(nextHref ? { nextHref } : {})}
+          {...(previousHref ? { previousHref } : {})}
           label="Run pagination"
         />
       </main>
