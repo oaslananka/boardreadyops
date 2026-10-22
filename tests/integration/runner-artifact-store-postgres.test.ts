@@ -393,6 +393,80 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
     }
   });
 
+  it("retains committed artifact bytes when PostgreSQL acknowledgement is lost after finalize", async () => {
+    const fixture = await setup(`artifact-test-lost-ack-${randomUUID().slice(0, 8)}`);
+    const artifactId = randomUUID();
+    const uploadToken = token(`lost-ack-${artifactId}`);
+    const sha256 = fingerprint("hello");
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "bro-upload-lost-ack-"));
+    try {
+      const issued = await createSqlRunnerArtifactStore(requireExecutor(), {
+        now: () => at(fixture.base, 10),
+        id: () => artifactId,
+        uploadToken: () => uploadToken,
+        capabilityTtlSeconds: 300,
+      }).issueCapabilities({
+        workerClass: "managed",
+        managedRunnerIdentityId: fixture.managedIdentityId,
+        requestTimestamp: requestTimestamp(at(fixture.base, 10)),
+        requestNonce: nonce(`lost-ack-${artifactId}`),
+        runId: fixture.runId,
+        executionAttemptId: fixture.attemptId,
+        leaseId: fixture.leaseId,
+        leaseToken: fixture.leaseToken,
+        artifacts: [
+          { kind: "report", name: "report.json", role: "machine", bytes: 5, sha256, contentType: "application/json" },
+        ],
+      });
+      expect(issued.status).toBe("accepted");
+      let postCommitAcknowledgementLost = false;
+      const response = await handleRunnerArtifactUploadRequest(
+        new Request(`https://boardreadyops.test/upload?cap=${uploadToken}`, {
+          method: "PUT",
+          body: "hello",
+        }),
+        artifactId,
+        {
+          environment: { ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot },
+          now: () => at(fixture.base, 20),
+          queryExecutor: requireExecutor,
+          createArtifactStore: (database) =>
+            createSqlRunnerArtifactStore(
+              {
+                ...database,
+                query: async (sql, params = []) => {
+                  const result = await database.query(sql, params);
+                  if (sql.includes("boardreadyops_complete_artifact_upload")) {
+                    postCommitAcknowledgementLost = true;
+                    throw new Error("simulated lost response after successful COMMIT");
+                  }
+                  return result;
+                },
+              },
+              { now: () => at(fixture.base, 20) },
+            ),
+        },
+      );
+      expect(response.status).toBe(503);
+      expect(postCommitAcknowledgementLost).toBe(true);
+      const persisted = rows(
+        await requireExecutor().query("select id, storage_path, sha256 from artifacts where id = $1", [artifactId]),
+      )[0];
+      expect(persisted).toMatchObject({ id: artifactId, sha256 });
+      await expect(readFile(path.join(storageRoot, String(persisted?.storage_path)), "utf8")).resolves.toBe("hello");
+      expect(
+        rows(
+          await requireExecutor().query("select status from runner_artifact_upload_capabilities where artifact_id=$1", [
+            artifactId,
+          ]),
+        ),
+      ).toEqual([{ status: "uploaded" }]);
+    } finally {
+      await cleanupTenant(fixture.tenant, fixture.managedIdentityId);
+      await rm(storageRoot, { recursive: true, force: true });
+    }
+  });
+
   it("persists a real KiCad draft through HTTP and PostgreSQL without enabling fabrication delivery", async (context) => {
     const cli = await detectKicadCli();
     if (!cli.found || !/^10[.]0[.]/u.test(cli.version ?? "")) {
