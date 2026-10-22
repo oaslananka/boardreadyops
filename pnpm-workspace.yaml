@@ -1,15 +1,5 @@
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
-  # GHSA-qxg6-89mg-rqv8 / GHSA-xp26-3454-mjgp: official Vitest v4 security backport; remove once 7 days old.
-  - 'vitest@4.1.12'
-  - '@vitest/coverage-v8@4.1.12'
-  - '@vitest/expect@4.1.12'
-  - '@vitest/mocker@4.1.12'
-  - '@vitest/pretty-format@4.1.12'
-  - '@vitest/runner@4.1.12'
-  - '@vitest/snapshot@4.1.12'
-  - '@vitest/spy@4.1.12'
-  - '@vitest/utils@4.1.12'
   - '@renovatebot/osv-offline-db@3.0.9'
   - '@renovatebot/osv-offline@3.0.9'
   - '@hono/node-server@2.0.12'

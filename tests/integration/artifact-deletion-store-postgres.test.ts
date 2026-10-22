@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { build } from "esbuild";
 import pg from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { processArtifactDeletion } from "../../apps/web/lib/artifact-deletion-worker.js";
@@ -780,6 +781,161 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("keeps a durable fence when the actual deletion worker crashes after unlink", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL required");
+    const label = `full-worker-kill-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const artifactId = randomUUID();
+    const deletionJobId = await insertJob(tenant, artifactId);
+    const workerId = `full-worker-${randomUUID().slice(0, 8)}`;
+    const tenantId = `artifact-delete-${label}`;
+    const store = createSqlArtifactDeletionStore(requireExecutor(), {
+      now: () => new Date(Date.now() + 1_000),
+      leaseSeconds: 120,
+    });
+    const claimed = (await store.claimDeletions({ workerId, limit: 1 }))[0];
+    expect(claimed?.deletionJobId).toBe(deletionJobId);
+    if (!claimed) throw new Error("Expected an isolated claimed deletion job");
+    const root = await mkdtemp(path.join(tmpdir(), "boardreadyops-worker-kill-"));
+    const objectPath = path.join(root, claimed.storagePath);
+    await mkdir(path.dirname(objectPath), { recursive: true });
+    await writeFile(objectPath, "DISPOSABLE FULL WORKER CRASH TEST");
+
+    // Bundle production worker/store implementation into a standalone subprocess.
+    // The only injected seam is the filesystem operation callback: it executes
+    // the actual production local unlink implementation, then holds the process
+    // precisely before the worker can commit completion or settle the fence.
+    const childSource = `
+      import { processArtifactDeletion, deleteLocalArtifactObject } from './apps/web/lib/artifact-deletion-worker.ts';
+      import { createSqlArtifactDeletionStore } from './packages/db/src/artifact-deletion-store.ts';
+      import { createPgQueryExecutor } from './packages/db/src/pg-executor.ts';
+      async function run() {
+        const executor = createPgQueryExecutor({ connectionString: process.env.DATABASE_URL, max: 2 });
+        const store = createSqlArtifactDeletionStore(executor);
+        await processArtifactDeletion(JSON.parse(process.env.WORKER_CLAIM), {
+          workerId: process.env.WORKER_ID,
+          storageRoot: process.env.WORKER_ROOT,
+          store,
+          deleteLocalObject: async (storageRoot, storagePath) => {
+            const result = await deleteLocalArtifactObject(storageRoot, storagePath);
+            process.send?.({ phase: 'unlinked', result });
+            await new Promise(() => {});
+            return result;
+          },
+        });
+        throw new Error('Worker unexpectedly completed past the crash boundary');
+      }
+      run().catch((error) => { process.send?.({ phase: 'error', message: String(error) }); process.exitCode = 1; });
+    `;
+    const bundled = await build({
+      stdin: {
+        contents: childSource,
+        resolveDir: process.cwd(),
+        sourcefile: "artifact-worker-crash-child.ts",
+        loader: "ts",
+      },
+      bundle: true,
+      platform: "node",
+      format: "cjs",
+      packages: "external",
+      write: false,
+      logLevel: "silent",
+    });
+    // Windows process command lines are length-limited; run the bundle from a
+    // temporary file under node_modules so the external pg module also resolves.
+    const childBundle = bundled.outputFiles[0]?.text;
+    if (!childBundle) throw new Error("Expected a built worker test bundle");
+    const childPath = path.join(process.cwd(), "node_modules", ".cache", `artifact-worker-${randomUUID()}.cjs`);
+    await mkdir(path.dirname(childPath), { recursive: true });
+    await writeFile(childPath, childBundle);
+    const child = spawn(process.execPath, [childPath], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        DATABASE_URL: connectionString,
+        WORKER_CLAIM: JSON.stringify(claimed),
+        WORKER_ID: workerId,
+        WORKER_ROOT: root,
+      },
+      stdio: ["ignore", "ignore", "ignore", "ipc"],
+    });
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    try {
+      const phase = await new Promise<unknown>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Worker did not reach unlink crash boundary")), 20_000);
+        child.once("message", (message) => {
+          clearTimeout(timeout);
+          resolve(message);
+        });
+        child.once("error", (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+        child.once("exit", () => {
+          clearTimeout(timeout);
+          reject(new Error("Worker exited before unlink boundary"));
+        });
+      });
+      expect(phase).toEqual({ phase: "unlinked", result: "deleted" });
+      child.kill("SIGKILL");
+      const signal = await new Promise<NodeJS.Signals | null>((resolve) => {
+        child.once("exit", (_code, exitSignal) => resolve(exitSignal));
+      });
+      expect(signal).toBe("SIGKILL");
+      await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+      const fence = rows(
+        await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+          deletionJobId,
+        ]),
+      );
+      expect(fence).toEqual([{ settled_at: null }]);
+      const jobs = rows(
+        await requireExecutor().query("select status from artifact_deletion_jobs where id=$1", [deletionJobId]),
+      );
+      expect(jobs).toEqual([{ status: "leased" }]);
+      await expect(
+        lifecycle.createLegalHold({
+          tenantId,
+          createdBy: "authorized-operator",
+          reason: "Full worker died after physical unlink and before durable completion",
+          scope: "organization",
+        }),
+      ).rejects.toBeInstanceOf(LegalHoldAdmissionConflictError);
+      await requireExecutor().query(
+        "update artifact_deletion_jobs set lease_expires_at=clock_timestamp()-interval '1 second' where id=$1",
+        [deletionJobId],
+      );
+      const nextWorker = createSqlArtifactDeletionStore(requireExecutor(), {
+        now: () => new Date(Date.now() + 60_000),
+      });
+      await expect(nextWorker.claimDeletions({ workerId: "post-sigkill-worker", limit: 1 })).resolves.toEqual([]);
+      expect(
+        rows(
+          await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+            deletionJobId,
+          ]),
+        ),
+      ).toEqual([{ settled_at: null }]);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      // Known synthetic object only: never use automated settlement for an
+      // unknown production filesystem outcome.
+      await store.completeDeletion({ deletionJobId, workerId, outcome: "deleted" });
+      const tokenRows = rows(
+        await requireExecutor().query("select token from artifact_unlink_fences where deletion_job_id=$1", [
+          deletionJobId,
+        ]),
+      );
+      const token = tokenRows[0]?.token;
+      if (typeof token === "string") {
+        await store.settlePhysicalDeletion({ deletionJobId, workerId, fenceToken: token, outcome: "deleted" });
+      }
+      await requireExecutor().query("delete from legal_holds where tenant_id=$1", [tenantId]);
+      await rm(childPath, { force: true });
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 30_000);
 
   it("prevents hold acknowledgement during irreversible unlink, then admits after settlement", async () => {
     if (!connectionString) throw new Error("Disposable PostgreSQL required");
