@@ -461,6 +461,31 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
           ]),
         ),
       ).toEqual([{ status: "uploaded" }]);
+      // A retry using an already-consumed capability is a non-mutating
+      // conflict, not permission to overwrite the committed artifact.
+      const retry = await handleRunnerArtifactUploadRequest(
+        new Request(`https://boardreadyops.test/upload?cap=${uploadToken}`, {
+          method: "PUT",
+          body: "hello",
+        }),
+        artifactId,
+        {
+          environment: { ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot },
+          now: () => at(fixture.base, 25),
+          queryExecutor: requireExecutor,
+          createArtifactStore: (database) =>
+            createSqlRunnerArtifactStore(database, { now: () => at(fixture.base, 25) }),
+        },
+      );
+      expect(retry.status).toBe(409);
+      expect(
+        rows(
+          await requireExecutor().query("select status from runner_artifact_upload_capabilities where artifact_id=$1", [
+            artifactId,
+          ]),
+        ),
+      ).toEqual([{ status: "uploaded" }]);
+      await expect(readFile(path.join(storageRoot, String(persisted?.storage_path)), "utf8")).resolves.toBe("hello");
     } finally {
       await cleanupTenant(fixture.tenant, fixture.managedIdentityId);
       await rm(storageRoot, { recursive: true, force: true });

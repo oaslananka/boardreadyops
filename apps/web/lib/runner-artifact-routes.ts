@@ -446,8 +446,9 @@ export async function handleRunnerArtifactUploadRequest(
   if (!completed) {
     // The database may have committed the upload before losing its response.
     // Deleting the published file or marking the upload failed here could
-    // destroy a durably acknowledged artifact. Quarantine the uncertain
+    // destroy a durably acknowledged artifact. Preserve the uncertain
     // outcome for operator reconciliation instead of guessing a rollback.
+    // No durable quarantine record or automatic recovery is created here.
     return jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503);
   }
   if (completed.status !== "accepted" && completed.status !== "replayed") {
