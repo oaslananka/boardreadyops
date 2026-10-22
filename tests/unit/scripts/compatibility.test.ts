@@ -63,7 +63,7 @@ type WorkflowJob = {
       os?: string[];
     };
   };
-  steps?: Array<{ uses?: string; run?: string; env?: Record<string, string> }>;
+  steps?: Array<{ uses?: string; run?: string; env?: Record<string, string>; name?: string; if?: string }>;
 };
 
 describe("compatibility matrix", () => {
@@ -408,24 +408,14 @@ describe("compatibility matrix", () => {
     const lintRuns = (workflow.jobs?.lint?.steps ?? []).map((step) => step.run ?? "").join("\n");
     const integrationRuns = (integration?.steps ?? []).map((step) => step.run ?? "").join("\n");
 
-    const kicadExpression = "${" + "{ matrix.kicad-version }}";
     const nodeExpression = "${" + "{ matrix.node-version }}";
     const pgExpression = "${" + "{ matrix.postgres-version }}";
-    expect(integration?.name).toBe(
-      `ci / test-int (KiCad ${kicadExpression}, Node ${nodeExpression}, PG ${pgExpression})`,
-    );
+    expect(integration?.name).toBe(`ci / test-int (Node ${nodeExpression}, PG ${pgExpression})`);
     expect(integration?.strategy?.matrix?.include).toEqual([
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
         "node-version": 22,
-        "postgres-version": "16",
-        "postgres-image": "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
-      },
-      {
-        "kicad-version": "10.0",
-        "kicad-ppa-series": "10.0",
-        "node-version": 24,
         "postgres-version": "16",
         "postgres-image": "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
       },
@@ -460,6 +450,24 @@ describe("compatibility matrix", () => {
     expect(integrationRuns).toContain("--reporter=default --reporter=junit");
     expect(integrationRuns).toContain("pnpm --filter @boardreadyops/db db:migrate");
     expect(integrationRuns).toContain("pnpm run test:int");
+    expect(integrationRuns).toContain("pnpm exec vitest run");
+    expect(integrationRuns).toContain("runner-artifact-store-postgres.test.ts");
+    expect(integrationRuns).toContain("--no-file-parallelism");
+    // Guard the discovered PostgreSQL suites BEFORE appending the two
+    // always-present auxiliary tests, otherwise an empty discovery passes.
+    const discoverIndex = integrationRuns.indexOf("mapfile -t db_suites");
+    const bashArraySize = "$" + "{#db_suites[@]}";
+    const emptyGuardIndex = integrationRuns.indexOf(`if [[ ${bashArraySize} -eq 0 ]]`);
+    const appendIndex = integrationRuns.indexOf("db_suites+=(");
+    expect(discoverIndex).toBeGreaterThanOrEqual(0);
+    expect(emptyGuardIndex).toBeGreaterThan(discoverIndex);
+    expect(appendIndex).toBeGreaterThan(emptyGuardIndex);
+
+    expect(integrationRuns).toContain("needs.risk-profile.outputs.needs_kicad");
+    const kicadInstall = integration?.steps?.find((step) => step.name?.startsWith("Install KiCad"));
+    expect(kicadInstall?.if).toContain("needs.risk-profile.outputs.needs_kicad == 'true'");
+    expect(kicadInstall?.if).toContain("matrix.node-version == 24");
+    expect(kicadInstall?.if).toContain("matrix.postgres-version == '17'");
     expect(config.kicad.tested).toEqual(["10.0"]);
     expect(config.kicad.eol).toEqual(["9.0"]);
     expect(config.source_checked.date).toBe("2026-10-12");

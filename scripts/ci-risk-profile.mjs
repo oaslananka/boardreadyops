@@ -46,7 +46,33 @@ const ACTION_PATTERNS = [
   /^tests\/action\//,
   /^tests\/unit\/action\//,
 ];
-const KICAD_PATTERNS = [/^src\/kicad\//, /^tests\/(unit|integration)\/kicad\//, /^tests\/fixtures\/projects\//];
+const KICAD_PATTERNS = [
+  /^src\/kicad\//,
+  /^src\/rules\/manufacturing\//,
+  /^src\/action\//,
+  /^tests\/(unit|integration)\/kicad\//,
+  /^tests\/fixtures\/projects\//,
+];
+// Only these server-side changes are known not to require KiCad CLI. Any
+// unfamiliar integration surface fails closed into the KiCad job, rather than
+// silently dropping manufacturing/export coverage.
+const DATABASE_ONLY_INTEGRATION_PATTERNS = [
+  /^packages\/db\/src\/billing-store\.ts$/,
+  /^packages\/db\/migrations\/\d{4}_(?:stripe_|pending_stripe_)[^/]+\.sql$/,
+  /^packages\/cloud-core\/src\/stripe-/,
+  /^apps\/web\/lib\/stripe-/,
+  /^apps\/web\/app\/api\/v1\/billing\//,
+];
+function databaseOnlyIntegrationFile(file) {
+  if (matchesAny(file, DATABASE_ONLY_INTEGRATION_PATTERNS)) return true;
+  return [
+    "tests/integration/stripe-entitlement-reconciliation-postgres.test.ts",
+    "tests/integration/billing-pending-stripe-events-postgres.test.ts",
+    "tests/integration/marketplace-billing-postgres.test.ts",
+    "tests/integration/entitlement-store-postgres.test.ts",
+  ].includes(file);
+}
+
 const INTEGRATION_PATTERNS = [
   /^tests\/integration\//,
   /^packages\/(contracts|cloud-core|db)\//,
@@ -136,6 +162,14 @@ export function classifyChangedFiles(files, options = {}) {
   const actionChanged = forceFull || changedFiles.some((file) => matchesAny(file, ACTION_PATTERNS));
   const kicadChanged = forceFull || changedFiles.some((file) => matchesAny(file, KICAD_PATTERNS));
   const integrationChanged = forceFull || changedFiles.some((file) => matchesAny(file, INTEGRATION_PATTERNS));
+  const needsIntegration = forceFull || integrationChanged || kicadChanged || dependencyChanged || workflowChanged;
+  const needsKiCad =
+    needsIntegration &&
+    (forceFull ||
+      kicadChanged ||
+      dependencyChanged ||
+      workflowChanged ||
+      changedFiles.some((file) => matchesAny(file, INTEGRATION_PATTERNS) && !databaseOnlyIntegrationFile(file)));
   const ruleChanged = forceFull || changedFiles.some((file) => matchesAny(file, RULE_PATTERNS));
   const parserModelChanged = forceFull || changedFiles.some((file) => matchesAny(file, PARSER_MODEL_PATTERNS));
   const securityChanged = forceFull || changedFiles.some((file) => matchesAny(file, SECURITY_PATTERNS));
@@ -176,7 +210,8 @@ export function classifyChangedFiles(files, options = {}) {
     needs_typecheck: codeChanged || workflowChanged || dependencyChanged,
     needs_unit: codeChanged || dependencyChanged,
     needs_unit_matrix: forceFull || pathSensitiveChanged || dependencyChanged || workflowChanged,
-    needs_integration: forceFull || integrationChanged || kicadChanged || dependencyChanged,
+    needs_integration: needsIntegration,
+    needs_kicad: needsKiCad,
     needs_cross_platform: forceFull || pathSensitiveChanged || dependencyChanged,
     needs_action_smoke: forceFull || actionChanged || packageChanged,
     needs_accessibility: forceFull || reportChanged || docsChanged || webUiChanged,
@@ -227,6 +262,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     `Docs only: ${profile.docs_only}`,
     `Needs unit matrix: ${profile.needs_unit_matrix}`,
     `Needs integration: ${profile.needs_integration}`,
+    `Needs KiCad CLI: ${profile.needs_kicad}`,
     `Needs coverage: ${profile.needs_coverage}`,
     `Needs mutation: ${profile.needs_mutation}`,
     `Needs security: ${profile.needs_security}`,
