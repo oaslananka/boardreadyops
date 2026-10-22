@@ -157,7 +157,7 @@ describeDatabase("real PostgreSQL runner draft provenance verification", () => {
     // has already returned, but before the filesystem/receipt work resumes.
     // The resulting stale first snapshot must not yield verified-runner-claim.
     let lookups = 0;
-    const racingExecutor: typeof input.executor = {
+    const racingExecutor: Parameters<typeof verifyStoredManufacturingDraftClaim>[0]["executor"] = {
       async query(sql, params) {
         const snapshot = await executor.query(sql, params);
         if (sql.includes("runner_artifact_upload_capabilities as capability") && ++lookups === 1) {
