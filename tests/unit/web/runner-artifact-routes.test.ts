@@ -360,14 +360,30 @@ describe("runner artifact transport routes", () => {
       expectedSha256: createHash("sha256").update("hello").digest("hex"),
     });
     completeUpload.mockRejectedValue(new Error("Database offline"));
-
-    const response = await handleRunnerArtifactUploadRequest(
-      uploadRequest("hello"),
-      artifactId,
-      dependencies({ ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot }),
-    );
+    const logs: string[] = [];
+    const logWrite = vi.spyOn(process.stdout, "write").mockImplementation((line) => {
+      logs.push(String(line));
+      return true;
+    });
+    let response: Response;
+    try {
+      response = await handleRunnerArtifactUploadRequest(
+        uploadRequest("hello"),
+        artifactId,
+        dependencies({ ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot }),
+      );
+    } finally {
+      logWrite.mockRestore();
+    }
 
     expect(response.status).toBe(503);
+    expect(logs).toHaveLength(1);
+    expect(JSON.parse(logs[0] ?? "{}")).toMatchObject({
+      event: "runner_artifact.upload_finalization_ambiguous",
+      artifactId,
+    });
+    expect(logs[0]).not.toContain(uploadToken);
+    expect(logs[0]).not.toContain("Database offline");
     const finalPath = path.join(requireStorageRoot(), runId, attemptId, `${artifactId}.bin`);
     await expect(readFile(finalPath, "utf8")).resolves.toBe("hello");
     expect(failUpload).not.toHaveBeenCalled();

@@ -10,7 +10,7 @@ A rejected `completeUpload` call must therefore preserve the linked bytes and av
 
 ## Read-only operator examination
 
-1. Record a bounded incident ID and the **artifact ID** from the authenticated request/audit context. Verify the installation, repository, release run, attempt and expected storage driver against authoritative database records. Do not disclose bearer capability tokens, `upload_token_digest`, local absolute paths, artifact content or personal information in tickets/logs.
+1. Find the structured application log event `runner_artifact.upload_finalization_ambiguous` (component `runner-artifact-uploads`), containing only a validated opaque `artifactId` and timestamp. Record an incident ID and correlate the **artifact ID** with the authenticated request, server logs and database ownership. This log is best effort and not a durable audit record; if it is missing or rotated, use authorized request/audit context and do not infer success from silence. Verify the installation, repository, release run, attempt and expected storage driver against authoritative database records. Do not disclose bearer capability tokens, `upload_token_digest`, local absolute paths, artifact content or personal information in tickets/logs.
 2. On an authorized, **read-only** PostgreSQL connection, inspect the exact artifact ID (parameter `$1`, not interpolated user text). Example query:
 
    ```sql
@@ -26,7 +26,18 @@ A rejected `completeUpload` call must therefore preserve the linked bytes and av
    where c.artifact_id = $1;
    ```
 
-   The capability row may have been removed by terminal-record retention. If it is missing, separately inspect the artifact row **and its full tenant/run ownership** before interpreting absence.
+   The capability row may have been removed by terminal-record retention. A zero-row result is **not** proof that the artifact is absent. Separately inspect the artifact row and its installation/repository/run ownership using the same artifact ID:
+
+   ```sql
+   select a.id, a.run_id, rr.repository_id, repo.installation_id,
+          a.bytes, a.sha256, a.storage_path
+   from artifacts a
+   join release_runs rr on rr.id = a.run_id
+   join repositories repo on repo.id = rr.repository_id
+   where a.id = $1;
+   ```
+
+   Keep `storage_path` and installation/repository identifiers inside the authorized session. Do not paste them into issue comments or exported logs.
 3. With separate filesystem authorization and an ownership-verified, canonical path, inspect **metadata only**: regular-file type, symlink boundaries, file size and SHA-256 digest. Compare with the `artifacts` and capability records, not untrusted request path components. No action here requires reading or exporting artifact contents outside the authorized host. The filesystem may have been changed by another actor: a successful check is only a point-in-time observation.
 4. Examine the append-only audit, active legal holds, outstanding unlink fences/deletion jobs (when the newer schema is deployed), retention obligations and all worker versions. Do not claim that a legacy unfenced worker obeys the new protocol. Preserve evidence of any mismatch and escalate to the designated storage/security operator.
 

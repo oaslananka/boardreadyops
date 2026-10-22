@@ -13,6 +13,7 @@ import {
   type RunnerArtifactStoreOptions,
 } from "@boardreadyops/db/runner-artifact-store";
 import { safeLocalArtifactPath } from "./artifact-downloads.js";
+import { emitAmbiguousArtifactUploadTelemetry } from "./artifact-upload-telemetry.js";
 import { resolveArtifactCapabilityConfiguration } from "./cloud-runtime-config.js";
 import { authenticateRunnerRequest } from "./runner-request-auth.js";
 
@@ -449,6 +450,8 @@ export async function handleRunnerArtifactUploadRequest(
     // destroy a durably acknowledged artifact. Preserve the uncertain
     // outcome for operator reconciliation instead of guessing a rollback.
     // No durable quarantine record or automatic recovery is created here.
+    // Emit a secret-free correlation ID so the operator can find this event.
+    emitAmbiguousArtifactUploadTelemetry(artifactId);
     return jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503);
   }
   if (completed.status !== "accepted" && completed.status !== "replayed") {
