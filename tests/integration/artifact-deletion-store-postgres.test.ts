@@ -75,6 +75,24 @@ async function insertJob(input: Awaited<ReturnType<typeof fixture>>, artifactId:
   return deletionJobId;
 }
 
+// Wait for the actual competing PostgreSQL backend to block on our advisory
+// lock, not merely for an elapsed sleep. A deadline avoids flaky failures on
+// loaded CI machines without weakening the concurrency assertion.
+async function waitForAdvisoryWait(applicationName: string, timeoutMs = 10_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const observed = rows(
+      await requireExecutor().query(
+        "select wait_event from pg_stat_activity where application_name=$1 and wait_event_type='Lock'",
+        [applicationName],
+      ),
+    );
+    if (observed.some((row) => row.wait_event === "advisory")) return true;
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+  }
+  return false;
+}
+
 afterAll(async () => {
   if (executor && createdInstallationIds.length > 0) {
     // Cascades to repositories/release_runs/artifact_deletion_jobs. Without this the fixed-
@@ -358,21 +376,7 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
           () => ({ ok: true as const }),
           (error: unknown) => ({ ok: false as const, error }),
         );
-      let waiting = false;
-      for (let attempt = 0; attempt < 35; attempt++) {
-        const observed = rows(
-          await requireExecutor().query(
-            "select wait_event from pg_stat_activity where application_name=$1 and wait_event_type='Lock'",
-            [waiterName],
-          ),
-        );
-        if (observed.some((row) => row.wait_event === "advisory")) {
-          waiting = true;
-          break;
-        }
-        await new Promise<void>((resolve) => setTimeout(resolve, 20));
-      }
-      expect(waiting).toBe(true);
+      expect(await waitForAdvisoryWait(waiterName)).toBe(true);
       await writer.query("commit");
       committed = true;
       await expect(writeResult).resolves.toMatchObject({ ok: false, error: { code: "B4401" } });
@@ -429,21 +433,7 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
         workerId,
         token,
       ]);
-      let waiting = false;
-      for (let attempt = 0; attempt < 35; attempt++) {
-        const observed = rows(
-          await requireExecutor().query(
-            "select wait_event from pg_stat_activity where application_name=$1 and wait_event_type='Lock'",
-            [waiterName],
-          ),
-        );
-        if (observed.some((row) => row.wait_event === "advisory")) {
-          waiting = true;
-          break;
-        }
-        await new Promise<void>((resolve) => setTimeout(resolve, 20));
-      }
-      expect(waiting).toBe(true);
+      expect(await waitForAdvisoryWait(waiterName)).toBe(true);
       await writer.query("commit");
       committed = true;
       expect((await blockedQuery).rows[0]?.outcome).toBe("held");
