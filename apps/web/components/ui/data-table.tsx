@@ -148,6 +148,8 @@ export function CursorPagination({
   cursorParameter = "cursor",
   previousCursor,
   nextCursor,
+  previousHref,
+  nextHref,
   label = "Pagination",
 }: Readonly<{
   basePath: string;
@@ -155,15 +157,20 @@ export function CursorPagination({
   cursorParameter?: string;
   previousCursor?: string | undefined;
   nextCursor?: string | undefined;
+  previousHref?: string | undefined;
+  nextHref?: string | undefined;
   label?: string;
 }>) {
-  if (!previousCursor && !nextCursor) return null;
+  if (!previousCursor && !nextCursor && !previousHref && !nextHref) return null;
 
   return (
     <nav aria-label={label} className="flex items-center justify-end gap-2">
-      {previousCursor ? (
+      {previousCursor || previousHref ? (
         <Button asChild variant="outline" size="sm">
-          <Link href={hrefWith(basePath, searchParameters, { [cursorParameter]: previousCursor })} rel="prev">
+          <Link
+            href={previousHref ?? hrefWith(basePath, searchParameters, { [cursorParameter]: previousCursor })}
+            rel="prev"
+          >
             Previous
           </Link>
         </Button>
@@ -172,9 +179,9 @@ export function CursorPagination({
           Previous
         </Button>
       )}
-      {nextCursor ? (
+      {nextCursor || nextHref ? (
         <Button asChild variant="outline" size="sm">
-          <Link href={hrefWith(basePath, searchParameters, { [cursorParameter]: nextCursor })} rel="next">
+          <Link href={nextHref ?? hrefWith(basePath, searchParameters, { [cursorParameter]: nextCursor })} rel="next">
             Next
           </Link>
         </Button>
