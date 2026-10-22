@@ -368,11 +368,39 @@ describe("runner artifact transport routes", () => {
     );
 
     expect(response.status).toBe(503);
-    expect(failUpload).toHaveBeenCalledWith({
+    const finalPath = path.join(requireStorageRoot(), runId, attemptId, `${artifactId}.bin`);
+    await expect(readFile(finalPath, "utf8")).resolves.toBe("hello");
+    expect(failUpload).not.toHaveBeenCalled();
+  });
+
+  it("preserves a physically committed artifact after an ambiguous metadata acknowledgement", async () => {
+    beginUpload.mockResolvedValue({
+      status: "accepted",
       artifactId,
-      uploadToken,
-      reason: "Artifact metadata persistence failed.",
+      runId,
+      executionAttemptId: attemptId,
+      leaseId,
+      storagePath: `${runId}/${attemptId}/${artifactId}.bin`,
+      declaredBytes: 5,
+      expectedSha256: createHash("sha256").update("hello").digest("hex"),
     });
+    // Simulate PostgreSQL committing the metadata update and the transport
+    // dropping its response. This rejection cannot prove a DB rollback.
+    let metadataCommitted = false;
+    completeUpload.mockImplementation(async () => {
+      metadataCommitted = true;
+      throw new Error("connection lost after COMMIT");
+    });
+    const response = await handleRunnerArtifactUploadRequest(
+      uploadRequest("hello"),
+      artifactId,
+      dependencies({ ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot }),
+    );
+    expect(response.status).toBe(503);
+    expect(metadataCommitted).toBe(true);
+    const finalPath = path.join(requireStorageRoot(), runId, attemptId, `${artifactId}.bin`);
+    await expect(readFile(finalPath, "utf8")).resolves.toBe("hello");
+    expect(failUpload).not.toHaveBeenCalled();
   });
 
   it("returns 410 if completed upload status is expired", async () => {
