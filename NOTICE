@@ -315,7 +315,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `configstore@7.1.0`
   - Description: Easily load and save config without having to think about where and how
   - Homepage: https://github.com/sindresorhus/configstore#readme
-- `dotenv@16.6.1`, `dotenv@17.4.2`
+- `dotenv@17.4.2`
   - Description: Loads environment variables from .env file
   - Homepage: https://github.com/motdotla/dotenv#readme
 - `entities@4.5.0`, `entities@7.0.1`
@@ -891,7 +891,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@modelcontextprotocol/sdk@1.32.0`
   - Description: Model Context Protocol implementation for TypeScript
   - Homepage: https://modelcontextprotocol.io
-- `@next/env@16.3.8`
+- `@next/env@16.4.1`
   - Description: Next.js dotenv file loading
   - Homepage: https://github.com/vercel/next.js#readme
 - `@nodable/entities@2.1.0`
@@ -1086,57 +1086,51 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@sec-ant/readable-stream@0.4.1`
   - Description: A tiny, zero-dependency yet spec-compliant asynchronous iterator polyfill/ponyfill for ReadableStreams.
   - Homepage: https://github.com/Sec-ant/readable-stream
-- `@sentry/babel-plugin-component-annotate@5.3.0`
-  - Description: A Babel plugin that annotates frontend components with additional data to enrich the experience in Sentry
-  - Homepage: https://github.com/getsentry/sentry-javascript-bundler-plugins/tree/main/packages/babel-plugin-component-annotate
-- `@sentry/browser@10.71.0`
+- `@sentry/browser@10.76.2`
   - Description: Official Sentry SDK for browsers
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/browser
-- `@sentry/browser-utils@10.71.0`
+- `@sentry/browser-utils@10.76.2`
   - Description: Browser Utilities for all Sentry JavaScript SDKs
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/browser-utils
-- `@sentry/bundler-plugin-core@5.3.0`
-  - Description: Sentry Bundler Plugin Core
-  - Homepage: https://github.com/getsentry/sentry-javascript-bundler-plugins/tree/main/packages/bundler-plugin-core
-- `@sentry/bundler-plugins@10.71.0`
+- `@sentry/bundler-plugins@10.76.2`
   - Description: Sentry Bundler Plugins
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/main/packages/bundler-plugins
 - `@sentry/conventions@0.16.0`
   - Homepage: https://github.com/getsentry/sentry-conventions#readme
-- `@sentry/core@10.71.0`
+- `@sentry/core@10.71.0`, `@sentry/core@10.76.2`
   - Description: Base implementation for all Sentry JavaScript SDKs
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/core
-- `@sentry/feedback@10.71.0`
+- `@sentry/feedback@10.76.2`
   - Description: Sentry SDK integration for user feedback
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/feedback
-- `@sentry/nextjs@10.71.0`
+- `@sentry/nextjs@10.76.2`
   - Description: Official Sentry SDK for Next.js
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/nextjs
-- `@sentry/node@10.71.0`
+- `@sentry/node@10.71.0`, `@sentry/node@10.76.2`
   - Description: Sentry Node SDK using OpenTelemetry for performance instrumentation
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/node
-- `@sentry/node-core@10.71.0`
+- `@sentry/node-core@10.71.0`, `@sentry/node-core@10.76.2`
   - Description: Sentry Node-Core SDK
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/node-core
-- `@sentry/opentelemetry@10.71.0`
+- `@sentry/opentelemetry@10.71.0`, `@sentry/opentelemetry@10.76.2`
   - Description: Official Sentry utilities for OpenTelemetry
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/opentelemetry
-- `@sentry/react@10.71.0`
+- `@sentry/react@10.76.2`
   - Description: Official Sentry SDK for React.js
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/react
-- `@sentry/replay@10.71.0`
+- `@sentry/replay@10.76.2`
   - Description: User replays for Sentry
   - Homepage: https://docs.sentry.io/platforms/javascript/session-replay/
-- `@sentry/replay-canvas@10.71.0`
+- `@sentry/replay-canvas@10.76.2`
   - Description: Replay canvas integration
   - Homepage: https://docs.sentry.io/platforms/javascript/session-replay/
-- `@sentry/server-utils@10.71.0`
+- `@sentry/server-utils@10.71.0`, `@sentry/server-utils@10.76.2`
   - Description: Server Utilities for all Sentry JavaScript SDKs
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/server-utils
-- `@sentry/vercel-edge@10.71.0`
+- `@sentry/vercel-edge@10.76.2`
   - Description: Official Sentry SDK for the Vercel Edge Runtime
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/vercel-edge
-- `@sentry/webpack-plugin@5.4.0`
+- `@sentry/webpack-plugin@5.4.1`
   - Description: Official Sentry Webpack plugin
   - Homepage: https://github.com/getsentry/sentry-javascript-bundler-plugins/tree/main/packages/webpack-plugin
 - `@shikijs/engine-oniguruma@3.23.0`
@@ -1844,7 +1838,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `import-fresh@3.3.1`
   - Description: Import a module while bypassing the cache
   - Homepage: https://github.com/sindresorhus/import-fresh#readme
-- `ip-address@10.7.3`
+- `ip-address@10.7.4`
   - Description: A library for parsing IPv4 and IPv6 IP addresses in node and the browser.
   - Homepage: https://github.com/beaugunderson/ip-address#readme
 - `ipaddr.js@1.9.1`
@@ -2038,7 +2032,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `neo-async@2.6.2`
   - Description: Neo-Async is a drop-in replacement for Async, it almost fully covers its functionality and runs faster
   - Homepage: https://github.com/suguru03/neo-async
-- `next@16.3.8`
+- `next@16.4.1`
   - Description: The React Framework
   - Homepage: https://nextjs.org
 - `next-themes@0.4.6`

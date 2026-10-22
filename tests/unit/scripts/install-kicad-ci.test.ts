@@ -11,6 +11,7 @@ const sudoMock = [
   "#!/usr/bin/env bash",
   "set -euo pipefail",
   'if [[ "$1" == "add-apt-repository" ]]; then exit 0; fi',
+  'if [[ "$1" == "apt-get" ]]; then printf "%s\n" "$*" >> "$BRO_MOCK_APT_CALLS"; fi',
   'if [[ "$1" == "apt-get" && "$2" == "update" ]]; then',
   '  case "$BRO_MOCK_APT_MODE" in',
   '    outage) echo "E: Failed to fetch https://ppa.launchpadcontent.net/kicad/kicad-10.0-releases/ubuntu/dists/noble/InRelease 503 Service Unavailable" >&2; exit 100;;',
@@ -74,6 +75,7 @@ async function fixture() {
     BRO_MOCK_OCI_VERSION: "10.0.7",
     BRO_MOCK_VENDOR: "KiCad",
     BRO_MOCK_DOCKER_LOG: path.join(root, "docker.log"),
+    BRO_MOCK_APT_CALLS: path.join(root, "apt-calls.log"),
   };
   return { root, env, githubPath };
 }
@@ -96,6 +98,26 @@ describe.runIf(process.platform === "linux")("Linux KiCad 10 signed PPA with off
       expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
       expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
       expect(await readFile(f.githubPath, "utf8")).toBe("");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("bounds signed PPA socket inactivity for both update and package download", async () => {
+    const f = await fixture();
+    try {
+      const result = execute(f.env);
+      expect(result.status).toBe(0);
+      const calls = (await readFile(f.env.BRO_MOCK_APT_CALLS as string, "utf8")).trim().split("\n");
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toContain("apt-get update");
+      expect(calls[1]).toContain("apt-get install");
+      for (const call of calls) {
+        expect(call).toContain("Acquire::Retries=1");
+        expect(call).toContain("Acquire::http::Timeout=45");
+        expect(call).toContain("Acquire::https::Timeout=45");
+      }
+      expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
     } finally {
       await rm(f.root, { recursive: true, force: true });
     }
