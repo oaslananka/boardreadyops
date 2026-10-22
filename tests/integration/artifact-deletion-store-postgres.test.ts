@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -662,6 +663,120 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     } finally {
       await originalConnection.close().catch(() => {});
       await requireExecutor().query("delete from legal_holds where lower(tenant_id)=lower($1)", [tenantId]);
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves a committed fence after a real child process is SIGKILLed before audit", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL required");
+    const label = `sigkill-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const artifactId = randomUUID();
+    const jobId = await insertJob(tenant, artifactId);
+    const tenantId = `artifact-delete-${label}`;
+    const workerId = `sigkill-worker-${randomUUID().slice(0, 8)}`;
+    const token = randomUUID();
+    const store = createSqlArtifactDeletionStore(requireExecutor(), {
+      now: () => new Date(Date.now() + 1_000),
+      leaseSeconds: 120,
+    });
+    expect((await store.claimDeletions({ workerId, limit: 1 }))[0]?.deletionJobId).toBe(jobId);
+    const root = await mkdtemp(path.join(tmpdir(), "boardreadyops-real-kill-"));
+    const objectPath = path.join(root, tenant.runId, `${artifactId}.bin`);
+    await mkdir(path.dirname(objectPath), { recursive: true });
+    await writeFile(objectPath, "DISPOSABLE PROCESS-CRASH ACCEPTANCE ONLY");
+
+    // The test child is an independent Node process and PostgreSQL session,
+    // exercising the exact admission SQL invoked by the production store.
+    // This is not a boot of the complete production worker. SIGKILL occurs
+    // AFTER unlink and BEFORE audit/settlement.
+    const childScript = `
+      const { Client } = require('pg');
+      const { unlink } = require('node:fs/promises');
+      (async () => {
+        const client = new Client({ connectionString: process.env.DATABASE_URL });
+        await client.connect();
+        const result = await client.query(
+          'select boardreadyops_begin_artifact_unlink($1, $2, $3::uuid) as outcome',
+          [process.argv[1], process.argv[2], process.argv[3]],
+        );
+        if (result.rows[0]?.outcome !== 'authorized') throw new Error('fence not authorized');
+        await unlink(process.argv[4]);
+        if (process.send) process.send({ phase: 'unlinked' });
+        setInterval(() => {}, 1000);
+      })().catch(() => { if (process.send) process.send({ phase: 'error' }); process.exit(1); });
+    `;
+    const child = spawn(process.execPath, ["-e", childScript, jobId, workerId, token, objectPath], {
+      cwd: process.cwd(),
+      env: { ...process.env, DATABASE_URL: connectionString },
+      stdio: ["ignore", "ignore", "ignore", "ipc"],
+    });
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    try {
+      const phase = await new Promise<string>((resolve, reject) => {
+        child.once("message", (message: unknown) => {
+          const value = message && typeof message === "object" && "phase" in message ? message.phase : undefined;
+          resolve(typeof value === "string" ? value : "invalid-message");
+        });
+        child.once("error", reject);
+        child.once("exit", () => reject(new Error("unlink child exited before acknowledging filesystem state")));
+      });
+      expect(phase).toBe("unlinked");
+      child.kill("SIGKILL");
+      const exitSignal = await new Promise<NodeJS.Signals | null>((resolve) => {
+        child.once("exit", (_code, signal) => resolve(signal));
+      });
+      expect(exitSignal).toBe("SIGKILL");
+      await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+
+      const fence = rows(
+        await requireExecutor().query("select token, settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+          jobId,
+        ]),
+      );
+      expect(fence).toEqual([{ token, settled_at: null }]);
+      await expect(
+        lifecycle.createLegalHold({
+          tenantId,
+          createdBy: "authorized-operator",
+          reason: "Hold must not acknowledge after a real SIGKILL",
+          scope: "organization",
+        }),
+      ).rejects.toBeInstanceOf(LegalHoldAdmissionConflictError);
+
+      await requireExecutor().query(
+        "update artifact_deletion_jobs set lease_expires_at=clock_timestamp()-interval '1 second' where id=$1",
+        [jobId],
+      );
+      const recovering = createSqlArtifactDeletionStore(requireExecutor(), {
+        now: () => new Date(Date.now() + 60_000),
+      });
+      await expect(recovering.claimDeletions({ workerId: "sigkill-recovery", limit: 1 })).resolves.toEqual([]);
+      await expect(
+        recovering.settlePhysicalDeletion({
+          deletionJobId: jobId,
+          workerId,
+          fenceToken: token,
+          outcome: "deleted",
+        }),
+      ).resolves.toBe("stale");
+
+      // Deliberately do NOT settle an ambiguous crash as part of automated
+      // recovery. An authenticated operator needs separate evidence and audit.
+      expect(
+        rows(
+          await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+            jobId,
+          ]),
+        ),
+      ).toEqual([{ settled_at: null }]);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      // Test-only cleanup settles the known, disposable fixture before the
+      // afterAll installation cascade; not a model for production recovery.
+      await store.completeDeletion({ deletionJobId: jobId, workerId, outcome: "deleted" });
+      await store.settlePhysicalDeletion({ deletionJobId: jobId, workerId, fenceToken: token, outcome: "deleted" });
+      await requireExecutor().query("delete from legal_holds where tenant_id=$1", [tenantId]);
       await rm(root, { recursive: true, force: true });
     }
   });
