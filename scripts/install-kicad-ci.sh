@@ -39,18 +39,29 @@ transient_ppa_outage() {
     grep -Eiq "^[[:space:]]+($transient)"
 }
 
+# Bound each APT socket's *inactivity* so a stalled signed PPA .deb download
+# returns a verifiable transport error instead of consuming the whole CI job.
+# The existing PPA-only transient-error classifier still decides whether the
+# immutable official KiCad OCI fallback is permitted; signature failures never
+# trigger fallback. No unsigned source or extra service is introduced.
+apt_transport_options=(
+  -o Acquire::Retries=1
+  -o Acquire::http::Timeout=45
+  -o Acquire::https::Timeout=45
+)
+
 echo '::notice::Attempting signed KiCad 10.0 PPA installation'
 sudo add-apt-repository --yes --no-update "ppa:kicad/kicad-$ppa_series-releases"
 
 native_ready=false
 for attempt in 1 2 3 4; do
-  if sudo apt-get update -o Acquire::Languages=none -o APT::Update::Error-Mode=any -o Acquire::Retries=2 -qq 2>&1 | tee "$apt_log"; then
+  if sudo apt-get update -o Acquire::Languages=none -o APT::Update::Error-Mode=any "${apt_transport_options[@]}" -qq 2>&1 | tee "$apt_log"; then
     candidate="$(apt-cache policy kicad | awk '/Candidate:/ {print $2; exit}')"
     if [[ "$candidate" != "$series".* ]]; then
       echo "::error::Signed KiCad PPA returned an unexpected candidate: ${candidate:-none}"
       exit 1
     fi
-    if sudo apt-get install --yes --no-install-recommends -o Acquire::Retries=5 kicad 2>&1 | tee "$apt_log"; then
+    if sudo apt-get install --yes --no-install-recommends "${apt_transport_options[@]}" kicad 2>&1 | tee "$apt_log"; then
       native_ready=true
       break
     fi
