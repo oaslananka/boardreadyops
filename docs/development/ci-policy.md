@@ -51,6 +51,30 @@ All heavyweight validation still runs when the relevant risk-profile flag is tru
 
 Full mutation testing is no longer the default for every pull request. The `ci / mutation` job runs on explicit workflow dispatch for mutation-sensitive changes; scheduled `mutation-nightly` provides the regular broader signal. This keeps feedback fast for low-risk pull requests while keeping a regular full mutation signal.
 
+## KiCad 10 real-integration reliability
+
+The Node 24 / PostgreSQL 17 manufacturing lane always executes genuine KiCad
+10.0.x integration tests when the risk classifier requires KiCad. Its primary
+install path is the project-maintained **signed** Ubuntu PPA with APT's
+signature, candidate-version and package-hash checks enabled. If and only if
+that KiCad PPA fails from an explicit transient 5xx or connectivity error,
+`scripts/install-kicad-ci.sh` uses the official KiCad CLI image from the
+public KiCad GitHub Container Registry pinned to a reviewed, immutable SHA-256
+digest. Signature or integrity verification failures, wrong KiCad versions,
+unexpected OCI vendor metadata and unrelated package-index errors still fail
+the CI job; no other test lane is skipped or deemed successful.
+
+The OCI CLI runs non-root with networking disabled, a read-only root filesystem,
+no added capabilities, an ephemeral runtime home and limited temporary and
+checkout-directory mounts. This is a **different trusted distribution channel**:
+OCI digest pinning verifies exact image bytes but must not be misrepresented as
+an APT GPG signature or a separately signed upstream attestation. Image digest
+updates require deliberate supply-chain review, not an automatic floating tag.
+The public GHCR image requires no custom image publishing, VPS capacity,
+additional runner, paid cache, or permanent binary in Git; the tradeoff is a
+large image pull if the PPA is unavailable. The regular required check names and
+real KiCad release gates are unchanged.
+
 ## Updating the policy
 
 When adding a new source area, update `scripts/ci-risk-profile.mjs` and add a unit test in `tests/unit/scripts/ci-risk-profile.test.ts`. If the new area should block merges, also update `scripts/setup-branch-protection.sh`.
