@@ -26,6 +26,23 @@ Keep `--no-file-parallelism` on `test:int` until every database-backed file has
 an isolated database or schema. Tests within each file retain their normal
 ordering and concurrency semantics.
 
+## CI integration scope and supported runtimes
+
+The PR risk classifier runs the PostgreSQL-backed integration suites on **Node 22
++ PostgreSQL 16** and **Node 24 + PostgreSQL 17**, covering the supported
+runtime lines and the production baseline. These jobs do not install KiCad for
+recognized billing/database-only changes. Database-only suites include the
+PostgreSQL tests and backup/restore checks; the real KiCad ZIP upload suite is
+reserved for the full integration lane.
+
+Changes affecting KiCad, manufacturing/exports, unknown integration contracts,
+dependencies, or CI workflow policy fail closed into a full real-KiCad 10
+integration run on Node 24 / PostgreSQL 17. Every main push and manual CI
+dispatch also runs that full suite. This does **not** reduce supported versions:
+Node 22/24 and PostgreSQL 16/17 are still exercised, and no KiCad-dependent
+test may be silently skipped on manufacturing/main validation. The former
+Node 24 + PostgreSQL 16 duplicate integration lane is no longer run.
+
 ## Required evidence in PRs
 
 Every pull request should list command results in the PR body. Public contract
