@@ -1284,28 +1284,28 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@visx/shape@4.0.1-alpha.0`
   - Description: visx shape
   - Homepage: https://github.com/airbnb/visx#readme
-- `@vitest/coverage-v8@4.1.11`
+- `@vitest/coverage-v8@4.1.12`
   - Description: V8 coverage provider for Vitest
   - Homepage: https://vitest.dev/guide/coverage
-- `@vitest/expect@4.1.11`
+- `@vitest/expect@4.1.12`
   - Description: Jest's expect matchers as a Chai plugin
   - Homepage: https://vitest.dev/api/expect
-- `@vitest/mocker@4.1.11`
+- `@vitest/mocker@4.1.12`
   - Description: Vitest module mocker implementation
   - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/mocker
-- `@vitest/pretty-format@4.1.11`
+- `@vitest/pretty-format@4.1.12`
   - Description: Fork of pretty-format with support for ESM
   - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/pretty-format
-- `@vitest/runner@4.1.11`
+- `@vitest/runner@4.1.12`
   - Description: Vitest test runner
   - Homepage: https://vitest.dev/api/advanced/runner
-- `@vitest/snapshot@4.1.11`
+- `@vitest/snapshot@4.1.12`
   - Description: Vitest snapshot manager
   - Homepage: https://vitest.dev/guide/snapshot
-- `@vitest/spy@4.1.11`
+- `@vitest/spy@4.1.12`
   - Description: Lightweight Jest compatible spy implementation
   - Homepage: https://vitest.dev/api/mock
-- `@vitest/utils@4.1.11`
+- `@vitest/utils@4.1.12`
   - Description: Shared Vitest utility functions
   - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/utils
 - `@webassemblyjs/ast@1.14.1`
@@ -2481,7 +2481,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `vite@8.2.4`
   - Description: Native-ESM powered web dev build tool
   - Homepage: https://vite.dev
-- `vitest@4.1.11`
+- `vitest@4.1.12`
   - Description: Next generation testing framework powered by Vite
   - Homepage: https://vitest.dev
 - `watchpack@2.5.2`

@@ -47,12 +47,45 @@ export function ProductNavigation() {
   }, [mobileOpen]);
 
   useEffect(() => {
-    function closeOnEscape(event: KeyboardEvent): void {
-      if (event.key === "Escape") setMobileOpen(false);
+    function handleDrawerKeys(event: KeyboardEvent): void {
+      if (!mobileOpen) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const drawer = document.getElementById("product-navigation-drawer");
+      if (!drawer) return;
+      const linksAndControls = drawer.querySelectorAll<HTMLElement>("a[href], button:not([disabled])");
+      const first = linksAndControls.item(0);
+      const last = linksAndControls.item(linksAndControls.length - 1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!drawer.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
+    document.addEventListener("keydown", handleDrawerKeys);
+    return () => document.removeEventListener("keydown", handleDrawerKeys);
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    const desktop = window.matchMedia?.("(min-width: 768px)");
+    if (!desktop) return;
+    const closeOnDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) setMobileOpen(false);
+    };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
   }, []);
 
   // Read the persisted collapse state after mount rather than during initial
@@ -103,6 +136,7 @@ export function ProductNavigation() {
         />
       ) : null}
 
+      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: the responsive role is dialog whenever aria-modal is enabled */}
       <aside
         id="product-navigation-drawer"
         className={cn(
@@ -110,8 +144,11 @@ export function ProductNavigation() {
           // as a stable selector hook for tests/e2e/regression-audit-findings.spec.ts.
           "product-rail fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card transition-transform md:sticky md:top-0 md:h-dvh md:translate-x-0",
           compact && "md:w-16",
-          !mobileOpen && "-translate-x-full md:translate-x-0",
+          !mobileOpen && "invisible -translate-x-full md:visible md:translate-x-0",
         )}
+        role={mobileOpen ? "dialog" : undefined}
+        aria-modal={mobileOpen || undefined}
+        aria-label={mobileOpen ? "Product navigation drawer" : undefined}
         data-compact={compact}
         data-mobile-open={mobileOpen}
       >
