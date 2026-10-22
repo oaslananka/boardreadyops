@@ -251,6 +251,43 @@ describe("server-side independent runner draft claim (NOT a manufacturing author
     expect((await verifyStoredManufacturingDraftClaim(f.input)).status).toBe("unverified");
   });
 
+  it.each([
+    ["runner revocation", "registered_status", "disabled"],
+    ["a superseded attempt", "attempt_status", "superseded"],
+    ["a replaced archive metadata row", "storage_path", "replaced.zip"],
+    ["a new ambiguous ZIP", "extra_archive", "duplicate"],
+  ] as const)(
+    "fails closed if %s arrives after the initial SQL lookup during ZIP verification",
+    async (_label, field, value) => {
+      const f = await fixture();
+      let queries = 0;
+      const initialRows = f.rows.map((row) => ({ ...row }));
+      const executor = {
+        query: async () => {
+          queries += 1;
+          if (queries === 1) {
+            // Model a committed change after the initial authoritative snapshot,
+            // while the verifier is awaiting a receipt/ZIP file read.
+            queueMicrotask(() => {
+              if (field === "extra_archive") {
+                f.rows.push({ ...f.rows[0], artifact_id: "77777777-7777-4777-8777-777777777777" });
+              } else {
+                const first = f.rows[0];
+                if (!first) throw new Error("missing archive fixture");
+                first[field] = value;
+              }
+            });
+            return { rows: initialRows };
+          }
+          return { rows: f.rows.map((row) => ({ ...row })) };
+        },
+      } as unknown as SqlQueryExecutor;
+      const result = await verifyStoredManufacturingDraftClaim({ ...f.input, executor });
+      expect(result.status).toBe("unverified");
+      expect(queries).toBe(2);
+    },
+  );
+
   it("rejects unsupported storage, invalid identifiers and unavailable SQL safely", async () => {
     const f = await fixture();
     for (const input of [
