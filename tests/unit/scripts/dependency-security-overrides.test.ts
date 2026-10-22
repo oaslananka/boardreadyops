@@ -52,10 +52,10 @@ describe("dependency security overrides", () => {
 
     expect(workspace.overrides?.["brace-expansion@>=5 <5.0.12"]).toBe("5.0.12");
     expect(workspace.overrides?.["fast-uri@>=3 <3.1.8"]).toBe("3.1.8");
-    const patchedIpAddress = workspace.overrides?.["ip-address@<10.7.1"];
+    const patchedIpAddress = workspace.overrides?.["ip-address@<10.7.4"];
     expect(patchedIpAddress).toMatch(/^\d+\.\d+\.\d+$/u);
     const [major = 0, minor = 0, patch = 0] = (patchedIpAddress ?? "0.0.0").split(".").map(Number);
-    expect(major > 10 || (major === 10 && (minor > 7 || (minor === 7 && patch >= 1)))).toBe(true);
+    expect(major > 10 || (major === 10 && (minor > 7 || (minor === 7 && patch >= 4)))).toBe(true);
     expect(lockfile).toContain(`ip-address@${patchedIpAddress}:`);
     const patchedUndici = workspace.overrides?.["undici@>=8.0.0 <8.11.0"];
     expect(patchedUndici).toMatch(/^\d+\.\d+\.\d+$/u);
@@ -64,9 +64,19 @@ describe("dependency security overrides", () => {
       undiciMajor > 8 || (undiciMajor === 8 && (undiciMinor > 11 || (undiciMinor === 11 && undiciPatch >= 0))),
     ).toBe(true);
     expect(workspace.overrides?.["qs@>=6.11.1 <6.16.0"]).toBe("6.16.0");
-    expect(workspace.minimumReleaseAgeExclude).toEqual(
-      expect.arrayContaining(["fast-uri@3.1.8", "ip-address@10.7.1", "qs@6.16.0"]),
-    );
+    expect(workspace.minimumReleaseAgeExclude).toEqual(expect.arrayContaining(["fast-uri@3.1.8", "qs@6.16.0"]));
+    expect(workspace.minimumReleaseAgeExclude).not.toContain("ip-address@10.7.1");
+    expect(workspace.minimumReleaseAgeExclude).not.toContain("next@16.3.8");
+    expect(workspace.overrides?.["next@<16.4.1"]).toBe("16.4.1");
+    expect(lockfile).toContain("next@16.4.1:");
+    expect(lockfile).not.toContain("next@16.3.8:");
+    expect(lockfile).not.toContain("ip-address@10.7.3:");
+    const web = JSON.parse(await readFile("apps/web/package.json", "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+    expect(web.dependencies?.next).toBe("16.4.1");
+    expect(web.dependencies?.["@sentry/nextjs"]).toBe("^10.75.2");
+    expect(lockfile).toContain("'@sentry/nextjs@10.76.2':");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("brace-expansion@5.0.9");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("brace-expansion@5.0.12");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("undici@8.9.0");
