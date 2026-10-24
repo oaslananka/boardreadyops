@@ -51,6 +51,11 @@ allowBuilds:
   sharp: true
   vue-demi: false
 
+# Upstream chromium-bidi v17 still references Zod 3's removed ZodError.errors alias.
+# Retain invalid-command protocol errors when running against the patched Zod 4.
+patchedDependencies:
+  chromium-bidi@17.0.2: patches/chromium-bidi@17.0.2.patch
+
 overrides:
   # Bound JSON.parse fallback matching to the upstream ReDoS fix (#1036).
   json-with-bigint: 3.5.12

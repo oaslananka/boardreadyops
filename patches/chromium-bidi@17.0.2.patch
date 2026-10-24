@@ -1,0 +1,12 @@
+diff --git a/out/Default/gen/src/protocol-parser/protocol-parser.js b/out/Default/gen/src/protocol-parser/protocol-parser.js
+--- a/out/Default/gen/src/protocol-parser/protocol-parser.js
++++ b/out/Default/gen/src/protocol-parser/protocol-parser.js
+@@ -30,7 +30,7 @@
+     if (parseResult.success) {
+         return parseResult.data;
+     }
+-    const errorMessage = parseResult.error.errors
++    const errorMessage = parseResult.error.issues
+         .map((e) => `${e.message} in ` +
+         `${e.path.map((p) => JSON.stringify(p)).join('/')}.`)
+         .join(' ');

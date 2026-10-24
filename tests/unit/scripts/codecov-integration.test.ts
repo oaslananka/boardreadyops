@@ -1,10 +1,15 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { normalizeOptions } from "@codecov/bundler-plugin-core";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import { buildCloudCoverageArguments } from "../../../scripts/run-cloud-codecov-coverage.mjs";
-import { buildCodecovBundleOptions, collectBundleAssets } from "../../../scripts/run-codecov-bundle-analysis.mjs";
+import {
+  buildCodecovBundleOptions,
+  collectBundleAssets,
+  createAndUploadBundleReport,
+} from "../../../scripts/run-codecov-bundle-analysis.mjs";
 import { buildCodecovCoverageArguments } from "../../../scripts/run-codecov-coverage.mjs";
 
 async function text(path: string): Promise<string> {
@@ -43,6 +48,27 @@ describe("Codecov integration", () => {
       expect(assets.map((asset) => asset.name)).toEqual(["app.js"]);
       expect(assets[0]).toMatchObject({ size: 19 });
       expect(typeof assets[0]?.gzipSize).toBe("number");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves Codecov validation errors and generates a real dry-run bundle report with patched Zod", async () => {
+    const options = buildCodecovBundleOptions({ dryRun: true });
+    const invalid = normalizeOptions({ ...options.coreOptions, apiUrl: "not-a-url" });
+    expect(invalid.success).toBe(false);
+    if (!invalid.success) {
+      expect(invalid.errors.join(" ")).toContain("apiUrl");
+    }
+
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-codecov-zod-runtime-"));
+    try {
+      await writeFile(path.join(root, "app.js"), "console.log('patched');\n");
+      const json = await createAndUploadBundleReport([root], options.coreOptions, options.bundleAnalyzerOptions);
+      expect(JSON.parse(json)).toMatchObject({
+        bundleName: "boardreadyops-web",
+        assets: [{ name: "app.js" }],
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }
