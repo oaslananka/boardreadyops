@@ -51,7 +51,7 @@ describe("dependency security overrides", () => {
     const actionBundle = await readFile("dist/action/index.cjs", "utf8");
 
     expect(workspace.overrides?.["brace-expansion@>=5 <5.0.12"]).toBe("5.0.12");
-    expect(workspace.overrides?.["fast-uri@>=3 <3.1.8"]).toBe("3.1.8");
+    expect(workspace.overrides?.["fast-uri@>=3 <3.1.9"]).toBe("3.1.9");
     const patchedIpAddress = workspace.overrides?.["ip-address@<10.7.4"];
     expect(patchedIpAddress).toMatch(/^\d+\.\d+\.\d+$/u);
     const [major = 0, minor = 0, patch = 0] = (patchedIpAddress ?? "0.0.0").split(".").map(Number);
@@ -64,7 +64,7 @@ describe("dependency security overrides", () => {
       undiciMajor > 8 || (undiciMajor === 8 && (undiciMinor > 11 || (undiciMinor === 11 && undiciPatch >= 0))),
     ).toBe(true);
     expect(workspace.overrides?.["qs@>=6.11.1 <6.16.0"]).toBe("6.16.0");
-    expect(workspace.minimumReleaseAgeExclude).toEqual(expect.arrayContaining(["fast-uri@3.1.8", "qs@6.16.0"]));
+    expect(workspace.minimumReleaseAgeExclude).toEqual(expect.arrayContaining(["fast-uri@3.1.9", "qs@6.16.0"]));
     expect(workspace.minimumReleaseAgeExclude).not.toContain("ip-address@10.7.1");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("next@16.3.8");
     expect(workspace.overrides?.["next@<16.4.1"]).toBe("16.4.1");

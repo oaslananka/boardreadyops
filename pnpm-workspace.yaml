@@ -21,8 +21,12 @@ minimumReleaseAgeExclude:
   - 'source-map-js@1.2.2'
   - '@modelcontextprotocol/sdk@1.32.0'
   - 'vite@8.2.4'
-  # Renovate security update: fast-uri@3.1.8
-  - 'fast-uri@3.1.8'
+  # Security advisory fixes from latest OSV scan. Review exclusions after normal age window.
+  - 'fast-uri@3.1.9'
+  - 'body-parser@2.4.0'
+  - 'undici@6.29.1'
+  - 'zod@4.6.6'
+  - 'happy-dom@21.0.4'
   - 'qs@6.16.0'
   - 'renovate@43.272.4'
 trustPolicy: no-downgrade
@@ -69,12 +73,17 @@ overrides:
   glob@>=10.0.0 <13.0.6: 13.0.6
   'qs@>=6.11.1 <6.16.0': 6.16.0
   'undici@>=8.0.0 <8.11.0': 8.11.2
+  'undici@>=6 <6.29.1': 6.29.1
   vite@<=6.4.1: '>=6.4.2'
   vite@^8.0.0: '8.2.4'
   '@babel/core@>=7.0.0 <7.29.1': '>=7.29.1'
   'brace-expansion@>=5 <5.0.12': 5.0.12
-  'fast-uri@>=3 <3.1.8': 3.1.8
+  'fast-uri@>=3 <3.1.9': 3.1.9
   'hono@<4.13.7': 4.13.13
+  'body-parser@>=2 <2.4.0': 2.4.0
+  # Explicit compatibility probes required: both upstream tools still declare Zod 3.
+  '@codecov/bundler-plugin-core>zod': 4.6.6
+  'chromium-bidi>zod': 4.6.6
   'markdown-it@<14.3.3': 14.3.3
   'next@<16.4.1': 16.4.1
   'smol-toml@<1.9.0': 1.9.0
