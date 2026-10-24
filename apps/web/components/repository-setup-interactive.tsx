@@ -769,6 +769,21 @@ function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetReposi
         <StatusBadge value={setupProgressBadgeValue(state.id)} label={label} />
       </div>
       <p className="text-sm text-muted-foreground">{description}</p>
+      {state.id === "ready" ? (
+        <Link
+          href="/runs"
+          className="inline-flex min-h-11 w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
+          View recorded readiness runs →
+        </Link>
+      ) : (
+        <a
+          href="#policy-preset"
+          className="inline-flex min-h-11 w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
+          Review policy and next setup step →
+        </a>
+      )}
       <SetupProgressDetails repository={repository} stateId={state.id} />
       <SetupProgressNav currentStep={state.currentStep} />
     </section>
