@@ -62362,7 +62362,9 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
   const [originX, originY, width, height] = box;
   const boardWidth = bounds.maxX - bounds.minX;
   const boardHeight = bounds.maxY - bounds.minY;
-  if (originX === void 0 || originY === void 0 || width === void 0 || height === void 0 || Math.abs(originX) > 1e-4 || Math.abs(originY) > 1e-4 || Math.abs(width - boardWidth) > 1e-3 || Math.abs(height - boardHeight) > 1e-3 || boardWidth <= 0 || boardHeight <= 0)
+  if (originX === void 0 || originY === void 0 || width === void 0 || height === void 0 || Math.abs(originX) > 1e-4 || Math.abs(originY) > 1e-4 || // KiCad 10 quantizes plot dimensions (10.0 mm becomes 9.9822 mm).
+  // Permit only narrow plot-unit rounding, never distinct board geometry.
+  Math.abs(width - boardWidth) > 0.025 || Math.abs(height - boardHeight) > 0.025 || boardWidth <= 0 || boardHeight <= 0)
     return [];
   const result = [];
   const seen = /* @__PURE__ */ new Set();
@@ -62375,7 +62377,8 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
       const description = candidate.description;
       const uuid5 = candidate.uuid;
       const pos = candidate.pos;
-      if (typeof description !== "string" || !description.trim().endsWith(` on ${layer}`) || typeof uuid5 !== "string" || !/^[a-f0-9-]{36}$/iu.test(uuid5) || !pos || typeof pos !== "object")
+      const sourceLayer = typeof description === "string" ? /\bon ((?:F|B)\.Cu)(?:, length \d+(?:\.\d+)? mm)?$/iu.exec(description.trim())?.[1] : void 0;
+      if (typeof description !== "string" || sourceLayer !== layer || typeof uuid5 !== "string" || !/^[a-f0-9-]{36}$/iu.test(uuid5) || !pos || typeof pos !== "object")
         continue;
       const { x, y } = pos;
       if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) continue;
@@ -62385,7 +62388,7 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
       const key = `${finding2.fingerprint}:${uuid5}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const name = /\bof ([#A-Za-z0-9_]+) on (?:F|B)\.Cu$/iu.exec(description)?.[1] ?? "Item";
+      const name = /\bof ([#A-Za-z0-9_]+) on (?:F|B)\.Cu$/iu.exec(description)?.[1] ?? (description.startsWith("Track ") ? "Track" : "Item");
       result.push({
         id: `kicad_item_${finding2.fingerprint.slice(0, 12)}_${uuid5.slice(0, 8)}`,
         kind: "finding",
