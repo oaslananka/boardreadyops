@@ -119,7 +119,8 @@ describe("repository setup preview page", () => {
   it("says what is written and where it cannot be written, plus explicit recovery actions", async () => {
     const markup = await render({ preset: "prototype" });
     expect(markup).toContain("Read the files before you decide");
-    expect(markup).toContain("never a commit to your default");
+    expect(markup).toContain("BoardReadyOps never");
+    expect(markup).toContain("Files you copy manually are outside this guarantee");
     expect(markup).toContain("Recovery and troubleshooting");
   });
 
