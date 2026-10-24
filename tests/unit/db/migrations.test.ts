@@ -144,6 +144,8 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0091_protected_release_seal_evidence_version_guard.sql",
       "0092_optional_legacy_delivery_archive_url.sql",
       "0093_explicit_manufacturing_share_authorizations.sql",
+      "0095_pending_stripe_customer_events_index.sql",
+      "0096_stripe_reconciliation_claims.sql",
     ]);
   });
 

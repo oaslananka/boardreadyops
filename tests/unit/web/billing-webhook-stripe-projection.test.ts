@@ -1,9 +1,11 @@
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as webhookPost } from "../../../apps/web/app/api/v1/billing/webhook/route.js";
+import { projectEntitlement } from "../../../apps/web/lib/stripe-entitlement-projection.js";
+import { BillingStore } from "../../../packages/db/src/billing-store.js";
 import * as pgExecutorModule from "../../../packages/db/src/pg-executor.js";
 
-const trackedEnvironmentNames = [
+const environmentNames = [
   "STRIPE_WEBHOOK_SECRET",
   "BOARDREADYOPS_PERSISTENCE_MODE",
   "DATABASE_URL",
@@ -12,28 +14,17 @@ const trackedEnvironmentNames = [
   "STRIPE_BUSINESS_MONTHLY_PRICE_ID",
   "STRIPE_BUSINESS_YEARLY_PRICE_ID",
 ] as const;
-const originalEnvironment = new Map(trackedEnvironmentNames.map((name) => [name, process.env[name]]));
+const originals = new Map(environmentNames.map((name) => [name, process.env[name]]));
+const secret = "whsec_synthetic_test";
+const now = Math.floor(Date.now() / 1_000);
 
-const webhookSecret = "whsec_test_secret_1234567890";
-
-function signedRequest(payload: Record<string, unknown>, timestamp = Math.floor(Date.now() / 1000)): Request {
-  const body = JSON.stringify(payload);
-  const digest = createHmac("sha256", webhookSecret).update(`${timestamp}.${body}`).digest("hex");
-  return new Request("https://boardreadyops.com/api/v1/billing/webhook", {
-    method: "POST",
-    body,
-    headers: { "content-type": "application/json", "stripe-signature": `t=${timestamp},v1=${digest}` },
-  });
+function event(id: string, type: string, object: Record<string, unknown>) {
+  return { id, type, created: now, data: { object } };
 }
-
-function stripeEvent(id: string, type: string, object: Record<string, unknown>): Record<string, unknown> {
-  return { id, type, created: Math.floor(Date.now() / 1000), data: { object } };
-}
-
-function subscriptionObject(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function subscription(overrides: Record<string, unknown> = {}) {
   return {
-    id: "sub_123",
-    customer: "cus_123",
+    id: "sub_synthetic",
+    customer: "cus_synthetic",
     status: "active",
     quantity: 1,
     current_period_start: 1_700_000_000,
@@ -43,272 +34,231 @@ function subscriptionObject(overrides: Record<string, unknown> = {}): Record<str
     ...overrides,
   };
 }
-
-/** Queues DB responses for postgres mode and returns the mocked `query` fn. */
-function postgresMode(...responses: Array<Record<string, unknown>>): ReturnType<typeof vi.fn> {
-  process.env.STRIPE_WEBHOOK_SECRET = webhookSecret;
-  process.env.DATABASE_URL = "postgresql://localhost:5432/testdb";
+function signedRequest(payload: object, signature = true): Request {
+  const body = JSON.stringify(payload);
+  const hash = createHmac("sha256", secret).update(`${now}.${body}`).digest("hex");
+  return new Request("https://boardreadyops.com/api/v1/billing/webhook", {
+    method: "POST",
+    body,
+    headers: { "stripe-signature": signature ? `t=${now},v1=${hash}` : "bad" },
+  });
+}
+function db(...values: unknown[]) {
+  const query = vi.fn();
+  for (const value of values) query.mockResolvedValueOnce(value);
+  process.env.STRIPE_WEBHOOK_SECRET = secret;
+  process.env.DATABASE_URL = "postgresql://localhost:5432/synthetic";
   process.env.STRIPE_TEAM_MONTHLY_PRICE_ID = "price_team_month";
   process.env.STRIPE_TEAM_YEARLY_PRICE_ID = "price_team_year";
-  process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID = "price_biz_month";
-  process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID = "price_biz_year";
+  process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID = "price_business_month";
+  process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID = "price_business_year";
   delete process.env.BOARDREADYOPS_PERSISTENCE_MODE;
-  const query = vi.fn();
-  for (const response of responses) query.mockResolvedValueOnce(response);
-  const close = vi.fn().mockResolvedValue(undefined);
-  vi.spyOn(pgExecutorModule, "createPgQueryExecutor").mockReturnValue({ query, close } as never);
+  vi.spyOn(pgExecutorModule, "createPgQueryExecutor").mockReturnValue({
+    query,
+    close: vi.fn().mockResolvedValue(undefined),
+  } as never);
   return query;
 }
-
-const recordedEventRow = { rows: [{ id: "ev_1", type: "x", tenant_id: null, processed_at: null, created_at: "" }] };
-const markedProcessed = { rows: [] };
-
 afterEach(() => {
-  for (const name of trackedEnvironmentNames) {
-    const value = originalEnvironment.get(name);
-    if (value === undefined) delete process.env[name];
-    else process.env[name] = value;
+  for (const name of environmentNames) {
+    const original = originals.get(name);
+    if (original === undefined) delete process.env[name];
+    else process.env[name] = original;
   }
   vi.restoreAllMocks();
 });
 
-describe("POST /api/v1/billing/webhook -- input size", () => {
-  it("rejects a streamed oversized payload before signature verification and database access", async () => {
-    process.env.STRIPE_WEBHOOK_SECRET = webhookSecret;
-    const request = new Request("https://boardreadyops.com/api/v1/billing/webhook", {
-      method: "POST",
-      body: "x".repeat(1024 * 1024 + 1),
-      headers: { "stripe-signature": "invalid" },
-    });
-    const response = await webhookPost(request);
+describe("verified Stripe inbox HTTP boundary", () => {
+  it("rejects an oversized request before DB access", async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = secret;
+    const response = await webhookPost(
+      new Request("https://boardreadyops.com/api/v1/billing/webhook", {
+        method: "POST",
+        body: "a".repeat(1024 * 1024 + 1),
+        headers: { "stripe-signature": "bad" },
+      }),
+    );
     expect(response.status).toBe(413);
+  });
+
+  it("rejects an invalid signature without recording", async () => {
+    const query = db();
+    expect((await webhookPost(signedRequest(event("evt_bad", "invoice.paid", {}), false))).status).toBe(400);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("durably records an event and returns promptly without projecting entitlements", async () => {
+    const query = db({ rows: [{ id: "id", stripe_event_id: "evt_1", type: "invoice.paid" }] });
+    const response = await webhookPost(signedRequest(event("evt_1", "invoice.paid", { customer: "cus_synthetic" })));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, received: true, duplicate: false });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(String(query.mock.calls[0]?.[0])).toContain("INSERT INTO billing_events");
+  });
+
+  it("acknowledges a redelivery without invoking a second projection", async () => {
+    const query = db({ rows: [] });
+    const response = await webhookPost(signedRequest(event("evt_dupe", "invoice.paid", {})));
+    await expect(response.json()).resolves.toEqual({ ok: true, received: true, duplicate: true });
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed if persistence is unavailable", async () => {
+    const query = db();
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+    const response = await webhookPost(signedRequest(event("evt_memory", "invoice.paid", {})));
+    expect(response.status).toBe(503);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("does not acknowledge a failed durable insert", async () => {
+    const query = db();
+    query.mockRejectedValueOnce(new Error("synthetic database outage"));
+    const response = await webhookPost(signedRequest(event("evt_outage", "invoice.paid", {})));
+    expect(response.status).toBe(503);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "Billing inbox temporarily unavailable",
+    });
+    expect(query).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("POST /api/v1/billing/webhook -- Stripe entitlement projection", () => {
-  it("links a Stripe customer id to a tenant on checkout.session.completed", async () => {
-    const query = postgresMode(
-      recordedEventRow,
-      {
+describe("transactional Stripe projection units", () => {
+  it("links checkout ownership and wakes, but never replays in the same HTTP request", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
         rows: [
           {
             id: "cust_1",
-            tenant_id: "octo-org",
-            stripe_customer_id: "cus_123",
+            tenant_id: "tenant_1",
+            stripe_customer_id: "cus_synthetic",
             tier: "free",
             status: "incomplete",
             trial_ends_at: null,
             grace_ends_at: null,
             current_period_end: null,
-            created_at: "2026-01-01T00:00:00.000Z",
-            updated_at: "2026-01-01T00:00:00.000Z",
+            created_at: new Date(),
+            updated_at: new Date(),
           },
         ],
-      },
-      markedProcessed,
-    );
-
-    const response = await webhookPost(
-      signedRequest(
-        stripeEvent("evt_checkout_1", "checkout.session.completed", {
-          customer: "cus_123",
-          client_reference_id: "octo-org",
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const store = new BillingStore({ query });
+    await expect(
+      projectEntitlement(
+        store,
+        event("evt_checkout", "checkout.session.completed", {
+          customer: "cus_synthetic",
+          client_reference_id: "tenant_1",
         }),
       ),
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      ok: true,
-      processed: true,
-      entitlement: "linked",
-      tenantId: "octo-org",
-    });
-    expect(query).toHaveBeenCalledTimes(3);
-    const [linkSql] = query.mock.calls[1] as [string, unknown[]];
-    expect(linkSql).toContain("INSERT INTO billing_customers");
+    ).resolves.toEqual({ entitlement: "linked", tenantId: "tenant_1" });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(String(query.mock.calls[1]?.[0])).toContain("available_at=NOW()");
   });
 
-  it("grants team entitlement from customer.subscription.created and mirrors it onto installations", async () => {
-    const query = postgresMode(recordedEventRow, { rows: [{ tenant_id: "octo-org", applied: true }] }, markedProcessed);
-
-    const response = await webhookPost(
-      signedRequest(stripeEvent("evt_sub_created_1", "customer.subscription.created", subscriptionObject())),
+  it("projects a subscription and retains the repository entitlement mirror", async () => {
+    process.env.STRIPE_TEAM_MONTHLY_PRICE_ID = "price_team_month";
+    process.env.STRIPE_TEAM_YEARLY_PRICE_ID = "price_team_year";
+    process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID = "price_business_month";
+    process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID = "price_business_year";
+    process.env.STRIPE_TEAM_YEARLY_PRICE_ID = "price_team_year";
+    process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID = "price_business_month";
+    process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID = "price_business_year";
+    const query = vi.fn().mockResolvedValue({ rows: [{ tenant_id: "tenant_1", applied: true }] });
+    const result = await projectEntitlement(
+      new BillingStore({ query }),
+      event("evt_subscription", "customer.subscription.created", subscription()),
     );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      ok: true,
-      processed: true,
-      entitlement: "applied",
-      tenantId: "octo-org",
-      tier: "team",
-    });
-    const [sql, params] = query.mock.calls[1] as [string, unknown[]];
-    expect(sql).toContain("UPDATE installations SET plan_tier = $5");
-    expect(params[4]).toBe("team");
-    expect(params[6]).toBe("active");
+    expect(result).toMatchObject({ entitlement: "applied", tenantId: "tenant_1", tier: "team" });
+    expect(String(query.mock.calls[0]?.[0])).toContain("UPDATE installations SET plan_tier = $5");
   });
 
-  it("projects a trialing subscription with trial_end onto billing_customers.status", async () => {
-    const query = postgresMode(recordedEventRow, { rows: [{ tenant_id: "octo-org", applied: true }] }, markedProcessed);
-
-    const response = await webhookPost(
-      signedRequest(
-        stripeEvent(
-          "evt_sub_trial_1",
-          "customer.subscription.created",
-          subscriptionObject({ status: "trialing", trial_end: 1_701_000_000 }),
-        ),
+  it("does not mark unmapped prices processed before configuration is fixed", async () => {
+    process.env.STRIPE_TEAM_MONTHLY_PRICE_ID = "price_team_month";
+    process.env.STRIPE_TEAM_YEARLY_PRICE_ID = "price_team_year";
+    process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID = "price_business_month";
+    process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID = "price_business_year";
+    process.env.STRIPE_TEAM_YEARLY_PRICE_ID = "price_team_year";
+    process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID = "price_business_month";
+    process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID = "price_business_year";
+    const query = vi.fn();
+    const result = await projectEntitlement(
+      new BillingStore({ query }),
+      event(
+        "evt_unknown_price",
+        "customer.subscription.updated",
+        subscription({ items: { data: [{ price: { id: "price_new" } }] } }),
       ),
     );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ ok: true, processed: true, entitlement: "applied" });
-    const [, params] = query.mock.calls[1] as [string, unknown[]];
-    expect(params[6]).toBe("trialing"); // billing_subscriptions.status (raw Stripe status)
-    expect(params[12]).toBe("trialing"); // billing_customers.status (mapped)
-    expect(params[13]).toBe(new Date(1_701_000_000 * 1000).toISOString()); // trial_ends_at
+    expect(result).toMatchObject({ entitlement: "deferred", reason: "unmapped_stripe_price" });
+    expect(query).not.toHaveBeenCalled();
   });
 
-  it("downgrades to free on customer.subscription.deleted", async () => {
-    const query = postgresMode(recordedEventRow, { rows: [{ tenant_id: "octo-org", applied: true }] }, markedProcessed);
-
-    const response = await webhookPost(
-      signedRequest(
-        stripeEvent("evt_sub_deleted_1", "customer.subscription.deleted", subscriptionObject({ status: "canceled" })),
-      ),
+  it("sends invoice event timestamps to the monotonic guard", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ tenant_id: "tenant_1" }] })
+      .mockResolvedValueOnce({ rows: [{ id: "cust_1" }] });
+    const result = await projectEntitlement(
+      new BillingStore({ query }),
+      event("evt_invoice", "invoice.payment_failed", { customer: "cus_synthetic", subscription: "sub_synthetic" }),
     );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      ok: true,
-      processed: true,
-      entitlement: "applied",
-      tier: "free",
-    });
-    const [, params] = query.mock.calls[1] as [string, unknown[]];
-    expect(params[4]).toBe("free");
-    expect(params[12]).toBe("canceled");
+    expect(result).toMatchObject({ entitlement: "grace_applied", tenantId: "tenant_1" });
+    expect(String(query.mock.calls[1]?.[0])).toContain("last_invoice_event_created_at");
   });
 
-  it("ignores a subscription event for a price id with no configured tier mapping", async () => {
-    const query = postgresMode(recordedEventRow, markedProcessed);
-
-    const response = await webhookPost(
-      signedRequest(
-        stripeEvent(
-          "evt_sub_unmapped_1",
-          "customer.subscription.updated",
-          subscriptionObject({ items: { data: [{ price: { id: "price_unknown" } }] } }),
-        ),
-      ),
+  it("flags opposite invoice outcomes with the same Stripe timestamp for provider reconciliation", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ tenant_id: "tenant_1" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            same_second: true,
+            last_invoice_event_outcome: "failed",
+            has_subscription: true,
+            linked_subscription: true,
+            subscription_conflict: false,
+          },
+        ],
+      });
+    const result = await projectEntitlement(
+      new BillingStore({ query }),
+      event("evt_ambiguous_paid", "invoice.paid", { customer: "cus_synthetic", subscription: "sub_synthetic" }),
     );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      ok: true,
-      processed: true,
-      entitlement: "ignored",
-      reason: "unmapped_stripe_price",
-      stripePriceId: "price_unknown",
-    });
-    expect(query).toHaveBeenCalledTimes(2); // recordEvent + markEventProcessed only, no projection write
-  });
-
-  it("defers projection when the subscription's Stripe customer has not been linked to a tenant yet", async () => {
-    const query = postgresMode(recordedEventRow, { rows: [{ tenant_id: null, applied: false }] }, markedProcessed);
-
-    const response = await webhookPost(
-      signedRequest(stripeEvent("evt_sub_unlinked_1", "customer.subscription.updated", subscriptionObject())),
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      ok: true,
-      processed: true,
-      entitlement: "deferred",
-      reason: "customer_not_linked",
+    expect(result).toMatchObject({
+      entitlement: "conflict",
+      reason: "ambiguous_invoice_order",
+      tenantId: "tenant_1",
     });
     expect(query).toHaveBeenCalledTimes(3);
   });
 
-  it("applies a grace period on invoice.payment_failed", async () => {
-    const query = postgresMode(
-      recordedEventRow,
-      { rows: [{ tenant_id: "octo-org" }] },
-      markedProcessed,
-      markedProcessed,
+  it("does not reconcile a linked customer's source-less invoice", async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{ tenant_id: "tenant_1" }] });
+    const result = await projectEntitlement(
+      new BillingStore({ query }),
+      event("evt_no_source", "invoice.paid", { customer: "cus_synthetic" }),
     );
-
-    const response = await webhookPost(
-      signedRequest(stripeEvent("evt_invoice_failed_1", "invoice.payment_failed", { customer: "cus_123" })),
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      ok: true,
-      processed: true,
-      entitlement: "grace_applied",
-      tenantId: "octo-org",
+    expect(result).toMatchObject({
+      entitlement: "conflict",
+      reason: "ambiguous_invoice_subscription",
+      tenantId: "tenant_1",
     });
-    expect(query).toHaveBeenCalledTimes(4);
-    const [graceSql, graceParams] = query.mock.calls[2] as [string, unknown[]];
-    expect(graceSql).toContain("status='past_due'");
-    expect(graceParams[0]).toBe("octo-org");
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
-  it("does not apply a grace period when the invoice's customer is unlinked", async () => {
-    const query = postgresMode(recordedEventRow, { rows: [] }, markedProcessed);
-
-    const response = await webhookPost(
-      signedRequest(stripeEvent("evt_invoice_failed_2", "invoice.payment_failed", { customer: "cus_unlinked" })),
+  it("leaves unlinked invoice events pending for later checkout", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const result = await projectEntitlement(
+      new BillingStore({ query }),
+      event("evt_unlinked", "invoice.paid", { customer: "cus_unknown" }),
     );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      ok: true,
-      processed: true,
-      entitlement: "deferred",
-      reason: "customer_not_linked",
-    });
-    expect(query).toHaveBeenCalledTimes(3);
-  });
-
-  it("clears the grace period on invoice.paid", async () => {
-    const query = postgresMode(
-      recordedEventRow,
-      { rows: [{ tenant_id: "octo-org" }] },
-      markedProcessed,
-      markedProcessed,
-    );
-
-    const response = await webhookPost(
-      signedRequest(stripeEvent("evt_invoice_paid_1", "invoice.paid", { customer: "cus_123" })),
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      ok: true,
-      processed: true,
-      entitlement: "grace_cleared",
-      tenantId: "octo-org",
-    });
-    const [clearSql] = query.mock.calls[2] as [string, unknown[]];
-    expect(clearSql).toContain("status='active'");
-    expect(clearSql).toContain("grace_ends_at=NULL");
-  });
-
-  it("stays idempotent on a redelivered event id regardless of event type", async () => {
-    const query = postgresMode({ rows: [] }); // ON CONFLICT DO NOTHING -> no row -> duplicate
-
-    const response = await webhookPost(
-      signedRequest(stripeEvent("evt_sub_created_1", "customer.subscription.created", subscriptionObject())),
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true, duplicate: true });
-    expect(query).toHaveBeenCalledTimes(1); // no projection or markEventProcessed call for a duplicate
+    expect(result).toMatchObject({ entitlement: "deferred", reason: "customer_not_linked" });
   });
 });

@@ -1,0 +1,8 @@
+---
+# BoardReadyOps migrations are PostgreSQL, not Microsoft Transact-SQL.
+# TSQLLint's SQL Server QUOTED_IDENTIFIER rule is inapplicable here.
+# All other Codacy analysis engines remain enabled for these files.
+engines:
+  tsqllint:
+    exclude_paths:
+      - "packages/db/migrations/**"

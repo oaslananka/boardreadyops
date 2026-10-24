@@ -80,23 +80,36 @@ export class BillingStore {
    * is the sole place the mapping is established. Deliberately leaves tier/status untouched
    * when the row already exists: checkout completion does not by itself say which price was
    * selected, so it must not clobber a tier that a subscription event already set.
+   *
+   * A completed checkout is not authority to transfer an existing tenant to
+   * another Stripe customer, nor to attach one Stripe customer to two tenants.
+   * Both require provider-state/operator reconciliation. The worker holds the
+   * per-customer advisory lock, so competing checkout events for one Stripe
+   * customer cannot race this query; concurrent different-customer attempts
+   * against one tenant are guarded by the ON CONFLICT WHERE predicate.
    */
-  async linkStripeCustomer(input: { tenantId: string; stripeCustomerId: string }): Promise<BillingCustomer> {
+  async linkStripeCustomer(input: { tenantId: string; stripeCustomerId: string }): Promise<BillingCustomer | null> {
     const id = randomUUID();
     const q = `
+      WITH foreign_customer AS (
+        SELECT 1 FROM billing_customers
+        WHERE stripe_customer_id=$3 AND tenant_id<>$2
+      )
       INSERT INTO billing_customers (id, tenant_id, stripe_customer_id, tier, status, created_at, updated_at)
-      VALUES ($1, $2, $3, 'free', 'incomplete', NOW(), NOW())
+      SELECT $1, $2, $3, 'free', 'incomplete', NOW(), NOW()
+      WHERE NOT EXISTS (SELECT 1 FROM foreign_customer)
       ON CONFLICT (tenant_id) DO UPDATE SET
         stripe_customer_id = EXCLUDED.stripe_customer_id,
         updated_at = NOW()
+      WHERE billing_customers.stripe_customer_id IS NULL
+         OR billing_customers.stripe_customer_id = EXCLUDED.stripe_customer_id
       RETURNING *
     `;
     const r = (await this.db.query(q, [id, input.tenantId, input.stripeCustomerId])) as {
       rows?: StoredBillingCustomerRow[];
     };
     const row = r.rows?.[0];
-    if (!row) throw new Error("linkStripeCustomer upsert failed");
-    return mapCustomer(row);
+    return row ? mapCustomer(row) : null;
   }
 
   /** The tenant a Stripe customer id was linked to via `linkStripeCustomer`, if any. */
@@ -115,7 +128,10 @@ export class BillingStore {
    *
    * Guarded against out-of-order delivery: `stripe_subscription_id` is the upsert conflict
    * target, and the write only applies when the incoming Stripe event's own `created` timestamp
-   * is at least as new as the last event already applied to that subscription. A tenant that
+   * is strictly newer than the last applied timestamp. Stripe timestamps have
+   * second precision: a second event in that same second has unknown ordering,
+   * so it is NOT applied until independent provider-state reconciliation.
+   * A tenant that
    * has not yet been linked via `linkStripeCustomer` (i.e. `checkout.session.completed` has not
    * been processed yet) yields `applied: false` rather than throwing -- the projection is
    * deferred, not lost, since the underlying event is already durably recorded by `recordEvent`.
@@ -134,10 +150,22 @@ export class BillingStore {
     cancelAtPeriodEnd: boolean;
     trialEndsAt: string | null;
     eventCreatedAt: string;
-  }): Promise<{ tenantId: string | null; applied: boolean }> {
+  }): Promise<{
+    tenantId: string | null;
+    applied: boolean;
+    conflict?: boolean;
+    conflictReason?: "ambiguous_multi_subscription";
+  }> {
     const q = `
       WITH target_customer AS (
         SELECT tenant_id FROM billing_customers WHERE stripe_customer_id = $1
+      ),
+      conflicting_subscription AS (
+        SELECT 1 FROM billing_subscriptions AS existing
+        JOIN target_customer ON existing.tenant_id = target_customer.tenant_id
+        WHERE existing.stripe_subscription_id <> $3
+          AND existing.status NOT IN ('canceled', 'incomplete_expired')
+        LIMIT 1
       ),
       upserted_subscription AS (
         INSERT INTO billing_subscriptions (
@@ -147,6 +175,7 @@ export class BillingStore {
         )
         SELECT $2, target_customer.tenant_id, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10::timestamptz, $11, $12::timestamptz, NOW(), NOW()
         FROM target_customer
+        WHERE NOT EXISTS (SELECT 1 FROM conflicting_subscription)
         ON CONFLICT (stripe_subscription_id) DO UPDATE SET
           stripe_price_id = EXCLUDED.stripe_price_id,
           tier = EXCLUDED.tier,
@@ -159,12 +188,21 @@ export class BillingStore {
           last_event_created_at = EXCLUDED.last_event_created_at,
           updated_at = NOW()
         WHERE billing_subscriptions.last_event_created_at IS NULL
-           OR EXCLUDED.last_event_created_at >= billing_subscriptions.last_event_created_at
+           OR EXCLUDED.last_event_created_at > billing_subscriptions.last_event_created_at
         RETURNING tenant_id
       ),
       updated_customer AS (
         UPDATE billing_customers
-        SET tier = $5, status = $13, trial_ends_at = $14::timestamptz, current_period_end = $10::timestamptz, updated_at = NOW()
+        SET tier = $5,
+            status = CASE
+                       WHEN $13::text = 'canceled' THEN 'canceled'
+                       WHEN last_invoice_event_created_at IS NULL
+                         OR last_invoice_event_created_at < $12::timestamptz
+                         OR (last_invoice_event_created_at = $12::timestamptz
+                             AND last_invoice_event_outcome = 'paid') THEN $13
+                       ELSE status END,
+            grace_ends_at = CASE WHEN $13::text = 'canceled' THEN NULL ELSE grace_ends_at END,
+            trial_ends_at = $14::timestamptz, current_period_end = $10::timestamptz, updated_at = NOW()
         WHERE tenant_id IN (SELECT tenant_id FROM upserted_subscription)
         RETURNING tenant_id
       ),
@@ -175,7 +213,8 @@ export class BillingStore {
       )
       SELECT
         (SELECT tenant_id FROM target_customer) AS tenant_id,
-        EXISTS (SELECT 1 FROM upserted_subscription) AS applied
+        EXISTS (SELECT 1 FROM upserted_subscription) AS applied,
+        EXISTS (SELECT 1 FROM conflicting_subscription) AS ambiguous_multi_subscription
     `;
     const r = (await this.db.query(q, [
       input.stripeCustomerId,
@@ -192,9 +231,28 @@ export class BillingStore {
       input.eventCreatedAt,
       input.customerStatus,
       input.trialEndsAt,
-    ])) as { rows?: Array<{ tenant_id: string | null; applied: boolean }> };
+    ])) as { rows?: Array<{ tenant_id: string | null; applied: boolean; ambiguous_multi_subscription: boolean }> };
     const row = r.rows?.[0];
-    return { tenantId: row?.tenant_id ?? null, applied: row?.applied ?? false };
+    if (row?.ambiguous_multi_subscription) {
+      return {
+        tenantId: row.tenant_id,
+        applied: false,
+        conflict: true,
+        conflictReason: "ambiguous_multi_subscription",
+      };
+    }
+    if (row?.applied || !row?.tenant_id) {
+      return { tenantId: row?.tenant_id ?? null, applied: row?.applied ?? false };
+    }
+    const existing = (await this.db.query(
+      "SELECT last_event_created_at = $2::timestamptz AS same_second FROM billing_subscriptions WHERE stripe_subscription_id=$1",
+      [input.stripeSubscriptionId, input.eventCreatedAt],
+    )) as { rows?: Array<{ same_second: boolean }> };
+    return {
+      tenantId: row.tenant_id,
+      applied: false,
+      conflict: existing.rows?.[0]?.same_second === true,
+    };
   }
 
   /** Reverses `applyGraceOnPaymentFailure` once an `invoice.paid` event clears the grace period. */
@@ -203,6 +261,98 @@ export class BillingStore {
       `UPDATE billing_customers SET status='active', grace_ends_at=NULL, updated_at=NOW() WHERE tenant_id=$1 AND status='past_due'`,
       [tenantId],
     );
+  }
+
+  /** Customer linkage also revives only customer_not_linked dead letters, never unrelated quarantines. */
+  async wakePendingStripeCustomerEvents(stripeCustomerId: string): Promise<void> {
+    await this.db.query(
+      `UPDATE billing_events
+       SET available_at=NOW(),
+           attempts=CASE WHEN dead_letter_at IS NOT NULL THEN 0 ELSE attempts END,
+           last_error_class=CASE WHEN dead_letter_at IS NOT NULL THEN NULL ELSE last_error_class END,
+           dead_letter_at=NULL
+       WHERE provider='stripe' AND processed_at IS NULL
+         AND (dead_letter_at IS NULL OR last_error_class='customer_not_linked')
+         AND payload #>> '{data,object,customer}' = $1`,
+      [stripeCustomerId],
+    );
+  }
+
+  /**
+   * A Stripe invoice timestamp has only second precision. Do not silently
+   * acknowledge opposite outcomes in the same second: they require provider
+   * reconciliation, not an arrival-order decision about paid entitlements.
+   * Caller owns the customer advisory lock and the surrounding transaction.
+   */
+  async applyStripeInvoiceEvent(input: {
+    tenantId: string;
+    stripeSubscriptionId?: string | undefined;
+    eventCreatedAt: string;
+    outcome: "paid" | "failed";
+  }): Promise<
+    "applied" | "stale" | "conflict" | "subscription_conflict" | "subscription_not_linked" | "missing_customer"
+  > {
+    const paid = input.outcome === "paid";
+    const graceEnds = new Date(Date.now() + 14 * 86_400_000).toISOString();
+    const result = (await this.db.query(
+      `UPDATE billing_customers
+       SET status = CASE
+             WHEN $3::boolean AND status='past_due' THEN 'active'
+             WHEN NOT $3::boolean AND status <> 'canceled' THEN 'past_due'
+             ELSE status END,
+           grace_ends_at = CASE WHEN $3::boolean OR status = 'canceled' THEN NULL ELSE $4::timestamptz END,
+           last_invoice_event_created_at=$2::timestamptz,
+           last_invoice_event_outcome=$5::text, updated_at=NOW()
+       WHERE tenant_id=$1
+         AND $6::text IS NOT NULL
+         AND EXISTS (
+           SELECT 1 FROM billing_subscriptions
+           WHERE tenant_id=$1 AND stripe_subscription_id=$6::text
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM billing_subscriptions
+           WHERE tenant_id=$1 AND status IN ('active','trialing','past_due')
+             AND ($6::text IS NULL OR stripe_subscription_id <> $6::text)
+         )
+         AND (last_invoice_event_created_at IS NULL OR last_invoice_event_created_at < $2::timestamptz)
+       RETURNING id`,
+      [input.tenantId, input.eventCreatedAt, paid, graceEnds, input.outcome, input.stripeSubscriptionId ?? null],
+    )) as { rows?: Array<{ id: string }> };
+    if ((result.rows?.length ?? 0) > 0) return "applied";
+
+    const current = (await this.db.query(
+      `SELECT last_invoice_event_created_at = $2::timestamptz AS same_second,
+              last_invoice_event_outcome,
+              EXISTS (
+                SELECT 1 FROM billing_subscriptions WHERE tenant_id=$1
+              ) AS has_subscription,
+              EXISTS (
+                SELECT 1 FROM billing_subscriptions
+                WHERE tenant_id=$1 AND stripe_subscription_id=$3::text
+              ) AS linked_subscription,
+              ($3::text IS NULL OR EXISTS (
+                SELECT 1 FROM billing_subscriptions
+                WHERE tenant_id=$1 AND status IN ('active','trialing','past_due')
+                  AND stripe_subscription_id <> $3::text
+              )) AS subscription_conflict
+       FROM billing_customers WHERE tenant_id=$1`,
+      [input.tenantId, input.eventCreatedAt, input.stripeSubscriptionId ?? null],
+    )) as {
+      rows?: Array<{
+        same_second: boolean | null;
+        last_invoice_event_outcome: string | null;
+        has_subscription: boolean;
+        linked_subscription: boolean;
+        subscription_conflict: boolean;
+      }>;
+    };
+    const existing = current.rows?.[0];
+    if (!existing) return "missing_customer";
+    if (!existing.linked_subscription)
+      return existing.has_subscription ? "subscription_conflict" : "subscription_not_linked";
+    if (existing.subscription_conflict) return "subscription_conflict";
+    if (existing.same_second && existing.last_invoice_event_outcome !== input.outcome) return "conflict";
+    return "stale";
   }
 
   async recordEvent(input: {
