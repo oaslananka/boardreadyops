@@ -24,17 +24,17 @@ const obsoleteTag = 'boardreadyops-web-runtime:'+'c'.repeat(40);
 const out = text => { process.stdout.write(text+'\n'); };
 const exit = code => process.exit(code);
 if (a[0] === 'ps') {
-  if (a.includes('-aq')) { if (process.env.TEST_PS_FAIL === '1') exit(1); out('webcid\nworkercid\nstoppedcid'); exit(0); }
-  if (a.some(x => x.includes('service=web'))) { out('webcid'); exit(0); }
-  if (a.some(x => x.includes('service=worker'))) { out('workercid'); exit(0); }
+  if (a.includes('-aq')) { if (process.env.TEST_PS_FAIL === '1') exit(1); out('aaa111\nbbb222\nccc333'); exit(0); }
+  if (a.some(x => x.includes('service=web'))) { out('aaa111'); exit(0); }
+  if (a.some(x => x.includes('service=worker'))) { out('bbb222'); exit(0); }
 }
 if (a[0] === 'inspect') {
   const fmt = a[a.indexOf('--format')+1];
-  if (a[1] === 'webcid' && a[2] === 'workercid') { out([active,active,stopped].join('\n')); exit(0); }
-  if (a[1] === 'webcid' || a[1] === 'workercid') {
+  if (a[1] === 'aaa111' && a[2] === 'bbb222') { out([active,active,stopped].join('\n')); exit(0); }
+  if (a[1] === 'aaa111' || a[1] === 'bbb222') {
     if (fmt.includes('.Config.Image')) { out(currentTag); exit(0); }
     if (fmt.includes('.State.Health')) { out(process.env.TEST_BAD_HEALTH === '1' ? 'unhealthy' : 'healthy'); exit(0); }
-    if (fmt.includes('.Image')) { out(a[1] === 'workercid' && process.env.TEST_MISMATCH === '1' ? obsolete : active); exit(0); }
+    if (fmt.includes('.Image')) { out(a[1] === 'bbb222' && process.env.TEST_MISMATCH === '1' ? obsolete : active); exit(0); }
   }
 }
 if (a[0] === 'image' && a[1] === 'inspect') {
