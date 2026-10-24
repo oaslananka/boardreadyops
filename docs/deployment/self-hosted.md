@@ -262,7 +262,7 @@ One-time setup before the workflow can be used:
 3. Create a Doppler service token scoped to project `boardreadyops`, config `deploy`, and store it as the single GitHub Actions repository secret `DOPPLER_TOKEN`.
 4. Create a `production` GitHub Environment (Settings → Environments) so the workflow's `environment: production` reference resolves and the run appears in the deployments audit trail.
 
-To use it: open the Actions tab, select **cloud-deploy**, click **Run workflow**. Leave `dry_run` at its default `true` to run `./deploy.sh build migrate web worker` — this builds the image from the fast-forwarded checkout and exercises the Doppler/SSH/Tailscale path without touching the running containers. Set it to `false` to run `./deploy.sh up -d --build migrate web worker`, the real deploy. After a successful real deploy, the workflow resolves the commissioned `BOARDREADYOPS_PUBLIC_URL` from the deploy configuration and fails closed unless representative `/` and `/dashboard` responses expose the browser-security header baseline (CSP framing/base/object restrictions, HSTS, nosniff, Referrer-Policy, Permissions-Policy, and X-Frame-Options). `retire_superseded_images` is a separate, default-off safety valve for a low-disk preflight: enable it only as an explicit operator opt-in after reviewing the rollback policy below. `rollback_images_to_keep` defaults to `3` and is consulted only by that opted-in preflight retirement; it can be reduced to `1` or `2` without changing the normal post-deploy retention of three rollback images. `deploy.sh` has no canary or automatic rollback of its own: a failed build fails the workflow before anything is replaced, but a failed `up` can leave the stack partially replaced — check `docker compose -p boardreadyops-cloud ps` on the host afterward if a real-deploy run fails.
+To use it: open the Actions tab, select **cloud-deploy**, click **Run workflow**. Leave `dry_run` at its default `true` to run `./deploy.sh build migrate web worker` — this builds the image from the fast-forwarded checkout and exercises the Doppler/SSH/Tailscale path without touching the running containers. Set it to `false` to run `./deploy.sh up -d --build migrate web worker`, the real deploy. After a successful real deploy, the workflow resolves the commissioned `BOARDREADYOPS_PUBLIC_URL` from the deploy configuration and fails closed unless representative `/` and `/dashboard` responses expose the browser-security header baseline (CSP framing/base/object restrictions, HSTS, nosniff, Referrer-Policy, Permissions-Policy, and X-Frame-Options). `retire_superseded_images` is a separate, default-off safety valve for a low-disk preflight: it can retire old runtime images **only if a distinct verified rollback image was previously pinned**; otherwise it fails closed. Before a real deployment, the workflow checks that the running web and worker containers use the same healthy image, then pins it as `boardreadyops-rollback-safety:verified`. Only after the new deployment and external browser-security smoke both succeed does it retire extra BoardReadyOps image tags, preserving the running image and this single proven prior image. Dry-run builds never pin a rollback or automatically retire runtime images. `deploy.sh` has no canary or automatic rollback of its own: a failed build fails the workflow before anything is replaced, but a failed `up` can leave the stack partially replaced — check `docker compose -p boardreadyops-cloud ps` on the host afterward if a real-deploy run fails.
 
 ### Host deploy runbook image pinning (separate approval)
 
@@ -308,16 +308,20 @@ after cleanup, so gradual growth is visible on normal deploys as well as low-spa
 build on the production host, so this keeps useful recent cache during normal operation without
 letting a low-space preflight fail while safe-to-delete cache still occupies the build floor.
 Before retiring tagged runtime images, the workflow checks the running web and worker containers and reads their actual Docker image references. Missing or unrecognized runtime identities stop cleanup without deleting any images; invalid Compose image-list formatting is not treated as an empty running set.
-Every successful dry-run and real deploy also applies the same BoardReadyOps-only image retention policy after the 3 GB cache trim: protect the verified running web/worker image refs plus the three newest non-running rollback tags. Repeated previews therefore cannot accumulate unlimited tagged runtime images. A dry-run leaves live containers and volumes unchanged but may retire obsolete unused BoardReadyOps runtime image tags; no other Docker project is touched.
+Image cleanup is deliberately separate from cache trimming. A dry-run builds an image but neither validates it as a deploy nor changes runtime-image retention; repeated rehearsals can still accumulate tagged build results. For a real deploy, the previously healthy runtime is pinned before container replacement, and obsolete BoardReadyOps runtime tags are retired only after the external browser-security smoke succeeds. A low-space preflight can reclaim tagged runtime images only with explicit operator opt-in and an existing distinct verified rollback pin.
 
 Tagged runtime images are not touched by cache GC and remain governed by the rollback retention
 policy below. If the host is
 still short after safe reclaim, the default behavior remains fail-closed with exit 78. An operator
-may explicitly enable `retire_superseded_images`; that bounded path defaults to three rollback images.
-When capacity is still blocked, the operator may explicitly reduce that preflight keep-set to one or
-two with `rollback_images_to_keep`, while the running image is always protected. Successful normal
-deploys continue to retain three non-running rollback targets. The workflow then removes only older
-`boardreadyops-web-runtime:<sha>` images.
+may explicitly enable `retire_superseded_images` for a bounded, fail-closed reclaim: both current
+web/worker containers must be healthy and use one identical image, and a different image must
+already carry the `boardreadyops-rollback-safety:verified` tag from a previous healthy deployment.
+Only surplus `boardreadyops-web-runtime:<sha>` and `boardreadyops-rollback-safety:pre-*` tags can
+be removed. No Docker volumes, shared images, or container references are removed. Without the
+verified rollback pin, the preflight **stops** rather than guessing from tag recency. The ordinary
+success path retires surplus image tags only **after** the browser-security smoke, keeping the
+active image and exactly one previously healthy image. A migration that cannot be reversed with
+the prior application image still requires a separate database rollback and recovery procedure.
 An image still referenced by a stopped container is kept. The workflow never broad-prunes volumes
 or arbitrary Docker images. If the host is still below the 12 GiB floor afterward, it emits the
 aggregate `docker system df` summary plus only the BoardReadyOps runtime-image count and total MiB;

@@ -95,8 +95,8 @@ describe("cloud-deploy topology preflight", () => {
 
     expect(lowSpaceCheck).toBeGreaterThan(0);
     expect(preflightReclaim).toBeGreaterThan(lowSpaceCheck);
-    expect(preflightReclaim).toBeLessThan(checkout);
-    expect(caseStart).toBeGreaterThan(checkout);
+    expect(preflightReclaim).toBeGreaterThan(checkout);
+    expect(caseStart).toBeGreaterThan(preflightReclaim);
     expect(caseEnd).toBeGreaterThan(caseStart);
     expect(finalTrim).toBeGreaterThan(caseEnd);
     expect(workflow).toContain("if ! trim_build_cache; then");
@@ -107,76 +107,54 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).not.toContain("docker volume prune");
   });
 
-  it("retires tagged runtime images before a blocked build only after explicit operator opt-in", () => {
+  it("only retires old runtime tags during opted-in low-space preflight with a verified rollback pin", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
-
+    const retireOptIn = "$" + "{retire_superseded_images}";
+    const cacheReclaim = workflow.indexOf("docker image prune --force || true");
+    const repoDir = "$" + "{repo_dir}";
+    const preflightRetire = workflow.indexOf(`"${repoDir}/scripts/cloud-runtime-image-retention.sh" retire --apply`);
+    const optInCheck = workflow.indexOf(`if [ "${retireOptIn}" = "1" ]; then`, cacheReclaim);
     const availableMib = "$" + "{available_mib}";
     const requiredMib = "$" + "{required_mib}";
-    const retireOptIn = "$" + "{retire_superseded_images}";
-    const shellImage = "$" + "{image}";
+    const capacityFailure = workflow.indexOf(
+      `          if [ "${availableMib}" -lt "${requiredMib}" ]; then`,
+      optInCheck,
+    );
 
     expect(workflow).toContain("retire_superseded_images:");
     expect(workflow).toContain("default: false");
     expect(workflow).toContain('retire_superseded_images="$2"');
-    expect(workflow).toContain(`if [ "${retireOptIn}" = "1" ]; then`);
-    expect(workflow).not.toContain("docker compose -p boardreadyops-cloud images");
-    expect(workflow).toContain("cannot verify both running runtime images; nothing retired");
-    expect(workflow).toContain("container_for_service");
-    expect(workflow).toContain("{{.Config.Image}}");
-    expect(workflow).toContain("grep -vxF -f <(printf");
-    expect(workflow).not.toContain("|| : >");
-    expect(workflow).toContain("grep -vxF");
-    expect(workflow).toContain("tail -n +$((retain + 1))");
-    expect(workflow).toContain(`docker image rm "${shellImage}"`);
+    expect(workflow).not.toContain("rollback_images_to_keep:");
+    expect(preflightRetire).toBeGreaterThan(optInCheck);
+    expect(capacityFailure).toBeGreaterThan(preflightRetire);
+    expect(workflow).not.toContain("retire_superseded_runtime_images");
     expect(workflow).not.toContain("docker system prune");
     expect(workflow).not.toContain("docker volume prune");
-
-    const cacheReclaim = workflow.indexOf("docker image prune --force || true");
-    const optInCheck = workflow.indexOf(`if [ "${retireOptIn}" = "1" ]; then`, cacheReclaim);
-    const capacityFailure = workflow.indexOf(`if [ "${availableMib}" -lt "${requiredMib}" ]; then`, optInCheck);
-
-    expect(cacheReclaim).toBeGreaterThan(0);
-    expect(optInCheck).toBeGreaterThan(cacheReclaim);
-    expect(capacityFailure).toBeGreaterThan(optInCheck);
     expect(documentation).toContain("explicit operator opt-in");
-    expect(documentation).toContain("bounded path defaults to three rollback images");
+    expect(documentation).toContain("verified rollback pin");
   });
 
-  it("lets an opted-in low-space deploy keep one to three rollback images without weakening normal retention", () => {
+  it("pins the last healthy runtime before real replacement, then retires only after browser smoke", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+    const repoDir = "$" + "{repo_dir}";
+    const pin = workflow.indexOf(`"${repoDir}/scripts/cloud-runtime-image-retention.sh" pin`);
+    const productionUp = workflow.indexOf("run_deploy up -d --build migrate web worker");
+    const smoke = workflow.indexOf("      - name: Verify production browser security headers");
+    const retention = workflow.indexOf("      - name: Retire superseded runtime images after successful browser smoke");
+    const keyCleanup = workflow.indexOf("      - name: Remove temporary SSH key");
 
-    const preflightKeep = "$" + "{preflight_rollback_images_to_keep}";
-
-    expect(workflow).toContain("rollback_images_to_keep:");
-    expect(workflow).toContain('default: "3"');
-    expect(workflow).toContain('- "1"');
-    expect(workflow).toContain('- "2"');
-    expect(workflow).toContain('- "3"');
-    expect(workflow).toContain('preflight_rollback_images_to_keep="$3"');
-    expect(workflow).toContain(`retire_superseded_runtime_images "${preflightKeep}"`);
-    expect(workflow).toContain('retire_superseded_runtime_images "3"');
-    const remoteCaseEnd = workflow.lastIndexOf(
-      "          esac",
-      workflow.indexOf("          # Both rehearsal and real deploy paths"),
-    );
-    const afterBuildCacheTrim = workflow.indexOf("          if ! trim_build_cache; then", remoteCaseEnd);
-    const normalRetention = workflow.indexOf('          retire_superseded_runtime_images "3"', afterBuildCacheTrim);
-    const endOfDeploy = workflow.indexOf("          report_disk_summary", normalRetention);
-    expect(afterBuildCacheTrim).toBeGreaterThan(remoteCaseEnd);
-    expect(normalRetention).toBeGreaterThan(afterBuildCacheTrim);
-    expect(endOfDeploy).toBeGreaterThan(normalRetention);
-    expect(workflow.match(/retire_superseded_runtime_images "3"/g)).toHaveLength(1);
-    expect(workflow).toContain('local retain="$1"');
-    expect(workflow).toContain("1|2|3)");
-    expect(workflow).not.toContain('rollback_images_to_keep: "0"');
-
-    expect(documentation).toContain("defaults to three rollback images");
-    expect(documentation).toContain("may explicitly reduce that preflight keep-set to one");
+    expect(pin).toBeGreaterThan(0);
+    expect(pin).toBeLessThan(productionUp);
+    expect(retention).toBeGreaterThan(smoke);
+    expect(keyCleanup).toBeGreaterThan(retention);
+    expect(workflow).toContain("scripts/cloud-runtime-image-retention.sh retire --apply'");
+    expect(workflow).not.toContain('retire_superseded_runtime_images "3"');
+    expect(documentation).toContain("single proven prior image");
   });
 
-  it("describes dry-run as a host-side build only, without claiming migration or health validation", () => {
+  it("keeps rehearsal to build + cache trim without touching running runtime-image retention", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
 
@@ -185,11 +163,11 @@ describe("cloud-deploy topology preflight", () => {
     );
     expect(workflow).toContain("inputs.dry_run && 'build migrate web worker'");
     expect(workflow).toContain("run_deploy build migrate web worker");
-    expect(workflow).toContain("          git reset --hard origin/main");
-    expect(workflow).toContain('          retire_superseded_runtime_images "3"');
+    expect(workflow).toContain("git reset --hard origin/main");
     expect(workflow).toContain("          if ! trim_build_cache; then");
     expect(documentation).toContain("no canary or automatic rollback");
     expect(documentation).toContain("without touching the running containers");
+    expect(documentation).toContain("repeated rehearsals can still accumulate tagged build results");
   });
 
   it("verifies the browser security baseline after a real deploy but not during dry-run", () => {
