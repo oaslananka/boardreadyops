@@ -116,7 +116,7 @@ export function verifiedNativePcbItemAnchors(
       // variant qualifies; combined-layer zones remain excluded.
       const sourceLayer =
         typeof description === "string"
-          ? /\bon ((?:F|B)\.Cu)(?:, length \d+(?:\.\d+)? mm)?$/iu.exec(description.trim())?.[1]
+          ? /\bon ([FB]\.Cu)(?:, length \d+(?:\.\d+)? mm)?$/iu.exec(description.trim())?.[1]
           : undefined;
       if (
         typeof description !== "string" ||
@@ -136,8 +136,7 @@ export function verifiedNativePcbItemAnchors(
       if (seen.has(key)) continue;
       seen.add(key);
       const name =
-        /\bof ([#A-Za-z0-9_]+) on (?:F|B)\.Cu$/iu.exec(description)?.[1] ??
-        (description.startsWith("Track ") ? "Track" : "Item");
+        /\bof ([#\w]+) on [FB]\.Cu$/iu.exec(description)?.[1] ?? (description.startsWith("Track ") ? "Track" : "Item");
       result.push({
         id: `kicad_item_${finding.fingerprint.slice(0, 12)}_${uuid.slice(0, 8)}`,
         kind: "finding",

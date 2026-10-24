@@ -62377,7 +62377,7 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
       const description = candidate.description;
       const uuid5 = candidate.uuid;
       const pos = candidate.pos;
-      const sourceLayer = typeof description === "string" ? /\bon ((?:F|B)\.Cu)(?:, length \d+(?:\.\d+)? mm)?$/iu.exec(description.trim())?.[1] : void 0;
+      const sourceLayer = typeof description === "string" ? /\bon ([FB]\.Cu)(?:, length \d+(?:\.\d+)? mm)?$/iu.exec(description.trim())?.[1] : void 0;
       if (typeof description !== "string" || sourceLayer !== layer || typeof uuid5 !== "string" || !/^[a-f0-9-]{36}$/iu.test(uuid5) || !pos || typeof pos !== "object")
         continue;
       const { x, y } = pos;
@@ -62388,7 +62388,7 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
       const key = `${finding2.fingerprint}:${uuid5}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const name = /\bof ([#A-Za-z0-9_]+) on (?:F|B)\.Cu$/iu.exec(description)?.[1] ?? (description.startsWith("Track ") ? "Track" : "Item");
+      const name = /\bof ([#\w]+) on [FB]\.Cu$/iu.exec(description)?.[1] ?? (description.startsWith("Track ") ? "Track" : "Item");
       result.push({
         id: `kicad_item_${finding2.fingerprint.slice(0, 12)}_${uuid5.slice(0, 8)}`,
         kind: "finding",

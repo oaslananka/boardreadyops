@@ -137,6 +137,21 @@ describe("Source-bound KiCad DRC object markers", () => {
         },
       },
     ]);
+    const genericItem = {
+      description: "Graphic on F.Cu",
+      uuid: "fb7a6d1c-fc23-48bc-b260-e95fb8116acc",
+      pos: { x: 3, y: 3 },
+    };
+    expect(
+      verifiedNativePcbItemAnchors(native, origin, [
+        { ...finding, details: { coordinate_units: "mm", items: [genericItem] } },
+      ]),
+    ).toMatchObject([{ targetRef: "Item", x: 0.3, y: 0.3 }]);
+    expect(
+      verifiedNativePcbItemAnchors(native, origin, [
+        { ...finding, details: { coordinate_units: "mm", items: [{ ...genericItem, description: 42 }] } },
+      ]),
+    ).toEqual([]);
     expect(
       verifiedNativePcbItemAnchors({ ...native, content: '<svg viewBox="0 0 9.94 9.9822"></svg>' }, origin, [finding]),
     ).toEqual([]);
