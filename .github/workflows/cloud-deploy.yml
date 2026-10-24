@@ -401,7 +401,7 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
             "ubuntu@${ssh_host}" \
-            '/home/ubuntu/boardreadyops-cloud/repo/scripts/cloud-runtime-image-retention.sh retire --apply --allow-unchanged'
+            '/home/ubuntu/boardreadyops-cloud/repo/scripts/cloud-runtime-image-retention.sh confirm "$(git -C /home/ubuntu/boardreadyops-cloud/repo rev-parse HEAD)" && /home/ubuntu/boardreadyops-cloud/repo/scripts/cloud-runtime-image-retention.sh retire --apply --allow-unchanged'
 
       - name: Remove temporary SSH key
         if: always()

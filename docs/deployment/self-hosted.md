@@ -318,7 +318,7 @@ still short after safe reclaim, the default behavior remains fail-closed with ex
 may explicitly enable `retire_superseded_images` for a bounded, fail-closed reclaim: both current
 web/worker containers must be healthy and use one identical image, and a different image must
 already carry the `boardreadyops-rollback-safety:verified` tag from a previous healthy deployment.
-Only surplus `boardreadyops-web-runtime:<sha>` and `boardreadyops-rollback-safety:pre-*` tags can
+A separate `boardreadyops-rollback-safety:smoke-verified` **tag** records the last successful external browser-smoke image without keeping a third image. If the latest release passes container health but **fails** browser smoke, subsequent deployments keep the last smoke-verified image pinned instead of promoting the failed release. The post-smoke confirmation checks the deployed Git revision before updating that marker; only then may image retirement run. If the successful marker is absent while an older rollback pin exists, cleanup and deployment pinning fail closed rather than guessing which release was good. Only surplus `boardreadyops-web-runtime:<sha>` and `boardreadyops-rollback-safety:pre-*` tags can
 be removed. No Docker volumes, shared images, or container references are removed. Without the
 verified rollback pin, the preflight **stops** rather than guessing from tag recency. The ordinary
 success path retires surplus image tags only **after** the browser-security smoke, keeping the

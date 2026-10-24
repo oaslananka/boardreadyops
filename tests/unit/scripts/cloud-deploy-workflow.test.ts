@@ -149,7 +149,17 @@ describe("cloud-deploy topology preflight", () => {
     expect(pin).toBeLessThan(productionUp);
     expect(retention).toBeGreaterThan(smoke);
     expect(keyCleanup).toBeGreaterThan(retention);
-    expect(workflow).toContain("scripts/cloud-runtime-image-retention.sh retire --apply --allow-unchanged'");
+    const successMarker = workflow.indexOf(
+      'scripts/cloud-runtime-image-retention.sh confirm "$(git -C /home/ubuntu/boardreadyops-cloud/repo rev-parse HEAD)"',
+    );
+    const successfulRetirement = workflow.indexOf(
+      "scripts/cloud-runtime-image-retention.sh retire --apply --allow-unchanged'",
+    );
+    expect(successMarker).toBeGreaterThan(retention);
+    expect(successfulRetirement).toBeGreaterThan(successMarker);
+    expect(workflow).toContain(
+      "&& /home/ubuntu/boardreadyops-cloud/repo/scripts/cloud-runtime-image-retention.sh retire",
+    );
     expect(workflow).toContain(`"$(git -C "${repoDir}" rev-parse HEAD)"`);
     expect(workflow).not.toContain('retire_superseded_runtime_images "3"');
     expect(documentation).toContain("single proven prior image");

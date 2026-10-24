@@ -16,6 +16,7 @@ const fs = require("node:fs");
 const a = process.argv.slice(2);
 const active = 'sha256:'+'a'.repeat(64);
 const pinned = process.env.TEST_SAME_PIN === '1' ? active : 'sha256:'+'b'.repeat(64);
+const known = process.env.TEST_KNOWN === 'none' ? null : process.env.TEST_KNOWN === 'pinned' ? pinned : process.env.TEST_KNOWN === 'foreign' ? 'sha256:'+'c'.repeat(64) : active;
 const obsolete = 'sha256:'+'c'.repeat(64);
 const stopped = 'sha256:'+'d'.repeat(64);
 const currentTag = 'boardreadyops-web-runtime:'+'a'.repeat(40);
@@ -39,8 +40,10 @@ if (a[0] === 'inspect') {
 }
 if (a[0] === 'image' && a[1] === 'inspect') {
   if (a[2] === 'boardreadyops-rollback-safety:verified' && process.env.TEST_NO_PIN === '1') exit(1);
+  if (a[2] === 'boardreadyops-rollback-safety:smoke-verified' && known === null) exit(1);
   const fmt = a[a.indexOf('--format')+1];
   let id = a[2] === 'boardreadyops-rollback-safety:verified' ? pinned :
+    a[2] === 'boardreadyops-rollback-safety:smoke-verified' ? known :
     [currentTag, active].includes(a[2]) ? active :
     [priorTag, 'sha256:'+'b'.repeat(64)].includes(a[2]) ? pinned :
     [obsoleteTag, 'boardreadyops-rollback-safety:pre-old'].includes(a[2]) ? obsolete :
@@ -89,6 +92,40 @@ describe("BoardReadyOps runtime image retention", () => {
     expect(run.dockerCalls).toContain(`image tag ${active} boardreadyops-rollback-safety:verified`);
   });
 
+  it("establishes a proven baseline only on first commissioning", () => {
+    const run = runRetention(["pin", "b".repeat(40)], { TEST_KNOWN: "none", TEST_NO_PIN: "1" });
+    expect(run.status).toBe(0);
+    expect(run.dockerCalls).toContain(`image tag ${active} boardreadyops-rollback-safety:smoke-verified`);
+    expect(run.dockerCalls).toContain(`image tag ${active} boardreadyops-rollback-safety:verified`);
+  });
+
+  it("refuses to infer a successful baseline when only a previous rollback pin exists", () => {
+    const run = runRetention(["pin", "b".repeat(40)], { TEST_KNOWN: "none" });
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain("rollback exists without successful marker");
+    expect(run.dockerCalls).toBe("");
+  });
+
+  it("never promotes a healthy but failed-smoke runtime over the last successful rollback", () => {
+    const run = runRetention(["pin", "c".repeat(40)], { TEST_KNOWN: "pinned" });
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain("current runtime unverified");
+    expect(run.dockerCalls).toBe("");
+  });
+
+  it("records success only after the verified revision matches the running image", () => {
+    const run = runRetention(["confirm", "a".repeat(40)], { TEST_KNOWN: "pinned" });
+    expect(run.status).toBe(0);
+    expect(run.dockerCalls).toContain(`image tag ${active} boardreadyops-rollback-safety:smoke-verified`);
+  });
+
+  it("refuses success confirmation for a mismatched deployment revision", () => {
+    const run = runRetention(["confirm", "c".repeat(40)], { TEST_KNOWN: "pinned" });
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain("revision differs from requested");
+    expect(run.dockerCalls).toBe("");
+  });
+
   it("preserves an older verified rollback when redeploying an unchanged revision", () => {
     const run = runRetention(["pin", "a".repeat(40)]);
     expect(run.status).toBe(0);
@@ -113,6 +150,13 @@ describe("BoardReadyOps runtime image retention", () => {
     const run = runRetention(["retire", "--apply"], vars);
     expect(run.status).not.toBe(0);
     expect(run.stderr).toContain(failure);
+    expect(run.dockerCalls).toBe("");
+  });
+
+  it("refuses retirement if the last successful runtime is neither active nor pinned", () => {
+    const run = runRetention(["retire", "--apply"], { TEST_KNOWN: "foreign" });
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain("last successful deployment is not protected");
     expect(run.dockerCalls).toBe("");
   });
 
