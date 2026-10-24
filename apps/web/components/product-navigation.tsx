@@ -26,6 +26,7 @@ export function ProductNavigation() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compact, setCompact] = useState(false);
+  const [governOpen, setGovernOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const firstLinkRef = useRef<HTMLAnchorElement>(null);
   const wasMobileOpen = useRef(false);
@@ -87,6 +88,19 @@ export function ProductNavigation() {
     desktop.addEventListener("change", closeOnDesktop);
     return () => desktop.removeEventListener("change", closeOnDesktop);
   }, []);
+
+  // Keep a deep-linked governance destination visible when arriving from the
+  // command palette or browser history. Other destinations stay discoverable in
+  // the palette without filling the sidebar with advanced choices.
+  useEffect(() => {
+    if (
+      navigationGroups
+        .find((group) => group.label === "Govern")
+        ?.items.some((item) => isCurrentRoute(pathname, item.href))
+    ) {
+      setGovernOpen(true);
+    }
+  }, [pathname]);
 
   // Read the persisted collapse state after mount rather than during initial
   // render, so server and first client render both start expanded (no
@@ -177,16 +191,39 @@ export function ProductNavigation() {
           </Link>
 
           {navigationGroups.map((group) => (
-            <section key={group.label} aria-labelledby={`nav-${slugify(group.label)}`} className="mb-4">
-              {!compact && (
+            <section
+              key={group.label}
+              aria-labelledby={group.label === "Govern" ? undefined : `nav-${slugify(group.label)}`}
+              className="mb-4"
+            >
+              {group.label === "Govern" ? (
+                <button
+                  type="button"
+                  className="flex min-h-11 w-full items-center rounded-md px-2.5 py-2 text-left text-xs font-bold uppercase tracking-wide text-muted-foreground hover:bg-muted md:min-h-9"
+                  aria-expanded={governOpen}
+                  aria-controls="nav-govern-items"
+                  aria-label={governOpen ? "Hide advanced governance" : "Show advanced governance"}
+                  title={compact ? "Advanced governance" : undefined}
+                  onClick={() => setGovernOpen((open) => !open)}
+                >
+                  <ProductIcon name="policies" />
+                  {!compact && <span className="ml-2">Advanced governance {governOpen ? "−" : "+"}</span>}
+                </button>
+              ) : null}
+              {group.label !== "Govern" && !compact ? (
                 <h2
                   id={`nav-${slugify(group.label)}`}
                   className="px-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground"
                 >
                   {group.label}
                 </h2>
-              )}
-              <ul className="flex flex-col gap-0.5">
+              ) : null}
+              <ul
+                id={group.label === "Govern" ? "nav-govern-items" : undefined}
+                className="flex flex-col gap-0.5"
+                hidden={group.label === "Govern" && !governOpen}
+                style={group.label === "Govern" && !governOpen ? { display: "none" } : undefined}
+              >
                 {group.items.map((item) => {
                   const current = isCurrentRoute(pathname, item.href);
                   return (
