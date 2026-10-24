@@ -64,7 +64,9 @@ export function ReviewHeader({
           <span aria-hidden="true">/</span>
           <span>{pullRequestNumber > 0 ? `PR #${pullRequestNumber}` : "Manual review"}</span>
           <span className="rounded-full border border-border px-2 py-0.5 text-xs">Rev {currentRevisionSequence}</span>
-          <StatusBadge value={status} />
+          <span className="hidden sm:inline-flex">
+            <StatusBadge value={status} />
+          </span>
         </div>
 
         <h1
@@ -76,6 +78,9 @@ export function ReviewHeader({
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <StatusBadge value={decisionTone} label={decisionLabel} />
+          <span className="sm:hidden">
+            <StatusBadge value={status} />
+          </span>
           <span
             role="img"
             aria-label={`Evidence is ${evidenceState}`}

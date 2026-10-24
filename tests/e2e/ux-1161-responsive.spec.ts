@@ -11,6 +11,9 @@ for (const width of [320, 390, 1440]) {
         localStorage.setItem("theme", selectedTheme);
       }, theme);
       await page.goto("/reviews/rev_gateway_42");
+      if (width < 640) {
+        await expect(page.locator("header").getByText("Active", { exact: true }).last()).toBeVisible();
+      }
       const preview = page.getByRole("region", { name: "Published design preview" });
       await expect(preview).toBeVisible();
       await expect(preview.getByText("Explore this board revision")).toBeVisible();
@@ -36,6 +39,7 @@ test("mobile Review keeps source evidence in the first screen and decisions in a
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/reviews/rev_gateway_42");
   const actions = page.locator("header details > summary");
+  await expect(page.locator("header").getByText("Active", { exact: true }).last()).toBeVisible();
   await expect(actions).toBeVisible();
   await expect(actions).toContainText("Review actions & evidence");
   await expect(page.getByRole("button", { name: "Approve review" })).toBeHidden();
