@@ -209,7 +209,8 @@ export function ProductNavigation() {
                   <ProductIcon name="policies" />
                   {!compact && <span className="ml-2">Advanced governance {governOpen ? "−" : "+"}</span>}
                 </button>
-              ) : !compact ? (
+              ) : null}
+              {group.label !== "Govern" && !compact ? (
                 <h2
                   id={`nav-${slugify(group.label)}`}
                   className="px-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground"

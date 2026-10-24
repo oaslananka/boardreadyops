@@ -114,8 +114,8 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
             </p>
             <p className="mt-2 text-muted-foreground">
               Writes are limited to <code>boardreadyops.yml</code>,{" "}
-              <code>.github/workflows/{repositorySetupWorkflowPath}</code>
-              and <code>.boardreadyops/**</code> on a new branch. See{" "}
+              <code>.github/workflows/{repositorySetupWorkflowPath}</code> and <code>.boardreadyops/**</code> on a new
+              branch. See{" "}
               <a href="#permissions" className="text-primary underline">
                 Permission review
               </a>
