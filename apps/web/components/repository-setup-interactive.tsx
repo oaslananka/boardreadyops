@@ -771,10 +771,10 @@ function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetReposi
       <p className="text-sm text-muted-foreground">{description}</p>
       {state.id === "ready" ? (
         <Link
-          href="/runs"
+          href={`/repositories/${repository?.id}`}
           className="inline-flex min-h-11 w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
         >
-          View recorded readiness runs →
+          View this repository's readiness runs →
         </Link>
       ) : (
         <a

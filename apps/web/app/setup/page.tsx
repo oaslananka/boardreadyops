@@ -102,8 +102,9 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
 
         <section aria-label="Repository write safety" className="rounded-md border border-border bg-card p-4 text-sm">
           <p className="font-medium text-foreground">
-            Repository configuration changes require a new branch and a reviewed pull request, never a commit to your
-            default branch or a protection bypass.
+            BoardReadyOps setup writes go to a new branch and open a pull request for review. BoardReadyOps never
+            commits to your default branch or bypasses its protections. Files you copy manually are outside this
+            guarantee.
           </p>
           <details className="mt-2">
             <summary className="cursor-pointer font-medium text-primary">How setup and permissions work</summary>
