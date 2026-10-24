@@ -19,7 +19,11 @@ describe("web Docker dependency layer", () => {
       const copyAt = dockerfile.indexOf("COPY patches patches");
       expect(copyAt).toBeGreaterThan(0);
       expect(copyAt).toBeLessThan(installAt);
-      expect((await readFile(".dockerignore", "utf8")).split("\n")).not.toContain("patches");
+      const dockerIgnoreRules = (await readFile(".dockerignore", "utf8"))
+        .split("\n")
+        .map((rule) => rule.trim().replace(/^\.?\/+|\/+$/gu, ""))
+        .filter((rule) => rule !== "" && !rule.startsWith("#") && !rule.startsWith("!"));
+      expect(dockerIgnoreRules.some((rule) => rule === "patches" || rule.startsWith("patches/"))).toBe(false);
     }
   });
 });
