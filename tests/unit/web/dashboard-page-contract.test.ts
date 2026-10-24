@@ -125,6 +125,9 @@ describe("dashboard operational hierarchy", () => {
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).toContain("Attention required");
     expect(markup).toContain("Next action");
+    expect(markup.indexOf("Attention required")).toBeLessThan(
+      markup.indexOf("Engineering activity and recorded supply monitoring"),
+    );
     expect(markup).toContain('href="/runs/run-1/findings"');
     expect(markup).toContain("Review 2 findings in octocat/widgets");
   });
