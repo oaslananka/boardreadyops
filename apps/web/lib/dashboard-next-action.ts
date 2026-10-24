@@ -11,7 +11,7 @@ export function repositoriesRequiringReview(groups: readonly RepositoryGroup[]):
     .filter((repository) => Boolean(repository.latestRunId) && repository.openFindings > 0)
     .sort((left, right) => {
       const time = (value: string | undefined) => {
-        const parsed = value ? Date.parse(value) : NaN;
+        const parsed = value ? Date.parse(value) : Number.NaN;
         return Number.isFinite(parsed) ? parsed : -Infinity;
       };
       const chronological = time(right.latestRunAt) - time(left.latestRunAt);

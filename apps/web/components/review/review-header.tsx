@@ -58,7 +58,9 @@ export function ReviewHeader({
             ← Reviews
           </Link>
           <span aria-hidden="true">/</span>
-          <span className="shrink-0 sm:break-all">{repositoryName}</span>
+          <span className="min-w-0 max-w-32 truncate sm:max-w-none sm:break-all" title={repositoryName}>
+            {repositoryName}
+          </span>
           <span aria-hidden="true">/</span>
           <span>{pullRequestNumber > 0 ? `PR #${pullRequestNumber}` : "Manual review"}</span>
           <span className="rounded-full border border-border px-2 py-0.5 text-xs">Rev {currentRevisionSequence}</span>
@@ -113,7 +115,7 @@ export function ReviewHeader({
             </Link>
           </nav>
         ) : null}
-        <div className="flex max-w-full items-center gap-2">
+        <div className="flex max-w-full flex-wrap items-center gap-2 sm:flex-nowrap">
           <Button size="sm" variant={isApproved ? "secondary" : "default"} onClick={() => onApprove?.()}>
             {isApproved ? "✓ Approved" : "Approve review"}
           </Button>
