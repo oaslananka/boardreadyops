@@ -203,6 +203,24 @@ describe("run investigation accessibility", () => {
     vi.unstubAllEnvs();
   });
 
+  it("lets mobile design viewers reach source-bound evidence before optional metadata and actions", async () => {
+    const run = sampleRun();
+    const markup = renderToStaticMarkup(
+      createElement(
+        RunPageFrame,
+        { run, active: "design" },
+        createElement("section", { id: "design-evidence" }, "Design view"),
+      ),
+    );
+    expect(markup).toContain('<details class="rounded-md border border-border bg-card lg:hidden">');
+    expect(markup).toContain("Run details and actions");
+    expect(markup).toContain('class="hidden lg:block"');
+    expect(markup).toContain("overflow-x-auto border-b border-border lg:overflow-visible");
+    expect(markup.indexOf("Run details and actions")).toBeLessThan(markup.indexOf("Ready to fabricate"));
+    expect(markup.indexOf("Ready to fabricate")).toBeLessThan(markup.indexOf('id="design-evidence"'));
+    expect(await axeViolations(markup, `/runs/${run.id}/design`)).toEqual([]);
+  });
+
   it("keeps the run header stacked through tablet widths and wraps long source identities", () => {
     const html = viewMarkup("findings");
     expect(html).toContain("lg:flex-row lg:items-start lg:justify-between");
