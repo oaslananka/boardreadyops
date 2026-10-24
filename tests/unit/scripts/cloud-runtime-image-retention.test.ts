@@ -24,7 +24,7 @@ const obsoleteTag = 'boardreadyops-web-runtime:'+'c'.repeat(40);
 const out = text => { process.stdout.write(text+'\n'); };
 const exit = code => process.exit(code);
 if (a[0] === 'ps') {
-  if (a.includes('-aq')) { out('webcid\nworkercid\nstoppedcid'); exit(0); }
+  if (a.includes('-aq')) { if (process.env.TEST_PS_FAIL === '1') exit(1); out('webcid\nworkercid\nstoppedcid'); exit(0); }
   if (a.some(x => x.includes('service=web'))) { out('webcid'); exit(0); }
   if (a.some(x => x.includes('service=worker'))) { out('workercid'); exit(0); }
 }
@@ -50,6 +50,7 @@ if (a[0] === 'image' && a[1] === 'inspect') {
   if (fmt.includes('.Id')) { out(id); exit(0); }
 }
 if (a[0] === 'image' && a[1] === 'ls') {
+  if (process.env.TEST_IMAGE_LS_FAIL === '1') exit(1);
   if (a[2].startsWith('boardreadyops-web-runtime:')) { out([currentTag, priorTag, obsoleteTag].join('\n')); exit(0); }
   if (a[2].startsWith('boardreadyops-rollback-safety:pre-')) { out('boardreadyops-rollback-safety:pre-old\nboardreadyops-rollback-safety:pre-stopped'); exit(0); }
 }
@@ -105,6 +106,16 @@ describe("BoardReadyOps runtime image retention", () => {
     const run = runRetention(["retire", "--apply"], vars);
     expect(run.status).not.toBe(0);
     expect(run.stderr).toContain(failure);
+    expect(run.dockerCalls).toBe("");
+  });
+
+  it.each([
+    [{ TEST_PS_FAIL: "1" }, "cannot list other container image references"],
+    [{ TEST_IMAGE_LS_FAIL: "1" }, "cannot list runtime tags"],
+  ])("refuses retirement on a Docker enumeration failure", (vars, reason) => {
+    const run = runRetention(["retire", "--apply"], vars);
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain(reason);
     expect(run.dockerCalls).toBe("");
   });
 

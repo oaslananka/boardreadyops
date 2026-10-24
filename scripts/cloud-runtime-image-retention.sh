@@ -54,17 +54,17 @@ case "$mode" in
     check_revision "$pinned"
 
     # Honor references from *all* containers (including stopped ones); no force removal.
-    mapfile -t container_ids < <(docker ps -aq)
+    container_list="$(docker ps -aq)" || fail 'cannot list other container image references'
     referenced=""
-    if [[ "${#container_ids[@]}" -gt 0 ]]; then
+    if [[ -n "$container_list" ]]; then
+      mapfile -t container_ids <<< "$container_list"
       referenced="$(docker inspect "${container_ids[@]}" --format '{{.Image}}')" || fail 'cannot enumerate existing container image references'
     fi
 
     # Deliberately narrow scope; no shared images, BuildKit caches, volumes or untagged images.
-    mapfile -t candidate_tags < <({
-      docker image ls "${repository}:*" --format '{{.Repository}}:{{.Tag}}'
-      docker image ls 'boardreadyops-rollback-safety:pre-*' --format '{{.Repository}}:{{.Tag}}'
-    } | LC_ALL=C sort -u)
+    runtime_tags="$(docker image ls "${repository}:*" --format '{{.Repository}}:{{.Tag}}')" || fail 'cannot list runtime tags'
+    legacy_tags="$(docker image ls 'boardreadyops-rollback-safety:pre-*' --format '{{.Repository}}:{{.Tag}}')" || fail 'cannot list legacy rollback tags'
+    mapfile -t candidate_tags < <(printf '%s\n' "$runtime_tags" "$legacy_tags" | awk 'NF' | LC_ALL=C sort -u)
     for tag in "${candidate_tags[@]}"; do
       [[ "$tag" == "$repository":* || "$tag" == boardreadyops-rollback-safety:pre-* ]] || fail 'unexpected candidate tag'
       id="$(docker image inspect "$tag" --format '{{.Id}}')" || fail "cannot inspect $tag"
