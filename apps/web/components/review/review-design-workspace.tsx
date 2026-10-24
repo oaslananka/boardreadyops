@@ -36,6 +36,16 @@ export function visibleReviewFindings(findings: readonly DemoFinding[], filter: 
   });
 }
 
+export function groupReviewFindings(findings: readonly DemoFinding[]): { ruleId: string; findings: DemoFinding[] }[] {
+  const groups = new Map<string, DemoFinding[]>();
+  for (const finding of findings) {
+    const existing = groups.get(finding.ruleId);
+    if (existing) existing.push(finding);
+    else groups.set(finding.ruleId, [finding]);
+  }
+  return Array.from(groups, ([ruleId, entries]) => ({ ruleId, findings: entries }));
+}
+
 function hasNativeObjectPosition(review: DemoReview, fingerprint: string): boolean {
   return Boolean(
     review.headSnapshots?.some(
@@ -76,6 +86,40 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
       setQuery("");
     }
     setSelectedFingerprint(fingerprint);
+  };
+
+  const renderFindingButton = (finding: DemoFinding) => {
+    const active = finding.fingerprint === selectedFingerprint;
+    return (
+      <button
+        key={finding.fingerprint}
+        type="button"
+        aria-pressed={active}
+        onClick={() => setSelectedFingerprint(finding.fingerprint)}
+        className={
+          "w-full min-w-0 rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
+          (active ? "border-primary bg-primary/10" : "border-border bg-background hover:border-primary/50")
+        }
+      >
+        <span
+          className={[
+            "block text-xs font-semibold",
+            isBlocking(finding) ? "text-danger" : "text-muted-foreground",
+          ].join(" ")}
+        >
+          {finding.severity.toUpperCase()} · {finding.ruleId}
+        </span>
+        <span className="mt-1 line-clamp-2 block break-words text-sm text-foreground">{finding.message}</span>
+        <span
+          className={
+            "mt-2 block text-xs " +
+            (isLinkedInSnapshot(review, finding.fingerprint) ? "text-primary" : "text-muted-foreground")
+          }
+        >
+          {isLinkedInSnapshot(review, finding.fingerprint) ? "Snapshot marker available" : "No snapshot marker"}
+        </span>
+      </button>
+    );
   };
 
   return (
@@ -144,45 +188,26 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
                 </p>
               </div>
               <div className="mt-3 flex max-h-[32rem] flex-col gap-2 overflow-y-auto">
-                {visibleFindings.map((finding) => {
-                  const active = finding.fingerprint === selectedFingerprint;
-                  return (
-                    <button
-                      key={finding.fingerprint}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setSelectedFingerprint(finding.fingerprint)}
-                      className={
-                        "w-full min-w-0 rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
-                        (active
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-background hover:border-primary/50")
-                      }
-                    >
-                      <span
-                        className={[
-                          "block text-xs font-semibold",
-                          isBlocking(finding) ? "text-danger" : "text-muted-foreground",
-                        ].join(" ")}
-                      >
-                        {finding.severity.toUpperCase()} · {finding.ruleId}
-                      </span>
-                      <span className="mt-1 line-clamp-2 block break-words text-sm text-foreground">
-                        {finding.message}
-                      </span>
-                      <span
-                        className={
-                          "mt-2 block text-xs " +
-                          (isLinkedInSnapshot(review, finding.fingerprint) ? "text-primary" : "text-muted-foreground")
-                        }
-                      >
-                        {isLinkedInSnapshot(review, finding.fingerprint)
-                          ? "Snapshot marker available"
-                          : "No snapshot marker"}
-                      </span>
-                    </button>
-                  );
-                })}
+                {groupReviewFindings(visibleFindings).map((group) => (
+                  <div key={group.ruleId} className="flex flex-col gap-2">
+                    {group.findings.length > 2 ? (
+                      <h4 className="text-xs font-semibold text-muted-foreground">
+                        {group.ruleId} · {group.findings.length} recorded findings
+                      </h4>
+                    ) : null}
+                    {group.findings.slice(0, 2).map(renderFindingButton)}
+                    {group.findings.length > 2 ? (
+                      <details className="rounded-md border border-border p-2">
+                        <summary className="min-h-10 cursor-pointer py-2 text-sm font-medium text-primary">
+                          Show {group.findings.length - 2} more {group.ruleId} findings
+                        </summary>
+                        <div className="flex flex-col gap-2 pt-2">
+                          {group.findings.slice(2).map(renderFindingButton)}
+                        </div>
+                      </details>
+                    ) : null}
+                  </div>
+                ))}
                 {visibleFindings.length === 0 ? (
                   <p className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
                     No findings match these filters. Switch to All or clear the search.

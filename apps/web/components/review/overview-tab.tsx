@@ -4,6 +4,7 @@ import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoReview } from "../../lib/demo-data.js";
 import { Button } from "../ui/button.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "../ui.js";
+import { ReviewCanvas } from "./review-canvas.js";
 
 /**
  * Whether this revision has rendered schematic/PCB snapshots behind the Changes tab.
@@ -201,6 +202,31 @@ export function OverviewTab({
 
   return (
     <div className="flex flex-col gap-5">
+      {hasCanvas(review) ? (
+        <section
+          aria-label="Published design preview"
+          className="space-y-3 rounded-md border border-border bg-card p-3 sm:p-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Explore this board revision</h2>
+              <p className="text-xs text-muted-foreground">
+                Published source-revision views, not a manufacturing approval or verified defect geometry.
+              </p>
+            </div>
+            {onOpenChanges ? (
+              <Button type="button" size="sm" onClick={onOpenChanges}>
+                Inspect findings on the board →
+              </Button>
+            ) : null}
+          </div>
+          <ReviewCanvas
+            compactMobile
+            headSnapshots={review.headSnapshots ?? []}
+            {...(review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {})}
+          />
+        </section>
+      ) : null}
       <section className={`rounded-md border p-4 ${readinessBandClass[readinessTone]}`}>
         <h3 className={`text-base font-bold ${readinessTextClass[readinessTone]}`}>{readinessTitle}</h3>
         <p className="mt-1 text-sm text-foreground">{readinessDescription}</p>

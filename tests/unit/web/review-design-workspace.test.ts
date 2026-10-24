@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+  groupReviewFindings,
   ReviewDesignWorkspace,
   visibleReviewFindings,
 } from "../../../apps/web/components/review/review-design-workspace.js";
@@ -92,6 +93,32 @@ describe("Zaptrace-inspired BoardReadyOps review workspace", () => {
     expect(visibleReviewFindings(review.findings, "all", "u2").map((x) => x.fingerprint)).toEqual(["fp-unmapped"]);
     expect(visibleReviewFindings(review.findings, "blocking", "PIN mismatch")).toEqual([]);
     expect(visibleReviewFindings([{ ...u1, disposition: "waived" }], "blocking", "")).toEqual([]);
+  });
+
+  it("groups repeated rule findings without losing their individual fingerprints or evidence", () => {
+    const repeated = [
+      ...Array.from({ length: 9 }, (_, index) => ({
+        ...u1,
+        fingerprint: `fp-${index}`,
+        component: `U${index}`,
+        message: `Insufficient clearance on U${index}`,
+      })),
+      r2,
+    ];
+    const groups = groupReviewFindings(repeated);
+    expect(groups.map((group) => [group.ruleId, group.findings.length])).toEqual([
+      ["drc.clearance", 9],
+      ["erc.pin_mismatch", 1],
+    ]);
+    expect(groups.flatMap((group) => group.findings.map((finding) => finding.fingerprint))).toEqual(
+      repeated.map((finding) => finding.fingerprint),
+    );
+    const html = renderToStaticMarkup(
+      createElement(ReviewDesignWorkspace, { review: { ...review, findings: repeated } }),
+    );
+    expect(html).toContain("Show 7 more drc.clearance findings");
+    expect(html).toContain("Insufficient clearance on U1");
+    expect(html).toContain("U8");
   });
 
   it("does not invent a PCB image or a passing verdict when no snapshots or findings exist", () => {

@@ -129,6 +129,20 @@ describe("Review Detail Tabs", () => {
     expect(fixture).not.toContain('aria-label="Review source runs"');
   });
 
+  it("shows source-bound PCB preview before technical review details when snapshots exist", () => {
+    const overview = renderToStaticMarkup(createElement(OverviewTab, { review, onOpenChanges: () => undefined }));
+    if ((review.headSnapshots?.length ?? 0) > 0) {
+      expect(overview).toContain('aria-label="Published design preview"');
+      expect(overview.indexOf("Explore this board revision")).toBeLessThan(overview.indexOf("Review Checks"));
+      expect(overview).toContain("not a manufacturing approval");
+      expect(overview).toContain("Inspect findings on the board");
+    }
+    const withoutImages = renderToStaticMarkup(
+      createElement(OverviewTab, { review: { ...review, headSnapshots: undefined }, onOpenChanges: () => undefined }),
+    );
+    expect(withoutImages).not.toContain('aria-label="Published design preview"');
+  });
+
   it("renders ReviewView with accessible tablist and workspace semantics", () => {
     const view = renderToStaticMarkup(createElement(ReviewView, { initialReview: review }));
     expect(view).toContain('aria-label="Review workspace"');
