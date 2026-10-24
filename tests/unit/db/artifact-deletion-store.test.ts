@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createSqlArtifactDeletionStore } from "../../../packages/db/src/artifact-deletion-store.js";
 
@@ -12,20 +14,26 @@ describe("artifact deletion store", () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ outcome: "held" }] });
     const deletionStore = createSqlArtifactDeletionStore(executor(query), { now: () => now });
     await expect(
-      deletionStore.authorizeOrDeferDeletion({
+      deletionStore.beginPhysicalDeletion({
         deletionJobId: "job-1",
         workerId: "worker-1",
+        fenceToken: randomUUID(),
       }),
     ).resolves.toBe("held");
     const sql = String(query.mock.calls[0]?.[0]);
-    expect(sql).toContain("join installations on installations.id = jobs.installation_id");
-    expect(sql).toContain("lower(legal_holds.tenant_id) = lower(claimed.account_login)");
-    expect(sql).toContain("legal_holds.active = true");
-    expect(sql).toContain("for update of jobs");
-    expect(sql).toContain("jobs.lease_expires_at > clock_timestamp()");
-    expect(sql).toContain("attempt_count = greatest(0, attempt_count - 1)");
-    expect(sql).toContain("available_at = clock_timestamp() + interval '30 minutes'");
-    expect(query.mock.calls[0]?.[1]).toEqual(["job-1", "worker-1"]);
+    expect(sql).toContain("boardreadyops_begin_artifact_unlink($1, $2, $3::uuid)");
+    const migration = readFileSync(
+      new URL("../../../packages/db/migrations/0094_durable_artifact_unlink_fences.sql", import.meta.url),
+      "utf8",
+    );
+    expect(migration).toContain("lower(tenant_id) = v_tenant and active = true");
+    expect(migration).toContain("j.lease_expires_at > clock_timestamp()");
+    expect(migration).toContain("attempt_count = greatest(0, attempt_count - 1)");
+    expect(migration).toContain("available_at = clock_timestamp() + interval '30 minutes'");
+    expect(migration).toContain("boardreadyops_guard_legal_hold_admission");
+    expect(migration).toContain("boardreadyops_guard_installation_while_unlinking");
+    expect(migration).toContain("and fence.settled_at is null");
+    expect(query.mock.calls[0]?.[1]).toEqual(["job-1", "worker-1", expect.any(String)]);
   });
 
   it("anchors destructive lease authorization and hold deferral to the PostgreSQL clock", async () => {
@@ -33,16 +41,20 @@ describe("artifact deletion store", () => {
     const skewedClock = new Date("2001-01-01T00:00:00.000Z");
     const store = createSqlArtifactDeletionStore(executor(query), { now: () => skewedClock });
     await expect(
-      store.authorizeOrDeferDeletion({
+      store.beginPhysicalDeletion({
         deletionJobId: "job-with-expired-lease",
         workerId: "worker-clock-behind",
+        fenceToken: randomUUID(),
       }),
     ).resolves.toBe("stale");
     const sql = String(query.mock.calls[0]?.[0]);
-    expect(sql).toContain("jobs.lease_expires_at > clock_timestamp()");
-    expect(sql).toContain("available_at = clock_timestamp() + interval '30 minutes'");
+    expect(sql).toContain("boardreadyops_begin_artifact_unlink");
     expect(sql).not.toContain("$3::timestamptz");
-    expect(query).toHaveBeenCalledWith(expect.any(String), ["job-with-expired-lease", "worker-clock-behind"]);
+    expect(query).toHaveBeenCalledWith(expect.any(String), [
+      "job-with-expired-lease",
+      "worker-clock-behind",
+      expect.any(String),
+    ]);
   });
 
   it("rejects stale leases and invalid worker identities without claiming authorization", async () => {
@@ -52,24 +64,47 @@ describe("artifact deletion store", () => {
       .mockResolvedValueOnce({ rows: [{ outcome: "authorized" }] });
     const deletionStore = createSqlArtifactDeletionStore(executor(query), { now: () => now });
     await expect(
-      deletionStore.authorizeOrDeferDeletion({
+      deletionStore.beginPhysicalDeletion({
         deletionJobId: "job-1",
         workerId: "worker-1",
+        fenceToken: randomUUID(),
       }),
     ).resolves.toBe("stale");
     await expect(
-      deletionStore.authorizeOrDeferDeletion({
+      deletionStore.beginPhysicalDeletion({
         deletionJobId: "job-1",
         workerId: "worker-1",
+        fenceToken: randomUUID(),
       }),
     ).resolves.toBe("authorized");
     await expect(
-      deletionStore.authorizeOrDeferDeletion({
+      deletionStore.beginPhysicalDeletion({
         deletionJobId: "job-1",
         workerId: "bad worker",
+        fenceToken: randomUUID(),
       }),
     ).rejects.toThrow("invalid artifact deletion worker id");
     expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it("settles only by matching job, worker, and attempt token", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ outcome: "settled" }] });
+    const store = createSqlArtifactDeletionStore(executor(query));
+    const fenceToken = randomUUID();
+    await expect(
+      store.settlePhysicalDeletion({
+        deletionJobId: "job-1",
+        workerId: "worker-1",
+        fenceToken,
+        outcome: "missing",
+      }),
+    ).resolves.toBe("settled");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("boardreadyops_settle_artifact_unlink"), [
+      "job-1",
+      "worker-1",
+      fenceToken,
+      "missing",
+    ]);
   });
 
   it("claims bounded tenant-scoped deletion jobs", async () => {
