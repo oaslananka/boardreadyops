@@ -320,7 +320,10 @@ Only surplus `boardreadyops-web-runtime:<sha>` and `boardreadyops-rollback-safet
 be removed. No Docker volumes, shared images, or container references are removed. Without the
 verified rollback pin, the preflight **stops** rather than guessing from tag recency. The ordinary
 success path retires surplus image tags only **after** the browser-security smoke, keeping the
-active image and exactly one previously healthy image. A migration that cannot be reversed with
+active image and exactly one previously healthy image. When rebuilding the currently running
+revision, the workflow preserves an existing distinct rollback pin rather than overwriting it;
+if the image ID is unchanged and no distinct pin exists, the post-smoke retirement is a no-op,
+while low-space preflight still refuses deletion. A migration that cannot be reversed with
 the prior application image still requires a separate database rollback and recovery procedure.
 An image still referenced by a stopped container is kept. The workflow never broad-prunes volumes
 or arbitrary Docker images. If the host is still below the 12 GiB floor afterward, it emits the

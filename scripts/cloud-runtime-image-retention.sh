@@ -39,19 +39,37 @@ check_revision() {
 mode="${1:-}"
 case "$mode" in
   pin)
-    [[ "$#" -eq 1 ]] || fail 'usage: pin (before a real deploy)'
+    [[ "$#" -eq 2 && "$2" =~ ^[0-9a-f]{40}$ ]] || fail 'usage: pin <target-revision>'
+    target_revision="$2"
     active="$(running_image)"
     check_revision "$active"
+    active_revision="$(docker image inspect "$active" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" || fail 'cannot inspect active revision'
+    if [[ "$active_revision" == "$target_revision" ]]; then
+      # An unchanged-code redeploy must not replace an older proven rollback
+      # with the currently running image merely to rebuild the same commit.
+      existing="$(docker image inspect "$rollback" --format '{{.Id}}' 2>/dev/null || true)"
+      if [[ -n "$existing" && "$existing" != "$active" ]]; then
+        check_revision "$existing"
+        printf 'cloud-image-retention: unchanged revision; preserved existing distinct rollback %s\n' "$existing"
+        exit 0
+      fi
+    fi
     docker image tag "$active" "$rollback" || fail 'cannot pin last known healthy image'
     printf 'cloud-image-retention: pinned healthy prior runtime %s\n' "$active"
     ;;
   retire)
-    [[ "$#" -eq 1 || ( "$#" -eq 2 && "$2" == --apply ) ]] || fail 'usage: retire [--apply]'
+    [[ "$#" -eq 1 || ( "$#" -eq 2 && "$2" == --apply ) || ( "$#" -eq 3 && "$2" == --apply && "$3" == --allow-unchanged ) ]] || fail 'usage: retire [--apply [--allow-unchanged]]'
     active="$(running_image)"
     check_revision "$active"
     pinned="$(docker image inspect "$rollback" --format '{{.Id}}' 2>/dev/null)" || fail 'no verified rollback pin; refusing cleanup'
     [[ "$pinned" =~ ^sha256:[0-9a-f]{64}$ ]] || fail 'invalid rollback pin'
-    [[ "$pinned" != "$active" ]] || fail 'rollback pin equals active image; refusing cleanup'
+    if [[ "$pinned" == "$active" ]]; then
+      if [[ "${3:-}" == --allow-unchanged ]]; then
+        printf 'cloud-image-retention: unchanged runtime; no distinct rollback available, nothing retired\n'
+        exit 0
+      fi
+      fail 'rollback pin equals active image; refusing cleanup'
+    fi
     check_revision "$pinned"
 
     # Honor references from *all* containers (including stopped ones); no force removal.
@@ -90,5 +108,5 @@ case "$mode" in
       fi
     done <<< "$candidates"
     ;;
-  *) fail 'usage: pin | retire [--apply]' ;;
+  *) fail 'usage: pin <target-revision> | retire [--apply [--allow-unchanged]]' ;;
 esac

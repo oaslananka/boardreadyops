@@ -302,7 +302,7 @@ jobs:
               # Verify the old running web + worker health and pin that exact image
               # before compose can replace either container. If deployment or browser
               # smoke fails, do not delete any image from this attempt.
-              "${repo_dir}/scripts/cloud-runtime-image-retention.sh" pin
+              "${repo_dir}/scripts/cloud-runtime-image-retention.sh" pin "$(git -C "${repo_dir}" rev-parse HEAD)"
               run_deploy up -d --build migrate web worker
               verify_release_policy_mount
 
@@ -401,7 +401,7 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
             "ubuntu@${ssh_host}" \
-            '/home/ubuntu/boardreadyops-cloud/repo/scripts/cloud-runtime-image-retention.sh retire --apply'
+            '/home/ubuntu/boardreadyops-cloud/repo/scripts/cloud-runtime-image-retention.sh retire --apply --allow-unchanged'
 
       - name: Remove temporary SSH key
         if: always()

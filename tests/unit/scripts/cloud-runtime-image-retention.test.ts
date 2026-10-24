@@ -84,16 +84,23 @@ function runRetention(args: string[], overrides: Record<string, string> = {}) {
 
 describe("BoardReadyOps runtime image retention", () => {
   it("pins only the running web and worker's identical healthy image", () => {
-    const run = runRetention(["pin"]);
+    const run = runRetention(["pin", "b".repeat(40)]);
     expect(run.status).toBe(0);
     expect(run.dockerCalls).toContain(`image tag ${active} boardreadyops-rollback-safety:verified`);
+  });
+
+  it("preserves an older verified rollback when redeploying an unchanged revision", () => {
+    const run = runRetention(["pin", "a".repeat(40)]);
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain("preserved existing distinct rollback");
+    expect(run.dockerCalls).toBe("");
   });
 
   it.each([
     [{ TEST_BAD_HEALTH: "1" }, "not healthy"],
     [{ TEST_MISMATCH: "1" }, "different images"],
   ])("refuses pinning a failed health/identity check", (vars, failure) => {
-    const run = runRetention(["pin"], vars);
+    const run = runRetention(["pin", "b".repeat(40)], vars);
     expect(run.status).not.toBe(0);
     expect(run.stderr).toContain(failure);
     expect(run.dockerCalls).toBe("");
@@ -106,6 +113,13 @@ describe("BoardReadyOps runtime image retention", () => {
     const run = runRetention(["retire", "--apply"], vars);
     expect(run.status).not.toBe(0);
     expect(run.stderr).toContain(failure);
+    expect(run.dockerCalls).toBe("");
+  });
+
+  it("allows only post-smoke unchanged deployment to no-op without removing images", () => {
+    const run = runRetention(["retire", "--apply", "--allow-unchanged"], { TEST_SAME_PIN: "1" });
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain("unchanged runtime; no distinct rollback available");
     expect(run.dockerCalls).toBe("");
   });
 
