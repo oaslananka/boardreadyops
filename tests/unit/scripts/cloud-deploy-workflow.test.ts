@@ -74,14 +74,19 @@ describe("cloud-deploy topology preflight", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
 
     const buildCacheMaxUsedSpace = "$" + "{build_cache_max_used_space}";
+    const buildCacheReservedSpace = "$" + "{build_cache_reserved_space}";
     const availableMib = "$" + "{available_mib}";
     const requiredMib = "$" + "{required_mib}";
     const repoDir = "$" + "{repo_dir}";
     const deployArgs = "$" + "{deploy_args}";
 
     expect(workflow).toContain("build_cache_max_used_space=3GB");
+    expect(workflow).toContain("build_cache_reserved_space=1GB");
     expect(workflow).toContain("docker builder prune --all --force || true");
-    expect(workflow).toContain(`docker buildx prune --all --force --max-used-space "${buildCacheMaxUsedSpace}"`);
+    expect(workflow).toContain(
+      `docker buildx prune --all --force --max-used-space "${buildCacheMaxUsedSpace}" --reserved-space "${buildCacheReservedSpace}"`,
+    );
+    expect(workflow).not.toContain(`--max-used-space "${buildCacheMaxUsedSpace}";`);
     expect(workflow).toContain("cloud-deploy cache: unable to enforce");
     expect(workflow).not.toContain(`--max-used-space "${buildCacheMaxUsedSpace}" || true`);
     expect(workflow).not.toContain("--filter until=168h");

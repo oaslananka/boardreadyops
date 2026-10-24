@@ -302,7 +302,11 @@ docker image prune --force
 ```
 
 After every successful build, including `dry_run`, the workflow enforces the normal 3 GB BuildKit
-cache cap with `docker buildx prune --all --force --max-used-space 3GB`.
+cache cap with `docker buildx prune --all --force --max-used-space 3GB --reserved-space 1GB`.
+The explicit `--reserved-space` is essential on VPS installations whose default Docker Engine
+BuildKit GC policy reserves ~13 GiB and would otherwise keep well above the 3 GB target. This
+controls **unused build cache only**; it is not a hard filesystem quota and does not delete
+container images, stopped containers, volumes or application data.
 If cache budget enforcement fails, the workflow reports a failure rather than silently allowing
 unbounded build garbage; for a real deploy, inspect the live stack because replacement may already
 have occurred. Every successful build prints an aggregate disk and BoardReadyOps image summary

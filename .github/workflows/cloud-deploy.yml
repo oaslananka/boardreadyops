@@ -212,11 +212,14 @@ jobs:
           free_mib() { df -Pm "$1" | awk 'NR==2 {print $4}'; }
           required_mib=12288
           build_cache_max_used_space=3GB
+          # The daemon's default ~13GiB GC reservation can defeat a 3GB prune
+          # target unless we explicitly supply the lower retention floor.
+          build_cache_reserved_space=1GB
           reclaim_build_cache_for_preflight() {
             docker builder prune --all --force || true
           }
           trim_build_cache() {
-            if ! docker buildx prune --all --force --max-used-space "${build_cache_max_used_space}"; then
+            if ! docker buildx prune --all --force --max-used-space "${build_cache_max_used_space}" --reserved-space "${build_cache_reserved_space}"; then
               printf 'cloud-deploy cache: unable to enforce %s cache budget; investigate host capacity after deploy\n' "${build_cache_max_used_space}" >&2
               return 1
             fi
