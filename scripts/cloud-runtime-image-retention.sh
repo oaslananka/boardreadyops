@@ -30,9 +30,10 @@ running_image() {
 }
 
 check_revision() {
+  local image_ref="$1"
   local revision
-  revision="$(docker image inspect "$1" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" || fail "missing image $1"
-  [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || fail "missing or invalid revision label for $1"
+  revision="$(docker image inspect "$image_ref" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" || fail "missing image $image_ref"
+  [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || fail "missing or invalid revision label for $image_ref"
 }
 
 mode="${1:-}"
