@@ -169,6 +169,7 @@ export function OverviewTab({
 
   const readinessTone = getReadinessTone(review.decision, reviewChecksMet);
   const readinessTitle = getReadinessTitle(review.decision, reviewChecksMet);
+  const optionalBaseSnapshots = review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {};
   const pendingChecklistCount = review.checklist.length - completedChecklist.length;
   const readinessDescription = getReadinessDescription(
     review.decision,
@@ -220,11 +221,7 @@ export function OverviewTab({
               </Button>
             ) : null}
           </div>
-          <ReviewCanvas
-            compactMobile
-            headSnapshots={review.headSnapshots ?? []}
-            {...(review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {})}
-          />
+          <ReviewCanvas compactMobile headSnapshots={review.headSnapshots ?? []} {...optionalBaseSnapshots} />
         </section>
       ) : null}
       <section className={`rounded-md border p-4 ${readinessBandClass[readinessTone]}`}>
