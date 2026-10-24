@@ -131,6 +131,60 @@ describe("repository API authorization", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it("resolves GitHub owner/name only within the bearer token's canonical repository scope", async () => {
+    configurePostgres();
+    query.mockResolvedValueOnce({ rows: [{ github_installation_id: "1001" }] });
+
+    const result = await resolveRepositoryApiContext(
+      bearerAuth("repo-token"),
+      new Request("https://boardreadyops.test/api/v1/runs"),
+      "boardreadyops/boardreadyops-e2e-public",
+    );
+
+    expect(result).not.toBeInstanceOf(Response);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("lower(repositories.owner || '/' || repositories.name) = lower($2)"),
+      ["repo-token", "boardreadyops/boardreadyops-e2e-public"],
+    );
+    if (!(result instanceof Response)) {
+      expect(result.repositoryId).toBe("repo-token");
+      await result.executor.close();
+    }
+  });
+
+  it("denies a different GitHub repository name even with a valid repository token", async () => {
+    configurePostgres();
+    query.mockResolvedValueOnce({ rows: [] });
+
+    const result = await resolveRepositoryApiContext(
+      bearerAuth("repo-token"),
+      new Request("https://boardreadyops.test/api/v1/runs"),
+      "other-account/other-repository",
+    );
+
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(403);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("lower(repositories.owner || '/' || repositories.name) = lower($2)"),
+      ["repo-token", "other-account/other-repository"],
+    );
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects conflicting repository name aliases before looking up data", async () => {
+    configurePostgres();
+
+    const result = await resolveRepositoryApiContext(
+      bearerAuth("repo-token"),
+      new Request("https://boardreadyops.test/api/v1/runs?repositoryId=owner/first"),
+      "owner/second",
+    );
+
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(403);
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("rejects requests without a repository scope", async () => {
     configurePostgres();
 
