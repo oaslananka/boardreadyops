@@ -57,8 +57,9 @@ describe("Review Detail Tabs", () => {
     );
     expect(html).toContain("line-clamp-2");
     expect(html).toContain("sm:line-clamp-none");
-    expect(html).toContain("overflow-x-auto whitespace-nowrap");
-    expect(html).toContain('class="sm:hidden"');
+    expect(html).toContain("overflow-hidden whitespace-nowrap");
+    expect(html).toContain("Review actions &amp; evidence");
+    expect(html).toContain('<details class="group rounded-md border border-border/70 bg-background/30 sm:hidden">');
     expect(html).toContain("Copy digest");
     expect(html).toContain('role="img" aria-label="Evidence is current"');
     expect(html).toContain("Approve review");

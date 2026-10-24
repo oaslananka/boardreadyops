@@ -29,3 +29,26 @@ for (const width of [320, 390, 1440]) {
     });
   }
 }
+
+test("mobile Review keeps source evidence in the first screen and decisions in an accessible disclosure", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/reviews/rev_gateway_42");
+  const actions = page.locator("header details > summary");
+  await expect(actions).toBeVisible();
+  await expect(actions).toContainText("Review actions & evidence");
+  await expect(page.getByRole("button", { name: "Approve review" })).toBeHidden();
+  const preview = page.getByRole("region", { name: "Published design preview" });
+  await expect(preview).toBeVisible();
+  expect((await preview.boundingBox())?.y).toBeLessThan(620);
+  await actions.click();
+  await expect(page.getByRole("button", { name: "Approve review" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Request changes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy digest" }).first()).toBeVisible();
+  await actions.click();
+  await expect(page.getByRole("button", { name: "Approve review" })).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(
+    false,
+  );
+});

@@ -206,17 +206,17 @@ export function OverviewTab({
       {hasCanvas(review) ? (
         <section
           aria-label="Published design preview"
-          className="space-y-3 rounded-md border border-border bg-card p-3 sm:p-4"
+          className="space-y-2 rounded-lg border border-border bg-card p-2.5 sm:space-y-3 sm:p-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Explore this board revision</h2>
+              <h2 className="text-base font-semibold text-foreground sm:text-lg">Explore this board revision</h2>
               <p className="text-xs text-muted-foreground">
-                Published source-revision views, not a manufacturing approval or verified defect geometry.
+                Source-linked views; not a manufacturing approval or verified defect geometry.
               </p>
             </div>
             {onOpenChanges ? (
-              <Button type="button" size="sm" onClick={onOpenChanges}>
+              <Button type="button" size="sm" variant="outline" onClick={onOpenChanges}>
                 Inspect findings on the board →
               </Button>
             ) : null}
