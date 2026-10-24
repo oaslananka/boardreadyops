@@ -69,6 +69,7 @@ describe("ProjectUploadWizard", () => {
     const link = container.querySelector('a[href="/setup"]');
     expect(link).not.toBeNull();
     expect(link?.textContent).toBe("Connect GitHub App");
+    expect(container.querySelector('a[href="/reviews"]')?.textContent).toContain("Open reviews");
   });
 
   it("defaults to the supported GitHub path instead of hosted upload", async () => {

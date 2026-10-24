@@ -94,7 +94,15 @@ function projectColumns(role: string, impact: WorkspaceProjectsImpact): readonly
       header: "Repository",
       cell: (project) =>
         project.githubRepoFullName ? (
-          <span className="font-mono break-all">{project.githubRepoFullName}</span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="font-mono text-xs break-all">{project.githubRepoFullName}</span>
+            <Link
+              href={`/reviews?repository=${encodeURIComponent(project.githubRepoFullName)}`}
+              className="w-fit text-sm font-medium text-primary underline underline-offset-2"
+            >
+              View repository reviews
+            </Link>
+          </div>
         ) : (
           <span className="text-muted-foreground">Not linked</span>
         ),
@@ -170,16 +178,18 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
                   Selected workspace: <strong>{result.selected.name}</strong>
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Projects here belong to this CAD workspace. Dashboard shows repository reviews available through
-                  GitHub App installations; those repositories are not automatically part of this workspace.
+                  CAD projects live here. GitHub App installations expose repository runs and published reviews
+                  separately; a repository is not linked to this workspace automatically.
                 </p>
               </div>
-              <Link
-                className="shrink-0 text-sm font-medium text-primary underline underline-offset-2"
-                href="/dashboard"
-              >
-                View GitHub repositories
-              </Link>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button asChild size="sm">
+                  <Link href="/reviews">Open hardware reviews</Link>
+                </Button>
+                <Link className="text-sm font-medium text-primary underline underline-offset-2" href="/dashboard">
+                  View GitHub repositories
+                </Link>
+              </div>
             </section>
 
             {result.total === 0 ? (

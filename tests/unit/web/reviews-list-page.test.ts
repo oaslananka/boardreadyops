@@ -38,6 +38,8 @@ describe("ReviewsListPage", () => {
     expect(markup).toContain("Reviews are separate, explicitly published records");
     expect(markup).toContain("verify its exact head commit and evidence");
     expect(markup).toContain("boardreadyops review publish");
+    expect(markup.indexOf("Hardware Reviews")).toBeLessThan(markup.indexOf('id="publish-review"'));
+    expect(markup.indexOf("PR #42")).toBeLessThan(markup.indexOf('id="publish-review"'));
   });
 
   it("counts only decision-pending reviews as awaiting a decision, not the whole list", async () => {

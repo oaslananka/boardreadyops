@@ -200,8 +200,6 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
           </p>
         </header>
 
-        {total > 0 ? <ReviewPublishingGuidance /> : null}
-
         {total > 0 ? (
           <ReviewListFilterBar
             filters={filters}
@@ -216,7 +214,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
         ) : null}
 
         {reviewsBody}
-        {total === 0 ? <ReviewPublishingGuidance /> : null}
+        <ReviewPublishingGuidance />
       </main>
     </AppShell>
   );
