@@ -358,7 +358,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `esquery@1.7.0`
   - Description: A query library for ECMAScript AST using a CSS selector like query language.
   - Homepage: https://github.com/estools/esquery/
-- `fast-uri@3.1.8`
+- `fast-uri@3.1.9`
   - Description: Dependency-free RFC 3986 URI toolbox
   - Homepage: https://github.com/fastify/fast-uri
 - `ieee754@1.2.1`
@@ -379,7 +379,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `jpeg-js@0.4.4`
   - Description: A pure javascript JPEG encoder and decoder
   - Homepage: https://github.com/eugeneware/jpeg-js#readme
-- `qs@6.16.0`
+- `qs@6.16.0`, `qs@6.16.1`
   - Description: A querystring parser that supports nesting and arrays, with a depth limit
   - Homepage: https://github.com/ljharb/qs
 - `smol-toml@1.9.0`
@@ -1425,7 +1425,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `binary@0.3.0`
   - Description: Unpack multibyte binary values from buffers
   - Homepage: https://github.com/substack/node-binary#readme
-- `body-parser@2.3.0`
+- `body-parser@2.4.0`
   - Description: Node.js body parsing middleware
   - Homepage: https://github.com/expressjs/body-parser#readme
 - `bottleneck@2.19.5`
@@ -1787,7 +1787,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `graphmatch@1.1.1`
   - Description: A low-level utility for matching a string against a directed acyclic graph of regexes.
   - Homepage: https://github.com/fabiospampinato/graphmatch#readme
-- `happy-dom@20.11.15`
+- `happy-dom@21.0.4`
   - Description: Happy DOM is a JavaScript implementation of a web browser without its graphical user interface. It includes many web standards from WHATWG DOM and HTML.
   - Homepage: https://github.com/capricorn86/happy-dom
 - `has-flag@4.0.0`
@@ -2433,7 +2433,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `underscore@1.13.8`
   - Description: JavaScript's functional programming helper library.
   - Homepage: https://underscorejs.org
-- `undici@6.29.0`
+- `undici@6.29.1`
   - Description: An HTTP/1.1 client, written from scratch for Node.js
   - Homepage: https://undici.nodejs.org
 - `undici-types@7.18.2`
@@ -2528,7 +2528,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `zip-stream@6.0.1`
   - Description: a streaming zip archive generator.
   - Homepage: https://github.com/archiverjs/node-zip-stream
-- `zod@3.25.76`, `zod@4.4.3`
+- `zod@4.6.6`
   - Description: TypeScript-first schema declaration and validation library with static type inference
   - Homepage: https://zod.dev
 
