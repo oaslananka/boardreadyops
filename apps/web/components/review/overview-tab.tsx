@@ -224,6 +224,7 @@ export function OverviewTab({
           <ReviewCanvas
             compactMobile
             previewMobileControls
+            preferPcbLayer
             headSnapshots={review.headSnapshots ?? []}
             {...optionalBaseSnapshots}
           />

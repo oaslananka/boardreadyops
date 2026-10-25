@@ -31,6 +31,20 @@ describe("ReviewCanvas", () => {
     }
   });
 
+  it("starts Overview on PCB layer if one is published and preserves default sheet elsewhere", () => {
+    const pcb = headSnapshots.find((snapshot) => snapshot.kind === "pcb_layer");
+    expect(pcb).toBeDefined();
+    const overview = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, preferPcbLayer: true }));
+    const fullInspector = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots }));
+    expect(overview).toContain(`value="${pcb?.sheetOrLayer}" selected=""`);
+    expect(fullInspector).toContain(`value="${headSnapshots[0]?.sheetOrLayer}" selected=""`);
+    const schematics = headSnapshots.filter((snapshot) => snapshot.kind === "schematic");
+    const fallback = renderToStaticMarkup(
+      createElement(ReviewCanvas, { headSnapshots: schematics, preferPcbLayer: true }),
+    );
+    expect(fallback).toContain(`value="${schematics[0]?.sheetOrLayer}" selected=""`);
+  });
+
   it("keeps long native sheet names inside the viewport on narrow screens", () => {
     const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
     expect(markup).toContain(

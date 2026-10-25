@@ -11,6 +11,8 @@ export interface ReviewCanvasProps {
   compactMobile?: boolean;
   /** Hide optional inspection chrome only in the initial Overview preview on small screens. */
   previewMobileControls?: boolean;
+  /** Start on the first actual PCB layer when used as a review overview teaser. */
+  preferPcbLayer?: boolean;
   findings?: DemoFinding[];
   comments?: DemoComment[];
   selectedFindingFingerprint?: string | undefined;
@@ -419,6 +421,7 @@ export function ReviewCanvas({
   baseSnapshots = [],
   compactMobile = false,
   previewMobileControls = false,
+  preferPcbLayer = false,
   findings = [],
   comments = [],
   selectedFindingFingerprint,
@@ -426,7 +429,12 @@ export function ReviewCanvas({
   onSelectComment,
   onAddCommentAtPoint,
 }: Readonly<ReviewCanvasProps>) {
-  const [selectedSheetOrLayer, setSelectedSheetOrLayer] = useState<string>(headSnapshots[0]?.sheetOrLayer ?? "Main");
+  const [selectedSheetOrLayer, setSelectedSheetOrLayer] = useState<string>(
+    () =>
+      (preferPcbLayer ? headSnapshots.find((snapshot) => snapshot.kind === "pcb_layer") : undefined)?.sheetOrLayer ??
+      headSnapshots[0]?.sheetOrLayer ??
+      "Main",
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("head");
   const [opacity, setOpacity] = useState<number>(0.5);
   const [zoom, setZoom] = useState<number>(1);

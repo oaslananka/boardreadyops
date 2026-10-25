@@ -50,6 +50,8 @@ test("mobile Review keeps source evidence in the first screen and decisions in a
   // optional comparison and zoom chrome. Changes retains those controls on mobile.
   await expect(preview.getByRole("group", { name: "Revision comparison modes" })).toBeHidden();
   await expect(preview.getByRole("button", { name: "Zoom in" })).toBeHidden();
+  // Prefer published PCB copper when both schematics and boards exist; never synthesize a layer.
+  await expect(preview.getByRole("combobox", { name: "Layer / Sheet:" })).toHaveValue("F.Cu");
   const boardCanvas = preview.getByRole("region", { name: "Schematic and PCB Review Canvas" });
   expect((await boardCanvas.boundingBox())?.y).toBeLessThan(760);
   await preview.getByRole("button", { name: /Inspect findings on the board/ }).click();
