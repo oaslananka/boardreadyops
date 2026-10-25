@@ -2,9 +2,9 @@ import Link from "next/link";
 import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
 import { ReviewListFilterBar } from "../../components/review/review-list-filters.js";
 import { ReviewListItem } from "../../components/review/review-list-item.js";
+import { ReviewRegistryCard } from "../../components/review/review-registry-card.js";
 import { Button } from "../../components/ui/button.js";
-import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
-import { AppShell, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
+import { AppShell, EmptyState, Panel } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { DEMO_REVIEWS } from "../../lib/demo-data.js";
 import {
@@ -15,7 +15,7 @@ import {
   reviewListSorts,
   reviewSortLabels,
 } from "../../lib/review-list-filters.js";
-import { loadViewerReviews, type ReviewListEntry } from "../../lib/review-listing.js";
+import { loadViewerReviews } from "../../lib/review-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
 export const metadata = {
@@ -24,45 +24,6 @@ export const metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-const columns: readonly DataColumn<ReviewListEntry>[] = [
-  {
-    id: "decision",
-    header: "Decision",
-    cell: (review) => <StatusBadge value={review.decision} />,
-  },
-  {
-    id: "review",
-    header: "Review",
-    rowHeader: true,
-    cell: (review) => (
-      <>
-        <Link href={`/reviews/${review.id}`} className="text-primary hover:underline">
-          {review.title}
-        </Link>
-        <div className="mt-0.5 text-meta text-muted-foreground">
-          {review.repositoryName}
-          {(review.pullRequestNumber ?? 0) > 0 ? ` · PR #${review.pullRequestNumber}` : " · Manual review"}
-        </div>
-      </>
-    ),
-  },
-  { id: "status", header: "Status", cell: (review) => <StatusBadge value={review.status} /> },
-  { id: "author", header: "Opened by", cell: (review) => review.createdBy },
-  {
-    id: "updated",
-    header: "Updated",
-    align: "end",
-    cell: (review) =>
-      review.updatedAt ? (
-        <time dateTime={review.updatedAt} className="text-muted-foreground tabular-nums">
-          {review.updatedAt.replace("T", " ").slice(0, 16)}
-        </time>
-      ) : (
-        "—"
-      ),
-  },
-];
 
 function NoMatchingReviews() {
   return (
@@ -76,26 +37,6 @@ function NoMatchingReviews() {
         }
       >
         <p>Widen the search, or pick a different decision, status, or repository.</p>
-      </EmptyState>
-    </Panel>
-  );
-}
-
-function NoReviews() {
-  return (
-    <Panel title="No Reviews">
-      <EmptyState
-        title="No hardware reviews found"
-        action={
-          <Button asChild variant="outline">
-            <Link href="/runs">Browse run history</Link>
-          </Button>
-        }
-      >
-        <p>Historical Runs remain in run history; this list contains only explicitly published Reviews.</p>
-        <p>
-          Start with a readiness run, then publish a Review from an authorized checkout when it is ready for sign-off.
-        </p>
       </EmptyState>
     </Panel>
   );
@@ -153,9 +94,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
   const facets = reviewListFacets(listing.reviews);
   const filtered = hasActiveReviewFilter(filters);
 
-  // The bundled demo reviews carry full finding detail, so they keep the richer card; database
-  // rows only have what the listing query selects, which is a table's worth. Both go through the
-  // same filter so the two shapes cannot diverge in what a filter means.
+  // Live cards use only source-authorized data; never invent blockers or geometry.
   let reviewsBody = <ReviewEmptyVisualPreview />;
   let shown = 0;
   if (listing.state === "fixtures") {
@@ -163,11 +102,11 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
     shown = visible.length;
     if (visible.length > 0) {
       reviewsBody = (
-        <div className="grid grid-cols-1 gap-4">
+        <section className="grid grid-cols-1 gap-3" aria-label="Hardware reviews across visible repositories">
           {visible.map((review) => (
             <ReviewListItem key={review.id} review={review} context="registry" />
           ))}
-        </div>
+        </section>
       );
     } else if (total > 0) {
       reviewsBody = <NoMatchingReviews />;
@@ -177,13 +116,11 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
     shown = visible.length;
     if (visible.length > 0) {
       reviewsBody = (
-        <DataTable
-          caption="Hardware reviews across every visible repository"
-          columns={columns}
-          rows={visible}
-          rowKey={(review) => review.id}
-          empty={<NoReviews />}
-        />
+        <ul className="flex flex-col gap-3" aria-label="Hardware reviews across visible repositories">
+          {visible.map((review) => (
+            <ReviewRegistryCard key={review.id} review={review} />
+          ))}
+        </ul>
       );
     } else if (total > 0) {
       reviewsBody = <NoMatchingReviews />;
@@ -193,11 +130,24 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Reviews" }]}>
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
-        <header>
-          <h1 className="text-2xl font-bold text-foreground">Hardware Reviews</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Decision-ready hardware design reviews across all repositories and pull requests.
-          </p>
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+              Hardware review workspace
+            </p>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Hardware Reviews</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              See what needs a decision, then inspect source-linked design evidence.
+            </p>
+          </div>
+          {total > 0 ? (
+            <Link
+              href="/runs"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground hover:border-primary/40 hover:text-primary"
+            >
+              View run history <span aria-hidden="true">↗</span>
+            </Link>
+          ) : null}
         </header>
 
         {total > 0 ? (
