@@ -52,7 +52,7 @@ export function ReviewRegistryCard({ review }: Readonly<{ review: ReviewListEntr
                 {review.status === "active" ? "Active review" : `Status: ${review.status}`}
               </span>
               <span aria-hidden="true">·</span>
-              <span title={review.createdBy}>Opened by {creatorLabel(review.createdBy)}</span>
+              <span>Opened by {creatorLabel(review.createdBy)}</span>
               {updated ? (
                 <>
                   <span aria-hidden="true">·</span>

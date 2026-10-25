@@ -81,7 +81,7 @@ describe("ReviewsListPage", () => {
     expect(markup).toContain('aria-label="Hardware reviews across visible repositories"');
     expect(markup).toContain("Inspect and decide");
     expect(markup).toContain("Opened by Recorded member");
-    expect(markup).not.toContain(">620f1df3-f731-497b-9a8c-c5425f762c7d<");
+    expect(markup).not.toContain("620f1df3-f731-497b-9a8c-c5425f762c7d");
     expect(markup).not.toContain("<table");
     // The richer fixture card carries finding counts the database listing does not query.
     expect(markup).not.toContain("blockers");
