@@ -39,106 +39,146 @@ export function ReviewListFilterBar({
   filtered,
 }: Readonly<ReviewListFilterBarProps>) {
   return (
-    <section className="flex flex-col gap-3 rounded-md border border-border bg-card p-4" aria-label="Review filters">
-      {/*
-        Wraps rather than forcing one row. Five controls and a button do not fit on one line even
-        at desktop width, and the search field — the only one without a fixed minimum — was the
-        one that got squeezed to nothing, leaving its label overlapping the next control.
-      */}
-      <form method="get" className="flex flex-wrap items-end gap-3">
-        <div className="min-w-56 flex-1">
-          <label htmlFor="review-filter-q" className="text-meta font-medium text-foreground">
-            Search
-          </label>
-          <Input
-            id="review-filter-q"
-            name="q"
-            type="search"
-            maxLength={128}
-            defaultValue={filters.query ?? ""}
-            placeholder="Title, repository, author, or #PR"
-            className="mt-1"
-          />
+    <section
+      className="rounded-xl border border-border bg-card px-4 py-4 shadow-e1 sm:px-5"
+      aria-label="Review filters"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-lg font-semibold tracking-tight text-foreground">Your review queue</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Filter by source, decision or repository. Saved filters stay shareable.
+          </p>
         </div>
-
-        <div className="min-w-40">
-          <label htmlFor="review-filter-decision" className="text-meta font-medium text-foreground">
-            Decision
-          </label>
-          <NativeSelect
-            id="review-filter-decision"
-            name="decision"
-            defaultValue={filters.decision ?? ""}
-            className="mt-1"
-          >
-            <option value="">Any decision</option>
-            {facets.decisions.map((decision) => (
-              <option key={decision} value={decision}>
-                {humanize(decision)}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="min-w-40">
-          <label htmlFor="review-filter-status" className="text-meta font-medium text-foreground">
-            Status
-          </label>
-          <NativeSelect id="review-filter-status" name="status" defaultValue={filters.status ?? ""} className="mt-1">
-            <option value="">Any status</option>
-            {facets.statuses.map((status) => (
-              <option key={status} value={status}>
-                {humanize(status)}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="min-w-48">
-          <label htmlFor="review-filter-repository" className="text-meta font-medium text-foreground">
-            Repository
-          </label>
-          <NativeSelect
-            id="review-filter-repository"
-            name="repository"
-            defaultValue={filters.repository ?? ""}
-            className="mt-1"
-          >
-            <option value="">Every repository</option>
-            {facets.repositories.map((repository) => (
-              <option key={repository} value={repository}>
-                {repository}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="min-w-52">
-          <label htmlFor="review-filter-sort" className="text-meta font-medium text-foreground">
-            Sort by
-          </label>
-          <NativeSelect id="review-filter-sort" name="sort" defaultValue={filters.sort} className="mt-1">
-            {sorts.map((sort) => (
-              <option key={sort} value={sort}>
-                {sortLabels[sort]}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
+        <Link
+          href="/reviews?decision=pending&sort=decision"
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 text-sm font-semibold text-primary hover:bg-primary/15"
+          aria-label={`Show ${awaiting} reviews awaiting a decision`}
+        >
+          <span>Awaiting decision</span>
+          <span className="rounded-md bg-primary/15 px-2 py-0.5 tabular-nums">{awaiting}</span>
+        </Link>
+      </div>
+      <form method="get" className="mt-4 flex flex-col gap-3">
+        <div className="flex flex-wrap items-end gap-2.5">
+          <div className="min-w-52 flex-1">
+            <label htmlFor="review-filter-q" className="sr-only">
+              Search reviews
+            </label>
+            <Input
+              id="review-filter-q"
+              name="q"
+              type="search"
+              maxLength={128}
+              defaultValue={filters.query ?? ""}
+              placeholder="Search review title, repository or PR"
+              aria-label="Search reviews"
+            />
+          </div>
           <Button type="submit" size="sm">
-            Apply
+            Search
           </Button>
-          {filtered ? (
-            <Button asChild size="sm" variant="ghost">
-              <Link href="/reviews">Clear</Link>
-            </Button>
-          ) : null}
         </div>
-      </form>
 
-      <p className="text-sm text-muted-foreground" aria-live="polite">
+        <details className="group border-t border-border/60 pt-3">
+          <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-muted-foreground marker:hidden hover:text-foreground">
+            <span className="flex items-center gap-2">
+              <span aria-hidden="true" className="text-primary">
+                ≡
+              </span>
+              {filtered
+                ? "Filters active · refine decision, status, repository and sort"
+                : "Refine by decision, status, repository and sort"}
+            </span>
+            <span aria-hidden="true" className="transition-transform group-open:rotate-180">
+              ⌄
+            </span>
+          </summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div>
+              <label htmlFor="review-filter-decision" className="text-meta font-medium text-foreground">
+                Decision
+              </label>
+              <NativeSelect
+                id="review-filter-decision"
+                name="decision"
+                defaultValue={filters.decision ?? ""}
+                className="mt-1"
+              >
+                <option value="">Any decision</option>
+                {facets.decisions.map((decision) => (
+                  <option key={decision} value={decision}>
+                    {humanize(decision)}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <label htmlFor="review-filter-status" className="text-meta font-medium text-foreground">
+                Status
+              </label>
+              <NativeSelect
+                id="review-filter-status"
+                name="status"
+                defaultValue={filters.status ?? ""}
+                className="mt-1"
+              >
+                <option value="">Any status</option>
+                {facets.statuses.map((status) => (
+                  <option key={status} value={status}>
+                    {humanize(status)}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <label htmlFor="review-filter-repository" className="text-meta font-medium text-foreground">
+                Repository
+              </label>
+              <NativeSelect
+                id="review-filter-repository"
+                name="repository"
+                defaultValue={filters.repository ?? ""}
+                className="mt-1"
+              >
+                <option value="">Every repository</option>
+                {facets.repositories.map((repository) => (
+                  <option key={repository} value={repository}>
+                    {repository}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div>
+              <label htmlFor="review-filter-sort" className="text-meta font-medium text-foreground">
+                Sort by
+              </label>
+              <NativeSelect id="review-filter-sort" name="sort" defaultValue={filters.sort} className="mt-1">
+                {sorts.map((sort) => (
+                  <option key={sort} value={sort}>
+                    {sortLabels[sort]}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="submit" size="sm">
+              Apply filters
+            </Button>
+          </div>
+        </details>
+      </form>
+      {filtered ? (
+        <Link
+          href="/reviews"
+          className="mt-2 inline-flex min-h-9 items-center text-xs font-semibold text-primary underline-offset-2 hover:underline"
+        >
+          Clear filters
+        </Link>
+      ) : null}
+
+      <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
         {filtered ? (
           <>
             Showing <strong className="text-foreground tabular-nums">{shown}</strong> of{" "}
