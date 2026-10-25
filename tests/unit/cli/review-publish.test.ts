@@ -181,6 +181,65 @@ describe("CLI review publish command", () => {
     }
   });
 
+  it("refuses to associate an opted-in source summary with findings from another checked-out revision", async () => {
+    const { root, base } = createCommittedPcbReviewFixture();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({ base, head: base, pcb: "safe-basic.kicad_pcb", shareFootprintSummary: true }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code).toBe(2);
+      expect(stderr.output).toContain("match checked-out HEAD");
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses opted-in summary publication when uncommitted worktree files could contaminate findings", async () => {
+    const { root, base, head } = createCommittedPcbReviewFixture();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      fs.appendFileSync(path.join(root, "safe-basic.kicad_pcb"), "\n; uncommitted board change\n");
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({ base, head, pcb: "safe-basic.kicad_pcb", shareFootprintSummary: true }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code).toBe(2);
+      expect(stderr.output).toContain("clean committed working tree");
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves default review head from the target repository, not CLI process cwd", async () => {
+    const { root, head } = createCommittedPcbReviewFixture();
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      const options = liveOptions({ dryRun: true });
+      delete options.head;
+      const code = await reviewPublishCommand(root, options, {
+        stdout: stdout.stream,
+        stderr: stderr.stream,
+      });
+      expect(code).toBe(0);
+      expect(stdout.output).toContain(`Commit:     ${head.slice(0, 8)}`);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("includes rendered review-canvas snapshots of the project's schematic/PCB files in the publish payload", async () => {
     const stdout = createMockStream();
     const stderr = createMockStream();

@@ -63017,10 +63017,13 @@ function writePublishResult(result, streams) {
   streams.stdout.write(`${JSON.stringify(result, null, 2)}
 `);
 }
-function getGitCommitSha(ref = "HEAD") {
+function getGitCommitSha(root, ref = "HEAD") {
   try {
     const gitExec = resolveGitExecutable();
-    return (0, import_node_child_process5.execFileSync)(gitExec, ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return (0, import_node_child_process5.execFileSync)(gitExec, ["-C", root, "rev-parse", ref], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
   } catch {
     return "0".repeat(40);
   }
@@ -63058,8 +63061,8 @@ async function reviewPublishCommand(target, options, streams) {
   const jsonOutput = options.format === "json";
   const loaded = await loadConfig(root, options.config);
   const config2 = loaded.config;
-  let headSha = options.head ?? getGitCommitSha("HEAD");
-  let baseSha = options.base ? getGitCommitSha(options.base) : void 0;
+  let headSha = options.head ?? getGitCommitSha(root, "HEAD");
+  let baseSha = options.base ? getGitCommitSha(root, options.base) : void 0;
   let pcbFootprintSummary;
   if (options.shareFootprintSummary) {
     if (!options.base || !options.pcb) {
@@ -63075,6 +63078,24 @@ async function reviewPublishCommand(target, options, streams) {
     if (evidence.status !== "complete") {
       streams.stderr.write("PCB summary unavailable; nothing uploaded.\n");
       return 1;
+    }
+    if (getGitCommitSha(root, "HEAD") !== evidence.headCommitSha) {
+      streams.stderr.write("PCB summary publishing requires --head to match checked-out HEAD; nothing uploaded.\n");
+      return 2;
+    }
+    try {
+      const dirty = (0, import_node_child_process5.execFileSync)(
+        resolveGitExecutable(),
+        ["-C", root, "status", "--porcelain", "--untracked-files=all"],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 1e4 }
+      );
+      if (dirty.length > 0) {
+        streams.stderr.write("PCB summary publishing requires a clean committed working tree; nothing uploaded.\n");
+        return 2;
+      }
+    } catch {
+      streams.stderr.write("Could not verify the PCB summary working-tree provenance; nothing uploaded.\n");
+      return 2;
     }
     pcbFootprintSummary = summaryFromVerifiedFacts(evidence);
     headSha = evidence.headCommitSha;
