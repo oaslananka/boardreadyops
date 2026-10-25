@@ -62354,6 +62354,11 @@ function verifiedPlacement(node2) {
   if (x === void 0 || y === void 0 || rotationRaw !== void 0 && rotation === void 0) return void 0;
   return { x, y, ...rotation === void 0 ? {} : { rotation } };
 }
+function validLibraryFootprintId(value) {
+  if (!value || [...value].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) return false;
+  const parts = value.split(":");
+  return parts.length === 2 && parts.every((part) => part.length > 0 && part.trim() === part);
+}
 function sourceFootprint(node2) {
   const uuidNode = singleChild(node2, "uuid");
   const positionNode = singleChild(node2, "at");
@@ -62366,7 +62371,7 @@ function sourceFootprint(node2) {
   if (uuidNode.children.length !== 2 || layerNode.children.length !== 2) return void 0;
   const libraryId = listValue(node2);
   const layer = listValue(layerNode);
-  if (!rawUuid || !UUID.test(rawUuid) || !reference || !libraryId || !layer || !/^[FB]\.[\w.]+$/u.test(layer)) {
+  if (!rawUuid || !UUID.test(rawUuid) || !reference || !validLibraryFootprintId(libraryId) || layer !== "F.Cu" && layer !== "B.Cu") {
     return void 0;
   }
   const place = verifiedPlacement(positionNode);
