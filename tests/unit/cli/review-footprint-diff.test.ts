@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { pcbFootprintSummarySchema } from "../../../packages/contracts/src/pcb-footprint-summary.js";
 import { reviewFootprintDiffCommand } from "../../../src/cli/commands/review-footprint-diff.js";
 
 function capture() {
@@ -78,6 +79,53 @@ describe("offline review footprint-diff CLI output", () => {
     expect(result.out).not.toContain("BOARDREADYOPS_TOKEN");
   });
 
+  it("emits only bounded counts, source digests and explicit non-assessment in summary-json", () => {
+    const result = command({ format: "summary-json" });
+    expect(result.code).toBe(0);
+    expect(result.err).toBe("");
+    const parsed = JSON.parse(result.out) as unknown;
+    expect(pcbFootprintSummarySchema.safeParse(parsed).success).toBe(true);
+    expect(parsed).toMatchObject({
+      schemaVersion: 1,
+      scope: "pcb-footprints-only",
+      disclosure: "counts-and-digests-only",
+      baseCommitSha: baseSha,
+      headCommitSha: headSha,
+      changes: {
+        added: 0,
+        removed: 0,
+        modified: 1,
+        byField: { reference: 0, libraryId: 0, layer: 0, positionMm: 1, rotationDeg: 0 },
+      },
+      riskAssessment: "not-evaluated",
+    });
+    // A summary must not disclose the full original object facts or the board's filename.
+    for (const sensitive of [
+      "board.kicad_pcb",
+      "bf7f5122-bc89-413e-aa3e-f19064ff92f7",
+      "R_0603",
+      "R1",
+      "F.Cu",
+      "sourceUuid",
+      "positionDeg",
+      'x":',
+      'y":',
+    ]) {
+      expect(result.out).not.toContain(sensitive);
+    }
+  });
+
+  it("fails closed when summary is unavailable instead of emitting success facts", () => {
+    const result = command({ format: "summary-json", pcb: "missing.kicad_pcb" });
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.out)).toEqual({
+      schemaVersion: 1,
+      status: "unavailable",
+      reason: "base-source-missing",
+    });
+    expect(result.err).toBe("");
+  });
+
   it("describes exact facts in text without claiming a full PCB or risk check", () => {
     const result = command({ format: "text" });
     expect(result.code).toBe(0);
@@ -99,7 +147,7 @@ describe("offline review footprint-diff CLI output", () => {
     expect(unsafe.err).toContain("invalid-source-path");
     const invalidFormat = command({ format: "xml" });
     expect(invalidFormat.code).toBe(2);
-    expect(invalidFormat.err).toContain("choose text or json");
+    expect(invalidFormat.err).toContain("choose text, json or summary-json");
     expect(invalidFormat.out).toBe("");
   });
 });

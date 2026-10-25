@@ -62540,7 +62540,7 @@ async function renderSchematicFile(file2, findings) {
       Array.from(parsed.netLabels)
     );
     const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-    const sha2563 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
+    const sha2564 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
     return {
       id: `snap_sch_${sheetName}`,
       name: `schematic_${sheetName}.svg`,
@@ -62550,7 +62550,7 @@ async function renderSchematicFile(file2, findings) {
       width: 1200,
       height: 800,
       content: svg,
-      sha256: sha2563,
+      sha256: sha2564,
       anchors: linkedAnchors
     };
   } catch {
@@ -62568,7 +62568,7 @@ async function renderPcbFile(file2, findings) {
         parsed.footprints.map((fp) => ({ reference: fp.reference, footprint: fp.footprint, at: fp.at }))
       );
       const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-      const sha2563 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
+      const sha2564 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
       artifacts.push({
         id: `snap_pcb_${layer.replaceAll(".", "_")}`,
         name: `pcb_${layer.replaceAll(".", "_")}.svg`,
@@ -62578,7 +62578,7 @@ async function renderPcbFile(file2, findings) {
         width: 1e3,
         height: 800,
         content: svg,
-        sha256: sha2563,
+        sha256: sha2564,
         anchors: linkedAnchors
       });
     }
@@ -62939,6 +62939,61 @@ async function reviewVerifyCommand(target, options, streams) {
   }
 }
 
+// packages/contracts/src/pcb-footprint-summary.ts
+init_zod();
+var sha2562 = external_exports.string().regex(/^[0-9a-f]{64}$/u);
+var gitObjectId = external_exports.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u);
+var footprintCount = external_exports.number().int().min(0).max(1e4);
+var changedFieldsSchema = external_exports.object({
+  reference: footprintCount,
+  libraryId: footprintCount,
+  layer: footprintCount,
+  positionMm: footprintCount,
+  rotationDeg: footprintCount
+}).strict();
+var pcbFootprintSummarySchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  scope: external_exports.literal("pcb-footprints-only"),
+  provenance: external_exports.literal("local-git-commits"),
+  disclosure: external_exports.literal("counts-and-digests-only"),
+  baseCommitSha: gitObjectId,
+  headCommitSha: gitObjectId,
+  baseBlobSha: gitObjectId,
+  headBlobSha: gitObjectId,
+  baseSourceSha256: sha2562,
+  headSourceSha256: sha2562,
+  changes: external_exports.object({
+    added: footprintCount,
+    removed: footprintCount,
+    modified: footprintCount,
+    byField: changedFieldsSchema
+  }).strict(),
+  riskAssessment: external_exports.literal("not-evaluated")
+}).strict().superRefine((value, ctx) => {
+  const { changes } = value;
+  if (changes.added + changes.removed + changes.modified > 2e4) {
+    ctx.addIssue({ code: "custom", path: ["changes"], message: "too many reported changes" });
+  }
+  let fields = 0;
+  for (const [field, count] of Object.entries(changes.byField)) {
+    if (count > changes.modified) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["changes", "byField", field],
+        message: "field count exceeds modified objects"
+      });
+    }
+    fields += count;
+  }
+  if (fields < changes.modified) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["changes", "byField"],
+      message: "each modified object must have a changed field"
+    });
+  }
+});
+
 // src/kicad/git-footprint-evidence.ts
 var import_node_child_process5 = require("node:child_process");
 
@@ -63156,9 +63211,37 @@ function gitPcbFootprintEvidence(options) {
 }
 
 // src/cli/commands/review-footprint-diff.ts
+function summaryFromVerifiedFacts(evidence) {
+  const countFields = { reference: 0, libraryId: 0, layer: 0, positionMm: 0, rotationDeg: 0 };
+  let added = 0;
+  let removed = 0;
+  let modified = 0;
+  for (const fact of evidence.facts.changes) {
+    if (fact.status === "footprint-added") added++;
+    else if (fact.status === "footprint-removed") removed++;
+    else {
+      modified++;
+      for (const field of fact.changedFields) countFields[field]++;
+    }
+  }
+  return pcbFootprintSummarySchema.parse({
+    schemaVersion: 1,
+    scope: "pcb-footprints-only",
+    provenance: "local-git-commits",
+    disclosure: "counts-and-digests-only",
+    baseCommitSha: evidence.baseCommitSha,
+    headCommitSha: evidence.headCommitSha,
+    baseBlobSha: evidence.baseBlobSha,
+    headBlobSha: evidence.headBlobSha,
+    baseSourceSha256: evidence.facts.baseSourceSha256,
+    headSourceSha256: evidence.facts.headSourceSha256,
+    changes: { added, removed, modified, byField: countFields },
+    riskAssessment: "not-evaluated"
+  });
+}
 function reviewFootprintDiffCommand(target, options, streams) {
-  if (options.format && options.format !== "text" && options.format !== "json") {
-    streams.stderr.write("Invalid format: choose text or json.\n");
+  if (options.format && options.format !== "text" && options.format !== "json" && options.format !== "summary-json") {
+    streams.stderr.write("Invalid format: choose text, json or summary-json.\n");
     return 2;
   }
   const result = gitPcbFootprintEvidence({
@@ -63167,6 +63250,16 @@ function reviewFootprintDiffCommand(target, options, streams) {
     headRef: options.head,
     sourcePath: options.pcb
   });
+  if (options.format === "summary-json") {
+    if (result.status !== "complete") {
+      streams.stdout.write(`${JSON.stringify({ schemaVersion: 1, ...result }, null, 2)}
+`);
+      return 1;
+    }
+    streams.stdout.write(`${JSON.stringify(summaryFromVerifiedFacts(result), null, 2)}
+`);
+    return 0;
+  }
   if (options.format === "json") {
     streams.stdout.write(`${JSON.stringify({ schemaVersion: 1, ...result }, null, 2)}
 `);
@@ -64315,7 +64408,7 @@ var import_node_path78 = __toESM(require("node:path"), 1);
 init_zod();
 var domain2 = "boardreadyops-runner-draft-receipt-v1\n";
 var uuid3 = external_exports.string().uuid();
-var sha2562 = external_exports.string().regex(/^[0-9a-f]{64}$/u);
+var sha2563 = external_exports.string().regex(/^[0-9a-f]{64}$/u);
 var payloadSchema = external_exports.object({
   version: external_exports.literal(1),
   purpose: external_exports.literal("manufacturing-draft"),
@@ -64324,7 +64417,7 @@ var payloadSchema = external_exports.object({
   executionAttemptId: uuid3,
   repository: external_exports.string().min(3).max(300).regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
   sourceCommitSha: external_exports.string().regex(/^[0-9a-f]{40}$/u),
-  archiveSha256: sha2562,
+  archiveSha256: sha2563,
   archiveBytes: external_exports.number().int().positive().max(64 * 1024 * 1024)
 }).strict();
 var signedSchema = external_exports.object({
@@ -67589,7 +67682,7 @@ function registerAllCommands(program2, streams) {
   ).action(async (pathInput, options) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
   });
-  review.command("footprint-diff").description("compare exact Git PCB footprint facts offline without uploading design sources").argument("[path]", "local Git checkout (defaults to current directory)").requiredOption("--base <ref>", "base Git revision").requiredOption("--head <ref>", "head Git revision").requiredOption("--pcb <path>", "repository-relative tracked .kicad_pcb file").option("--format <format>", "text or json", "text").action((pathInput, options) => {
+  review.command("footprint-diff").description("compare exact Git PCB footprint facts offline without uploading design sources").argument("[path]", "local Git checkout (defaults to current directory)").requiredOption("--base <ref>", "base Git revision").requiredOption("--head <ref>", "head Git revision").requiredOption("--pcb <path>", "repository-relative tracked .kicad_pcb file").option("--format <format>", "text, json or summary-json (counts/digests only)", "text").action((pathInput, options) => {
     process.exitCode = reviewFootprintDiffCommand(pathInput, options, streams);
   });
   addCommonOptions(

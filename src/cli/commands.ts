@@ -439,7 +439,7 @@ export function registerAllCommands(
     .requiredOption("--base <ref>", "base Git revision")
     .requiredOption("--head <ref>", "head Git revision")
     .requiredOption("--pcb <path>", "repository-relative tracked .kicad_pcb file")
-    .option("--format <format>", "text or json", "text")
+    .option("--format <format>", "text, json or summary-json (counts/digests only)", "text")
     .action((pathInput: string | undefined, options: ReviewFootprintDiffOptions) => {
       process.exitCode = reviewFootprintDiffCommand(pathInput, options, streams);
     });

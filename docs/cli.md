@@ -35,6 +35,19 @@ Successful JSON stdout is one schema-versioned document containing the BoardRead
 
 The result intentionally excludes API tokens, authorization headers, uploaded source contents, internal trace fields, and unrelated service response data. A successful service response must contain either a same-origin `reviewUrl` or a `runId`; otherwise the command fails closed.
 
+## Offline, source-verified PCB footprint comparison
+
+`boardreadyops review footprint-diff [path] --base <ref> --head <ref> --pcb <repo-relative.kicad_pcb>` compares **immutable Git commit blobs** for one tracked KiCad PCB. It ignores uncommitted edits, reads no cloud data and makes no network requests. It reports footprint UUID-backed additions, removals, and changes to reference, library ID, layer, position and rotation. An unavailable or incomplete native source causes a nonzero exit without invented changes.
+
+```bash
+boardreadyops review footprint-diff . --base HEAD~1 --head HEAD --pcb hardware/mainboard/board.kicad_pcb --format text
+boardreadyops review footprint-diff . --base HEAD~1 --head HEAD --pcb hardware/mainboard/board.kicad_pcb --format summary-json
+```
+
+Use `--format json` only for **local detailed inspection**: it includes object UUIDs, references, library identifiers and absolute source coordinates, all potentially confidential design information. Prefer `--format summary-json` for manually handled, disclosure-minimal evidence: versioned counts by change type/field, Git commit/blob IDs, SHA-256 source digests, and an explicit `not-evaluated` risk state. The summary excludes object UUIDs, coordinates, references and library identifiers. Both output formats may still expose sensitive source-derived information (including commit identity and content hashes); follow your organization's information-sharing policy.
+
+Neither output publishes to the BoardReadyOps server or asserts DRC, risk, policy or manufacturing acceptance. The server does **not** currently ingest this v1 summary; any future ingestion requires separate repository authorization, commit binding, opt-in, tamper verification and retention rules. Comparison covers KiCad **footprints only**, not traces, vias, zones, schematic content or entire PCB geometry.
+
 ## Self-hosted runner operations
 
 `boardreadyops runner` provides the customer-worker lifecycle for the self-hosted execution plane.
