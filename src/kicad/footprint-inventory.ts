@@ -27,7 +27,11 @@ function singleChild(node: SexprListNode, name: string): SexprListNode | undefin
   return matches.length === 1 ? matches[0] : undefined;
 }
 
-const DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/u;
+const DECIMAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/u;
+
+function scalarArgumentCount(node: SexprListNode): number {
+  return node.children.slice(1).filter((child) => child.kind !== "list").length;
+}
 
 function parseDecimal(raw: string | undefined): number | undefined {
   if (raw === undefined || !DECIMAL.test(raw)) return undefined;
@@ -57,7 +61,10 @@ function sourceFootprint(node: SexprListNode): VerifiedPcbFootprint | undefined 
   const rawUuid = listValue(uuidNode);
   const references = directChildLists(node, "property").filter((child) => listValue(child, 1) === "Reference");
   const referenceProperty = references.length === 1 ? references[0] : undefined;
-  const reference = referenceProperty ? listValue(referenceProperty, 2) : undefined;
+  const reference =
+    referenceProperty && scalarArgumentCount(referenceProperty) === 2 ? listValue(referenceProperty, 2) : undefined;
+  // UUID and layer declarations are exact single-scalar fields.
+  if (uuidNode.children.length !== 2 || layerNode.children.length !== 2) return undefined;
   const libraryId = listValue(node);
   const layer = listValue(layerNode);
   if (!rawUuid || !UUID.test(rawUuid) || !reference || !libraryId || !layer || !/^[FB]\.[\w.]+$/u.test(layer)) {
