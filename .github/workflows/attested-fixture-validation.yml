@@ -1,0 +1,65 @@
+# TEST FIXTURE ONLY. Do not use this attestation as fabrication approval or a customer delivery.
+# The exact KiCad source lives in this public repository and is intentionally synthetic.
+# Manual dispatch on the protected main branch. Fails closed for other refs.
+name: Manufacturing fixture attestation smoke
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  attest-fixture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Checkout protected exact source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - name: Require protected main (never attest PR or unprotected sources)
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${{ github.event_name }}" == "workflow_dispatch" ]]
+          [[ "${{ github.ref }}" == "refs/heads/main" ]]
+          [[ "${{ github.ref_protected }}" == "true" ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+      - name: Install Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install and check KiCad 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo add-apt-repository --yes ppa:kicad/kicad-10.0-releases
+          sudo apt-get update -qq
+          sudo apt-get install --yes kicad
+          [[ "$(kicad-cli version)" == 10.0.* ]]
+      - name: Export exact Gerber, drill, BOM and CPL bytes from test fixture
+        id: export
+        uses: ./.github/actions/manufacturing-attested-export
+        with:
+          reviewed-source-sha: ${{ github.sha }}
+          project: tests/fixtures/projects/safe-basic/safe-basic.kicad_pro
+      - name: Sign test fixture export inventory with GitHub OIDC
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-checksums: ${{ steps.export.outputs.subject-checksums }}
+      - name: Retain test-only export for independent byte verification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-fixture-attested-manufacturing-export
+          path: ${{ steps.export.outputs.export-directory }}/
+          if-no-files-found: error
+          retention-days: 7
+

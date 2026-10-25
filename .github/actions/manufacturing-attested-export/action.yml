@@ -1,6 +1,6 @@
 name: BoardReadyOps reviewed manufacturing export
 description: >-
-  Opt-in clean-SHA KiCad 10 Gerber/Excellon export and checksum preparation.
+  Opt-in clean-SHA KiCad 10 Gerber/Excellon/BOM/CPL export and checksum preparation.
   Produces unsigned subjects only; caller must attest in its own repository.
 inputs:
   reviewed-source-sha:
@@ -14,7 +14,7 @@ outputs:
     description: Absolute runner-temporary checksum file path for actions/attest
     value: ${{ steps.export.outputs.subject-checksums }}
   export-directory:
-    description: Root-relative directory containing generated Gerbers, drill files and manifest
+    description: Root-relative directory containing generated Gerbers, drill, BOM, CPL and manifest
     value: ${{ steps.export.outputs.export-directory }}
   manifest:
     description: Root-relative export-provenance manifest
@@ -71,6 +71,27 @@ runs:
           --recipe "${BOARDREADYOPS_ACTION_DIR}/manufacturing-recipe.json" \
           --output build/boardreadyops-attested \
           --reviewed-source-sha "${GITHUB_SHA}"
+
+        # Sign only a complete, source-linked fabrication and assembly set.
+        # A missing schematic or failed KiCad BOM/CPL export must fail closed.
+        node - "build/boardreadyops-attested/manifest.json" <<'NODE'
+        const fs = require("node:fs");
+        const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+        const required = {
+          gerbers: "gerber",
+          drill: "drill",
+          bom: "bom",
+          positions: "cpl",
+        };
+        for (const [step, kind] of Object.entries(required)) {
+          if (
+            !manifest.steps?.some((item) => item.kind === step && item.status === "generated" && item.files > 0) ||
+            !manifest.artifacts?.some((item) => item.kind === kind && item.bytes > 0)
+          ) {
+            throw new Error("Incomplete manufacturing export: missing " + step + " (" + kind + ")");
+          }
+        }
+        NODE
 
         # The checksum file is OUTSIDE the signed output tree and is itself
         # just the subject-list input to actions/attest, never an attestation.
