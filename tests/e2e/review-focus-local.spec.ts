@@ -31,6 +31,16 @@ test.describe("PCB-first review canvas focus", () => {
     await expect(page.getByRole("tab", { name: /^Changes/ })).toHaveAttribute("aria-selected", "true");
   });
 
+  test("demo summary images do not masquerade as KiCad source-verified movement", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openInteractiveChanges(page);
+    await expect(page.getByRole("region", { name: "Source-verified PCB object movement" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Schematic and PCB Review Canvas" })).toBeVisible();
+    await expect(
+      page.getByText("Published review snapshots are component/layer summaries", { exact: false }),
+    ).toBeVisible();
+  });
+
   test("390px mobile: canvas remains reachable when focus mode is toggled", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openInteractiveChanges(page);

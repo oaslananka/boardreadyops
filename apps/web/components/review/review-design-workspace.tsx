@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { DemoFinding, DemoReview } from "../../lib/demo-data.js";
 import { ReviewCanvas } from "./review-canvas.js";
+import { VerifiedObjectPositions } from "./verified-object-positions.js";
 
 const severityOrder: Record<DemoFinding["severity"], number> = {
   critical: 0,
@@ -252,6 +253,15 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
                 comments={review.comments}
                 selectedFindingFingerprint={selectedFingerprint}
                 onSelectFinding={selectCanvasFinding}
+              />
+              <VerifiedObjectPositions
+                baseSnapshots={review.baseSnapshots ?? []}
+                headSnapshots={snapshots}
+                findingFingerprints={review.findings.map((finding) => finding.fingerprint)}
+                onInspectFinding={(fingerprint) => {
+                  selectCanvasFinding(fingerprint);
+                  setFocusCanvas(false);
+                }}
               />
               <p className="text-xs text-muted-foreground">
                 {nativeViews > 0
