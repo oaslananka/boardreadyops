@@ -38,6 +38,7 @@ import {
   reviewPublishCommand,
   reviewVerifyCommand,
 } from "./commands/review.js";
+import { type ReviewFootprintDiffOptions, reviewFootprintDiffCommand } from "./commands/review-footprint-diff.js";
 import { addCommonOptions, type CommonCliOptions, runCommand } from "./commands/run.js";
 import {
   type RunnerActivateCliOptions,
@@ -430,6 +431,18 @@ export function registerAllCommands(
   ).action(async (pathInput: string | undefined, options: ReviewPublishOptions) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
   });
+
+  review
+    .command("footprint-diff")
+    .description("compare exact Git PCB footprint facts offline without uploading design sources")
+    .argument("[path]", "local Git checkout (defaults to current directory)")
+    .requiredOption("--base <ref>", "base Git revision")
+    .requiredOption("--head <ref>", "head Git revision")
+    .requiredOption("--pcb <path>", "repository-relative tracked .kicad_pcb file")
+    .option("--format <format>", "text or json", "text")
+    .action((pathInput: string | undefined, options: ReviewFootprintDiffOptions) => {
+      process.exitCode = reviewFootprintDiffCommand(pathInput, options, streams);
+    });
 
   addCommonOptions(
     review

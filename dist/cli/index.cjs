@@ -48953,14 +48953,14 @@ function dependencyFrom(key, value, warnings) {
   }
   const table = value;
   const versionSpec = stringField(table.version);
-  const git = stringField(table.git);
+  const git2 = stringField(table.git);
   const path85 = stringField(table.path);
   const overridePath = stringField(table.override_path);
-  if (git) {
+  if (git2) {
     const subPath = path85;
     return {
       declaredName: key,
-      source: subPath === void 0 ? { kind: "git", url: git } : { kind: "git", url: git, path: subPath },
+      source: subPath === void 0 ? { kind: "git", url: git2 } : { kind: "git", url: git2, path: subPath },
       versionSpec,
       pinned: isPinned(versionSpec)
     };
@@ -58877,14 +58877,14 @@ async function commitFixPlan(root, plan) {
   if (add.code !== 0) {
     throw new Error(add.stderr.trim() || add.error || "git add failed");
   }
-  const commit2 = await runProcess("git", ["commit", "--only", "-m", "fix: apply boardreadyops fixes", "--", ...paths], {
+  const commit3 = await runProcess("git", ["commit", "--only", "-m", "fix: apply boardreadyops fixes", "--", ...paths], {
     cwd: root,
     timeoutMs: 3e4,
     maxStdoutBytes: 128 * 1024,
     maxStderrBytes: 128 * 1024
   });
-  if (commit2.code !== 0) {
-    throw new Error(commit2.stderr.trim() || commit2.error || "git commit failed");
+  if (commit3.code !== 0) {
+    throw new Error(commit3.stderr.trim() || commit3.error || "git commit failed");
   }
 }
 function formatFixPlan(plan) {
@@ -60022,7 +60022,7 @@ ${result.stderr}`).trim() || `${step.kind} export failed`
     }
     await assertReviewedSource(options);
   }
-  const git = options.gitRoot ? await gitState(options.gitRoot) : {};
+  const git2 = options.gitRoot ? await gitState(options.gitRoot) : {};
   const manifest = {
     kind: "boardreadyops.export-provenance",
     schemaVersion: 1,
@@ -60036,7 +60036,7 @@ ${result.stderr}`).trim() || `${step.kind} export failed`
     },
     recipe: { source: options.recipeSource ?? "default", hash: recipeHash, steps: recipe.steps },
     ...options.kicadVersion ? { kicadVersion: options.kicadVersion } : {},
-    ...git.sha ? { git } : {},
+    ...git2.sha ? { git: git2 } : {},
     ...sourceSnapshot ? { sourceSnapshot } : {},
     ...sourceSnapshot === "stable" && sourceFingerprintBefore ? { sourceFingerprint: sourceFingerprintBefore } : {},
     environment: { platform: process.platform, nodeVersion: process.version },
@@ -61717,12 +61717,12 @@ async function releaseAuditClausesCommand(passportFile, options, streams) {
 }
 async function releasePackCommand(pathInput, options, streams) {
   const root = await canonicalRoot(import_node_path72.default.resolve(normalizePathInput(pathInput ?? ".")));
-  const git = await gitState2(root);
+  const git2 = await gitState2(root);
   const result = await runPipeline(pipelineInputFromCli(root, options, false));
   const bundle = await writeReleaseEvidenceBundle(root, result, {
     outputDir: options.output ?? "build/boardreadyops-release",
-    gitSha: git.sha,
-    gitDirty: git.dirty,
+    gitSha: git2.sha,
+    gitDirty: git2.dirty,
     includeGenerated: options.includeGenerated,
     provenance: {
       attestation: options.provenanceAttestation,
@@ -62939,18 +62939,271 @@ async function reviewVerifyCommand(target, options, streams) {
   }
 }
 
+// src/kicad/git-footprint-evidence.ts
+var import_node_child_process5 = require("node:child_process");
+
+// src/kicad/footprint-inventory.ts
+var import_node_crypto21 = require("node:crypto");
+var UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;
+var MAX_FOOTPRINTS = 1e4;
+function singleChild(node2, name) {
+  const matches = directChildLists(node2, name);
+  return matches.length === 1 ? matches[0] : void 0;
+}
+var DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/u;
+function parseDecimal(raw) {
+  if (raw === void 0 || !DECIMAL.test(raw)) return void 0;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : void 0;
+}
+function verifiedPlacement(node2) {
+  if (node2.children.length > 4) return void 0;
+  const x = parseDecimal(listValue(node2, 1));
+  const y = parseDecimal(listValue(node2, 2));
+  const rotationRaw = listValue(node2, 3);
+  const rotation = rotationRaw === void 0 ? void 0 : parseDecimal(rotationRaw);
+  if (x === void 0 || y === void 0 || rotationRaw !== void 0 && rotation === void 0) return void 0;
+  return { x, y, ...rotation === void 0 ? {} : { rotation } };
+}
+function sourceFootprint(node2) {
+  const uuidNode = singleChild(node2, "uuid");
+  const positionNode = singleChild(node2, "at");
+  const layerNode = singleChild(node2, "layer");
+  if (!uuidNode || !positionNode || !layerNode) return void 0;
+  const rawUuid = listValue(uuidNode);
+  const references = directChildLists(node2, "property").filter((child) => listValue(child, 1) === "Reference");
+  const referenceProperty = references.length === 1 ? references[0] : void 0;
+  const reference = referenceProperty ? listValue(referenceProperty, 2) : void 0;
+  const libraryId = listValue(node2);
+  const layer = listValue(layerNode);
+  if (!rawUuid || !UUID.test(rawUuid) || !reference || !libraryId || !layer || !/^[FB]\.[\w.]+$/u.test(layer)) {
+    return void 0;
+  }
+  const place = verifiedPlacement(positionNode);
+  if (!place) return void 0;
+  return {
+    sourceUuid: rawUuid.toLowerCase(),
+    reference,
+    libraryId,
+    layer,
+    positionMm: { x: place.x, y: place.y },
+    ...place.rotation === void 0 ? {} : { rotationDeg: place.rotation }
+  };
+}
+function compareSourceUuids(a, b) {
+  if (a.sourceUuid === b.sourceUuid) return 0;
+  return a.sourceUuid < b.sourceUuid ? -1 : 1;
+}
+function verifiedPcbFootprintInventory(text) {
+  let model;
+  try {
+    model = parseKicadDocument(text, "pcb");
+  } catch (error62) {
+    if (error62 instanceof HostileInputError) return { status: "unavailable", reason: "malformed-source" };
+    throw error62;
+  }
+  if (model.ast.errors.length !== 0 || model.ast.nodes.length !== 1 || !model.root || listHead(model.root) !== "kicad_pcb") {
+    return { status: "unavailable", reason: "malformed-source" };
+  }
+  const footprints2 = directChildLists(model.root, "footprint");
+  if (footprints2.length > MAX_FOOTPRINTS) return { status: "unavailable", reason: "too-many-footprints" };
+  const found = [];
+  const identities = /* @__PURE__ */ new Set();
+  for (const node2 of footprints2) {
+    const parsed = sourceFootprint(node2);
+    if (!parsed) return { status: "unavailable", reason: "missing-source-identity" };
+    if (identities.has(parsed.sourceUuid)) return { status: "unavailable", reason: "duplicate-uuid" };
+    identities.add(parsed.sourceUuid);
+    found.push(parsed);
+  }
+  found.sort(compareSourceUuids);
+  return { status: "complete", sourceSha256: (0, import_node_crypto21.createHash)("sha256").update(text).digest("hex"), footprints: found };
+}
+
+// src/kicad/footprint-diff.ts
+function changedFields(before, after) {
+  const fields = [];
+  if (before.reference !== after.reference) fields.push("reference");
+  if (before.libraryId !== after.libraryId) fields.push("libraryId");
+  if (before.layer !== after.layer) fields.push("layer");
+  if (before.positionMm.x !== after.positionMm.x || before.positionMm.y !== after.positionMm.y) {
+    fields.push("positionMm");
+  }
+  if (before.rotationDeg !== after.rotationDeg) fields.push("rotationDeg");
+  return fields;
+}
+function diffVerifiedPcbFootprints(basePcb, headPcb) {
+  const base = verifiedPcbFootprintInventory(basePcb);
+  if (base.status !== "complete") return { status: "unavailable", side: "base", reason: base.reason };
+  const head = verifiedPcbFootprintInventory(headPcb);
+  if (head.status !== "complete") return { status: "unavailable", side: "head", reason: head.reason };
+  const beforeById = new Map(base.footprints.map((item2) => [item2.sourceUuid, item2]));
+  const afterById = new Map(head.footprints.map((item2) => [item2.sourceUuid, item2]));
+  const changes = [];
+  for (const item2 of base.footprints) {
+    const after = afterById.get(item2.sourceUuid);
+    if (!after) {
+      changes.push({ status: "footprint-removed", sourceUuid: item2.sourceUuid, base: item2 });
+      continue;
+    }
+    const fields = changedFields(item2, after);
+    if (fields.length > 0) {
+      changes.push({
+        status: "footprint-modified",
+        sourceUuid: item2.sourceUuid,
+        changedFields: fields,
+        base: item2,
+        head: after
+      });
+    }
+  }
+  for (const item2 of head.footprints) {
+    if (!beforeById.has(item2.sourceUuid)) {
+      changes.push({ status: "footprint-added", sourceUuid: item2.sourceUuid, head: item2 });
+    }
+  }
+  changes.sort((a, b) => a.sourceUuid === b.sourceUuid ? 0 : a.sourceUuid < b.sourceUuid ? -1 : 1);
+  return {
+    status: "complete",
+    baseSourceSha256: base.sourceSha256,
+    headSourceSha256: head.sourceSha256,
+    changes
+  };
+}
+
+// src/kicad/git-footprint-evidence.ts
+var MAX_PCB_SOURCE_BYTES = 64 * 1024 * 1024;
+var MAX_GIT_OUTPUT_BYTES = MAX_PCB_SOURCE_BYTES + 1024;
+var COMMIT_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+var BLOB_SHA = COMMIT_SHA;
+function hasControl(value) {
+  return [...value].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
+}
+function validSourcePath(value) {
+  if (!value || value.length > 1024 || value.startsWith("/") || !value.endsWith(".kicad_pcb")) return false;
+  if (value.includes("\\") || value.includes(":") || hasControl(value)) return false;
+  return value.split("/").every((segment2) => segment2.length > 0 && segment2 !== "." && segment2 !== ".." && segment2 !== ".git");
+}
+function git(root, args, maxBuffer = 4096) {
+  return (0, import_node_child_process5.execFileSync)(resolveGitExecutable(), ["-C", root, ...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: 1e4,
+    maxBuffer
+  });
+}
+function commit2(root, ref) {
+  if (!ref || ref.length > 255 || ref.startsWith("-") || hasControl(ref)) return void 0;
+  try {
+    const resolved = git(root, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`]).trim();
+    return COMMIT_SHA.test(resolved) ? resolved : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function sourceAtCommit(root, sha, file2) {
+  let blobSha;
+  try {
+    blobSha = git(root, ["rev-parse", "--verify", "--end-of-options", `${sha}:${file2}`]).trim();
+  } catch {
+    return { status: "unavailable", reason: "missing" };
+  }
+  if (!BLOB_SHA.test(blobSha)) return { status: "unavailable", reason: "unreadable" };
+  try {
+    const type = git(root, ["cat-file", "-t", blobSha]).trim();
+    if (type !== "blob") return { status: "unavailable", reason: "unreadable" };
+    const size = Number(git(root, ["cat-file", "-s", blobSha]).trim());
+    if (!Number.isSafeInteger(size) || size < 0) return { status: "unavailable", reason: "unreadable" };
+    if (size > MAX_PCB_SOURCE_BYTES) return { status: "unavailable", reason: "too-large" };
+    const text = git(root, ["cat-file", "blob", blobSha], MAX_GIT_OUTPUT_BYTES);
+    if (Buffer.byteLength(text, "utf8") !== size) return { status: "unavailable", reason: "unreadable" };
+    return { status: "complete", blobSha, text };
+  } catch {
+    return { status: "unavailable", reason: "unreadable" };
+  }
+}
+function gitPcbFootprintEvidence(options) {
+  if (!validSourcePath(options.sourcePath)) return { status: "unavailable", reason: "invalid-source-path" };
+  const base = commit2(options.repositoryRoot, options.baseRef);
+  const head = commit2(options.repositoryRoot, options.headRef);
+  if (!base || !head) return { status: "unavailable", reason: "unresolved-commit" };
+  const baseSource = sourceAtCommit(options.repositoryRoot, base, options.sourcePath);
+  if (baseSource.status !== "complete") {
+    return {
+      status: "unavailable",
+      reason: baseSource.reason === "too-large" ? "source-too-large" : baseSource.reason === "missing" ? "base-source-missing" : "unreadable-source"
+    };
+  }
+  const headSource = sourceAtCommit(options.repositoryRoot, head, options.sourcePath);
+  if (headSource.status !== "complete") {
+    return {
+      status: "unavailable",
+      reason: headSource.reason === "too-large" ? "source-too-large" : headSource.reason === "missing" ? "head-source-missing" : "unreadable-source"
+    };
+  }
+  const facts = diffVerifiedPcbFootprints(baseSource.text, headSource.text);
+  if (facts.status !== "complete") return facts;
+  return {
+    status: "complete",
+    sourcePath: options.sourcePath,
+    baseCommitSha: base,
+    headCommitSha: head,
+    baseBlobSha: baseSource.blobSha,
+    headBlobSha: headSource.blobSha,
+    facts,
+    riskAssessment: "not-evaluated"
+  };
+}
+
+// src/cli/commands/review-footprint-diff.ts
+function reviewFootprintDiffCommand(target, options, streams) {
+  if (options.format && options.format !== "text" && options.format !== "json") {
+    streams.stderr.write("Invalid format: choose text or json.\n");
+    return 2;
+  }
+  const result = gitPcbFootprintEvidence({
+    repositoryRoot: target ?? process.cwd(),
+    baseRef: options.base,
+    headRef: options.head,
+    sourcePath: options.pcb
+  });
+  if (options.format === "json") {
+    streams.stdout.write(`${JSON.stringify({ schemaVersion: 1, ...result }, null, 2)}
+`);
+    return result.status === "complete" ? 0 : 1;
+  }
+  if (result.status === "unavailable") {
+    streams.stderr.write(`PCB source comparison unavailable: ${result.reason}. No change verdict was computed.
+`);
+    return 1;
+  }
+  const added = result.facts.changes.filter((change) => change.status === "footprint-added").length;
+  const removed = result.facts.changes.filter((change) => change.status === "footprint-removed").length;
+  const modified = result.facts.changes.filter((change) => change.status === "footprint-modified").length;
+  streams.stdout.write(
+    `Verified Git PCB footprint facts: ${result.sourcePath}
+Base: ${result.baseCommitSha} (${result.facts.baseSourceSha256})
+Head: ${result.headCommitSha} (${result.facts.headSourceSha256})
+Footprints: ${added} added, ${removed} removed, ${modified} modified.
+Risk/policy/DRC assessment: not evaluated. Other PCB objects are not covered.
+Local-only comparison: no source files or results were uploaded.
+`
+  );
+  return 0;
+}
+
 // src/cli/commands/runner.ts
 var import_node_path83 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-enrollment-admin.ts
-var import_node_child_process5 = require("node:child_process");
-var import_node_crypto22 = require("node:crypto");
+var import_node_child_process6 = require("node:child_process");
+var import_node_crypto23 = require("node:crypto");
 var import_promises31 = require("node:fs/promises");
 var import_node_os5 = __toESM(require("node:os"), 1);
 var import_node_path75 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-registration-enrollment-store.ts
-var import_node_crypto21 = require("node:crypto");
+var import_node_crypto22 = require("node:crypto");
 var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
 var repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
@@ -62978,7 +63231,7 @@ function isoColumn(row, key) {
   return Number.isNaN(parsed.valueOf()) ? void 0 : parsed.toISOString();
 }
 function digest2(value) {
-  return (0, import_node_crypto21.createHash)("sha256").update(value, "utf8").digest("hex");
+  return (0, import_node_crypto22.createHash)("sha256").update(value, "utf8").digest("hex");
 }
 function positiveInteger3(value, fallback, name, maximum) {
   const selected = value ?? fallback;
@@ -63012,8 +63265,8 @@ function validActorId(value) {
 }
 function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
   const now = options.now ?? (() => /* @__PURE__ */ new Date());
-  const id = options.id ?? import_node_crypto21.randomUUID;
-  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto21.randomBytes)(32).toString("base64url"));
+  const id = options.id ?? import_node_crypto22.randomUUID;
+  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto22.randomBytes)(32).toString("base64url"));
   const enrollmentTtlSeconds = positiveInteger3(options.enrollmentTtlSeconds, 15 * 60, "enrollmentTtlSeconds", 60 * 60);
   return {
     async issueEnrollment(input2) {
@@ -63143,7 +63396,7 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
 var maximumPsqlOutputBytes = 1024 * 1024;
 var defaultDependencies = {
   query: executePsqlQuery,
-  token: () => (0, import_node_crypto22.randomBytes)(32).toString("base64url")
+  token: () => (0, import_node_crypto23.randomBytes)(32).toString("base64url")
 };
 async function issueRunnerEnrollment(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
@@ -63311,7 +63564,7 @@ function spawnPsql(args, environment) {
   if (process.platform !== "linux") {
     throw new Error("runner enrollment administration is supported only on Linux control-plane hosts");
   }
-  return (0, import_node_child_process5.spawn)("/usr/bin/psql", args, {
+  return (0, import_node_child_process6.spawn)("/usr/bin/psql", args, {
     env: environment,
     stdio: "pipe",
     windowsHide: true
@@ -63488,14 +63741,14 @@ async function assertPrivateFile(filePath, label) {
 init_version();
 
 // src/runner/identity.ts
-var import_node_crypto24 = require("node:crypto");
+var import_node_crypto25 = require("node:crypto");
 var import_promises33 = require("node:fs/promises");
 var import_node_os6 = __toESM(require("node:os"), 1);
 var import_node_path76 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/client.ts
-var import_node_crypto23 = require("node:crypto");
+var import_node_crypto24 = require("node:crypto");
 var import_promises32 = require("node:fs/promises");
 init_src();
 var responseBodyLimitBytes = 1024 * 1024;
@@ -63536,7 +63789,7 @@ var RunnerControlPlaneClient = class {
     this.privateKey = options.privateKey;
     this.fetchImpl = options.fetch ?? fetch;
     this.now = options.now ?? (() => /* @__PURE__ */ new Date());
-    this.nonce = options.nonce ?? (() => (0, import_node_crypto23.randomBytes)(24).toString("base64url"));
+    this.nonce = options.nonce ?? (() => (0, import_node_crypto24.randomBytes)(24).toString("base64url"));
     this.requestTimeoutMs = positiveInteger4(options.requestTimeoutMs ?? 3e4, "requestTimeoutMs");
   }
   async claim(input2) {
@@ -63569,7 +63822,7 @@ var RunnerControlPlaneClient = class {
     if (content.byteLength !== maximumBytes) {
       throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${content.byteLength}`);
     }
-    if ((0, import_node_crypto23.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
+    if ((0, import_node_crypto24.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
       throw new Error("artifact digest changed before upload");
     }
     const response = await this.fetchImpl(url2, {
@@ -63687,7 +63940,7 @@ async function activateRunner(input2) {
   }
 }
 async function loadRunnerPrivateKey(filePath) {
-  return (0, import_node_crypto23.createPrivateKey)(await (0, import_promises32.readFile)(filePath, "utf8"));
+  return (0, import_node_crypto24.createPrivateKey)(await (0, import_promises32.readFile)(filePath, "utf8"));
 }
 function normalizeControlPlaneUrl(value) {
   let url2;
@@ -63771,7 +64024,7 @@ async function activateRunnerIdentity(options) {
   const privateKeyFile = import_node_path76.default.join(identityDirectory, privateKeyName);
   const publicKeyFile = import_node_path76.default.join(identityDirectory, publicKeyName);
   await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
-  const generated = (0, import_node_crypto24.generateKeyPairSync)("ed25519");
+  const generated = (0, import_node_crypto25.generateKeyPairSync)("ed25519");
   const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
   const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
   const activated = await activateRunner({
@@ -63940,7 +64193,7 @@ var import_node_path80 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/customer-artifacts.ts
-var import_node_crypto25 = require("node:crypto");
+var import_node_crypto26 = require("node:crypto");
 var import_node_fs11 = require("node:fs");
 var import_promises34 = require("node:fs/promises");
 var import_node_path77 = __toESM(require("node:path"), 1);
@@ -64014,7 +64267,7 @@ async function persistCustomerRunnerArtifacts(input2) {
         } finally {
           await handle.close();
         }
-        const digest3 = (0, import_node_crypto25.createHash)("sha256").update(content).digest("hex");
+        const digest3 = (0, import_node_crypto26.createHash)("sha256").update(content).digest("hex");
         if (content.length !== artifact.bytes || digest3 !== artifact.sha256) {
           throw new Error("runner artifact bytes do not match its declaration");
         }
@@ -64055,7 +64308,7 @@ async function persistCustomerRunnerArtifacts(input2) {
 }
 
 // src/runner/draft-attestation.ts
-var import_node_crypto26 = require("node:crypto");
+var import_node_crypto27 = require("node:crypto");
 var import_node_fs12 = require("node:fs");
 var import_promises35 = require("node:fs/promises");
 var import_node_path78 = __toESM(require("node:path"), 1);
@@ -64087,7 +64340,7 @@ function signManufacturingDraftReceipt(payload, privateKey) {
   return signedSchema.parse({
     payload: normalized,
     algorithm: "Ed25519",
-    signature: (0, import_node_crypto26.sign)(null, signedBytes(normalized), privateKey).toString("base64url")
+    signature: (0, import_node_crypto27.sign)(null, signedBytes(normalized), privateKey).toString("base64url")
   });
 }
 async function createManufacturingDraftReceiptArtifact(input2) {
@@ -64115,7 +64368,7 @@ async function createManufacturingDraftReceiptArtifact(input2) {
   } finally {
     await handle.close();
   }
-  if (data.byteLength !== archive.bytes || (0, import_node_crypto26.createHash)("sha256").update(data).digest("hex") !== archive.sha256) {
+  if (data.byteLength !== archive.bytes || (0, import_node_crypto27.createHash)("sha256").update(data).digest("hex") !== archive.sha256) {
     throw new Error("draft archive digest changed before runner signing");
   }
   const receipt = signManufacturingDraftReceipt(
@@ -64143,12 +64396,12 @@ async function createManufacturingDraftReceiptArtifact(input2) {
     contentType: "application/json",
     filePath,
     bytes: content.byteLength,
-    sha256: (0, import_node_crypto26.createHash)("sha256").update(content).digest("hex")
+    sha256: (0, import_node_crypto27.createHash)("sha256").update(content).digest("hex")
   };
 }
 
 // src/runner/source.ts
-var import_node_child_process6 = require("node:child_process");
+var import_node_child_process7 = require("node:child_process");
 var import_promises36 = require("node:fs/promises");
 var import_node_path79 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
@@ -64164,7 +64417,7 @@ async function checkoutRunnerSource(options) {
   const workspace = await (0, import_promises36.mkdtemp)(import_node_path79.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
-  const git = async (args) => {
+  const git2 = async (args) => {
     options.signal?.throwIfAborted();
     return await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
       cwd: workspace,
@@ -64174,15 +64427,15 @@ async function checkoutRunnerSource(options) {
   };
   try {
     if (process.platform !== "win32") await (0, import_promises36.chmod)(workspace, 448);
-    await git(["init", "--quiet"]);
-    await git(["remote", "add", "origin", repository]);
-    await git(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
-    await git(["checkout", "--quiet", "--detach", "FETCH_HEAD"]);
-    const resolved = (await git(["rev-parse", "HEAD"])).stdout.trim();
+    await git2(["init", "--quiet"]);
+    await git2(["remote", "add", "origin", repository]);
+    await git2(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
+    await git2(["checkout", "--quiet", "--detach", "FETCH_HEAD"]);
+    const resolved = (await git2(["rev-parse", "HEAD"])).stdout.trim();
     if (resolved !== options.job.repository.commitSha) {
       throw new Error(`checked-out commit did not match the assigned commit: ${resolved}`);
     }
-    await git(["remote", "remove", "origin"]);
+    await git2(["remote", "remove", "origin"]);
     options.signal?.throwIfAborted();
     return workspace;
   } catch (error62) {
@@ -64192,7 +64445,7 @@ async function checkoutRunnerSource(options) {
 }
 async function executeRunnerCommand(command, args, options) {
   return await new Promise((resolve, reject) => {
-    const child = (0, import_node_child_process6.spawn)(command, args, {
+    const child = (0, import_node_child_process7.spawn)(command, args, {
       cwd: options.cwd,
       env: options.env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -64764,7 +65017,7 @@ var RunnerShutdownError = class extends Error {
 };
 
 // src/cli/runner-pipeline.ts
-var import_node_crypto27 = require("node:crypto");
+var import_node_crypto28 = require("node:crypto");
 var import_promises39 = require("node:fs/promises");
 var import_node_path82 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
@@ -64893,7 +65146,7 @@ async function runnerArtifact(filePath, kind, name, role) {
     role,
     filePath,
     bytes: content.byteLength,
-    sha256: (0, import_node_crypto27.createHash)("sha256").update(content).digest("hex")
+    sha256: (0, import_node_crypto28.createHash)("sha256").update(content).digest("hex")
   };
 }
 function runnerReportFromResult(report) {
@@ -67335,6 +67588,9 @@ function registerAllCommands(program2, streams) {
     ).option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
   ).action(async (pathInput, options) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
+  });
+  review.command("footprint-diff").description("compare exact Git PCB footprint facts offline without uploading design sources").argument("[path]", "local Git checkout (defaults to current directory)").requiredOption("--base <ref>", "base Git revision").requiredOption("--head <ref>", "head Git revision").requiredOption("--pcb <path>", "repository-relative tracked .kicad_pcb file").option("--format <format>", "text or json", "text").action((pathInput, options) => {
+    process.exitCode = reviewFootprintDiffCommand(pathInput, options, streams);
   });
   addCommonOptions(
     review.command("verify").description("cryptographically verify a hardware review evidence ledger offline").argument("[path]", "path to evidence-ledger.json or review bundle directory").option("--ledger <path>", "explicit path to evidence-ledger.json").option("--digest <sha>", "expected composite evidence digest").option("--artifacts <path>", "directory containing local artifacts to verify")

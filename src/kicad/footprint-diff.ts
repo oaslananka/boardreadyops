@@ -3,9 +3,9 @@ import { verifiedPcbFootprintInventory } from "./footprint-inventory.js";
 
 type VerifiedFootprint = Extract<FootprintInventoryResult, { status: "complete" }>["footprints"][number];
 
-export type VerifiedFootprintChangeField = "reference" | "libraryId" | "layer" | "positionMm" | "rotationDeg";
+type VerifiedFootprintChangeField = "reference" | "libraryId" | "layer" | "positionMm" | "rotationDeg";
 
-export type VerifiedFootprintChange =
+type VerifiedFootprintChange =
   | { status: "footprint-added"; sourceUuid: string; head: VerifiedFootprint }
   | { status: "footprint-removed"; sourceUuid: string; base: VerifiedFootprint }
   | {
