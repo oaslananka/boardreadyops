@@ -179,6 +179,98 @@ function FindingsAttentionBanner({
   );
 }
 
+function RecordedHardwareWork({ groups }: Readonly<{ groups: RepositoryGroup[] }>) {
+  const recent = groups.flatMap((group) => group.repositories).filter((repository) => Boolean(repository.latestRunId));
+  recent.sort((a, b) => {
+    const date = (value: string | undefined) => {
+      const parsed = value ? Date.parse(value) : Number.NaN;
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+    return date(b.latestRunAt) - date(a.latestRunAt) || `${a.owner}/${a.name}`.localeCompare(`${b.owner}/${b.name}`);
+  });
+  const attention = recent.filter((repository) => repository.openFindings > 0);
+  const selected = [...attention, ...recent.filter((repository) => repository.openFindings === 0)].slice(0, 3);
+  if (selected.length === 0) return null;
+
+  return (
+    <section aria-labelledby="recorded-hardware-work-heading" className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Real repository activity</p>
+          <h2 id="recorded-hardware-work-heading" className="font-display text-2xl font-semibold tracking-tight">
+            Pick up your hardware work
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Latest recorded runs from your connected repositories. Finding counts are not severity ratings.
+          </p>
+        </div>
+        <Link
+          href="/runs"
+          className="inline-flex min-h-10 items-center text-sm font-semibold text-primary hover:underline"
+        >
+          All runs →
+        </Link>
+      </div>
+      <div className="grid gap-3 xl:grid-cols-3">
+        {selected.map((repository) => {
+          const hasFindings = repository.openFindings > 0;
+          const url = hasFindings ? `/runs/${repository.latestRunId}/findings` : `/runs/${repository.latestRunId}`;
+          return (
+            <article
+              key={repository.id}
+              className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border border-border bg-card p-5 shadow-e1 transition-[border-color,box-shadow] hover:border-primary/35 hover:shadow-e2"
+            >
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {hasFindings ? "Findings to investigate" : "Recorded check"}
+                  </span>
+                  <StatusBadge value={repository.latestRunDecision ?? repository.latestRunStatus ?? "unknown"} />
+                </div>
+                <h3 className="break-words text-base font-semibold text-foreground">
+                  {repository.owner}/{repository.name}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {hasFindings
+                    ? `${repository.openFindings} open findings in the latest recorded run`
+                    : "No open findings in the latest recorded run"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {repository.latestRunAt ? `Last run ${when(repository.latestRunAt)} UTC` : "Run date unavailable"}
+                </p>
+              </div>
+              <Link
+                href={url}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {hasFindings ? "Inspect findings" : "Inspect run evidence"} <span aria-hidden="true">↗</span>
+              </Link>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ExpandableExamplePreview() {
+  return (
+    <details className="overflow-hidden rounded-xl border border-border bg-card">
+      <summary className="flex min-h-14 cursor-pointer items-center justify-between gap-3 px-5 py-3 text-sm font-semibold text-foreground hover:bg-muted/35">
+        <span>
+          Explore a sample PCB and schematic <span className="font-normal text-muted-foreground">· Example only</span>
+        </span>
+        <span aria-hidden="true" className="text-primary">
+          ⌄
+        </span>
+      </summary>
+      <div className="border-t border-border p-3">
+        <ReviewEmptyVisualPreview mode="onboarding" />
+      </div>
+    </details>
+  );
+}
+
 function SetupInProgressBanner({ summary }: Readonly<{ summary: DashboardRepositorySummary }>) {
   return (
     <output className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-info/40 bg-info-surface px-5 py-4">
@@ -337,9 +429,8 @@ function DashboardBody({
   return (
     <div className="flex flex-col gap-5">
       <AttentionBanner summary={summary} groups={groups} />
-      {summary.repositoriesWithoutRuns > summary.repositories / 2 ? (
-        <ReviewEmptyVisualPreview mode="onboarding" />
-      ) : null}
+      <RecordedHardwareWork groups={groups} />
+      {summary.repositoriesWithoutRuns > summary.repositories / 2 ? <ExpandableExamplePreview /> : null}
       {summary.repositoriesWithOpenFindings === 0 &&
       summary.repositoriesWithoutRuns === 0 &&
       summary.supplyAlerts === 0 ? (
@@ -357,7 +448,18 @@ function DashboardBody({
           </Link>
         </section>
       ) : null}
-      <RepositorySections groups={groups} />
+      {summary.repositories > 5 ? (
+        <details className="rounded-xl border border-border bg-card" aria-label="All connected repositories">
+          <summary className="min-h-12 cursor-pointer px-5 py-4 text-sm font-semibold hover:text-primary">
+            Browse all {summary.repositories} connected repositories
+          </summary>
+          <div className="border-t border-border p-4">
+            <RepositorySections groups={groups} />
+          </div>
+        </details>
+      ) : (
+        <RepositorySections groups={groups} />
+      )}
       <OperationalSummarySection summary={summary} />
     </div>
   );
