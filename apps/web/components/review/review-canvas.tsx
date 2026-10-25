@@ -570,6 +570,9 @@ export function ReviewCanvas({
       ? "head"
       : viewMode;
 
+  let canvasHeightClass = compactMobile ? "h-[19rem] md:h-[34rem]" : "h-[27rem] md:h-[34rem]";
+  if (immersive) canvasHeightClass = "h-[min(75dvh,56rem)] min-h-[24rem]";
+
   const modeButtonClass = (active: boolean) =>
     `shrink-0 rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
 
@@ -715,7 +718,7 @@ export function ReviewCanvas({
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
-        className={`relative ${immersive ? "h-[min(75dvh,56rem)] min-h-[24rem]" : compactMobile ? "h-[19rem] md:h-[34rem]" : "h-[27rem] md:h-[34rem]"} overflow-hidden rounded-md border border-border bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`relative ${canvasHeightClass} overflow-hidden rounded-md border border-border bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
