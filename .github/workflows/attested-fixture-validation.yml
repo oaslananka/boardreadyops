@@ -26,11 +26,13 @@ jobs:
           fetch-depth: 1
       - name: Require protected main (never attest PR or unprotected sources)
         shell: bash
+        env:
+          PROTECTED_REF: ${{ github.ref_protected }}
         run: |
           set -euo pipefail
-          [[ "${{ github.event_name }}" == "workflow_dispatch" ]]
-          [[ "${{ github.ref }}" == "refs/heads/main" ]]
-          [[ "${{ github.ref_protected }}" == "true" ]]
+          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          [[ "$PROTECTED_REF" == "true" ]]
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
       - name: Install Node 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

@@ -127,10 +127,13 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     const steps = job?.steps ?? [];
     const guard = steps.find((step) => String(step.name ?? "").startsWith("Require protected main"));
     expect(guard?.run).toContain("refs/heads/main");
-    expect(guard?.run).toContain("github.ref_protected");
+    expect(raw).toContain("PROTECTED_REF:");
+    expect(guard?.run).toContain("PROTECTED_REF");
     const exportStep = steps.find((step) => step.id === "export");
     expect(exportStep?.uses).toBe("./.github/actions/manufacturing-attested-export");
-    expect(exportStep?.with?.project).toBe("tests/fixtures/projects/safe-basic/safe-basic.kicad_pro");
+    expect((exportStep?.with as { project?: string } | undefined)?.project).toBe(
+      "tests/fixtures/projects/safe-basic/safe-basic.kicad_pro",
+    );
     expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/attest@"))).toBe(true);
     expect(raw).toContain("TEST FIXTURE ONLY");
     expect(raw).not.toContain("pull_request:");
