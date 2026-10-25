@@ -51,7 +51,7 @@ describe("offline review footprint-diff CLI output", () => {
     const write = (pos: string) =>
       fs.writeFileSync(
         path.join(root, "board.kicad_pcb"),
-        `(kicad_pcb (version 20250114) (footprint "R_0603" (layer "F.Cu") (at ${pos}) (uuid "bf7f5122-bc89-413e-aa3e-f19064ff92f7") (property "Reference" "R1")))`,
+        `(kicad_pcb (version 20250114) (footprint "Resistor_SMD:R_0603" (layer "F.Cu") (at ${pos}) (uuid "bf7f5122-bc89-413e-aa3e-f19064ff92f7") (property "Reference" "R1")))`,
       );
     write("1 2");
     execute("add", "-A");

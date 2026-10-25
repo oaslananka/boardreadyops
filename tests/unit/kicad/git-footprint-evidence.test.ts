@@ -10,7 +10,7 @@ const uuidA = "bf7f5122-bc89-413e-aa3e-f19064ff92f7";
 const uuidB = "c71b2196-ae56-4853-92ac-5497683704cd";
 const file = "hardware/main board.kicad_pcb";
 const footprint = (uuid: string, reference: string, at: string) =>
-  `(footprint "R_0603" (layer "F.Cu") (at ${at}) (uuid "${uuid}") (property "Reference" "${reference}"))`;
+  `(footprint "Resistor_SMD:R_0603" (layer "F.Cu") (at ${at}) (uuid "${uuid}") (property "Reference" "${reference}"))`;
 const board = (...items: string[]) => `(kicad_pcb (version 20250114) ${items.join(" ")})`;
 
 describe("local Git-commit-backed KiCad footprint evidence", () => {

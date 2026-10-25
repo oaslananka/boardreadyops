@@ -6,7 +6,13 @@ import { diffVerifiedPcbFootprints } from "../../../src/kicad/footprint-diff.js"
 const a = "bf7f5122-bc89-413e-aa3e-f19064ff92f7";
 const b = "c71b2196-ae56-4853-92ac-5497683704cd";
 const c = "da57c9c2-65cc-45e7-a22f-f92c0cff0051";
-function fp(id: string, reference: string, position = "1 2", layer = "F.Cu", libraryId = "R_0603"): string {
+function fp(
+  id: string,
+  reference: string,
+  position = "1 2",
+  layer = "F.Cu",
+  libraryId = "Resistor_SMD:R_0603",
+): string {
   return `(footprint "${libraryId}" (layer "${layer}") (at ${position}) (uuid "${id}") (property "Reference" "${reference}"))`;
 }
 function pcb(...footprints: string[]): string {
@@ -15,8 +21,8 @@ function pcb(...footprints: string[]): string {
 
 describe("verified source-only PCB footprint changes", () => {
   it("detects same-UUID property and absolute physical position changes, retaining both source digests", () => {
-    const base = pcb(fp(a, "R1", "10 20 90", "F.Cu", "R_0603"));
-    const head = pcb(fp(a, "R2", "11 20 180", "B.Cu", "R_0805"));
+    const base = pcb(fp(a, "R1", "10 20 90", "F.Cu", "Resistor_SMD:R_0603"));
+    const head = pcb(fp(a, "R2", "11 20 180", "B.Cu", "Resistor_SMD:R_0805"));
     const delta = diffVerifiedPcbFootprints(base, head);
     expect(delta).toMatchObject({
       status: "complete",
