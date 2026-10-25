@@ -1,12 +1,7 @@
 import Link from "next/link";
+import { displayReviewAuthor } from "../../lib/review-author-display.js";
 import type { ReviewListEntry } from "../../lib/review-listing.js";
 import { StatusBadge } from "../ui.js";
-
-function creatorLabel(value: string): string {
-  // A UUID from the database is a record key, not a displayable GitHub identity.
-  if (/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu.test(value)) return "Recorded member";
-  return value || "Unknown creator";
-}
 
 export function ReviewRegistryCard({ review }: Readonly<{ review: ReviewListEntry }>) {
   const pending = review.decision === "pending";
@@ -52,7 +47,7 @@ export function ReviewRegistryCard({ review }: Readonly<{ review: ReviewListEntr
                 {review.status === "active" ? "Active review" : `Status: ${review.status}`}
               </span>
               <span aria-hidden="true">·</span>
-              <span>Opened by {creatorLabel(review.createdBy)}</span>
+              <span>Opened by {displayReviewAuthor(review.createdBy)}</span>
               {updated ? (
                 <>
                   <span aria-hidden="true">·</span>
