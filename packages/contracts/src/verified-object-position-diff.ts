@@ -88,6 +88,9 @@ export function diffVerifiedObjectPositions(
       headMm: { x: after.x, y: after.y },
     });
   }
-  const compare = (left: string, right: string) => (left === right ? 0 : left < right ? -1 : 1);
+  const compare = (left: string, right: string): number => {
+    if (left === right) return 0;
+    return left < right ? -1 : 1;
+  };
   return deltas.sort((a, b) => compare(a.sheetOrLayer, b.sheetOrLayer) || compare(a.sourceUuid, b.sourceUuid));
 }
