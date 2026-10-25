@@ -109,6 +109,37 @@ describe("verified KiCad source footprint inventory", () => {
     }
   });
 
+  it("rejects duplicate scalar values in UUID, layer and Reference fields", () => {
+    const source = footprint(rId, "R1");
+    for (const ambiguous of [
+      source.replace(`(uuid "${rId}")`, `(uuid "${rId}" "extra")`),
+      source.replace('(layer "F.Cu")', '(layer "F.Cu" "B.Cu")'),
+      source.replace('(property "Reference" "R1")', '(property "Reference" "R1" "extra")'),
+    ]) {
+      expect(verifiedPcbFootprintInventory(board(ambiguous))).toEqual({
+        status: "unavailable",
+        reason: "missing-source-identity",
+      });
+    }
+  });
+
+  it("allows nested KiCad Reference property metadata without extra scalar values", () => {
+    const withMetadata = footprint(rId, "R1").replace(
+      '(property "Reference" "R1")',
+      '(property "Reference" "R1" (at 1 2 90) (effects (font (size 1 1))))',
+    );
+    const result = verifiedPcbFootprintInventory(board(withMetadata));
+    expect(result.status).toBe("complete");
+    if (result.status === "complete") expect(result.footprints[0]?.reference).toBe("R1");
+  });
+
+  it("rejects hostile long numeric atoms ending in an invalid character", () => {
+    expect(verifiedPcbFootprintInventory(board(footprint(rId, "R1", `${"1".repeat(16_384)}x 2`)))).toEqual({
+      status: "unavailable",
+      reason: "missing-source-identity",
+    });
+  });
+
   it("rejects ambiguous duplicate Reference properties", () => {
     const duplicated = footprint(rId, "R1").replace(
       '(property "Reference" "R1")',
