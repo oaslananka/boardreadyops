@@ -71,6 +71,36 @@ describe("dashboard operational hierarchy", () => {
     );
   });
 
+  it("prioritizes verified repository work above sample artwork without inventing a risk score", async () => {
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("Pick up your hardware work");
+    expect(markup).toContain("octocat/widgets");
+    expect(markup).toContain("2 open findings in the latest recorded run");
+    expect(markup).toContain("Finding counts are not severity ratings");
+    expect(markup).toContain('href="/runs/run-1/findings"');
+    expect(markup).not.toContain("fabrication approved");
+  });
+
+  it("keeps sample art secondary and long repository tables on demand", async () => {
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 37,
+      repositoriesWithOpenFindings: 1,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 36,
+      watchedBoards: 0,
+    });
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("Browse all 37 connected repositories");
+    expect(markup).toContain("Explore a sample PCB and schematic");
+    expect(markup.indexOf("Pick up your hardware work")).toBeLessThan(
+      markup.indexOf("Explore a sample PCB and schematic"),
+    );
+    expect(markup.indexOf("Pick up your hardware work")).toBeLessThan(
+      markup.indexOf("Browse all 37 connected repositories"),
+    );
+    expect(markup).toContain("Example only");
+  });
+
   it("does not interrupt experienced teams with onboarding visuals", async () => {
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).not.toContain("Your next hardware review starts with the board");
