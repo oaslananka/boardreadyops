@@ -357,7 +357,7 @@ function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-co
       </section>
       <details className="rounded-xl border border-border bg-card" aria-label="Optional CAD workspace setup">
         <summary className="min-h-14 cursor-pointer px-5 py-4 text-sm font-semibold text-foreground hover:bg-muted/35">
-          Optional: Create your first workspace
+          <span className="block">Optional: Create your first workspace</span>
           <span className="mt-1 block text-xs font-normal text-muted-foreground">
             Group CAD projects, revisions and evidence with a team only when you need a shared workspace.
           </span>
