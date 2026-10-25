@@ -36,7 +36,11 @@ function parseDecimal(raw: string | undefined): number | undefined {
 }
 
 function verifiedPlacement(node: SexprListNode): { x: number; y: number; rotation?: number } | undefined {
-  if (node.children.length > 4) return undefined;
+  // Exact source placement must be scalar x/y and optional scalar rotation.
+  // A nested S-expression in the rotation slot is not an omitted angle.
+  if (node.children.length < 3 || node.children.length > 4 || node.children.some((child) => child.kind === "list")) {
+    return undefined;
+  }
   const x = parseDecimal(listValue(node, 1));
   const y = parseDecimal(listValue(node, 2));
   const rotationRaw = listValue(node, 3);

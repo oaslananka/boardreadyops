@@ -100,6 +100,15 @@ describe("verified KiCad source footprint inventory", () => {
     }
   });
 
+  it("rejects nested or structurally ambiguous at coordinates rather than inventing rotation", () => {
+    for (const position of ["1 2 (offset 3)", "1 2 (rotate 90)", "1 2 (xyz 4 5)"]) {
+      expect(verifiedPcbFootprintInventory(board(footprint(rId, "R1", position)))).toEqual({
+        status: "unavailable",
+        reason: "missing-source-identity",
+      });
+    }
+  });
+
   it("rejects ambiguous duplicate Reference properties", () => {
     const duplicated = footprint(rId, "R1").replace(
       '(property "Reference" "R1")',
