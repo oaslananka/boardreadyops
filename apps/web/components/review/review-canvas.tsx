@@ -571,7 +571,7 @@ export function ReviewCanvas({
       : viewMode;
 
   let canvasHeightClass = compactMobile ? "h-[19rem] md:h-[34rem]" : "h-[27rem] md:h-[34rem]";
-  if (immersive) canvasHeightClass = "h-[min(75dvh,56rem)] min-h-[24rem]";
+  if (immersive) canvasHeightClass = "h-[min(75dvh,56rem)]";
 
   const modeButtonClass = (active: boolean) =>
     `shrink-0 rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
