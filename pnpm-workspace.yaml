@@ -24,7 +24,8 @@ minimumReleaseAgeExclude:
   # Security advisory fixes from latest OSV scan. Review exclusions after normal age window.
   - 'fast-uri@3.1.9'
   - 'body-parser@2.4.0'
-  - 'undici@6.29.1'
+  # Renovate security update: undici@8.12.2
+  - 'undici@6.29.1 || 8.12.2'
   - 'zod@4.6.6'
   - 'happy-dom@21.0.4'
   - 'qs@6.16.0'
@@ -77,7 +78,7 @@ overrides:
   esbuild@<=0.24.2: '>=0.25.0'
   glob@>=10.0.0 <13.0.6: 13.0.6
   'qs@>=6.11.1 <6.16.0': 6.16.0
-  'undici@>=8.0.0 <8.11.0': 8.11.2
+  'undici@>=8.0.0 <8.11.0': 8.12.2
   'undici@>=6 <6.29.1': 6.29.1
   vite@<=6.4.1: '>=6.4.2'
   vite@^8.0.0: '8.2.4'
