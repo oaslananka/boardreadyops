@@ -13,6 +13,15 @@ import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
 import { buildDemoSnapshots } from "../../../apps/web/lib/demo-snapshots.js";
 
 describe("ReviewCanvas", () => {
+  it("offers a taller focused native evidence viewport only when the reviewer requests it", () => {
+    const focused = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots: [], immersive: true }));
+    const standard = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots: [], compactMobile: true }));
+    expect(focused).toContain("h-[min(75dvh,56rem)]");
+    expect(focused).not.toContain("min-h-[24rem]");
+    expect(standard).toContain("h-[19rem]");
+    expect(standard).not.toContain("h-[min(75dvh,56rem)]");
+  });
+
   const review = DEMO_REVIEWS[0] as (typeof DEMO_REVIEWS)[0];
   const headSnapshots = buildDemoSnapshots(review.changedFiles, review.findings);
 

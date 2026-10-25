@@ -76,7 +76,10 @@ describe("Zaptrace-inspired BoardReadyOps review workspace", () => {
     expect(html).toContain("Search findings by rule, component or message");
     expect(html).toContain("not exact native KiCad");
     expect(html).toContain("not verified");
-    expect(html).toContain("xl:grid-cols-[minmax(275px,1.05fr)_minmax(0,1.9fr)_minmax(235px,0.95fr)]");
+    expect(html).toContain("xl:grid-cols-[minmax(245px,0.9fr)_minmax(0,3fr)_minmax(245px,0.9fr)]");
+    expect(html).toContain("Focus PCB / schematic");
+    expect(html).toContain('aria-controls="review-evidence-canvas"');
+    expect(html).toContain('aria-pressed="false"');
     expect(html).toContain("line-clamp-2");
     expect(html).toContain("h-[19rem]");
     expect(html).toContain("px-3 py-2 sm:gap-3 sm:p-4");

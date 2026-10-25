@@ -201,3 +201,15 @@
   tab-size: 2;
   white-space: pre;
 }
+
+/*
+ * Make the actual PCB/schematic change workspace the primary desktop surface.
+ * Keep Overview, Findings, approvals and evidence at the familiar reading width.
+ * CSS derives the state from the currently rendered accessible tab panel so
+ * direct ?tab=changes links, Back/Forward and keyboard tabs work identically.
+ */
+@media (min-width: 1280px) {
+  .review-detail-main:has(#panel-changes) {
+    max-width: min(100%, 105rem);
+  }
+}

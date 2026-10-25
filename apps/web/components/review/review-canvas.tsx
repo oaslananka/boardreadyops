@@ -9,6 +9,8 @@ export interface ReviewCanvasProps {
   baseSnapshots?: SnapshotArtifact[];
   /** Use a shorter preview before the finding list on narrow run-inspection screens. */
   compactMobile?: boolean;
+  /** Enlarged evidence viewport while secondary triage panels are hidden. */
+  immersive?: boolean;
   /** Hide optional inspection chrome only in the initial Overview preview on small screens. */
   previewMobileControls?: boolean;
   /** Start on the first actual PCB layer when used as a review overview teaser. */
@@ -420,6 +422,7 @@ export function ReviewCanvas({
   headSnapshots,
   baseSnapshots = [],
   compactMobile = false,
+  immersive = false,
   previewMobileControls = false,
   preferPcbLayer = false,
   findings = [],
@@ -567,6 +570,9 @@ export function ReviewCanvas({
       ? "head"
       : viewMode;
 
+  let canvasHeightClass = compactMobile ? "h-[19rem] md:h-[34rem]" : "h-[27rem] md:h-[34rem]";
+  if (immersive) canvasHeightClass = "h-[min(75dvh,56rem)]";
+
   const modeButtonClass = (active: boolean) =>
     `shrink-0 rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
 
@@ -712,7 +718,7 @@ export function ReviewCanvas({
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
-        className={`relative ${compactMobile ? "h-[19rem]" : "h-[27rem]"} overflow-hidden rounded-md border border-border bg-muted md:h-[34rem] ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`relative ${canvasHeightClass} overflow-hidden rounded-md border border-border bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
