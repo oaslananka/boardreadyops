@@ -62334,7 +62334,10 @@ function singleChild(node2, name) {
   const matches = directChildLists(node2, name);
   return matches.length === 1 ? matches[0] : void 0;
 }
-var DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/u;
+var DECIMAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/u;
+function scalarArgumentCount(node2) {
+  return node2.children.slice(1).filter((child) => child.kind !== "list").length;
+}
 function parseDecimal(raw) {
   if (raw === void 0 || !DECIMAL.test(raw)) return void 0;
   const value = Number(raw);
@@ -62359,7 +62362,8 @@ function sourceFootprint(node2) {
   const rawUuid = listValue(uuidNode);
   const references = directChildLists(node2, "property").filter((child) => listValue(child, 1) === "Reference");
   const referenceProperty = references.length === 1 ? references[0] : void 0;
-  const reference = referenceProperty ? listValue(referenceProperty, 2) : void 0;
+  const reference = referenceProperty && scalarArgumentCount(referenceProperty) === 2 ? listValue(referenceProperty, 2) : void 0;
+  if (uuidNode.children.length !== 2 || layerNode.children.length !== 2) return void 0;
   const libraryId = listValue(node2);
   const layer = listValue(layerNode);
   if (!rawUuid || !UUID.test(rawUuid) || !reference || !libraryId || !layer || !/^[FB]\.[\w.]+$/u.test(layer)) {
