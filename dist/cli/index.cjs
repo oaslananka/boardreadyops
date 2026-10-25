@@ -62341,7 +62341,9 @@ function parseDecimal(raw) {
   return Number.isFinite(value) ? value : void 0;
 }
 function verifiedPlacement(node2) {
-  if (node2.children.length > 4) return void 0;
+  if (node2.children.length < 3 || node2.children.length > 4 || node2.children.some((child) => child.kind === "list")) {
+    return void 0;
+  }
   const x = parseDecimal(listValue(node2, 1));
   const y = parseDecimal(listValue(node2, 2));
   const rotationRaw = listValue(node2, 3);
