@@ -12,6 +12,7 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { customerPlanLabel, customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import { loadWorkspaceProjects, type WorkspaceProjectsImpact } from "../../lib/project-listing.js";
+import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 import {
   createProjectAction,
@@ -92,20 +93,26 @@ function projectColumns(role: string, impact: WorkspaceProjectsImpact): readonly
     {
       id: "repository",
       header: "Repository",
-      cell: (project) =>
-        project.githubRepoFullName ? (
+      cell: (project) => {
+        const repository = project.githubRepoFullName;
+        const canonical = repository ? canonicalRepositoryName(repository) : undefined;
+        if (!repository) return <span className="text-muted-foreground">Not linked</span>;
+        return (
           <div className="flex min-w-0 flex-col gap-1">
-            <span className="font-mono text-xs break-all">{project.githubRepoFullName}</span>
-            <Link
-              href={`/reviews?repository=${encodeURIComponent(project.githubRepoFullName)}`}
-              className="w-fit text-sm font-medium text-primary underline underline-offset-2"
-            >
-              View repository reviews
-            </Link>
+            <span className="font-mono text-xs break-all">{repository}</span>
+            {canonical ? (
+              <Link
+                href={`/reviews?repository=${encodeURIComponent(canonical)}`}
+                className="w-fit text-sm font-medium text-primary underline underline-offset-2"
+              >
+                View repository reviews
+              </Link>
+            ) : (
+              <span className="text-xs text-muted-foreground">Use GitHub owner/name to link repository reviews.</span>
+            )}
           </div>
-        ) : (
-          <span className="text-muted-foreground">Not linked</span>
-        ),
+        );
+      },
     },
     {
       id: "created",
