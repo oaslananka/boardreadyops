@@ -1,3 +1,4 @@
+/* tsqllint-disable set-quoted-identifier */
 -- Optional, disclosure-minimal PCB-footprint counts provided by an authenticated
 -- client. Immutable run evidence, not independently verified source or a verdict.
 -- Existing runs/reviews remain unaffected. Cascades with their owning run/repo.

@@ -84,6 +84,7 @@ describe("additive PCB-summary PostgreSQL migration", () => {
       new URL("../../../packages/db/migrations/0094_run_pcb_footprint_summaries.sql", import.meta.url),
       "utf8",
     );
+    expect(sql).toContain("/* tsqllint-disable set-quoted-identifier */");
     expect(sql).toContain("run_id text primary key references release_runs(id) on delete cascade");
     expect(sql).toContain("repository_id text not null references repositories(id) on delete cascade");
     expect(sql).toContain("summary_sha256 text not null");
