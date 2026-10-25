@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { verifiedPcbFootprintInventory } from "../../../src/kicad/footprint-inventory.js";
+import { MAX_KICAD_TEXT_BYTES } from "../../../src/kicad/project-model.js";
 
 const rId = "bf7f5122-bc89-413e-aa3e-f19064ff92f7";
 const cId = "c71b2196-ae56-4853-92ac-5497683704cd";
@@ -90,6 +91,42 @@ describe("verified KiCad source footprint inventory", () => {
     ).toEqual({ status: "unavailable", reason: "missing-source-identity" });
   });
 
+  it("rejects malformed decimal coordinates, blank rotation and extra placement values", () => {
+    for (const position of ["0x10 2", "0b11 2", '1 2 ""', "1 2 3 4", "1 2 1e9999"]) {
+      expect(verifiedPcbFootprintInventory(board(footprint(rId, "R1", position)))).toEqual({
+        status: "unavailable",
+        reason: "missing-source-identity",
+      });
+    }
+  });
+
+  it("rejects ambiguous duplicate Reference properties", () => {
+    const duplicated = footprint(rId, "R1").replace(
+      '(property "Reference" "R1")',
+      '(property "Reference" "R1") (property "Reference" "R2")',
+    );
+    expect(verifiedPcbFootprintInventory(board(duplicated))).toEqual({
+      status: "unavailable",
+      reason: "missing-source-identity",
+    });
+  });
+
+  it("reports oversize source as unavailable rather than throwing", () => {
+    expect(verifiedPcbFootprintInventory("x".repeat(MAX_KICAD_TEXT_BYTES + 1))).toEqual({
+      status: "unavailable",
+      reason: "malformed-source",
+    });
+  });
+
+  it("rejects 10,001 valid footprints before returning partial results", () => {
+    const parts = Array.from({ length: 10_001 }, (_, index) =>
+      footprint(`bf7f5122-bc89-413e-aa3e-${index.toString(16).padStart(12, "0")}`, `R${index}`),
+    );
+    expect(verifiedPcbFootprintInventory(board(...parts))).toEqual({
+      status: "unavailable",
+      reason: "too-many-footprints",
+    });
+  });
   it("returns a complete but empty footprint inventory for a valid board with none", () => {
     const result = verifiedPcbFootprintInventory(board());
     expect(result.status).toBe("complete");

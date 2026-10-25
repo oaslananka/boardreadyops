@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { directChildLists, listHead, listValue, parseKicadDocument, propertyValue } from "./project-model.js";
+import { HostileInputError } from "../util/errors.js";
+import { directChildLists, listHead, listValue, parseKicadDocument } from "./project-model.js";
 import type { SexprListNode } from "./sexpr.js";
 
 interface VerifiedPcbFootprint {
@@ -26,17 +27,21 @@ function singleChild(node: SexprListNode, name: string): SexprListNode | undefin
   return matches.length === 1 ? matches[0] : undefined;
 }
 
+const DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/u;
+
+function parseDecimal(raw: string | undefined): number | undefined {
+  if (raw === undefined || !DECIMAL.test(raw)) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
+
 function verifiedPlacement(node: SexprListNode): { x: number; y: number; rotation?: number } | undefined {
-  const xRaw = listValue(node, 1);
-  const yRaw = listValue(node, 2);
+  if (node.children.length > 4) return undefined;
+  const x = parseDecimal(listValue(node, 1));
+  const y = parseDecimal(listValue(node, 2));
   const rotationRaw = listValue(node, 3);
-  if (!xRaw?.trim() || !yRaw?.trim()) return undefined;
-  const x = Number(xRaw);
-  const y = Number(yRaw);
-  const rotation = rotationRaw === undefined ? undefined : Number(rotationRaw);
-  if (!Number.isFinite(x) || !Number.isFinite(y) || (rotation !== undefined && !Number.isFinite(rotation))) {
-    return undefined;
-  }
+  const rotation = rotationRaw === undefined ? undefined : parseDecimal(rotationRaw);
+  if (x === undefined || y === undefined || (rotationRaw !== undefined && rotation === undefined)) return undefined;
   return { x, y, ...(rotation === undefined ? {} : { rotation }) };
 }
 
@@ -46,7 +51,9 @@ function sourceFootprint(node: SexprListNode): VerifiedPcbFootprint | undefined 
   const layerNode = singleChild(node, "layer");
   if (!uuidNode || !positionNode || !layerNode) return undefined;
   const rawUuid = listValue(uuidNode);
-  const reference = propertyValue(node, "Reference");
+  const references = directChildLists(node, "property").filter((child) => listValue(child, 1) === "Reference");
+  const referenceProperty = references.length === 1 ? references[0] : undefined;
+  const reference = referenceProperty ? listValue(referenceProperty, 2) : undefined;
   const libraryId = listValue(node);
   const layer = listValue(layerNode);
   if (!rawUuid || !UUID.test(rawUuid) || !reference || !libraryId || !layer || !/^[FB]\.[\w.]+$/u.test(layer)) {
@@ -74,7 +81,13 @@ function compareSourceUuids(a: VerifiedPcbFootprint, b: VerifiedPcbFootprint): n
  * Other PCB objects (tracks, vias, pads, zones) and schematics are NOT covered.
  */
 export function verifiedPcbFootprintInventory(text: string): FootprintInventoryResult {
-  const model = parseKicadDocument(text, "pcb");
+  let model: ReturnType<typeof parseKicadDocument>;
+  try {
+    model = parseKicadDocument(text, "pcb");
+  } catch (error) {
+    if (error instanceof HostileInputError) return { status: "unavailable", reason: "malformed-source" };
+    throw error;
+  }
   if (
     model.ast.errors.length !== 0 ||
     model.ast.nodes.length !== 1 ||
