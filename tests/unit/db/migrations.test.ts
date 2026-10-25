@@ -12,6 +12,7 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("FindingDecision");
     expect(cloudDatabaseModels).toContain("FindingAssignment");
     expect(cloudDatabaseModels).toContain("ReviewComment");
+    expect(cloudDatabaseModels).toContain("PcbFootprintSummary");
     expect(cloudDatabaseModels).toContain("ReviewApproval");
     expect(cloudDatabaseModels).toContain("BoardSupplyWatch");
     expect(cloudDatabaseModels).toContain("ComponentLifecycleObservation");
@@ -144,6 +145,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0091_protected_release_seal_evidence_version_guard.sql",
       "0092_optional_legacy_delivery_archive_url.sql",
       "0093_explicit_manufacturing_share_authorizations.sql",
+      "0094_run_pcb_footprint_summaries.sql",
     ]);
   });
 

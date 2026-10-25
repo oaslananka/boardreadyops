@@ -8,7 +8,7 @@ export interface ReviewFootprintDiffOptions {
   format?: string;
 }
 
-function summaryFromVerifiedFacts(evidence: Extract<GitPcbEvidenceResult, { status: "complete" }>) {
+export function summaryFromVerifiedFacts(evidence: Extract<GitPcbEvidenceResult, { status: "complete" }>) {
   const countFields = { reference: 0, libraryId: 0, layer: 0, positionMm: 0, rotationDeg: 0 };
   let added = 0;
   let removed = 0;

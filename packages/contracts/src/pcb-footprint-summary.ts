@@ -19,9 +19,10 @@ const changedFieldsSchema = z
  * No PCB source text, object UUIDs, coordinates, references, library IDs,
  * physical geometry, manufacturing suitability, or risk verdict.
  *
- * This contract does NOT authorize upload or server-side ingestion. A future
- * publishing flow must separately verify caller/repository authority, commit
- * binding, consent and storage lifecycle before accepting this evidence.
+ * This contract alone does NOT authorize upload. The optional Review publish
+ * route separately checks caller/repository authority, commit binding and
+ * explicit consent, and retains the summary with its owning run. The server
+ * cannot independently establish the truth of client-reported source facts.
  */
 export const pcbFootprintSummarySchema = z
   .object({
@@ -70,3 +71,5 @@ export const pcbFootprintSummarySchema = z
       });
     }
   });
+
+export type PcbFootprintSummary = z.infer<typeof pcbFootprintSummarySchema>;

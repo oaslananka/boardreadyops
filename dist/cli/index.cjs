@@ -62148,8 +62148,8 @@ async function gitState2(root) {
 }
 
 // src/cli/commands/review.ts
-var import_node_child_process4 = require("node:child_process");
-var import_node_crypto20 = require("node:crypto");
+var import_node_child_process5 = require("node:child_process");
+var import_node_crypto21 = require("node:crypto");
 var import_node_path74 = __toESM(require("node:path"), 1);
 
 // packages/cloud-core/src/archive-sanitizer.ts
@@ -62323,12 +62323,228 @@ function mapFindingsForCloud(findings) {
 // src/cli/commands/review.ts
 init_version();
 
+// src/kicad/git-footprint-evidence.ts
+var import_node_child_process4 = require("node:child_process");
+
+// src/kicad/footprint-inventory.ts
+var import_node_crypto18 = require("node:crypto");
+var UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;
+var MAX_FOOTPRINTS = 1e4;
+function singleChild(node2, name) {
+  const matches = directChildLists(node2, name);
+  return matches.length === 1 ? matches[0] : void 0;
+}
+var DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/u;
+function parseDecimal(raw) {
+  if (raw === void 0 || !DECIMAL.test(raw)) return void 0;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : void 0;
+}
+function verifiedPlacement(node2) {
+  if (node2.children.length > 4) return void 0;
+  const x = parseDecimal(listValue(node2, 1));
+  const y = parseDecimal(listValue(node2, 2));
+  const rotationRaw = listValue(node2, 3);
+  const rotation = rotationRaw === void 0 ? void 0 : parseDecimal(rotationRaw);
+  if (x === void 0 || y === void 0 || rotationRaw !== void 0 && rotation === void 0) return void 0;
+  return { x, y, ...rotation === void 0 ? {} : { rotation } };
+}
+function sourceFootprint(node2) {
+  const uuidNode = singleChild(node2, "uuid");
+  const positionNode = singleChild(node2, "at");
+  const layerNode = singleChild(node2, "layer");
+  if (!uuidNode || !positionNode || !layerNode) return void 0;
+  const rawUuid = listValue(uuidNode);
+  const references = directChildLists(node2, "property").filter((child) => listValue(child, 1) === "Reference");
+  const referenceProperty = references.length === 1 ? references[0] : void 0;
+  const reference = referenceProperty ? listValue(referenceProperty, 2) : void 0;
+  const libraryId = listValue(node2);
+  const layer = listValue(layerNode);
+  if (!rawUuid || !UUID.test(rawUuid) || !reference || !libraryId || !layer || !/^[FB]\.[\w.]+$/u.test(layer)) {
+    return void 0;
+  }
+  const place = verifiedPlacement(positionNode);
+  if (!place) return void 0;
+  return {
+    sourceUuid: rawUuid.toLowerCase(),
+    reference,
+    libraryId,
+    layer,
+    positionMm: { x: place.x, y: place.y },
+    ...place.rotation === void 0 ? {} : { rotationDeg: place.rotation }
+  };
+}
+function compareSourceUuids(a, b) {
+  if (a.sourceUuid === b.sourceUuid) return 0;
+  return a.sourceUuid < b.sourceUuid ? -1 : 1;
+}
+function verifiedPcbFootprintInventory(text) {
+  let model;
+  try {
+    model = parseKicadDocument(text, "pcb");
+  } catch (error62) {
+    if (error62 instanceof HostileInputError) return { status: "unavailable", reason: "malformed-source" };
+    throw error62;
+  }
+  if (model.ast.errors.length !== 0 || model.ast.nodes.length !== 1 || !model.root || listHead(model.root) !== "kicad_pcb") {
+    return { status: "unavailable", reason: "malformed-source" };
+  }
+  const footprints2 = directChildLists(model.root, "footprint");
+  if (footprints2.length > MAX_FOOTPRINTS) return { status: "unavailable", reason: "too-many-footprints" };
+  const found = [];
+  const identities = /* @__PURE__ */ new Set();
+  for (const node2 of footprints2) {
+    const parsed = sourceFootprint(node2);
+    if (!parsed) return { status: "unavailable", reason: "missing-source-identity" };
+    if (identities.has(parsed.sourceUuid)) return { status: "unavailable", reason: "duplicate-uuid" };
+    identities.add(parsed.sourceUuid);
+    found.push(parsed);
+  }
+  found.sort(compareSourceUuids);
+  return { status: "complete", sourceSha256: (0, import_node_crypto18.createHash)("sha256").update(text).digest("hex"), footprints: found };
+}
+
+// src/kicad/footprint-diff.ts
+function changedFields(before, after) {
+  const fields = [];
+  if (before.reference !== after.reference) fields.push("reference");
+  if (before.libraryId !== after.libraryId) fields.push("libraryId");
+  if (before.layer !== after.layer) fields.push("layer");
+  if (before.positionMm.x !== after.positionMm.x || before.positionMm.y !== after.positionMm.y) {
+    fields.push("positionMm");
+  }
+  if (before.rotationDeg !== after.rotationDeg) fields.push("rotationDeg");
+  return fields;
+}
+function diffVerifiedPcbFootprints(basePcb, headPcb) {
+  const base = verifiedPcbFootprintInventory(basePcb);
+  if (base.status !== "complete") return { status: "unavailable", side: "base", reason: base.reason };
+  const head = verifiedPcbFootprintInventory(headPcb);
+  if (head.status !== "complete") return { status: "unavailable", side: "head", reason: head.reason };
+  const beforeById = new Map(base.footprints.map((item2) => [item2.sourceUuid, item2]));
+  const afterById = new Map(head.footprints.map((item2) => [item2.sourceUuid, item2]));
+  const changes = [];
+  for (const item2 of base.footprints) {
+    const after = afterById.get(item2.sourceUuid);
+    if (!after) {
+      changes.push({ status: "footprint-removed", sourceUuid: item2.sourceUuid, base: item2 });
+      continue;
+    }
+    const fields = changedFields(item2, after);
+    if (fields.length > 0) {
+      changes.push({
+        status: "footprint-modified",
+        sourceUuid: item2.sourceUuid,
+        changedFields: fields,
+        base: item2,
+        head: after
+      });
+    }
+  }
+  for (const item2 of head.footprints) {
+    if (!beforeById.has(item2.sourceUuid)) {
+      changes.push({ status: "footprint-added", sourceUuid: item2.sourceUuid, head: item2 });
+    }
+  }
+  changes.sort((a, b) => a.sourceUuid === b.sourceUuid ? 0 : a.sourceUuid < b.sourceUuid ? -1 : 1);
+  return {
+    status: "complete",
+    baseSourceSha256: base.sourceSha256,
+    headSourceSha256: head.sourceSha256,
+    changes
+  };
+}
+
+// src/kicad/git-footprint-evidence.ts
+var MAX_PCB_SOURCE_BYTES = 64 * 1024 * 1024;
+var MAX_GIT_OUTPUT_BYTES = MAX_PCB_SOURCE_BYTES + 1024;
+var COMMIT_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+var BLOB_SHA = COMMIT_SHA;
+function hasControl(value) {
+  return [...value].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
+}
+function validSourcePath(value) {
+  if (!value || value.length > 1024 || value.startsWith("/") || !value.endsWith(".kicad_pcb")) return false;
+  if (value.includes("\\") || value.includes(":") || hasControl(value)) return false;
+  return value.split("/").every((segment2) => segment2.length > 0 && segment2 !== "." && segment2 !== ".." && segment2 !== ".git");
+}
+function git(root, args, maxBuffer = 4096) {
+  return (0, import_node_child_process4.execFileSync)(resolveGitExecutable(), ["-C", root, ...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: 1e4,
+    maxBuffer
+  });
+}
+function commit2(root, ref) {
+  if (!ref || ref.length > 255 || ref.startsWith("-") || hasControl(ref)) return void 0;
+  try {
+    const resolved = git(root, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`]).trim();
+    return COMMIT_SHA.test(resolved) ? resolved : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function sourceAtCommit(root, sha, file2) {
+  let blobSha;
+  try {
+    blobSha = git(root, ["rev-parse", "--verify", "--end-of-options", `${sha}:${file2}`]).trim();
+  } catch {
+    return { status: "unavailable", reason: "missing" };
+  }
+  if (!BLOB_SHA.test(blobSha)) return { status: "unavailable", reason: "unreadable" };
+  try {
+    const type = git(root, ["cat-file", "-t", blobSha]).trim();
+    if (type !== "blob") return { status: "unavailable", reason: "unreadable" };
+    const size = Number(git(root, ["cat-file", "-s", blobSha]).trim());
+    if (!Number.isSafeInteger(size) || size < 0) return { status: "unavailable", reason: "unreadable" };
+    if (size > MAX_PCB_SOURCE_BYTES) return { status: "unavailable", reason: "too-large" };
+    const text = git(root, ["cat-file", "blob", blobSha], MAX_GIT_OUTPUT_BYTES);
+    if (Buffer.byteLength(text, "utf8") !== size) return { status: "unavailable", reason: "unreadable" };
+    return { status: "complete", blobSha, text };
+  } catch {
+    return { status: "unavailable", reason: "unreadable" };
+  }
+}
+function gitPcbFootprintEvidence(options) {
+  if (!validSourcePath(options.sourcePath)) return { status: "unavailable", reason: "invalid-source-path" };
+  const base = commit2(options.repositoryRoot, options.baseRef);
+  const head = commit2(options.repositoryRoot, options.headRef);
+  if (!base || !head) return { status: "unavailable", reason: "unresolved-commit" };
+  const baseSource = sourceAtCommit(options.repositoryRoot, base, options.sourcePath);
+  if (baseSource.status !== "complete") {
+    return {
+      status: "unavailable",
+      reason: baseSource.reason === "too-large" ? "source-too-large" : baseSource.reason === "missing" ? "base-source-missing" : "unreadable-source"
+    };
+  }
+  const headSource = sourceAtCommit(options.repositoryRoot, head, options.sourcePath);
+  if (headSource.status !== "complete") {
+    return {
+      status: "unavailable",
+      reason: headSource.reason === "too-large" ? "source-too-large" : headSource.reason === "missing" ? "head-source-missing" : "unreadable-source"
+    };
+  }
+  const facts = diffVerifiedPcbFootprints(baseSource.text, headSource.text);
+  if (facts.status !== "complete") return facts;
+  return {
+    status: "complete",
+    sourcePath: options.sourcePath,
+    baseCommitSha: base,
+    headCommitSha: head,
+    baseBlobSha: baseSource.blobSha,
+    headBlobSha: headSource.blobSha,
+    facts,
+    riskAssessment: "not-evaluated"
+  };
+}
+
 // src/kicad/snapshots.ts
-var import_node_crypto19 = require("node:crypto");
+var import_node_crypto20 = require("node:crypto");
 init_src();
 
 // src/kicad/native-snapshots.ts
-var import_node_crypto18 = require("node:crypto");
+var import_node_crypto19 = require("node:crypto");
 var import_promises30 = __toESM(require("node:fs/promises"), 1);
 var import_node_os4 = __toESM(require("node:os"), 1);
 var import_node_path73 = __toESM(require("node:path"), 1);
@@ -62337,7 +62553,7 @@ var MAX_SHEETS = 16;
 var EXPORT_TIMEOUT_MS = 45e3;
 var PROCESS_LIMITS = { timeoutMs: EXPORT_TIMEOUT_MS, maxStdoutBytes: 8192, maxStderrBytes: 8192 };
 function digest(value) {
-  return (0, import_node_crypto18.createHash)("sha256").update(value).digest("hex");
+  return (0, import_node_crypto19.createHash)("sha256").update(value).digest("hex");
 }
 function sourceDigest(file2) {
   return import_promises30.default.readFile(file2).then(digest);
@@ -62540,7 +62756,7 @@ async function renderSchematicFile(file2, findings) {
       Array.from(parsed.netLabels)
     );
     const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-    const sha2564 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
+    const sha2564 = (0, import_node_crypto20.createHash)("sha256").update(svg).digest("hex");
     return {
       id: `snap_sch_${sheetName}`,
       name: `schematic_${sheetName}.svg`,
@@ -62568,7 +62784,7 @@ async function renderPcbFile(file2, findings) {
         parsed.footprints.map((fp) => ({ reference: fp.reference, footprint: fp.footprint, at: fp.at }))
       );
       const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
-      const sha2564 = (0, import_node_crypto19.createHash)("sha256").update(svg).digest("hex");
+      const sha2564 = (0, import_node_crypto20.createHash)("sha256").update(svg).digest("hex");
       artifacts.push({
         id: `snap_pcb_${layer.replaceAll(".", "_")}`,
         name: `pcb_${layer.replaceAll(".", "_")}.svg`,
@@ -62624,6 +62840,136 @@ async function generateSnapshots(options) {
   return rendered.flat().slice(0, 64);
 }
 
+// packages/contracts/src/pcb-footprint-summary.ts
+init_zod();
+var sha2562 = external_exports.string().regex(/^[0-9a-f]{64}$/u);
+var gitObjectId = external_exports.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u);
+var footprintCount = external_exports.number().int().min(0).max(1e4);
+var changedFieldsSchema = external_exports.object({
+  reference: footprintCount,
+  libraryId: footprintCount,
+  layer: footprintCount,
+  positionMm: footprintCount,
+  rotationDeg: footprintCount
+}).strict();
+var pcbFootprintSummarySchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  scope: external_exports.literal("pcb-footprints-only"),
+  provenance: external_exports.literal("local-git-commits"),
+  disclosure: external_exports.literal("counts-and-digests-only"),
+  baseCommitSha: gitObjectId,
+  headCommitSha: gitObjectId,
+  baseBlobSha: gitObjectId,
+  headBlobSha: gitObjectId,
+  baseSourceSha256: sha2562,
+  headSourceSha256: sha2562,
+  changes: external_exports.object({
+    added: footprintCount,
+    removed: footprintCount,
+    modified: footprintCount,
+    byField: changedFieldsSchema
+  }).strict(),
+  riskAssessment: external_exports.literal("not-evaluated")
+}).strict().superRefine((value, ctx) => {
+  const { changes } = value;
+  if (changes.added + changes.removed + changes.modified > 2e4) {
+    ctx.addIssue({ code: "custom", path: ["changes"], message: "too many reported changes" });
+  }
+  let fields = 0;
+  for (const [field, count] of Object.entries(changes.byField)) {
+    if (count > changes.modified) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["changes", "byField", field],
+        message: "field count exceeds modified objects"
+      });
+    }
+    fields += count;
+  }
+  if (fields < changes.modified) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["changes", "byField"],
+      message: "each modified object must have a changed field"
+    });
+  }
+});
+
+// src/cli/commands/review-footprint-diff.ts
+function summaryFromVerifiedFacts(evidence) {
+  const countFields = { reference: 0, libraryId: 0, layer: 0, positionMm: 0, rotationDeg: 0 };
+  let added = 0;
+  let removed = 0;
+  let modified = 0;
+  for (const fact of evidence.facts.changes) {
+    if (fact.status === "footprint-added") added++;
+    else if (fact.status === "footprint-removed") removed++;
+    else {
+      modified++;
+      for (const field of fact.changedFields) countFields[field]++;
+    }
+  }
+  return pcbFootprintSummarySchema.parse({
+    schemaVersion: 1,
+    scope: "pcb-footprints-only",
+    provenance: "local-git-commits",
+    disclosure: "counts-and-digests-only",
+    baseCommitSha: evidence.baseCommitSha,
+    headCommitSha: evidence.headCommitSha,
+    baseBlobSha: evidence.baseBlobSha,
+    headBlobSha: evidence.headBlobSha,
+    baseSourceSha256: evidence.facts.baseSourceSha256,
+    headSourceSha256: evidence.facts.headSourceSha256,
+    changes: { added, removed, modified, byField: countFields },
+    riskAssessment: "not-evaluated"
+  });
+}
+function reviewFootprintDiffCommand(target, options, streams) {
+  if (options.format && options.format !== "text" && options.format !== "json" && options.format !== "summary-json") {
+    streams.stderr.write("Invalid format: choose text, json or summary-json.\n");
+    return 2;
+  }
+  const result = gitPcbFootprintEvidence({
+    repositoryRoot: target ?? process.cwd(),
+    baseRef: options.base,
+    headRef: options.head,
+    sourcePath: options.pcb
+  });
+  if (options.format === "summary-json") {
+    if (result.status !== "complete") {
+      streams.stdout.write(`${JSON.stringify({ schemaVersion: 1, ...result }, null, 2)}
+`);
+      return 1;
+    }
+    streams.stdout.write(`${JSON.stringify(summaryFromVerifiedFacts(result), null, 2)}
+`);
+    return 0;
+  }
+  if (options.format === "json") {
+    streams.stdout.write(`${JSON.stringify({ schemaVersion: 1, ...result }, null, 2)}
+`);
+    return result.status === "complete" ? 0 : 1;
+  }
+  if (result.status === "unavailable") {
+    streams.stderr.write(`PCB source comparison unavailable: ${result.reason}. No change verdict was computed.
+`);
+    return 1;
+  }
+  const added = result.facts.changes.filter((change) => change.status === "footprint-added").length;
+  const removed = result.facts.changes.filter((change) => change.status === "footprint-removed").length;
+  const modified = result.facts.changes.filter((change) => change.status === "footprint-modified").length;
+  streams.stdout.write(
+    `Verified Git PCB footprint facts: ${result.sourcePath}
+Base: ${result.baseCommitSha} (${result.facts.baseSourceSha256})
+Head: ${result.headCommitSha} (${result.facts.headSourceSha256})
+Footprints: ${added} added, ${removed} removed, ${modified} modified.
+Risk/policy/DRC assessment: not evaluated. Other PCB objects are not covered.
+Local-only comparison: no source files or results were uploaded.
+`
+  );
+  return 0;
+}
+
 // src/cli/commands/review.ts
 function nonEmptyString(value) {
   if (typeof value !== "string") return void 0;
@@ -62668,7 +63014,7 @@ function writePublishResult(result, streams) {
 function getGitCommitSha(ref = "HEAD") {
   try {
     const gitExec = resolveGitExecutable();
-    return (0, import_node_child_process4.execFileSync)(gitExec, ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return (0, import_node_child_process5.execFileSync)(gitExec, ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return "0".repeat(40);
   }
@@ -62676,7 +63022,7 @@ function getGitCommitSha(ref = "HEAD") {
 function resolveReviewPublishRef(sourceRoot, headSha) {
   try {
     const gitExec = resolveGitExecutable();
-    const run = (args) => (0, import_node_child_process4.execFileSync)(gitExec, ["-C", sourceRoot, ...args], {
+    const run = (args) => (0, import_node_child_process5.execFileSync)(gitExec, ["-C", sourceRoot, ...args], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
@@ -62691,7 +63037,7 @@ function resolveReviewPublishRef(sourceRoot, headSha) {
 function getGitOriginRepo() {
   try {
     const gitExec = resolveGitExecutable();
-    const url2 = (0, import_node_child_process4.execFileSync)(gitExec, ["remote", "get-url", "origin"], {
+    const url2 = (0, import_node_child_process5.execFileSync)(gitExec, ["remote", "get-url", "origin"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
@@ -62706,8 +63052,31 @@ async function reviewPublishCommand(target, options, streams) {
   const jsonOutput = options.format === "json";
   const loaded = await loadConfig(root, options.config);
   const config2 = loaded.config;
-  const headSha = options.head ?? getGitCommitSha("HEAD");
-  const baseSha = options.base ? getGitCommitSha(options.base) : void 0;
+  let headSha = options.head ?? getGitCommitSha("HEAD");
+  let baseSha = options.base ? getGitCommitSha(options.base) : void 0;
+  let pcbFootprintSummary;
+  if (options.shareFootprintSummary) {
+    if (!options.base || !options.pcb) {
+      streams.stderr.write("PCB summary opt-in requires --base and --pcb; nothing uploaded.\n");
+      return 2;
+    }
+    const evidence = gitPcbFootprintEvidence({
+      repositoryRoot: root,
+      sourcePath: options.pcb,
+      baseRef: options.base,
+      headRef: options.head ?? "HEAD"
+    });
+    if (evidence.status !== "complete") {
+      streams.stderr.write("PCB summary unavailable; nothing uploaded.\n");
+      return 1;
+    }
+    pcbFootprintSummary = summaryFromVerifiedFacts(evidence);
+    headSha = evidence.headCommitSha;
+    baseSha = evidence.baseCommitSha;
+  } else if (options.pcb) {
+    streams.stderr.write("--pcb requires --share-footprint-summary; nothing uploaded.\n");
+    return 2;
+  }
   const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
   const uploadMode = options.nativeVisuals && (!options.upload || options.upload === "metadata") ? "snapshots" : options.upload ?? "metadata";
   const server = (options.server ?? process.env.BOARDREADYOPS_SERVER_URL ?? "https://app.boardreadyops.com").replace(
@@ -62728,8 +63097,8 @@ async function reviewPublishCommand(target, options, streams) {
     failOn: "never"
   });
   const findings = mapFindingsForCloud(result.findings);
-  const rulePackDigest = (0, import_node_crypto20.createHash)("sha256").update("boardreadyops-v1").digest("hex");
-  const configDigest = (0, import_node_crypto20.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
+  const rulePackDigest = (0, import_node_crypto21.createHash)("sha256").update("boardreadyops-v1").digest("hex");
+  const configDigest = (0, import_node_crypto21.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
   const evidenceDigest = computeEvidenceDigest({
     toolVersion: boardReadyVersion,
     rulePackDigest,
@@ -62737,7 +63106,12 @@ async function reviewPublishCommand(target, options, streams) {
     headCommitSha: headSha,
     ...baseSha ? { baseCommitSha: baseSha } : {},
     findingFingerprints: findings.map((f) => f.fingerprint),
-    artifactDigests: []
+    artifactDigests: pcbFootprintSummary ? [
+      {
+        name: "pcb-footprint-summary.v1.json",
+        sha256: (0, import_node_crypto21.createHash)("sha256").update(JSON.stringify(pcbFootprintSummary)).digest("hex")
+      }
+    ] : []
   });
   if (!jsonOutput) {
     streams.stdout.write(`\u{1F4CA} Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)
@@ -62763,6 +63137,7 @@ async function reviewPublishCommand(target, options, streams) {
 `);
     streams.stdout.write(`  Digest:     ${evidenceDigest}
 `);
+    if (pcbFootprintSummary) streams.stdout.write("  PCB summary: explicit opt-in (counts and source hashes)\n");
     streams.stdout.write(`\u2714 Dry run completed successfully without network transmission.
 `);
     return 0;
@@ -62809,7 +63184,8 @@ async function reviewPublishCommand(target, options, streams) {
         snapshots,
         evidenceDigest,
         title: options.title ?? `Review for ${headSha.slice(0, 8)}`,
-        ...baseSha ? { baseCommitSha: baseSha } : {}
+        ...baseSha ? { baseCommitSha: baseSha } : {},
+        ...pcbFootprintSummary ? { pcbFootprintSummary, pcbFootprintSummaryConsent: true } : {}
       })
     });
     if (!response.ok) {
@@ -62823,6 +63199,10 @@ async function reviewPublishCommand(target, options, streams) {
     } catch {
       streams.stderr.write(`\u274C Unexpected server response.
 `);
+      return 1;
+    }
+    if (pcbFootprintSummary && (!data || typeof data !== "object" || data.acceptedFootprintSummary !== true)) {
+      streams.stderr.write("Server did not acknowledge PCB summary evidence.\n");
       return 1;
     }
     const published = resolvePublishedReview(server, data);
@@ -62937,352 +63317,6 @@ async function reviewVerifyCommand(target, options, streams) {
 `);
     return 1;
   }
-}
-
-// packages/contracts/src/pcb-footprint-summary.ts
-init_zod();
-var sha2562 = external_exports.string().regex(/^[0-9a-f]{64}$/u);
-var gitObjectId = external_exports.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u);
-var footprintCount = external_exports.number().int().min(0).max(1e4);
-var changedFieldsSchema = external_exports.object({
-  reference: footprintCount,
-  libraryId: footprintCount,
-  layer: footprintCount,
-  positionMm: footprintCount,
-  rotationDeg: footprintCount
-}).strict();
-var pcbFootprintSummarySchema = external_exports.object({
-  schemaVersion: external_exports.literal(1),
-  scope: external_exports.literal("pcb-footprints-only"),
-  provenance: external_exports.literal("local-git-commits"),
-  disclosure: external_exports.literal("counts-and-digests-only"),
-  baseCommitSha: gitObjectId,
-  headCommitSha: gitObjectId,
-  baseBlobSha: gitObjectId,
-  headBlobSha: gitObjectId,
-  baseSourceSha256: sha2562,
-  headSourceSha256: sha2562,
-  changes: external_exports.object({
-    added: footprintCount,
-    removed: footprintCount,
-    modified: footprintCount,
-    byField: changedFieldsSchema
-  }).strict(),
-  riskAssessment: external_exports.literal("not-evaluated")
-}).strict().superRefine((value, ctx) => {
-  const { changes } = value;
-  if (changes.added + changes.removed + changes.modified > 2e4) {
-    ctx.addIssue({ code: "custom", path: ["changes"], message: "too many reported changes" });
-  }
-  let fields = 0;
-  for (const [field, count] of Object.entries(changes.byField)) {
-    if (count > changes.modified) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["changes", "byField", field],
-        message: "field count exceeds modified objects"
-      });
-    }
-    fields += count;
-  }
-  if (fields < changes.modified) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["changes", "byField"],
-      message: "each modified object must have a changed field"
-    });
-  }
-});
-
-// src/kicad/git-footprint-evidence.ts
-var import_node_child_process5 = require("node:child_process");
-
-// src/kicad/footprint-inventory.ts
-var import_node_crypto21 = require("node:crypto");
-var UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;
-var MAX_FOOTPRINTS = 1e4;
-function singleChild(node2, name) {
-  const matches = directChildLists(node2, name);
-  return matches.length === 1 ? matches[0] : void 0;
-}
-var DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/u;
-function parseDecimal(raw) {
-  if (raw === void 0 || !DECIMAL.test(raw)) return void 0;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : void 0;
-}
-function verifiedPlacement(node2) {
-  if (node2.children.length > 4) return void 0;
-  const x = parseDecimal(listValue(node2, 1));
-  const y = parseDecimal(listValue(node2, 2));
-  const rotationRaw = listValue(node2, 3);
-  const rotation = rotationRaw === void 0 ? void 0 : parseDecimal(rotationRaw);
-  if (x === void 0 || y === void 0 || rotationRaw !== void 0 && rotation === void 0) return void 0;
-  return { x, y, ...rotation === void 0 ? {} : { rotation } };
-}
-function sourceFootprint(node2) {
-  const uuidNode = singleChild(node2, "uuid");
-  const positionNode = singleChild(node2, "at");
-  const layerNode = singleChild(node2, "layer");
-  if (!uuidNode || !positionNode || !layerNode) return void 0;
-  const rawUuid = listValue(uuidNode);
-  const references = directChildLists(node2, "property").filter((child) => listValue(child, 1) === "Reference");
-  const referenceProperty = references.length === 1 ? references[0] : void 0;
-  const reference = referenceProperty ? listValue(referenceProperty, 2) : void 0;
-  const libraryId = listValue(node2);
-  const layer = listValue(layerNode);
-  if (!rawUuid || !UUID.test(rawUuid) || !reference || !libraryId || !layer || !/^[FB]\.[\w.]+$/u.test(layer)) {
-    return void 0;
-  }
-  const place = verifiedPlacement(positionNode);
-  if (!place) return void 0;
-  return {
-    sourceUuid: rawUuid.toLowerCase(),
-    reference,
-    libraryId,
-    layer,
-    positionMm: { x: place.x, y: place.y },
-    ...place.rotation === void 0 ? {} : { rotationDeg: place.rotation }
-  };
-}
-function compareSourceUuids(a, b) {
-  if (a.sourceUuid === b.sourceUuid) return 0;
-  return a.sourceUuid < b.sourceUuid ? -1 : 1;
-}
-function verifiedPcbFootprintInventory(text) {
-  let model;
-  try {
-    model = parseKicadDocument(text, "pcb");
-  } catch (error62) {
-    if (error62 instanceof HostileInputError) return { status: "unavailable", reason: "malformed-source" };
-    throw error62;
-  }
-  if (model.ast.errors.length !== 0 || model.ast.nodes.length !== 1 || !model.root || listHead(model.root) !== "kicad_pcb") {
-    return { status: "unavailable", reason: "malformed-source" };
-  }
-  const footprints2 = directChildLists(model.root, "footprint");
-  if (footprints2.length > MAX_FOOTPRINTS) return { status: "unavailable", reason: "too-many-footprints" };
-  const found = [];
-  const identities = /* @__PURE__ */ new Set();
-  for (const node2 of footprints2) {
-    const parsed = sourceFootprint(node2);
-    if (!parsed) return { status: "unavailable", reason: "missing-source-identity" };
-    if (identities.has(parsed.sourceUuid)) return { status: "unavailable", reason: "duplicate-uuid" };
-    identities.add(parsed.sourceUuid);
-    found.push(parsed);
-  }
-  found.sort(compareSourceUuids);
-  return { status: "complete", sourceSha256: (0, import_node_crypto21.createHash)("sha256").update(text).digest("hex"), footprints: found };
-}
-
-// src/kicad/footprint-diff.ts
-function changedFields(before, after) {
-  const fields = [];
-  if (before.reference !== after.reference) fields.push("reference");
-  if (before.libraryId !== after.libraryId) fields.push("libraryId");
-  if (before.layer !== after.layer) fields.push("layer");
-  if (before.positionMm.x !== after.positionMm.x || before.positionMm.y !== after.positionMm.y) {
-    fields.push("positionMm");
-  }
-  if (before.rotationDeg !== after.rotationDeg) fields.push("rotationDeg");
-  return fields;
-}
-function diffVerifiedPcbFootprints(basePcb, headPcb) {
-  const base = verifiedPcbFootprintInventory(basePcb);
-  if (base.status !== "complete") return { status: "unavailable", side: "base", reason: base.reason };
-  const head = verifiedPcbFootprintInventory(headPcb);
-  if (head.status !== "complete") return { status: "unavailable", side: "head", reason: head.reason };
-  const beforeById = new Map(base.footprints.map((item2) => [item2.sourceUuid, item2]));
-  const afterById = new Map(head.footprints.map((item2) => [item2.sourceUuid, item2]));
-  const changes = [];
-  for (const item2 of base.footprints) {
-    const after = afterById.get(item2.sourceUuid);
-    if (!after) {
-      changes.push({ status: "footprint-removed", sourceUuid: item2.sourceUuid, base: item2 });
-      continue;
-    }
-    const fields = changedFields(item2, after);
-    if (fields.length > 0) {
-      changes.push({
-        status: "footprint-modified",
-        sourceUuid: item2.sourceUuid,
-        changedFields: fields,
-        base: item2,
-        head: after
-      });
-    }
-  }
-  for (const item2 of head.footprints) {
-    if (!beforeById.has(item2.sourceUuid)) {
-      changes.push({ status: "footprint-added", sourceUuid: item2.sourceUuid, head: item2 });
-    }
-  }
-  changes.sort((a, b) => a.sourceUuid === b.sourceUuid ? 0 : a.sourceUuid < b.sourceUuid ? -1 : 1);
-  return {
-    status: "complete",
-    baseSourceSha256: base.sourceSha256,
-    headSourceSha256: head.sourceSha256,
-    changes
-  };
-}
-
-// src/kicad/git-footprint-evidence.ts
-var MAX_PCB_SOURCE_BYTES = 64 * 1024 * 1024;
-var MAX_GIT_OUTPUT_BYTES = MAX_PCB_SOURCE_BYTES + 1024;
-var COMMIT_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
-var BLOB_SHA = COMMIT_SHA;
-function hasControl(value) {
-  return [...value].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
-}
-function validSourcePath(value) {
-  if (!value || value.length > 1024 || value.startsWith("/") || !value.endsWith(".kicad_pcb")) return false;
-  if (value.includes("\\") || value.includes(":") || hasControl(value)) return false;
-  return value.split("/").every((segment2) => segment2.length > 0 && segment2 !== "." && segment2 !== ".." && segment2 !== ".git");
-}
-function git(root, args, maxBuffer = 4096) {
-  return (0, import_node_child_process5.execFileSync)(resolveGitExecutable(), ["-C", root, ...args], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-    timeout: 1e4,
-    maxBuffer
-  });
-}
-function commit2(root, ref) {
-  if (!ref || ref.length > 255 || ref.startsWith("-") || hasControl(ref)) return void 0;
-  try {
-    const resolved = git(root, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`]).trim();
-    return COMMIT_SHA.test(resolved) ? resolved : void 0;
-  } catch {
-    return void 0;
-  }
-}
-function sourceAtCommit(root, sha, file2) {
-  let blobSha;
-  try {
-    blobSha = git(root, ["rev-parse", "--verify", "--end-of-options", `${sha}:${file2}`]).trim();
-  } catch {
-    return { status: "unavailable", reason: "missing" };
-  }
-  if (!BLOB_SHA.test(blobSha)) return { status: "unavailable", reason: "unreadable" };
-  try {
-    const type = git(root, ["cat-file", "-t", blobSha]).trim();
-    if (type !== "blob") return { status: "unavailable", reason: "unreadable" };
-    const size = Number(git(root, ["cat-file", "-s", blobSha]).trim());
-    if (!Number.isSafeInteger(size) || size < 0) return { status: "unavailable", reason: "unreadable" };
-    if (size > MAX_PCB_SOURCE_BYTES) return { status: "unavailable", reason: "too-large" };
-    const text = git(root, ["cat-file", "blob", blobSha], MAX_GIT_OUTPUT_BYTES);
-    if (Buffer.byteLength(text, "utf8") !== size) return { status: "unavailable", reason: "unreadable" };
-    return { status: "complete", blobSha, text };
-  } catch {
-    return { status: "unavailable", reason: "unreadable" };
-  }
-}
-function gitPcbFootprintEvidence(options) {
-  if (!validSourcePath(options.sourcePath)) return { status: "unavailable", reason: "invalid-source-path" };
-  const base = commit2(options.repositoryRoot, options.baseRef);
-  const head = commit2(options.repositoryRoot, options.headRef);
-  if (!base || !head) return { status: "unavailable", reason: "unresolved-commit" };
-  const baseSource = sourceAtCommit(options.repositoryRoot, base, options.sourcePath);
-  if (baseSource.status !== "complete") {
-    return {
-      status: "unavailable",
-      reason: baseSource.reason === "too-large" ? "source-too-large" : baseSource.reason === "missing" ? "base-source-missing" : "unreadable-source"
-    };
-  }
-  const headSource = sourceAtCommit(options.repositoryRoot, head, options.sourcePath);
-  if (headSource.status !== "complete") {
-    return {
-      status: "unavailable",
-      reason: headSource.reason === "too-large" ? "source-too-large" : headSource.reason === "missing" ? "head-source-missing" : "unreadable-source"
-    };
-  }
-  const facts = diffVerifiedPcbFootprints(baseSource.text, headSource.text);
-  if (facts.status !== "complete") return facts;
-  return {
-    status: "complete",
-    sourcePath: options.sourcePath,
-    baseCommitSha: base,
-    headCommitSha: head,
-    baseBlobSha: baseSource.blobSha,
-    headBlobSha: headSource.blobSha,
-    facts,
-    riskAssessment: "not-evaluated"
-  };
-}
-
-// src/cli/commands/review-footprint-diff.ts
-function summaryFromVerifiedFacts(evidence) {
-  const countFields = { reference: 0, libraryId: 0, layer: 0, positionMm: 0, rotationDeg: 0 };
-  let added = 0;
-  let removed = 0;
-  let modified = 0;
-  for (const fact of evidence.facts.changes) {
-    if (fact.status === "footprint-added") added++;
-    else if (fact.status === "footprint-removed") removed++;
-    else {
-      modified++;
-      for (const field of fact.changedFields) countFields[field]++;
-    }
-  }
-  return pcbFootprintSummarySchema.parse({
-    schemaVersion: 1,
-    scope: "pcb-footprints-only",
-    provenance: "local-git-commits",
-    disclosure: "counts-and-digests-only",
-    baseCommitSha: evidence.baseCommitSha,
-    headCommitSha: evidence.headCommitSha,
-    baseBlobSha: evidence.baseBlobSha,
-    headBlobSha: evidence.headBlobSha,
-    baseSourceSha256: evidence.facts.baseSourceSha256,
-    headSourceSha256: evidence.facts.headSourceSha256,
-    changes: { added, removed, modified, byField: countFields },
-    riskAssessment: "not-evaluated"
-  });
-}
-function reviewFootprintDiffCommand(target, options, streams) {
-  if (options.format && options.format !== "text" && options.format !== "json" && options.format !== "summary-json") {
-    streams.stderr.write("Invalid format: choose text, json or summary-json.\n");
-    return 2;
-  }
-  const result = gitPcbFootprintEvidence({
-    repositoryRoot: target ?? process.cwd(),
-    baseRef: options.base,
-    headRef: options.head,
-    sourcePath: options.pcb
-  });
-  if (options.format === "summary-json") {
-    if (result.status !== "complete") {
-      streams.stdout.write(`${JSON.stringify({ schemaVersion: 1, ...result }, null, 2)}
-`);
-      return 1;
-    }
-    streams.stdout.write(`${JSON.stringify(summaryFromVerifiedFacts(result), null, 2)}
-`);
-    return 0;
-  }
-  if (options.format === "json") {
-    streams.stdout.write(`${JSON.stringify({ schemaVersion: 1, ...result }, null, 2)}
-`);
-    return result.status === "complete" ? 0 : 1;
-  }
-  if (result.status === "unavailable") {
-    streams.stderr.write(`PCB source comparison unavailable: ${result.reason}. No change verdict was computed.
-`);
-    return 1;
-  }
-  const added = result.facts.changes.filter((change) => change.status === "footprint-added").length;
-  const removed = result.facts.changes.filter((change) => change.status === "footprint-removed").length;
-  const modified = result.facts.changes.filter((change) => change.status === "footprint-modified").length;
-  streams.stdout.write(
-    `Verified Git PCB footprint facts: ${result.sourcePath}
-Base: ${result.baseCommitSha} (${result.facts.baseSourceSha256})
-Head: ${result.headCommitSha} (${result.facts.headSourceSha256})
-Footprints: ${added} added, ${removed} removed, ${modified} modified.
-Risk/policy/DRC assessment: not evaluated. Other PCB objects are not covered.
-Local-only comparison: no source files or results were uploaded.
-`
-  );
-  return 0;
 }
 
 // src/cli/commands/runner.ts
@@ -67678,7 +67712,7 @@ function registerAllCommands(program2, streams) {
     review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option(
       "--native-visuals",
       "explicitly upload KiCad-native PCB/schematic artwork (may disclose detailed design IP)"
-    ).option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
+    ).option("--share-footprint-summary", "opt in to publishing PCB change counts and source hashes").option("--pcb <path>", "tracked PCB path required for opted-in change summary").option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
   ).action(async (pathInput, options) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
   });

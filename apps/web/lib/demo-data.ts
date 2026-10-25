@@ -9,6 +9,7 @@ import type {
   ReviewStatus,
   SnapshotArtifact,
 } from "@boardreadyops/contracts";
+import type { PcbFootprintSummary } from "@boardreadyops/contracts/pcb-footprint-summary";
 
 export interface DemoFinding {
   fingerprint: string;
@@ -109,6 +110,8 @@ export interface DemoReview {
   headSnapshots?: SnapshotArtifact[] | undefined;
   /** Snapshots for the revision's base commit, when a prior run recorded them; enables overlay/diff canvas modes. */
   baseSnapshots?: SnapshotArtifact[] | undefined;
+  /** Authenticated client-reported PCB footprint counts; not independently verified by cloud. */
+  pcbFootprintSummary?: PcbFootprintSummary | undefined;
   /** Effective cloud governance policy plus field-level inheritance provenance. */
   effectivePolicy?: DemoEffectivePolicy | undefined;
 }
