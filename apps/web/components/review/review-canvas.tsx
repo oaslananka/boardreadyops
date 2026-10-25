@@ -9,6 +9,8 @@ export interface ReviewCanvasProps {
   baseSnapshots?: SnapshotArtifact[];
   /** Use a shorter preview before the finding list on narrow run-inspection screens. */
   compactMobile?: boolean;
+  /** Hide optional inspection chrome only in the initial Overview preview on small screens. */
+  previewMobileControls?: boolean;
   findings?: DemoFinding[];
   comments?: DemoComment[];
   selectedFindingFingerprint?: string | undefined;
@@ -416,6 +418,7 @@ export function ReviewCanvas({
   headSnapshots,
   baseSnapshots = [],
   compactMobile = false,
+  previewMobileControls = false,
   findings = [],
   comments = [],
   selectedFindingFingerprint,
@@ -583,7 +586,7 @@ export function ReviewCanvas({
           </select>
 
           <fieldset
-            className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0"
+            className={`${previewMobileControls ? "hidden sm:flex" : "flex"} w-full min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0`}
             aria-label="Revision comparison modes"
           >
             <button
@@ -638,7 +641,9 @@ export function ReviewCanvas({
           </fieldset>
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-start sm:gap-3">
+        <div
+          className={`${previewMobileControls ? "hidden sm:flex" : "flex"} min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-start sm:gap-3`}
+        >
           {effectiveViewMode === "overlay" ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Base</span>

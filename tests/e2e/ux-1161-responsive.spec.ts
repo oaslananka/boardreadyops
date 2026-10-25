@@ -46,6 +46,16 @@ test("mobile Review keeps source evidence in the first screen and decisions in a
   const preview = page.getByRole("region", { name: "Published design preview" });
   await expect(preview).toBeVisible();
   expect((await preview.boundingBox())?.y).toBeLessThan(620);
+  // The Overview is a preview, not the entire CAD workstation: show source art before
+  // optional comparison and zoom chrome. Changes retains those controls on mobile.
+  await expect(preview.getByRole("group", { name: "Revision comparison modes" })).toBeHidden();
+  await expect(preview.getByRole("button", { name: "Zoom in" })).toBeHidden();
+  const boardCanvas = preview.getByRole("region", { name: "Schematic and PCB Review Canvas" });
+  expect((await boardCanvas.boundingBox())?.y).toBeLessThan(760);
+  await preview.getByRole("button", { name: /Inspect findings on the board/ }).click();
+  await expect(page.getByRole("group", { name: "Revision comparison modes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Zoom in" })).toBeVisible();
+  await page.getByRole("tab", { name: "Overview" }).click();
   await actions.click();
   await expect(page.getByRole("button", { name: "Approve review" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Request changes" })).toBeVisible();
