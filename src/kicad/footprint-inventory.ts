@@ -53,6 +53,12 @@ function verifiedPlacement(node: SexprListNode): { x: number; y: number; rotatio
   return { x, y, ...(rotation === undefined ? {} : { rotation }) };
 }
 
+function validLibraryFootprintId(value: string | undefined): value is string {
+  if (!value || [...value].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) return false;
+  const parts = value.split(":");
+  return parts.length === 2 && parts.every((part) => part.length > 0 && part.trim() === part);
+}
+
 function sourceFootprint(node: SexprListNode): VerifiedPcbFootprint | undefined {
   const uuidNode = singleChild(node, "uuid");
   const positionNode = singleChild(node, "at");
@@ -67,7 +73,13 @@ function sourceFootprint(node: SexprListNode): VerifiedPcbFootprint | undefined 
   if (uuidNode.children.length !== 2 || layerNode.children.length !== 2) return undefined;
   const libraryId = listValue(node);
   const layer = listValue(layerNode);
-  if (!rawUuid || !UUID.test(rawUuid) || !reference || !libraryId || !layer || !/^[FB]\.[\w.]+$/u.test(layer)) {
+  if (
+    !rawUuid ||
+    !UUID.test(rawUuid) ||
+    !reference ||
+    !validLibraryFootprintId(libraryId) ||
+    (layer !== "F.Cu" && layer !== "B.Cu")
+  ) {
     return undefined;
   }
   const place = verifiedPlacement(positionNode);

@@ -91,6 +91,31 @@ describe("verified KiCad source footprint inventory", () => {
     ).toEqual({ status: "unavailable", reason: "missing-source-identity" });
   });
 
+  it("rejects noncanonical library footprint IDs instead of verifying fabricated source identity", () => {
+    const source = footprint(rId, "R1");
+    for (const invalid of [
+      "not-a-library-id",
+      ":R_0603",
+      "Resistor_SMD:",
+      "Resistor_SMD:R_0603:extra",
+      " Resistor_SMD:R_0603",
+    ]) {
+      expect(verifiedPcbFootprintInventory(board(source.replace("Resistor_SMD:R_0603", invalid)))).toEqual({
+        status: "unavailable",
+        reason: "missing-source-identity",
+      });
+    }
+  });
+
+  it("rejects nonexistent footprint-placement layers despite a plausible side prefix", () => {
+    for (const layer of ["F.NotReal", "B.NotReal", "F.SilkS", "B.Mask", "In1.Cu"]) {
+      expect(verifiedPcbFootprintInventory(board(footprint(rId, "R1", "1 2", layer)))).toEqual({
+        status: "unavailable",
+        reason: "missing-source-identity",
+      });
+    }
+  });
+
   it("rejects malformed decimal coordinates, blank rotation and extra placement values", () => {
     for (const position of ["0x10 2", "0b11 2", '1 2 ""', "1 2 3 4", "1 2 1e9999"]) {
       expect(verifiedPcbFootprintInventory(board(footprint(rId, "R1", position)))).toEqual({
