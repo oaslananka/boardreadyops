@@ -200,11 +200,7 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
             </section>
 
             {result.total === 0 ? (
-              <ReviewEmptyVisualPreview
-                mode="onboarding"
-                actionHref="/projects/new"
-                actionLabel="Add your first project source"
-              />
+              <OptionalProjectPreview actionHref="/projects/new" actionLabel="Add your first project source" />
             ) : null}
             <Panel
               title={result.selected.name}
@@ -269,6 +265,24 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
   );
 }
 
+function OptionalProjectPreview({ actionHref, actionLabel }: Readonly<{ actionHref: string; actionLabel: string }>) {
+  return (
+    <details className="overflow-hidden rounded-xl border border-border bg-card" aria-label="Example hardware review">
+      <summary className="flex min-h-14 cursor-pointer items-center justify-between gap-3 px-5 py-3 text-sm font-semibold text-foreground hover:bg-muted/35">
+        <span>
+          Explore a sample PCB and schematic <span className="font-normal text-muted-foreground">· Example only</span>
+        </span>
+        <span aria-hidden="true" className="text-primary">
+          ⌄
+        </span>
+      </summary>
+      <div className="border-t border-border p-3">
+        <ReviewEmptyVisualPreview mode="onboarding" actionHref={actionHref} actionLabel={actionLabel} />
+      </div>
+    </details>
+  );
+}
+
 function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-configured" | "no-workspaces" }>) {
   if (state === "signed-out") {
     return (
@@ -309,40 +323,53 @@ function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-co
     );
   }
 
-  // A GitHub App repository is not a CAD workspace membership. Keep both
-  // paths available without implying a user must reconnect an existing repository.
+  // A GitHub App repository is not a CAD workspace membership. The existing
+  // GitHub review path is first; optional CAD workspace setup stays second.
   return (
     <>
-      <ReviewEmptyVisualPreview
-        mode="onboarding"
-        actionHref="/dashboard"
-        actionLabel="Explore your GitHub repositories"
-      />
-      <section className="grid min-w-0 gap-4 lg:grid-cols-2" aria-label="Choose your hardware workflow">
-        <Panel
-          title="Continue with GitHub repositories"
-          description="No CAD workspace is required to inspect your existing repository readiness runs."
+      <section
+        className="rounded-xl border border-border bg-card p-5 shadow-e1 sm:p-6"
+        aria-labelledby="github-first-projects-heading"
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Start with real hardware work</p>
+        <h2
+          id="github-first-projects-heading"
+          className="mt-2 font-display text-2xl font-semibold tracking-tight text-foreground"
         >
-          <p className="text-sm text-muted-foreground">
-            GitHub App repositories are shown on Dashboard. CAD workspaces have separate memberships and do not
-            automatically import those repositories. Your existing runs and findings remain available.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Button asChild>
-              <Link href="/dashboard">View repositories</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/runs">Browse readiness runs</Link>
-            </Button>
-          </div>
-        </Panel>
-        <Panel
-          title="Create your first workspace"
-          description="Optional: group CAD projects, revisions and manufacturing deliveries in a shared workspace."
-        >
-          <CreateWorkspaceForm action={createWorkspaceAction} />
-        </Panel>
+          Continue with GitHub repositories
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          No CAD workspace is required to inspect your existing repository readiness runs or Reviews. GitHub App
+          repositories are shown on Dashboard. CAD workspaces have separate memberships and do not automatically import
+          those repositories. Your existing runs and findings remain available.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button asChild>
+            <Link href="/reviews">Open hardware reviews</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/dashboard">View repositories</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/runs">Browse readiness runs</Link>
+          </Button>
+        </div>
       </section>
+      <details className="rounded-xl border border-border bg-card" aria-label="Optional CAD workspace setup">
+        <summary className="min-h-14 cursor-pointer px-5 py-4 text-sm font-semibold text-foreground hover:bg-muted/35">
+          <span className="block">Optional: Create your first workspace</span>
+          <span className="mt-1 block text-xs font-normal text-muted-foreground">
+            Group CAD projects, revisions and evidence with a team only when you need a shared workspace.
+          </span>
+        </summary>
+        <div className="border-t border-border px-5 py-5">
+          <p className="mb-4 text-sm text-muted-foreground">
+            Optional: group CAD projects, revisions and manufacturing deliveries in a shared workspace.
+          </p>
+          <CreateWorkspaceForm action={createWorkspaceAction} />
+        </div>
+      </details>
+      <OptionalProjectPreview actionHref="/dashboard" actionLabel="Explore your GitHub repositories" />
     </>
   );
 }
