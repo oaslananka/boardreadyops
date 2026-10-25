@@ -37545,6 +37545,13 @@ var init_storage = __esm({
   }
 });
 
+// packages/contracts/src/verified-object-position-diff.ts
+var init_verified_object_position_diff = __esm({
+  "packages/contracts/src/verified-object-position-diff.ts"() {
+    "use strict";
+  }
+});
+
 // packages/contracts/src/index.ts
 function inferredConclusion(input2) {
   if (input2.status === "timed_out") {
@@ -37575,6 +37582,7 @@ var init_src = __esm({
     init_runner_protocol();
     init_snapshots();
     init_storage();
+    init_verified_object_position_diff();
     releaseRunStatusSchema = external_exports.enum(["queued", "running", "completed", "timed_out", "failed"]);
     releaseDecisionSchema = external_exports.enum(["pass", "fail", "error"]);
     releaseRunConclusionSchema = external_exports.enum(["success", "failure", "neutral", "timed_out"]);
@@ -62402,6 +62410,10 @@ function verifiedNativePcbItemAnchors(snapshot, bounds, findings) {
           severity: finding2.severity,
           message: finding2.message.slice(0, 500),
           sourceUuid: uuid5,
+          // Absolute KiCad-reported millimeters, not projected image coordinates.
+          // These survive a changed board outline/viewBox in a later revision.
+          sourceXmm: x,
+          sourceYmm: y,
           provenance: "kicad-json-object-position",
           locationMeaning: "Referenced source object, not verified violation center"
         }
