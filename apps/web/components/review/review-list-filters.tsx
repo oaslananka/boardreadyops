@@ -55,7 +55,7 @@ export function ReviewListFilterBar({
           className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 text-sm font-semibold text-primary hover:bg-primary/15"
           aria-label={`Show ${awaiting} reviews awaiting a decision`}
         >
-          Awaiting decision
+          <span>Awaiting decision</span>
           <span className="rounded-md bg-primary/15 px-2 py-0.5 tabular-nums">{awaiting}</span>
         </Link>
       </div>
