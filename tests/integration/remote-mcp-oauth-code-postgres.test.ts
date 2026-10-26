@@ -10,6 +10,7 @@ import {
   remoteMcpAuthorizationRedirect,
   remoteMcpOauthLifetime,
 } from "../../apps/web/lib/remote-mcp-authorization-code.js";
+import { handleRemoteMcpConsentGet, handleRemoteMcpConsentPost } from "../../apps/web/lib/remote-mcp-consent-http.js";
 import { remoteMcpResource } from "../../apps/web/lib/remote-mcp-foundation.js";
 import { isRemoteMcpGrantActive, revokeRemoteMcpGrant } from "../../apps/web/lib/remote-mcp-grant-store.js";
 import { createRemoteMcpJwtVerifier } from "../../apps/web/lib/remote-mcp-jwt-verifier.js";
@@ -18,6 +19,7 @@ import {
   createRemoteMcpTokenIssuer,
   remoteMcpAuthorizationServerMetadata,
 } from "../../apps/web/lib/remote-mcp-token-issuer.js";
+import { encodeUserSession } from "../../apps/web/lib/user-session.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -320,6 +322,100 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
       await exchangeRemoteMcpAuthorizationCode(
         executor(),
         { code: required(required(approved).code), clientId, redirectUri, codeVerifier: verifier },
+        issuer,
+        tokenIssuer.sign,
+      ),
+    ).toBeNull();
+  });
+
+  it("renders live user-bound HTML consent and exchanges its one-use approval code", async () => {
+    const sessionSecret = "local-test-secret".repeat(4);
+    const signedSession = encodeUserSession(
+      {
+        userId: githubUserId,
+        login: "test-user",
+        installationIds: [],
+        issuedAt: new Date(Date.now() - 60_000).toISOString(),
+        expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+      sessionSecret,
+    );
+    const cookie = `brops_session=${signedSession}`;
+    const consentParams = new URLSearchParams({
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      state: randomUUID(),
+      scope: "review:read",
+      resource: remoteMcpResource,
+    });
+    const deps = {
+      issuer,
+      sessionSecret,
+      openDb: async () => ({
+        query: executor().query,
+        close: async () => undefined,
+      }),
+    };
+    const page = await handleRemoteMcpConsentGet(
+      new Request(`${issuer}/oauth/authorize?${consentParams}`, {
+        headers: { cookie },
+      }),
+      deps,
+    );
+    const rendered = await page.text();
+    expect(page.status, rendered).toBe(200);
+    expect(rendered).toContain("Trusted Test Client");
+    const authorizationId = rendered.match(/name="authorization_id" value="([a-f0-9-]+)"/u)?.[1];
+    const csrf = rendered.match(/name="csrf" value="([A-Za-z0-9_-]+)"/u)?.[1];
+    expect(authorizationId).toBeTruthy();
+    expect(csrf).toBeTruthy();
+    const body = new URLSearchParams({
+      authorization_id: required(authorizationId),
+      csrf: required(csrf),
+      decision: "approve",
+    });
+    const response = await handleRemoteMcpConsentPost(
+      new Request(`${issuer}/oauth/authorize`, {
+        method: "POST",
+        headers: {
+          cookie,
+          origin: issuer,
+          "sec-fetch-site": "same-origin",
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body,
+      }),
+      deps,
+    );
+    expect(response.status).toBe(303);
+    const redirect = new URL(required(response.headers.get("location")));
+    expect(redirect.origin).toBe("https://trusted.example");
+    expect(redirect.searchParams.get("state")).toBe(consentParams.get("state"));
+    const code = required(redirect.searchParams.get("code"));
+    const result = await exchangeRemoteMcpAuthorizationCode(
+      executor(),
+      {
+        code,
+        clientId,
+        redirectUri,
+        codeVerifier: verifier,
+      },
+      issuer,
+      tokenIssuer.sign,
+    );
+    expect(result?.token_type).toBe("Bearer");
+    expect(
+      await exchangeRemoteMcpAuthorizationCode(
+        executor(),
+        {
+          code,
+          clientId,
+          redirectUri,
+          codeVerifier: verifier,
+        },
         issuer,
         tokenIssuer.sign,
       ),

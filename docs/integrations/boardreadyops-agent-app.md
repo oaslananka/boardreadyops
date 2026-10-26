@@ -233,3 +233,47 @@ turning on the existing `/mcp` endpoint: implement session-bound consent pages,
 same-origin POST/CSRF protection, production issuer and metadata routing,
 pre-registered ChatGPT/Claude client details, trusted signing key rotation,
 request throttling, activity audit and representative live user testing.
+
+### OAuth browser consent and discovery routes (next local increment)
+
+The **disabled-by-default** Next.js routes are implemented at
+`/oauth/authorize` (GET/POST), `/oauth/token` (POST),
+`/.well-known/oauth-authorization-server`, `/.well-known/jwks.json` and
+`/.well-known/oauth-protected-resource/mcp`. The existing `/mcp` endpoint
+**still returns 503**: a complete authenticated MCP release is not implied by
+publishing the authorization server groundwork.
+
+The operator-controlled configuration requires
+`BOARDREADYOPS_REMOTE_MCP_OAUTH_ENABLED=true`,
+`BOARDREADYOPS_REMOTE_MCP_OAUTH_ISSUER=https://boardreadyops.com`,
+`BOARDREADYOPS_REMOTE_MCP_RSA_PRIVATE_KEY`,
+`BOARDREADYOPS_REMOTE_MCP_KEY_ID`, `SESSION_SECRET` and `DATABASE_URL`.
+Never enable this flag until the rest of #1248's production security gate
+has passed; RSA private keys and session/database secrets must be managed in
+Doppler rather than checked into the repository. The signing key is stable
+across instances, not generated per request. An invalid key or any missing
+required configuration leaves *all new routes* unavailable by default.
+
+Browser consent uses an HMAC-verified GitHub dashboard session solely to
+identify the approving user. A signed-in GET creates a **pending** record and
+renders a standalone HTML page displaying escaped client name, redirect
+origin and requested read-only scopes. It neither grants access nor issues
+an access token. The explicit Approve/Deny POST requires an active signed
+session, exact same-origin `Origin`, urlencoded form and the saved unpredictable
+CSRF nonce. The POST returns `303` to the exact pre-registered redirect URI
+with `state` and RFC 9207 `iss`; it never sends a code via an unvalidated
+redirect. Strict CSP, no-referrer, frame denial, noindex and `no-store` are
+applied. Users without a session receive a sign-in link and may need to
+restart the AI-client connection if the OAuth request exceeds the dashboard's
+safe return-path limit.
+
+This increment was validated with local route tests plus disposable PostgreSQL
+integration exercising real signed browser session → rendered consent form →
+CSRF-bound approval → single-use code → JWT grant. There are **no** real
+ChatGPT/Claude client registrations, configured production signing keys, rate
+limits or deployment migrations yet. The existing gateway release hold remains.
+
+Implementation cross-checked with RFC 9700 and the August 2026 browser-based
+OAuth BCP RFC 10017. Official OpenAI plugin authorization documentation supports
+predefined OAuth clients, CIMD and dynamic client registration; only the
+predefined allowlist is in scope here to avoid untrusted client-metadata SSRF.
