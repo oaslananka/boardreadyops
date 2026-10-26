@@ -10,6 +10,31 @@ import {
 } from "./remote-mcp-access.js";
 import { remoteMcpMetadataUrl } from "./remote-mcp-foundation.js";
 
+/** Keep this limit synchronized with createMcpHandler.maxRequestBodySize.
+ * SDK 2.3.1 enforces the *actual streamed bytes* at this same limit; this
+ * cheap header gate prevents wasteful JWT and durable-grant reads when the
+ * request already advertises that it is malformed or too large.
+ */
+const maximumRemoteMcpRequestBytes = 64 * 1024;
+
+function rejectInvalidMcpPostHeaders(request: Request): Response | null {
+  if (request.method !== "POST") return null;
+  const size = request.headers.get("content-length");
+  if (size !== null) {
+    if (!/^(0|[1-9][0-9]*)$/u.test(size)) {
+      return new Response(null, { status: 400, headers: { "cache-control": "no-store" } });
+    }
+    if (Number(size) > maximumRemoteMcpRequestBytes) {
+      return new Response(null, { status: 413, headers: { "cache-control": "no-store" } });
+    }
+  }
+  const contentType = request.headers.get("content-type");
+  if (!contentType || !/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(contentType)) {
+    return new Response(null, { status: 415, headers: { "cache-control": "no-store" } });
+  }
+  return null;
+}
+
 interface RemoteMcpReadDependencies {
   openDb(): Promise<Pick<PgQueryExecutor, "query" | "close">>;
   checkCurrentPermission: CheckLiveRepositoryPermission;
@@ -28,8 +53,9 @@ function trustedRemoteMcpHttpTarget(request: Request): boolean {
   }
 }
 
-/** Internal, stateless MCP v2 HTTP handler. Every request is authorized before
- * constructing the MCP server. Use only in tests until the OAuth release gate passes.
+/** Stateless MCP v2 HTTP handler. Every request is authorized before
+ * constructing the server; the public route remains behind two disabled-by-default
+ * release flags and required live GitHub permission acceptance.
  */
 export async function handleAuthorizedRemoteMcpHttp(
   request: Request,
@@ -77,7 +103,7 @@ export async function handleAuthorizedRemoteMcpHttp(
       }
       return server;
     },
-    { legacy: "stateless", maxRequestBodySize: 64 * 1024 },
+    { legacy: "stateless", maxRequestBodySize: maximumRemoteMcpRequestBytes },
   );
 
   const response = await handler.fetch(request);
@@ -96,6 +122,8 @@ export async function handleRemoteMcpWithVerifiedGrant(
   if (!trustedRemoteMcpHttpTarget(request)) {
     return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
   }
+  const invalidPostHeaders = rejectInvalidMcpPostHeaders(request);
+  if (invalidPostHeaders) return invalidPostHeaders;
   const principal = await authenticateRemoteMcpRequest(request, config.issuer, config.verifier);
   if (!principal) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {

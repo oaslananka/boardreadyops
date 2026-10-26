@@ -704,3 +704,30 @@ cause zero token issuer and fetch calls, while the canonical root still
 performs the three fixture-backed identity, repository and current-user
 permission checks. No real App token or private key was accessed, and live
 user-specific GitHub permission acceptance remains outstanding.
+
+### MCP POST preauthorization header gate (unreleased)
+
+Before performing **any JWT signature check or durable grant lookup**, the
+`/mcp` verifier checks easily rejected POST headers. A noncanonical or
+nonnumeric `Content-Length` receives **400**, an explicitly advertised body
+larger than **65,536 bytes** receives **413**, and a missing or unsupported
+JSON Content-Type receives **415**. All of these responses are `no-store` and
+occur before database or GitHub access. Canonical JSON and optional UTF-8
+charset headers remain compatible with the protected-resource Bearer **401**
+discovery response when authorization is missing or invalid.
+
+The SDK's separate, already-installed `maxRequestBodySize` uses the **same
+65,536-byte limit** on the *actual streamed body* (including requests with no
+Content-Length or a misleading smaller declaration), and returns 413 once it
+receives too many bytes. The header gate is an early resource-savings check,
+**not** a replacement for the SDK's byte cap or edge slow-client/connection
+rate controls. It does not trust a small Content-Length as proof that the
+body is small, does not parse client-controlled JSON before authenticating the
+request, and does not bypass the signed OAuth grant or current-user GitHub
+permission checks for Review reads.
+
+Unit tests verify forged, malformed and oversized declared lengths, invalid
+media types, valid JSON media parameters, the missing-token OAuth challenge,
+and the SDK's streamed-body limit. They explicitly assert zero verifier and
+PostgreSQL calls for early rejected input. The dual release feature gates
+remain disabled in production; no deployment or client enrollment occurred.

@@ -155,6 +155,124 @@ describe("remote MCP signed-token verifier", () => {
   });
 });
 
+describe("MCP pre-authentication request-size and media guards", () => {
+  function deniedWithoutGrantLookup(request: Request, expectedStatus: number) {
+    const verifier = {
+      verifySignedAccessToken: vi.fn(),
+      grantIsActive: vi.fn(),
+    };
+    const openDb = vi.fn();
+    const checkCurrentPermission = vi.fn();
+    return handleRemoteMcpWithVerifiedGrant(request, {
+      issuer,
+      verifier,
+      openDb,
+      checkCurrentPermission,
+    }).then((response) => {
+      expect(response.status).toBe(expectedStatus);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(verifier.verifySignedAccessToken).not.toHaveBeenCalled();
+      expect(verifier.grantIsActive).not.toHaveBeenCalled();
+      expect(openDb).not.toHaveBeenCalled();
+      expect(checkCurrentPermission).not.toHaveBeenCalled();
+    });
+  }
+
+  it.each([
+    ["65537", 413],
+    ["900719925474099999999", 413],
+    ["-1", 400],
+    ["-0", 400],
+    ["NaN", 400],
+    ["0001", 400],
+    ["12.5", 400],
+    ["123abc", 400],
+  ] as const)(
+    "denies advertised invalid or excessive POST Content-Length %s before JWT",
+    async (length, expectedStatus) => {
+      const req = mcpRequest("tools/list");
+      req.headers.set("content-length", length);
+      await deniedWithoutGrantLookup(req, expectedStatus);
+    },
+  );
+
+  it.each([
+    "text/plain",
+    "application/x-www-form-urlencoded",
+    "application/json-patch+json",
+    "application/json; charset=iso-8859-1",
+  ])("denies unsupported POST Content-Type %s before JWT", async (media) => {
+    const req = mcpRequest("tools/list");
+    req.headers.set("content-type", media);
+    await deniedWithoutGrantLookup(req, 415);
+  });
+
+  it.each(["application/json", "application/json; charset=utf-8", "APPLICATION/JSON; CHARSET=UTF-8"])(
+    "preserves OAuth challenge for correctly typed but unauthenticated MCP POST %s",
+    async (type) => {
+      const request = mcpRequest("tools/list");
+      request.headers.set("content-type", type);
+      const verifier = { verifySignedAccessToken: vi.fn().mockResolvedValue(null), grantIsActive: vi.fn() };
+      const openDb = vi.fn();
+      const result = await handleRemoteMcpWithVerifiedGrant(request, {
+        issuer,
+        verifier,
+        openDb,
+        checkCurrentPermission: vi.fn(),
+      });
+      expect(result.status).toBe(401);
+      expect(result.headers.get("www-authenticate")).toContain("oauth-protected-resource/mcp");
+      expect(verifier.verifySignedAccessToken).toHaveBeenCalledOnce();
+      expect(openDb).not.toHaveBeenCalled();
+    },
+  );
+
+  it("denies POST requests missing Content-Type without verifying or querying a grant", async () => {
+    const req = mcpRequest("tools/list");
+    req.headers.delete("content-type");
+    await deniedWithoutGrantLookup(req, 415);
+  });
+
+  it("keeps SDK stream enforcement at the same 64 KiB actual-body limit when length is absent", async () => {
+    const request = new Request(remoteMcpResource, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer signed.jwt",
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "Mcp-Protocol-Version": "2026-07-28",
+        "Mcp-Method": "tools/list",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "tools/list", id: 1, params: { padding: "x".repeat(70_000) } }),
+    });
+    const verifier = {
+      verifySignedAccessToken: vi.fn().mockResolvedValue({
+        iss: issuer,
+        aud: remoteMcpResource,
+        sub: `github:${ghUser}`,
+        jti,
+        githubUserId: ghUser,
+        clientId,
+        scope: "review:read",
+        iat: now(),
+        exp: now() + 600,
+      }),
+      grantIsActive: vi.fn().mockResolvedValue(true),
+    };
+    const openDb = vi.fn();
+    const result = await handleRemoteMcpWithVerifiedGrant(request, {
+      issuer,
+      verifier,
+      openDb,
+      checkCurrentPermission: vi.fn(),
+    });
+    expect(result.status).toBe(413);
+    expect(result.headers.get("cache-control")).toBe("private, no-store");
+    expect(verifier.grantIsActive).toHaveBeenCalledOnce();
+    expect(openDb).not.toHaveBeenCalled();
+  });
+});
+
 describe("MCP v2 stateless web request boundary", () => {
   it("returns HTTP 401 and RFC9728 discovery on missing OAuth grant, before opening DB", async () => {
     const openDb = vi.fn();
