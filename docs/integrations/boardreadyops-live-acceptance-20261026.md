@@ -63,3 +63,38 @@ or deploy `/mcp` on the strength of this report.**
 `amd2700x-ubuntu-chrome` if browser automation is desired. Later browser-based
 GitHub/ChatGPT/Claude sign-in or consent may need the user's interaction.
 No GitHub or cloud service credentials need to be copied into chat.
+
+## MSI browser acceptance follow-up (user-authorized alternative browser)
+
+The user explicitly authorized attempting the same acceptance workflow using
+`msi-chrome` rather than the separate AMD browser whose control had been
+paused. The MSI Chrome device was online and browser automation succeeded.
+Existing BoardReadyOps and KiHub tabs were left untouched; new task tabs
+were used for the checks below.
+
+- **BoardReadyOps:** Chrome showed the authenticated BoardReadyOps Cloud
+  navigation on `https://boardreadyops.com/mcp`, followed by **Page not found**.
+  There is no publicly deployed MCP route to authorize against yet.
+- **ChatGPT:** the browser account was signed in (Plus). Plugins → Add →
+  Add custom MCP server was available; a non-persisted draft for the canonical
+  `https://boardreadyops.com/mcp` server was used to inspect advanced OAuth
+  settings. **OAuth discovery failed** for the not-yet-deployed endpoint.
+  User-defined OAuth Client setup is visible, including a generated callback
+  field, while the other registration approaches were unavailable in this
+  state. Exact callback must be collected again from the final creation flow;
+  don't treat the uncommitted, generated draft callback as permanent. The
+  draft dialog was closed **without creating a plugin or OAuth connection**.
+- **Claude:** the browser was signed in (Free). Settings → Connectors listed
+  existing connected services, but its **Add custom connector** item was
+  disabled. Its exact account/feature eligibility blocker was not disclosed
+  by the page. No plan change or connector creation was attempted.
+
+**Revised user action:** the AMD browser does not need to be resumed for MSI
+browser acceptance. Do not request credential sharing. First deploy the
+reviewed, gated `/mcp` and OAuth metadata routes through an authorized
+release path while keeping the handler disabled until prerequisites pass;
+then discover callback/client IDs with the providers and complete the
+browser-controlled OAuth tests. If Claude's custom connector option remains
+disabled, resolve its account eligibility/plan restrictions with the owner,
+without assuming a paid upgrade is the only solution. Production remains on
+release HOLD; MSI browser access alone does not authorize deployment.
