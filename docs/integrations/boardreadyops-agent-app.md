@@ -892,7 +892,12 @@ raw KiCad files, tenant names and manufacturing verdicts are not queried or
 returned. Failed permissions, missing revisions and malformed finding data
 fail closed as generic unavailable responses; a missing repository is not
 distinguishable from a denied repository. Disposable PostgreSQL and unit
-tests validate pagination and no cross-run leakage.
+tests validate pagination and no cross-run leakage. Additive migration
+`0101_hosted_review_findings_pagination_index.sql` supplies a run-prefixed
+`(run_id, id)` index for bounded cursor scans. Migration runner transactions
+mean this non-concurrent index may briefly block writers on a large live
+`findings` table; staging review and a separately approved production
+migration window are still required. **No production migration was run.**
 
 This is a reviewable code increment only. Current-host acceptance with ChatGPT
 and Claude, actual product installation-token revocation tests, deployment,

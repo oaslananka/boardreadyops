@@ -21,7 +21,7 @@ const row = (index: number) => ({
   rule_id: "drc.clearance",
   severity: "error",
   kind: "electrical",
-  fingerprint: "fp_" + index,
+  fingerprint: `fp_${index}`,
   message: "PRIVATE BOARD DESIGN",
   path: "/mnt/secret-board.kicad_pcb",
 });
@@ -125,6 +125,18 @@ describe("hosted read-only MCP finding pages", () => {
       vi.fn().mockResolvedValue(true),
     );
     expect(result?.findings[0]).toEqual({ ruleId: "drc.clearance", severity: "error", fingerprint: null, kind: null });
+  });
+
+  it("fails closed on unavailable database rows instead of claiming a finding-free Review", async () => {
+    const db = store();
+    db.query
+      .mockReset()
+      .mockResolvedValueOnce({ rows: [review] })
+      .mockResolvedValueOnce({ rows: [revision] })
+      .mockResolvedValueOnce({ rows: undefined });
+    expect(
+      await loadAuthorizedRemoteFindings(db, principal, reviewId, undefined, vi.fn().mockResolvedValue(true)),
+    ).toBeNull();
   });
 
   it("fails closed on malformed and unbounded records instead of leaking source text", async () => {

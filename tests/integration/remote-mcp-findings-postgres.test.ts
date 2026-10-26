@@ -27,8 +27,9 @@ describePg("live-authorized MCP finding pagination against PostgreSQL", () => {
       "0001_cloud_schema.sql",
       "0048_review_domain_spine.sql",
       "0056_marketplace_subscription_state.sql",
+      "0101_hosted_review_findings_pagination_index.sql",
     ]) {
-      const source = await readFile(new URL("../../packages/db/migrations/" + file, import.meta.url), "utf8");
+      const source = await readFile(new URL(`../../packages/db/migrations/${file}`, import.meta.url), "utf8");
       // This fixture needs the marketplace table but not its separate erasure lifecycle.
       // Run the exact production table/index definitions on this empty disposable DB.
       const sql =
@@ -68,7 +69,7 @@ describePg("live-authorized MCP finding pagination against PostgreSQL", () => {
           "drc.clearance",
           "PRIVATE DESIGN MESSAGE",
           "/secret/source/board.kicad_pcb",
-          "fp_" + index,
+          `fp_${index}`,
         ],
       );
     }
@@ -83,6 +84,23 @@ describePg("live-authorized MCP finding pagination against PostgreSQL", () => {
     } finally {
       await db?.close();
     }
+  });
+
+  it("installs the idempotent run-prefixed pagination index on disposable schema", async () => {
+    const index = (await executor().query(
+      `select indexdef from pg_indexes where schemaname = current_schema() and indexname = 'findings_run_id_idx'`,
+    )) as { rows: Array<{ indexdef: string }> };
+    expect(index.rows).toHaveLength(1);
+    expect(index.rows[0]?.indexdef).toMatch(/USING btree \(run_id, id\)/u);
+    const source = await readFile(
+      new URL("../../packages/db/migrations/0101_hosted_review_findings_pagination_index.sql", import.meta.url),
+      "utf8",
+    );
+    await executor().query(source);
+    const again = (await executor().query(
+      `select indexdef from pg_indexes where schemaname = current_schema() and indexname = 'findings_run_id_idx'`,
+    )) as { rows: Array<{ indexdef: string }> };
+    expect(again.rows).toHaveLength(1);
   });
 
   it("pages exactly the current head run, never the older run or private messages/paths", async () => {

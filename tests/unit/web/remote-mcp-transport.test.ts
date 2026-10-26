@@ -484,6 +484,19 @@ describe("MCP v2 stateless web request boundary", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it("normalizes datastore exceptions without sending internal data to MCP clients", async () => {
+    const openDb = vi.fn().mockRejectedValue(new Error("PRIVATE_CONN_STRING"));
+    const called = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/call", { name: "boardreadyops_review_findings", arguments: { reviewId } }),
+      { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] },
+      { openDb, checkCurrentPermission: vi.fn() },
+    );
+    const response = await called.text();
+    expect(called.status).toBe(200);
+    expect(response).toContain("Review unavailable");
+    expect(response).not.toContain("PRIVATE_CONN_STRING");
+  });
+
   it("returns identical generic unavailable errors for unauthorized or missing finding Reviews", async () => {
     const principal = { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] };
     for (const rows of [

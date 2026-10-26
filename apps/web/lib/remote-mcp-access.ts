@@ -184,8 +184,7 @@ export async function loadAuthorizedRemoteReviewSnapshot(
   );
   const row = ((result as { rows?: AuthorizedReviewRow[] }).rows ?? [])[0];
   if (
-    !row ||
-    row.id !== reviewId ||
+    row?.id !== reviewId ||
     !row.current_revision_id ||
     typeof row.head_run_id !== "string" ||
     row.head_run_id.length < 1 ||

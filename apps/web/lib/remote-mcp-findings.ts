@@ -12,6 +12,13 @@ const allowedRule = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const allowedKind = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
 const allowedFingerprint = /^[A-Za-z0-9_-]{1,128}$/u;
 
+type FindingSeverity = "error" | "high" | "medium" | "low" | "info";
+type PublicFinding = {
+  ruleId: string;
+  severity: FindingSeverity;
+  kind: string | null;
+  fingerprint: string | null;
+};
 type FindingRow = {
   id: string;
   rule_id: string;
@@ -19,6 +26,31 @@ type FindingRow = {
   kind: string | null;
   fingerprint: string | null;
 };
+
+/** No finding text, paths, source coordinates or arbitrary object fields cross this boundary. */
+function optionalIdentifier(value: unknown, format: RegExp): value is string | null {
+  return value === null || (typeof value === "string" && format.test(value));
+}
+
+function allowlistedFinding(value: unknown): { id: string; finding: PublicFinding } | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Partial<FindingRow>;
+  if (typeof row.id !== "string" || !allowedId.test(row.id)) return null;
+  if (typeof row.rule_id !== "string" || !allowedRule.test(row.rule_id)) return null;
+  const severity = findingSeveritySchema.safeParse(row.severity);
+  if (!severity.success) return null;
+  if (!optionalIdentifier(row.kind, allowedKind) || !optionalIdentifier(row.fingerprint, allowedFingerprint))
+    return null;
+  return {
+    id: row.id,
+    finding: {
+      ruleId: row.rule_id,
+      severity: severity.data,
+      kind: row.kind,
+      fingerprint: row.fingerprint,
+    },
+  };
+}
 
 /**
  * Read only persisted, deterministic finding identifiers for the exact current
@@ -36,12 +68,7 @@ export async function loadAuthorizedRemoteFindings(
   availability: "available";
   evidenceDigest: string;
   headCommitSha: string;
-  findings: Array<{
-    ruleId: string;
-    severity: "error" | "high" | "medium" | "low" | "info";
-    kind: string | null;
-    fingerprint: string | null;
-  }>;
+  findings: PublicFinding[];
   nextCursor: string | null;
 } | null> {
   if (!principal.scopes.includes("review:read") || (cursor !== undefined && !allowedId.test(cursor))) return null;
@@ -58,39 +85,20 @@ export async function loadAuthorizedRemoteFindings(
   );
   const rows: unknown = (result as { rows?: unknown }).rows;
   if (!Array.isArray(rows) || rows.length > pageSize + 1) return null;
-  const findings: Array<{
-    ruleId: string;
-    severity: "error" | "high" | "medium" | "low" | "info";
-    kind: string | null;
-    fingerprint: string | null;
-  }> = [];
+  const findings: PublicFinding[] = [];
+  let lastId: string | null = null;
   for (const input of rows.slice(0, pageSize)) {
-    const row = input as Partial<FindingRow> | null;
-    if (
-      !row ||
-      typeof row.id !== "string" ||
-      !allowedId.test(row.id) ||
-      typeof row.rule_id !== "string" ||
-      !allowedRule.test(row.rule_id) ||
-      !findingSeveritySchema.safeParse(row.severity).success ||
-      (row.kind !== null && (typeof row.kind !== "string" || !allowedKind.test(row.kind))) ||
-      (row.fingerprint !== null && (typeof row.fingerprint !== "string" || !allowedFingerprint.test(row.fingerprint)))
-    )
-      return null;
-    findings.push({
-      ruleId: row.rule_id,
-      severity: row.severity as "error" | "high" | "medium" | "low" | "info",
-      kind: row.kind,
-      fingerprint: row.fingerprint,
-    });
+    const row = allowlistedFinding(input);
+    if (!row) return null;
+    findings.push(row.finding);
+    lastId = row.id;
   }
-  const last = rows[pageSize - 1] as FindingRow | undefined;
   return {
     schemaVersion: 1,
     availability: "available",
     evidenceDigest: snapshot.facts.evidenceDigest,
     headCommitSha: snapshot.facts.headCommitSha,
     findings,
-    nextCursor: rows.length > pageSize ? (last?.id ?? null) : null,
+    nextCursor: rows.length > pageSize ? lastId : null,
   };
 }
