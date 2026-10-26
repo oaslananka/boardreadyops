@@ -1,5 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Keep versioned Docker tags with immutable SHA-256 digests; Renovate maintains both values to preserve reproducible updates."
+  ],
   "extends": [
     "config:best-practices",
     ":dependencyDashboard",
