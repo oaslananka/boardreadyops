@@ -130,6 +130,7 @@ describe("Remote MCP browser consent security boundary", () => {
     expect(html).toContain('method="post"');
     expect(html).toContain('value="approve"');
     expect(html).toContain('value="deny"');
+    expect(html).toContain('href="/oauth/connections"');
     expect(store.query.mock.calls.find(([sql]) => sql.includes("remote_mcp_oauth_clients"))?.[1]).toEqual([
       clientId,
       redirectUri,

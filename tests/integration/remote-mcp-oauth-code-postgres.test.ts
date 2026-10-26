@@ -22,6 +22,10 @@ import {
   takeRemoteMcpOAuthRateLimit,
 } from "../../apps/web/lib/remote-mcp-oauth-abuse.js";
 import { prepareRemoteMcpProductionHandler } from "../../apps/web/lib/remote-mcp-production.js";
+import {
+  handleRemoteMcpConnectionsGet,
+  handleRemoteMcpConnectionsPost,
+} from "../../apps/web/lib/remote-mcp-revocation-http.js";
 import { handleRemoteMcpTokenRequest } from "../../apps/web/lib/remote-mcp-token-http.js";
 import {
   createRemoteMcpTokenIssuer,
@@ -977,6 +981,94 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     expect(revoked.status).toBe(401);
     expect(query.mock.calls.filter(([sql]) => sql.includes("remote_mcp_oauth_grants"))).toHaveLength(4);
     expect(close).toHaveBeenCalledTimes(6);
+  });
+
+  it("allows a GitHub user to revoke only their own live grant through the browser, invalidating subsequent MCP requests", async () => {
+    const loginSecret = "revocation-integration-secret-".repeat(3);
+    const ownerId = githubUserId + 33;
+    const strangerId = githubUserId + 44;
+    const ownJti = randomUUID();
+    const strangerJti = randomUUID();
+    const session = encodeUserSession(
+      {
+        userId: ownerId,
+        login: "grant-owner",
+        installationIds: [],
+        issuedAt: new Date(Date.now() - 60_000).toISOString(),
+        expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+      loginSecret,
+    );
+    const dependencies = {
+      issuer,
+      sessionSecret: loginSecret,
+      openDb: async () => ({
+        query: (sql: string, args?: readonly unknown[]) => executor().query(sql, args),
+        close: async () => undefined,
+      }),
+    };
+    try {
+      for (const [jti, user] of [
+        [ownJti, ownerId],
+        [strangerJti, strangerId],
+      ] as const) {
+        await executor().query(
+          `insert into remote_mcp_oauth_grants
+             (jti, github_user_id, client_id, issuer, scope, expires_at)
+           values ($1, $2, $3, $4, 'review:read', now() + interval '15 minutes')`,
+          [jti, user, clientId, issuer],
+        );
+      }
+      expect(await isRemoteMcpGrantActive(executor(), ownJti, ownerId, clientId, issuer, "review:read")).toBe(true);
+      const page = await handleRemoteMcpConnectionsGet(
+        new Request(`${issuer}/oauth/connections`, {
+          headers: { cookie: `brops_session=${session}` },
+        }),
+        dependencies,
+      );
+      expect(page.status).toBe(200);
+      const html = await page.text();
+      expect(html).toContain(ownJti);
+      expect(html).not.toContain(strangerJti);
+      expect(html).not.toContain(session);
+      const csrf = html.match(/name="csrf" value="([^"]+)"/u)?.[1];
+      expect(csrf).toBeTruthy();
+      const request = new Request(`${issuer}/oauth/connections`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          origin: issuer,
+          "sec-fetch-site": "same-origin",
+          cookie: `brops_session=${session}`,
+        },
+        body: new URLSearchParams({ grant_id: ownJti, csrf: required(csrf) }),
+      });
+      const revoked = await handleRemoteMcpConnectionsPost(request, dependencies);
+      expect(revoked.status).toBe(303);
+      expect(revoked.headers.get("location")).toBe("/oauth/connections");
+      expect(await isRemoteMcpGrantActive(executor(), ownJti, ownerId, clientId, issuer, "review:read")).toBe(false);
+      expect(await isRemoteMcpGrantActive(executor(), strangerJti, strangerId, clientId, issuer, "review:read")).toBe(
+        true,
+      );
+      const audit = await executor().query(
+        "select event_kind, github_user_id from remote_mcp_oauth_security_events where grant_id = $1",
+        [ownJti],
+      );
+      expect((audit as { rows: { event_kind: string; github_user_id: string }[] }).rows).toMatchObject([
+        { event_kind: "grant_revoked" },
+      ]);
+      const empty = await handleRemoteMcpConnectionsGet(
+        new Request(`${issuer}/oauth/connections`, {
+          headers: { cookie: `brops_session=${session}` },
+        }),
+        dependencies,
+      );
+      expect(await empty.text()).not.toContain(ownJti);
+    } finally {
+      await executor().query("delete from remote_mcp_oauth_grants where jti = any($1::text[])", [
+        [ownJti, strangerJti],
+      ]);
+    }
   });
 
   it("announces only supported discovery features, not dynamic registration", () => {

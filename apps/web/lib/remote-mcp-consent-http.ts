@@ -124,6 +124,7 @@ function htmlPage(values: {
 <p>Return destination: <code>${escaped(values.redirectOrigin)}</code></p>
 <p>Permissions requested:</p><ul>${scopes}</ul>
 <p>This grants read-only access to eligible repositories that your GitHub account can currently access. No production approval is implied. Access expires and may be revoked.</p>
+<p><a href="/oauth/connections">Manage or revoke existing OAuth connections</a></p>
 <form action="/oauth/authorize" method="post">
 <input type="hidden" name="authorization_id" value="${escaped(values.authorizationId)}">
 <input type="hidden" name="csrf" value="${escaped(values.csrfNonce)}">

@@ -731,3 +731,35 @@ media types, valid JSON media parameters, the missing-token OAuth challenge,
 and the SDK's streamed-body limit. They explicitly assert zero verifier and
 PostgreSQL calls for early rejected input. The dual release feature gates
 remain disabled in production; no deployment or client enrollment occurred.
+
+### Browser self-service for OAuth grant revocation (unreleased)
+
+When the independent **OAuth issuer** feature gate and stable signing/session
+prerequisites are enabled, the GitHub-signed-in user can visit
+`GET /oauth/connections`. The page lists **only their own unexpired, unrevoked
+OAuth grants** (up to 50 most recent rows), with escaped client identity,
+registered display name, scope and expiry. A link from the OAuth consent page
+leads to it. All responses have private/no-store, restrictive HTML CSP,
+noindex and frame-deny headers; no access tokens, signing keys or session
+cookies are embedded in the rendered page.
+
+Revocation requires `POST /oauth/connections` with the same signed GitHub
+session, an exact same-origin Origin header, a **session/user/grant-bound HMAC
+CSRF token expiring in ten minutes**, and a bounded 2 KiB form. Duplicate
+fields, expired tokens, foreign-browser sessions and cross-site requests fail
+closed before database access. The existing owner-scoped SQL revocation
+function updates only grants belonging to the authenticated GitHub user and
+atomically records the redacted `grant_revoked` audit event. A successful
+revocation redirects back to the connections page; already-revoked or
+other-user grant IDs yield the same safe redirect, preventing enumeration.
+Subsequent MCP requests consult durable grant state and immediately reject a
+revoked JWT. Revoking a connection does not terminate the user's GitHub
+browser session. No background installation or global OAuth client is revoked.
+
+Focused browser tests cover cross-user/CSRF substitution, untrusted Origin,
+XSS escaping, SQL errors, bounded form size and disabled-by-default routing.
+An independent, disposable PostgreSQL 17 integration test confirms the UI
+revokes the intended grant, leaves another GitHub user's grant intact,
+records the audit event and denies further authorization for the revoked
+identity. This adds **no schema migrations** and does **not** enable the
+production OAuth/MCP feature flags; real provider acceptance remains open.
