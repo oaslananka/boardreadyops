@@ -33,7 +33,30 @@ Successful JSON stdout is one schema-versioned document containing the BoardRead
 
 **Native PCB and schematic visuals require explicit opt-in.** Use boardreadyops review publish . --native-visuals only when your organization permits detailed source-derived design geometry to be stored by the configured BoardReadyOps server. The option changes the effective upload mode to snapshots when it would otherwise be metadata; the exported SVG can reveal copper routing, component arrangement, net labels, and schematics even though raw KiCad source files are not uploaded. Without the flag, Review publishing retains the existing lightweight summary snapshots and does **not** upload native design artwork. This option neither certifies manufacturing readiness nor links plotted geometry independently to the reviewed commit.
 
+**Optional PCB footprint-count publishing requires a separate explicit opt-in.** With two exact Git revisions and a tracked KiCad PCB, use:
+
+```bash
+boardreadyops review publish . --base HEAD~1 --head HEAD --pcb hardware/mainboard/board.kicad_pcb --share-footprint-summary --format json
+```
+
+With `--share-footprint-summary`, the selected `--head` revision must be the repository's **checked-out HEAD**, and the working tree (including untracked files) must be clean. This prevents attaching current-directory pipeline findings to a different immutable PCB revision; otherwise publication fails before any network request. Offline `review footprint-diff` does not impose these working-tree limits, since it compares committed blobs without publishing pipeline findings.
+
+Without `--share-footprint-summary`, the CLI does not send source-derived PCB counts or hashes. With opt-in, the CLI reads only immutable Git blobs, validates the complete footprint inventories, and sends a *bounded count-only* summary with commit/blob IDs and source SHA-256 digests. These hashes can still reveal source identity and must be approved by the repository owner. Raw PCB source, coordinates, references and footprint UUIDs are never transmitted by this option. Cloud requires repository-scoped `runs:write`, explicit consent, exact base/head commit binding, strict schema validation and a matching run before persisting. The server acknowledges that it stored the summary; the CLI rejects older-server responses that do not acknowledge it. The hosted Review labels these counts as **client-reported**, not independently verified against Git source by the server. The totals cover only the single PCB file named by `--pcb`. It never asserts electrical/DRC/policy/manufacturing approval. The feature requires migration `0094_run_pcb_footprint_summaries.sql` in the target deployment; it is not enabled in production by merely creating the local development commit.
+
 The result intentionally excludes API tokens, authorization headers, uploaded source contents, internal trace fields, and unrelated service response data. A successful service response must contain either a same-origin `reviewUrl` or a `runId`; otherwise the command fails closed.
+
+## Offline, source-verified PCB footprint comparison
+
+`boardreadyops review footprint-diff [path] --base <ref> --head <ref> --pcb <repo-relative.kicad_pcb>` compares **immutable Git commit blobs** for one tracked KiCad PCB. It ignores uncommitted edits, reads no cloud data and makes no network requests. It reports footprint UUID-backed additions, removals, and changes to reference, library ID, layer, position and rotation. An unavailable or incomplete native source causes a nonzero exit without invented changes.
+
+```bash
+boardreadyops review footprint-diff . --base HEAD~1 --head HEAD --pcb hardware/mainboard/board.kicad_pcb --format text
+boardreadyops review footprint-diff . --base HEAD~1 --head HEAD --pcb hardware/mainboard/board.kicad_pcb --format summary-json
+```
+
+Use `--format json` only for **local detailed inspection**: it includes object UUIDs, references, library identifiers and absolute source coordinates, all potentially confidential design information. Prefer `--format summary-json` for manually handled, disclosure-minimal evidence: versioned counts by change type/field, Git commit/blob IDs, SHA-256 source digests, and an explicit `not-evaluated` risk state. The summary excludes object UUIDs, coordinates, references and library identifiers. Both output formats may still expose sensitive source-derived information (including commit identity and content hashes); follow your organization's information-sharing policy.
+
+Neither output publishes to the BoardReadyOps server or asserts DRC, risk, policy or manufacturing acceptance. Only the separately opted-in `review publish --share-footprint-summary` workflow can send the count-only v1 summary through the authenticated and commit-bound cloud ingestion route. The server verifies the persisted summary digest for integrity, **not** the truth of its client-reported PCB change counts. Comparison covers KiCad **footprints only**, not traces, vias, zones, schematic content or entire PCB geometry.
 
 ## Self-hosted runner operations
 

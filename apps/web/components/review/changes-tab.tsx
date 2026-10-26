@@ -83,6 +83,48 @@ export function ChangesTab({ review }: { readonly review: DemoReview }) {
 
   return (
     <div className="flex flex-col gap-5">
+      {review.pcbFootprintSummary ? (
+        <section
+          aria-label="Client-reported PCB footprint changes"
+          className="rounded-lg border border-border bg-card p-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-foreground">PCB footprint changes</h3>
+            <span className="rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground">
+              Source-linked · client reported
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Counts for one selected KiCad PCB file, supplied by an authorized CLI from two Git versions. Other PCB
+            files, tracks, vias and zones are not assessed. The server checks commit bindings and summary integrity, but
+            has not independently examined the source design. Risk, DRC and manufacturing readiness are not evaluated.
+          </p>
+          <dl className="mt-3 grid grid-cols-3 gap-3 text-center sm:max-w-md">
+            {(
+              [
+                ["Added", review.pcbFootprintSummary.changes.added],
+                ["Removed", review.pcbFootprintSummary.changes.removed],
+                ["Modified", review.pcbFootprintSummary.changes.modified],
+              ] as const
+            ).map(([name, count]) => (
+              <div key={name} className="rounded-md border border-border bg-background p-2">
+                <dt className="text-xs text-muted-foreground">{name}</dt>
+                <dd className="text-xl font-semibold tabular-nums text-foreground">{count}</dd>
+              </div>
+            ))}
+          </dl>
+          <details className="mt-3 text-xs text-muted-foreground">
+            <summary className="cursor-pointer py-2 font-medium text-primary">Show source-digest provenance</summary>
+            <div className="mt-2 grid gap-2 break-all font-mono">
+              <p>Base Git: {review.pcbFootprintSummary.baseCommitSha}</p>
+              <p>Head Git: {review.pcbFootprintSummary.headCommitSha}</p>
+              <p>Base source SHA-256: {review.pcbFootprintSummary.baseSourceSha256}</p>
+              <p>Head source SHA-256: {review.pcbFootprintSummary.headSourceSha256}</p>
+            </div>
+          </details>
+        </section>
+      ) : null}
+
       <ReviewDesignWorkspace review={review} />
 
       <details className="rounded-lg border border-border bg-card">

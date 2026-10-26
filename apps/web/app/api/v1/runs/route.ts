@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   findingSchema,
   isUnattestedManufacturingArchive,
@@ -6,7 +6,8 @@ import {
   snapshotArtifactSchema,
   triggerKindSchema,
 } from "@boardreadyops/contracts";
-import { ReviewStore } from "@boardreadyops/db";
+import { type PcbFootprintSummary, pcbFootprintSummarySchema } from "@boardreadyops/contracts/pcb-footprint-summary";
+import { ReviewStore, storeRunPcbFootprintSummary } from "@boardreadyops/db";
 import { z } from "zod";
 import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
 import { decodeRunListingCursor, loadViewerRuns, normalizedRunListingLimit } from "../../../../lib/run-listing.js";
@@ -17,44 +18,68 @@ export const runtime = "nodejs";
 // Exported for consumer-driven contract tests covering the CLI->Cloud and Action->Cloud
 // boundaries (`src/cli/commands/review.ts` and `src/action/cloud-publish.ts` both POST here):
 // see tests/unit/contracts/cli-cloud-forward-compat.test.ts.
-export const ingestRunRequestSchema = z.object({
-  repositoryId: z.string().min(1),
-  commitSha: z.string().min(7).max(64),
-  ref: z.string().min(1),
-  pullRequestNumber: z.number().int().positive().optional(),
-  triggerKind: triggerKindSchema.default("manual"),
-  decision: z.enum(["pass", "fail", "error"]).optional(),
-  title: z.string().max(256).optional(),
-  findings: z.array(findingSchema).default([]),
-  artifacts: z
-    .array(
-      releaseRunArtifactSchema.refine(
-        (artifact) => !isUnattestedManufacturingArchive(artifact),
-        "unattested manufacturing archives cannot be published as approved",
-      ),
-    )
-    .default([]),
-  // Review-canvas snapshots (rendered SVG + finding anchors) from `boardreadyops review publish`;
-  // see src/kicad/snapshots.ts::generateSnapshots. Content is inline SVG text, so these ride the
-  // same JSON payload as findings rather than going through the binary artifact upload protocol.
-  // The snapshot columns are PostgreSQL int4. Accept fractional SVG viewBox
-  // dimensions at the API edge but reject out-of-range values before any write.
-  snapshots: z
-    .array(
-      snapshotArtifactSchema.extend({
-        width: z.number().positive().max(2_147_483_647),
-        height: z.number().positive().max(2_147_483_647),
-      }),
-    )
-    .max(64)
-    .default([]),
-  evidenceDigest: z
-    .string()
-    .regex(/^[0-9a-f]{64}$/u)
-    .optional(),
-  baseRunId: z.string().optional(),
-  baseCommitSha: z.string().optional(),
-});
+export const ingestRunRequestSchema = z
+  .object({
+    repositoryId: z.string().min(1),
+    commitSha: z.string().min(7).max(64),
+    ref: z.string().min(1),
+    pullRequestNumber: z.number().int().positive().optional(),
+    triggerKind: triggerKindSchema.default("manual"),
+    decision: z.enum(["pass", "fail", "error"]).optional(),
+    title: z.string().max(256).optional(),
+    findings: z.array(findingSchema).default([]),
+    artifacts: z
+      .array(
+        releaseRunArtifactSchema.refine(
+          (artifact) => !isUnattestedManufacturingArchive(artifact),
+          "unattested manufacturing archives cannot be published as approved",
+        ),
+      )
+      .default([]),
+    // Review-canvas snapshots (rendered SVG + finding anchors) from `boardreadyops review publish`;
+    // see src/kicad/snapshots.ts::generateSnapshots. Content is inline SVG text, so these ride the
+    // same JSON payload as findings rather than going through the binary artifact upload protocol.
+    // The snapshot columns are PostgreSQL int4. Accept fractional SVG viewBox
+    // dimensions at the API edge but reject out-of-range values before any write.
+    snapshots: z
+      .array(
+        snapshotArtifactSchema.extend({
+          width: z.number().positive().max(2_147_483_647),
+          height: z.number().positive().max(2_147_483_647),
+        }),
+      )
+      .max(64)
+      .default([]),
+    evidenceDigest: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/u)
+      .optional(),
+    baseRunId: z.string().optional(),
+    baseCommitSha: z.string().optional(),
+    pcbFootprintSummary: pcbFootprintSummarySchema.optional(),
+    pcbFootprintSummaryConsent: z.literal(true).optional(),
+  })
+  .superRefine((payload, ctx) => {
+    const summary = payload.pcbFootprintSummary;
+    if (!summary) {
+      if (payload.pcbFootprintSummaryConsent) {
+        ctx.addIssue({ code: "custom", path: ["pcbFootprintSummaryConsent"], message: "Summary is required" });
+      }
+      return;
+    }
+    if (
+      payload.commitSha !== summary.headCommitSha ||
+      payload.baseCommitSha !== summary.baseCommitSha ||
+      !payload.evidenceDigest ||
+      !payload.pcbFootprintSummaryConsent
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["pcbFootprintSummary"],
+        message: "PCB source evidence must bind to this run's exact base/head commits and evidence digest",
+      });
+    }
+  });
 
 type IngestRunRequest = z.infer<typeof ingestRunRequestSchema>;
 
@@ -87,6 +112,7 @@ async function checkIdempotentRun(
   executor: { query: (sql: string, params: unknown[]) => Promise<unknown> },
   repositoryId: string,
   idempotencyKey?: string,
+  summary?: PcbFootprintSummary,
 ): Promise<Response | undefined> {
   if (!idempotencyKey) return undefined;
   const existing = await executor.query(
@@ -98,12 +124,26 @@ async function checkIdempotentRun(
     status: string;
   }[];
   if (rows.length > 0 && rows[0]) {
+    const previous = rows[0];
+    if (summary) {
+      const fingerprint = createHash("sha256").update(JSON.stringify(summary)).digest("hex");
+      const existing = await executor.query(
+        `select summary_sha256 from run_pcb_footprint_summaries
+         where run_id = $1 and repository_id = $2 and base_commit_sha = $3 and head_commit_sha = $4`,
+        [previous.id, repositoryId, summary.baseCommitSha, summary.headCommitSha],
+      );
+      const matches = (existing as { rows?: { summary_sha256: string }[] }).rows ?? [];
+      if (matches[0]?.summary_sha256 !== fingerprint) {
+        return Response.json({ ok: false, error: "Idempotent PCB summary evidence mismatch" }, { status: 409 });
+      }
+    }
     return Response.json(
       {
         ok: true,
         runId: rows[0].id,
         status: rows[0].status,
         deduplicated: true,
+        ...(summary ? { acceptedFootprintSummary: true } : {}),
       },
       { status: 200 },
     );
@@ -155,6 +195,10 @@ async function insertRunEntities(
       ) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [artifactId, runId, a.kind, a.name, a.storagePath, a.sha256, a.bytes, a.role],
     );
+  }
+
+  if (payload.pcbFootprintSummary) {
+    await storeRunPcbFootprintSummary(executor, repositoryId, runId, payload.pcbFootprintSummary);
   }
 
   for (const s of payload.snapshots) {
@@ -233,7 +277,12 @@ export async function POST(request: Request): Promise<Response> {
   const idempotencyKey = request.headers.get("idempotency-key")?.trim() ?? undefined;
   try {
     return await executor.withTransaction(async (transaction) => {
-      const existingResponse = await checkIdempotentRun(transaction, repositoryId, idempotencyKey);
+      const existingResponse = await checkIdempotentRun(
+        transaction,
+        repositoryId,
+        idempotencyKey,
+        payload.pcbFootprintSummary,
+      );
       if (existingResponse) return existingResponse;
 
       const runId = randomUUID();
@@ -250,6 +299,7 @@ export async function POST(request: Request): Promise<Response> {
           status: "completed",
           decision,
           ...(reviewUrl ? { reviewUrl } : {}),
+          ...(payload.pcbFootprintSummary ? { acceptedFootprintSummary: true } : {}),
         },
         { status: 201 },
       );

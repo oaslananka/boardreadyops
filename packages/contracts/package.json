@@ -18,6 +18,16 @@
       "types": "./src/review.ts",
       "import": "./src/review.ts",
       "default": "./src/review.ts"
+    },
+    "./pcb-footprint-summary": {
+      "types": "./src/pcb-footprint-summary.ts",
+      "import": "./src/pcb-footprint-summary.ts",
+      "default": "./src/pcb-footprint-summary.ts"
+    },
+    "./verified-object-position-diff": {
+      "types": "./src/verified-object-position-diff.ts",
+      "import": "./src/verified-object-position-diff.ts",
+      "default": "./src/verified-object-position-diff.ts"
     }
   },
   "scripts": {

@@ -80,9 +80,164 @@ describe("CLI review publish source provenance", () => {
   });
 });
 
+function createCommittedPcbReviewFixture(): { root: string; base: string; head: string } {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "bro-review-optin-"));
+  fs.cpSync(fixtureRoot, root, { recursive: true });
+  const run = (...args: string[]) =>
+    execFileSync("git", ["-C", root, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  run("init", "-q", "-b", "main");
+  run("config", "user.name", "Test");
+  run("config", "user.email", "review@example.test");
+  const pcb = path.join(root, "safe-basic.kicad_pcb");
+  const uuid = "bf7f5122-bc89-413e-aa3e-f19064ff92f7";
+  const original = fs.readFileSync(pcb, "utf8");
+  const token = '(footprint "Resistor_SMD:R_0603"';
+  if (!original.includes(token)) throw new Error("Missing expected source fixture");
+  const basePcb = original.replace(token, `${token} (layer "F.Cu") (at 100 100) (uuid "${uuid}")`);
+  fs.writeFileSync(pcb, basePcb);
+  run("add", "-A");
+  run("commit", "-qm", "base");
+  const base = run("rev-parse", "HEAD");
+  fs.writeFileSync(pcb, basePcb.replace("(at 100 100)", "(at 101 100)"));
+  run("add", "-A");
+  run("commit", "-qm", "head");
+  return { root, base, head: run("rev-parse", "HEAD") };
+}
+
 describe("CLI review publish command", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("requires explicit opt-in and both revisions before sending PCB-derived summary fields", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    expect(
+      await reviewPublishCommand(fixtureRoot, liveOptions({ pcb: "safe-basic.kicad_pcb" }), {
+        stdout: stdout.stream,
+        stderr: stderr.stream,
+      }),
+    ).toBe(2);
+    expect(
+      await reviewPublishCommand(fixtureRoot, liveOptions({ shareFootprintSummary: true }), {
+        stdout: stdout.stream,
+        stderr: stderr.stream,
+      }),
+    ).toBe(2);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends opted-in counts only with committed source digests, requires server acknowledgment", async () => {
+    const { root, base, head } = createCommittedPcbReviewFixture();
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      const fetchMock = vi.fn().mockResolvedValue(
+        successResponse({
+          ok: true,
+          runId: "run-1",
+          reviewUrl: "/reviews/rev-1",
+          acceptedFootprintSummary: true,
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const options = liveOptions({
+        format: "json",
+        shareFootprintSummary: true,
+        base,
+        head,
+        pcb: "safe-basic.kicad_pcb",
+      });
+      const code = await reviewPublishCommand(root, options, { stdout: stdout.stream, stderr: stderr.stream });
+      expect(code).toBe(0);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      expect(body).toMatchObject({ commitSha: head, baseCommitSha: base, pcbFootprintSummaryConsent: true });
+      expect(body.pcbFootprintSummary).toMatchObject({
+        disclosure: "counts-and-digests-only",
+        baseCommitSha: base,
+        headCommitSha: head,
+        changes: { added: 0, removed: 0, modified: 1, byField: { positionMm: 1 } },
+        riskAssessment: "not-evaluated",
+      });
+      expect(JSON.stringify(body.pcbFootprintSummary)).not.toContain("bf7f5122-bc89-413e-aa3e-f19064ff92f7");
+      expect(JSON.stringify(body.pcbFootprintSummary)).not.toContain("(kicad_pcb");
+
+      fetchMock.mockResolvedValue(successResponse({ ok: true, runId: "run-1", reviewUrl: "/reviews/rev-1" }));
+      const rejected = createMockStream();
+      const rejectedErr = createMockStream();
+      const bad = await reviewPublishCommand(root, options, { stdout: rejected.stream, stderr: rejectedErr.stream });
+      expect(bad).toBe(1);
+      expect(rejected.output).toBe("");
+      expect(rejectedErr.output).toContain("did not acknowledge");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses to associate an opted-in source summary with findings from another checked-out revision", async () => {
+    const { root, base } = createCommittedPcbReviewFixture();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({ base, head: base, pcb: "safe-basic.kicad_pcb", shareFootprintSummary: true }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code).toBe(2);
+      expect(stderr.output).toContain("match checked-out HEAD");
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses opted-in summary publication when uncommitted worktree files could contaminate findings", async () => {
+    const { root, base, head } = createCommittedPcbReviewFixture();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      fs.appendFileSync(path.join(root, "safe-basic.kicad_pcb"), "\n; uncommitted board change\n");
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({ base, head, pcb: "safe-basic.kicad_pcb", shareFootprintSummary: true }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code).toBe(2);
+      expect(stderr.output).toContain("clean committed working tree");
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves default review head from the target repository, not CLI process cwd", async () => {
+    const { root, head } = createCommittedPcbReviewFixture();
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      const options = liveOptions({ dryRun: true });
+      delete options.head;
+      const code = await reviewPublishCommand(root, options, {
+        stdout: stdout.stream,
+        stderr: stderr.stream,
+      });
+      expect(code).toBe(0);
+      expect(stdout.output).toContain(`Commit:     ${head.slice(0, 8)}`);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("includes rendered review-canvas snapshots of the project's schematic/PCB files in the publish payload", async () => {
