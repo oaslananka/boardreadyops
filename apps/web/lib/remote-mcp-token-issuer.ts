@@ -115,6 +115,7 @@ export function remoteMcpAuthorizationServerMetadata(issuer: string) {
   }
   return {
     issuer,
+    authorization_response_iss_parameter_supported: true,
     authorization_endpoint: `${issuer}/oauth/authorize`,
     token_endpoint: `${issuer}/oauth/token`,
     jwks_uri: `${issuer}/.well-known/jwks.json`,

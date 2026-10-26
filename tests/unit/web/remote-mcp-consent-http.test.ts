@@ -201,11 +201,13 @@ describe("Remote MCP metadata release hold", () => {
       issuer: string;
       jwks_uri: string;
       code_challenge_methods_supported: string[];
+      authorization_response_iss_parameter_supported: boolean;
     };
     const keys = (await jwksResponse.json()) as { keys: Array<Record<string, unknown>> };
     expect(resource.resource).toBe(remoteMcpResource);
     expect(resource.authorization_servers).toEqual([issuer]);
     expect(auth.issuer).toBe(issuer);
+    expect(auth.authorization_response_iss_parameter_supported).toBe(true);
     expect(auth.jwks_uri).toBe(`${issuer}/.well-known/jwks.json`);
     expect(auth.code_challenge_methods_supported).toEqual(["S256"]);
     expect(keys.keys).toHaveLength(1);

@@ -5,6 +5,7 @@ function dependencies(overrides: Partial<Parameters<typeof runRetentionMaintenan
   return {
     purgeWebhookInbox: vi.fn().mockResolvedValue(3),
     purgeRunnerRequestNonces: vi.fn().mockResolvedValue(7),
+    purgeRemoteMcpOAuth: vi.fn().mockResolvedValue({ rateLimitBucketsPurged: 4, securityEventsPurged: 5 }),
     expireArtifactUploadCapabilities: vi.fn().mockResolvedValue(5),
     revokeExpiredRunnerRegistrationEnrollments: vi.fn().mockResolvedValue(2),
     expireRepositorySetupProbes: vi.fn().mockResolvedValue(4),
@@ -27,6 +28,8 @@ describe("retention maintenance worker", () => {
     await expect(runRetentionMaintenanceCleanup(dependencies())).resolves.toEqual({
       webhookInboxPurged: 3,
       runnerRequestNoncesPurged: 7,
+      remoteMcpRateLimitBucketsPurged: 4,
+      remoteMcpSecurityEventsPurged: 5,
       artifactUploadCapabilitiesExpired: 5,
       runnerRegistrationEnrollmentsRevoked: 2,
       repositorySetupProbesExpired: 4,
@@ -49,6 +52,8 @@ describe("retention maintenance worker", () => {
     await expect(runRetentionMaintenanceCleanup(input)).resolves.toEqual({
       webhookInboxPurged: 0,
       runnerRequestNoncesPurged: 7,
+      remoteMcpRateLimitBucketsPurged: 4,
+      remoteMcpSecurityEventsPurged: 5,
       artifactUploadCapabilitiesExpired: 5,
       runnerRegistrationEnrollmentsRevoked: 2,
       repositorySetupProbesExpired: 4,
@@ -64,6 +69,7 @@ describe("retention maintenance worker", () => {
       completed: false,
     });
     expect(input.purgeRunnerRequestNonces).toHaveBeenCalledOnce();
+    expect(input.purgeRemoteMcpOAuth).toHaveBeenCalledOnce();
     expect(input.expireArtifactUploadCapabilities).toHaveBeenCalledOnce();
     expect(input.revokeExpiredRunnerRegistrationEnrollments).toHaveBeenCalledOnce();
     expect(input.expireRepositorySetupProbes).toHaveBeenCalledOnce();
@@ -73,6 +79,17 @@ describe("retention maintenance worker", () => {
     expect(input.purgeCompletedControlPlaneOutbox).toHaveBeenCalledOnce();
     expect(input.purgeCompletedControlPlaneReconciliationItems).toHaveBeenCalledOnce();
     expect(input.expireArtifactRetention).toHaveBeenCalledOnce();
+  });
+
+  it("reports MCP OAuth retention errors without interrupting independent scopes", async () => {
+    const input = dependencies({ purgeRemoteMcpOAuth: vi.fn().mockRejectedValue(new Error("private-db-info")) });
+    const result = await runRetentionMaintenanceCleanup(input);
+    expect(result.remoteMcpRateLimitBucketsPurged).toBe(0);
+    expect(result.remoteMcpSecurityEventsPurged).toBe(0);
+    expect(result.completed).toBe(false);
+    expect(result.failures).toContainEqual({ scope: "remote_mcp_oauth", errorClass: "Error" });
+    expect(JSON.stringify(result)).not.toContain("private-db-info");
+    expect(input.purgeWebhookInbox).toHaveBeenCalledOnce();
   });
 
   it("reports content-free error classes for multiple failures", async () => {

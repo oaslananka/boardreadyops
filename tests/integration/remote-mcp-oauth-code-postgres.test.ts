@@ -471,6 +471,7 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
   it("announces only supported discovery features, not dynamic registration", () => {
     const metadata = remoteMcpAuthorizationServerMetadata(issuer);
     expect(metadata.code_challenge_methods_supported).toEqual(["S256"]);
+    expect(metadata.authorization_response_iss_parameter_supported).toBe(true);
     expect(metadata.token_endpoint_auth_methods_supported).toEqual(["none"]);
     expect(metadata).not.toHaveProperty("registration_endpoint");
     expect(remoteMcpOauthLifetime).toEqual({ consentSeconds: 600, codeSeconds: 90, accessTokenSeconds: 900 });

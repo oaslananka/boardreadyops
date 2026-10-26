@@ -76,8 +76,61 @@ export async function recordRemoteMcpOAuthEvent(
   );
 }
 
-/** Intended for periodic scheduled maintenance; do not delete active buckets. */
-export async function purgeExpiredRemoteMcpOAuthSecurityData(db: Pick<PgQueryExecutor, "query">) {
-  await db.query("delete from remote_mcp_oauth_rate_limits where window_started_at < now() - interval '2 days'");
-  await db.query("delete from remote_mcp_oauth_security_events where recorded_at < now() - interval '90 days'");
+export type RemoteMcpOAuthCleanupCounts = {
+  rateLimitBucketsPurged: number;
+  securityEventsPurged: number;
+};
+
+/** Hourly, bounded retention cleanup, safe for concurrent worker replicas.
+ * Expired rate buckets are retained for 2 days, redacted audit for 90 days.
+ * In a deployment that has not yet applied OAuth migrations, do nothing;
+ * if only one required table exists, report the partial migration as failure.
+ * Existing live and recently expired rate buckets are never deleted.
+ */
+export async function purgeExpiredRemoteMcpOAuthSecurityData(
+  db: Pick<PgQueryExecutor, "query">,
+  limit = 1000,
+): Promise<RemoteMcpOAuthCleanupCounts> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10_000) {
+    throw new RangeError("Invalid MCP OAuth retention batch size");
+  }
+  const presence = await db.query(
+    `select to_regclass('public.remote_mcp_oauth_rate_limits') is not null as has_buckets,
+            to_regclass('public.remote_mcp_oauth_security_events') is not null as has_events`,
+  );
+  const tables = ((presence as { rows?: { has_buckets: boolean; has_events: boolean }[] }).rows ?? [])[0];
+  if (!tables) throw new Error("OAuth retention schema check unavailable");
+  if (!tables.has_buckets && !tables.has_events) {
+    return { rateLimitBucketsPurged: 0, securityEventsPurged: 0 };
+  }
+  if (!tables.has_buckets || !tables.has_events) throw new Error("Incomplete MCP OAuth retention migration");
+
+  const buckets = await db.query(
+    `with expired as (
+       select ctid from remote_mcp_oauth_rate_limits
+       where window_started_at < now() - interval '2 days'
+       order by window_started_at limit $1 for update skip locked
+     ), deleted as (
+       delete from remote_mcp_oauth_rate_limits where ctid in (select ctid from expired)
+       returning 1
+     ) select count(*)::int as n from deleted`,
+    [limit],
+  );
+  const events = await db.query(
+    `with expired as (
+       select ctid from remote_mcp_oauth_security_events
+       where recorded_at < now() - interval '90 days'
+       order by recorded_at limit $1 for update skip locked
+     ), deleted as (
+       delete from remote_mcp_oauth_security_events where ctid in (select ctid from expired)
+       returning 1
+     ) select count(*)::int as n from deleted`,
+    [limit],
+  );
+  const bucketCount = Number(((buckets as { rows?: { n: number }[] }).rows ?? [])[0]?.n);
+  const eventCount = Number(((events as { rows?: { n: number }[] }).rows ?? [])[0]?.n);
+  if (!Number.isSafeInteger(bucketCount) || bucketCount < 0 || !Number.isSafeInteger(eventCount) || eventCount < 0) {
+    throw new Error("Invalid MCP OAuth retention result");
+  }
+  return { rateLimitBucketsPurged: bucketCount, securityEventsPurged: eventCount };
 }

@@ -299,9 +299,13 @@ and user-requested revocation are logged atomically with their state-changing
 SQL transactions. Other recorded events include consent creation, rejected
 token exchanges and throttling. Audit records never include raw access tokens,
 authorization codes, PKCE secrets, cookies or remote IP headers: client IDs are
-SHA-256 digests. An explicit maintenance function deletes rate buckets older
-than two days and audit records older than 90 days; **scheduling that retention
-job is still required before public operation**.
+SHA-256 digests. The existing hourly control-plane worker now schedules bounded PostgreSQL
+retention passes: rate-limit buckets older than two days and redacted audit
+records older than 90 days. Each table is processed in batches using the
+worker's configured retention batch size (default 1,000, range 1–10,000),
+`FOR UPDATE SKIP LOCKED` for concurrent workers, and independent failure
+reporting. Deployments without either migration table skip cleanly; partial
+migrations fail visibly rather than hiding schema drift.
 
 Controlled RS256 key rollover accepts an optional Doppler-managed
 `BOARDREADYOPS_REMOTE_MCP_PREVIOUS_PUBLIC_JWKS` containing a conventional JSON
@@ -317,6 +321,29 @@ for synchronizing issuer configuration and signing keys across replicas.
 Verified with actual isolated PostgreSQL 17 concurrent quota, immediate
 client-disable, and sanitized audit tests and with real RSA/JWT rollover tests.
 No production migrations, customer signing keys or public MCP rollout occurred.
-Remaining gates include scheduled data expiry, end-to-end real-client
+Remaining gates include end-to-end real-client
 connectivity, GitHub permission reliability and safely enabling the `/mcp`
 handler; this commit does NOT enable the hosted MCP endpoint.
+
+### Hosted OAuth client interoperability (October 2026 review)
+
+- OpenAI's current plugin OAuth guide documents stable ChatGPT CIMD client ID
+  `https://chatgpt.com/oauth/client.json` and stable callback
+  `https://chatgpt.com/connector_platform_oauth_redirect` **when the issuer
+  identification contract is satisfied**. Our metadata now declares
+  `authorization_response_iss_parameter_supported: true`, consistent with
+  `iss` on both successful approvals and explicit user denials. This does not
+  register or enable a ChatGPT client automatically. For predefined clients,
+  copy the **exact production client ID and callback URI shown in the user's
+  ChatGPT connector management interface** into the disabled-by-default
+  allowlist, then explicitly enable that specific row after acceptance tests.
+- Claude's latest custom-connector UI offers its published identity,
+  automatic client registration, and user-provided OAuth client configuration.
+  Dynamic client registration and metadata URL fetching remain intentionally
+  unsupported in this stage. Choose a manually registered client with the
+  exact Claude connector callback and client ID for the selected integration
+  mode; do not guess or globally allow `claude.ai` callback patterns.
+- Both providers require real OAuth and MCP tool invocations for acceptance.
+  A successful synthetic consent/token exchange is not sufficient to claim
+  ChatGPT or Claude connection compatibility. Never publish the protected
+  `/mcp` endpoint or register a client before its boundary checks pass.
