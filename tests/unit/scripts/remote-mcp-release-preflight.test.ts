@@ -71,7 +71,7 @@ describe("MCP operator preflight is always an evidence-only release blocker", ()
     [9, "authorization epoch column"],
     [10, "grant epoch column"],
     [11, "client epoch rotation trigger"],
-  ] as const)("blocks a partial v100 migration missing %s: %s", async (missing) => {
+  ] as const)("blocks a partial v100 migration missing %s: %s", async (missing, _label) => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ...presence, [`p${missing}`]: false }] });
     const result = await inspectRemoteMcpReleasePrerequisites(fullEnvironment, query);
     expect(get(result.checks, "oauth_database_schema")).toBe("blocked");
@@ -177,12 +177,14 @@ describe("MCP operator preflight is always an evidence-only release blocker", ()
     expect(result.publicMcpReleaseApproved).toBe(false);
   });
 
-  it.each([
-    [{ ...clientRows[0], enabled: false }],
-    [{ ...clientRows[0], redirect_uri: "http://insecure.example/callback" }],
-    [{ ...clientRows[0], client_id: "invalid id containing spaces" }],
-    Array.from({ length: 101 }, () => clientRows[0]),
-  ])("rejects absent, malformed or oversized client registration views", async (clients) => {
+  it.each(
+    [
+      [{ ...clientRows[0], enabled: false }],
+      [{ ...clientRows[0], redirect_uri: "http://insecure.example/callback" }],
+      [{ ...clientRows[0], client_id: "invalid id containing spaces" }],
+      Array.from({ length: 101 }, () => clientRows[0]),
+    ].map((clients) => ({ clients })),
+  )("rejects absent, malformed or oversized client registration views", async ({ clients }) => {
     const query = vi
       .fn()
       .mockResolvedValueOnce({ rows: [presence] })
