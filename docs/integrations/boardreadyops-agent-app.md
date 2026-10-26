@@ -574,9 +574,15 @@ stored or exposed by this logic.
 
 Octokit remains the default live installation-token issuer. A narrow injectable
 token factory permits isolated tests to verify the exact normalized PEM input,
-installation ID and three permission GET requests, without accessing real
-signing keys or network tokens. Missing/revoked installation tokens fail
-closed. The GitHub JSON response limit is enforced using **UTF-8 byte size**
+installation ID and the user/repository/explicit-membership/permission REST
+checks, without accessing real signing keys or network tokens. GitHub returns
+`permission: read` for ordinary users of public repositories even when they
+have no collaborator or team membership. The hosted Review authorization now
+requires HTTP 204 from the separate repository collaborator-membership GET
+before evaluating calculated permission; 404, GitHub API errors, timeouts and
+malformed responses fail closed. Merely being able to read public source code
+must never grant access to tenant-specific Review evidence. Missing/revoked
+installation tokens also fail closed. The GitHub JSON response limit is enforced using **UTF-8 byte size**
 rather than JavaScript string length, preventing oversized multibyte responses
 from bypassing the 64 KiB cap when `Content-Length` is absent. The tests also
 confirm response overflow fails before subsequent repository reads.

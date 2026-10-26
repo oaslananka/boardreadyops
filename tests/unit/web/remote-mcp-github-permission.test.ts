@@ -13,6 +13,7 @@ const permission = {
   name: "design",
 };
 const json = (body: unknown, status = 200): Response => Response.json(body, { status });
+const collaborator = () => new Response(null, { status: 204 });
 function withResponses(...responses: Response[]) {
   const fetcher = vi.fn().mockImplementation(async () => responses.shift() ?? json({}, 404));
   const tokens = vi.fn().mockResolvedValue("fake-installation-token");
@@ -29,14 +30,16 @@ describe("live GitHub permission for remote MCP", () => {
     const { check, fetcher, tokens } = withResponses(
       json({ id: 123, login: "current-login" }),
       json({ id: 456 }),
+      collaborator(),
       json({ permission: "read" }),
     );
     expect(await check(permission)).toBe(true);
     expect(tokens).toHaveBeenCalledWith(789);
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher).toHaveBeenCalledTimes(4);
     expect(fetcher.mock.calls.map((call) => call[0])).toEqual([
       "https://api.github.com/user/123",
       "https://api.github.com/repos/hardware-team/design",
+      "https://api.github.com/repos/hardware-team/design/collaborators/current-login",
       "https://api.github.com/repos/hardware-team/design/collaborators/current-login/permission",
     ]);
     for (const [, init] of fetcher.mock.calls) {
@@ -50,11 +53,45 @@ describe("live GitHub permission for remote MCP", () => {
     const { check, fetcher } = withResponses(
       json({ id: 123, login: "current-login" }),
       json({ id: 456 }),
+      collaborator(),
       json({ permission: "none" }),
     );
     expect(await check(permission)).toBe(false);
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher).toHaveBeenCalledTimes(4);
   });
+
+  it("rejects public-repository readers who are not actual collaborators", async () => {
+    // GitHub returns 'read' for arbitrary signed-in users of public repos,
+    // even if they have no explicit collaborator/team/organization grant.
+    // The membership endpoint must independently return 204.
+    const { check, fetcher } = withResponses(
+      json({ id: 123, login: "public-reader" }),
+      json({ id: 456, private: false }),
+      json({ message: "Not Found" }, 404),
+      json({ permission: "read" }),
+    );
+    expect(await check(permission)).toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.calls[2]?.[0]).toBe(
+      "https://api.github.com/repos/hardware-team/design/collaborators/public-reader",
+    );
+  });
+
+  it.each([200, 302, 403, 404, 429, 500])(
+    "fails closed when the collaborator check returns HTTP %s rather than 204",
+    async (status) => {
+      const { check, fetcher } = withResponses(
+        json({ id: 123, login: "current-login" }),
+        json({ id: 456 }),
+        status === 302
+          ? new Response(null, { status, headers: { location: "https://example.invalid" } })
+          : json({ permission: "read" }, status),
+        json({ permission: "read" }),
+      );
+      expect(await check(permission)).toBe(false);
+      expect(fetcher).toHaveBeenCalledTimes(3);
+    },
+  );
 
   it("denies a replaced repository under the same owner/name", async () => {
     const { check, fetcher } = withResponses(json({ id: 123, login: "current-login" }), json({ id: 999 }));
@@ -127,6 +164,7 @@ describe("live GitHub permission for remote MCP", () => {
         .fn()
         .mockResolvedValueOnce(json({ id: 123, login: "current-login" }))
         .mockResolvedValueOnce(json({ id: 456 }))
+        .mockResolvedValueOnce(collaborator())
         .mockResolvedValueOnce(json({ permission: "read" }));
       const check = createProductionLiveGitHubRepositoryAccess(
         { GITHUB_APP_ID: "123456", GITHUB_APP_PRIVATE_KEY: "fixture-only-key", GITHUB_API_BASE_URL: apiRoot },
@@ -138,6 +176,7 @@ describe("live GitHub permission for remote MCP", () => {
       expect(fetched.mock.calls.map(([target]) => target)).toEqual([
         "https://api.github.com/user/123",
         "https://api.github.com/repos/hardware-team/design",
+        "https://api.github.com/repos/hardware-team/design/collaborators/current-login",
         "https://api.github.com/repos/hardware-team/design/collaborators/current-login/permission",
       ]);
     },
@@ -149,6 +188,7 @@ describe("live GitHub permission for remote MCP", () => {
       .fn()
       .mockResolvedValueOnce(json({ id: 123, login: "current-login" }))
       .mockResolvedValueOnce(json({ id: 456 }))
+      .mockResolvedValueOnce(collaborator())
       .mockResolvedValueOnce(json({ permission: "read" }));
     const escapedPem = "fixture-header\\nsynthetic-key-material\\nfixture-footer";
     const check = createProductionLiveGitHubRepositoryAccess(
@@ -162,10 +202,10 @@ describe("live GitHub permission for remote MCP", () => {
     );
     const allowed = await check(permission);
     expect(mintToken, "GitHub App token issuer should be called").toHaveBeenCalledOnce();
-    expect(fetched, "GitHub permission REST sequence").toHaveBeenCalledTimes(3);
+    expect(fetched, "GitHub permission REST sequence").toHaveBeenCalledTimes(4);
     expect(allowed).toBe(true);
     expect(mintToken).toHaveBeenCalledWith("123456", "fixture-header\nsynthetic-key-material\nfixture-footer", 789);
-    expect(fetched).toHaveBeenCalledTimes(3);
+    expect(fetched).toHaveBeenCalledTimes(4);
     for (const [, options] of fetched.mock.calls) {
       expect(options.headers.authorization).toBe("Bearer synthetic-installation-token");
       expect(options.redirect).toBe("error");
@@ -234,6 +274,7 @@ describe("live GitHub permission for remote MCP", () => {
     const { check, fetcher } = withResponses(
       new Response(stream, { headers: { "content-length": "200" } }),
       json({ id: 456 }),
+      collaborator(),
       json({ permission: "read" }),
     );
     expect(await check(permission)).toBe(false);
@@ -249,9 +290,9 @@ describe("live GitHub permission for remote MCP", () => {
         controller.close();
       },
     });
-    const valid = withResponses(new Response(stream), json({ id: 456 }), json({ permission: "read" }));
+    const valid = withResponses(new Response(stream), json({ id: 456 }), collaborator(), json({ permission: "read" }));
     expect(await valid.check(permission)).toBe(true);
-    expect(valid.fetcher).toHaveBeenCalledTimes(3);
+    expect(valid.fetcher).toHaveBeenCalledTimes(4);
     const invalidUser = withResponses(new Response(new Uint8Array([123, 34, 120, 34, 58, 34, 255, 34, 125])));
     expect(await invalidUser.check(permission)).toBe(false);
     expect(invalidUser.fetcher).toHaveBeenCalledTimes(1);

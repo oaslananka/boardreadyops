@@ -51,14 +51,9 @@ async function readBoundedGithubJson(response: Response): Promise<GithubResponse
   }
 }
 
-/** Restricted JSON decoder: no redirects, no partial responses, no oversized API payloads. */
-async function githubJson(
-  apiRoot: string,
-  token: string,
-  resource: string,
-  fetcher: GithubFetch,
-): Promise<GithubResponse | null> {
-  const response = await fetcher(`${apiRoot}${resource}`, {
+/** All installation-token reads use the same bounded, no-redirect request contract. */
+function githubGet(apiRoot: string, token: string, resource: string, fetcher: GithubFetch): Promise<Response> {
+  return fetcher(`${apiRoot}${resource}`, {
     method: "GET",
     headers: {
       authorization: `Bearer ${token}`,
@@ -69,6 +64,31 @@ async function githubJson(
     redirect: "error",
     signal: AbortSignal.timeout(requestTimeoutMs),
   });
+}
+
+/** Require explicit collaborator/team/organization membership, not public readability. */
+async function githubIsCollaborator(
+  apiRoot: string,
+  token: string,
+  resource: string,
+  fetcher: GithubFetch,
+): Promise<boolean> {
+  const response = await githubGet(apiRoot, token, resource, fetcher);
+  // GitHub returns HTTP 204 for a genuine collaborator and HTTP 404 for an
+  // outsider. Public repositories can misleadingly report "permission: read"
+  // for unrelated accounts, so only HTTP 204 from this endpoint is accepted.
+  await response.body?.cancel().catch(() => undefined);
+  return response.status === 204;
+}
+
+/** Restricted JSON decoder: no redirects, no partial responses, no oversized API payloads. */
+async function githubJson(
+  apiRoot: string,
+  token: string,
+  resource: string,
+  fetcher: GithubFetch,
+): Promise<GithubResponse | null> {
+  const response = await githubGet(apiRoot, token, resource, fetcher);
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
     return null;
@@ -91,7 +111,8 @@ export interface LiveGitHubPermissionDependencies {
  * Live GitHub user→repository access, resolved by immutable user and repository ids.
  * The installation token authenticates the GitHub App only; it is NOT evidence of
  * the user's permission. We validate the user and repo identities separately and
- * read the user's calculated collaborator permission on every call.
+ * require real collaborator membership and the calculated permission on every
+ * call. Public repository visibility by itself is NEVER Review data authority.
  */
 export function createLiveGitHubRepositoryAccess(
   deps: LiveGitHubPermissionDependencies,
@@ -118,12 +139,9 @@ export function createLiveGitHubRepositoryAccess(
       const repositoryPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
       const repository = await githubJson(deps.apiRoot, token, repositoryPath, deps.fetcher);
       if (Number(repository?.id) !== githubRepositoryId) return false;
-      const permission = await githubJson(
-        deps.apiRoot,
-        token,
-        `${repositoryPath}/collaborators/${encodeURIComponent(String(user.login))}/permission`,
-        deps.fetcher,
-      );
+      const collaboratorPath = `${repositoryPath}/collaborators/${encodeURIComponent(String(user.login))}`;
+      if (!(await githubIsCollaborator(deps.apiRoot, token, collaboratorPath, deps.fetcher))) return false;
+      const permission = await githubJson(deps.apiRoot, token, `${collaboratorPath}/permission`, deps.fetcher);
       return (
         permission?.permission === "read" ||
         permission?.permission === "write" ||
