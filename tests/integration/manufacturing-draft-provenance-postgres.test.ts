@@ -153,6 +153,27 @@ describeDatabase("real PostgreSQL runner draft provenance verification", () => {
       archiveArtifactId: zipArtifact,
       receiptArtifactId: receiptArtifact,
     });
+    // Commit a REAL PostgreSQL revocation after the verifier's initial SELECT
+    // has already returned, but before the filesystem/receipt work resumes.
+    // The resulting stale first snapshot must not yield verified-runner-claim.
+    let lookups = 0;
+    const racingExecutor: Parameters<typeof verifyStoredManufacturingDraftClaim>[0]["executor"] = {
+      async query(sql, params) {
+        const snapshot = await executor.query(sql, params);
+        if (sql.includes("runner_artifact_upload_capabilities as capability") && ++lookups === 1) {
+          await executor.query("update runner_registrations set status='disabled', disabled_at=now() where id=$1", [
+            runner,
+          ]);
+        }
+        return snapshot;
+      },
+    };
+    expect(await verifyStoredManufacturingDraftClaim({ ...input, executor: racingExecutor })).toEqual({
+      status: "unverified",
+      reason: "identity",
+    });
+    expect(lookups).toBe(2);
+    await executor.query("update runner_registrations set status='active', disabled_at=null where id=$1", [runner]);
     await executor.query(
       "update runner_registrations set allowed_repositories=ARRAY['other-owner/pcb']::text[] where id=$1",
       [runner],

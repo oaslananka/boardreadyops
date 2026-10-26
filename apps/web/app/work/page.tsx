@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { DEMO_REVIEWS } from "../../lib/demo-data.js";
+import { displayReviewAuthor } from "../../lib/review-author-display.js";
 import { loadViewerReviews } from "../../lib/review-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 import { loadViewerWorkQueue } from "../../lib/work-queue.js";
@@ -119,6 +120,133 @@ export default async function MyWorkPage() {
     );
   }
 
+  const assignedSection = (
+    <section className="min-w-0">
+      <Panel
+        title="Assigned Findings"
+        description="DRC, clearance, and BOM findings assigned to you for disposition."
+        tone="raised"
+      >
+        {assignedFindings.length === 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+            <p>
+              <strong className="text-foreground">No assigned findings.</strong> Repository readiness runs can still
+              contain issues that have not been assigned to anyone.
+            </p>
+            <Link
+              href="/runs"
+              className="inline-flex min-h-10 items-center font-medium text-primary underline underline-offset-2"
+            >
+              Browse all readiness runs →
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {assignedFindings.map((finding) => (
+              <article key={finding.fingerprint} className="rounded-md border border-border p-4">
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                  <StatusBadge
+                    value={finding.severity === "critical" || finding.severity === "error" ? "danger" : "warning"}
+                    label={finding.severity}
+                  />
+                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{finding.ruleId}</code>
+                  <span className="text-muted-foreground">{finding.reviewLabel}</span>
+                  <span className="text-muted-foreground">{prLabel(finding.pullRequestNumber)}</span>
+                </div>
+                <p className="text-sm text-foreground">{finding.message}</p>
+                <code className="mt-1 block break-all font-mono text-xs text-muted-foreground">{finding.path}</code>
+                <div className="mt-3">
+                  <Link
+                    href={`/reviews/${finding.reviewId}?tab=findings`}
+                    className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+                  >
+                    Triage in {prLabel(finding.pullRequestNumber) || "this review"} →
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </Panel>
+    </section>
+  );
+  const reviewSection = (
+    <section className="flex min-w-0 flex-col gap-5">
+      <Panel
+        title="Reviews Awaiting Decision"
+        description="Published Reviews visible to you; these may not be individually assigned."
+      >
+        {awaitingReviews.length === 0 ? (
+          <EmptyState title="No pending reviews">
+            <p>
+              No published Reviews are awaiting your decision. This does not mean every repository is release-ready.
+            </p>
+            <Link href="/runs" className="mt-2 inline-block text-primary underline underline-offset-2">
+              View readiness runs →
+            </Link>
+          </EmptyState>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {awaitingReviews.map((review) => (
+              <article
+                key={review.id}
+                className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/35"
+              >
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{review.repositoryName}</span>
+                  <span>{prLabel(review.pullRequestNumber)}</span>
+                </div>
+                <h4 className="mt-2 text-base font-semibold leading-snug text-foreground">{review.title}</h4>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    Opened by {displayReviewAuthor(review.createdBy)}
+                  </span>
+                  <Link
+                    href={`/reviews/${review.id}`}
+                    className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                  >
+                    Open Review →
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      {changesRequested.length > 0 ? (
+        <Panel
+          title="Changes Requested on Your PRs"
+          description="Revisions requiring design updates before fabrication."
+          tone="critical"
+        >
+          <div className="flex flex-col gap-3">
+            {changesRequested.map((review) => (
+              <article
+                key={review.id}
+                className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/35"
+              >
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{review.repositoryName}</span>
+                  <span>{prLabel(review.pullRequestNumber)}</span>
+                </div>
+                <h4 className="mt-2 text-base font-semibold leading-snug text-foreground">{review.title}</h4>
+                <div className="mt-2">
+                  <Link
+                    href={`/reviews/${review.id}?tab=discussion`}
+                    className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+                  >
+                    View Required Changes →
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
+    </section>
+  );
+
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "My Work" }]}>
       <main className="flex w-full flex-col gap-5 px-6 py-6" id="main-content">
@@ -141,122 +269,24 @@ export default async function MyWorkPage() {
           </span>
         </section>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <section className="min-w-0">
-            <Panel
-              title="Assigned Findings"
-              description="DRC, clearance, and BOM findings assigned to you for disposition."
-              tone="raised"
-            >
-              {assignedFindings.length === 0 ? (
-                <EmptyState title="No assigned findings">
-                  <p>
-                    You have no findings assigned through a published Review. Repository readiness runs can still
-                    contain issues that have not been assigned to anyone.
-                  </p>
-                  <Link href="/runs" className="mt-2 inline-block text-primary underline underline-offset-2">
-                    Browse all readiness runs →
-                  </Link>
-                </EmptyState>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {assignedFindings.map((finding) => (
-                    <article key={finding.fingerprint} className="rounded-md border border-border p-4">
-                      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                        <StatusBadge
-                          value={finding.severity === "critical" || finding.severity === "error" ? "danger" : "warning"}
-                          label={finding.severity}
-                        />
-                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{finding.ruleId}</code>
-                        <span className="text-muted-foreground">{finding.reviewLabel}</span>
-                        <span className="text-muted-foreground">{prLabel(finding.pullRequestNumber)}</span>
-                      </div>
-                      <p className="text-sm text-foreground">{finding.message}</p>
-                      <code className="mt-1 block break-all font-mono text-xs text-muted-foreground">
-                        {finding.path}
-                      </code>
-                      <div className="mt-3">
-                        <Link
-                          href={`/reviews/${finding.reviewId}?tab=findings`}
-                          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
-                        >
-                          Triage in {prLabel(finding.pullRequestNumber) || "this review"} →
-                        </Link>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </Panel>
-          </section>
-
-          <aside className="flex min-w-0 flex-col gap-5">
-            <Panel
-              title="Awaiting Your Review"
-              description="Hardware pull requests waiting for engineering review or sign-off."
-            >
-              {awaitingReviews.length === 0 ? (
-                <EmptyState title="No pending reviews">
-                  <p>
-                    No published Reviews are awaiting your decision. This does not mean every repository is
-                    release-ready.
-                  </p>
-                  <Link href="/runs" className="mt-2 inline-block text-primary underline underline-offset-2">
-                    View readiness runs →
-                  </Link>
-                </EmptyState>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {awaitingReviews.map((review) => (
-                    <article key={review.id} className="rounded-md bg-muted p-3">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{review.repositoryName}</span>
-                        <span>{prLabel(review.pullRequestNumber)}</span>
-                      </div>
-                      <h4 className="mt-1 text-sm font-semibold text-foreground">{review.title}</h4>
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-xs text-muted-foreground">Author: {review.createdBy}</span>
-                        <Link
-                          href={`/reviews/${review.id}`}
-                          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                        >
-                          Open Review →
-                        </Link>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </Panel>
-
-            {changesRequested.length > 0 ? (
-              <Panel
-                title="Changes Requested on Your PRs"
-                description="Revisions requiring design updates before fabrication."
-                tone="critical"
-              >
-                <div className="flex flex-col gap-3">
-                  {changesRequested.map((review) => (
-                    <article key={review.id} className="rounded-md bg-muted p-3">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{review.repositoryName}</span>
-                        <span>{prLabel(review.pullRequestNumber)}</span>
-                      </div>
-                      <h4 className="mt-1 text-sm font-semibold text-foreground">{review.title}</h4>
-                      <div className="mt-2">
-                        <Link
-                          href={`/reviews/${review.id}?tab=discussion`}
-                          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
-                        >
-                          View Required Changes →
-                        </Link>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </Panel>
-            ) : null}
-          </aside>
+        <div
+          className={
+            assignedFindings.length === 0
+              ? "flex flex-col gap-5"
+              : "grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
+          }
+        >
+          {assignedFindings.length === 0 ? (
+            <>
+              {reviewSection}
+              {assignedSection}
+            </>
+          ) : (
+            <>
+              {assignedSection}
+              {reviewSection}
+            </>
+          )}
         </div>
       </main>
     </AppShell>

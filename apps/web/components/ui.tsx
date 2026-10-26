@@ -113,14 +113,16 @@ export function Panel({ children, title, description, actions, id, tone = "defau
 }
 
 export function DefinitionGrid({ children }: Readonly<{ children: ReactNode }>) {
-  return <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">{children}</dl>;
+  return (
+    <dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-3 min-[360px]:grid-cols-2 sm:grid-cols-3">{children}</dl>
+  );
 }
 
 export function Definition({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
   return (
     <div>
       <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm text-foreground">{children}</dd>
+      <dd className="mt-1 min-w-0 break-words text-sm text-foreground">{children}</dd>
     </div>
   );
 }

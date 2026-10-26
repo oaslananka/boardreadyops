@@ -13,6 +13,15 @@ import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
 import { buildDemoSnapshots } from "../../../apps/web/lib/demo-snapshots.js";
 
 describe("ReviewCanvas", () => {
+  it("offers a taller focused native evidence viewport only when the reviewer requests it", () => {
+    const focused = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots: [], immersive: true }));
+    const standard = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots: [], compactMobile: true }));
+    expect(focused).toContain("h-[min(75dvh,56rem)]");
+    expect(focused).not.toContain("min-h-[24rem]");
+    expect(standard).toContain("h-[19rem]");
+    expect(standard).not.toContain("h-[min(75dvh,56rem)]");
+  });
+
   const review = DEMO_REVIEWS[0] as (typeof DEMO_REVIEWS)[0];
   const headSnapshots = buildDemoSnapshots(review.changedFiles, review.findings);
 
@@ -29,6 +38,20 @@ describe("ReviewCanvas", () => {
     for (const snapshot of headSnapshots) {
       expect(markup).toContain(snapshot.sheetOrLayer);
     }
+  });
+
+  it("starts Overview on PCB layer if one is published and preserves default sheet elsewhere", () => {
+    const pcb = headSnapshots.find((snapshot) => snapshot.kind === "pcb_layer");
+    expect(pcb).toBeDefined();
+    const overview = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, preferPcbLayer: true }));
+    const fullInspector = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots }));
+    expect(overview).toContain(`value="${pcb?.sheetOrLayer}" selected=""`);
+    expect(fullInspector).toContain(`value="${headSnapshots[0]?.sheetOrLayer}" selected=""`);
+    const schematics = headSnapshots.filter((snapshot) => snapshot.kind === "schematic");
+    const fallback = renderToStaticMarkup(
+      createElement(ReviewCanvas, { headSnapshots: schematics, preferPcbLayer: true }),
+    );
+    expect(fallback).toContain(`value="${schematics[0]?.sheetOrLayer}" selected=""`);
   });
 
   it("keeps long native sheet names inside the viewport on narrow screens", () => {

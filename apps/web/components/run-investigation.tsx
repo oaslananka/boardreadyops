@@ -44,8 +44,17 @@ const navigationItems: ReadonlyArray<{ view: RunView; label: string; suffix: str
 
 function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunView }>) {
   return (
-    <nav className="flex flex-wrap gap-1 border-b border-border" aria-label="Run investigation">
-      <ul className="flex flex-wrap gap-1">
+    <nav
+      className={
+        active === "design"
+          ? "flex gap-1 overflow-x-auto border-b border-border lg:overflow-visible"
+          : "flex flex-wrap gap-1 border-b border-border"
+      }
+      aria-label="Run investigation"
+    >
+      <ul
+        className={active === "design" ? "flex w-max flex-nowrap gap-1 lg:w-auto lg:flex-wrap" : "flex flex-wrap gap-1"}
+      >
         {navigationItems.map((item) => (
           <li key={item.view}>
             <Link
@@ -128,8 +137,30 @@ export function RunPageFrame({
         { label: currentLabel },
       ]}
     >
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-8" id="main-content">
-        <RunHeader run={run} />
+      <main
+        className={`mx-auto flex w-full max-w-6xl flex-col gap-4 ${active === "design" ? "px-4 py-4 sm:px-6 sm:py-8" : "px-6 py-8"}`}
+        id="main-content"
+      >
+        {active === "design" ? (
+          <>
+            <details className="rounded-md border border-border bg-card lg:hidden">
+              <summary className="cursor-pointer px-4 py-3 text-sm text-foreground">
+                <span className="block break-words font-semibold">{run.repository}</span>
+                <span className="block text-xs text-muted-foreground">
+                  Commit {run.commitSha.slice(0, 12)} · Run details and actions
+                </span>
+              </summary>
+              <div className="p-2 pt-0">
+                <RunHeader run={run} />
+              </div>
+            </details>
+            <div className="hidden lg:block">
+              <RunHeader run={run} />
+            </div>
+          </>
+        ) : (
+          <RunHeader run={run} />
+        )}
         <RunVerdictBanner run={run} />
         {liveRefresh ? <RunLiveRefresh enabled /> : null}
         <RunNavigation runId={run.id} active={active} />

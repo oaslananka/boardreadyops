@@ -121,14 +121,17 @@ export async function resolveRepositoryApiContext(
   const url = new URL(request.url);
   const queryRepositoryId = url.searchParams.get("repositoryId") ?? undefined;
 
-  if (auth.repositoryId && explicitRepositoryId && auth.repositoryId !== explicitRepositoryId) {
+  // CLI owner/name aliases can only match the token's already-authorized UUID.
+  const identifiers = [explicitRepositoryId, queryRepositoryId].filter((value): value is string => value !== undefined);
+  const aliases = auth.repositoryId ? identifiers.filter((value) => value !== auth.repositoryId) : [];
+  if (
+    aliases.some((value) => !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(value)) ||
+    new Set(aliases.map((value) => value.toLowerCase())).size > 1
+  ) {
     return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
   }
-  if (auth.repositoryId && queryRepositoryId && auth.repositoryId !== queryRepositoryId) {
-    return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
-  }
-
-  const repositoryId = explicitRepositoryId ?? auth.repositoryId ?? queryRepositoryId;
+  const alias = aliases[0];
+  const repositoryId = auth.repositoryId ?? explicitRepositoryId ?? queryRepositoryId;
   if (!repositoryId) {
     return Response.json({ ok: false, error: "repositoryId is required" }, { status: 400 });
   }
@@ -147,9 +150,10 @@ export async function resolveRepositoryApiContext(
         where repositories.id = $1
           and repositories.disabled_at is null
           and installations.suspended_at is null
+          ${alias ? "and lower(repositories.owner || '/' || repositories.name) = lower($2)" : ""}
           and ${notCancelledSubscription}
         limit 1`,
-      [repositoryId],
+      alias ? [repositoryId, alias] : [repositoryId],
     );
     const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
     const githubInstallationId = safeInstallationId(rows[0]?.github_installation_id);

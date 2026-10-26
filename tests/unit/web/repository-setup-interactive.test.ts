@@ -208,6 +208,11 @@ describe("repository setup readiness controls", () => {
     });
 
     expect(container.textContent).toContain("Repository setup verified");
+    const scopedLink = [...container.querySelectorAll("a")].find((link) =>
+      link.textContent?.includes("View this repository's readiness runs"),
+    );
+    expect(scopedLink?.getAttribute("href")).toBe("/repositories/repo-1");
+
     expect(container.textContent).toContain("No new setup pull request is needed");
     expect([...container.querySelectorAll("a")].some((link) => link.getAttribute("href") === "/runs")).toBe(true);
     expect(() => button(container, "Open setup pull request")).toThrow("button not found");

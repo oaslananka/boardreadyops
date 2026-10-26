@@ -8,6 +8,8 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Patched pnpm dependencies are resolved during the install layer.
+COPY patches patches
 COPY scripts scripts
 COPY apps/web/package.json apps/web/package.json
 COPY packages/cloud-core/package.json packages/cloud-core/package.json

@@ -393,6 +393,120 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
     }
   });
 
+  it.each(["committed", "rolled-back"] as const)(
+    "retains artifact bytes when PostgreSQL finalization acknowledgement is lost (%s)",
+    async (outcome) => {
+      const fixture = await setup(`artifact-test-lost-ack-${randomUUID().slice(0, 8)}`);
+      const artifactId = randomUUID();
+      const uploadToken = token(`lost-ack-${artifactId}`);
+      const sha256 = fingerprint("hello");
+      const storageRoot = await mkdtemp(path.join(os.tmpdir(), "bro-upload-lost-ack-"));
+      try {
+        const issued = await createSqlRunnerArtifactStore(requireExecutor(), {
+          now: () => at(fixture.base, 10),
+          id: () => artifactId,
+          uploadToken: () => uploadToken,
+          capabilityTtlSeconds: 300,
+        }).issueCapabilities({
+          workerClass: "managed",
+          managedRunnerIdentityId: fixture.managedIdentityId,
+          requestTimestamp: requestTimestamp(at(fixture.base, 10)),
+          requestNonce: nonce(`lost-ack-${artifactId}`),
+          runId: fixture.runId,
+          executionAttemptId: fixture.attemptId,
+          leaseId: fixture.leaseId,
+          leaseToken: fixture.leaseToken,
+          artifacts: [
+            { kind: "report", name: "report.json", role: "machine", bytes: 5, sha256, contentType: "application/json" },
+          ],
+        });
+        expect(issued.status).toBe("accepted");
+        let acknowledgementLost = false;
+        const response = await handleRunnerArtifactUploadRequest(
+          new Request(`https://boardreadyops.test/upload?cap=${uploadToken}`, {
+            method: "PUT",
+            body: "hello",
+          }),
+          artifactId,
+          {
+            environment: { ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot },
+            now: () => at(fixture.base, 20),
+            queryExecutor: requireExecutor,
+            createArtifactStore: (database) =>
+              createSqlRunnerArtifactStore(
+                {
+                  ...database,
+                  query: async (sql, params = []) => {
+                    if (sql.includes("boardreadyops_complete_artifact_upload") && outcome === "rolled-back") {
+                      acknowledgementLost = true;
+                      throw new Error("simulated transport failure before SQL execution");
+                    }
+                    const result = await database.query(sql, params);
+                    if (sql.includes("boardreadyops_complete_artifact_upload")) {
+                      acknowledgementLost = true;
+                      throw new Error("simulated lost response after successful COMMIT");
+                    }
+                    return result;
+                  },
+                },
+                { now: () => at(fixture.base, 20) },
+              ),
+          },
+        );
+        expect(response.status).toBe(503);
+        expect(acknowledgementLost).toBe(true);
+        const persisted = rows(
+          await requireExecutor().query("select id, storage_path, sha256 from artifacts where id = $1", [artifactId]),
+        );
+        const capability = rows(
+          await requireExecutor().query(
+            "select status, storage_path from runner_artifact_upload_capabilities where artifact_id=$1",
+            [artifactId],
+          ),
+        )[0];
+        expect(capability?.status).toBe(outcome === "committed" ? "uploaded" : "uploading");
+        const finalFile = path.join(storageRoot, String(capability?.storage_path));
+        await expect(readFile(finalFile, "utf8")).resolves.toBe("hello");
+        if (outcome === "rolled-back") {
+          // The failed SQL left no durable artifact row. Preserving bytes avoids
+          // an irreversible guess; the orphan needs operator reconciliation.
+          expect(persisted).toEqual([]);
+        } else {
+          expect(persisted).toEqual([expect.objectContaining({ id: artifactId, sha256 })]);
+          // A retry with an already-consumed capability is a non-mutating
+          // conflict, not permission to overwrite the committed artifact.
+          const retry = await handleRunnerArtifactUploadRequest(
+            new Request(`https://boardreadyops.test/upload?cap=${uploadToken}`, {
+              method: "PUT",
+              body: "hello",
+            }),
+            artifactId,
+            {
+              environment: { ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot },
+              now: () => at(fixture.base, 25),
+              queryExecutor: requireExecutor,
+              createArtifactStore: (database) =>
+                createSqlRunnerArtifactStore(database, { now: () => at(fixture.base, 25) }),
+            },
+          );
+          expect(retry.status).toBe(409);
+          expect(
+            rows(
+              await requireExecutor().query(
+                "select status from runner_artifact_upload_capabilities where artifact_id=$1",
+                [artifactId],
+              ),
+            ),
+          ).toEqual([{ status: "uploaded" }]);
+          await expect(readFile(finalFile, "utf8")).resolves.toBe("hello");
+        }
+      } finally {
+        await cleanupTenant(fixture.tenant, fixture.managedIdentityId);
+        await rm(storageRoot, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("persists a real KiCad draft through HTTP and PostgreSQL without enabling fabrication delivery", async (context) => {
     const cli = await detectKicadCli();
     if (!cli.found || !/^10[.]0[.]/u.test(cli.version ?? "")) {

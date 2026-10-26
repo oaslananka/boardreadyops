@@ -280,6 +280,10 @@ export async function verifyStoredManufacturingDraftClaim(input: {
     const records = (result as { rows: RecordRow[] }).rows;
     if (!records?.length) return fail("missing");
     if (!records.every(validArtifact)) return fail("ineligible");
+    // Save an immutable authority snapshot before any asynchronous filesystem
+    // read. Runner revocation, attempt supersession, storage metadata changes
+    // or a new ambiguous receipt/ZIP must invalidate this verification.
+    const initialAuthoritySnapshot = JSON.stringify(records);
     const pair = selectDraftPair(records);
     if (!pair) return fail("ineligible");
     const { archive, receipt } = pair;
@@ -316,6 +320,15 @@ export async function verifyStoredManufacturingDraftClaim(input: {
       maxTotalExtractedBytes: 128 * 1024 * 1024,
     });
     if (structure.fileCount === 0) return fail("bytes");
+    // Re-read the SAME server-owned authority projection after I/O. A stale
+    // initial query must never attest a claim revoked/replaced during the
+    // receipt/ZIP read. This narrows the read/verify TOCTOU window; it is not
+    // durable sharing authorization or a lock against future changes.
+    const currentAuthority = await input.executor.query(trustedArtifactsQuery, [input.runId, input.executionAttemptId]);
+    const currentRows = (currentAuthority as { rows?: RecordRow[] }).rows;
+    if (!Array.isArray(currentRows) || JSON.stringify(currentRows) !== initialAuthoritySnapshot) {
+      return fail("identity");
+    }
     return {
       status: "verified-runner-claim",
       archiveArtifactId: archive.artifact_id,

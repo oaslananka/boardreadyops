@@ -1,4 +1,17 @@
 {
   "schemaVersion": 1,
-  "steps": [{ "kind": "gerbers" }, { "kind": "drill" }]
+  "steps": [
+    {
+      "kind": "gerbers"
+    },
+    {
+      "kind": "drill"
+    },
+    {
+      "kind": "bom"
+    },
+    {
+      "kind": "positions"
+    }
+  ]
 }

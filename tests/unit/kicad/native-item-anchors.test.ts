@@ -63,6 +63,8 @@ describe("Source-bound KiCad DRC object markers", () => {
       metadata: {
         provenance: "kicad-json-object-position",
         sourceUuid: sourceUUID,
+        sourceXmm: 145.621548,
+        sourceYmm: 107.108452,
         fingerprint: "f".repeat(64),
         locationMeaning: "Referenced source object, not verified violation center",
       },
@@ -92,6 +94,69 @@ describe("Source-bound KiCad DRC object markers", () => {
     expect(anchors[0]?.x).toBeCloseTo((138.785 - bounds.minX) / 25.4, 6);
     expect(anchors[0]?.y).toBeCloseTo((99.9275 - bounds.minY) / 25.4, 6);
     expect(verifiedNativePcbItemAnchors(plot, bounds, [finding])).toEqual([]);
+  });
+
+  it("maps a real KiCad 10 track object despite SVG plot rounding and length suffix", () => {
+    // Captured with KiCad CLI 10.0.7 DRC --format json --units mm.
+    const parsed = parseKicadDiagnostics(
+      JSON.stringify({
+        coordinate_units: "mm",
+        violations: [
+          {
+            type: "track_dangling",
+            severity: "warning",
+            description: "Track has unconnected end",
+            items: [
+              {
+                description: "Track [NET_A] on F.Cu, length 6.0000 mm",
+                pos: { x: 2, y: 2 },
+                uuid: "f18bfa9e-fd9d-4b93-bbf4-347b5f9b065d",
+              },
+            ],
+          },
+        ],
+      }),
+      "drc",
+    );
+    const finding: SnapshotFinding = {
+      fingerprint: "a".repeat(64),
+      ruleId: `drc.${parsed[0]?.ruleId}`,
+      severity: "medium",
+      message: parsed[0]?.message ?? "",
+      details: parsed[0]?.raw,
+    };
+    const native = { ...plot, content: '<svg viewBox="0 0 9.9822 9.9822"></svg>' };
+    const origin = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
+    expect(verifiedNativePcbItemAnchors(native, origin, [finding])).toMatchObject([
+      {
+        kind: "finding",
+        targetRef: "Track",
+        x: 0.2,
+        y: 0.2,
+        metadata: {
+          sourceUuid: "f18bfa9e-fd9d-4b93-bbf4-347b5f9b065d",
+          locationMeaning: "Referenced source object, not verified violation center",
+        },
+      },
+    ]);
+    const genericItem = {
+      description: "Graphic on F.Cu",
+      uuid: "fb7a6d1c-fc23-48bc-b260-e95fb8116acc",
+      pos: { x: 3, y: 3 },
+    };
+    expect(
+      verifiedNativePcbItemAnchors(native, origin, [
+        { ...finding, details: { coordinate_units: "mm", items: [genericItem] } },
+      ]),
+    ).toMatchObject([{ targetRef: "Item", x: 0.3, y: 0.3 }]);
+    expect(
+      verifiedNativePcbItemAnchors(native, origin, [
+        { ...finding, details: { coordinate_units: "mm", items: [{ ...genericItem, description: 42 }] } },
+      ]),
+    ).toEqual([]);
+    expect(
+      verifiedNativePcbItemAnchors({ ...native, content: '<svg viewBox="0 0 9.94 9.9822"></svg>' }, origin, [finding]),
+    ).toEqual([]);
   });
 
   it("fails closed when source units, plot geometry, layer, or item provenance differ", () => {

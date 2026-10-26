@@ -27,7 +27,7 @@ describe("MyWorkPage", () => {
     const markup = await render();
 
     expect(markup).toContain("Assigned Findings");
-    expect(markup).toContain("Awaiting Your Review");
+    expect(markup).toContain("Reviews Awaiting Decision");
 
     const assigned = DEMO_REVIEWS.flatMap((r) =>
       r.findings.filter((f) => f.assignees.length > 0 && f.disposition === "open"),
@@ -74,6 +74,34 @@ describe("MyWorkPage", () => {
     expect(markup).toContain("acme/board");
     expect(markup).toContain("PR #7");
     expect(markup).toContain('href="/reviews/rev_real_1?tab=findings"');
+  });
+
+  it("shows real pending reviews before empty assignments and never renders a raw creator UUID", async () => {
+    const uuid = "620f1df3-f731-497b-9a8c-c5425f762c7d";
+    loadViewerReviews.mockResolvedValue({
+      state: "ok",
+      next: undefined,
+      reviews: [
+        {
+          id: "rev_real_2",
+          repositoryId: "repo_2",
+          repositoryName: "acme/board",
+          pullRequestNumber: 17,
+          title: "Review clearance change",
+          status: "active",
+          decision: "pending",
+          createdBy: uuid,
+          updatedAt: "2026-10-25T00:00:00.000Z",
+        },
+      ],
+    });
+    loadViewerWorkQueue.mockResolvedValue({ assignedFindings: [] });
+    const markup = await render();
+    expect(markup.indexOf("Reviews Awaiting Decision")).toBeLessThan(markup.indexOf("Assigned Findings"));
+    expect(markup).toContain("Opened by Recorded member");
+    expect(markup).not.toContain(uuid);
+    expect(markup).toContain('href="/reviews/rev_real_2"');
+    expect(markup).toContain("No assigned findings.");
   });
 
   it("distinguishes a zero assigned-review queue from zero release-readiness issues", async () => {

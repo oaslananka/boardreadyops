@@ -91,24 +91,39 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs uppercase text-muted-foreground">Repository setup</p>
-            <h1 className="text-2xl font-bold text-foreground">
-              Choose a policy, review every file, then let us open the pull request.
-            </h1>
+            <h1 className="text-2xl font-bold text-foreground">Connect or check your repository</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Nothing is committed until you act. Read the exact two files below, then either copy them into your own
-              branch or have BoardReadyOps open the pull request for you — the contents are identical either way, and
-              both land as a pull request your reviewers approve.
+              See its current setup status first. GitHub repositories and readiness runs are separate from CAD workspace
+              projects and revisions; connecting one does not automatically create the other.
             </p>
           </div>
           <StatusBadge value="preview" label="Nothing changes until you choose" />
         </header>
 
-        <Alert title="Read the files before you decide" tone="info">
-          <p>
-            Both paths end at the same reviewed pull request against a new branch, never a commit to your default
-            branch. Step 3 is where you choose between copying the files yourself and having them opened for you.
+        <section aria-label="Repository write safety" className="rounded-md border border-border bg-card p-4 text-sm">
+          <p className="font-medium text-foreground">
+            BoardReadyOps setup writes go to a new branch and open a pull request for review. BoardReadyOps never
+            commits to your default branch or bypasses its protections. Files you copy manually are outside this
+            guarantee.
           </p>
-        </Alert>
+          <details className="mt-2">
+            <summary className="cursor-pointer font-medium text-primary">How setup and permissions work</summary>
+            <p className="mt-2 text-muted-foreground">
+              Read the files before you decide. You can copy the proposed policy/workflow files to your own branch or
+              ask BoardReadyOps to open a reviewable setup pull request. The exact files and the permission profile
+              remain below for inspection before choosing.
+            </p>
+            <p className="mt-2 text-muted-foreground">
+              Writes are limited to <code>boardreadyops.yml</code>,{" "}
+              <code>.github/workflows/{repositorySetupWorkflowPath}</code> and <code>.boardreadyops/**</code> on a new
+              branch. See{" "}
+              <a href="#permissions" className="text-primary underline">
+                Permission review
+              </a>
+              .
+            </p>
+          </details>
+        </section>
 
         {hasInstallationHandoff ? (
           <Alert title="GitHub App installation handoff" tone="success">
@@ -125,16 +140,6 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
             </p>
           </Alert>
         ) : null}
-
-        <Alert title="What BoardReadyOps may write, and where it may not" tone="info">
-          <p>
-            Repository writes are limited to <code>boardreadyops.yml</code>,{" "}
-            <code>.github/workflows/{repositorySetupWorkflowPath}</code>, and <code>.boardreadyops/**</code>, always on
-            a new branch opened as a pull request for your review. BoardReadyOps never commits to a default branch,
-            never bypasses branch protection or required reviews, and requests no organization or account permission.
-            The full list is in <a href="#permissions">Permission review</a> below.
-          </p>
-        </Alert>
 
         <RepositorySetupInteractive
           presets={repositorySetupPresets}

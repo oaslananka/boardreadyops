@@ -93,4 +93,36 @@ describeDb("draft provenance access binds exact PostgreSQL run to session-author
     expect(authorizeInstallation).toHaveBeenCalledWith(installationId);
     expect(verify).toHaveBeenCalledWith(expect.objectContaining({ runId, executionAttemptId: attemptId }));
   });
+  it("fails closed when PostgreSQL suspends the installation after initial authorization", async () => {
+    if (!url || !db) throw new Error("PostgreSQL test database is required");
+    const authorizeInstallation = vi.fn(async (id: string) => {
+      const result = (await db.query("select id from installations where id=$1 and suspended_at is null", [id])) as {
+        rows: { id: string }[];
+      };
+      return result.rows.length === 1;
+    });
+    const verify = vi.fn(async () => {
+      await db.query("update installations set suspended_at=now() where id=$1", [installationId]);
+      return {
+        status: "verified-runner-claim" as const,
+        archiveArtifactId: randomUUID(),
+        receiptArtifactId: randomUUID(),
+        archiveSha256: "a".repeat(64),
+      };
+    });
+    try {
+      const result = await handleDraftProvenanceStatus(runId, {
+        authorize: async () => ({ session: {}, authorizeInstallation }),
+        openExecutor: () => createPgQueryExecutor({ connectionString: url, max: 1 }),
+        verify,
+        environment: { ARTIFACT_STORAGE_ROOT: "/unused-test-fixture" },
+      });
+      expect(result.status).toBe(404);
+      expect(await result.json()).toEqual({ ok: false, error: "Run not found" });
+      expect(verify).toHaveBeenCalledTimes(1);
+      expect(authorizeInstallation).toHaveBeenCalledTimes(2);
+    } finally {
+      await db.query("update installations set suspended_at=null where id=$1", [installationId]);
+    }
+  });
 });

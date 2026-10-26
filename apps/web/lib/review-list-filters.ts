@@ -29,6 +29,30 @@ export type ReviewListFilters = {
   sort: ReviewListSort;
 };
 
+/** Turn a stored GitHub repository identity into a verified owner/name filter.
+ * Unknown shapes stay unlinked instead of suggesting an unrelated Review.
+ */
+export function canonicalRepositoryName(value: string): string | undefined {
+  let candidate = value.trim();
+  const lower = candidate.toLowerCase();
+  let cloneUrl = false;
+  for (const prefix of ["https://github.com/", "https://www.github.com/", "git@github.com:"]) {
+    if (lower.startsWith(prefix)) {
+      candidate = candidate.slice(prefix.length);
+      cloneUrl = true;
+      break;
+    }
+  }
+  if (candidate.endsWith("/")) candidate = candidate.slice(0, -1);
+  if (cloneUrl && candidate.toLowerCase().endsWith(".git")) candidate = candidate.slice(0, -4);
+  const parts = candidate.split("/");
+  if (parts.length !== 2) return undefined;
+  const [owner, name] = parts;
+  if (!owner || !name || !/^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/iu.test(owner)) return undefined;
+  if (!/^[a-z0-9._-]{1,100}$/iu.test(name)) return undefined;
+  return `${owner.toLowerCase()}/${name.toLowerCase()}`;
+}
+
 export const reviewListSorts: readonly ReviewListSort[] = ["updated", "decision", "repository"];
 
 export const reviewSortLabels: Record<ReviewListSort, string> = {
@@ -100,7 +124,10 @@ export function applyReviewListFilters<T extends ReviewListFilterable>(
   const matched = reviews.filter((review) => {
     if (filters.decision && review.decision !== filters.decision) return false;
     if (filters.status && review.status !== filters.status) return false;
-    if (filters.repository && review.repositoryName !== filters.repository) return false;
+    if (filters.repository) {
+      const selected = canonicalRepositoryName(filters.repository);
+      if (!selected || canonicalRepositoryName(review.repositoryName) !== selected) return false;
+    }
     if (filters.query && !matchesQuery(review, filters.query)) return false;
     return true;
   });

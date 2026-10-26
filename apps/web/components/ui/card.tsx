@@ -15,7 +15,10 @@ export function CardHeader({ className, ...props }: Readonly<ComponentProps<"div
   return (
     <div
       data-slot="card-header"
-      className={cn("flex min-w-0 items-start justify-between gap-4 border-b border-border px-5 py-4", className)}
+      className={cn(
+        "flex min-w-0 flex-wrap items-start justify-between gap-4 border-b border-border px-5 py-4 sm:flex-nowrap",
+        className,
+      )}
       {...props}
     />
   );

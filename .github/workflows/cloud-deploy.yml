@@ -9,19 +9,10 @@ on:
         default: true
         type: boolean
       retire_superseded_images:
-        description: On low disk only, retire BoardReadyOps runtime images older than the running image plus the selected rollback keep-set.
+        description: On low disk only, reclaim old runtime images if a previous successfully deployed rollback image is already pinned.
         required: false
         default: false
         type: boolean
-      rollback_images_to_keep:
-        description: Number of non-running rollback images to preserve during opted-in low-space preflight retirement.
-        required: false
-        default: "3"
-        type: choice
-        options:
-          - "1"
-          - "2"
-          - "3"
 
 concurrency:
   group: cloud-deploy
@@ -95,7 +86,6 @@ jobs:
           # container) instead of the real `up -d --build` (replaces web/worker/migrate).
           DEPLOY_ARGS: ${{ inputs.dry_run && 'build migrate web worker' || 'up -d --build migrate web worker' }}
           RETIRE_SUPERSEDED_IMAGES: ${{ inputs.retire_superseded_images && '1' || '0' }}
-          ROLLBACK_IMAGES_TO_KEEP: ${{ inputs.rollback_images_to_keep }}
         run: |
           set -euo pipefail
           # Fetched fresh here instead of exported via an earlier step: this value is only
@@ -107,7 +97,7 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
             "ubuntu@${ssh_host}" \
-            "bash -s -- '${DEPLOY_ARGS}' '${RETIRE_SUPERSEDED_IMAGES}' '${ROLLBACK_IMAGES_TO_KEEP}'" <<'REMOTE_DEPLOY'
+            "bash -s -- '${DEPLOY_ARGS}' '${RETIRE_SUPERSEDED_IMAGES}'" <<'REMOTE_DEPLOY'
           set -euo pipefail
           deploy_root=/home/ubuntu/boardreadyops-cloud
           repo_dir="${deploy_root}/repo"
@@ -118,7 +108,6 @@ jobs:
           container_policy_path="/run/policies/repositories"
           deploy_args="$1"
           retire_superseded_images="$2"
-          preflight_rollback_images_to_keep="$3"
 
           test -d "${repo_dir}/.git" || {
             printf '%s\n' 'cloud-deploy preflight: deployment checkout is not commissioned; follow docs/deployment/self-hosted.md before retrying' >&2
@@ -212,15 +201,25 @@ jobs:
           #
           # So: report the space, reclaim only what is safe to reclaim, and fail early and
           # specifically if it is still not enough.
+          # Use the freshly verified helper even for the opt-in low-disk preflight.
+          cd "${repo_dir}"
+          git fetch origin --prune
+          git checkout main
+          git reset --hard origin/main
+          cd "${deploy_root}"
+
           docker_root="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || printf '/var/lib/docker')"
           free_mib() { df -Pm "$1" | awk 'NR==2 {print $4}'; }
           required_mib=12288
           build_cache_max_used_space=3GB
+          # The daemon's default ~13GiB GC reservation can defeat a 3GB prune
+          # target unless we explicitly supply the lower retention floor.
+          build_cache_reserved_space=1GB
           reclaim_build_cache_for_preflight() {
             docker builder prune --all --force || true
           }
           trim_build_cache() {
-            if ! docker buildx prune --all --force --max-used-space "${build_cache_max_used_space}"; then
+            if ! docker buildx prune --all --force --max-used-space "${build_cache_max_used_space}" --reserved-space "${build_cache_reserved_space}"; then
               printf 'cloud-deploy cache: unable to enforce %s cache budget; investigate host capacity after deploy\n' "${build_cache_max_used_space}" >&2
               return 1
             fi
@@ -255,64 +254,6 @@ jobs:
               "${runtime_image_count}" "${runtime_image_mib}"
           }
 
-          retire_superseded_runtime_images() {
-            local retain="$1"
-            local running_images
-            local service
-            local container
-            local current_image
-            local superseded
-
-            case "${retain}" in
-              1|2|3) ;;
-              *)
-                printf 'cloud-deploy retention: invalid rollback keep-set: %s\n' "${retain}" >&2
-                return 64
-                ;;
-            esac
-
-            # Compose v5 does not accept Go-template output for its image listing.
-            # Use the already-checked project/service container identity instead.
-            # Unknown running image references must prevent any cleanup.
-            running_images="$(
-              for service in web worker; do
-                container="$(container_for_service "$service")" || exit 78
-                current_image="$(docker inspect "$container" --format '{{.Config.Image}}')" || exit 78
-                case "$current_image" in
-                  boardreadyops-web-runtime:*) printf '%s\n' "$current_image" ;;
-                  *)
-                    printf 'cloud-deploy retention: unexpected running image for %s\n' "$service" >&2
-                    exit 78
-                    ;;
-                esac
-              done
-            )" || {
-              printf '%s\n' 'cloud-deploy retention: cannot verify both running runtime images; nothing retired' >&2
-              return 78
-            }
-
-            superseded="$(
-              docker image ls 'boardreadyops-web-runtime:*' \
-                --format '{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}' 2>/dev/null \
-                | sort -r \
-                | cut -f2 \
-                | grep -vxF -f <(printf '%s\n' "$running_images") \
-                | tail -n +$((retain + 1)) || true
-            )"
-
-            if [ -n "${superseded}" ]; then
-              printf 'cloud-deploy retention: retiring %s superseded runtime image(s), keeping the running image and newest %s rollback targets\n' \
-                "$(printf '%s\n' "${superseded}" | wc -l | tr -d ' ')" "${retain}"
-              printf '%s\n' "${superseded}" | while IFS= read -r image; do
-                [ -n "${image}" ] || continue
-                docker image rm "${image}" >/dev/null 2>&1 || printf '  kept (still referenced): %s\n' "${image}"
-              done
-              printf 'cloud-deploy retention: %s MiB free after retiring\n' "$(free_mib "${docker_root}")"
-            else
-              printf '%s\n' 'cloud-deploy retention: nothing superseded to retire'
-            fi
-          }
-
           available_mib="$(free_mib "${docker_root}")"
           printf 'cloud-deploy preflight: %s MiB free on %s (want >= %s MiB)\n' \
             "${available_mib}" "${docker_root}" "${required_mib}"
@@ -331,7 +272,7 @@ jobs:
           if [ "${available_mib}" -lt "${required_mib}" ]; then
             if [ "${retire_superseded_images}" = "1" ]; then
               printf '%s\n' 'cloud-deploy preflight: operator opted in to bounded superseded-runtime retirement'
-              retire_superseded_runtime_images "${preflight_rollback_images_to_keep}"
+              "${repo_dir}/scripts/cloud-runtime-image-retention.sh" retire --apply
               available_mib="$(free_mib "${docker_root}")"
               printf 'cloud-deploy preflight: %s MiB free after bounded runtime-image retirement\n' "${available_mib}"
             else
@@ -344,7 +285,7 @@ jobs:
             if [ "${retire_superseded_images}" = "1" ]; then
               printf '%s\n' \
                 "cloud-deploy preflight: only ${available_mib} MiB free on ${docker_root}, need ${required_mib} MiB after bounded runtime-image retirement." \
-                'The running image and three newest rollback targets were preserved; remaining space' \
+                'The current and explicitly pinned verified rollback images were preserved; remaining space' \
                 'is held by retained images, volumes or logs and needs a separate operator decision.' >&2
             else
               printf '%s\n' \
@@ -356,17 +297,15 @@ jobs:
             exit 78
           fi
 
-          cd "${repo_dir}"
-          git fetch origin --prune
-          git checkout main
-          git reset --hard origin/main
-          cd "${deploy_root}"
-
           case "${deploy_args}" in
             "build migrate web worker")
               run_deploy build migrate web worker
               ;;
             "up -d --build migrate web worker")
+              # Verify the old running web + worker health and pin that exact image
+              # before compose can replace either container. If deployment or browser
+              # smoke fails, do not delete any image from this attempt.
+              "${repo_dir}/scripts/cloud-runtime-image-retention.sh" pin "$(git -C "${repo_dir}" rev-parse HEAD)"
               run_deploy up -d --build migrate web worker
               verify_release_policy_mount
 
@@ -386,12 +325,8 @@ jobs:
             exit 78
           fi
           printf 'cloud-deploy cache: %s MiB free after cache cap\n' "$(free_mib "${docker_root}")"
-          # Both dry-runs and real deployments leave a new, tagged runtime image.
-          # After the build succeeds and cache is bounded, apply one canonical
-          # rollback-retention path to both. Identity checks fail closed before
-          # deleting any tag; the running images and three newest non-running
-          # rollback targets remain available.
-          retire_superseded_runtime_images "3"
+          # Image retirement happens only after the separate external browser smoke
+          # passes. A rehearsal cannot validate a new image; it never retires one.
           # Report bounded aggregate usage after every rehearsal or real deployment,
           # not only when a preflight is already out of space. No other Docker
           # projects, rollback volumes, or private per-container metadata are altered.
@@ -456,6 +391,20 @@ jobs:
               "camera=()" "geolocation=()" "microphone=()" "usb=()"
             require_header_directives "${headers}" "X-Frame-Options" "${path}" "DENY"
           done
+
+      - name: Retire superseded runtime images after successful browser smoke
+        if: ${{ !inputs.dry_run }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          set -euo pipefail
+          ssh_host="$(doppler secrets get CLOUD_DEPLOY_SSH_HOST --plain \
+            --project boardreadyops --config deploy)"
+          ssh -i "${CLOUD_DEPLOY_SSH_KEY_PATH}" \
+            -o StrictHostKeyChecking=accept-new \
+            -o ConnectTimeout=15 \
+            "ubuntu@${ssh_host}" \
+            '/home/ubuntu/boardreadyops-cloud/repo/scripts/cloud-runtime-image-retention.sh confirm "$(git -C /home/ubuntu/boardreadyops-cloud/repo rev-parse HEAD)" && /home/ubuntu/boardreadyops-cloud/repo/scripts/cloud-runtime-image-retention.sh retire --apply --allow-unchanged'
 
       - name: Remove temporary SSH key
         if: always()

@@ -33,12 +33,17 @@ export function ProjectUploadWizard({ workspaceId: _workspaceId = "default" }: P
           Connect your GitHub organization or personal repository to run automated BoardReadyOps verdict checks directly
           on pull requests and commit pushes.
         </p>
-        <Link
-          href="/setup"
-          className="inline-flex w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Connect GitHub App
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/setup"
+            className="inline-flex w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Connect GitHub App
+          </Link>
+          <Link href="/reviews" className="text-sm font-medium text-primary underline underline-offset-2">
+            Already connected? Open reviews
+          </Link>
+        </div>
       </TabsContent>
 
       <TabsContent value="cli" className="flex flex-col gap-3 text-sm">
