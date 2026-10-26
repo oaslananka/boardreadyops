@@ -43,18 +43,27 @@ CLI's own JSON output.
 
 ## Usage
 
-Configure your MCP client to run:
+**Current source-checkout setup:** The `@boardreadyops/mcp-server` package has **not**
+been confirmed published to npm. Do not use `npx -y @boardreadyops/mcp-server` until a
+verified release exists. For local use, clone the project, run `corepack pnpm install
+--frozen-lockfile` and `corepack pnpm run build`, then configure an MCP-capable editor
+or Claude Desktop to launch the checked-in entrypoint:
 
 ```json
 {
   "mcpServers": {
     "boardreadyops": {
-      "command": "npx",
-      "args": ["-y", "@boardreadyops/mcp-server"]
+      "command": "node",
+      "args": ["/absolute/path/to/boardreadyops/packages/mcp-server/bin/boardreadyops-mcp.js"]
     }
   }
 }
 ```
+
+Use the actual absolute repository path on your computer; the source checkout must keep its
+installed dependencies. This is a **local** MCP connection, not a Claude.ai web connector.
+Remote ChatGPT and Claude.ai integrations require a separately deployed, authenticated HTTPS
+MCP service.
 
 ## Next integration phase
 
