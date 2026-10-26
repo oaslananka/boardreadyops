@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 const tempDirs: string[] = [];
@@ -18,7 +19,7 @@ function discover(names: string[]) {
     [
       "--input-type=module",
       "-e",
-      `import { listMigrationFiles } from ${JSON.stringify(path.resolve("packages/db/scripts/apply-migrations.mjs"))};
+      `import { listMigrationFiles } from ${JSON.stringify(pathToFileURL(path.resolve("packages/db/scripts/apply-migrations.mjs")).href)};
 try { console.log(JSON.stringify(await listMigrationFiles(process.argv[1]))); } catch (error) { console.error(String(error)); process.exitCode = 1; }`,
       dir,
     ],
