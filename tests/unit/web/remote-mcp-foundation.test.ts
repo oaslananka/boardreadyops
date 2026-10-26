@@ -46,7 +46,7 @@ describe("remote MCP foundation - deny by default", () => {
           host: "evil.test",
         },
       });
-      const response = handler(request);
+      const response = await handler(request);
       expect(response.status).toBe(503);
       expect(response.headers.get("cache-control")).toBe("no-store");
       expect(JSON.stringify(await response.json())).not.toContain("token");

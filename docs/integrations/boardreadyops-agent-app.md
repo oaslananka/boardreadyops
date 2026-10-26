@@ -150,8 +150,9 @@ repository's numeric ID against the Review-owning record, and asks GitHub for
 The service never accepts an installation token as proof of a *user's* access.
 Disabled repository/installation checks are enforced separately in SQL.
 
-This adapter is injectable/tested locally, but **not connected to production
-OAuth or `/mcp`**. It fails closed on GitHub errors, rate limits, changed IDs,
+This GitHub permission adapter is injectable/tested locally and now composed
+behind the disabled-by-default OAuth/MCP route gates; no production deployment
+or live user-specific GitHub App collaborator acceptance was performed. It fails closed on GitHub errors, rate limits, changed IDs,
 revoked collaborators, missing credentials and untrusted redirects. No token
 is included in the tool response or persisted by the adapter. For every MCP
 request, token/grant activity and repository permission must be checked anew.
@@ -170,7 +171,8 @@ https://docs.github.com/en/rest/collaborators/collaborators.
   schema-validated input, an allowlisted facts-only response, a generic
   unavailable result and fresh per-call repository permission checks.
   Unauthorized HTTP requests receive a `401` OAuth metadata challenge. The
-  production `/mcp` route is still deliberately `503`.
+  locally guarded `/mcp` route denies by default with `503`; the older
+  hosted deployment currently returns `404` and was not changed.
 - `jose` checks trusted issuer, MCP-specific audience, asymmetric RS256/ES256
   signatures, expiry, user identity and client binding. The durable
   `remote_mcp_oauth_grants` table additionally binds active JTI, user, client,
@@ -467,11 +469,15 @@ GitHub App errors, token failures and SQL errors do not grant access.
 controls the in-process OAuth issuer; the additional
 `BOARDREADYOPS_REMOTE_MCP_HANDLER_READY=true` is required before production
 adapter composition, along with valid OAuth signing keys and the GitHub App
-identity. **Neither flag mounts the MCP route**: `/mcp` still unconditionally
-returns HTTP 503 in `apps/web/app/mcp/route.ts`. Do not set either flag in
-production or modify that route until the final audited enablement, real
-GitHub App installation-token access and ChatGPT/Claude OAuth/MCP client
-acceptance are independently verified.
+identity. `apps/web/app/mcp/route.ts` is now wired to the production-shaped
+adapter, **but ONLY when both explicit flags are set to `true`** and all
+OAuth/GitHub App prerequisites exist. Otherwise GET/POST/DELETE return HTTP
+503, without initializing the verifier or touching the repository database.
+Invalid configuration and runtime errors also fail closed to 503. Both flags
+remain **disabled in production**, and no public release/deployment has been
+performed. Do not set either flag in production until the final audited
+enablement, actual user-specific GitHub App collaborator permission checks,
+and ChatGPT/Claude OAuth/MCP client acceptance are independently verified.
 
 Unit tests exercise real local RS256 JWT signatures, private/duplicate key
 rejection, HTTP Origin/URL denial before any DB connection, repeated durable
@@ -480,4 +486,26 @@ isolated PostgreSQL 17 integration test exercises the production-shaped
 adapter with persisted OAuth grants, real revocation SQL and the modern MCP v2
 wire format. The **GitHub App permission outcome is injected in these tests**:
 this verifies composition and fail-closed authorization, **not** the live GitHub
-installation-token API or provider cloud acceptance.
+user-specific collaborator-permission API or provider cloud acceptance.
+
+The paired route-gate tests enforce denied GET/POST/DELETE requests with
+zero verifier setup when either flag is missing, disabled, or incorrectly set;
+missing and throwing adapters also produce safe 503 responses. When both
+flags are set and the adapter is successfully initialized, the route forwards
+the original Request for further bearer/grant/permission checks. This is a
+source-code release switch, not a declaration that the live site is enabled.
+
+An independent operator-side read using Ops' existing `gh-boardreadyops` GitHub
+App connection returned five installation repositories and successfully read
+metadata for the **private** `boardreadyops/boardreadyops-e2e-private`
+repository (HTTP 200; `Metadata: read`). This is useful evidence for the
+installation's private repository visibility; it is **not** user-specific
+collaborator permission acceptance. No GitHub private key or installation token
+was extracted during this read-only check.
+
+Direct GET/POST/DELETE probes of the existing hosted
+`https://boardreadyops.com/mcp` endpoint returned **404** on 26 October 2026,
+reflecting the currently deployed build/front door, NOT the new local route's
+explicit 503 release-hold response. No deployment, migration, OAuth client
+registration, production flag change, GitHub push, PR or merge accompanied this
+increment.

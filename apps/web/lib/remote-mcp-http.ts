@@ -86,8 +86,8 @@ export async function handleAuthorizedRemoteMcpHttp(
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
-/** A stand-alone testable gate. The public /mcp route still returns 503 until
- * OAuth user consent, client discovery and an issuer are installed and accepted.
+/** Stand-alone verified-grant gate: public /mcp route invokes this only when
+ * both explicit release flags, signing keys and App configuration are valid.
  */
 export async function handleRemoteMcpWithVerifiedGrant(
   request: Request,

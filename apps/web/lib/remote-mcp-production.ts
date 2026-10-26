@@ -21,7 +21,8 @@ export interface PreparedRemoteMcpProductionOptions {
  * Testable, production-shaped resource adapter. Keys are supplied ONLY by
  * trusted server configuration, never from the request, its JWT headers or a
  * remote metadata URL. No session state or credentials are cached per user.
- * This adapter is not mounted on a public route during the #1248 release hold.
+ * Its route is present but remains disabled unless both explicit release gates
+ * and all signing, session, database and GitHub App prerequisites are present.
  */
 export function prepareRemoteMcpProductionHandler(
   options: PreparedRemoteMcpProductionOptions,
@@ -81,8 +82,8 @@ export function prepareRemoteMcpProductionHandler(
   }
 }
 
-/** Independent safety latch. Even an enabled OAuth issuer does NOT expose MCP.
- * This is deliberately NOT connected to apps/web/app/mcp/route.ts yet.
+/** Independent safety latch. OAuth issuer enablement alone does NOT expose MCP.
+ * The route now requires this distinct, disabled-by-default release switch.
  */
 export async function prepareConfiguredRemoteMcpProductionHandler(
   environment: Readonly<Record<string, string | undefined>> = process.env,
