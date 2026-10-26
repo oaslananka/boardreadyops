@@ -113,3 +113,48 @@ transport and test both clients. Keep the existing v1 `@modelcontextprotocol/sdk
 local stdio implementation on its supported maintenance line unless a separate
 compatibility migration is justified.
 This checkpoint neither configures secrets nor changes production or database schema.
+
+## Local authorization boundary (26 October 2026, later increment)
+
+`apps/web/lib/remote-mcp-access.ts` now contains a testable **disabled-by-default**
+remote-read policy. Only a signature-verified, audience-bound, user-bound, expiring
+OAuth grant with a current non-revoked `jti` can reach the Review repository lookup.
+The token validator and grant revocation store are required integration adapters,
+not yet implemented or wired to `/mcp`. A separate live GitHub user-to-repository
+permission check is mandatory for every read. Historical login-time
+`installationIds`, GitHub App installation ownership, repository name aliases and
+unverified workspace/project names **do not** satisfy that check. Suspended,
+disabled and cancelled installations are rejected in the read query. A missing,
+revoked or unreachable permission check denies access; private Review identifiers
+must not be discoverable through error differences. Current revision evidence is
+loaded only after that authorization check and returned through an allowlist.
+
+The helper also verifies OAuth authorization-code PKCE `S256` using RFC 7636's
+test vector; `plain` is intentionally rejected. It is *not* an authorization server,
+and no code grants or OAuth token exchanges are active. The still-missing steps
+before a real client can connect are: verified GitHub user grants and live repo
+permission adapter, durable revocation storage, cryptographic token verification,
+OAuth authorization + PKCE issuance, discovery and the official MCP v2 HTTP handler.
+Do not enable remote tools by substituting CLI repository API tokens or browser
+session cookies for this integration. No production route or user permissions changed.
+
+### Current GitHub collaborator authorization adapter
+
+`apps/web/lib/remote-mcp-github-permission.ts` reuses the existing GitHub App
+credentials. After receiving a **signature-verified** user's stable GitHub ID
+from the future OAuth resource layer, it mints an installation token, resolves
+`GET /user/{account_id}` to the user's current login, verifies the GitHub
+repository's numeric ID against the Review-owning record, and asks GitHub for
+`GET /repos/{owner}/{repo}/collaborators/{username}/permission`. A live
+`read`/`write`/`admin` (or mapped `triage`/`maintain`) response is mandatory.
+The service never accepts an installation token as proof of a *user's* access.
+Disabled repository/installation checks are enforced separately in SQL.
+
+This adapter is injectable/tested locally, but **not connected to production
+OAuth or `/mcp`**. It fails closed on GitHub errors, rate limits, changed IDs,
+revoked collaborators, missing credentials and untrusted redirects. No token
+is included in the tool response or persisted by the adapter. For every MCP
+request, token/grant activity and repository permission must be checked anew.
+
+Primary API references: https://docs.github.com/en/rest/users/users and
+https://docs.github.com/en/rest/collaborators/collaborators.
