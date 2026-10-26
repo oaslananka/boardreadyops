@@ -1,6 +1,6 @@
 # BoardReadyOps AI App — Common MCP Gateway Design
 
-**Status:** engineering contract / staged rollout plan. **Not a deployed remote connector, not an app-directory listing.**
+**Status:** staged implementation; remote endpoint fails closed (HTTP 503) pending OAuth acceptance. **Not a deployed remote connector, not an app-directory listing.**
 
 ## Product decision
 
@@ -88,7 +88,28 @@ part of this increment. They must not be claimed or activated before the gates a
 
 ## Upstream references
 
-- [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
+- [MCP authorization (2026-07-28)](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
 - [MCP Apps](https://apps.extensions.modelcontextprotocol.io/)
 - [OpenAI Apps SDK](https://developers.openai.com/apps-sdk/)
 - [Claude custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
+
+## 2026-10-26 implementation checkpoint
+
+`/mcp` is reserved on the existing Next.js host but deliberately returns HTTP 503 for
+GET, POST and DELETE. Neither web sessions nor existing repository-scoped bearer
+API tokens grant remote MCP access. The tested resource metadata builder uses the
+canonical `https://boardreadyops.com/mcp` audience; its OAuth discovery route is
+**not published**, as no user-bound authorization server or live revocation validation
+exists yet. The existing count/digest-only PCB contract is reused for prospective
+read-only tool results, with unavailable/client-reported states kept distinct.
+
+The 2026-07-28 core specification added stateless HTTP, header-based request
+routing and cacheable lists. MCP Apps is a separately versioned extension. Do not
+claim ChatGPT/Claude compatibility until each host's OAuth and UI flow has passed
+real end-to-end tests. Before enabling this route, implement short-lived
+audience-restricted OAuth grants, enforce current workspace/repository membership
+for **every** read, then use the official MCP v2 `@modelcontextprotocol/server`
+transport and test both clients. Keep the existing v1 `@modelcontextprotocol/sdk`
+local stdio implementation on its supported maintenance line unless a separate
+compatibility migration is justified.
+This checkpoint neither configures secrets nor changes production or database schema.
