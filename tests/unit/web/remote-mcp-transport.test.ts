@@ -28,7 +28,9 @@ function mcpRequest(method: string, params: object = {}, accessToken = "signed.j
       authorization: `Bearer ${accessToken}`,
       "Mcp-Protocol-Version": "2026-07-28",
       "Mcp-Method": method,
-      ...(method === "tools/call" ? { "Mcp-Name": "boardreadyops_review_get" } : {}),
+      ...(method === "tools/call"
+        ? { "Mcp-Name": (params as { name?: string }).name ?? "boardreadyops_review_get" }
+        : {}),
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -374,6 +376,7 @@ describe("MCP v2 stateless web request boundary", () => {
     const body = await result.text();
     expect(result.status, body).toBe(200);
     expect(body).toContain("boardreadyops_review_get");
+    expect(body).toContain("boardreadyops_review_findings");
     expect(body).not.toContain("run_shell");
     expect(result.headers.get("cache-control")).toBe("private, no-store");
     expect(openDb).not.toHaveBeenCalled();
@@ -421,6 +424,7 @@ describe("MCP v2 stateless web request boundary", () => {
     const listing = await listed.text();
     expect([200, 404], listing).toContain(listed.status);
     expect(listing).not.toContain("boardreadyops_review_get");
+    expect(listing).not.toContain("boardreadyops_review_findings");
     const called = await handleAuthorizedRemoteMcpHttp(
       mcpRequest("tools/call", { name: "boardreadyops_review_get", arguments: { reviewId } }),
       principal,
@@ -429,6 +433,87 @@ describe("MCP v2 stateless web request boundary", () => {
     const result = await called.text();
     expect(result).not.toContain('"schemaVersion":1');
     expect(openDb).not.toHaveBeenCalled();
+  });
+
+  it("returns a source-minimized findings page through the authenticated MCP transport", async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: reviewId,
+            repository_id: "private-repo",
+            head_run_id: "head-run",
+            current_revision_id: "current-revision",
+            status: "active",
+            decision: "pending",
+            owner: "secret-owner",
+            name: "secret-repo",
+            github_repo_id: "456",
+            github_installation_id: "789",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ head_commit_sha: "a".repeat(40), evidence_digest: "b".repeat(64) }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "000001",
+            rule_id: "drc.clearance",
+            severity: "error",
+            kind: "electrical",
+            fingerprint: "fp_1",
+          },
+        ],
+      });
+    const openDb = vi.fn().mockResolvedValue({ query, close });
+    const access = vi.fn().mockResolvedValue(true);
+    const response = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/call", { name: "boardreadyops_review_findings", arguments: { reviewId } }),
+      { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] },
+      { openDb, checkCurrentPermission: access },
+    );
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(body).toContain("drc.clearance");
+    expect(body).toContain("fp_1");
+    expect(body).not.toContain("secret-owner");
+    expect(body).not.toContain("secret-repo");
+    expect(access).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("returns identical generic unavailable errors for unauthorized or missing finding Reviews", async () => {
+    const principal = { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] };
+    for (const rows of [
+      [],
+      [
+        {
+          id: reviewId,
+          repository_id: "private-repo",
+          head_run_id: "run-1",
+          current_revision_id: "revision-1",
+          status: "active",
+          decision: "pending",
+          owner: "secret-owner",
+          name: "secret-repo",
+          github_repo_id: "456",
+          github_installation_id: "789",
+        },
+      ],
+    ]) {
+      const close = vi.fn().mockResolvedValue(undefined);
+      const openDb = vi.fn().mockResolvedValue({ query: vi.fn().mockResolvedValue({ rows }), close });
+      const denied = await handleAuthorizedRemoteMcpHttp(
+        mcpRequest("tools/call", { name: "boardreadyops_review_findings", arguments: { reviewId } }),
+        principal,
+        { openDb, checkCurrentPermission: vi.fn().mockResolvedValue(false) },
+      );
+      expect(denied.status).toBe(200);
+      expect(await denied.text()).toContain("Review unavailable");
+      expect(close).toHaveBeenCalledOnce();
+    }
   });
 
   it("returns only authorized review facts and closes the database for tools/call", async () => {

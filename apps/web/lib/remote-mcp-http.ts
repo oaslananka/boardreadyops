@@ -10,6 +10,7 @@ import {
   type RemoteMcpPrincipal,
   type RemoteMcpTokenVerifier,
 } from "./remote-mcp-access.js";
+import { loadAuthorizedRemoteFindings } from "./remote-mcp-findings.js";
 import { remoteMcpMetadataUrl } from "./remote-mcp-foundation.js";
 
 /** Keep this limit synchronized with createMcpHandler.maxRequestBodySize.
@@ -96,6 +97,44 @@ export async function handleAuthorizedRemoteMcpHttp(
               return { content: [{ type: "text", text: JSON.stringify(facts) }], structuredContent: facts };
             } catch {
               // Do not disclose repository IDs, CAD paths, database errors or external service details.
+              return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
+            } finally {
+              await db?.close().catch(() => undefined);
+            }
+          },
+        );
+      }
+      if (principal.scopes.includes("review:read")) {
+        server.registerTool(
+          "boardreadyops_review_findings",
+          {
+            description:
+              "Page through at most 30 deterministic finding identifiers for an authorized current Review. No raw messages, paths or CAD.",
+            inputSchema: z
+              .object({
+                reviewId: z.string().uuid(),
+                cursor: z
+                  .string()
+                  .regex(/^[A-Za-z0-9_-]{1,120}$/u)
+                  .optional(),
+              })
+              .strict(),
+            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+          },
+          async ({ reviewId, cursor }) => {
+            let db: Awaited<ReturnType<RemoteMcpReadDependencies["openDb"]>> | undefined;
+            try {
+              db = await dependencies.openDb();
+              const data = await loadAuthorizedRemoteFindings(
+                db,
+                principal,
+                reviewId,
+                cursor,
+                dependencies.checkCurrentPermission,
+              );
+              if (!data) return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
+              return { content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data };
+            } catch {
               return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
             } finally {
               await db?.close().catch(() => undefined);
