@@ -681,3 +681,26 @@ forged `Content-Length`, invalid UTF-8 and early database denial for both
 OAuth endpoints. Isolated PostgreSQL 17 OAuth + retention + operator preflight
 acceptance continues to pass, with no hosted configuration or production
 client enrollment changed.
+
+### GitHub App installation-token destination pinning (unreleased)
+
+Hosted Reviews in this integration use **GitHub.com**, not an unverified
+GitHub Enterprise appliance. An installation token is a credential and must
+never be sent to an arbitrary HTTPS API root. The production MCP permission
+adapter now permits only the canonical `https://api.github.com` endpoint
+(with an optional trailing slash in the environment configuration). Any
+`GITHUB_API_BASE_URL` override targeting another host, user-info URL,
+nonstandard port, path, query, fragment, or insecure scheme fails closed
+**before** attempting to mint an installation token or make an HTTP request.
+The independent, read-only `mcp:preflight` gate applies the same exact
+GitHub.com allowlist and reports a blocked App prerequisite for any deviation.
+
+This is deliberately narrower than other legacy application components that
+may support alternate GitHub API bases for separate workflows. Adding GitHub
+Enterprise support to **remote MCP** would require its own approved hostname,
+TLS, trust and token-isolation review; do not substitute a test endpoint or
+proxy in production. Focused tests verify denied attacker-controlled API roots
+cause zero token issuer and fetch calls, while the canonical root still
+performs the three fixture-backed identity, repository and current-user
+permission checks. No real App token or private key was accessed, and live
+user-specific GitHub permission acceptance remains outstanding.

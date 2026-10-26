@@ -77,15 +77,7 @@ function checkAppIdentity(environment) {
     const key = createPrivateKey((environment.GITHUB_APP_PRIVATE_KEY ?? "").replaceAll(String.raw`\n`, "\n"));
     if (key.asymmetricKeyType !== "rsa" || (key.asymmetricKeyDetails?.modulusLength ?? 0) < 2048) return false;
     const api = environment.GITHUB_API_BASE_URL?.trim() || "https://api.github.com";
-    const url = new URL(api);
-    return (
-      url.protocol === "https:" &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash &&
-      (url.href === api || url.href === `${api}/`)
-    );
+    return api === "https://api.github.com" || api === "https://api.github.com/";
   } catch {
     return false;
   }

@@ -96,6 +96,53 @@ describe("live GitHub permission for remote MCP", () => {
     expect(await broken.check(permission)).toBe(false);
   });
 
+  it.each([
+    "https://evil.example",
+    "https://github.com",
+    "https://api.github.com.evil.example",
+    "https://api.github.com@evil.example",
+    "https://api.github.com:8443",
+    "https://api.github.com/proxy",
+    "https://api.github.com/?redirect=other",
+    "http://api.github.com",
+    "https://api.github.com#fragment",
+  ])("never mints or sends installation tokens to untrusted GitHub API root: %s", async (apiRoot) => {
+    const mintToken = vi.fn().mockResolvedValue("sensitive-fixture-token");
+    const fetched = vi.fn();
+    const check = createProductionLiveGitHubRepositoryAccess(
+      { GITHUB_APP_ID: "123456", GITHUB_APP_PRIVATE_KEY: "fixture-only-key", GITHUB_API_BASE_URL: apiRoot },
+      fetched,
+      mintToken,
+    );
+    expect(await check(permission)).toBe(false);
+    expect(mintToken).not.toHaveBeenCalled();
+    expect(fetched).not.toHaveBeenCalled();
+  });
+
+  it.each(["https://api.github.com", "https://api.github.com/"])(
+    "allows only the canonical GitHub.com API root and normalizes trailing slash: %s",
+    async (apiRoot) => {
+      const mintToken = vi.fn().mockResolvedValue("synthetic-installation-token");
+      const fetched = vi
+        .fn()
+        .mockResolvedValueOnce(json({ id: 123, login: "current-login" }))
+        .mockResolvedValueOnce(json({ id: 456 }))
+        .mockResolvedValueOnce(json({ permission: "read" }));
+      const check = createProductionLiveGitHubRepositoryAccess(
+        { GITHUB_APP_ID: "123456", GITHUB_APP_PRIVATE_KEY: "fixture-only-key", GITHUB_API_BASE_URL: apiRoot },
+        fetched,
+        mintToken,
+      );
+      expect(await check(permission)).toBe(true);
+      expect(mintToken).toHaveBeenCalledOnce();
+      expect(fetched.mock.calls.map(([target]) => target)).toEqual([
+        "https://api.github.com/user/123",
+        "https://api.github.com/repos/hardware-team/design",
+        "https://api.github.com/repos/hardware-team/design/collaborators/current-login/permission",
+      ]);
+    },
+  );
+
   it("normalizes Doppler-style escaped GitHub App PEM before issuing an installation token", async () => {
     const mintToken = vi.fn().mockResolvedValue("synthetic-installation-token");
     const fetched = vi

@@ -120,6 +120,28 @@ describe("MCP operator preflight is always an evidence-only release blocker", ()
     expect(get(result.checks, id)).toBe("blocked");
   });
 
+  it.each([
+    "https://evil.example",
+    "https://api.github.com.evil.example",
+    "https://api.github.com@evil.example",
+    "https://api.github.com/proxy",
+    "https://api.github.com:8443",
+    "http://api.github.com",
+  ])("blocks production preflight for a non-GitHub.com installation-token destination: %s", async (apiRoot) => {
+    const report = await inspectRemoteMcpReleasePrerequisites({ ...fullEnvironment, GITHUB_API_BASE_URL: apiRoot });
+    expect(get(report.checks, "github_app_signing_configuration")).toBe("blocked");
+    expect(report.publicMcpReleaseApproved).toBe(false);
+  });
+
+  it.each(["https://api.github.com", "https://api.github.com/"])(
+    "keeps canonical GitHub.com endpoint eligible without approving production: %s",
+    async (apiRoot) => {
+      const report = await inspectRemoteMcpReleasePrerequisites({ ...fullEnvironment, GITHUB_API_BASE_URL: apiRoot });
+      expect(get(report.checks, "github_app_signing_configuration")).toBe("configured");
+      expect(report.publicMcpReleaseApproved).toBe(false);
+    },
+  );
+
   it("accepts a validated retired public key without treating it as live-client acceptance", async () => {
     const configured = {
       ...fullEnvironment,

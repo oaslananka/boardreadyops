@@ -8,23 +8,13 @@ const githubLoginPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
 const maxResponseBytes = 64 * 1024;
 const requestTimeoutMs = 5_000;
 
+/** GitHub.com is the only provider for hosted Reviews. Installation tokens
+ * must never be sent to arbitrary HTTPS origins or caller-configured paths.
+ * Future GitHub Enterprise support requires a separate audited trust policy.
+ */
 function strictGithubApiRoot(environment: Readonly<Record<string, string | undefined>>): string | null {
   const input = environment.GITHUB_API_BASE_URL?.trim() || "https://api.github.com";
-  try {
-    const parsed = new URL(input);
-    if (
-      parsed.protocol !== "https:" ||
-      parsed.username ||
-      parsed.password ||
-      parsed.search ||
-      parsed.hash ||
-      (parsed.toString() !== input && parsed.toString() !== `${input}/`)
-    )
-      return null;
-    return parsed.toString().replace(/\/$/u, "");
-  } catch {
-    return null;
-  }
+  return input === "https://api.github.com" || input === "https://api.github.com/" ? "https://api.github.com" : null;
 }
 
 /** Enforce the response size while receiving chunks, before allocating an
