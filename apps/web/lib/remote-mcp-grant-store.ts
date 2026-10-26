@@ -21,11 +21,12 @@ export async function isRemoteMcpGrantActive(
     return false;
   try {
     const result = await executor.query(
-      `select 1 from remote_mcp_oauth_grants
-       where jti = $1 and github_user_id = $2
-         and revoked_at is null and expires_at > now()
-         and audience = $3
-         and client_id = $4 and issuer = $5
+      `select 1 from remote_mcp_oauth_grants g
+       join remote_mcp_oauth_clients c on c.client_id = g.client_id
+       where g.jti = $1 and g.github_user_id = $2
+         and g.revoked_at is null and g.expires_at > now()
+         and g.audience = $3 and g.client_id = $4 and g.issuer = $5
+         and c.enabled = true
        limit 1`,
       [grantId, githubUserId, remoteMcpResource, clientId, issuer],
     );
@@ -50,9 +51,15 @@ export async function revokeRemoteMcpGrant(
   )
     return false;
   const result = await executor.query(
-    `update remote_mcp_oauth_grants set revoked_at = now()
-     where jti = $1 and github_user_id = $2 and revoked_at is null
-     returning jti`,
+    `with revoked as (
+       update remote_mcp_oauth_grants set revoked_at = now()
+       where jti = $1 and github_user_id = $2 and revoked_at is null
+       returning jti, github_user_id
+     ), logged as (
+       insert into remote_mcp_oauth_security_events(event_kind, github_user_id, grant_id)
+       select 'grant_revoked', github_user_id, jti from revoked returning id
+     )
+     select revoked.jti from revoked join logged on true`,
     [grantId, authenticatedGithubUserId],
   );
   return ((result as { rows?: unknown[] }).rows ?? []).length === 1;

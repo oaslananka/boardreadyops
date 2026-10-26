@@ -277,3 +277,46 @@ Implementation cross-checked with RFC 9700 and the August 2026 browser-based
 OAuth BCP RFC 10017. Official OpenAI plugin authorization documentation supports
 predefined OAuth clients, CIMD and dynamic client registration; only the
 predefined allowlist is in scope here to avoid untrusted client-metadata SSRF.
+
+### OAuth client revocation, distributed quotas and key rollover (local increment)
+
+Migration **0097** introduces PostgreSQL-backed, atomic one-minute rate-limit
+buckets and a redacted OAuth security-event log. The authorization consent GET
+has a per-authenticated-GitHub-user budget of 12 requests/minute; consent POST
+has 20/minute. The token endpoint has both a global budget of 600/minute and a
+40/minute budget **per enabled pre-registered client**. Throttled responses use
+HTTP `429` with `Retry-After`. The global budget deliberately bounds unknown
+clients before they can create arbitrarily many per-client buckets. A missing
+limiter/audit database is treated as a service failure rather than bypassing
+security. The shared PostgreSQL store prevents individual server replicas from
+resetting quotas independently.
+
+Each MCP bearer validation now joins the durable grant with the CURRENT
+`remote_mcp_oauth_clients.enabled` state. Disabling a client therefore denies
+its already-issued tokens at the next validation; a signed JWT or unexpired
+grant is not sufficient by itself. Consent approvals/denials, token issuance
+and user-requested revocation are logged atomically with their state-changing
+SQL transactions. Other recorded events include consent creation, rejected
+token exchanges and throttling. Audit records never include raw access tokens,
+authorization codes, PKCE secrets, cookies or remote IP headers: client IDs are
+SHA-256 digests. An explicit maintenance function deletes rate buckets older
+than two days and audit records older than 90 days; **scheduling that retention
+job is still required before public operation**.
+
+Controlled RS256 key rollover accepts an optional Doppler-managed
+`BOARDREADYOPS_REMOTE_MCP_PREVIOUS_PUBLIC_JWKS` containing a conventional JSON
+JWKS object `{ "keys": [...] }` with at most three previously issued **public**
+RSA-2048+ signing keys. Only `kty`, `kid`, `alg`, `use`, `n`, and `e` are accepted;
+unknown/private key fields, weak keys, unsupported algorithms and repeated
+`kid` values fail closed. Rotate by publishing the new and old public keys
+before changing the signing key used by all instances. Preserve each retired
+public key for the maximum remaining 15-minute access-token lifetime plus JWKS
+cache time and a clock-skew margin, then remove it. The operator is responsible
+for synchronizing issuer configuration and signing keys across replicas.
+
+Verified with actual isolated PostgreSQL 17 concurrent quota, immediate
+client-disable, and sanitized audit tests and with real RSA/JWT rollover tests.
+No production migrations, customer signing keys or public MCP rollout occurred.
+Remaining gates include scheduled data expiry, end-to-end real-client
+connectivity, GitHub permission reliability and safely enabling the `/mcp`
+handler; this commit does NOT enable the hosted MCP endpoint.

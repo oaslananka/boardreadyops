@@ -1,6 +1,7 @@
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { exchangeRemoteMcpAuthorizationCode, type SignedRemoteMcpTokenFacts } from "./remote-mcp-authorization-code.js";
 import { remoteMcpResource } from "./remote-mcp-foundation.js";
+import { recordRemoteMcpOAuthEvent, takeRemoteMcpOAuthRateLimit } from "./remote-mcp-oauth-abuse.js";
 
 const genericHeaders = {
   "content-type": "application/json; charset=utf-8",
@@ -65,6 +66,28 @@ export async function handleRemoteMcpTokenRequest(
   let db: Awaited<ReturnType<typeof deps.openDb>> | undefined;
   try {
     db = await deps.openDb();
+    const globalLimit = await takeRemoteMcpOAuthRateLimit(db, "token-global", "oauth-token", 600);
+    if (!globalLimit.allowed) {
+      await recordRemoteMcpOAuthEvent(db, "rate_limited");
+      return new Response(JSON.stringify({ error: "slow_down" }), {
+        status: 429,
+        headers: { ...genericHeaders, "retry-after": String(globalLimit.retryAfterSeconds) },
+      });
+    }
+    const clientId = parameters.get("client_id") ?? "";
+    const registered = await db.query(
+      "select 1 from remote_mcp_oauth_clients where client_id = $1 and enabled = true limit 1",
+      [clientId],
+    );
+    if (((registered as { rows?: unknown[] }).rows ?? []).length !== 1) return errorResponse("invalid_grant", 400);
+    const clientLimit = await takeRemoteMcpOAuthRateLimit(db, "token-client", clientId, 40);
+    if (!clientLimit.allowed) {
+      await recordRemoteMcpOAuthEvent(db, "rate_limited", undefined, clientId);
+      return new Response(JSON.stringify({ error: "slow_down" }), {
+        status: 429,
+        headers: { ...genericHeaders, "retry-after": String(clientLimit.retryAfterSeconds) },
+      });
+    }
     const exchanged = await exchangeRemoteMcpAuthorizationCode(
       db,
       {
@@ -76,7 +99,10 @@ export async function handleRemoteMcpTokenRequest(
       deps.issuer,
       deps.signAccessToken,
     );
-    if (!exchanged) return errorResponse("invalid_grant", 400);
+    if (!exchanged) {
+      await recordRemoteMcpOAuthEvent(db, "token_rejected", undefined, clientId);
+      return errorResponse("invalid_grant", 400);
+    }
     return Response.json(exchanged, { status: 200, headers: genericHeaders });
   } catch {
     // External services and SQL diagnostics are never shown to OAuth clients.

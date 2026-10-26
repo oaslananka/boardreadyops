@@ -3,11 +3,58 @@ import { exportJWK, SignJWT } from "jose";
 import type { SignedRemoteMcpTokenFacts } from "./remote-mcp-authorization-code.js";
 import { remoteMcpResource } from "./remote-mcp-foundation.js";
 
+type PublicRsaJwk = {
+  kty: "RSA";
+  kid: string;
+  alg: "RS256";
+  use: "sig";
+  n: string;
+  e: string;
+};
+
+/** Accept ONLY public, 2048-bit-or-better RSA signing keys from operator
+ * configuration; reject embedded private material, duplicates and ambiguity.
+ */
+function verifiedPreviousPublicKeys(value: unknown, currentKid: string): PublicRsaJwk[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 3) throw new Error("Invalid previous MCP JWKS keys");
+  const known = new Set([currentKid]);
+  return value.map((entry: unknown) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error("Invalid previous MCP JWK");
+    const key = entry as Record<string, unknown>;
+    if (
+      Object.keys(key).some((name) => !["kty", "kid", "alg", "use", "n", "e"].includes(name)) ||
+      key.kty !== "RSA" ||
+      key.alg !== "RS256" ||
+      key.use !== "sig" ||
+      typeof key.kid !== "string" ||
+      !/^[a-zA-Z0-9_-]{8,128}$/u.test(key.kid) ||
+      typeof key.n !== "string" ||
+      !/^[A-Za-z0-9_-]{342,1024}$/u.test(key.n) ||
+      typeof key.e !== "string" ||
+      !/^[A-Za-z0-9_-]{3,12}$/u.test(key.e) ||
+      known.has(key.kid)
+    )
+      throw new Error("Untrusted or duplicate previous MCP JWK");
+    const publicKey = createPublicKey({ key: { kty: "RSA", n: key.n, e: key.e }, format: "jwk" });
+    if (publicKey.asymmetricKeyType !== "rsa" || (publicKey.asymmetricKeyDetails?.modulusLength ?? 0) < 2048) {
+      throw new Error("Previous MCP public key is too short");
+    }
+    known.add(key.kid);
+    return { kty: "RSA", kid: key.kid, alg: "RS256", use: "sig", n: key.n, e: key.e };
+  });
+}
+
 /** Signing keys arrive only from authorized server-side secret configuration
  * (Doppler in production); never generate a fresh key for each request.
  * A signing key rotation must preserve prior public keys until grants expire.
  */
-export function createRemoteMcpTokenIssuer(config: { issuer: string; privateKeyPem: string; keyId: string }): {
+export function createRemoteMcpTokenIssuer(config: {
+  issuer: string;
+  privateKeyPem: string;
+  keyId: string;
+  previousPublicKeys?: unknown;
+}): {
   sign: (claims: SignedRemoteMcpTokenFacts) => Promise<string>;
   publicJwks: () => Promise<{ keys: Record<string, unknown>[] }>;
 } {
@@ -25,6 +72,7 @@ export function createRemoteMcpTokenIssuer(config: { issuer: string; privateKeyP
     throw new Error("MCP token issuer requires an RSA key of at least 2048 bits");
   }
   const publicKey = createPublicKey(privateKey);
+  const previousPublicKeys = verifiedPreviousPublicKeys(config.previousPublicKeys, config.keyId);
   return {
     async sign(claims) {
       if (
@@ -54,7 +102,7 @@ export function createRemoteMcpTokenIssuer(config: { issuer: string; privateKeyP
     },
     async publicJwks() {
       const jwk = await exportJWK(publicKey);
-      return { keys: [{ ...jwk, kid: config.keyId, alg: "RS256", use: "sig" }] };
+      return { keys: [{ ...jwk, kid: config.keyId, alg: "RS256", use: "sig" }, ...previousPublicKeys] };
     },
   };
 }

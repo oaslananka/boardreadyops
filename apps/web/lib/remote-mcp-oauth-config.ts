@@ -4,6 +4,21 @@ import { configuredSessionSecret } from "./user-session.js";
 
 const issuer = "https://boardreadyops.com";
 
+function parseRetiredPublicJwks(raw: string): unknown {
+  if (raw.length > 12000) throw new Error("Previous JWKS is too large");
+  const doc: unknown = JSON.parse(raw);
+  if (
+    !doc ||
+    typeof doc !== "object" ||
+    Array.isArray(doc) ||
+    Object.keys(doc).length !== 1 ||
+    !Array.isArray((doc as { keys?: unknown }).keys)
+  ) {
+    throw new Error("Expected a JWKS object containing only keys");
+  }
+  return (doc as { keys: unknown[] }).keys;
+}
+
 /**
  * Remote OAuth remains completely unpublished unless the operator explicitly
  * enables it AND all prerequisites (including a stable signing key) validate.
@@ -24,6 +39,9 @@ export function configuredRemoteMcpOAuth(environment: Readonly<Record<string, st
       issuer,
       privateKeyPem: environment.BOARDREADYOPS_REMOTE_MCP_RSA_PRIVATE_KEY.replaceAll(String.raw`\n`, "\n"),
       keyId: environment.BOARDREADYOPS_REMOTE_MCP_KEY_ID,
+      previousPublicKeys: environment.BOARDREADYOPS_REMOTE_MCP_PREVIOUS_PUBLIC_JWKS
+        ? parseRetiredPublicJwks(environment.BOARDREADYOPS_REMOTE_MCP_PREVIOUS_PUBLIC_JWKS)
+        : undefined,
     });
     const connectionString = environment.DATABASE_URL;
     return {

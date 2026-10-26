@@ -3,6 +3,7 @@ import type { SqlQueryExecutor } from "@boardreadyops/db";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { verifyPkceS256 } from "./remote-mcp-access.js";
 import { remoteMcpResource } from "./remote-mcp-foundation.js";
+import { recordRemoteMcpOAuthEvent } from "./remote-mcp-oauth-abuse.js";
 
 const sha256 = (secret: string): string => createHash("sha256").update(secret, "utf8").digest("hex");
 const challengePattern = /^[A-Za-z0-9_-]{43}$/u;
@@ -153,7 +154,8 @@ export async function decideRemoteMcpConsent(
     return null;
   const code = approved ? randomBytes(32).toString("base64url") : null;
   const decision = await db.query(
-    `update remote_mcp_oauth_authorizations as auth
+    `with decision as (
+     update remote_mcp_oauth_authorizations as auth
         set approved_at = case when $4::boolean then now() else null end,
             denied_at = case when $4::boolean then null else now() end,
             code_sha256 = case when $4::boolean then $5 else null end,
@@ -162,7 +164,13 @@ export async function decideRemoteMcpConsent(
         and auth.expires_at > now() and auth.approved_at is null and auth.denied_at is null
         and exists (select 1 from remote_mcp_oauth_clients c
                     where c.client_id = auth.client_id and c.redirect_uri = auth.redirect_uri and c.enabled)
-      returning auth.redirect_uri, auth.state`,
+      returning auth.redirect_uri, auth.state, auth.github_user_id
+    ), logged as (
+      insert into remote_mcp_oauth_security_events(event_kind, github_user_id)
+      select case when $4::boolean then 'consent_approved' else 'consent_denied' end,
+             github_user_id from decision returning id
+    )
+    select decision.redirect_uri, decision.state from decision join logged on true`,
     [authorizationId, githubUserId, sha256(csrfNonce), approved, code ? sha256(code) : null],
   );
   const row = ((decision as { rows?: { redirect_uri: string; state: string }[] }).rows ?? [])[0];
@@ -263,7 +271,9 @@ export async function exchangeRemoteMcpAuthorizationCode(
        values ($1, $2, $3, $4, $5, $6, to_timestamp($7)) returning jti`,
       [facts.jti, facts.githubUserId, facts.clientId, issuer, remoteMcpResource, facts.scope, facts.expiresAt],
     );
-    return ((result as { rows?: unknown[] }).rows ?? []).length === 1;
+    if (((result as { rows?: unknown[] }).rows ?? []).length !== 1) return false;
+    await recordRemoteMcpOAuthEvent(tx, "token_issued", facts.githubUserId, facts.clientId, facts.jti);
+    return true;
   });
   return consumed
     ? { access_token: token, token_type: "Bearer", expires_in: tokenLifetimeSeconds, scope: facts.scope }

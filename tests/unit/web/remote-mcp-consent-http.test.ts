@@ -50,8 +50,14 @@ function cookieHeaders(extra: Record<string, string> = {}): Record<string, strin
 }
 
 function database(queries: unknown[] = []) {
-  const query = vi.fn();
-  for (const item of queries) query.mockResolvedValueOnce({ rows: item });
+  const results = [...queries];
+  const query = vi.fn().mockImplementation(async (sql: string) => {
+    if (sql.includes("remote_mcp_oauth_rate_limits")) return { rows: [{ attempts: 1, retry_after: 60 }] };
+    if (sql.includes("remote_mcp_oauth_security_events") && !sql.includes("remote_mcp_oauth_authorizations")) {
+      return { rows: [] };
+    }
+    return { rows: results.shift() ?? [] };
+  });
   const close = vi.fn().mockResolvedValue(undefined);
   return { query, close };
 }
@@ -90,8 +96,12 @@ describe("Remote MCP browser consent security boundary", () => {
     expect(html).toContain('method="post"');
     expect(html).toContain('value="approve"');
     expect(html).toContain('value="deny"');
-    expect(store.query.mock.calls[0]?.[1]).toEqual([clientId, redirectUri]);
-    expect(store.query.mock.calls[1]?.[0]).toContain("remote_mcp_oauth_authorizations");
+    expect(store.query.mock.calls.find(([sql]) => sql.includes("remote_mcp_oauth_clients"))?.[1]).toEqual([
+      clientId,
+      redirectUri,
+    ]);
+    expect(store.query.mock.calls.some(([sql]) => sql.includes("remote_mcp_oauth_authorizations"))).toBe(true);
+    expect(store.query.mock.calls.some(([sql]) => sql.includes("remote_mcp_oauth_security_events"))).toBe(true);
     expect(store.close).toHaveBeenCalledOnce();
   });
 
@@ -106,7 +116,7 @@ describe("Remote MCP browser consent security boundary", () => {
     expect(config.openDb).not.toHaveBeenCalled();
     const unknown = await handleRemoteMcpConsentGet(new Request(consentUrl(), { headers: cookieHeaders() }), config);
     expect(unknown.status).toBe(400);
-    expect(store.query).toHaveBeenCalledTimes(1);
+    expect(store.query.mock.calls.filter(([sql]) => sql.includes("remote_mcp_oauth_clients"))).toHaveLength(1);
   });
 
   it("refuses browser CSRF from a foreign origin, invalid session and duplicate decision fields", async () => {
@@ -153,7 +163,7 @@ describe("Remote MCP browser consent security boundary", () => {
     expect(location.searchParams.get("iss")).toBe(issuer);
     expect(location.searchParams.get("state")).toBe("state-value-12345");
     expect(location.searchParams.get("code")).toMatch(/^[A-Za-z0-9_-]{43}$/u);
-    expect(store.query.mock.calls[0]?.[1]?.[1]).toBe(123);
+    expect(store.query.mock.calls.find(([sql]) => sql.includes("remote_mcp_oauth_authorizations"))?.[1]?.[1]).toBe(123);
     expect(store.close).toHaveBeenCalledOnce();
   });
 });

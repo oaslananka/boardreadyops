@@ -14,6 +14,12 @@ import { handleRemoteMcpConsentGet, handleRemoteMcpConsentPost } from "../../app
 import { remoteMcpResource } from "../../apps/web/lib/remote-mcp-foundation.js";
 import { isRemoteMcpGrantActive, revokeRemoteMcpGrant } from "../../apps/web/lib/remote-mcp-grant-store.js";
 import { createRemoteMcpJwtVerifier } from "../../apps/web/lib/remote-mcp-jwt-verifier.js";
+import {
+  oauthClientDigest,
+  purgeExpiredRemoteMcpOAuthSecurityData,
+  recordRemoteMcpOAuthEvent,
+  takeRemoteMcpOAuthRateLimit,
+} from "../../apps/web/lib/remote-mcp-oauth-abuse.js";
 import { handleRemoteMcpTokenRequest } from "../../apps/web/lib/remote-mcp-token-http.js";
 import {
   createRemoteMcpTokenIssuer,
@@ -69,7 +75,11 @@ async function consent(overrides: Record<string, string> = {}) {
 
 describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
   beforeAll(async () => {
-    for (const name of ["0095_remote_mcp_oauth_grants.sql", "0096_remote_mcp_oauth_authorization_codes.sql"]) {
+    for (const name of [
+      "0095_remote_mcp_oauth_grants.sql",
+      "0096_remote_mcp_oauth_authorization_codes.sql",
+      "0097_remote_mcp_oauth_abuse_controls.sql",
+    ]) {
       const sql = await readFile(new URL(`../../packages/db/migrations/${name}`, import.meta.url), "utf8");
       await executor().query(sql);
     }
@@ -243,6 +253,13 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     await executor().query("update remote_mcp_oauth_clients set enabled = false where client_id = $1", [clientId]);
     try {
       expect(await beginRemoteMcpConsent(executor(), githubUserId, params())).toBeNull();
+      const beforeRevocation = await executor().query(
+        `select jti from remote_mcp_oauth_grants where client_id = $1 and revoked_at is null and expires_at > now() limit 1`,
+        [clientId],
+      );
+      const activeId = (beforeRevocation as { rows: { jti: string }[] }).rows[0]?.jti;
+      if (activeId)
+        expect(await isRemoteMcpGrantActive(executor(), activeId, githubUserId, clientId, issuer)).toBe(false);
       expect(
         await exchangeRemoteMcpAuthorizationCode(
           executor(),
@@ -420,6 +437,35 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
         tokenIssuer.sign,
       ),
     ).toBeNull();
+  });
+
+  it("enforces a shared PostgreSQL rate cap across concurrent authorization requests", async () => {
+    const unique = randomUUID();
+    const outcomes = await Promise.all(
+      Array.from({ length: 12 }, () => takeRemoteMcpOAuthRateLimit(executor(), "consent-user", unique, 5)),
+    );
+    expect(outcomes.filter((value) => value.allowed)).toHaveLength(5);
+    expect(outcomes.filter((value) => !value.allowed)).toHaveLength(7);
+    expect(outcomes.every((value) => value.retryAfterSeconds >= 1 && value.retryAfterSeconds <= 60)).toBe(true);
+    const raw = await executor().query("select attempts from remote_mcp_oauth_rate_limits where bucket_sha256 = $1", [
+      oauthClientDigest(`consent-user:${unique}`),
+    ]);
+    expect(Number((raw as { rows: { attempts: number }[] }).rows[0]?.attempts)).toBe(12);
+  });
+
+  it("persists redacted OAuth audit history and removes expired records safely", async () => {
+    const marker = randomUUID();
+    await recordRemoteMcpOAuthEvent(executor(), "token_rejected", githubUserId, marker);
+    const audits = await executor().query(
+      "select event_kind, github_user_id, client_sha256 from remote_mcp_oauth_security_events where client_sha256 = $1",
+      [oauthClientDigest(marker)],
+    );
+    const row = (audits as { rows: Array<{ event_kind: string; github_user_id: string; client_sha256: string }> })
+      .rows[0];
+    expect(row?.event_kind).toBe("token_rejected");
+    expect(Number(row?.github_user_id)).toBe(githubUserId);
+    expect(row?.client_sha256).not.toContain(marker);
+    await purgeExpiredRemoteMcpOAuthSecurityData(executor());
   });
 
   it("announces only supported discovery features, not dynamic registration", () => {

@@ -5,6 +5,7 @@ import {
   type OAuthAuthorizationParameters,
   remoteMcpAuthorizationRedirect,
 } from "./remote-mcp-authorization-code.js";
+import { recordRemoteMcpOAuthEvent, takeRemoteMcpOAuthRateLimit } from "./remote-mcp-oauth-abuse.js";
 import { decodeUserSession } from "./user-session.js";
 import { sessionCookieName } from "./viewer-authorization.js";
 
@@ -150,8 +151,21 @@ export async function handleRemoteMcpConsentGet(
   let db: Awaited<ReturnType<typeof deps.openDb>> | undefined;
   try {
     db = await deps.openDb();
+    const throttle = await takeRemoteMcpOAuthRateLimit(db, "consent-user", String(userId), 12);
+    if (!throttle.allowed) {
+      await recordRemoteMcpOAuthEvent(db, "rate_limited", userId);
+      return new Response("Too many consent requests", {
+        status: 429,
+        headers: {
+          ...securityHeaders,
+          "retry-after": String(throttle.retryAfterSeconds),
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
+    }
     const pending = await beginRemoteMcpConsent(db, userId, params);
     if (!pending) return errorResponse(400, "OAuth client or authorization request unavailable");
+    await recordRemoteMcpOAuthEvent(db, "consent_started", userId, params.clientId);
     return new Response(
       htmlPage({
         clientName: pending.displayName,
@@ -208,6 +222,18 @@ export async function handleRemoteMcpConsentPost(
   let db: Awaited<ReturnType<typeof deps.openDb>> | undefined;
   try {
     db = await deps.openDb();
+    const throttle = await takeRemoteMcpOAuthRateLimit(db, "consent-decision-user", String(userId), 20);
+    if (!throttle.allowed) {
+      await recordRemoteMcpOAuthEvent(db, "rate_limited", userId);
+      return new Response("Too many consent decisions", {
+        status: 429,
+        headers: {
+          ...securityHeaders,
+          "retry-after": String(throttle.retryAfterSeconds),
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
+    }
     const decided = await decideRemoteMcpConsent(db, userId, id, csrf, decision === "approve");
     if (!decided) return errorResponse(400, "Consent expired or already decided");
     const location = remoteMcpAuthorizationRedirect(decided, deps.issuer);
