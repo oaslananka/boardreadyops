@@ -22,6 +22,25 @@ operator-selected HTTPS origin
 
 Choose the public HTTPS origin as part of deployment commissioning. The repository does not define a production hostname, provider, IP address, or DNS record. `deploy/env.example` uses the reserved `boardreadyops.example.com` documentation domain only as a placeholder. Replace it with the real origin before deployment and configure `BOARDREADYOPS_CADDY_HOST`, `APP_URL`, `NEXT_PUBLIC_APP_URL`, `BOARDREADYOPS_PUBLIC_URL`, and `BOARDREADYOPS_CLOUD_HEALTH_URL` consistently.
 
+## OAuth ingress source verification (release-gated)
+
+The generic `deploy/Caddyfile` overwrites
+`X-BoardReadyOps-Verified-Client-IP` with Caddy's verified `{client_ip}`
+when proxying to the private web service. OAuth login-resumption and token
+endpoints require a single valid address from that header, apply per-source
+PostgreSQL request limits, and fail closed if this trusted ingress contract is
+missing. Client-supplied `X-Forwarded-For` is never accepted as authority by
+these handlers; rate-limit bucket keys are hashed before persistence.
+
+If another CDN or load balancer precedes Caddy, `{client_ip}` can represent
+the intermediary instead of the end user. Before enabling the remote OAuth
+release switch, commission a reviewed Caddy `trusted_proxies` policy for the
+actual ingress and verify spoof rejection, forwarded address normalization,
+shared-network behavior, per-client/global limits, and edge-layer abuse
+protection with real clients. Do not assume the generic Compose example
+describes production's commissioned proxy or authorization state. A successful
+synthetic unit test or Compose parse is not approval to deploy or activate MCP.
+
 ## Runtime layout
 
 Recommended paths:

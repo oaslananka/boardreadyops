@@ -9,6 +9,7 @@ type RetentionCleanupScope =
   | "completed_control_plane_outbox"
   | "completed_control_plane_reconciliation_items"
   | "webhook_inbox"
+  | "remote_mcp_oauth"
   | "artifact_retention";
 
 type RetentionCleanupFailure = {
@@ -30,6 +31,11 @@ export type RetentionCleanupResult = {
   artifactRetentionRevoked: number;
   artifactDeletionJobsQueued: number;
   artifactSharedObjectsRetained: number;
+  remoteMcpRateLimitBucketsPurged: number;
+  remoteMcpSecurityEventsPurged: number;
+  remoteMcpLoginResumptionsPurged: number;
+  remoteMcpExpiredGrantsPurged: number;
+  remoteMcpExpiredAuthorizationsPurged: number;
   failures: RetentionCleanupFailure[];
   completed: boolean;
 };
@@ -37,6 +43,13 @@ export type RetentionCleanupResult = {
 export type RetentionMaintenanceDependencies = {
   purgeWebhookInbox(): Promise<number>;
   purgeRunnerRequestNonces(): Promise<number>;
+  purgeRemoteMcpOAuth(): Promise<{
+    rateLimitBucketsPurged: number;
+    securityEventsPurged: number;
+    loginResumptionsPurged: number;
+    expiredGrantsPurged: number;
+    expiredAuthorizationsPurged: number;
+  }>;
   expireArtifactUploadCapabilities(): Promise<number>;
   revokeExpiredRunnerRegistrationEnrollments(): Promise<number>;
   expireRepositorySetupProbes(): Promise<number>;
@@ -62,6 +75,7 @@ export async function runRetentionMaintenanceCleanup(
   const [
     webhookInbox,
     runnerRequestNonces,
+    remoteMcpOAuth,
     artifactUploadCapabilities,
     runnerRegistrationEnrollments,
     repositorySetupProbes,
@@ -74,6 +88,7 @@ export async function runRetentionMaintenanceCleanup(
   ] = await Promise.allSettled([
     dependencies.purgeWebhookInbox(),
     dependencies.purgeRunnerRequestNonces(),
+    dependencies.purgeRemoteMcpOAuth(),
     dependencies.expireArtifactUploadCapabilities(),
     dependencies.revokeExpiredRunnerRegistrationEnrollments(),
     dependencies.expireRepositorySetupProbes(),
@@ -88,6 +103,7 @@ export async function runRetentionMaintenanceCleanup(
   const results = [
     ["webhook_inbox", webhookInbox],
     ["runner_request_nonces", runnerRequestNonces],
+    ["remote_mcp_oauth", remoteMcpOAuth],
     ["artifact_upload_capabilities", artifactUploadCapabilities],
     ["runner_registration_enrollments", runnerRegistrationEnrollments],
     ["repository_setup_probes", repositorySetupProbes],
@@ -126,6 +142,15 @@ export async function runRetentionMaintenanceCleanup(
       artifactRetention.status === "fulfilled" ? artifactRetention.value.deletionJobsQueued : 0,
     artifactSharedObjectsRetained:
       artifactRetention.status === "fulfilled" ? artifactRetention.value.sharedObjectsRetained : 0,
+    remoteMcpRateLimitBucketsPurged:
+      remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.rateLimitBucketsPurged : 0,
+    remoteMcpSecurityEventsPurged:
+      remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.securityEventsPurged : 0,
+    remoteMcpLoginResumptionsPurged:
+      remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.loginResumptionsPurged : 0,
+    remoteMcpExpiredGrantsPurged: remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.expiredGrantsPurged : 0,
+    remoteMcpExpiredAuthorizationsPurged:
+      remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.expiredAuthorizationsPurged : 0,
     failures,
     completed: failures.length === 0,
   };

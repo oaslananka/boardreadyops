@@ -146,6 +146,12 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0092_optional_legacy_delivery_archive_url.sql",
       "0093_explicit_manufacturing_share_authorizations.sql",
       "0094_run_pcb_footprint_summaries.sql",
+      "0095_remote_mcp_oauth_grants.sql",
+      "0096_remote_mcp_oauth_authorization_codes.sql",
+      "0097_remote_mcp_oauth_abuse_controls.sql",
+      "0098_remote_mcp_oauth_login_resumptions.sql",
+      "0099_remote_mcp_oauth_retention_indexes.sql",
+      "0100_remote_mcp_oauth_client_epochs.sql",
     ]);
   });
 

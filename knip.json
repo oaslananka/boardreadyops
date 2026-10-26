@@ -32,5 +32,6 @@
       "ignore": ["lib/utils.ts"]
     }
   },
+  "ignore": ["packages/db/scripts/remote-mcp-release-preflight.d.mts"],
   "ignoreBinaries": ["psql"]
 }
