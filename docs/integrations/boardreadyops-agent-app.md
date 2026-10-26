@@ -655,3 +655,29 @@ all fail closed. Bounded chunked reading also avoids allocating attacker-sized
 JSON response strings before performing the size check. The code and unit
 tests use synthetic responses only; production GitHub App keys and tokens were
 not read or changed.
+
+### OAuth form request streaming limits (unreleased hardening)
+
+`POST /oauth/token` and authenticated `POST /oauth/authorize` now share the
+`remote-mcp-bounded-form` reader instead of calling unbounded `request.text()`.
+It enforces **4096 bytes** at the token endpoint and **2048 bytes** for consent
+decisions *while reading* the request stream, not after allocating its full
+body. Any over-limit stream is canceled without consuming subsequent chunks;
+none of these rejected requests can reach PostgreSQL, issue a grant, approve a
+consent or run the signer. Limits use actual bytes rather than JavaScript
+character counts, including for percent-encoded and multibyte text.
+
+An absent `Content-Length` is not trusted as evidence of a small body; a
+forged short value cannot bypass the incremental cap. Malformed, excessive or
+mismatched declared lengths, invalid UTF-8, empty forms, interrupted streams
+and already-consumed bodies fail closed. Normal valid OAuth forms retain the
+same parameter allowlist, PKCE S256 validation, CSRF validation and return
+semantics. The ingress must **independently** enforce transport/connection
+timeouts and edge request-size controls; this application reader is not a
+substitute for ingress slow-client protections.
+
+Focused stream tests verify exact-limit requests, cancellation on oversize,
+forged `Content-Length`, invalid UTF-8 and early database denial for both
+OAuth endpoints. Isolated PostgreSQL 17 OAuth + retention + operator preflight
+acceptance continues to pass, with no hosted configuration or production
+client enrollment changed.

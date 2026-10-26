@@ -65,6 +65,30 @@ function deps(db: ReturnType<typeof database>) {
   return { issuer, sessionSecret, openDb: vi.fn().mockResolvedValue(db) };
 }
 
+function streamingConsentRequest(chunks: Uint8Array[], length?: string, onCancel?: () => void): Request {
+  let next = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (next === chunks.length) controller.close();
+      else controller.enqueue(chunks[next++] as Uint8Array);
+    },
+    cancel() {
+      onCancel?.();
+    },
+  });
+  return new Request(`${issuer}/oauth/authorize`, {
+    method: "POST",
+    headers: cookieHeaders({
+      origin: issuer,
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/x-www-form-urlencoded",
+      ...(length === undefined ? {} : { "content-length": length }),
+    }),
+    body: stream,
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
+}
+
 describe("Remote MCP browser consent security boundary", () => {
   it("preserves an unsigned user's OAuth request behind a short cookie-bound GitHub login resume", async () => {
     const store = database([[{ id: "created" }]]);
@@ -147,6 +171,39 @@ describe("Remote MCP browser consent security boundary", () => {
     expect((await handleRemoteMcpConsentPost(post("https://evil.example", fields), config)).status).toBe(403);
     expect((await handleRemoteMcpConsentPost(post(issuer, fields, "not-signed"), config)).status).toBe(401);
     expect((await handleRemoteMcpConsentPost(post(issuer, `${fields}&decision=deny`), config)).status).toBe(400);
+    expect(config.openDb).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized chunked consent POST before any database or approval mutation", async () => {
+    let canceled = false;
+    const form = new TextEncoder().encode(
+      `authorization_id=123e4567-e89b-42d3-a456-426614174000&csrf=${"a".repeat(43)}&decision=approve`,
+    );
+    const config = deps(database());
+    const response = await handleRemoteMcpConsentPost(
+      streamingConsentRequest([form, new Uint8Array(2049), new TextEncoder().encode("never-read")], "4", () => {
+        canceled = true;
+      }),
+      config,
+    );
+    expect(response.status).toBe(400);
+    expect(canceled).toBe(true);
+    expect(config.openDb).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed UTF-8 and declared-size mismatches before querying consent tables", async () => {
+    const config = deps(database());
+    expect(
+      (await handleRemoteMcpConsentPost(streamingConsentRequest([new Uint8Array([255, 254])]), config)).status,
+    ).toBe(400);
+    expect(
+      (
+        await handleRemoteMcpConsentPost(
+          streamingConsentRequest([new TextEncoder().encode("decision=approve")], "1"),
+          config,
+        )
+      ).status,
+    ).toBe(400);
     expect(config.openDb).not.toHaveBeenCalled();
   });
 

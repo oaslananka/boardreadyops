@@ -6,6 +6,7 @@ import {
   remoteMcpAuthorizationRedirect,
   validRemoteMcpOAuthAuthorizationParameters,
 } from "./remote-mcp-authorization-code.js";
+import { readBoundedRemoteMcpForm } from "./remote-mcp-bounded-form.js";
 import {
   beginRemoteMcpLoginResumption,
   clearedRemoteMcpLoginResumptionCookie,
@@ -249,7 +250,9 @@ export async function handleRemoteMcpConsentPost(
     request.headers.get("origin") !== deps.issuer ||
     request.headers.get("sec-fetch-site") === "cross-site" ||
     !/^application\/x-www-form-urlencoded(?:;\s*charset=utf-8)?$/iu.test(request.headers.get("content-type") ?? "") ||
-    Number(request.headers.get("content-length") ?? 0) > maxConsentPostBytes
+    (request.headers.has("content-length") &&
+      (!/^(0|[1-9][0-9]*)$/u.test(request.headers.get("content-length") ?? "") ||
+        Number(request.headers.get("content-length")) > maxConsentPostBytes))
   ) {
     return errorResponse(403, "Consent request forbidden");
   }
@@ -258,8 +261,8 @@ export async function handleRemoteMcpConsentPost(
 
   let data: URLSearchParams;
   try {
-    const body = await request.text();
-    if (body.length === 0 || body.length > maxConsentPostBytes) return errorResponse(400, "Invalid consent request");
+    const body = await readBoundedRemoteMcpForm(request, maxConsentPostBytes);
+    if (body === null) return errorResponse(400, "Invalid consent request");
     data = new URLSearchParams(body);
   } catch {
     return errorResponse(400, "Invalid consent request");

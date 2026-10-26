@@ -23,6 +23,28 @@ function request(form: Record<string, string>, headers: HeadersInit = {}, url = 
   });
 }
 
+function streamedTokenRequest(chunks: Uint8Array[], length?: string, onCancel?: () => void): Request {
+  let cursor = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (cursor >= chunks.length) controller.close();
+      else controller.enqueue(chunks[cursor++] as Uint8Array);
+    },
+    cancel() {
+      onCancel?.();
+    },
+  });
+  return new Request(`${issuer}/oauth/token`, {
+    method: "POST",
+    body: stream,
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      ...(length === undefined ? {} : { "content-length": length }),
+    },
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
+}
+
 describe("OAuth token HTTP input boundary", () => {
   it.each([
     ["wrong resource", { ...validForm, resource: "https://other.example/mcp" }],
@@ -34,6 +56,32 @@ describe("OAuth token HTTP input boundary", () => {
     const response = await handleRemoteMcpTokenRequest(request(form), config as never);
     expect(response.status).toBe(400);
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(config.openDb).not.toHaveBeenCalled();
+  });
+
+  it("rejects a chunked oversized token form before opening any database connection", async () => {
+    let canceled = false;
+    const encoded = new TextEncoder().encode(new URLSearchParams(validForm).toString());
+    const chunks = [encoded, new Uint8Array(4097), new TextEncoder().encode("hidden_secret")];
+    const config = deps();
+    const response = await handleRemoteMcpTokenRequest(
+      streamedTokenRequest(chunks, "5", () => {
+        canceled = true;
+      }),
+      config as never,
+    );
+    expect(response.status).toBe(400);
+    expect(canceled).toBe(true);
+    expect(config.openDb).not.toHaveBeenCalled();
+    expect(await response.json()).toEqual({ error: "invalid_request" });
+  });
+
+  it("rejects invalid token form encoding without opening a database connection", async () => {
+    const config = deps();
+    const invalidUtf8 = streamedTokenRequest([new Uint8Array([255, 254])]);
+    expect((await handleRemoteMcpTokenRequest(invalidUtf8, config as never)).status).toBe(400);
+    const invalidLength = streamedTokenRequest([new TextEncoder().encode("valid=1")], "bad");
+    expect((await handleRemoteMcpTokenRequest(invalidLength, config as never)).status).toBe(400);
     expect(config.openDb).not.toHaveBeenCalled();
   });
 

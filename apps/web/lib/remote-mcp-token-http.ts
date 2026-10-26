@@ -1,5 +1,6 @@
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { exchangeRemoteMcpAuthorizationCode, type SignedRemoteMcpTokenFacts } from "./remote-mcp-authorization-code.js";
+import { readBoundedRemoteMcpForm } from "./remote-mcp-bounded-form.js";
 import { remoteMcpResource } from "./remote-mcp-foundation.js";
 import { recordRemoteMcpOAuthEvent, takeRemoteMcpOAuthRateLimit } from "./remote-mcp-oauth-abuse.js";
 
@@ -41,14 +42,16 @@ export async function handleRemoteMcpTokenRequest(
     url.search.length > 0 ||
     request.headers.has("cookie") ||
     !/^application\/x-www-form-urlencoded(?:;\s*charset=utf-8)?$/iu.test(request.headers.get("content-type") ?? "") ||
-    Number(request.headers.get("content-length") ?? 0) > 4096
+    (request.headers.has("content-length") &&
+      (!/^(0|[1-9][0-9]*)$/u.test(request.headers.get("content-length") ?? "") ||
+        Number(request.headers.get("content-length")) > 4096))
   )
     return errorResponse("invalid_request", 400);
 
   let parameters: URLSearchParams;
   try {
-    const raw = await request.text();
-    if (raw.length === 0 || raw.length > 4096) return errorResponse("invalid_request", 400);
+    const raw = await readBoundedRemoteMcpForm(request, 4096);
+    if (raw === null) return errorResponse("invalid_request", 400);
     parameters = new URLSearchParams(raw);
   } catch {
     return errorResponse("invalid_request", 400);
