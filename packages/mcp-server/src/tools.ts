@@ -19,6 +19,17 @@ export interface VerifyBundleToolInput {
   trustedKey?: string | undefined;
 }
 
+export interface FootprintSummaryToolInput {
+  /** Local Git checkout. Never uploaded. */
+  path?: string | undefined;
+  /** Base commit/reference resolved within the checkout. */
+  base: string;
+  /** Head commit/reference resolved within the checkout. */
+  head: string;
+  /** Tracked repository-relative KiCad PCB filename. */
+  pcb: string;
+}
+
 export type ToolResult = { ok: true; result: unknown } | { ok: false; error: string; exitCode: number };
 
 /**
@@ -98,4 +109,42 @@ export async function runVerifyBundleTool(input: VerifyBundleToolInput, runCli: 
   args.push(input.bundleDir);
   const run = await runCli(args);
   return parseCliJsonOutput(run, "boardreadyops release verify");
+}
+
+/**
+ * Compares immutable local Git PCB revisions without transferring design sources.
+ * Only emits source digests and footprint change counts; no individual object
+ * positions, refs, source bytes, risk predictions or fabrication verdicts.
+ */
+export async function runFootprintSummaryTool(
+  input: FootprintSummaryToolInput,
+  runCli: CliRunner,
+): Promise<ToolResult> {
+  const repoPath = input.path ?? ".";
+  for (const [label, value] of [
+    ["path", repoPath],
+    ["base", input.base],
+    ["head", input.head],
+    ["pcb", input.pcb],
+  ] as const) {
+    if (!value.trim() || [...value].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) {
+      return { ok: false, error: `${label} must be a nonempty plain value`, exitCode: 1 };
+    }
+    const rejected = rejectFlagLike(value, label);
+    if (rejected) return rejected;
+  }
+  const run = await runCli([
+    "review",
+    "footprint-diff",
+    "--base",
+    input.base,
+    "--head",
+    input.head,
+    "--pcb",
+    input.pcb,
+    "--format",
+    "summary-json",
+    repoPath,
+  ]);
+  return parseCliJsonOutput(run, "boardreadyops review footprint-diff");
 }

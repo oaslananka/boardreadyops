@@ -25,6 +25,14 @@ running the same command by hand.
 | `boardreadyops_check` | `boardreadyops check --format json` | `path?`, `config?`, `failOn?` |
 | `boardreadyops_plan` | `boardreadyops plan` | `path?`, `config?`, `failOn?` |
 | `boardreadyops_verify_bundle` | `boardreadyops release verify --format json` | `bundleDir`, `trustedKey?` |
+| `boardreadyops_footprint_summary` | `boardreadyops review footprint-diff --format summary-json` | `path?`, `base`, `head`, `pcb` |
+
+`boardreadyops_footprint_summary` reads **two immutable local Git revisions**. It returns only
+verified footprint change counts, source hashes and commit/blob identities: **no KiCad source,
+per-footprint data, exact positions, electrical risk or production decision**. If the source is
+unavailable/ambiguous, the tool preserves the CLI's `status: "unavailable"` result rather than
+filling gaps. You must specify the repository-relative tracked `.kicad_pcb` path explicitly.
+This is a **local stdio MCP tool**, not a remote cloud endpoint.
 
 Each tool returns `{ ok: true, result: <parsed CLI JSON output> }` on success, or
 `{ ok: false, error: string, exitCode: number }` when the underlying CLI invocation itself failed
@@ -47,6 +55,14 @@ Configure your MCP client to run:
   }
 }
 ```
+
+## Next integration phase
+
+The proposed ChatGPT / Claude integration will reuse this deterministic tool layer and the
+existing hosted Review contracts. Its **remote MCP** and **interactive MCP Apps UI** must first
+pass the per-tenant OAuth authorization, private-design IP minimization, and hosted evidence
+security gates described in [the integration plan](../../docs/integrations/boardreadyops-agent-app.md).
+Neither a public remote MCP URL nor a published ChatGPT App is shipped in this package today.
 
 ## What's not here yet
 
