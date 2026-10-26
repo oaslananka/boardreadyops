@@ -1,6 +1,6 @@
 # Renovate uses the explicit 26.04 version and immutable digest below; do not combine tag@digest here.
 # renovate: datasource=docker depName=ubuntu currentValue=26.04
-FROM ubuntu@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
+FROM ubuntu@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
 
 ARG NODE_VERSION=24.21.0
 ARG BOARDREADYOPS_VERSION

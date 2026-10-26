@@ -379,6 +379,40 @@ describe("MCP v2 stateless web request boundary", () => {
     expect(openDb).not.toHaveBeenCalled();
   });
 
+  it("exposes the portable MCP Apps Review resource only after the user-bound OAuth grant", async () => {
+    const openDb = vi.fn();
+    const config = { openDb, checkCurrentPermission: vi.fn() };
+    const principal = { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] };
+    const listed = await handleAuthorizedRemoteMcpHttp(mcpRequest("resources/list"), principal, config);
+    expect(listed.status).toBe(200);
+    const catalog = await listed.json();
+    expect(catalog.result.resources).toEqual(
+      expect.arrayContaining([expect.objectContaining({ uri: "ui://boardreadyops/review.html" })]),
+    );
+    const readRequest = mcpRequest("resources/read", { uri: "ui://boardreadyops/review.html" });
+    // MCP v2 requires the resource identity in the per-request Mcp-Name header.
+    readRequest.headers.set("Mcp-Name", "ui://boardreadyops/review.html");
+    const loaded = await handleAuthorizedRemoteMcpHttp(readRequest, principal, config);
+    expect(loaded.status).toBe(200);
+    const payload = await loaded.text();
+    expect(payload).toContain("BoardReadyOps");
+    expect(payload).toContain("text/html;profile=mcp-app");
+    expect(payload).not.toContain("bro_live_");
+    expect(openDb).not.toHaveBeenCalled();
+    const denied = await handleRemoteMcpWithVerifiedGrant(
+      mcpRequest("resources/read", {
+        uri: "ui://boardreadyops/review.html",
+      }),
+      {
+        issuer,
+        verifier: { verifySignedAccessToken: vi.fn().mockResolvedValue(null), grantIsActive: vi.fn() },
+        ...config,
+      },
+    );
+    expect(denied.status).toBe(401);
+    expect(openDb).not.toHaveBeenCalled();
+  });
+
   it("does not advertise or invoke Review tools for evidence-only OAuth grants", async () => {
     const openDb = vi.fn();
     const principal = { githubUserId: ghUser, grantId: jti, scopes: ["evidence:read"] };

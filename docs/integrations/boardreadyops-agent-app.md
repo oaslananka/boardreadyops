@@ -842,3 +842,27 @@ approved grants remain usable; display-only changes leave valid access alone.
 **Migration 0100 has not been applied to production**, and the hosted MCP/OAuth
 feature gates remain disabled. Do not push, deploy, or apply the migration
 without the explicit final release decision.
+
+## Integration of existing PR #1249 (non-production review branch)
+
+The previously independent PR #1249 contributes a non-sensitive MCP Apps
+HTML view, `ui://boardreadyops/review.html`, generated from source, a
+customer-facing `/connect` unavailable-state page and additional tests for
+bounded review/finding/footprint data. The local #1248 foundation contributes
+browser-bound OAuth consent, durable token grants, per-request **live** GitHub
+App collaborator checks and self-service revocation.
+
+**Conflict resolution:** the public `/mcp` route and path-specific OAuth
+protected-resource discovery remain owned by the stricter #1248
+**double-release-gated** production handler. PR #1249's earlier experimental
+repo-token or external-IDP handler survives for testing the UI adapter only;
+its legacy bearer path is **not** wired to the deployed `/mcp` route. Never
+enable the old `BOARDREADYOPS_MCP_REMOTE_ENABLED` switch to expose an
+alternative authorization model. The shared MCP Apps resource and richer
+read-only tools still need explicit incorporation into the secure
+GitHub-user-grant handler before launch. Both gated systems remain in HOLD.
+
+The merge is prepared in an isolated integration worktree, not the production
+checkout. Deployment, migration and provider enrollment require the
+separate live acceptance documented in
+`boardreadyops-live-acceptance-20261026.md`.

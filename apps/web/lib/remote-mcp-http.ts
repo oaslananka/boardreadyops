@@ -1,6 +1,8 @@
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { RESOURCE_MIME_TYPE, registerAppResource } from "@modelcontextprotocol/ext-apps/server";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { mcpReviewViewHtml } from "./generated-mcp-review-view.js";
 import {
   authenticateRemoteMcpRequest,
   type CheckLiveRepositoryPermission,
@@ -99,6 +101,27 @@ export async function handleAuthorizedRemoteMcpHttp(
               await db?.close().catch(() => undefined);
             }
           },
+        );
+      }
+      if (principal.scopes.includes("review:read")) {
+        // The shared MCP Apps view is available only AFTER signature, durable
+        // grant and browser-origin checks. The view does not fetch network
+        // resources, disclose bearer credentials, or claim missing evidence.
+        registerAppResource(
+          server,
+          "PCB evidence review",
+          "ui://boardreadyops/review.html",
+          {
+            description: "Read-only source evidence summary; no external network access",
+            _meta: {
+              ui: { csp: { connectDomains: [], resourceDomains: [], frameDomains: [] }, prefersBorder: true },
+            },
+          },
+          () => ({
+            contents: [
+              { uri: "ui://boardreadyops/review.html", mimeType: RESOURCE_MIME_TYPE, text: mcpReviewViewHtml },
+            ],
+          }),
         );
       }
       return server;
