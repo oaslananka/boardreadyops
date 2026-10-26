@@ -51,10 +51,16 @@ export function updateReviewToolResult(elements: ReviewEvidenceElements, result:
     }
 
     const change = evidence.changes;
-    if (!change || typeof change !== "object" || Array.isArray(change)) return;
+    if (!change || typeof change !== "object" || Array.isArray(change)) {
+      status.textContent = "Source evidence unavailable";
+      return;
+    }
     const changes = change as Record<string, unknown>;
     const values = [changes.added, changes.removed, changes.modified];
-    if (!values.every((x) => typeof x === "number" && Number.isSafeInteger(x) && x >= 0)) return;
+    if (!values.every((x) => typeof x === "number" && Number.isSafeInteger(x) && x >= 0)) {
+      status.textContent = "Source evidence unavailable";
+      return;
+    }
 
     heading.textContent = "Source-linked footprint changes";
     counts.textContent = `${values[0]} added · ${values[1]} removed · ${values[2]} modified`;

@@ -65,10 +65,18 @@ describe("MCP Apps Review evidence lifecycle", () => {
     cleared();
     expect(status.textContent).toContain("No verified");
 
-    show();
-    handle({ structuredContent: { ...valid, changes: null } });
-    cleared();
-    expect(status.textContent).toBe("");
+    for (const invalidChanges of [
+      null,
+      [1, 2, 3],
+      { added: -1, removed: 0, modified: 0 },
+      { added: Number.NaN, removed: 0, modified: 0 },
+      { added: 1, removed: 0.5, modified: 0 },
+    ]) {
+      show();
+      handle({ structuredContent: { ...valid, changes: invalidChanges } });
+      cleared();
+      expect(status.textContent).toBe("Source evidence unavailable");
+    }
 
     show();
     handle({ content: [{ type: "text", text: "invalid JSON" }] });
