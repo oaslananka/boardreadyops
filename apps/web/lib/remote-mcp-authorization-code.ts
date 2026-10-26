@@ -43,12 +43,23 @@ function validHttpsUrl(value: string): boolean {
       !url.username &&
       !url.password &&
       !url.hash &&
+      !/%(?![0-9a-fA-F]{2})/u.test(value) &&
       url.href === value &&
       value.length <= 2048
     );
   } catch {
     return false;
   }
+}
+
+/** Public OAuth client IDs are opaque by default (RFC 6749). Accept tightly
+ * bounded ASCII IDs for operator-pre-registered clients, or canonical HTTPS
+ * metadata-document URLs. Neither form grants access without an exact match
+ * to a currently enabled client and its registered redirect URI in PostgreSQL.
+ * No metadata URL is fetched and no dynamic client registration is implied.
+ */
+export function validRemoteMcpOAuthClientId(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._~-]{7,127}$/u.test(value) || validHttpsUrl(value);
 }
 
 function validIssuerOrigin(value: string): boolean {
@@ -79,7 +90,7 @@ export function validRemoteMcpOAuthAuthorizationParameters(params: OAuthAuthoriz
     challengePattern.test(params.codeChallenge) &&
     params.resource === remoteMcpResource &&
     validScopes(params.scope) &&
-    validHttpsUrl(params.clientId) &&
+    validRemoteMcpOAuthClientId(params.clientId) &&
     validHttpsUrl(params.redirectUri) &&
     typeof params.state === "string" &&
     params.state.length >= 8 &&
@@ -217,7 +228,7 @@ export async function exchangeRemoteMcpAuthorizationCode(
 ): Promise<{ access_token: string; token_type: "Bearer"; expires_in: number; scope: string } | null> {
   if (
     !/^[A-Za-z0-9_-]{43}$/u.test(input.code) ||
-    !validHttpsUrl(input.clientId) ||
+    !validRemoteMcpOAuthClientId(input.clientId) ||
     !validHttpsUrl(input.redirectUri) ||
     !validIssuerOrigin(issuer)
   )

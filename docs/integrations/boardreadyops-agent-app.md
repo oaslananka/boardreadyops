@@ -357,6 +357,34 @@ nonce, replay protection, login continuation, preserved state and retention
 were exercised on an isolated PostgreSQL 17 instance. This feature remains
 behind the existing unpublished OAuth and MCP rollout gates.
 
+### Exact pre-registered OAuth client IDs (CIMD and manual public clients)
+
+`client_id` is an opaque OAuth identifier, not intrinsically an HTTPS URL.
+The authorization consent validation and authorization-code token exchange now
+both accept canonical HTTPS client-metadata URLs (e.g. the verified ChatGPT
+CIMD identity) **or** constrained ASCII opaque IDs (8–128 characters;
+letters, digits, `.`, `_`, `~`, and `-`). This removes an avoidable
+compatibility blocker for providers' manual OAuth-client configuration, such
+as Claude's **Use your own OAuth client** mode. The token issuer and durable
+JWT/grant checks bind the exact client ID, whichever form is configured.
+
+Every client MUST already exist as an exact match in
+`remote_mcp_oauth_clients`, have `enabled=true`, and match the requested
+pre-registered canonical HTTPS `redirect_uri`. An enabled client may authorize
+**only its own stored callback**. No fallback registration, wildcard callback,
+CIMD fetch, remote URL dereference, or issuer/client impersonation is added.
+In particular, we intentionally do **not** advertise
+`client_id_metadata_document_supported: true`, because that would imply a
+CIMD-fetch/validation capability we have not implemented. For manual Claude
+setup, take its actual client ID and callback from the connector configuration;
+do not presume the published metadata identity has been registered.
+
+A disposable PostgreSQL integration exercises an opaque client through
+single-use consent, PKCE-bound token exchange, a persisted grant and
+signature-verifying access, and refuses an alternate identity, altered HTTPS
+callback, malformed client ID and insecure request. No client registration,
+public OAuth activation or production schema change was performed.
+
 ### Hosted OAuth client interoperability (October 2026 review)
 
 - OpenAI's current plugin OAuth guide documents stable ChatGPT CIMD client ID

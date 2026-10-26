@@ -102,6 +102,105 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     }
   });
 
+  it("accepts only pre-registered opaque OAuth client IDs with an exact HTTPS callback", async () => {
+    const opaqueId = `claude-local-client-${randomUUID()}`;
+    const opaqueCallback = "https://claude.ai/api/mcp/auth_callback";
+    try {
+      await executor().query(
+        `insert into remote_mcp_oauth_clients (client_id, redirect_uri, display_name, enabled)
+         values ($1, $2, 'Opaque Test Client', true)`,
+        [opaqueId, opaqueCallback],
+      );
+      const allowed = await beginRemoteMcpConsent(
+        executor(),
+        githubUserId,
+        params({ clientId: opaqueId, redirectUri: opaqueCallback }),
+      );
+      expect(allowed?.displayName).toBe("Opaque Test Client");
+      expect(allowed?.redirectOrigin).toBe("https://claude.ai");
+      expect(
+        await beginRemoteMcpConsent(
+          executor(),
+          githubUserId,
+          params({ clientId: opaqueId, redirectUri: "https://evil.example/callback" }),
+        ),
+      ).toBeNull();
+      expect(
+        await beginRemoteMcpConsent(
+          executor(),
+          githubUserId,
+          params({ clientId: `${opaqueId}-other`, redirectUri: opaqueCallback }),
+        ),
+      ).toBeNull();
+      expect(
+        await beginRemoteMcpConsent(
+          executor(),
+          githubUserId,
+          params({ clientId: "http://insecure.example/client-id", redirectUri: opaqueCallback }),
+        ),
+      ).toBeNull();
+      expect(
+        await beginRemoteMcpConsent(
+          executor(),
+          githubUserId,
+          params({ clientId: "opaque client with spaces", redirectUri: opaqueCallback }),
+        ),
+      ).toBeNull();
+
+      const started = required(allowed);
+      const approved = await decideRemoteMcpConsent(
+        executor(),
+        githubUserId,
+        started.authorizationId,
+        started.csrfNonce,
+        true,
+      );
+      const incorrectClientExchange = await exchangeRemoteMcpAuthorizationCode(
+        executor(),
+        {
+          code: required(required(approved).code),
+          clientId: clientId,
+          redirectUri: opaqueCallback,
+          codeVerifier: verifier,
+        },
+        issuer,
+        tokenIssuer.sign,
+      );
+      expect(incorrectClientExchange).toBeNull();
+      const exchanged = await exchangeRemoteMcpAuthorizationCode(
+        executor(),
+        {
+          code: required(required(approved).code),
+          clientId: opaqueId,
+          redirectUri: opaqueCallback,
+          codeVerifier: verifier,
+        },
+        issuer,
+        tokenIssuer.sign,
+      );
+      expect(required(exchanged).access_token).toBeTruthy();
+      const verified = createRemoteMcpJwtVerifier({
+        issuer,
+        verifyKey: createLocalJWKSet((await tokenIssuer.publicJwks()) as never),
+        activeGrant: (grantId, id, registeredClient, scope, signedIssuer) =>
+          isRemoteMcpGrantActive(executor(), grantId, id, registeredClient, signedIssuer, scope),
+      });
+      const principal = await authenticateRemoteMcpRequest(
+        new Request(remoteMcpResource, {
+          headers: { authorization: `Bearer ${required(exchanged).access_token}` },
+        }),
+        issuer,
+        verified,
+      );
+      expect(principal?.githubUserId).toBe(githubUserId);
+      expect(principal?.scopes).toEqual(["review:read"]);
+    } finally {
+      await executor().query("delete from remote_mcp_oauth_grants where client_id = $1", [opaqueId]);
+      await executor().query("delete from remote_mcp_oauth_authorizations where client_id = $1", [opaqueId]);
+      await executor().query("delete from remote_mcp_oauth_clients where client_id = $1", [opaqueId]);
+    }
+  });
+
   it("starts consent only for a pre-registered exact HTTPS client and S256", async () => {
     const started = await consent();
     expect(started.displayName).toBe("Trusted Test Client");
