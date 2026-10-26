@@ -29,34 +29,36 @@ export async function handleAuthorizedRemoteMcpHttp(
         { name: "boardreadyops-hosted-review", version: "0.1.0" },
         { maxToolInputElements: 20 },
       );
-      server.registerTool(
-        "boardreadyops_review_get",
-        {
-          description:
-            "Read bounded deterministic state for one authorized BoardReadyOps hosted Review. Never a fabrication verdict.",
-          inputSchema: z.object({ reviewId: z.string().uuid() }).strict(),
-          annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-        },
-        async ({ reviewId }) => {
-          let db: Awaited<ReturnType<RemoteMcpReadDependencies["openDb"]>> | undefined;
-          try {
-            db = await dependencies.openDb();
-            const facts = await loadAuthorizedRemoteReview(
-              db,
-              principal,
-              reviewId,
-              dependencies.checkCurrentPermission,
-            );
-            if (!facts) return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
-            return { content: [{ type: "text", text: JSON.stringify(facts) }], structuredContent: facts };
-          } catch {
-            // Do not disclose repository IDs, CAD paths, database errors or external service details.
-            return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
-          } finally {
-            await db?.close().catch(() => undefined);
-          }
-        },
-      );
+      if (principal.scopes.includes("review:read")) {
+        server.registerTool(
+          "boardreadyops_review_get",
+          {
+            description:
+              "Read bounded deterministic state for one authorized BoardReadyOps hosted Review. Never a fabrication verdict.",
+            inputSchema: z.object({ reviewId: z.string().uuid() }).strict(),
+            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+          },
+          async ({ reviewId }) => {
+            let db: Awaited<ReturnType<RemoteMcpReadDependencies["openDb"]>> | undefined;
+            try {
+              db = await dependencies.openDb();
+              const facts = await loadAuthorizedRemoteReview(
+                db,
+                principal,
+                reviewId,
+                dependencies.checkCurrentPermission,
+              );
+              if (!facts) return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
+              return { content: [{ type: "text", text: JSON.stringify(facts) }], structuredContent: facts };
+            } catch {
+              // Do not disclose repository IDs, CAD paths, database errors or external service details.
+              return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
+            } finally {
+              await db?.close().catch(() => undefined);
+            }
+          },
+        );
+      }
       return server;
     },
     { legacy: "stateless", maxRequestBodySize: 64 * 1024 },

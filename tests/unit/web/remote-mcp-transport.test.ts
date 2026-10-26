@@ -157,6 +157,24 @@ describe("MCP v2 stateless web request boundary", () => {
     expect(openDb).not.toHaveBeenCalled();
   });
 
+  it("does not advertise or invoke Review tools for evidence-only OAuth grants", async () => {
+    const openDb = vi.fn();
+    const principal = { githubUserId: ghUser, grantId: jti, scopes: ["evidence:read"] };
+    const config = { openDb, checkCurrentPermission: vi.fn() };
+    const listed = await handleAuthorizedRemoteMcpHttp(mcpRequest("tools/list"), principal, config);
+    const listing = await listed.text();
+    expect([200, 404], listing).toContain(listed.status);
+    expect(listing).not.toContain("boardreadyops_review_get");
+    const called = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/call", { name: "boardreadyops_review_get", arguments: { reviewId } }),
+      principal,
+      config,
+    );
+    const result = await called.text();
+    expect(result).not.toContain('"schemaVersion":1');
+    expect(openDb).not.toHaveBeenCalled();
+  });
+
   it("returns only authorized review facts and closes the database for tools/call", async () => {
     const close = vi.fn().mockResolvedValue(undefined);
     const query = vi

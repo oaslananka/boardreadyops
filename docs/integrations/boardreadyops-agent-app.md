@@ -347,3 +347,45 @@ handler; this commit does NOT enable the hosted MCP endpoint.
   A successful synthetic consent/token exchange is not sufficient to claim
   ChatGPT or Claude connection compatibility. Never publish the protected
   `/mcp` endpoint or register a client before its boundary checks pass.
+
+### Signed OAuth → modern MCP v2 end-to-end internal acceptance (26 October 2026)
+
+The local PostgreSQL 17 integration suite now performs a continuous
+**user-bound consent → S256 one-time authorization-code exchange → RS256 JWT →
+durable grant lookup → MCP v2 `tools/list` and `tools/call`** exercise. The
+MCP tool call is further gated by an injected live-repository-permission
+checker. The test verifies that only the expected Review digest, SHA and
+review status are serialized, that the owning repository's identity stays
+private, that a removed GitHub permission returns the same generic `Review
+unavailable` error as a missing Review, and that grant revocation produces
+HTTP 401 with the OAuth resource metadata challenge before opening review DB.
+The Review SQL adapter and permission result are **test fixtures**; the durable
+OAuth authorization/grant queries run against disposable real PostgreSQL.
+
+Review tools are no longer registered for principals with only the
+`evidence:read` scope. Other scope requests remain accepted as defined by the
+existing metadata and grant policy, but an evidence-only grant cannot invoke
+the Review tool. The actual user-authorization boundary remains mandatory
+for all Review lookups.
+
+**Live integration boundary:** The production container has its GitHub App
+configuration present and OAuth explicitly disabled. An attempted live
+installation-token acceptance was refused by the connected operations tool's
+security policy. No alternate means were used to obtain signing keys or
+installation tokens. Prior live `gh` checks of GitHub REST user/repository/
+collaborator permission endpoints used a *user CLI credential*, **not** the
+GitHub App installation token. The live GitHub App permission test therefore
+remains **unverified**. GitHub's official REST reference confirms these GET
+endpoints support installation access tokens, with `Metadata: read` required
+for the repository collaborator-permission endpoint.
+
+OAuth clients remain unregistered and disabled in production, and actual
+ChatGPT/Claude cloud connectivity is unverified. For ChatGPT, the published
+stable predefined client tuple is
+`https://chatgpt.com/oauth/client.json` plus
+`https://chatgpt.com/connector_platform_oauth_redirect` for issuers that send
+RFC 9207 `iss`. Only copy the *actual connector-managed* client and callback
+from the provider UI when enabling. For Claude use the selected connector's
+published client and callback; do not trust hard-coded assumptions about its
+registration mode. Do not enable `/mcp`, relax authorization or claim live
+provider interoperability based solely on these internal acceptance tests.

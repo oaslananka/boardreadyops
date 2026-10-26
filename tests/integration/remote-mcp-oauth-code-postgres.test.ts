@@ -1,7 +1,7 @@
 import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createLocalJWKSet } from "jose";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { authenticateRemoteMcpRequest } from "../../apps/web/lib/remote-mcp-access.js";
 import {
   beginRemoteMcpConsent,
@@ -13,6 +13,7 @@ import {
 import { handleRemoteMcpConsentGet, handleRemoteMcpConsentPost } from "../../apps/web/lib/remote-mcp-consent-http.js";
 import { remoteMcpResource } from "../../apps/web/lib/remote-mcp-foundation.js";
 import { isRemoteMcpGrantActive, revokeRemoteMcpGrant } from "../../apps/web/lib/remote-mcp-grant-store.js";
+import { handleRemoteMcpWithVerifiedGrant } from "../../apps/web/lib/remote-mcp-http.js";
 import { createRemoteMcpJwtVerifier } from "../../apps/web/lib/remote-mcp-jwt-verifier.js";
 import {
   oauthClientDigest,
@@ -466,6 +467,124 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     expect(Number(row?.github_user_id)).toBe(githubUserId);
     expect(row?.client_sha256).not.toContain(marker);
     await purgeExpiredRemoteMcpOAuthSecurityData(executor());
+  });
+
+  it("connects real PostgreSQL OAuth grant to MCP v2 tools, denies removed permission and revoked token", async () => {
+    const started = await consent();
+    const approved = await decideRemoteMcpConsent(
+      executor(),
+      githubUserId,
+      started.authorizationId,
+      started.csrfNonce,
+      true,
+    );
+    const exchanged = await exchangeRemoteMcpAuthorizationCode(
+      executor(),
+      {
+        code: required(required(approved).code),
+        clientId,
+        redirectUri,
+        codeVerifier: verifier,
+      },
+      issuer,
+      tokenIssuer.sign,
+    );
+    const token = required(exchanged).access_token;
+    const jwtVerifier = createRemoteMcpJwtVerifier({
+      issuer,
+      verifyKey: createLocalJWKSet((await tokenIssuer.publicJwks()) as never),
+      activeGrant: (jti, id, client, signedIssuer) => isRemoteMcpGrantActive(executor(), jti, id, client, signedIssuer),
+    });
+    const reviewId = randomUUID();
+    const report = {
+      id: reviewId,
+      repository_id: "private-database-id",
+      head_run_id: "run-1",
+      current_revision_id: "revision-1",
+      status: "active",
+      decision: "pending",
+      owner: "private-owner",
+      name: "private-repository",
+      github_repo_id: "456",
+      github_installation_id: "789",
+    };
+    const sql = vi.fn().mockImplementation(async (query: string) => {
+      if (query.includes("from reviews")) return { rows: [report] };
+      if (query.includes("from review_revisions"))
+        return {
+          rows: [{ head_commit_sha: "a".repeat(40), evidence_digest: "b".repeat(64) }],
+        };
+      throw new Error("unexpected query");
+    });
+    const close = vi.fn().mockResolvedValue(undefined);
+    const openDb = vi.fn().mockResolvedValue({ query: sql, close });
+    const checkCurrentPermission = vi.fn().mockResolvedValue(true);
+    const config = { issuer, verifier: jwtVerifier, openDb, checkCurrentPermission };
+    const request = (method: string, args: Record<string, unknown> = {}) =>
+      new Request(remoteMcpResource, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          authorization: `Bearer ${token}`,
+          "Mcp-Protocol-Version": "2026-07-28",
+          "Mcp-Method": method,
+          ...(method === "tools/call" ? { "Mcp-Name": "boardreadyops_review_get" } : {}),
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method,
+          params: {
+            ...args,
+            _meta: {
+              "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+              "io.modelcontextprotocol/clientCapabilities": {},
+              "io.modelcontextprotocol/clientInfo": { name: "pg-test", version: "1" },
+            },
+          },
+        }),
+      });
+    const listed = await handleRemoteMcpWithVerifiedGrant(request("tools/list"), config);
+    expect(listed.status).toBe(200);
+    expect(await listed.text()).toContain("boardreadyops_review_get");
+    expect(openDb).not.toHaveBeenCalled();
+
+    const call = request("tools/call", { name: "boardreadyops_review_get", arguments: { reviewId } });
+    const allowed = await handleRemoteMcpWithVerifiedGrant(call, config);
+    const allowedBody = await allowed.text();
+    expect(allowed.status, allowedBody).toBe(200);
+    expect(allowedBody).toContain("not-evaluated");
+    expect(allowedBody).toContain("evidenceDigest");
+    expect(allowedBody).not.toContain("private-owner");
+    expect(allowedBody).not.toContain("private-database-id");
+    expect(checkCurrentPermission).toHaveBeenCalledWith({
+      githubUserId,
+      githubRepositoryId: 456,
+      githubInstallationId: 789,
+      owner: "private-owner",
+      name: "private-repository",
+    });
+
+    checkCurrentPermission.mockResolvedValue(false);
+    const denied = await handleRemoteMcpWithVerifiedGrant(
+      request("tools/call", { name: "boardreadyops_review_get", arguments: { reviewId } }),
+      config,
+    );
+    const deniedBody = await denied.text();
+    expect(denied.status, deniedBody).toBe(200);
+    expect(deniedBody).toContain("Review unavailable");
+    expect(deniedBody).not.toContain("private-owner");
+    expect(deniedBody).not.toContain("evidenceDigest");
+    expect(close).toHaveBeenCalledTimes(2);
+
+    const grant = await authenticateRemoteMcpRequest(request("tools/list"), issuer, jwtVerifier);
+    expect(grant).not.toBeNull();
+    expect(await revokeRemoteMcpGrant(executor(), required(grant).grantId, githubUserId)).toBe(true);
+    const revoked = await handleRemoteMcpWithVerifiedGrant(request("tools/list"), config);
+    expect(revoked.status).toBe(401);
+    expect(revoked.headers.get("www-authenticate")).toContain("oauth-protected-resource/mcp");
+    expect(openDb).toHaveBeenCalledTimes(2);
   });
 
   it("announces only supported discovery features, not dynamic registration", () => {
