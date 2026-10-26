@@ -1897,7 +1897,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `jiti@2.6.1`, `jiti@2.7.0`
   - Description: Runtime typescript and ESM support for Node.js
   - Homepage: https://github.com/unjs/jiti#readme
-- `jose@6.1.0`, `jose@6.2.10`
+- `jose@6.2.10`
   - Description: JWA, JWS, JWE, JWT, JWK, JWKS for Node.js, Browser, Cloudflare Workers, Deno, Bun, and other Web-interoperable runtimes
   - Homepage: https://github.com/panva/jose
 - `js-library-detector@6.7.0`
