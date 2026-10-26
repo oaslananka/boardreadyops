@@ -70,6 +70,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
   const blocking = findings.filter(isBlocking).length;
   const [filter, setFilter] = useState<FindingFilter>(blocking > 0 ? "blocking" : "all");
   const [query, setQuery] = useState("");
+  const [focusCanvas, setFocusCanvas] = useState(false);
   const visibleFindings = visibleReviewFindings(findings, filter, query);
   const [selectedFingerprint, setSelectedFingerprint] = useState<string | undefined>(
     findings.find(isBlocking)?.fingerprint ?? findings[0]?.fingerprint,
@@ -132,6 +133,15 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
           <h2 className="text-base font-semibold text-foreground sm:text-lg">See the evidence, then decide</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
+          <button
+            type="button"
+            aria-pressed={focusCanvas}
+            aria-controls="review-evidence-canvas"
+            onClick={() => setFocusCanvas((focused) => !focused)}
+            className="inline-flex min-h-10 items-center rounded-md border border-primary/40 bg-primary/10 px-3 py-2 font-semibold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            {focusCanvas ? "Show findings and inspector" : "Focus PCB / schematic"}
+          </button>
           <span className="rounded-md bg-danger-surface px-2 py-1 font-semibold text-danger">
             {blocking} open critical/error
           </span>
@@ -144,8 +154,16 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
         </div>
       </header>
 
-      <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(275px,1.05fr)_minmax(0,1.9fr)_minmax(235px,0.95fr)]">
-        <div className="order-2 min-w-0 rounded-lg border border-border bg-card p-3 xl:order-1">
+      <div
+        className={
+          focusCanvas
+            ? "grid min-w-0 grid-cols-1 gap-3"
+            : "grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(245px,0.9fr)_minmax(0,3fr)_minmax(245px,0.9fr)]"
+        }
+      >
+        <div
+          className={focusCanvas ? "hidden" : "order-2 min-w-0 rounded-lg border border-border bg-card p-3 xl:order-1"}
+        >
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground">Findings</h3>
             <span className="text-xs text-muted-foreground">{findings.length} recorded</span>
@@ -222,11 +240,12 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
           )}
         </div>
 
-        <div className="order-1 min-w-0 space-y-2 xl:order-2">
+        <div id="review-evidence-canvas" className="order-1 min-w-0 space-y-2 xl:order-2">
           {snapshots.length ? (
             <>
               <ReviewCanvas
                 compactMobile
+                immersive={focusCanvas}
                 headSnapshots={snapshots}
                 {...optionalBaseSnapshots}
                 findings={review.findings}
@@ -256,7 +275,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
 
         <aside
           aria-label="Selected finding inspector"
-          className="order-3 min-w-0 rounded-lg border border-border bg-card p-3"
+          className={focusCanvas ? "hidden" : "order-3 min-w-0 rounded-lg border border-border bg-card p-3"}
         >
           <h3 className="text-sm font-semibold text-foreground">Inspector</h3>
           {selected ? (

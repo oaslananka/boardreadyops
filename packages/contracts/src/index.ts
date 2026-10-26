@@ -12,6 +12,7 @@ export * from "./review.js";
 export * from "./runner-protocol.js";
 export * from "./snapshots.js";
 export * from "./storage.js";
+export * from "./verified-object-position-diff.js";
 
 export const releaseRunStatusSchema = z.enum(["queued", "running", "completed", "timed_out", "failed"]);
 export const releaseDecisionSchema = z.enum(["pass", "fail", "error"]);

@@ -150,6 +150,10 @@ export function verifiedNativePcbItemAnchors(
           severity: finding.severity,
           message: finding.message.slice(0, 500),
           sourceUuid: uuid,
+          // Absolute KiCad-reported millimeters, not projected image coordinates.
+          // These survive a changed board outline/viewBox in a later revision.
+          sourceXmm: x,
+          sourceYmm: y,
           provenance: "kicad-json-object-position",
           locationMeaning: "Referenced source object, not verified violation center",
         },

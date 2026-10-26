@@ -57,3 +57,6 @@ TEMP/
 /walkthrough.md
 .stryker-tmp
 reports/mutation
+
+# Test-only source-bound manufacturing attestation output (never a release).
+/build/boardreadyops-attested/

@@ -113,6 +113,32 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"))).toBe(true);
   });
 
+  it("keeps real GitHub OIDC signing confined to a manually dispatched protected test fixture", async () => {
+    const raw = await fs.readFile(".github/workflows/attested-fixture-validation.yml", "utf8");
+    const wf = load(raw) as TargetSpec;
+    expect(Object.keys(wf.on)).toEqual(["workflow_dispatch"]);
+    const job = wf.jobs["attest-fixture"];
+    expect(job?.permissions).toMatchObject({
+      contents: "read",
+      "id-token": "write",
+      attestations: "write",
+      "artifact-metadata": "write",
+    });
+    const steps = job?.steps ?? [];
+    const guard = steps.find((step) => String(step.name ?? "").startsWith("Require protected main"));
+    expect(guard?.run).toContain("refs/heads/main");
+    expect(raw).toContain("PROTECTED_REF:");
+    expect(guard?.run).toContain("PROTECTED_REF");
+    const exportStep = steps.find((step) => step.id === "export");
+    expect(exportStep?.uses).toBe("./.github/actions/manufacturing-attested-export");
+    expect((exportStep?.with as { project?: string } | undefined)?.project).toBe(
+      "tests/fixtures/projects/safe-basic/safe-basic.kicad_pro",
+    );
+    expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/attest@"))).toBe(true);
+    expect(raw).toContain("TEST FIXTURE ONLY");
+    expect(raw).not.toContain("pull_request:");
+  });
+
   it("provides an isolated GitHub-internal signed bundle path without API or public transparency-log storage", async () => {
     const raw = await fs.readFile("examples/github/workflows/boardreadyops-manufacturing-internal.yml", "utf8");
     const template = load(raw) as TargetSpec;
@@ -150,7 +176,7 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(raw).not.toContain("artifact-metadata: write");
   });
 
-  it("exports REAL KiCad Gerbers and drill from the exact clean SHA and inventories all bytes", async (ctx) => {
+  it("exports REAL KiCad Gerbers, drill, BOM and CPL from the exact clean SHA and inventories all bytes", async (ctx) => {
     const cli = await detectKicadCli();
     if (!process.env.CI) ctx.skip(!cli.found || !/^10\.0\./u.test(cli.version ?? ""), "Requires KiCad 10");
     expect(cli.found).toBe(true);
@@ -177,9 +203,15 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
       artifacts: Array<{ path: string; sha256: string; kind: string }>;
     };
     expect(manifest.git).toEqual({ sha: f.sha, dirty: false });
-    expect(manifest.steps.filter((s) => s.status === "generated").map((s) => s.kind)).toEqual(["gerbers", "drill"]);
-    expect(manifest.artifacts.some((a) => a.kind === "gerber")).toBe(true);
-    expect(manifest.artifacts.some((a) => a.kind === "drill")).toBe(true);
+    expect(manifest.steps.filter((s) => s.status === "generated").map((s) => s.kind)).toEqual([
+      "gerbers",
+      "drill",
+      "bom",
+      "positions",
+    ]);
+    for (const kind of ["gerber", "drill", "bom", "cpl"]) {
+      expect(manifest.artifacts.some((artifact) => artifact.kind === kind && artifact.sha256.length === 64)).toBe(true);
+    }
     const checksumLines = (await fs.readFile(checksumFile, "utf8")).trim().split("\n");
     expect(checksumLines).toHaveLength(manifest.artifacts.length + 1);
     const subjects = new Set<string>();
@@ -196,6 +228,33 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     }
     expect(subjects.has("build/boardreadyops-attested/manifest.json")).toBe(true);
     expect(subjects.has("build/boardreadyops-attested/gerbers/safe-basic-F_Cu.gtl")).toBe(true);
+    expect(subjects.has("build/boardreadyops-attested/assembly/bom.csv")).toBe(true);
+    expect(subjects.has("build/boardreadyops-attested/assembly/positions.csv")).toBe(true);
+  });
+
+  it("refuses an archive when the reviewed source has no BOM schematic", async () => {
+    const f = await fixture();
+    await fs.rm(path.join(f.root, "safe-basic.kicad_sch"));
+    execFileSync("git", ["add", "-A"], { cwd: f.root });
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "remove schematic",
+      ],
+      { cwd: f.root },
+    );
+    f.sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
+    const result = await runExport(f);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Incomplete manufacturing export");
+    expect(await fs.readFile(f.output, "utf8")).not.toContain("subject-checksums=");
   });
 
   it.each([

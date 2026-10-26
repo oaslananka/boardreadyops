@@ -63,6 +63,8 @@ describe("Source-bound KiCad DRC object markers", () => {
       metadata: {
         provenance: "kicad-json-object-position",
         sourceUuid: sourceUUID,
+        sourceXmm: 145.621548,
+        sourceYmm: 107.108452,
         fingerprint: "f".repeat(64),
         locationMeaning: "Referenced source object, not verified violation center",
       },

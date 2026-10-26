@@ -15,12 +15,17 @@ const REVIEW_PATH = "/reviews/rev_gateway_42";
 
 async function openReviewAndWaitForHydration(page: Page) {
   await page.goto(REVIEW_PATH);
-  // The tab bar is a client component; clicking before hydration completes is a no-op.
-  await page
-    .getByRole("button", { name: /Approve/i })
-    .first()
-    .waitFor({ state: "visible" });
-  await page.waitForTimeout(1500);
+  // The Approve action moved into a closed mobile disclosure; its visibility is
+  // not a hydration signal. Prove that the client-side tabs respond instead.
+  const changes = page.getByRole("tab", { name: /^Changes/ });
+  const overview = page.getByRole("tab", { name: "Overview" });
+  await expect(changes).toBeVisible();
+  await expect(async () => {
+    await changes.click();
+    await expect(changes).toHaveAttribute("aria-selected", "true", { timeout: 750 });
+  }).toPass({ timeout: 10_000 });
+  await overview.click();
+  await expect(overview).toHaveAttribute("aria-selected", "true");
 }
 
 async function openTab(page: Page, name: string) {
@@ -207,6 +212,12 @@ test.describe("Review lifecycle", () => {
   test("16. Mobile viewport renders the comment form usably", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await openReviewAndWaitForHydration(page);
+    // The full decision actions remain available on mobile, but only when
+    // the user explicitly opens the disclosure rather than above the board.
+    const actions = page.locator("details", { has: page.getByText("Review actions & evidence") });
+    await expect(actions.getByRole("button", { name: "Approve review" })).toBeHidden();
+    await actions.locator("summary").click();
+    await expect(actions.getByRole("button", { name: "Approve review" })).toBeVisible();
     await openTab(page, "Discussion (3)");
     await expect(page.getByPlaceholder("Leave an engineering review note or question...")).toBeVisible();
     await expect(page.getByRole("button", { name: "Post Comment" })).toBeVisible();
