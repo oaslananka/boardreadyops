@@ -188,3 +188,48 @@ https://docs.github.com/en/rest/collaborators/collaborators.
   directory listing or auto-approval is authorized by this increment.
 
 Reference: https://ts.sdk.modelcontextprotocol.io/v2/migration/support-2026-07-28
+
+### Authorization-code / consent groundwork (26 October 2026)
+
+Migration **0096** introduces a disabled-by-default **pre-registered client registry**
+(exact HTTPS client ID and exact redirect URI, `enabled=false`) plus a
+per-user authorization consent/code store. Neither SQL migration has been
+applied to the production database, and **no client registrations have been
+created**. Client ID Metadata Documents and dynamic client registration are
+not yet accepted: public metadata URLs must undergo SSRF hardening and an
+explicit trust policy before enabling that path.
+
+Internal `beginRemoteMcpConsent` validates `response_type=code`, S256 challenge,
+registered and enabled client, exact callback URL, allowed read scopes and the
+canonical MCP resource. It takes a stable GitHub user ID **only from a caller
+that has verified a signed browser session**; the OAuth client must never supply
+that user ID. The application must display the client identity, callback host
+and requested scopes and require an explicit POST approval with the
+unpredictable CSRF nonce before using `decideRemoteMcpConsent`.
+
+One-time consent decisions are bound to the user and expire after **10 minutes**;
+authorization codes expire after **90 seconds**, with only their SHA-256 digests
+persisted. `exchangeRemoteMcpAuthorizationCode` validates the exact client,
+redirect URI and S256 verifier, then atomically consumes the code and inserts a
+15-minute audience-bound grant in one database transaction. Concurrent exchanges
+produce at most one successful token. Authorization denial returns `access_denied`
+and cannot later be upgraded without a new user interaction.
+
+The internal form-encoded token HTTP adapter refuses browser cookies, query
+credentials, duplicate fields, client secrets, unsupported grant types and
+wrong `resource`. It does **not** expose the token endpoint publicly. The
+RSA-2048+ RS256 signer emits access JWTs with `kid`, stable GitHub subject,
+OAuth client ID, token lifetime and MCP-specific audience. Its public JWKS
+contains only public key material. Private keys and key IDs must be sourced
+from Doppler at deployment, never added to GitHub secrets or source control.
+A safe rollover plan must retain prior public keys until all associated tokens
+expire; JWKS and RFC 8414 metadata are only in-process builders for now.
+
+All nine authorization-flow checks (including same-code parallel exchanges,
+disabled clients and signed JWT revocation) passed against a disposable local
+PostgreSQL 17 instance. This is a **local security increment**, not evidence of
+complete OAuth client integration or ChatGPT/Claude interoperability. Before
+turning on the existing `/mcp` endpoint: implement session-bound consent pages,
+same-origin POST/CSRF protection, production issuer and metadata routing,
+pre-registered ChatGPT/Claude client details, trusted signing key rotation,
+request throttling, activity audit and representative live user testing.

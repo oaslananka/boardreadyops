@@ -147,6 +147,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0093_explicit_manufacturing_share_authorizations.sql",
       "0094_run_pcb_footprint_summaries.sql",
       "0095_remote_mcp_oauth_grants.sql",
+      "0096_remote_mcp_oauth_authorization_codes.sql",
     ]);
   });
 
