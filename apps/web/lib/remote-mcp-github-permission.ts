@@ -49,7 +49,9 @@ async function githubJson(
   const length = Number(response.headers.get("content-length"));
   if (Number.isFinite(length) && length > maxResponseBytes) return null;
   const body = await response.text();
-  if (body.length > maxResponseBytes) return null;
+  // JavaScript string length counts UTF-16 code units, not response bytes.
+  // A response containing multibyte Unicode must obey the same 64 KiB limit.
+  if (Buffer.byteLength(body, "utf8") > maxResponseBytes) return null;
   const result: unknown = JSON.parse(body);
   return result && typeof result === "object" && !Array.isArray(result) ? (result as GithubResponse) : null;
 }
@@ -111,22 +113,34 @@ export function createLiveGitHubRepositoryAccess(
   };
 }
 
+/** The production default signs a short-lived installation grant with Octokit.
+ * The injectable function is used by fixture-based acceptance tests only.
+ */
+export type MintMcpGitHubInstallationToken = (
+  appId: string,
+  privateKey: string,
+  installationId: number,
+) => Promise<string | null>;
+
+const mintGitHubAppInstallationToken: MintMcpGitHubInstallationToken = async (appId, privateKey, installationId) => {
+  const authenticate = createAppAuth({ appId, privateKey, installationId });
+  const result = await authenticate({ type: "installation" });
+  return result.token || null;
+};
+
 /** Uses existing GitHub App configuration, with no new secret or authentication service. */
 export function createProductionLiveGitHubRepositoryAccess(
   environment: Readonly<Record<string, string | undefined>> = process.env,
   fetcher: GithubFetch = fetch,
+  mintInstallationToken: MintMcpGitHubInstallationToken = mintGitHubAppInstallationToken,
 ): CheckLiveRepositoryPermission {
   const appId = environment.GITHUB_APP_ID?.trim();
-  const privateKey = environment.GITHUB_APP_PRIVATE_KEY?.replaceAll(String.raw`\\n`, "\n").trim();
+  const privateKey = environment.GITHUB_APP_PRIVATE_KEY?.replaceAll(String.raw`\n`, "\n").trim();
   const apiRoot = strictGithubApiRoot(environment);
   if (!appId || !privateKey || !apiRoot) return async () => false;
   return createLiveGitHubRepositoryAccess({
     apiRoot,
     fetcher,
-    async createInstallationToken(installationId) {
-      const authenticate = createAppAuth({ appId, privateKey, installationId });
-      const result = await authenticate({ type: "installation" });
-      return result.token || null;
-    },
+    createInstallationToken: (installationId) => mintInstallationToken(appId, privateKey, installationId),
   });
 }

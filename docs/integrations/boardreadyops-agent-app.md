@@ -509,3 +509,29 @@ reflecting the currently deployed build/front door, NOT the new local route's
 explicit 503 release-hold response. No deployment, migration, OAuth client
 registration, production flag change, GitHub push, PR or merge accompanied this
 increment.
+
+### GitHub App token-issuer acceptance hardening (26 October 2026, local)
+
+The MCP repository permission adapter now normalizes the GitHub App private key
+configuration in precisely the same way as the existing BoardReadyOps GitHub
+modules: a literal `\\n` escape from Doppler becomes one PEM newline. A
+previous mismatch would leave escaped PEM separators intact and could prevent
+Octokit from minting an installation access token. No private key is logged,
+stored or exposed by this logic.
+
+Octokit remains the default live installation-token issuer. A narrow injectable
+token factory permits isolated tests to verify the exact normalized PEM input,
+installation ID and three permission GET requests, without accessing real
+signing keys or network tokens. Missing/revoked installation tokens fail
+closed. The GitHub JSON response limit is enforced using **UTF-8 byte size**
+rather than JavaScript string length, preventing oversized multibyte responses
+from bypassing the 64 KiB cap when `Content-Length` is absent. The tests also
+confirm response overflow fails before subsequent repository reads.
+
+Read-only GitHub App repository metadata access has been confirmed on the
+connected Ops App, and the public REST documentation confirms `GET
+/user/{account_id}` and repository collaborator-permission endpoints support
+installation tokens. This does **not** establish a successful real-user
+collaborator-permission request through the App's installation token; that
+release requirement remains open. No flags, credentials, migrations or
+production deployment were changed in this increment.

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import {
   createLiveGitHubRepositoryAccess,
   createProductionLiveGitHubRepositoryAccess,
@@ -93,6 +94,59 @@ describe("live GitHub permission for remote MCP", () => {
     const broken = withResponses();
     broken.fetcher.mockRejectedValue(new Error("offline"));
     expect(await broken.check(permission)).toBe(false);
+  });
+
+  it("normalizes Doppler-style escaped GitHub App PEM before issuing an installation token", async () => {
+    const mintToken = vi.fn().mockResolvedValue("synthetic-installation-token");
+    const fetched = vi
+      .fn()
+      .mockResolvedValueOnce(json({ id: 123, login: "current-login" }))
+      .mockResolvedValueOnce(json({ id: 456 }))
+      .mockResolvedValueOnce(json({ permission: "read" }));
+    const escapedPem = "fixture-header\\nsynthetic-key-material\\nfixture-footer";
+    const check = createProductionLiveGitHubRepositoryAccess(
+      {
+        GITHUB_APP_ID: "123456",
+        GITHUB_APP_PRIVATE_KEY: escapedPem,
+        GITHUB_API_BASE_URL: "https://api.github.com",
+      },
+      fetched,
+      mintToken,
+    );
+    const allowed = await check(permission);
+    expect(mintToken, "GitHub App token issuer should be called").toHaveBeenCalledOnce();
+    expect(fetched, "GitHub permission REST sequence").toHaveBeenCalledTimes(3);
+    expect(allowed).toBe(true);
+    expect(mintToken).toHaveBeenCalledWith("123456", "fixture-header\nsynthetic-key-material\nfixture-footer", 789);
+    expect(fetched).toHaveBeenCalledTimes(3);
+    for (const [, options] of fetched.mock.calls) {
+      expect(options.headers.authorization).toBe("Bearer synthetic-installation-token");
+      expect(options.redirect).toBe("error");
+      expect(options.cache).toBe("no-store");
+    }
+  });
+
+  it("refuses access if GitHub App installation-token issuance fails", async () => {
+    const mintToken = vi.fn().mockRejectedValue(new Error("installation no longer active"));
+    const fetched = vi.fn();
+    const check = createProductionLiveGitHubRepositoryAccess(
+      {
+        GITHUB_APP_ID: "123456",
+        GITHUB_APP_PRIVATE_KEY: "test-only-private-key",
+      },
+      fetched,
+      mintToken,
+    );
+    expect(await check(permission)).toBe(false);
+    expect(mintToken).toHaveBeenCalledOnce();
+    expect(fetched).not.toHaveBeenCalled();
+  });
+
+  it("bounds UTF-8 response bytes, not only the shorter JavaScript character count", async () => {
+    const oversizedUser = json({ id: 123, login: "current-login", padding: "é".repeat(40_000) });
+    const { check, fetcher } = withResponses(oversizedUser, json({ id: 456 }), json({ permission: "read" }));
+    expect(await check(permission)).toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("denies oversized responses and redirects instead of following URLs", async () => {
