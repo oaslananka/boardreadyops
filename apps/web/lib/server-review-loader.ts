@@ -1,4 +1,5 @@
 import type { SnapshotArtifact } from "@boardreadyops/contracts";
+import { loadRunPcbFootprintSummary } from "@boardreadyops/db";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { type CloudPersistenceConfiguration, resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
@@ -487,16 +488,24 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       return null;
     }
 
-    const [findings, evidenceItems, governance, headSnapshots, baseSnapshots, effectivePolicy] = await Promise.all([
-      loadReconstructedFindings(executor, reviewId, revision.head_run_id),
-      loadEvidenceArtifacts(executor, revision.head_run_id),
-      loadReviewGovernanceData(executor, reviewId, row.repository_id),
-      loadHeadSnapshots(executor, revision.head_run_id),
-      loadBaseSnapshots(executor, row.repository_id, revision.base_commit_sha),
-      session
-        ? resolveReviewEffectivePolicy({ executor, repositoryId: row.repository_id, tenantId: row.account_login })
-        : Promise.resolve(null),
-    ]);
+    const [findings, evidenceItems, governance, headSnapshots, baseSnapshots, effectivePolicy, pcbFootprintSummary] =
+      await Promise.all([
+        loadReconstructedFindings(executor, reviewId, revision.head_run_id),
+        loadEvidenceArtifacts(executor, revision.head_run_id),
+        loadReviewGovernanceData(executor, reviewId, row.repository_id),
+        loadHeadSnapshots(executor, revision.head_run_id),
+        loadBaseSnapshots(executor, row.repository_id, revision.base_commit_sha),
+        session
+          ? resolveReviewEffectivePolicy({ executor, repositoryId: row.repository_id, tenantId: row.account_login })
+          : Promise.resolve(null),
+        loadRunPcbFootprintSummary(
+          executor,
+          row.repository_id,
+          revision.head_run_id,
+          revision.base_commit_sha,
+          revision.head_commit_sha,
+        ),
+      ]);
 
     const baseCommit = revision.base_commit_sha ?? "0000000000000000000000000000000000000000";
 
@@ -526,6 +535,7 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       approvals: governance.approvals,
       checklist: governance.checklist,
       comments: governance.comments,
+      ...(pcbFootprintSummary ? { pcbFootprintSummary } : {}),
       headSnapshots: headSnapshots.length > 0 ? headSnapshots : undefined,
       baseSnapshots: baseSnapshots.length > 0 ? baseSnapshots : undefined,
       effectivePolicy: effectivePolicy

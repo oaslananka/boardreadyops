@@ -70,7 +70,7 @@ afterEach(() => {
   for (const dir of workdirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-function runRetention(args: string[], overrides: Record<string, string> = {}) {
+function runRetention(args: string[], overrides: Record<string, string> = {}, timeoutMs = 10_000) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "boardreadyops-retention-"));
   workdirs.push(dir);
   const dockerPath = path.join(dir, "docker");
@@ -80,7 +80,7 @@ function runRetention(args: string[], overrides: Record<string, string> = {}) {
   const run = spawnSync("bash", [retentionScript, ...args], {
     encoding: "utf8",
     env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, TEST_DOCKER_LOG: log, ...overrides },
-    timeout: 10000,
+    timeout: timeoutMs,
   });
   return { ...run, dockerCalls: fs.readFileSync(log, "utf8") };
 }
@@ -178,15 +178,18 @@ describe("BoardReadyOps runtime image retention", () => {
   });
 
   it("shows dry-run candidates without deleting active, rollback, stopped or other project images", () => {
-    const run = runRetention(["retire"]);
-    expect(run.status).toBe(0);
+    // The dry run launches many separate Node-backed Docker mocks. Windows CI
+    // process startup can exceed the default 10s subprocess budget under load.
+    // This is test-only; the real retention script remains fail-closed.
+    const run = runRetention(["retire"], {}, 30_000);
+    expect(run.status, run.error?.message ?? run.stderr).toBe(0);
     expect(run.stdout).toContain(`would retire ${obsoleteTag}`);
     expect(run.stdout).toContain("would retire boardreadyops-rollback-safety:pre-old");
     expect(run.stdout).toContain(`protected ${currentTag}`);
     expect(run.stdout).toContain(`protected ${priorTag}`);
     expect(run.stdout).toContain("protected boardreadyops-rollback-safety:pre-stopped");
     expect(run.dockerCalls).toBe("");
-  });
+  }, 45_000);
 
   it("only removes exact unreferenced tags after explicit apply", () => {
     const run = runRetention(["retire", "--apply"]);
