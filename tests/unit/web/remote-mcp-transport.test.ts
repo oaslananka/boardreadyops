@@ -81,7 +81,7 @@ describe("remote MCP signed-token verifier", () => {
       activeGrant: vi.fn().mockResolvedValue(true),
     });
     const token = await new SignJWT({ scope: "review:read", githubUserId: ghUser, clientId })
-      .setProtectedHeader({ alg: "RS256", kid: "test-1" })
+      .setProtectedHeader({ alg: "RS256", kid: "test-1", typ: "at+jwt" })
       .setSubject(`github:${ghUser}`)
       .setIssuer(issuer)
       .setAudience(remoteMcpResource)
@@ -101,7 +101,7 @@ describe("remote MCP signed-token verifier", () => {
       ),
     ).toBeNull();
     const badAud = await new SignJWT({ scope: "review:read", githubUserId: ghUser, clientId })
-      .setProtectedHeader({ alg: "RS256", kid: "test-1" })
+      .setProtectedHeader({ alg: "RS256", kid: "test-1", typ: "at+jwt" })
       .setSubject(`github:${ghUser}`)
       .setIssuer(issuer)
       .setAudience("https://wrong.example/mcp")
@@ -110,6 +110,68 @@ describe("remote MCP signed-token verifier", () => {
       .setExpirationTime(now() + 600)
       .sign(privateKey);
     expect(await authenticateRemoteMcpRequest(mcpRequest("tools/list", {}, badAud), issuer, verifier)).toBeNull();
+  });
+
+  it("rejects same-key non-access JWT types before consulting the durable grant", async () => {
+    const { publicKey, privateKey } = await generateKeyPair("RS256");
+    const publicJwk = await exportJWK(publicKey);
+    const activeGrant = vi.fn().mockResolvedValue(true);
+    const verifier = createRemoteMcpJwtVerifier({
+      issuer,
+      verifyKey: createLocalJWKSet({ keys: [{ ...publicJwk, kid: "rsa-test-kid", alg: "RS256", use: "sig" }] }),
+      activeGrant,
+    });
+    async function signed(typ?: string) {
+      const header = typ
+        ? { alg: "RS256" as const, kid: "rsa-test-kid", typ }
+        : { alg: "RS256" as const, kid: "rsa-test-kid" };
+      return new SignJWT({ scope: "review:read", githubUserId: ghUser, clientId })
+        .setProtectedHeader(header)
+        .setSubject(`github:${ghUser}`)
+        .setIssuer(issuer)
+        .setAudience(remoteMcpResource)
+        .setJti(jti)
+        .setIssuedAt(now())
+        .setExpirationTime(now() + 600)
+        .sign(privateKey);
+    }
+    for (const typ of [undefined, "JWT", "id+jwt", "dpop+jwt", "application/id+jwt"]) {
+      const token = await signed(typ);
+      expect(
+        await authenticateRemoteMcpRequest(mcpRequest("tools/list", {}, token), issuer, verifier),
+        `Must deny wrong JWT type ${typ ?? "missing"}`,
+      ).toBeNull();
+    }
+    expect(activeGrant).not.toHaveBeenCalled();
+    const accessToken = await signed("at+jwt");
+    expect(await authenticateRemoteMcpRequest(mcpRequest("tools/list", {}, accessToken), issuer, verifier)).toEqual({
+      githubUserId: ghUser,
+      grantId: jti,
+      scopes: ["review:read"],
+    });
+    expect(activeGrant).toHaveBeenCalledOnce();
+  });
+
+  it("rejects ES256 JWTs even if a trusted key verifies their signature and claims", async () => {
+    const { publicKey, privateKey } = await generateKeyPair("ES256");
+    const publicJwk = await exportJWK(publicKey);
+    const activeGrant = vi.fn().mockResolvedValue(true);
+    const verifier = createRemoteMcpJwtVerifier({
+      issuer,
+      verifyKey: createLocalJWKSet({ keys: [{ ...publicJwk, kid: "elliptic-test-kid", alg: "ES256", use: "sig" }] }),
+      activeGrant,
+    });
+    const jwt = await new SignJWT({ scope: "review:read", githubUserId: ghUser, clientId })
+      .setProtectedHeader({ alg: "ES256", kid: "elliptic-test-kid", typ: "at+jwt" })
+      .setSubject(`github:${ghUser}`)
+      .setIssuer(issuer)
+      .setAudience(remoteMcpResource)
+      .setJti(jti)
+      .setIssuedAt(now())
+      .setExpirationTime(now() + 600)
+      .sign(privateKey);
+    expect(await authenticateRemoteMcpRequest(mcpRequest("tools/list", {}, jwt), issuer, verifier)).toBeNull();
+    expect(activeGrant).not.toHaveBeenCalled();
   });
 
   it("rejects untrusted JWKS origins or HTTP issuers", () => {

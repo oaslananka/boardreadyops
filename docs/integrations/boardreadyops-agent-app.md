@@ -173,8 +173,8 @@ https://docs.github.com/en/rest/collaborators/collaborators.
   Unauthorized HTTP requests receive a `401` OAuth metadata challenge. The
   locally guarded `/mcp` route denies by default with `503`; the older
   hosted deployment currently returns `404` and was not changed.
-- `jose` checks trusted issuer, MCP-specific audience, asymmetric RS256/ES256
-  signatures, expiry, user identity and client binding. The durable
+- `jose` checks trusted issuer, MCP-specific audience, RS256 signatures,
+  required access-token `typ: at+jwt`, expiry, user identity and client binding. The durable
   `remote_mcp_oauth_grants` table additionally binds active JTI, user, client,
   issuer, audience and one-hour expiry, and supports immediate revocation.
   No raw access token is stored in the grant table. Migration 0095 was exercised
@@ -763,3 +763,25 @@ revokes the intended grant, leaves another GitHub user's grant intact,
 records the audit event and denies further authorization for the revoked
 identity. This adds **no schema migrations** and does **not** enable the
 production OAuth/MCP feature flags; real provider acceptance remains open.
+
+### JWT access-token type and algorithm pinning (unreleased hardening)
+
+The remote MCP token verifier now implements an explicit OAuth access-token
+profile boundary: `jwtVerify` requires `typ: at+jwt` (RFC 9068) and **only
+RS256**, precisely matching the first-party token issuer and its RSA-only
+local/previous JWKS keys. Previously a successfully signed RS256 JWT without a
+`typ` header, or one with another token type, would pass the generic JWT
+signature/claims validator if the same identity and grant claims were present;
+ES256 was also permitted by the verification algorithm list even though MCP
+does not issue ES256 tokens. That unnecessary acceptance surface is removed.
+
+A valid RS256 `at+jwt` still needs all the existing issuer, exact MCP
+audience, subject, client, expiry, scope and **live durable grant** checks;
+there is no token bypass or algorithm negotiation with the caller. Unit tests
+sign real local RS256 tokens with missing, `JWT`, `id+jwt`, `dpop+jwt` and
+`application/id+jwt` type headers, plus a signed ES256 `at+jwt`, and confirm
+that none invokes the grant lookup. The correct RS256 access token succeeds.
+Disposable PostgreSQL acceptance independently asserts the OAuth issuer's
+`RS256`/`at+jwt`/configured-key-ID header before validating the real grant
+and revocation lifecycle. This change does **not** activate any OAuth/MCP
+route, enroll a provider or rotate keys in production.

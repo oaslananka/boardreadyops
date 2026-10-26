@@ -2,7 +2,10 @@ import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from "jose";
 import type { RemoteMcpTokenVerifier, SignedRemoteMcpClaims } from "./remote-mcp-access.js";
 import { remoteMcpResource } from "./remote-mcp-foundation.js";
 
-/** Only asymmetrically signed tokens from a trusted issuer may authenticate MCP. */
+/** Access-token confusion defense (RFC 9068): only this issuer's RS256
+ * at+jwt tokens authenticate MCP. Another JWT type (ID/session) or algorithm
+ * must not be accepted, even if it contains the same claims and is signed.
+ */
 export function createRemoteMcpJwtVerifier(input: {
   issuer: string;
   verifyKey: JWTVerifyGetKey;
@@ -14,7 +17,8 @@ export function createRemoteMcpJwtVerifier(input: {
         const { payload } = await jwtVerify(token, input.verifyKey, {
           issuer: input.issuer,
           audience: remoteMcpResource,
-          algorithms: ["RS256", "ES256"],
+          algorithms: ["RS256"],
+          typ: "at+jwt",
           maxTokenAge: "1h",
         });
         if (

@@ -1,6 +1,6 @@
 import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { createLocalJWKSet } from "jose";
+import { createLocalJWKSet, decodeProtectedHeader } from "jose";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { authenticateRemoteMcpRequest } from "../../apps/web/lib/remote-mcp-access.js";
 import {
@@ -397,6 +397,11 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     expect(token?.token_type).toBe("Bearer");
     expect(token?.expires_in).toBe(900);
     expect(token?.scope).toBe("review:read");
+    expect(decodeProtectedHeader(required(token?.access_token))).toMatchObject({
+      alg: "RS256",
+      typ: "at+jwt",
+      kid: "oauth-test-key-01",
+    });
     expect(await exchangeRemoteMcpAuthorizationCode(executor(), input, issuer, signing)).toBeNull();
 
     const jwks = await tokenIssuer.publicJwks();
