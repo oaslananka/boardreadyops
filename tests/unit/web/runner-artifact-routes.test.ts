@@ -360,19 +360,63 @@ describe("runner artifact transport routes", () => {
       expectedSha256: createHash("sha256").update("hello").digest("hex"),
     });
     completeUpload.mockRejectedValue(new Error("Database offline"));
+    const logs: string[] = [];
+    const logWrite = vi.spyOn(process.stdout, "write").mockImplementation((line) => {
+      logs.push(String(line));
+      return true;
+    });
+    let response: Response;
+    try {
+      response = await handleRunnerArtifactUploadRequest(
+        uploadRequest("hello"),
+        artifactId,
+        dependencies({ ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot }),
+      );
+    } finally {
+      logWrite.mockRestore();
+    }
 
+    expect(response.status).toBe(503);
+    expect(logs).toHaveLength(1);
+    expect(JSON.parse(logs[0] ?? "{}")).toMatchObject({
+      event: "runner_artifact.upload_finalization_ambiguous",
+      artifactId,
+    });
+    expect(logs[0]).not.toContain(uploadToken);
+    expect(logs[0]).not.toContain("Database offline");
+    const finalPath = path.join(requireStorageRoot(), runId, attemptId, `${artifactId}.bin`);
+    await expect(readFile(finalPath, "utf8")).resolves.toBe("hello");
+    expect(failUpload).not.toHaveBeenCalled();
+  });
+
+  it("preserves a physically committed artifact after an ambiguous metadata acknowledgement", async () => {
+    beginUpload.mockResolvedValue({
+      status: "accepted",
+      artifactId,
+      runId,
+      executionAttemptId: attemptId,
+      leaseId,
+      storagePath: `${runId}/${attemptId}/${artifactId}.bin`,
+      declaredBytes: 5,
+      expectedSha256: createHash("sha256").update("hello").digest("hex"),
+    });
+    // Simulate PostgreSQL committing the metadata update and the transport
+    // dropping its response. This rejection cannot prove a DB rollback.
+    let metadataCommitted = false;
+    completeUpload.mockImplementation(async () => {
+      metadataCommitted = true;
+      throw new Error("connection lost after COMMIT");
+    });
     const response = await handleRunnerArtifactUploadRequest(
       uploadRequest("hello"),
       artifactId,
       dependencies({ ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot }),
     );
-
     expect(response.status).toBe(503);
-    expect(failUpload).toHaveBeenCalledWith({
-      artifactId,
-      uploadToken,
-      reason: "Artifact metadata persistence failed.",
-    });
+    expect(metadataCommitted).toBe(true);
+    const finalPath = path.join(requireStorageRoot(), runId, attemptId, `${artifactId}.bin`);
+    await expect(readFile(finalPath, "utf8")).resolves.toBe("hello");
+    expect(failUpload).not.toHaveBeenCalled();
   });
 
   it("returns 410 if completed upload status is expired", async () => {

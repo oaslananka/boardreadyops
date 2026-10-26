@@ -38,6 +38,8 @@ describe("ReviewsListPage", () => {
     expect(markup).toContain("Reviews are separate, explicitly published records");
     expect(markup).toContain("verify its exact head commit and evidence");
     expect(markup).toContain("boardreadyops review publish");
+    expect(markup.indexOf("Hardware Reviews")).toBeLessThan(markup.indexOf('id="publish-review"'));
+    expect(markup.indexOf("PR #42")).toBeLessThan(markup.indexOf('id="publish-review"'));
   });
 
   it("counts only decision-pending reviews as awaiting a decision, not the whole list", async () => {
@@ -51,7 +53,7 @@ describe("ReviewsListPage", () => {
     expect(markup).toContain(`>${pendingCount}</strong> awaiting a decision`);
   });
 
-  it("renders real rows in a table once the listing comes from the database", async () => {
+  it("renders real reviews as decision cards without leaking raw member UUIDs", async () => {
     loadViewerReviews.mockResolvedValue({
       state: "ok",
       next: undefined,
@@ -64,7 +66,7 @@ describe("ReviewsListPage", () => {
           title: "Add ESD protection to USB-C port",
           status: "active",
           decision: "pending",
-          createdBy: "dana@acme.corp",
+          createdBy: "620f1df3-f731-497b-9a8c-c5425f762c7d",
           updatedAt: "2026-09-01T09:30:00.000Z",
         },
       ],
@@ -76,8 +78,13 @@ describe("ReviewsListPage", () => {
     expect(markup).toContain("acme/board");
     expect(markup).toContain('href="/reviews/rev_real_1"');
     expect(markup).toContain(">1</strong> awaiting a decision");
+    expect(markup).toContain('aria-label="Hardware reviews across visible repositories"');
+    expect(markup).toContain("Inspect and decide");
+    expect(markup).toContain("Opened by Recorded member");
+    expect(markup).not.toContain("620f1df3-f731-497b-9a8c-c5425f762c7d");
+    expect(markup).not.toContain("<table");
     // The richer fixture card carries finding counts the database listing does not query.
-    expect(markup).toContain("<table");
+    expect(markup).not.toContain("blockers");
   });
 
   it("asks an unrecognised viewer to sign in rather than showing an empty registry", async () => {

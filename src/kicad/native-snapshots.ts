@@ -86,8 +86,10 @@ export function verifiedNativePcbItemAnchors(
     height === undefined ||
     Math.abs(originX) > 0.0001 ||
     Math.abs(originY) > 0.0001 ||
-    Math.abs(width - boardWidth) > 0.001 ||
-    Math.abs(height - boardHeight) > 0.001 ||
+    // KiCad 10 quantizes plot dimensions (10.0 mm becomes 9.9822 mm).
+    // Permit only narrow plot-unit rounding, never distinct board geometry.
+    Math.abs(width - boardWidth) > 0.025 ||
+    Math.abs(height - boardHeight) > 0.025 ||
     boardWidth <= 0 ||
     boardHeight <= 0
   )
@@ -110,9 +112,15 @@ export function verifiedNativePcbItemAnchors(
       const description = candidate.description;
       const uuid = candidate.uuid;
       const pos = candidate.pos;
+      // Only KiCad's exact copper-layer suffix or its native track-length
+      // variant qualifies; combined-layer zones remain excluded.
+      const sourceLayer =
+        typeof description === "string"
+          ? /\bon ([FB]\.Cu)(?:, length \d+(?:\.\d+)? mm)?$/iu.exec(description.trim())?.[1]
+          : undefined;
       if (
         typeof description !== "string" ||
-        !description.trim().endsWith(` on ${layer}`) ||
+        sourceLayer !== layer ||
         typeof uuid !== "string" ||
         !/^[a-f0-9-]{36}$/iu.test(uuid) ||
         !pos ||
@@ -127,7 +135,8 @@ export function verifiedNativePcbItemAnchors(
       const key = `${finding.fingerprint}:${uuid}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const name = /\bof ([#A-Za-z0-9_]+) on (?:F|B)\.Cu$/iu.exec(description)?.[1] ?? "Item";
+      const name =
+        /\bof ([#\w]+) on [FB]\.Cu$/iu.exec(description)?.[1] ?? (description.startsWith("Track ") ? "Track" : "Item");
       result.push({
         id: `kicad_item_${finding.fingerprint.slice(0, 12)}_${uuid.slice(0, 8)}`,
         kind: "finding",
@@ -141,6 +150,10 @@ export function verifiedNativePcbItemAnchors(
           severity: finding.severity,
           message: finding.message.slice(0, 500),
           sourceUuid: uuid,
+          // Absolute KiCad-reported millimeters, not projected image coordinates.
+          // These survive a changed board outline/viewBox in a later revision.
+          sourceXmm: x,
+          sourceYmm: y,
           provenance: "kicad-json-object-position",
           locationMeaning: "Referenced source object, not verified violation center",
         },

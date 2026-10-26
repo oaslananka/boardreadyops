@@ -9,6 +9,12 @@ export interface ReviewCanvasProps {
   baseSnapshots?: SnapshotArtifact[];
   /** Use a shorter preview before the finding list on narrow run-inspection screens. */
   compactMobile?: boolean;
+  /** Enlarged evidence viewport while secondary triage panels are hidden. */
+  immersive?: boolean;
+  /** Hide optional inspection chrome only in the initial Overview preview on small screens. */
+  previewMobileControls?: boolean;
+  /** Start on the first actual PCB layer when used as a review overview teaser. */
+  preferPcbLayer?: boolean;
   findings?: DemoFinding[];
   comments?: DemoComment[];
   selectedFindingFingerprint?: string | undefined;
@@ -416,6 +422,9 @@ export function ReviewCanvas({
   headSnapshots,
   baseSnapshots = [],
   compactMobile = false,
+  immersive = false,
+  previewMobileControls = false,
+  preferPcbLayer = false,
   findings = [],
   comments = [],
   selectedFindingFingerprint,
@@ -423,7 +432,12 @@ export function ReviewCanvas({
   onSelectComment,
   onAddCommentAtPoint,
 }: Readonly<ReviewCanvasProps>) {
-  const [selectedSheetOrLayer, setSelectedSheetOrLayer] = useState<string>(headSnapshots[0]?.sheetOrLayer ?? "Main");
+  const [selectedSheetOrLayer, setSelectedSheetOrLayer] = useState<string>(
+    () =>
+      (preferPcbLayer ? headSnapshots.find((snapshot) => snapshot.kind === "pcb_layer") : undefined)?.sheetOrLayer ??
+      headSnapshots[0]?.sheetOrLayer ??
+      "Main",
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("head");
   const [opacity, setOpacity] = useState<number>(0.5);
   const [zoom, setZoom] = useState<number>(1);
@@ -556,6 +570,9 @@ export function ReviewCanvas({
       ? "head"
       : viewMode;
 
+  let canvasHeightClass = compactMobile ? "h-[19rem] md:h-[34rem]" : "h-[27rem] md:h-[34rem]";
+  if (immersive) canvasHeightClass = "h-[min(75dvh,56rem)]";
+
   const modeButtonClass = (active: boolean) =>
     `shrink-0 rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
 
@@ -582,13 +599,14 @@ export function ReviewCanvas({
             ))}
           </select>
 
-          <section
-            className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0"
+          <fieldset
+            className={`${previewMobileControls ? "hidden sm:flex" : "flex"} w-full min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0`}
             aria-label="Revision comparison modes"
           >
             <button
               type="button"
-              className={modeButtonClass(viewMode === "overlay")}
+              className={modeButtonClass(effectiveViewMode === "overlay")}
+              aria-pressed={effectiveViewMode === "overlay"}
               disabled={!comparable}
               onClick={() => setViewMode("overlay")}
               title="Overlay with opacity slider"
@@ -597,7 +615,8 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={modeButtonClass(viewMode === "split")}
+              className={modeButtonClass(effectiveViewMode === "split")}
+              aria-pressed={effectiveViewMode === "split"}
               disabled={!comparable}
               onClick={() => setViewMode("split")}
               title="Side-by-side comparison"
@@ -606,7 +625,8 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={modeButtonClass(viewMode === "diff")}
+              className={modeButtonClass(effectiveViewMode === "diff")}
+              aria-pressed={effectiveViewMode === "diff"}
               disabled={!comparable}
               onClick={() => setViewMode("diff")}
               title="Difference highlight"
@@ -615,7 +635,8 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={modeButtonClass(viewMode === "head")}
+              className={modeButtonClass(effectiveViewMode === "head")}
+              aria-pressed={effectiveViewMode === "head"}
               onClick={() => setViewMode("head")}
               title="Head revision only"
             >
@@ -623,17 +644,20 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={modeButtonClass(viewMode === "base")}
+              className={modeButtonClass(effectiveViewMode === "base")}
+              aria-pressed={effectiveViewMode === "base"}
               disabled={!baseSrc}
               onClick={() => setViewMode("base")}
               title="Base revision only"
             >
               Base Only
             </button>
-          </section>
+          </fieldset>
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-start sm:gap-3">
+        <div
+          className={`${previewMobileControls ? "hidden sm:flex" : "flex"} min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-start sm:gap-3`}
+        >
           {effectiveViewMode === "overlay" ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Base</span>
@@ -694,7 +718,7 @@ export function ReviewCanvas({
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
-        className={`relative ${compactMobile ? "h-[19rem]" : "h-[27rem]"} overflow-hidden rounded-md border border-border bg-muted md:h-[34rem] ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`relative ${canvasHeightClass} overflow-hidden rounded-md border border-border bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

@@ -44,12 +44,11 @@ export async function handleDraftProvenanceStatus(
   if (!executor) return response({ ok: false, error: "Run store is unavailable" }, 503);
   try {
     // Source ownership is authoritative; no caller-supplied repository ID.
-    const found = await executor.query(
+    const sourceQuery =
       "select repositories.installation_id, release_runs.execution_attempt_id " +
-        "from release_runs join repositories on repositories.id = release_runs.repository_id " +
-        "where release_runs.id = $1 and repositories.disabled_at is null limit 1",
-      [runId],
-    );
+      "from release_runs join repositories on repositories.id = release_runs.repository_id " +
+      "where release_runs.id = $1 and repositories.disabled_at is null limit 1";
+    const found = await executor.query(sourceQuery, [runId]);
     const row = records(found)[0];
     const installationId = row?.installation_id;
     if (typeof installationId !== "string" || !uuid.test(installationId)) {
@@ -69,6 +68,16 @@ export async function handleDraftProvenanceStatus(
         storageDriver: dependencies.environment.ARTIFACT_STORAGE_DRIVER ?? "local",
       });
       status = result.status;
+    }
+    // The receipt/ZIP read may outlive the viewer's permission or the run's
+    // original ownership/attempt. Refresh both before disclosing even a
+    // read-only status. This narrows the race but is not a sharing grant.
+    const latest = records(await executor.query(sourceQuery, [runId]))[0];
+    if (latest?.installation_id !== installationId || latest.execution_attempt_id !== attempt) {
+      return response({ ok: false, error: "Run not found" }, 404);
+    }
+    if (!(await viewer.authorizeInstallation(installationId))) {
+      return response({ ok: false, error: "Run not found" }, 404);
     }
     return response({ ok: true, status, manufacturingApproved: false }, 200);
   } catch {

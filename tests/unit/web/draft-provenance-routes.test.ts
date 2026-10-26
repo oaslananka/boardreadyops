@@ -68,6 +68,7 @@ describe("authenticated, non-authorizing draft provenance status", () => {
   it("does not verify a run without a current authoritative attempt", async () => {
     const f = fixture();
     f.query.mockResolvedValueOnce({ rows: [{ installation_id: installationId, execution_attempt_id: null }] });
+    f.query.mockResolvedValueOnce({ rows: [{ installation_id: installationId, execution_attempt_id: null }] });
     const result = await handleDraftProvenanceStatus(runId, f.deps);
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ ok: true, status: "unverified", manufacturingApproved: false });
@@ -93,6 +94,38 @@ describe("authenticated, non-authorizing draft provenance status", () => {
     expect(f.query).toHaveBeenCalledWith(expect.stringContaining("repositories.id = release_runs.repository_id"), [
       runId,
     ]);
+    expect(f.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a revoked installation after the asynchronous ZIP verifier completes", async () => {
+    const f = fixture();
+    f.authorizeInstallation.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const result = await handleDraftProvenanceStatus(runId, f.deps);
+    expect(result.status).toBe(404);
+    expect(await result.json()).toEqual({ ok: false, error: "Run not found" });
+    expect(f.verify).toHaveBeenCalledTimes(1);
+    expect(f.authorizeInstallation).toHaveBeenCalledTimes(2);
+    expect(f.close).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["deleted/disabled repository", []],
+    [
+      "installation switched",
+      [{ installation_id: "44444444-4444-4444-8444-444444444444", execution_attempt_id: attemptId }],
+    ],
+    [
+      "attempt superseded",
+      [{ installation_id: installationId, execution_attempt_id: "55555555-5555-4555-8555-555555555555" }],
+    ],
+  ] as const)("rejects %s before disclosing any verified status", async (_case, latestRows) => {
+    const f = fixture();
+    f.query.mockResolvedValueOnce({ rows: [{ installation_id: installationId, execution_attempt_id: attemptId }] });
+    f.query.mockResolvedValueOnce({ rows: [...latestRows] });
+    const result = await handleDraftProvenanceStatus(runId, f.deps);
+    expect(result.status).toBe(404);
+    expect(await result.json()).toEqual({ ok: false, error: "Run not found" });
+    expect(f.verify).toHaveBeenCalledTimes(1);
     expect(f.close).toHaveBeenCalledTimes(1);
   });
 

@@ -63,14 +63,18 @@ describe("first-use visual-first routes", () => {
     expect(projectsMock).toHaveBeenCalledOnce();
   });
 
-  it("leads with the KiCad example instead of the create-workspace form for a first-time member", async () => {
+  it("leads with the real GitHub review workflow and leaves CAD workspace and sample optional", async () => {
     authMock.mockResolvedValue({ session: { userId: "123", login: "tester" } });
     projectsMock.mockResolvedValue({ state: "no-workspaces" });
     const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
     expect(html.indexOf("Your next hardware review starts with the board")).toBeGreaterThan(0);
-    expect(html.indexOf("Your next hardware review starts with the board")).toBeLessThan(
-      html.indexOf("Create your first workspace"),
+    expect(html.indexOf("Continue with GitHub repositories")).toBeLessThan(html.indexOf("Create your first workspace"));
+    expect(html.indexOf("Continue with GitHub repositories")).toBeLessThan(
+      html.indexOf("Explore a sample PCB and schematic"),
     );
+    expect(html).toContain('aria-label="Optional CAD workspace setup"');
+    expect(html).toContain('aria-label="Example hardware review"');
+    expect(html).toContain("Open hardware reviews");
     expect(html).toContain('href="/dashboard"');
     expect(html).toContain('href="/runs"');
     expect(html).toContain("No CAD workspace is required");

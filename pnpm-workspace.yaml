@@ -1,15 +1,5 @@
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
-  # GHSA-qxg6-89mg-rqv8 / GHSA-xp26-3454-mjgp: official Vitest v4 security backport; remove once 7 days old.
-  - 'vitest@4.1.12'
-  - '@vitest/coverage-v8@4.1.12'
-  - '@vitest/expect@4.1.12'
-  - '@vitest/mocker@4.1.12'
-  - '@vitest/pretty-format@4.1.12'
-  - '@vitest/runner@4.1.12'
-  - '@vitest/snapshot@4.1.12'
-  - '@vitest/spy@4.1.12'
-  - '@vitest/utils@4.1.12'
   - '@renovatebot/osv-offline-db@3.0.9'
   - '@renovatebot/osv-offline@3.0.9'
   - '@hono/node-server@2.0.12'
@@ -23,11 +13,7 @@ minimumReleaseAgeExclude:
   - 'hono@4.13.7'
   # OSV security update: GHSA-vfgh-jcmw-g37q patched markdown-it@14.3.3
   - 'markdown-it@14.3.3'
-  # September 2026 Next.js security release
-  - 'next@16.3.8'
   - 'smol-toml@1.9.0'
-  # Renovate security update: ip-address@10.7.1
-  - 'ip-address@10.7.1'
   - 'valibot@1.4.2'
   # Security fixes; review/remove exceptions after the minimum release age.
   - 'sharp@0.35.5'
@@ -35,8 +21,12 @@ minimumReleaseAgeExclude:
   - 'source-map-js@1.2.2'
   - '@modelcontextprotocol/sdk@1.32.0'
   - 'vite@8.2.4'
-  # Renovate security update: fast-uri@3.1.8
-  - 'fast-uri@3.1.8'
+  # Security advisory fixes from latest OSV scan. Review exclusions after normal age window.
+  - 'fast-uri@3.1.9'
+  - 'body-parser@2.4.0'
+  - 'undici@6.29.1'
+  - 'zod@4.6.6'
+  - 'happy-dom@21.0.4'
   - 'qs@6.16.0'
   - 'renovate@43.272.4'
 trustPolicy: no-downgrade
@@ -61,6 +51,11 @@ allowBuilds:
   sharp: true
   vue-demi: false
 
+# Upstream chromium-bidi v17 still references Zod 3's removed ZodError.errors alias.
+# Retain invalid-command protocol errors when running against the patched Zod 4.
+patchedDependencies:
+  chromium-bidi@17.0.2: patches/chromium-bidi@17.0.2.patch
+
 overrides:
   # Bound JSON.parse fallback matching to the upstream ReDoS fix (#1036).
   json-with-bigint: 3.5.12
@@ -83,16 +78,21 @@ overrides:
   glob@>=10.0.0 <13.0.6: 13.0.6
   'qs@>=6.11.1 <6.16.0': 6.16.0
   'undici@>=8.0.0 <8.11.0': 8.11.2
+  'undici@>=6 <6.29.1': 6.29.1
   vite@<=6.4.1: '>=6.4.2'
   vite@^8.0.0: '8.2.4'
   '@babel/core@>=7.0.0 <7.29.1': '>=7.29.1'
   'brace-expansion@>=5 <5.0.12': 5.0.12
-  'fast-uri@>=3 <3.1.8': 3.1.8
+  'fast-uri@>=3 <3.1.9': 3.1.9
   'hono@<4.13.7': 4.13.13
+  'body-parser@>=2 <2.4.0': 2.4.0
+  # Explicit compatibility probes required: both upstream tools still declare Zod 3.
+  '@codecov/bundler-plugin-core>zod': 4.6.6
+  'chromium-bidi>zod': 4.6.6
   'markdown-it@<14.3.3': 14.3.3
-  'next@<16.3.8': 16.3.8
+  'next@<16.4.1': 16.4.1
   'smol-toml@<1.9.0': 1.9.0
-  'ip-address@<10.7.1': 10.7.3
+  'ip-address@<10.7.4': 10.7.4
   'nanoid@<3.3.17': 3.3.20
   js-yaml@>=4 <4.3.2: 4.3.2
   linkify-it@>=5 <5.0.2: 5.0.2

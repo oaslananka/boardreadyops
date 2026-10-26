@@ -50,6 +50,21 @@ describe("ProductNavigation preserved behavior: mobile drawer and focus manageme
     delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
   });
 
+  it("keeps advanced governance discoverable without exposing all links by default", async () => {
+    await act(async () => {
+      root.render(createElement(ProductNavigation, {}));
+    });
+    const disclosure = container.querySelector<HTMLButtonElement>('button[aria-controls="nav-govern-items"]');
+    expect(disclosure?.getAttribute("aria-expanded")).toBe("false");
+    expect(container.querySelector("#nav-govern-items")?.getAttribute("hidden")).not.toBeNull();
+    await act(async () => disclosure?.click());
+    expect(disclosure?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector("#nav-govern-items")?.getAttribute("hidden")).toBeNull();
+    expect(container.querySelector('#nav-govern-items a[href="/rules"]')).not.toBeNull();
+    await act(async () => disclosure?.click());
+    expect(container.querySelector("#nav-govern-items")?.getAttribute("hidden")).not.toBeNull();
+  });
+
   it("exposes honest aria controls for the mobile drawer trigger", async () => {
     await act(async () => {
       root.render(createElement(ProductNavigation, {}));
