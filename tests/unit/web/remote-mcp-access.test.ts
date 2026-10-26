@@ -99,6 +99,9 @@ describe("remote MCP OAuth grant boundary", () => {
 
   it.each([
     [{ aud: "https://other.example/mcp" }, "wrong audience"],
+    [{ aud: [remoteMcpResource, "https://second.example/resource"] }, "multi-audience JWT"],
+    [{ aud: [remoteMcpResource] }, "array instead of canonical audience"],
+    [{ aud: [remoteMcpResource, remoteMcpResource] }, "duplicate audience array"],
     [{ iss: "https://other.example" }, "wrong issuer"],
     [{ exp: now - 1 }, "expired"],
     [{ iat: now + 1000 }, "future issue"],

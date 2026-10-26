@@ -785,3 +785,22 @@ Disposable PostgreSQL acceptance independently asserts the OAuth issuer's
 `RS256`/`at+jwt`/configured-key-ID header before validating the real grant
 and revocation lifecycle. This change does **not** activate any OAuth/MCP
 route, enroll a provider or rotate keys in production.
+
+### Exact single-resource OAuth access-token audience (unreleased hardening)
+
+The JWT resource-server boundary now accepts **only the canonical, scalar**
+`aud: "https://boardreadyops.com/mcp"`. Previously a signed JWT with an
+`aud` *array* containing the MCP resource alongside other service audiences
+passed both the generic JOSE audience check and the resource guard. Even a
+one-element audience array is now rejected: the BoardReadyOps OAuth signer
+always issues a single string audience and durable grants are likewise bound
+to that exact URL. This prevents a multiply targeted token from being
+reused at MCP if another application ever shares a trusted signing issuer.
+
+Unit tests verify mixed-resource, duplicated-resource and single-element
+arrays are rejected **before any durable grant lookup**, including a real
+RS256-signed multi-audience JWT whose signature and generic JOSE audience
+verification succeed. Canonical single-audience OAuth access JWTs, their
+existing revocation checks and repository access logic remain unchanged.
+Production OAuth/MCP release gates stay disabled; this change registers no
+new clients and performs no deployment.

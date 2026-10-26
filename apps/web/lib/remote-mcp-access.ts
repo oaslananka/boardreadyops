@@ -88,9 +88,8 @@ export async function authenticateRemoteMcpRequest(
   if (
     !claims ||
     claims.iss !== expectedIssuer ||
-    !(typeof claims.aud === "string"
-      ? claims.aud === remoteMcpResource
-      : Array.isArray(claims.aud) && claims.aud.includes(remoteMcpResource)) ||
+    // This issuer only mints single-resource MCP access tokens.
+    claims.aud !== remoteMcpResource ||
     !Number.isSafeInteger(claims.githubUserId) ||
     claims.githubUserId <= 0 ||
     claims.sub !== `github:${claims.githubUserId}` ||

@@ -110,6 +110,18 @@ describe("remote MCP signed-token verifier", () => {
       .setExpirationTime(now() + 600)
       .sign(privateKey);
     expect(await authenticateRemoteMcpRequest(mcpRequest("tools/list", {}, badAud), issuer, verifier)).toBeNull();
+    const multiAudience = await new SignJWT({ scope: "review:read", githubUserId: ghUser, clientId })
+      .setProtectedHeader({ alg: "RS256", kid: "test-1", typ: "at+jwt" })
+      .setSubject(`github:${ghUser}`)
+      .setIssuer(issuer)
+      .setAudience([remoteMcpResource, "https://second.example/resource"])
+      .setJti(jti)
+      .setIssuedAt(now())
+      .setExpirationTime(now() + 600)
+      .sign(privateKey);
+    expect(
+      await authenticateRemoteMcpRequest(mcpRequest("tools/list", {}, multiAudience), issuer, verifier),
+    ).toBeNull();
   });
 
   it("rejects same-key non-access JWT types before consulting the durable grant", async () => {
