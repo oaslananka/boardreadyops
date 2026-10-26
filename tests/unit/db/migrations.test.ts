@@ -149,6 +149,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0095_remote_mcp_oauth_grants.sql",
       "0096_remote_mcp_oauth_authorization_codes.sql",
       "0097_remote_mcp_oauth_abuse_controls.sql",
+      "0098_remote_mcp_oauth_login_resumptions.sql",
     ]);
   });
 

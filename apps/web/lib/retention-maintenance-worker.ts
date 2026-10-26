@@ -33,6 +33,7 @@ export type RetentionCleanupResult = {
   artifactSharedObjectsRetained: number;
   remoteMcpRateLimitBucketsPurged: number;
   remoteMcpSecurityEventsPurged: number;
+  remoteMcpLoginResumptionsPurged: number;
   failures: RetentionCleanupFailure[];
   completed: boolean;
 };
@@ -40,7 +41,11 @@ export type RetentionCleanupResult = {
 export type RetentionMaintenanceDependencies = {
   purgeWebhookInbox(): Promise<number>;
   purgeRunnerRequestNonces(): Promise<number>;
-  purgeRemoteMcpOAuth(): Promise<{ rateLimitBucketsPurged: number; securityEventsPurged: number }>;
+  purgeRemoteMcpOAuth(): Promise<{
+    rateLimitBucketsPurged: number;
+    securityEventsPurged: number;
+    loginResumptionsPurged: number;
+  }>;
   expireArtifactUploadCapabilities(): Promise<number>;
   revokeExpiredRunnerRegistrationEnrollments(): Promise<number>;
   expireRepositorySetupProbes(): Promise<number>;
@@ -137,6 +142,8 @@ export async function runRetentionMaintenanceCleanup(
       remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.rateLimitBucketsPurged : 0,
     remoteMcpSecurityEventsPurged:
       remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.securityEventsPurged : 0,
+    remoteMcpLoginResumptionsPurged:
+      remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.loginResumptionsPurged : 0,
     failures,
     completed: failures.length === 0,
   };

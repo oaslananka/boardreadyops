@@ -80,6 +80,7 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
       "0095_remote_mcp_oauth_grants.sql",
       "0096_remote_mcp_oauth_authorization_codes.sql",
       "0097_remote_mcp_oauth_abuse_controls.sql",
+      "0098_remote_mcp_oauth_login_resumptions.sql",
     ]) {
       const sql = await readFile(new URL(`../../packages/db/migrations/${name}`, import.meta.url), "utf8");
       await executor().query(sql);
@@ -119,6 +120,104 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     expect(
       await beginRemoteMcpConsent(executor(), githubUserId, params({ resource: "https://wrong.example/mcp" })),
     ).toBeNull();
+  });
+
+  it("resumes a long OAuth request after GitHub login using a cookie-bound, one-use short link", async () => {
+    const secret = "resume-local-session-secret-".repeat(3);
+    const signedSession = encodeUserSession(
+      {
+        userId: githubUserId,
+        login: "oauth-test-user",
+        installationIds: [],
+        issuedAt: new Date(Date.now() - 60_000).toISOString(),
+        expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+      secret,
+    );
+    const state = randomUUID().repeat(12);
+    const url = new URL(`${issuer}/oauth/authorize`);
+    for (const [key, value] of Object.entries({
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      state,
+      scope: "review:read",
+      resource: remoteMcpResource,
+    }))
+      url.searchParams.set(key, value);
+    expect(url.href.length).toBeGreaterThan(512);
+    const deps = {
+      issuer,
+      sessionSecret: secret,
+      openDb: async () => ({
+        query: executor().query,
+        close: async () => undefined,
+      }),
+    };
+    const beforeLogin = await handleRemoteMcpConsentGet(new Request(url), deps);
+    expect(beforeLogin.status).toBe(401);
+    const loginHtml = await beforeLogin.text();
+    expect(loginHtml).not.toContain(state);
+    expect(loginHtml).not.toContain(challenge);
+    expect(loginHtml).toContain("resume%3D");
+    const id = loginHtml.match(/resume%3D([0-9a-f-]{36})/iu)?.[1];
+    expect(id).toBeTruthy();
+    const setCookie = beforeLogin.headers.get("set-cookie") ?? "";
+    const cookie = setCookie.split(";")[0];
+    expect(cookie).toMatch(/^brops_mcp_login_resume=[A-Za-z0-9_-]{43}$/u);
+    const resumedUrl = `${issuer}/oauth/authorize?resume=${id}`;
+    const browserSessionCookie = `brops_session=${signedSession}; ${cookie}`;
+    const forged = await handleRemoteMcpConsentGet(
+      new Request(resumedUrl, {
+        headers: { cookie: `brops_session=${signedSession}; brops_mcp_login_resume=${"A".repeat(43)}` },
+      }),
+      deps,
+    );
+    expect(forged.status).toBe(400);
+    const actual = await handleRemoteMcpConsentGet(
+      new Request(resumedUrl, {
+        headers: { cookie: browserSessionCookie },
+      }),
+      deps,
+    );
+    expect(actual.status, await actual.clone().text()).toBe(200);
+    expect(actual.headers.get("set-cookie")).toContain("Max-Age=0");
+    const rendered = await actual.text();
+    expect(rendered).toContain("Trusted Test Client");
+    expect(rendered).toContain("review:read");
+    const replay = await handleRemoteMcpConsentGet(
+      new Request(resumedUrl, {
+        headers: { cookie: browserSessionCookie },
+      }),
+      deps,
+    );
+    expect(replay.status).toBe(400);
+    const authorizationId = rendered.match(/name="authorization_id" value="([a-f0-9-]+)"/u)?.[1];
+    const csrf = rendered.match(/name="csrf" value="([A-Za-z0-9_-]+)"/u)?.[1];
+    const decision = await handleRemoteMcpConsentPost(
+      new Request(`${issuer}/oauth/authorize`, {
+        method: "POST",
+        headers: {
+          cookie: `brops_session=${signedSession}`,
+          origin: issuer,
+          "sec-fetch-site": "same-origin",
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          authorization_id: required(authorizationId),
+          csrf: required(csrf),
+          decision: "approve",
+        }),
+      }),
+      deps,
+    );
+    expect(decision.status).toBe(303);
+    const location = new URL(required(decision.headers.get("location")));
+    expect(location.searchParams.get("state")).toBe(state);
+    expect(location.searchParams.get("iss")).toBe(issuer);
+    expect(location.searchParams.get("code")).toMatch(/^[A-Za-z0-9_-]{43}$/u);
   });
 
   it("refuses cross-user consent, invalid CSRF, double approval and redirect manipulation", async () => {

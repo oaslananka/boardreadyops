@@ -7,6 +7,7 @@ describe("OAuth maintenance migration and database safety", () => {
     await expect(purgeExpiredRemoteMcpOAuthSecurityData({ query } as never)).resolves.toEqual({
       rateLimitBucketsPurged: 0,
       securityEventsPurged: 0,
+      loginResumptionsPurged: 0,
     });
     expect(query).toHaveBeenCalledTimes(1);
     expect(query.mock.calls[0]?.[0]).toContain("to_regclass");
@@ -29,6 +30,7 @@ describe("OAuth maintenance migration and database safety", () => {
     await expect(purgeExpiredRemoteMcpOAuthSecurityData({ query } as never, 7)).resolves.toEqual({
       rateLimitBucketsPurged: 2,
       securityEventsPurged: 3,
+      loginResumptionsPurged: 0,
     });
     expect(query.mock.calls[1]?.[1]).toEqual([7]);
     expect(query.mock.calls[2]?.[1]).toEqual([7]);

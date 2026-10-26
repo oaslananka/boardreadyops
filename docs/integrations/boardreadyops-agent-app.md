@@ -263,15 +263,23 @@ session, exact same-origin `Origin`, urlencoded form and the saved unpredictable
 CSRF nonce. The POST returns `303` to the exact pre-registered redirect URI
 with `state` and RFC 9207 `iss`; it never sends a code via an unvalidated
 redirect. Strict CSP, no-referrer, frame denial, noindex and `no-store` are
-applied. Users without a session receive a sign-in link and may need to
-restart the AI-client connection if the OAuth request exceeds the dashboard's
-safe return-path limit.
+applied. Users without a session receive a sign-in link that preserves
+validated OAuth request parameters across the GitHub login round-trip by means
+of migration 0098's ten-minute, one-use database record and an unpredictable
+HttpOnly, Secure, SameSite=Lax browser cookie. The login return path contains
+only a short UUID, never the potentially long OAuth client/PKCE/state query.
+After a verified GitHub sign-in, the original client request is recovered
+only if the same browser supplies the corresponding cookie; the record is
+atomically consumed and the cookie cleared. Expired, already used, missing
+cookie, disabled client and cross-browser attempts fail closed. Every returned
+consent still requires explicit POST approval and its own CSRF nonce.
 
 This increment was validated with local route tests plus disposable PostgreSQL
 integration exercising real signed browser session → rendered consent form →
 CSRF-bound approval → single-use code → JWT grant. There are **no** real
-ChatGPT/Claude client registrations, configured production signing keys, rate
-limits or deployment migrations yet. The existing gateway release hold remains.
+ChatGPT/Claude client registrations, configured production signing keys or
+production OAuth deployment migrations yet. PostgreSQL-backed rate limits
+are implemented locally but not deployed. The existing gateway release hold remains.
 
 Implementation cross-checked with RFC 9700 and the August 2026 browser-based
 OAuth BCP RFC 10017. Official OpenAI plugin authorization documentation supports
@@ -324,6 +332,28 @@ No production migrations, customer signing keys or public MCP rollout occurred.
 Remaining gates include end-to-end real-client
 connectivity, GitHub permission reliability and safely enabling the `/mcp`
 handler; this commit does NOT enable the hosted MCP endpoint.
+
+### Browser-bound OAuth login continuation (local acceptance)
+
+Migration `0098_remote_mcp_oauth_login_resumptions.sql` stores validated,
+pre-registered OAuth authorization request parameters for at most ten minutes,
+before the user has signed in. Only a SHA-256 digest of the 32-byte browser
+nonce is stored, and the pre-login record is not bound to a fabricated user ID.
+The browser receives a Secure, HttpOnly, SameSite=Lax cookie restricted to
+`/oauth/authorize`; GitHub's existing `return_to` remains bounded to 512
+characters because it now contains only `?resume=<uuid>`. The server requires
+a verified current GitHub login, the exact resumption ID, the matching browser
+nonce and still-enabled exact registered OAuth client before atomically
+consuming the record and displaying the permission screen. A long OAuth
+`state` survives the entire login, consent and redirect sequence without
+appearing in a login link. No grant is issued automatically.
+
+The shared hourly maintenance worker deletes expired continuation rows in
+bounded `SKIP LOCKED` batches, separately counts purged rows, and leaves
+unexpired login attempts untouched. The migration, cookie isolation, failed
+nonce, replay protection, login continuation, preserved state and retention
+were exercised on an isolated PostgreSQL 17 instance. This feature remains
+behind the existing unpublished OAuth and MCP rollout gates.
 
 ### Hosted OAuth client interoperability (October 2026 review)
 

@@ -4,7 +4,15 @@ import {
   decideRemoteMcpConsent,
   type OAuthAuthorizationParameters,
   remoteMcpAuthorizationRedirect,
+  validRemoteMcpOAuthAuthorizationParameters,
 } from "./remote-mcp-authorization-code.js";
+import {
+  beginRemoteMcpLoginResumption,
+  clearedRemoteMcpLoginResumptionCookie,
+  consumeRemoteMcpLoginResumption,
+  remoteMcpLoginResumptionCookie,
+  remoteMcpLoginResumptionCookieHeader,
+} from "./remote-mcp-login-resume.js";
 import { recordRemoteMcpOAuthEvent, takeRemoteMcpOAuthRateLimit } from "./remote-mcp-oauth-abuse.js";
 import { decodeUserSession } from "./user-session.js";
 import { sessionCookieName } from "./viewer-authorization.js";
@@ -123,6 +131,12 @@ function htmlPage(values: {
 </form></main></body></html>`;
 }
 
+function withResumeCookie(response: Response, cookie: string): Response {
+  const headers = new Headers(response.headers);
+  headers.append("set-cookie", cookie);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 function signInPage(returnTo: string): Response {
   const path = `${consentPath}${returnTo}`;
   const signInUrl =
@@ -143,18 +157,53 @@ export async function handleRemoteMcpConsentGet(
     return errorResponse(400, "Invalid OAuth authorization request");
   }
   const url = new URL(request.url);
+  const resume = url.searchParams.get("resume");
+  const resuming = url.searchParams.has("resume");
+  if (resuming && (url.searchParams.size !== 1 || resume === null || !/^[0-9a-f-]{36}$/iu.test(resume)))
+    return errorResponse(400, "Invalid OAuth continuation");
+  const directParams = resuming ? null : paramsFromQuery(url.searchParams);
+  if (!resuming && (!directParams || !validRemoteMcpOAuthAuthorizationParameters(directParams))) {
+    return errorResponse(400, "Invalid OAuth authorization request");
+  }
   const userId = sessionUser(request, deps.sessionSecret);
-  if (!userId) return signInPage(url.search);
-  const params = paramsFromQuery(url.searchParams);
-  if (!params) return errorResponse(400, "Invalid OAuth authorization request");
-
+  const cookie = tokenFromCookies(request.headers.get("cookie") ?? "", remoteMcpLoginResumptionCookie);
+  if (resuming && !cookie) return errorResponse(400, "OAuth continuation expired");
+  if (!userId && resuming) return signInPage(`?resume=${resume}`);
   let db: Awaited<ReturnType<typeof deps.openDb>> | undefined;
   try {
     db = await deps.openDb();
+    if (!userId) {
+      // An unauthenticated caller has no verified principal. Use a shared
+      // pre-login budget, not a spoofable forwarded-IP based bucket.
+      const throttle = await takeRemoteMcpOAuthRateLimit(db, "token-global", "oauth-login-preauth", 120);
+      if (!throttle.allowed) {
+        await recordRemoteMcpOAuthEvent(db, "rate_limited");
+        return new Response("Too many sign-in requests", {
+          status: 429,
+          headers: {
+            ...securityHeaders,
+            "retry-after": String(throttle.retryAfterSeconds),
+            "content-type": "text/plain; charset=utf-8",
+          },
+        });
+      }
+      if (!directParams) return errorResponse(400, "Invalid OAuth authorization request");
+      const continuation = await beginRemoteMcpLoginResumption(db, directParams);
+      if (!continuation) return errorResponse(400, "OAuth client or authorization request unavailable");
+      return withResumeCookie(
+        signInPage(`?resume=${continuation.id}`),
+        remoteMcpLoginResumptionCookieHeader(continuation.nonce),
+      );
+    }
+    const params = resuming ? await consumeRemoteMcpLoginResumption(db, resume ?? "", cookie ?? "") : directParams;
+    if (!params) {
+      const error = errorResponse(400, "OAuth continuation expired or already used");
+      return resuming ? withResumeCookie(error, clearedRemoteMcpLoginResumptionCookie) : error;
+    }
     const throttle = await takeRemoteMcpOAuthRateLimit(db, "consent-user", String(userId), 12);
     if (!throttle.allowed) {
       await recordRemoteMcpOAuthEvent(db, "rate_limited", userId);
-      return new Response("Too many consent requests", {
+      const rateLimited = new Response("Too many consent requests", {
         status: 429,
         headers: {
           ...securityHeaders,
@@ -162,11 +211,15 @@ export async function handleRemoteMcpConsentGet(
           "content-type": "text/plain; charset=utf-8",
         },
       });
+      return resuming ? withResumeCookie(rateLimited, clearedRemoteMcpLoginResumptionCookie) : rateLimited;
     }
     const pending = await beginRemoteMcpConsent(db, userId, params);
-    if (!pending) return errorResponse(400, "OAuth client or authorization request unavailable");
+    if (!pending) {
+      const error = errorResponse(400, "OAuth client or authorization request unavailable");
+      return resuming ? withResumeCookie(error, clearedRemoteMcpLoginResumptionCookie) : error;
+    }
     await recordRemoteMcpOAuthEvent(db, "consent_started", userId, params.clientId);
-    return new Response(
+    const page = new Response(
       htmlPage({
         clientName: pending.displayName,
         redirectOrigin: pending.redirectOrigin,
@@ -176,8 +229,10 @@ export async function handleRemoteMcpConsentGet(
       }),
       { status: 200, headers: securityHeaders },
     );
+    return resuming ? withResumeCookie(page, clearedRemoteMcpLoginResumptionCookie) : page;
   } catch {
-    return errorResponse(503, "Authorization service temporarily unavailable");
+    const error = errorResponse(503, "Authorization service temporarily unavailable");
+    return resuming ? withResumeCookie(error, clearedRemoteMcpLoginResumptionCookie) : error;
   } finally {
     await db?.close().catch(() => undefined);
   }

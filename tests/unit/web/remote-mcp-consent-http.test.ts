@@ -66,15 +66,25 @@ function deps(db: ReturnType<typeof database>) {
 }
 
 describe("Remote MCP browser consent security boundary", () => {
-  it("does not create a pending consent without a signed user session", async () => {
-    const store = database();
+  it("preserves an unsigned user's OAuth request behind a short cookie-bound GitHub login resume", async () => {
+    const store = database([[{ id: "created" }]]);
     const config = deps(store);
     const result = await handleRemoteMcpConsentGet(new Request(consentUrl()), config);
     expect(result.status).toBe(401);
     expect(result.headers.get("cache-control")).toBe("private, no-store");
     expect(result.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
-    expect(await result.text()).toContain("Sign in with GitHub");
-    expect(config.openDb).not.toHaveBeenCalled();
+    const html = await result.text();
+    expect(html).toContain("Sign in with GitHub");
+    expect(html).toContain("resume%3D");
+    expect(html).not.toContain("client_id%3D");
+    const cookie = result.headers.get("set-cookie") ?? "";
+    expect(cookie).toContain("brops_mcp_login_resume=");
+    expect(cookie).toContain("HttpOnly; Secure; SameSite=Lax");
+    expect(cookie).not.toContain("state-value-12345");
+    expect(cookie).not.toContain(clientId);
+    expect(store.query.mock.calls.some(([sql]) => sql.includes("remote_mcp_oauth_login_resumptions"))).toBe(true);
+    expect(store.query.mock.calls.some(([sql]) => sql.includes("remote_mcp_oauth_authorizations"))).toBe(false);
+    expect(store.close).toHaveBeenCalledOnce();
   });
 
   it("shows only escaped registered client details and requested read-only scopes", async () => {

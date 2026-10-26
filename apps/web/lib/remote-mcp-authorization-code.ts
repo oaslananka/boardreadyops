@@ -69,6 +69,24 @@ function validScopes(value: string): boolean {
   );
 }
 
+/** OAuth request parameter validation is shared across pre-login continuation
+ * and post-login consent. Untrusted request JSON never supplies the user ID.
+ */
+export function validRemoteMcpOAuthAuthorizationParameters(params: OAuthAuthorizationParameters): boolean {
+  return (
+    params.responseType === "code" &&
+    params.codeChallengeMethod === "S256" &&
+    challengePattern.test(params.codeChallenge) &&
+    params.resource === remoteMcpResource &&
+    validScopes(params.scope) &&
+    validHttpsUrl(params.clientId) &&
+    validHttpsUrl(params.redirectUri) &&
+    typeof params.state === "string" &&
+    params.state.length >= 8 &&
+    params.state.length <= 512
+  );
+}
+
 /** No dynamic client registration or remote metadata fetching: only deliberately
  * pre-registered, enabled client IDs and their EXACT redirect URIs may proceed.
  * The caller must resolve authenticated Github user ID from a verified session.
@@ -84,20 +102,7 @@ export async function beginRemoteMcpConsent(
   redirectOrigin: string;
   scopes: string[];
 } | null> {
-  if (
-    !Number.isSafeInteger(githubUserId) ||
-    githubUserId <= 0 ||
-    params.responseType !== "code" ||
-    params.codeChallengeMethod !== "S256" ||
-    !challengePattern.test(params.codeChallenge) ||
-    params.resource !== remoteMcpResource ||
-    !validScopes(params.scope) ||
-    !validHttpsUrl(params.clientId) ||
-    !validHttpsUrl(params.redirectUri) ||
-    typeof params.state !== "string" ||
-    params.state.length < 8 ||
-    params.state.length > 512
-  )
+  if (!Number.isSafeInteger(githubUserId) || githubUserId <= 0 || !validRemoteMcpOAuthAuthorizationParameters(params))
     return null;
 
   const clients = await db.query(

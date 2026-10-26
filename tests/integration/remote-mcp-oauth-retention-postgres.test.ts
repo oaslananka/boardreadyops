@@ -21,11 +21,15 @@ function executor() {
 
 describePg("bounded remote MCP OAuth worker cleanup on PostgreSQL", () => {
   beforeAll(async () => {
-    const migration = await readFile(
-      new URL("../../packages/db/migrations/0097_remote_mcp_oauth_abuse_controls.sql", import.meta.url),
-      "utf8",
-    );
-    await executor().query(migration);
+    for (const name of [
+      "0095_remote_mcp_oauth_grants.sql",
+      "0096_remote_mcp_oauth_authorization_codes.sql",
+      "0097_remote_mcp_oauth_abuse_controls.sql",
+      "0098_remote_mcp_oauth_login_resumptions.sql",
+    ]) {
+      const migration = await readFile(new URL(`../../packages/db/migrations/${name}`, import.meta.url), "utf8");
+      await executor().query(migration);
+    }
     for (const bucket of oldBuckets) {
       await executor().query(
         "insert into remote_mcp_oauth_rate_limits(bucket_sha256, window_started_at, attempts) values($1, now() - interval '4 days', 3)",
@@ -68,7 +72,7 @@ describePg("bounded remote MCP OAuth worker cleanup on PostgreSQL", () => {
 
   it("deletes at most one stale rate bucket and one stale audit record per pass", async () => {
     const result = await purgeExpiredRemoteMcpOAuthSecurityData(executor(), 1);
-    expect(result).toEqual({ rateLimitBucketsPurged: 1, securityEventsPurged: 1 });
+    expect(result).toEqual({ rateLimitBucketsPurged: 1, securityEventsPurged: 1, loginResumptionsPurged: 0 });
     const remainingOldRate = await executor().query(
       "select count(*)::int as n from remote_mcp_oauth_rate_limits where bucket_sha256 = any($1::text[])",
       [oldBuckets],
@@ -78,10 +82,11 @@ describePg("bounded remote MCP OAuth worker cleanup on PostgreSQL", () => {
 
   it("eventually clears only expired data while preserving recent rate and audit records", async () => {
     const remaining = await purgeExpiredRemoteMcpOAuthSecurityData(executor(), 10);
-    expect(remaining).toEqual({ rateLimitBucketsPurged: 2, securityEventsPurged: 2 });
+    expect(remaining).toEqual({ rateLimitBucketsPurged: 2, securityEventsPurged: 2, loginResumptionsPurged: 0 });
     expect(await purgeExpiredRemoteMcpOAuthSecurityData(executor(), 10)).toEqual({
       rateLimitBucketsPurged: 0,
       securityEventsPurged: 0,
+      loginResumptionsPurged: 0,
     });
     const activeRate = await executor().query(
       "select attempts from remote_mcp_oauth_rate_limits where bucket_sha256 = $1",
@@ -93,5 +98,44 @@ describePg("bounded remote MCP OAuth worker cleanup on PostgreSQL", () => {
       [recentEvent],
     );
     expect((activeEvent as { rows: { event_kind: string }[] }).rows[0]?.event_kind).toBe("token_issued");
+  });
+  it("expires browser-bound login resumptions in bounded batches, preserving live requests", async () => {
+    const client = `https://oauth-retention.example/${marker}`;
+    await executor().query(
+      `insert into remote_mcp_oauth_clients(client_id, redirect_uri, display_name, enabled)
+       values ($1, 'https://oauth-retention.example/callback', 'Retention Test', true)`,
+      [client],
+    );
+    const oldIds = [randomUUID(), randomUUID(), randomUUID()];
+    const currentId = randomUUID();
+    try {
+      for (const id of oldIds) {
+        await executor().query(
+          `insert into remote_mcp_oauth_login_resumptions
+            (id, nonce_sha256, client_id, request_parameters, created_at, expires_at)
+           values($1::uuid, $2, $3, '{}'::jsonb, now() - interval '12 minutes', now() - interval '3 minutes')`,
+          [id, digest(id), client],
+        );
+      }
+      await executor().query(
+        `insert into remote_mcp_oauth_login_resumptions
+          (id, nonce_sha256, client_id, request_parameters, expires_at)
+         values ($1::uuid, $2, $3, '{}'::jsonb, now() + interval '9 minutes')`,
+        [currentId, digest(currentId), client],
+      );
+      const first = await purgeExpiredRemoteMcpOAuthSecurityData(executor(), 1);
+      expect(first.loginResumptionsPurged).toBe(1);
+      const second = await purgeExpiredRemoteMcpOAuthSecurityData(executor(), 10);
+      expect(second.loginResumptionsPurged).toBe(2);
+      const third = await purgeExpiredRemoteMcpOAuthSecurityData(executor(), 10);
+      expect(third.loginResumptionsPurged).toBe(0);
+      const active = await executor().query("select id from remote_mcp_oauth_login_resumptions where id = $1::uuid", [
+        currentId,
+      ]);
+      expect((active as { rows: unknown[] }).rows).toHaveLength(1);
+    } finally {
+      await executor().query("delete from remote_mcp_oauth_login_resumptions where client_id = $1", [client]);
+      await executor().query("delete from remote_mcp_oauth_clients where client_id = $1", [client]);
+    }
   });
 });
