@@ -2,7 +2,7 @@
 -- A fence is settled only after the local filesystem Promise has terminated AND
 -- the existing completion/failure transition has committed. Do not time-expire
 -- or automatically garbage collect unsettled fences after worker crashes.
--- Rollout must quiesce ALL pre-0094 physical-unlink workers before enabling
+-- Rollout must quiesce ALL pre-fencing physical-unlink workers before enabling
 -- legal-hold acknowledgement; a mixed-version deployment is not safe.
 
 create table if not exists public.artifact_unlink_fences (
@@ -365,5 +365,5 @@ $$;
 
 
 insert into public.cloud_schema_migrations (version)
-values ('0094_durable_artifact_unlink_fences')
+values ('0097_durable_artifact_unlink_fences')
 on conflict (version) do nothing;
