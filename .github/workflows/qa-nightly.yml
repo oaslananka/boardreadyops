@@ -31,7 +31,7 @@ jobs:
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
       - run: corepack pnpm run deps:install-ci
-      - run: corepack pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - run: bash scripts/install-playwright-ci.sh ${{ matrix.browser }}
       - name: Full route audit (all viewports)
         run: corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts --project=${{ matrix.browser }}
         env:
@@ -68,7 +68,7 @@ jobs:
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
       - run: corepack pnpm run deps:install-ci
-      - run: corepack pnpm exec playwright install --with-deps chromium
+      - run: bash scripts/install-playwright-ci.sh chromium
       - name: Visual regression
         run: corepack pnpm run qa:visual
         env:

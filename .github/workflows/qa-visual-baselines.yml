@@ -36,7 +36,7 @@ jobs:
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
       - run: corepack pnpm run deps:install-ci
-      - run: corepack pnpm exec playwright install --with-deps chromium
+      - run: bash scripts/install-playwright-ci.sh chromium
       - name: Regenerate visual baselines
         run: corepack pnpm run qa:visual:update
         env:
