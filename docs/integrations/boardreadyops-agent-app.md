@@ -1,6 +1,6 @@
 # BoardReadyOps AI App — Common MCP Gateway Design
 
-**Status:** engineering contract / staged rollout plan. **Not a deployed remote connector, not an app-directory listing.**
+**Status:** local MCP merged; [remote MCP candidate](boardreadyops-remote-mcp.md) under implementation. **Not a deployed remote connector, not an app-directory listing.**
 
 ## Product decision
 
@@ -53,14 +53,15 @@ It is not a cloud-hosted MCP endpoint.
   instructions. All user-triggered tool calls go back through the authenticated MCP
   host. Fall back to structured text when the host lacks MCP Apps support.
 
-## Proposed hosted tool contract (not registered yet)
+## Guarded hosted tool contract (implemented in source, production disabled)
 
 | Tool | Inputs | Authorized response | State |
 | --- | --- | --- | --- |
-| `boardreadyops_review_get` | `reviewId` | State, explicitly qualified coverage, authorized repository and PR link | Planned |
-| `boardreadyops_review_findings` | `reviewId`, `cursor?` | Bounded deterministic findings, evidence fingerprint, page cursor | Planned |
-| `boardreadyops_review_footprint_summary` | `reviewId` | Consented source-bound digest/count facts, or `unavailable` | Planned |
-| `boardreadyops_evidence_get` | `evidenceId` | Metadata/hash and authorized in-app link, not raw design bytes | Planned |
+| `boardreadyops_reviews_list` | `limit?` | Bounded recent reviews for one authorized repository | Guarded implementation |
+| `boardreadyops_review_get` | `reviewId` | Exact review and current revision metadata | Guarded implementation |
+| `boardreadyops_review_findings` | `reviewId` | Up to 30 source-scoped severity/rule fingerprints; no CAD paths or unrestricted messages | Guarded implementation |
+| `boardreadyops_review_footprint_summary` | `reviewId` | Consented source-bound digest/count facts, or `unavailable`; MCP Apps view | Guarded implementation |
+| `boardreadyops_evidence_get` | `evidenceId` | Authorized metadata-only link; pending artifact-permission model | Planned, not registered |
 
 Tool schemas must be drawn from the existing versioned contracts before implementation.
 Do not reuse local stdio filesystem inputs as remote MCP tool inputs.
@@ -82,9 +83,9 @@ Do not reuse local stdio filesystem inputs as remote MCP tool inputs.
 
 ## Explicitly deferred
 
-Production remote endpoint, OAuth client registration, ChatGPT directory submission,
-Claude connector listing, write-capable agent tools and additional billing are **not**
-part of this increment. They must not be claimed or activated before the gates above.
+Production enablement, deployment to live `boardreadyops.com/mcp`, OAuth authorization server
+registration/grant issuance, ChatGPT directory submission, Claude connector listing,
+write-capable agent tools and additional billing are **not** part of this increment. They must not be claimed or activated before the gates above.
 
 ## Upstream references
 
