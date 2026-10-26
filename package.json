@@ -45,6 +45,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && corepack pnpm run qa:typecheck && corepack pnpm --filter @boardreadyops/web run typecheck",
     "qa:typecheck": "tsc --noEmit -p tests/e2e/tsconfig.json",
     "test": "vitest run",
+    "mcp:preflight": "node packages/db/scripts/remote-mcp-release-preflight.mjs --database",
     "test:unit": "vitest run tests/unit",
     "test:int": "vitest run tests/integration --no-file-parallelism",
     "test:action": "corepack pnpm run build && vitest run tests/action",

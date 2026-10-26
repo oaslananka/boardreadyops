@@ -588,3 +588,48 @@ installation tokens. This does **not** establish a successful real-user
 collaborator-permission request through the App's installation token; that
 release requirement remains open. No flags, credentials, migrations or
 production deployment were changed in this increment.
+
+### Read-only MCP release preflight (operator tool, unpublished)
+
+From an authorized BoardReadyOps source checkout, run:
+
+```bash
+corepack pnpm run mcp:preflight
+```
+
+The command invokes `packages/db/scripts/remote-mcp-release-preflight.mjs`
+with `--database`. It uses the currently available environment without
+printing its values and opens an explicit PostgreSQL **read-only transaction**
+to check required migration tables and 0099 expiry indexes, then inspects at
+most 101 pre-registered client rows. It checks that at least one exact-match
+client/callback pair is enabled; disabled-only, malformed, or overly large
+registration sets fail closed. All database and signing-key errors map to fixed
+JSON statuses; exception messages, credentials, PEM data, client IDs,
+redirect URIs and connection strings are not written to stdout or stderr.
+
+The same tool checks the two release switches, canonical HTTPS issuer,
+minimum signed browser-session secret, at-least-2048-bit OAuth RSA signing key,
+key ID, bounded public-key rotation JWKS and the configured RSA GitHub App
+identity. It **never** signs an access token, calls GitHub APIs, modifies OAuth
+clients, applies a migration, or writes to the database. It does not fetch
+CIMD metadata or connect ChatGPT or Claude. An optional direct `node
+packages/db/scripts/remote-mcp-release-preflight.mjs` invocation omits database
+access entirely, explicitly marking the storage checks `not_checked`.
+
+Its report has `schemaVersion: 1` and the permanent safety field
+`publicMcpReleaseApproved: false`. Technical checks have only the values
+`configured`, `blocked` or `not_checked`. Separate manual evidence gates
+for **real GitHub installation-token user collaborator permission**, real
+ChatGPT OAuth→MCP and real Claude OAuth→MCP always report
+`manual_required`. Those gates are intentionally NOT inferred from a valid
+key, an enabled client row or a local synthetic integration test. The command
+exits **nonzero (1) even if every technical prerequisite passes**: do not
+interpret it as a deployment approval and do not use its exit status alone
+to enable `/mcp`. An invalid CLI argument exits 2.
+
+The CLI and its pure inspector have unit tests for absent switches, malformed
+signing keys, duplicate JWKS key IDs, missing migrations, disabled/wrong OAuth
+client registrations, SQL failure redaction and the irrevocable manual release
+hold. Separate disposable PostgreSQL 17 acceptance confirms the actual
+`0095–0099` schema detection, disabled versus enabled client registration
+status and read-only reporting, with no hosted data or production keys.
