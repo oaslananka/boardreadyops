@@ -31,7 +31,9 @@ function display(value: unknown) {
   heading.textContent = "Source-linked footprint changes";
   counts.textContent = `${values[0]} added · ${values[1]} removed · ${values[2]} modified`;
   status.textContent = "One KiCad PCB file · client-reported Git evidence · risk not evaluated";
-  provenance.textContent = `Base commit: ${String(v.baseCommitSha ?? "unavailable")}\nHead commit: ${String(v.headCommitSha ?? "unavailable")}`;
+  const baseCommit = typeof v.baseCommitSha === "string" ? v.baseCommitSha : "unavailable";
+  const headCommit = typeof v.headCommitSha === "string" ? v.headCommitSha : "unavailable";
+  provenance.textContent = `Base commit: ${baseCommit}\nHead commit: ${headCommit}`;
   detailButton.hidden = false;
 }
 
@@ -55,6 +57,11 @@ detailButton.addEventListener("click", () => {
   detailButton.textContent = open ? "Hide provenance" : "Show provenance";
 });
 
-void app.connect().catch(() => {
-  status.textContent = "Review widget connection unavailable";
-});
+async function connectReviewView(): Promise<void> {
+  try {
+    await app.connect();
+  } catch {
+    status.textContent = "Review widget connection unavailable";
+  }
+}
+void connectReviewView();

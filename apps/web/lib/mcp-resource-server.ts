@@ -168,7 +168,7 @@ function createBoardReadyOpsRemoteMcpServer(
       description: "Read-only evidence summary; no source content or external network access",
       _meta: { ui: { csp: { connectDomains: [], resourceDomains: [], frameDomains: [] }, prefersBorder: true } },
     },
-    async () => ({
+    () => ({
       contents: [{ uri: "ui://boardreadyops/review.html", mimeType: RESOURCE_MIME_TYPE, text: mcpReviewViewHtml }],
     }),
   );
@@ -236,11 +236,12 @@ export async function handleBoardReadyOpsMcpRequest(
     );
   if (!credential.startsWith("Bearer ")) return deny();
   const rawToken = credential.slice(7);
-  const auth = /^bro_live_[0-9a-f]{48}$/u.test(rawToken)
-    ? await deps.authenticate(request, "reviews:read")
-    : oauth
-      ? await authenticateMcpOAuthToken(rawToken, oauth)
-      : undefined;
+  let auth: Awaited<ReturnType<typeof authenticateApiRequest>> | undefined;
+  if (/^bro_live_[0-9a-f]{48}$/u.test(rawToken)) {
+    auth = await deps.authenticate(request, "reviews:read");
+  } else if (oauth) {
+    auth = await authenticateMcpOAuthToken(rawToken, oauth);
+  }
   if (!auth?.ok || auth.authType !== "bearer_token" || !auth.repositoryId || !auth.scopes.includes("reviews:read")) {
     return deny();
   }
