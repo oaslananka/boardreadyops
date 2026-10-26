@@ -262,7 +262,10 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
         close: async () => undefined,
       }),
     };
-    const beforeLogin = await handleRemoteMcpConsentGet(new Request(url), deps);
+    const beforeLogin = await handleRemoteMcpConsentGet(
+      new Request(url, { headers: { "x-boardreadyops-verified-client-ip": "192.0.2.15" } }),
+      deps,
+    );
     expect(beforeLogin.status).toBe(401);
     const loginHtml = await beforeLogin.text();
     expect(loginHtml).not.toContain(state);
@@ -574,7 +577,10 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     const request = (form: Record<string, string>) =>
       new Request(`${issuer}/oauth/token`, {
         method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "x-boardreadyops-verified-client-ip": "192.0.2.15",
+        },
         body: new URLSearchParams(form).toString(),
       });
     const missingResource = await handleRemoteMcpTokenRequest(
