@@ -27,6 +27,40 @@ function strictGithubApiRoot(environment: Readonly<Record<string, string | undef
   }
 }
 
+/** Enforce the response size while receiving chunks, before allocating an
+ * unbounded string. Content-Length is only a hint and may be absent or wrong.
+ * Cancel the remaining body on oversize, even if the server is still streaming.
+ */
+async function readBoundedGithubJson(response: Response): Promise<GithubResponse | null> {
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!(value instanceof Uint8Array)) return null;
+      bytes += value.byteLength;
+      if (bytes > maxResponseBytes) {
+        await reader.cancel().catch(() => undefined);
+        return null;
+      }
+      chunks.push(value);
+    }
+    const raw = new Uint8Array(bytes);
+    let position = 0;
+    for (const chunk of chunks) {
+      raw.set(chunk, position);
+      position += chunk.byteLength;
+    }
+    const result: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(raw));
+    return result && typeof result === "object" && !Array.isArray(result) ? (result as GithubResponse) : null;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 /** Restricted JSON decoder: no redirects, no partial responses, no oversized API payloads. */
 async function githubJson(
   apiRoot: string,
@@ -45,15 +79,16 @@ async function githubJson(
     redirect: "error",
     signal: AbortSignal.timeout(requestTimeoutMs),
   });
-  if (!response.ok) return null;
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
+    return null;
+  }
   const length = Number(response.headers.get("content-length"));
-  if (Number.isFinite(length) && length > maxResponseBytes) return null;
-  const body = await response.text();
-  // JavaScript string length counts UTF-16 code units, not response bytes.
-  // A response containing multibyte Unicode must obey the same 64 KiB limit.
-  if (Buffer.byteLength(body, "utf8") > maxResponseBytes) return null;
-  const result: unknown = JSON.parse(body);
-  return result && typeof result === "object" && !Array.isArray(result) ? (result as GithubResponse) : null;
+  if (Number.isFinite(length) && length > maxResponseBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    return null;
+  }
+  return readBoundedGithubJson(response);
 }
 
 export interface LiveGitHubPermissionDependencies {

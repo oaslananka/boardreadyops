@@ -633,3 +633,25 @@ client registrations, SQL failure redaction and the irrevocable manual release
 hold. Separate disposable PostgreSQL 17 acceptance confirms the actual
 `0095–0099` schema detection, disabled versus enabled client registration
 status and read-only reporting, with no hosted data or production keys.
+
+### Live GitHub permission HTTP stream size enforcement (unreleased)
+
+The hosted Review's current-user permission check receives three GitHub REST
+GET responses authenticated with the App **installation token**: immutable
+GitHub user ID/login, immutable repository ID, and that user's current
+repository collaborator permission. GitHub App installation metadata by itself
+is never treated as proof of a particular user's repository access. The
+connected Ops App does not expose a verified user-collaborator permission read
+operation; the real installation-token user-permission release gate is still
+**unverified** and cannot be inferred from the tests below.
+
+Responses are now read incrementally from the HTTP response stream and
+limited to a **total of 64 KiB per response in actual UTF-8 bytes**, not
+character count or an untrusted `Content-Length` header. As soon as the limit
+is exceeded the remaining body is canceled and access is denied. Early HTTP
+errors and advertised oversized bodies also cancel the stream. Invalid UTF-8,
+partial JSON, denied permissions, redirects, GitHub timeouts and read errors
+all fail closed. Bounded chunked reading also avoids allocating attacker-sized
+JSON response strings before performing the size check. The code and unit
+tests use synthetic responses only; production GitHub App keys and tokens were
+not read or changed.

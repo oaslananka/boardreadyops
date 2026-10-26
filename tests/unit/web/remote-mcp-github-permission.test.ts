@@ -149,6 +149,67 @@ describe("live GitHub permission for remote MCP", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("stops a chunked GitHub stream as soon as cumulative bytes exceed the 64 KiB cap", async () => {
+    const prefix = new TextEncoder().encode(JSON.stringify({ id: 123, login: "current-login" }));
+    const padding = new Uint8Array(64 * 1024 - prefix.byteLength);
+    let cancelled = false;
+    let returned = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        returned += 1;
+        if (returned === 1) controller.enqueue(prefix);
+        else if (returned === 2) controller.enqueue(padding);
+        else controller.enqueue(new Uint8Array([120]));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const response = new Response(stream, { status: 200 });
+    const { check, fetcher } = withResponses(response, json({ id: 456 }), json({ permission: "read" }));
+    expect(await check(permission)).toBe(false);
+    expect(cancelled).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks actual UTF-8 bytes across chunks even with a lying small Content-Length", async () => {
+    const encoded = new TextEncoder().encode(
+      JSON.stringify({ id: 123, login: "current-login", padding: "é".repeat(40_000) }),
+    );
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoded.subarray(0, 26_000));
+        controller.enqueue(encoded.subarray(26_000, 52_000));
+        controller.enqueue(encoded.subarray(52_000));
+        controller.close();
+      },
+    });
+    const { check, fetcher } = withResponses(
+      new Response(stream, { headers: { "content-length": "200" } }),
+      json({ id: 456 }),
+      json({ permission: "read" }),
+    );
+    expect(await check(permission)).toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports valid chunked GitHub JSON and rejects invalid UTF-8 without repository reads", async () => {
+    const user = new TextEncoder().encode(JSON.stringify({ id: 123, login: "current-login" }));
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(user.subarray(0, 9));
+        controller.enqueue(user.subarray(9));
+        controller.close();
+      },
+    });
+    const valid = withResponses(new Response(stream), json({ id: 456 }), json({ permission: "read" }));
+    expect(await valid.check(permission)).toBe(true);
+    expect(valid.fetcher).toHaveBeenCalledTimes(3);
+    const invalidUser = withResponses(new Response(new Uint8Array([123, 34, 120, 34, 58, 34, 255, 34, 125])));
+    expect(await invalidUser.check(permission)).toBe(false);
+    expect(invalidUser.fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("denies oversized responses and redirects instead of following URLs", async () => {
     const big = new Response("x".repeat(65_537), { status: 200 });
     const oversize = withResponses(big);
