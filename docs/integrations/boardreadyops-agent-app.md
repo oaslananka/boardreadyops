@@ -310,8 +310,10 @@ SQL transactions. Other recorded events include consent creation, rejected
 token exchanges and throttling. Audit records never include raw access tokens,
 authorization codes, PKCE secrets, cookies or remote IP headers: client IDs are
 SHA-256 digests. The existing hourly control-plane worker now schedules bounded PostgreSQL
-retention passes: rate-limit buckets older than two days and redacted audit
-records older than 90 days. Each table is processed in batches using the
+retention passes: rate-limit buckets older than two days, redacted audit
+records older than 90 days, expired authorization/code records older than one
+day, and expired access grants older than two days. Each table is processed in
+batches using the
 worker's configured retention batch size (default 1,000, range 1–10,000),
 `FOR UPDATE SKIP LOCKED` for concurrent workers, and independent failure
 reporting. Deployments without either migration table skip cleanly; partial
@@ -384,6 +386,29 @@ single-use consent, PKCE-bound token exchange, a persisted grant and
 signature-verifying access, and refuses an alternate identity, altered HTTPS
 callback, malformed client ID and insecure request. No client registration,
 public OAuth activation or production schema change was performed.
+
+### Expired authorization and grant retention (migration 0099)
+
+The hourly, PostgreSQL-backed OAuth maintenance now deletes **expired
+one-use authorization/code records** only after a further one-day retention
+window and **expired/revoked authorization grants** only once their normal
+expiry is more than two days old. All deletions are independent per-table,
+bounded to the worker's configured batch size (1–10,000), and use
+`FOR UPDATE SKIP LOCKED` to avoid duplicate cleanup across replicas.
+Migration `0099_remote_mcp_oauth_retention_indexes.sql` adds expiry indexes
+for the authorization and grant tables, avoiding full-table expiry scans on
+large hosted instances. It changes no tokens, client registrations, OAuth
+feature switches or existing grant lifetimes.
+
+The worker reports `remoteMcpExpiredGrantsPurged` and
+`remoteMcpExpiredAuthorizationsPurged` as aggregate numeric counters without
+exposing consent state, PKCE challenge, client ID or JWT material. Real
+PostgreSQL 17 tests insert both long-expired and still-active grants and
+pending authorizations, verify successive batch limits and eventual complete
+purge, and prove current credentials survive. Redacted security audit records
+remain on their separate **90-day** retention schedule, preserving audit
+coverage after unnecessary grant/code rows have been deleted. Production
+migration application and maintenance activation have **not** occurred.
 
 ### Hosted OAuth client interoperability (October 2026 review)
 

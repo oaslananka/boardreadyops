@@ -34,6 +34,8 @@ export type RetentionCleanupResult = {
   remoteMcpRateLimitBucketsPurged: number;
   remoteMcpSecurityEventsPurged: number;
   remoteMcpLoginResumptionsPurged: number;
+  remoteMcpExpiredGrantsPurged: number;
+  remoteMcpExpiredAuthorizationsPurged: number;
   failures: RetentionCleanupFailure[];
   completed: boolean;
 };
@@ -45,6 +47,8 @@ export type RetentionMaintenanceDependencies = {
     rateLimitBucketsPurged: number;
     securityEventsPurged: number;
     loginResumptionsPurged: number;
+    expiredGrantsPurged: number;
+    expiredAuthorizationsPurged: number;
   }>;
   expireArtifactUploadCapabilities(): Promise<number>;
   revokeExpiredRunnerRegistrationEnrollments(): Promise<number>;
@@ -144,6 +148,9 @@ export async function runRetentionMaintenanceCleanup(
       remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.securityEventsPurged : 0,
     remoteMcpLoginResumptionsPurged:
       remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.loginResumptionsPurged : 0,
+    remoteMcpExpiredGrantsPurged: remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.expiredGrantsPurged : 0,
+    remoteMcpExpiredAuthorizationsPurged:
+      remoteMcpOAuth.status === "fulfilled" ? remoteMcpOAuth.value.expiredAuthorizationsPurged : 0,
     failures,
     completed: failures.length === 0,
   };

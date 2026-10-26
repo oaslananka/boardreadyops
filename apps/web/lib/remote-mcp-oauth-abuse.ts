@@ -80,10 +80,14 @@ export type RemoteMcpOAuthCleanupCounts = {
   rateLimitBucketsPurged: number;
   securityEventsPurged: number;
   loginResumptionsPurged: number;
+  expiredGrantsPurged: number;
+  expiredAuthorizationsPurged: number;
 };
 
 /** Hourly, bounded retention cleanup, safe for concurrent worker replicas.
  * Expired rate buckets are retained for 2 days, redacted audit for 90 days.
+ * Expired grants are retained for 2 days, expired codes/consents for 1 day.
+ * Real, current grants and consent/code lifetimes are never shortened.
  * In a deployment that has not yet applied OAuth migrations, do nothing;
  * if only one required table exists, report the partial migration as failure.
  * Existing live and recently expired rate buckets are never deleted.
@@ -98,15 +102,33 @@ export async function purgeExpiredRemoteMcpOAuthSecurityData(
   const presence = await db.query(
     `select to_regclass('public.remote_mcp_oauth_rate_limits') is not null as has_buckets,
             to_regclass('public.remote_mcp_oauth_security_events') is not null as has_events,
-            to_regclass('public.remote_mcp_oauth_login_resumptions') is not null as has_resumptions`,
+            to_regclass('public.remote_mcp_oauth_login_resumptions') is not null as has_resumptions,
+            to_regclass('public.remote_mcp_oauth_authorizations') is not null as has_authorizations,
+            to_regclass('public.remote_mcp_oauth_grants') is not null as has_grants`,
   );
-  const tables = ((presence as { rows?: { has_buckets: boolean; has_events: boolean; has_resumptions?: boolean }[] })
-    .rows ?? [])[0];
+  const tables = ((
+    presence as {
+      rows?: {
+        has_buckets: boolean;
+        has_events: boolean;
+        has_resumptions?: boolean;
+        has_authorizations?: boolean;
+        has_grants?: boolean;
+      }[];
+    }
+  ).rows ?? [])[0];
   if (!tables) throw new Error("OAuth retention schema check unavailable");
   if (!tables.has_buckets && !tables.has_events) {
-    return { rateLimitBucketsPurged: 0, securityEventsPurged: 0, loginResumptionsPurged: 0 };
+    return {
+      rateLimitBucketsPurged: 0,
+      securityEventsPurged: 0,
+      loginResumptionsPurged: 0,
+      expiredGrantsPurged: 0,
+      expiredAuthorizationsPurged: 0,
+    };
   }
-  if (!tables.has_buckets || !tables.has_events) throw new Error("Incomplete MCP OAuth retention migration");
+  if (!tables.has_buckets || !tables.has_events || !tables.has_authorizations || !tables.has_grants)
+    throw new Error("Incomplete MCP OAuth retention migration");
 
   const buckets = await db.query(
     `with expired as (
@@ -143,6 +165,30 @@ export async function purgeExpiredRemoteMcpOAuthSecurityData(
         [limit],
       )
     : null;
+  const grants = await db.query(
+    `with expired as (
+       select ctid from remote_mcp_oauth_grants
+       where expires_at < now() - interval '2 days'
+       order by expires_at limit $1 for update skip locked
+     ), deleted as (
+       delete from remote_mcp_oauth_grants where ctid in (select ctid from expired)
+       returning 1
+     ) select count(*)::int as n from deleted`,
+    [limit],
+  );
+  const authorizations = await db.query(
+    `with expired as (
+       select ctid from remote_mcp_oauth_authorizations
+       where expires_at < now() - interval '1 day'
+       order by expires_at limit $1 for update skip locked
+     ), deleted as (
+       delete from remote_mcp_oauth_authorizations where ctid in (select ctid from expired)
+       returning 1
+     ) select count(*)::int as n from deleted`,
+    [limit],
+  );
+  const grantCount = Number(((grants as { rows?: { n: number }[] }).rows ?? [])[0]?.n);
+  const authorizationCount = Number(((authorizations as { rows?: { n: number }[] }).rows ?? [])[0]?.n);
   const resumeCount = resumes ? Number(((resumes as { rows?: { n: number }[] }).rows ?? [])[0]?.n) : 0;
   const bucketCount = Number(((buckets as { rows?: { n: number }[] }).rows ?? [])[0]?.n);
   const eventCount = Number(((events as { rows?: { n: number }[] }).rows ?? [])[0]?.n);
@@ -152,9 +198,19 @@ export async function purgeExpiredRemoteMcpOAuthSecurityData(
     !Number.isSafeInteger(eventCount) ||
     eventCount < 0 ||
     !Number.isSafeInteger(resumeCount) ||
-    resumeCount < 0
+    resumeCount < 0 ||
+    !Number.isSafeInteger(grantCount) ||
+    grantCount < 0 ||
+    !Number.isSafeInteger(authorizationCount) ||
+    authorizationCount < 0
   ) {
     throw new Error("Invalid MCP OAuth retention result");
   }
-  return { rateLimitBucketsPurged: bucketCount, securityEventsPurged: eventCount, loginResumptionsPurged: resumeCount };
+  return {
+    rateLimitBucketsPurged: bucketCount,
+    securityEventsPurged: eventCount,
+    loginResumptionsPurged: resumeCount,
+    expiredGrantsPurged: grantCount,
+    expiredAuthorizationsPurged: authorizationCount,
+  };
 }

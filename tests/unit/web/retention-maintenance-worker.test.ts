@@ -5,9 +5,13 @@ function dependencies(overrides: Partial<Parameters<typeof runRetentionMaintenan
   return {
     purgeWebhookInbox: vi.fn().mockResolvedValue(3),
     purgeRunnerRequestNonces: vi.fn().mockResolvedValue(7),
-    purgeRemoteMcpOAuth: vi
-      .fn()
-      .mockResolvedValue({ rateLimitBucketsPurged: 4, securityEventsPurged: 5, loginResumptionsPurged: 3 }),
+    purgeRemoteMcpOAuth: vi.fn().mockResolvedValue({
+      rateLimitBucketsPurged: 4,
+      securityEventsPurged: 5,
+      loginResumptionsPurged: 3,
+      expiredGrantsPurged: 6,
+      expiredAuthorizationsPurged: 7,
+    }),
     expireArtifactUploadCapabilities: vi.fn().mockResolvedValue(5),
     revokeExpiredRunnerRegistrationEnrollments: vi.fn().mockResolvedValue(2),
     expireRepositorySetupProbes: vi.fn().mockResolvedValue(4),
@@ -33,6 +37,8 @@ describe("retention maintenance worker", () => {
       remoteMcpRateLimitBucketsPurged: 4,
       remoteMcpSecurityEventsPurged: 5,
       remoteMcpLoginResumptionsPurged: 3,
+      remoteMcpExpiredGrantsPurged: 6,
+      remoteMcpExpiredAuthorizationsPurged: 7,
       artifactUploadCapabilitiesExpired: 5,
       runnerRegistrationEnrollmentsRevoked: 2,
       repositorySetupProbesExpired: 4,
@@ -58,6 +64,8 @@ describe("retention maintenance worker", () => {
       remoteMcpRateLimitBucketsPurged: 4,
       remoteMcpSecurityEventsPurged: 5,
       remoteMcpLoginResumptionsPurged: 3,
+      remoteMcpExpiredGrantsPurged: 6,
+      remoteMcpExpiredAuthorizationsPurged: 7,
       artifactUploadCapabilitiesExpired: 5,
       runnerRegistrationEnrollmentsRevoked: 2,
       repositorySetupProbesExpired: 4,
@@ -91,6 +99,8 @@ describe("retention maintenance worker", () => {
     expect(result.remoteMcpRateLimitBucketsPurged).toBe(0);
     expect(result.remoteMcpSecurityEventsPurged).toBe(0);
     expect(result.remoteMcpLoginResumptionsPurged).toBe(0);
+    expect(result.remoteMcpExpiredGrantsPurged).toBe(0);
+    expect(result.remoteMcpExpiredAuthorizationsPurged).toBe(0);
     expect(result.completed).toBe(false);
     expect(result.failures).toContainEqual({ scope: "remote_mcp_oauth", errorClass: "Error" });
     expect(JSON.stringify(result)).not.toContain("private-db-info");

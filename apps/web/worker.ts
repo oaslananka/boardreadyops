@@ -805,6 +805,8 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
     result.remoteMcpRateLimitBucketsPurged > 0 ||
     result.remoteMcpSecurityEventsPurged > 0 ||
     result.remoteMcpLoginResumptionsPurged > 0 ||
+    result.remoteMcpExpiredGrantsPurged > 0 ||
+    result.remoteMcpExpiredAuthorizationsPurged > 0 ||
     result.artifactUploadCapabilitiesExpired > 0 ||
     result.runnerRegistrationEnrollmentsRevoked > 0 ||
     result.repositorySetupProbesExpired > 0 ||
@@ -823,6 +825,8 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
       remoteMcpRateLimitBucketsPurged: result.remoteMcpRateLimitBucketsPurged,
       remoteMcpSecurityEventsPurged: result.remoteMcpSecurityEventsPurged,
       remoteMcpLoginResumptionsPurged: result.remoteMcpLoginResumptionsPurged,
+      remoteMcpExpiredGrantsPurged: result.remoteMcpExpiredGrantsPurged,
+      remoteMcpExpiredAuthorizationsPurged: result.remoteMcpExpiredAuthorizationsPurged,
       artifactUploadCapabilitiesExpired: result.artifactUploadCapabilitiesExpired,
       runnerRegistrationEnrollmentsRevoked: result.runnerRegistrationEnrollmentsRevoked,
       repositorySetupProbesExpired: result.repositorySetupProbesExpired,
