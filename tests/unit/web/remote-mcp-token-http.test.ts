@@ -46,6 +46,65 @@ function streamedTokenRequest(chunks: Uint8Array[], length?: string, onCancel?: 
 }
 
 describe("OAuth token HTTP input boundary", () => {
+  it("requires ingress-verifiable source on otherwise valid token forms", async () => {
+    const query = vi.fn();
+    const config = {
+      issuer,
+      openDb: async () => ({ query, close: async () => {}, withTransaction: vi.fn() }),
+      signAccessToken: vi.fn(),
+    };
+    const response = await handleRemoteMcpTokenRequest(
+      request(validForm, { "x-forwarded-for": "192.0.2.42" }),
+      config as never,
+    );
+    expect(response.status).toBe(503);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("does not spend the global token rate limit for unknown clients", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("remote_mcp_oauth_rate_limits")) return { rows: [{ attempts: 1, retry_after: 50 }] };
+      if (sql.includes("remote_mcp_oauth_clients")) return { rows: [] };
+      return { rows: [] };
+    });
+    const config = {
+      issuer,
+      openDb: async () => ({ query, close: async () => {}, withTransaction: vi.fn() }),
+      signAccessToken: vi.fn(),
+    };
+    const response = await handleRemoteMcpTokenRequest(
+      request(validForm, { "x-boardreadyops-verified-client-ip": "198.51.100.4" }),
+      config as never,
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_grant" });
+    expect(query.mock.calls.filter(([sql]) => sql.includes("remote_mcp_oauth_rate_limits"))).toHaveLength(1);
+  });
+
+  it("blocks a single registered client's bucket before reaching the shared token budget", async () => {
+    let limiterCalls = 0;
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("remote_mcp_oauth_rate_limits")) {
+        limiterCalls++;
+        return { rows: [{ attempts: limiterCalls === 1 ? 1 : 41, retry_after: 49 }] };
+      }
+      if (sql.includes("remote_mcp_oauth_clients")) return { rows: [{ one: 1 }] };
+      return { rows: [] };
+    });
+    const config = {
+      issuer,
+      openDb: async () => ({ query, close: async () => {}, withTransaction: vi.fn() }),
+      signAccessToken: vi.fn(),
+    };
+    const response = await handleRemoteMcpTokenRequest(
+      request(validForm, { "x-boardreadyops-verified-client-ip": "198.51.100.4" }),
+      config as never,
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("49");
+    expect(limiterCalls).toBe(2);
+  });
+
   it.each([
     ["wrong resource", { ...validForm, resource: "https://other.example/mcp" }],
     ["unknown grant", { ...validForm, grant_type: "refresh_token" }],

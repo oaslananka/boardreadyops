@@ -1,6 +1,6 @@
 # BoardReadyOps AI App — Common MCP Gateway Design
 
-**Status:** staged implementation; remote endpoint fails closed (HTTP 503) pending OAuth acceptance. **Not a deployed remote connector, not an app-directory listing.**
+**Status:** staged implementation; guarded remote endpoint fails closed (HTTP 503) until both release switches, valid OAuth/GitHub App configuration, live user-permission checks and ChatGPT/Claude host acceptance are complete. **Not a deployed remote connector, not an app-directory listing.**
 
 ## Product decision
 
@@ -176,7 +176,7 @@ https://docs.github.com/en/rest/collaborators/collaborators.
 - `jose` checks trusted issuer, MCP-specific audience, RS256 signatures,
   required access-token `typ: at+jwt`, expiry, user identity and client binding. The durable
   `remote_mcp_oauth_grants` table additionally binds active JTI, user, client,
-  issuer, audience and one-hour expiry, and supports immediate revocation.
+  issuer, audience and at most one-hour verifier limit (the current authorization-code exchange issues 15-minute grants), and supports immediate revocation.
   No raw access token is stored in the grant table. Migration 0095 was exercised
   on a disposable, network-isolated PostgreSQL 17 instance; **it has not been
   applied to staging or production**.

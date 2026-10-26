@@ -2,7 +2,11 @@ import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { exchangeRemoteMcpAuthorizationCode, type SignedRemoteMcpTokenFacts } from "./remote-mcp-authorization-code.js";
 import { readBoundedRemoteMcpForm } from "./remote-mcp-bounded-form.js";
 import { remoteMcpResource } from "./remote-mcp-foundation.js";
-import { recordRemoteMcpOAuthEvent, takeRemoteMcpOAuthRateLimit } from "./remote-mcp-oauth-abuse.js";
+import {
+  recordRemoteMcpOAuthEvent,
+  takeRemoteMcpOAuthRateLimit,
+  verifiedRemoteMcpSource,
+} from "./remote-mcp-oauth-abuse.js";
 
 const genericHeaders = {
   "content-type": "application/json; charset=utf-8",
@@ -69,12 +73,14 @@ export async function handleRemoteMcpTokenRequest(
   let db: Awaited<ReturnType<typeof deps.openDb>> | undefined;
   try {
     db = await deps.openDb();
-    const globalLimit = await takeRemoteMcpOAuthRateLimit(db, "token-global", "oauth-token", 600);
-    if (!globalLimit.allowed) {
+    const source = verifiedRemoteMcpSource(request);
+    if (!source) return errorResponse("temporarily_unavailable", 503);
+    const sourceLimit = await takeRemoteMcpOAuthRateLimit(db, "token-source", source, 30);
+    if (!sourceLimit.allowed) {
       await recordRemoteMcpOAuthEvent(db, "rate_limited");
       return new Response(JSON.stringify({ error: "slow_down" }), {
         status: 429,
-        headers: { ...genericHeaders, "retry-after": String(globalLimit.retryAfterSeconds) },
+        headers: { ...genericHeaders, "retry-after": String(sourceLimit.retryAfterSeconds) },
       });
     }
     const clientId = parameters.get("client_id") ?? "";
@@ -89,6 +95,16 @@ export async function handleRemoteMcpTokenRequest(
       return new Response(JSON.stringify({ error: "slow_down" }), {
         status: 429,
         headers: { ...genericHeaders, "retry-after": String(clientLimit.retryAfterSeconds) },
+      });
+    }
+    // Invalid client IDs cannot deplete the global exchange bucket. A
+    // single valid client is limited before it can affect other clients.
+    const globalLimit = await takeRemoteMcpOAuthRateLimit(db, "token-global", "oauth-token", 600);
+    if (!globalLimit.allowed) {
+      await recordRemoteMcpOAuthEvent(db, "rate_limited", undefined, clientId);
+      return new Response(JSON.stringify({ error: "slow_down" }), {
+        status: 429,
+        headers: { ...genericHeaders, "retry-after": String(globalLimit.retryAfterSeconds) },
       });
     }
     const exchanged = await exchangeRemoteMcpAuthorizationCode(

@@ -14,7 +14,11 @@ import {
   remoteMcpLoginResumptionCookie,
   remoteMcpLoginResumptionCookieHeader,
 } from "./remote-mcp-login-resume.js";
-import { recordRemoteMcpOAuthEvent, takeRemoteMcpOAuthRateLimit } from "./remote-mcp-oauth-abuse.js";
+import {
+  recordRemoteMcpOAuthEvent,
+  takeRemoteMcpOAuthRateLimit,
+  verifiedRemoteMcpSource,
+} from "./remote-mcp-oauth-abuse.js";
 import { decodeUserSession } from "./user-session.js";
 import { sessionCookieName } from "./viewer-authorization.js";
 
@@ -175,9 +179,14 @@ export async function handleRemoteMcpConsentGet(
   try {
     db = await deps.openDb();
     if (!userId) {
-      // An unauthenticated caller has no verified principal. Use a shared
-      // pre-login budget, not a spoofable forwarded-IP based bucket.
-      const throttle = await takeRemoteMcpOAuthRateLimit(db, "token-global", "oauth-login-preauth", 120);
+      // Caddy overwrites the source header at the trusted ingress boundary.
+      // Fail closed without it; untrusted X-Forwarded-For is never used.
+      const source = verifiedRemoteMcpSource(request);
+      if (!source) return errorResponse(503, "Authorization ingress unavailable");
+      const sourceLimit = await takeRemoteMcpOAuthRateLimit(db, "preauth-source", source, 12);
+      const throttle = sourceLimit.allowed
+        ? await takeRemoteMcpOAuthRateLimit(db, "token-global", "oauth-login-preauth", 120)
+        : sourceLimit;
       if (!throttle.allowed) {
         await recordRemoteMcpOAuthEvent(db, "rate_limited");
         return new Response("Too many sign-in requests", {
@@ -220,6 +229,23 @@ export async function handleRemoteMcpConsentGet(
       const error = errorResponse(400, "OAuth client or authorization request unavailable");
       return resuming ? withResumeCookie(error, clearedRemoteMcpLoginResumptionCookie) : error;
     }
+    // The redirect origin is derived from an enabled, exact-match registered
+    // OAuth client, not from a query parameter or caller-selected header.
+    let redirectOrigin: string;
+    try {
+      const destination = new URL(pending.redirectOrigin);
+      if (
+        destination.protocol !== "https:" ||
+        destination.origin !== pending.redirectOrigin ||
+        destination.username ||
+        destination.password ||
+        pending.redirectOrigin.length > 512
+      )
+        return errorResponse(400, "Invalid registered OAuth redirect origin");
+      redirectOrigin = destination.origin;
+    } catch {
+      return errorResponse(400, "Invalid registered OAuth redirect origin");
+    }
     await recordRemoteMcpOAuthEvent(db, "consent_started", userId, params.clientId);
     const page = new Response(
       htmlPage({
@@ -229,7 +255,18 @@ export async function handleRemoteMcpConsentGet(
         authorizationId: pending.authorizationId,
         csrfNonce: pending.csrfNonce,
       }),
-      { status: 200, headers: securityHeaders },
+      {
+        status: 200,
+        headers: {
+          ...securityHeaders,
+          // A form's 303 response can redirect to the exact registered OAuth
+          // client; permitting only that origin avoids blocking the return.
+          "content-security-policy": securityHeaders["content-security-policy"].replace(
+            "form-action 'self'",
+            `form-action 'self' ${redirectOrigin}`,
+          ),
+        },
+      },
     );
     return resuming ? withResumeCookie(page, clearedRemoteMcpLoginResumptionCookie) : page;
   } catch {

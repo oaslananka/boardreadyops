@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 
 export type OAuthAuditKind =
@@ -13,13 +14,29 @@ export type OAuthAuditKind =
 export const oauthClientDigest = (clientId: string): string =>
   createHash("sha256").update(clientId, "utf8").digest("hex");
 
+/**
+ * The deployment Caddy ingress overwrites this header with its verified
+ * network/client peer. Never fall back to caller-controlled X-Forwarded-For.
+ * Only the SHA-256 of the source key enters the rate-limit table.
+ */
+export function verifiedRemoteMcpSource(request: Request): string | null {
+  const candidate = request.headers.get("x-boardreadyops-verified-client-ip");
+  return candidate && candidate.length <= 64 && isIP(candidate) ? candidate : null;
+}
+
 /** PostgreSQL upsert is atomic across server replicas and concurrent requests.
  * No request-provided IP/X-Forwarded-For header is trusted for the key.
  * A DB error must propagate to the caller, which must deny the request.
  */
 export async function takeRemoteMcpOAuthRateLimit(
   db: Pick<PgQueryExecutor, "query">,
-  category: "token-global" | "token-client" | "consent-user" | "consent-decision-user",
+  category:
+    | "token-global"
+    | "token-client"
+    | "token-source"
+    | "preauth-source"
+    | "consent-user"
+    | "consent-decision-user",
   key: string,
   limit: number,
 ): Promise<{ allowed: boolean; retryAfterSeconds: number }> {

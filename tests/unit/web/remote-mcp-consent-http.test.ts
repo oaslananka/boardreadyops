@@ -93,7 +93,10 @@ describe("Remote MCP browser consent security boundary", () => {
   it("preserves an unsigned user's OAuth request behind a short cookie-bound GitHub login resume", async () => {
     const store = database([[{ id: "created" }]]);
     const config = deps(store);
-    const result = await handleRemoteMcpConsentGet(new Request(consentUrl()), config);
+    const result = await handleRemoteMcpConsentGet(
+      new Request(consentUrl(), { headers: { "x-boardreadyops-verified-client-ip": "192.0.2.10" } }),
+      config,
+    );
     expect(result.status).toBe(401);
     expect(result.headers.get("cache-control")).toBe("private, no-store");
     expect(result.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
@@ -109,6 +112,31 @@ describe("Remote MCP browser consent security boundary", () => {
     expect(store.query.mock.calls.some(([sql]) => sql.includes("remote_mcp_oauth_login_resumptions"))).toBe(true);
     expect(store.query.mock.calls.some(([sql]) => sql.includes("remote_mcp_oauth_authorizations"))).toBe(false);
     expect(store.close).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed without Caddy's verified source and never trusts a supplied forwarded-for value", async () => {
+    const store = database();
+    const result = await handleRemoteMcpConsentGet(
+      new Request(consentUrl(), { headers: { "x-forwarded-for": "192.0.2.10" } }),
+      deps(store),
+    );
+    expect(result.status).toBe(503);
+    expect(store.query).not.toHaveBeenCalled();
+  });
+
+  it("limits one anonymous source before allowing it to consume the shared sign-in budget", async () => {
+    const store = database();
+    store.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("remote_mcp_oauth_rate_limits")) return { rows: [{ attempts: 13, retry_after: 37 }] };
+      return { rows: [] };
+    });
+    const response = await handleRemoteMcpConsentGet(
+      new Request(consentUrl(), { headers: { "x-boardreadyops-verified-client-ip": "2001:db8::1" } }),
+      deps(store),
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("37");
+    expect(store.query.mock.calls.filter(([sql]) => sql.includes("remote_mcp_oauth_rate_limits"))).toHaveLength(1);
   });
 
   it("shows only escaped registered client details and requested read-only scopes", async () => {
@@ -129,6 +157,8 @@ describe("Remote MCP browser consent security boundary", () => {
     );
     const html = await response.text();
     expect(response.status).toBe(200);
+    expect(response.headers.get("content-security-policy")).toContain("form-action 'self' https://chatgpt.com");
+    expect(response.headers.get("content-security-policy")).not.toContain("evil.example");
     expect(html).toContain("&lt;img src=x onerror=&quot;bad()&quot;&gt;");
     expect(html).not.toContain("<img src=x");
     expect(html).toContain("https://chatgpt.com");

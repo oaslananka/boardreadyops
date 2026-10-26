@@ -98,6 +98,61 @@ const clientEpochSchemaGuards = [
   ["remote_mcp_oauth_grants", "client_registration_epoch"],
 ];
 
+function regclassColumn(index) {
+  return `to_regclass($${index + 1}::text) is not null as p${index}`;
+}
+
+/**
+ * Isolate schema/registration queries from the release-report evaluator.
+ * A partial migration, database failure or invalid client always blocks.
+ */
+async function checkDatabaseReadiness(query) {
+  if (!query) return ["not_checked", "not_checked"];
+  try {
+    const names = [...dbTables, ...dbIndexes];
+    const epochColumns = clientEpochSchemaGuards.map(
+      ([table, column], i) => `exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = '${table}' and column_name = '${column}') as p${names.length + i}`,
+    );
+    const triggerIndex = names.length + epochColumns.length;
+    const epochTrigger = `exists (select 1 from pg_trigger
+      where tgrelid = to_regclass('public.remote_mcp_oauth_clients')
+        and tgname = 'remote_mcp_oauth_client_epoch_refresh' and not tgisinternal) as p${triggerIndex}`;
+    const regclassColumns = names.map((_, i) => regclassColumn(i));
+    const sql = `select ${regclassColumns.join(", ")}, ${epochColumns.join(", ")}, ${epochTrigger}`;
+    const response = await query(
+      sql,
+      names.map((name) => `public.${name}`),
+    );
+    const found = response?.rows?.[0];
+    const allPresent =
+      found && Array.from({ length: triggerIndex + 1 }, (_, i) => found[`p${i}`] === true).every(Boolean);
+    if (!allPresent) return ["blocked", "blocked"];
+
+    const result = await query(
+      "select client_id, redirect_uri, display_name, enabled from remote_mcp_oauth_clients limit 101",
+    );
+    const entries = result?.rows;
+    const enabled = Array.isArray(entries) ? entries.filter((row) => row.enabled === true) : [];
+    const valid =
+      Array.isArray(entries) &&
+      entries.length <= 100 &&
+      enabled.length > 0 &&
+      enabled.every(
+        (row) =>
+          (opaqueClientPattern.test(row.client_id) || canonicalHttps(row.client_id)) &&
+          canonicalHttps(row.redirect_uri) &&
+          typeof row.display_name === "string" &&
+          row.display_name.length > 0 &&
+          row.display_name.length <= 128,
+      );
+    return ["configured", valid ? "configured" : "blocked"];
+  } catch {
+    // No unredacted provider/SQL/registration diagnostics can leave the evaluator.
+    return ["blocked", "blocked"];
+  }
+}
+
 /** Only fixed reason codes and status values can leave this evaluator. Neither
  * SQL diagnostics nor client identifiers/redirect URLs are ever returned.
  * query is an explicitly provided READ-ONLY executor; an absent one is pending.
@@ -112,57 +167,9 @@ export async function inspectRemoteMcpReleasePrerequisites(environment, query) {
   add("oauth_rsa_signing_and_rotation", checkSigning(environment) ? "configured" : "blocked");
   add("github_app_signing_configuration", checkAppIdentity(environment) ? "configured" : "blocked");
 
-  if (!query) {
-    add("oauth_database_schema", "not_checked");
-    add("enabled_exact_client_registrations", "not_checked");
-  } else {
-    try {
-      const names = [...dbTables, ...dbIndexes];
-      const epochColumns = clientEpochSchemaGuards.map(
-        ([table, column], i) => `exists (select 1 from information_schema.columns
-          where table_schema = 'public' and table_name = '${table}' and column_name = '${column}') as p${names.length + i}`,
-      );
-      const triggerIndex = names.length + epochColumns.length;
-      const epochTrigger = `exists (select 1 from pg_trigger
-        where tgrelid = to_regclass('public.remote_mcp_oauth_clients')
-          and tgname = 'remote_mcp_oauth_client_epoch_refresh' and not tgisinternal) as p${triggerIndex}`;
-      const q = await query(
-        `select ${names.map((_, i) => `to_regclass($${i + 1}::text) is not null as p${i}`).join(", ")},
-          ${epochColumns.join(", ")}, ${epochTrigger}`,
-        names.map((name) => `public.${name}`),
-      );
-      const found = q?.rows?.[0];
-      const allPresent =
-        found && Array.from({ length: triggerIndex + 1 }, (_, i) => found[`p${i}`] === true).every(Boolean);
-      add("oauth_database_schema", allPresent ? "configured" : "blocked");
-      if (!allPresent) {
-        add("enabled_exact_client_registrations", "blocked");
-      } else {
-        const rows = await query(
-          "select client_id, redirect_uri, display_name, enabled from remote_mcp_oauth_clients limit 101",
-        );
-        const entries = rows?.rows;
-        const enabled = Array.isArray(entries) ? entries.filter((row) => row.enabled === true) : [];
-        const valid =
-          Array.isArray(entries) &&
-          entries.length <= 100 &&
-          enabled.length > 0 &&
-          enabled.every(
-            (row) =>
-              (opaqueClientPattern.test(row.client_id) || canonicalHttps(row.client_id)) &&
-              canonicalHttps(row.redirect_uri) &&
-              typeof row.display_name === "string" &&
-              row.display_name.length > 0 &&
-              row.display_name.length <= 128,
-          );
-        add("enabled_exact_client_registrations", valid ? "configured" : "blocked");
-      }
-    } catch {
-      // Do not expose SQL diagnostics, connection strings or stored client data.
-      add("oauth_database_schema", "blocked");
-      add("enabled_exact_client_registrations", "blocked");
-    }
-  }
+  const [schemaStatus, clientsStatus] = await checkDatabaseReadiness(query);
+  add("oauth_database_schema", schemaStatus);
+  add("enabled_exact_client_registrations", clientsStatus);
   // External acceptance cannot be inferred from flags, schema or test fixtures.
   add("live_installation_user_collaborator_permission", "manual_required");
   add("live_chatgpt_oauth_mcp_exchange", "manual_required");
