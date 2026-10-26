@@ -18,7 +18,8 @@ export function resolveMcpOauthConfiguration(
   const rawJwks = environment.BOARDREADYOPS_MCP_OAUTH_JWKS_URI;
   if (!rawIssuer || !rawJwks) return undefined;
   try {
-    const issuer = new URL(rawIssuer);
+    const issuerText = rawIssuer.trim();
+    const issuer = new URL(issuerText);
     const jwks = new URL(rawJwks);
     if (issuer.protocol !== "https:" || jwks.protocol !== "https:" || issuer.origin !== jwks.origin) return undefined;
     if (
@@ -32,8 +33,8 @@ export function resolveMcpOauthConfiguration(
       jwks.hash
     )
       return undefined;
-    if (issuer.toString().length > 512 || jwks.toString().length > 512) return undefined;
-    return { issuer: issuer.toString().replace(/\/$/u, ""), jwksUri: jwks.toString() };
+    if (issuerText.length > 512 || jwks.toString().length > 512) return undefined;
+    return { issuer: issuerText, jwksUri: jwks.toString() };
   } catch {
     return undefined;
   }
