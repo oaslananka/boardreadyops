@@ -31,7 +31,7 @@ export interface RemoteMcpTokenVerifier {
   /** Must authenticate the JWT signature and trusted issuer keys; return null on failure. */
   verifySignedAccessToken(token: string): Promise<SignedRemoteMcpClaims | null>;
   /** Must check a durable revocation/grant store on EACH request, not an in-memory cache. */
-  grantIsActive(jti: string, githubUserId: number, clientId: string): Promise<boolean>;
+  grantIsActive(jti: string, githubUserId: number, clientId: string, scope: string): Promise<boolean>;
 }
 
 const bearerTokenPattern = /^Bearer ([A-Za-z0-9._~+/-]+={0,2})$/u;
@@ -115,7 +115,7 @@ export async function authenticateRemoteMcpRequest(
   const scopes = claims.scope.split(" ").filter(Boolean);
   if (scopes.length === 0 || scopes.some((scope) => scope !== "review:read" && scope !== "evidence:read")) return null;
   try {
-    if (!(await verifier.grantIsActive(claims.jti, claims.githubUserId, claims.clientId))) return null;
+    if (!(await verifier.grantIsActive(claims.jti, claims.githubUserId, claims.clientId, claims.scope))) return null;
   } catch {
     return null;
   }

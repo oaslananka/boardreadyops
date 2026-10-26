@@ -6,7 +6,7 @@ import { remoteMcpResource } from "./remote-mcp-foundation.js";
 export function createRemoteMcpJwtVerifier(input: {
   issuer: string;
   verifyKey: JWTVerifyGetKey;
-  activeGrant(jti: string, githubUserId: number, clientId: string, issuer: string): Promise<boolean>;
+  activeGrant(jti: string, githubUserId: number, clientId: string, scope: string, issuer: string): Promise<boolean>;
 }): RemoteMcpTokenVerifier {
   return {
     async verifySignedAccessToken(token) {
@@ -34,7 +34,8 @@ export function createRemoteMcpJwtVerifier(input: {
         return null;
       }
     },
-    grantIsActive: (jti, githubUserId, clientId) => input.activeGrant(jti, githubUserId, clientId, input.issuer),
+    grantIsActive: (jti, githubUserId, clientId, scope) =>
+      input.activeGrant(jti, githubUserId, clientId, scope, input.issuer),
   };
 }
 
@@ -42,14 +43,16 @@ export function createRemoteMcpJwtVerifier(input: {
 export function createProductionRemoteMcpJwtVerifier(input: {
   issuer: string;
   jwksUrl: string;
-  activeGrant(jti: string, githubUserId: number, clientId: string, issuer: string): Promise<boolean>;
+  activeGrant(jti: string, githubUserId: number, clientId: string, scope: string, issuer: string): Promise<boolean>;
 }): RemoteMcpTokenVerifier | null {
   try {
     const issuer = new URL(input.issuer);
     const jwks = new URL(input.jwksUrl);
     if (
       issuer.protocol !== "https:" ||
+      issuer.origin !== input.issuer ||
       jwks.protocol !== "https:" ||
+      jwks.href !== `${input.issuer}/.well-known/jwks.json` ||
       issuer.origin !== jwks.origin ||
       jwks.username ||
       jwks.password ||
@@ -59,7 +62,7 @@ export function createProductionRemoteMcpJwtVerifier(input: {
       issuer.search ||
       jwks.search ||
       jwks.hash ||
-      !jwks.pathname.endsWith("/jwks.json")
+      jwks.pathname !== "/.well-known/jwks.json"
     )
       return null;
     return createRemoteMcpJwtVerifier({

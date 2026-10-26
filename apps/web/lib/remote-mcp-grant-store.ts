@@ -10,13 +10,15 @@ export async function isRemoteMcpGrantActive(
   githubUserId: number,
   clientId: string,
   issuer: string,
+  scope: string,
 ): Promise<boolean> {
   if (
     typeof grantId !== "string" ||
     grantId.length < 16 ||
     grantId.length > 128 ||
     !Number.isSafeInteger(githubUserId) ||
-    githubUserId <= 0
+    githubUserId <= 0 ||
+    !["review:read", "evidence:read", "review:read evidence:read", "evidence:read review:read"].includes(scope)
   )
     return false;
   try {
@@ -26,9 +28,9 @@ export async function isRemoteMcpGrantActive(
        where g.jti = $1 and g.github_user_id = $2
          and g.revoked_at is null and g.expires_at > now()
          and g.audience = $3 and g.client_id = $4 and g.issuer = $5
-         and c.enabled = true
+         and g.scope = $6 and c.enabled = true
        limit 1`,
-      [grantId, githubUserId, remoteMcpResource, clientId, issuer],
+      [grantId, githubUserId, remoteMcpResource, clientId, issuer, scope],
     );
     return ((result as { rows?: unknown[] }).rows ?? []).length === 1;
   } catch {

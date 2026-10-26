@@ -389,3 +389,24 @@ from the provider UI when enabling. For Claude use the selected connector's
 published client and callback; do not trust hard-coded assumptions about its
 registration mode. Do not enable `/mcp`, relax authorization or claim live
 provider interoperability based solely on these internal acceptance tests.
+
+### Persistent OAuth scope binding and exact JWKS origin (pre-release hardening)
+
+The resource server's signature verification is necessary but is not by
+itself the full authorization decision. Every authenticated MCP request now
+compares the **exact signed scope string** to the `scope` of the active
+`remote_mcp_oauth_grants` row, in addition to matching JTI, immutable GitHub
+user, client ID, issuer, audience, expiry, current client enabled status and
+revocation state. An `evidence:read` consent/grant cannot be transformed into a
+`review:read` grant by presenting a differently scoped JWT with the same JTI,
+even when the JWT has a valid signature. Invalid or unknown scopes are denied
+before data access. Real PostgreSQL tests exercise a signed mismatched-scope
+bearer to confirm HTTP 401 and no Review exposure.
+
+Production JWKS discovery is now pinned to the **exact**
+`<issuer>/.well-known/jwks.json` HTTPS URL where `<issuer>` is the canonical
+HTTPS origin. It rejects other same-origin paths ending in `jwks.json`, query
+parameters, path-bearing issuers, untrusted hosts and insecure schemes. JWKS
+configuration is not learned from untrusted JWT headers. The HTTP `/mcp`
+release hold remains unchanged: no client credentials have been enrolled or
+production token validation enabled yet.

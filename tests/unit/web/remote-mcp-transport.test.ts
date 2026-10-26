@@ -49,16 +49,17 @@ function mcpRequest(method: string, params: object = {}, accessToken = "signed.j
 describe("remote MCP durable grant checks", () => {
   it("matches authenticated user, client, resource and active revocation record every time", async () => {
     const db = { query: vi.fn().mockResolvedValue({ rows: [{ present: 1 }] }) };
-    expect(await isRemoteMcpGrantActive(db as never, jti, ghUser, clientId, issuer)).toBe(true);
-    expect(db.query.mock.calls[0]?.[1]).toEqual([jti, ghUser, remoteMcpResource, clientId, issuer]);
+    expect(await isRemoteMcpGrantActive(db as never, jti, ghUser, clientId, issuer, "review:read")).toBe(true);
+    expect(db.query.mock.calls[0]?.[1]).toEqual([jti, ghUser, remoteMcpResource, clientId, issuer, "review:read"]);
+    expect(db.query.mock.calls[0]?.[0]).toContain("g.scope = $6");
     expect(db.query.mock.calls[0]?.[0]).toContain("revoked_at is null");
     expect(db.query.mock.calls[0]?.[0]).toContain("c.enabled = true");
     expect(db.query.mock.calls[0]?.[0]).toContain("expires_at > now()");
     db.query.mockResolvedValue({ rows: [] });
-    expect(await isRemoteMcpGrantActive(db as never, jti, ghUser, clientId, issuer)).toBe(false);
-    expect(await isRemoteMcpGrantActive(db as never, jti, ghUser, "", issuer)).toBe(false);
+    expect(await isRemoteMcpGrantActive(db as never, jti, ghUser, clientId, issuer, "review:read")).toBe(false);
+    expect(await isRemoteMcpGrantActive(db as never, jti, ghUser, "", issuer, "review:read")).toBe(false);
     db.query.mockRejectedValue(new Error("db-down"));
-    expect(await isRemoteMcpGrantActive(db as never, jti, ghUser, clientId, issuer)).toBe(false);
+    expect(await isRemoteMcpGrantActive(db as never, jti, ghUser, clientId, issuer, "review:read")).toBe(false);
   });
 
   it("revoke is scoped to current authenticated user and idempotent", async () => {
@@ -123,6 +124,34 @@ describe("remote MCP signed-token verifier", () => {
     expect(
       createProductionRemoteMcpJwtVerifier({ issuer, jwksUrl: "https://evil.example/jwks.json", activeGrant }),
     ).toBeNull();
+    expect(
+      createProductionRemoteMcpJwtVerifier({
+        issuer,
+        jwksUrl: `${issuer}/api/attacker/jwks.json`,
+        activeGrant,
+      }),
+    ).toBeNull();
+    expect(
+      createProductionRemoteMcpJwtVerifier({
+        issuer: `${issuer}/not-an-origin`,
+        jwksUrl: `${issuer}/.well-known/jwks.json`,
+        activeGrant,
+      }),
+    ).toBeNull();
+    expect(
+      createProductionRemoteMcpJwtVerifier({
+        issuer,
+        jwksUrl: `${issuer}/.well-known/jwks.json?from=untrusted`,
+        activeGrant,
+      }),
+    ).toBeNull();
+    expect(
+      createProductionRemoteMcpJwtVerifier({
+        issuer,
+        jwksUrl: `${issuer}/.well-known/jwks.json`,
+        activeGrant,
+      }),
+    ).not.toBeNull();
   });
 });
 

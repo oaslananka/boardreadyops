@@ -204,7 +204,8 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     const jwtVerifier = createRemoteMcpJwtVerifier({
       issuer,
       verifyKey: createLocalJWKSet(jwks as never),
-      activeGrant: (jti, id, client, tokenIssuer) => isRemoteMcpGrantActive(executor(), jti, id, client, tokenIssuer),
+      activeGrant: (jti, id, client, scope, tokenIssuer) =>
+        isRemoteMcpGrantActive(executor(), jti, id, client, tokenIssuer, scope),
     });
     const request = new Request(remoteMcpResource, { headers: { authorization: `Bearer ${token?.access_token}` } });
     const authenticated = await authenticateRemoteMcpRequest(request, issuer, jwtVerifier);
@@ -213,6 +214,63 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     expect(await revokeRemoteMcpGrant(executor(), required(authenticated).grantId, githubUserId + 1)).toBe(false);
     expect(await revokeRemoteMcpGrant(executor(), required(authenticated).grantId, githubUserId)).toBe(true);
     expect(await authenticateRemoteMcpRequest(request, issuer, jwtVerifier)).toBeNull();
+  });
+
+  it("binds a signed token scope to the exact persisted grant scope, denying scope escalation", async () => {
+    const started = await consent({ scope: "evidence:read" });
+    const approved = await decideRemoteMcpConsent(
+      executor(),
+      githubUserId,
+      started.authorizationId,
+      started.csrfNonce,
+      true,
+    );
+    const exchanged = await exchangeRemoteMcpAuthorizationCode(
+      executor(),
+      {
+        code: required(required(approved).code),
+        clientId,
+        redirectUri,
+        codeVerifier: verifier,
+      },
+      issuer,
+      tokenIssuer.sign,
+    );
+    const verifierWithDb = createRemoteMcpJwtVerifier({
+      issuer,
+      verifyKey: createLocalJWKSet((await tokenIssuer.publicJwks()) as never),
+      activeGrant: (jti, id, client, scope, signedIssuer) =>
+        isRemoteMcpGrantActive(executor(), jti, id, client, signedIssuer, scope),
+    });
+    const genuine = new Request(remoteMcpResource, {
+      headers: { authorization: `Bearer ${required(exchanged).access_token}` },
+    });
+    const validPrincipal = await authenticateRemoteMcpRequest(genuine, issuer, verifierWithDb);
+    expect(validPrincipal?.scopes).toEqual(["evidence:read"]);
+    const grantId = required(validPrincipal).grantId;
+    expect(await isRemoteMcpGrantActive(executor(), grantId, githubUserId, clientId, issuer, "review:read")).toBe(
+      false,
+    );
+    const now = Math.floor(Date.now() / 1000);
+    const elevated = await tokenIssuer.sign({
+      githubUserId,
+      clientId,
+      scope: "review:read",
+      jti: grantId,
+      issuedAt: now,
+      expiresAt: now + 600,
+    });
+    const elevatedRequest = new Request(remoteMcpResource, {
+      headers: { authorization: `Bearer ${elevated}` },
+    });
+    expect(await authenticateRemoteMcpRequest(elevatedRequest, issuer, verifierWithDb)).toBeNull();
+    const deniedMcp = await handleRemoteMcpWithVerifiedGrant(elevatedRequest, {
+      issuer,
+      verifier: verifierWithDb,
+      openDb: vi.fn(),
+      checkCurrentPermission: vi.fn(),
+    });
+    expect(deniedMcp.status).toBe(401);
   });
 
   it("allows exactly one winner when two token exchanges race for one code", async () => {
@@ -260,7 +318,9 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
       );
       const activeId = (beforeRevocation as { rows: { jti: string }[] }).rows[0]?.jti;
       if (activeId)
-        expect(await isRemoteMcpGrantActive(executor(), activeId, githubUserId, clientId, issuer)).toBe(false);
+        expect(await isRemoteMcpGrantActive(executor(), activeId, githubUserId, clientId, issuer, "review:read")).toBe(
+          false,
+        );
       expect(
         await exchangeRemoteMcpAuthorizationCode(
           executor(),
@@ -493,7 +553,8 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     const jwtVerifier = createRemoteMcpJwtVerifier({
       issuer,
       verifyKey: createLocalJWKSet((await tokenIssuer.publicJwks()) as never),
-      activeGrant: (jti, id, client, signedIssuer) => isRemoteMcpGrantActive(executor(), jti, id, client, signedIssuer),
+      activeGrant: (jti, id, client, scope, signedIssuer) =>
+        isRemoteMcpGrantActive(executor(), jti, id, client, signedIssuer, scope),
     });
     const reviewId = randomUUID();
     const report = {

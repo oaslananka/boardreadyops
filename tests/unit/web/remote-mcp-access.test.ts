@@ -80,6 +80,7 @@ describe("remote MCP OAuth grant boundary", () => {
       scopes: ["review:read", "evidence:read"],
     });
     expect(check.grantIsActive).toHaveBeenCalledOnce();
+    expect(check.grantIsActive).toHaveBeenCalledWith(valid.jti, valid.githubUserId, valid.clientId, valid.scope);
   });
 
   it("rejects sessions, missing tokens, URL tokens, and token-looking cookies without consulting a verifier", async () => {
