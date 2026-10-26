@@ -87,6 +87,7 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
       "0097_remote_mcp_oauth_abuse_controls.sql",
       "0098_remote_mcp_oauth_login_resumptions.sql",
       "0099_remote_mcp_oauth_retention_indexes.sql",
+      "0100_remote_mcp_oauth_client_epochs.sql",
     ]) {
       const sql = await readFile(new URL(`../../packages/db/migrations/${name}`, import.meta.url), "utf8");
       await executor().query(sql);
@@ -1019,8 +1020,9 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
       ] as const) {
         await executor().query(
           `insert into remote_mcp_oauth_grants
-             (jti, github_user_id, client_id, issuer, scope, expires_at)
-           values ($1, $2, $3, $4, 'review:read', now() + interval '15 minutes')`,
+             (jti, github_user_id, client_id, issuer, scope, expires_at, client_registration_epoch)
+           select $1, $2, $3, $4, 'review:read', now() + interval '15 minutes', c.registration_epoch
+             from remote_mcp_oauth_clients c where c.client_id = $3`,
           [jti, user, clientId, issuer],
         );
       }
@@ -1073,6 +1075,129 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
       await executor().query("delete from remote_mcp_oauth_grants where jti = any($1::text[])", [
         [ownJti, strangerJti],
       ]);
+    }
+  });
+
+  it("never resurrects old grants or one-use codes when an OAuth client is disabled and re-enabled", async () => {
+    const rotatingId = `operator-client-${randomUUID()}`;
+    const initialRedirect = "https://connector.example/first/callback";
+    const changedRedirect = "https://connector.example/second/callback";
+    const registration = async () => {
+      const result = await executor().query(
+        "select registration_epoch from remote_mcp_oauth_clients where client_id = $1",
+        [rotatingId],
+      );
+      return required((result as { rows: { registration_epoch: string }[] }).rows[0]).registration_epoch;
+    };
+    const issue = async (redirectUri: string) => {
+      const started = required(
+        await beginRemoteMcpConsent(executor(), githubUserId, params({ clientId: rotatingId, redirectUri })),
+      );
+      const approved = required(
+        await decideRemoteMcpConsent(executor(), githubUserId, started.authorizationId, started.csrfNonce, true),
+      );
+      const exchanged = await exchangeRemoteMcpAuthorizationCode(
+        executor(),
+        {
+          code: required(approved.code),
+          clientId: rotatingId,
+          redirectUri,
+          codeVerifier: verifier,
+        },
+        issuer,
+        tokenIssuer.sign,
+      );
+      expect(exchanged).not.toBeNull();
+      const grants = await executor().query(
+        "select jti, client_registration_epoch from remote_mcp_oauth_grants where client_id = $1 order by created_at desc limit 1",
+        [rotatingId],
+      );
+      return required((grants as { rows: { jti: string; client_registration_epoch: string }[] }).rows[0]);
+    };
+    await executor().query(
+      `insert into remote_mcp_oauth_clients (client_id, redirect_uri, display_name, enabled)
+       values ($1, $2, 'Versioned Client', true)`,
+      [rotatingId, initialRedirect],
+    );
+    try {
+      const initialEpoch = await registration();
+      const first = await issue(initialRedirect);
+      expect(first.client_registration_epoch).toBe(initialEpoch);
+      expect(await isRemoteMcpGrantActive(executor(), first.jti, githubUserId, rotatingId, issuer, "review:read")).toBe(
+        true,
+      );
+
+      // An approved but not yet redeemed code must not cross an operator
+      // disable/enable cycle either.
+      const pending = required(
+        await beginRemoteMcpConsent(
+          executor(),
+          githubUserId,
+          params({ clientId: rotatingId, redirectUri: initialRedirect }),
+        ),
+      );
+      const pendingCode = required(
+        required(
+          await decideRemoteMcpConsent(executor(), githubUserId, pending.authorizationId, pending.csrfNonce, true),
+        ).code,
+      );
+      await executor().query("update remote_mcp_oauth_clients set enabled = false where client_id = $1", [rotatingId]);
+      const disabledEpoch = await registration();
+      expect(disabledEpoch).not.toBe(initialEpoch);
+      expect(await isRemoteMcpGrantActive(executor(), first.jti, githubUserId, rotatingId, issuer, "review:read")).toBe(
+        false,
+      );
+      await executor().query("update remote_mcp_oauth_clients set enabled = true where client_id = $1", [rotatingId]);
+      const reenabledEpoch = await registration();
+      expect(reenabledEpoch).not.toBe(disabledEpoch);
+      expect(reenabledEpoch).not.toBe(initialEpoch);
+      expect(await isRemoteMcpGrantActive(executor(), first.jti, githubUserId, rotatingId, issuer, "review:read")).toBe(
+        false,
+      );
+      expect(
+        await exchangeRemoteMcpAuthorizationCode(
+          executor(),
+          {
+            code: pendingCode,
+            clientId: rotatingId,
+            redirectUri: initialRedirect,
+            codeVerifier: verifier,
+          },
+          issuer,
+          tokenIssuer.sign,
+        ),
+      ).toBeNull();
+
+      const second = await issue(initialRedirect);
+      expect(second.client_registration_epoch).toBe(reenabledEpoch);
+      expect(
+        await isRemoteMcpGrantActive(executor(), second.jti, githubUserId, rotatingId, issuer, "review:read"),
+      ).toBe(true);
+      await executor().query("update remote_mcp_oauth_clients set redirect_uri = $2 where client_id = $1", [
+        rotatingId,
+        changedRedirect,
+      ]);
+      expect(
+        await isRemoteMcpGrantActive(executor(), second.jti, githubUserId, rotatingId, issuer, "review:read"),
+      ).toBe(false);
+      const third = await issue(changedRedirect);
+      expect(await isRemoteMcpGrantActive(executor(), third.jti, githubUserId, rotatingId, issuer, "review:read")).toBe(
+        true,
+      );
+      // Display-only edits cannot rewrite the security epoch.
+      const epochBeforeDisplay = await registration();
+      await executor().query("update remote_mcp_oauth_clients set display_name = $2 where client_id = $1", [
+        rotatingId,
+        "A renamed client",
+      ]);
+      expect(await registration()).toBe(epochBeforeDisplay);
+      expect(await isRemoteMcpGrantActive(executor(), third.jti, githubUserId, rotatingId, issuer, "review:read")).toBe(
+        true,
+      );
+    } finally {
+      await executor().query("delete from remote_mcp_oauth_grants where client_id = $1", [rotatingId]);
+      await executor().query("delete from remote_mcp_oauth_authorizations where client_id = $1", [rotatingId]);
+      await executor().query("delete from remote_mcp_oauth_clients where client_id = $1", [rotatingId]);
     }
   });
 

@@ -92,6 +92,11 @@ const dbTables = [
   "remote_mcp_oauth_login_resumptions",
 ];
 const dbIndexes = ["remote_mcp_oauth_grants_expiry_idx", "remote_mcp_oauth_authorizations_expiry_idx"];
+const clientEpochSchemaGuards = [
+  ["remote_mcp_oauth_clients", "registration_epoch"],
+  ["remote_mcp_oauth_authorizations", "client_registration_epoch"],
+  ["remote_mcp_oauth_grants", "client_registration_epoch"],
+];
 
 /** Only fixed reason codes and status values can leave this evaluator. Neither
  * SQL diagnostics nor client identifiers/redirect URLs are ever returned.
@@ -113,12 +118,22 @@ export async function inspectRemoteMcpReleasePrerequisites(environment, query) {
   } else {
     try {
       const names = [...dbTables, ...dbIndexes];
+      const epochColumns = clientEpochSchemaGuards.map(
+        ([table, column], i) => `exists (select 1 from information_schema.columns
+          where table_schema = 'public' and table_name = '${table}' and column_name = '${column}') as p${names.length + i}`,
+      );
+      const triggerIndex = names.length + epochColumns.length;
+      const epochTrigger = `exists (select 1 from pg_trigger
+        where tgrelid = to_regclass('public.remote_mcp_oauth_clients')
+          and tgname = 'remote_mcp_oauth_client_epoch_refresh' and not tgisinternal) as p${triggerIndex}`;
       const q = await query(
-        `select ${names.map((_, i) => `to_regclass($${i + 1}::text) is not null as p${i}`).join(", ")}`,
+        `select ${names.map((_, i) => `to_regclass($${i + 1}::text) is not null as p${i}`).join(", ")},
+          ${epochColumns.join(", ")}, ${epochTrigger}`,
         names.map((name) => `public.${name}`),
       );
       const found = q?.rows?.[0];
-      const allPresent = found && names.every((_, i) => found[`p${i}`] === true);
+      const allPresent =
+        found && Array.from({ length: triggerIndex + 1 }, (_, i) => found[`p${i}`] === true).every(Boolean);
       add("oauth_database_schema", allPresent ? "configured" : "blocked");
       if (!allPresent) {
         add("enabled_exact_client_registrations", "blocked");

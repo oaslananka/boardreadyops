@@ -113,7 +113,14 @@ describe("Remote MCP browser consent security boundary", () => {
 
   it("shows only escaped registered client details and requested read-only scopes", async () => {
     const store = database([
-      [{ client_id: clientId, redirect_uri: redirectUri, display_name: '<img src=x onerror="bad()">' }],
+      [
+        {
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          registration_epoch: "123e4567-e89b-42d3-a456-426614174000",
+          display_name: '<img src=x onerror="bad()">',
+        },
+      ],
       [{ id: "saved" }],
     ]);
     const response = await handleRemoteMcpConsentGet(

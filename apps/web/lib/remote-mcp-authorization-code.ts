@@ -22,7 +22,12 @@ export type OAuthAuthorizationParameters = {
   resource: string;
 };
 
-type RegisteredClient = { client_id: string; redirect_uri: string; display_name: string };
+type RegisteredClient = {
+  client_id: string;
+  redirect_uri: string;
+  display_name: string;
+  registration_epoch: string;
+};
 
 type AuthorizationRow = {
   id: string;
@@ -32,6 +37,7 @@ type AuthorizationRow = {
   scope: string;
   state: string;
   code_challenge: string;
+  client_registration_epoch: string;
 };
 
 function validHttpsUrl(value: string): boolean {
@@ -117,18 +123,25 @@ export async function beginRemoteMcpConsent(
     return null;
 
   const clients = await db.query(
-    `select client_id, redirect_uri, display_name from remote_mcp_oauth_clients
+    `select client_id, redirect_uri, display_name, registration_epoch from remote_mcp_oauth_clients
      where client_id = $1 and redirect_uri = $2 and enabled = true limit 1`,
     [params.clientId, params.redirectUri],
   );
   const client = ((clients as { rows?: RegisteredClient[] }).rows ?? [])[0];
-  if (!client || client.client_id !== params.clientId || client.redirect_uri !== params.redirectUri) return null;
+  if (
+    !client ||
+    client.client_id !== params.clientId ||
+    client.redirect_uri !== params.redirectUri ||
+    !/^[0-9a-f-]{36}$/iu.test(client.registration_epoch)
+  )
+    return null;
   const authorizationId = randomUUID();
   const csrfNonce = randomBytes(32).toString("base64url");
   const saved = await db.query(
     `insert into remote_mcp_oauth_authorizations
-       (id, github_user_id, client_id, redirect_uri, scope, state, code_challenge, csrf_sha256, expires_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, now() + interval '10 minutes') returning id`,
+       (id, github_user_id, client_id, redirect_uri, scope, state, code_challenge,
+        csrf_sha256, client_registration_epoch, expires_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now() + interval '10 minutes') returning id`,
     [
       authorizationId,
       githubUserId,
@@ -138,6 +151,7 @@ export async function beginRemoteMcpConsent(
       params.state,
       params.codeChallenge,
       sha256(csrfNonce),
+      client.registration_epoch,
     ],
   );
   if (((saved as { rows?: unknown[] }).rows ?? []).length !== 1) return null;
@@ -179,7 +193,8 @@ export async function decideRemoteMcpConsent(
       where auth.id = $1 and auth.github_user_id = $2 and auth.csrf_sha256 = $3
         and auth.expires_at > now() and auth.approved_at is null and auth.denied_at is null
         and exists (select 1 from remote_mcp_oauth_clients c
-                    where c.client_id = auth.client_id and c.redirect_uri = auth.redirect_uri and c.enabled)
+                    where c.client_id = auth.client_id and c.redirect_uri = auth.redirect_uri
+                      and c.registration_epoch = auth.client_registration_epoch and c.enabled)
       returning auth.redirect_uri, auth.state, auth.github_user_id
     ), logged as (
       insert into remote_mcp_oauth_security_events(event_kind, github_user_id)
@@ -235,11 +250,13 @@ export async function exchangeRemoteMcpAuthorizationCode(
     return null;
   const codeHash = sha256(input.code);
   const candidate = await db.query(
-    `select a.id, a.github_user_id, a.client_id, a.redirect_uri, a.scope, a.state, a.code_challenge
+    `select a.id, a.github_user_id, a.client_id, a.redirect_uri, a.scope, a.state, a.code_challenge,
+              a.client_registration_epoch
        from remote_mcp_oauth_authorizations a
        join remote_mcp_oauth_clients c on c.client_id = a.client_id
       where a.code_sha256 = $1 and a.client_id = $2 and a.redirect_uri = $3
-        and c.redirect_uri = a.redirect_uri and c.enabled = true
+        and c.redirect_uri = a.redirect_uri and c.registration_epoch = a.client_registration_epoch
+        and c.enabled = true
         and a.approved_at is not null and a.denied_at is null and a.redeemed_at is null
         and a.code_expires_at > now() and a.expires_at > now()
       limit 1`,
@@ -252,6 +269,7 @@ export async function exchangeRemoteMcpAuthorizationCode(
     !Number.isSafeInteger(githubUserId) ||
     githubUserId <= 0 ||
     !validScopes(row.scope) ||
+    !/^[0-9a-f-]{36}$/iu.test(row.client_registration_epoch) ||
     !verifyPkceS256(input.codeVerifier, row.code_challenge, "S256")
   )
     return null;
@@ -273,19 +291,30 @@ export async function exchangeRemoteMcpAuthorizationCode(
         where a.id = $1 and a.code_sha256 = $2 and a.client_id = $3 and a.redirect_uri = $4
           and a.redeemed_at is null and a.approved_at is not null and a.denied_at is null
           and a.code_expires_at > now() and a.expires_at > now()
+          and a.client_registration_epoch = $5
           and exists (select 1 from remote_mcp_oauth_clients c
-                      where c.client_id = a.client_id and c.redirect_uri = a.redirect_uri and c.enabled)
+                      where c.client_id = a.client_id and c.redirect_uri = a.redirect_uri
+                        and c.registration_epoch = a.client_registration_epoch and c.enabled)
         returning a.github_user_id, a.scope`,
-      [row.id, codeHash, row.client_id, row.redirect_uri],
+      [row.id, codeHash, row.client_id, row.redirect_uri, row.client_registration_epoch],
     );
     const authorized = ((taken as { rows?: { github_user_id: string | number; scope: string }[] }).rows ?? [])[0];
     if (!authorized || Number(authorized.github_user_id) !== facts.githubUserId || authorized.scope !== facts.scope)
       return false;
     const result = await tx.query(
       `insert into remote_mcp_oauth_grants
-         (jti, github_user_id, client_id, issuer, audience, scope, expires_at)
-       values ($1, $2, $3, $4, $5, $6, to_timestamp($7)) returning jti`,
-      [facts.jti, facts.githubUserId, facts.clientId, issuer, remoteMcpResource, facts.scope, facts.expiresAt],
+         (jti, github_user_id, client_id, issuer, audience, scope, expires_at, client_registration_epoch)
+       values ($1, $2, $3, $4, $5, $6, to_timestamp($7), $8) returning jti`,
+      [
+        facts.jti,
+        facts.githubUserId,
+        facts.clientId,
+        issuer,
+        remoteMcpResource,
+        facts.scope,
+        facts.expiresAt,
+        row.client_registration_epoch,
+      ],
     );
     if (((result as { rows?: unknown[] }).rows ?? []).length !== 1) return false;
     await recordRemoteMcpOAuthEvent(tx, "token_issued", facts.githubUserId, facts.clientId, facts.jti);

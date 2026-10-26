@@ -93,6 +93,7 @@ describe("OAuth connection self-service revocation", () => {
     expect(extract(html)).toHaveLength(2);
     expect(db.query).toHaveBeenCalledWith(expect.stringContaining("g.github_user_id = $1"), [user, issuer, 50]);
     expect(db.query.mock.calls[0]?.[0]).toContain("g.revoked_at is null");
+    expect(db.query.mock.calls[0]?.[0]).toContain("c.registration_epoch = g.client_registration_epoch");
     expect(db.close).toHaveBeenCalledOnce();
   });
 

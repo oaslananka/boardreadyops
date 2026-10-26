@@ -126,7 +126,8 @@ export async function handleRemoteMcpConnectionsGet(
     const found = await db.query(
       `select g.jti, g.client_id, c.display_name, g.scope, g.expires_at
          from remote_mcp_oauth_grants g
-         left join remote_mcp_oauth_clients c on c.client_id = g.client_id
+         join remote_mcp_oauth_clients c on c.client_id = g.client_id
+           and c.registration_epoch = g.client_registration_epoch and c.enabled = true
         where g.github_user_id = $1 and g.issuer = $2
           and g.revoked_at is null and g.expires_at > now()
         order by g.created_at desc, g.jti desc limit $3`,

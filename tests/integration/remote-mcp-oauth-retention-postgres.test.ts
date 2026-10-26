@@ -27,6 +27,7 @@ describePg("bounded remote MCP OAuth worker cleanup on PostgreSQL", () => {
       "0097_remote_mcp_oauth_abuse_controls.sql",
       "0098_remote_mcp_oauth_login_resumptions.sql",
       "0099_remote_mcp_oauth_retention_indexes.sql",
+      "0100_remote_mcp_oauth_client_epochs.sql",
     ]) {
       const migration = await readFile(new URL(`../../packages/db/migrations/${name}`, import.meta.url), "utf8");
       await executor().query(migration);
@@ -168,16 +169,21 @@ describePg("bounded remote MCP OAuth worker cleanup on PostgreSQL", () => {
       for (const id of pastGrants) {
         await executor().query(
           `insert into remote_mcp_oauth_grants
-            (jti, github_user_id, client_id, issuer, scope, created_at, expires_at)
-           values ($1, 123, $2, 'https://boardreadyops.com', 'review:read',
-                   now() - interval '4 days', now() - interval '4 days' + interval '15 minutes')`,
+            (jti, github_user_id, client_id, issuer, scope, created_at, expires_at,
+             client_registration_epoch)
+           select $1, 123, $2, 'https://boardreadyops.com', 'review:read',
+                  now() - interval '4 days', now() - interval '4 days' + interval '15 minutes',
+                  c.registration_epoch from remote_mcp_oauth_clients c where c.client_id = $2`,
           [id, clientId],
         );
       }
       await executor().query(
         `insert into remote_mcp_oauth_grants
-          (jti, github_user_id, client_id, issuer, scope, expires_at)
-         values ($1, 123, $2, 'https://boardreadyops.com', 'review:read', now() + interval '15 minutes')`,
+          (jti, github_user_id, client_id, issuer, scope, expires_at,
+           client_registration_epoch)
+         select $1, 123, $2, 'https://boardreadyops.com', 'review:read',
+                now() + interval '15 minutes', c.registration_epoch
+           from remote_mcp_oauth_clients c where c.client_id = $2`,
         [liveGrant, clientId],
       );
       for (const id of pastCodes) {

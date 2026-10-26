@@ -804,3 +804,41 @@ verification succeed. Canonical single-audience OAuth access JWTs, their
 existing revocation checks and repository access logic remain unchanged.
 Production OAuth/MCP release gates stay disabled; this change registers no
 new clients and performs no deployment.
+
+### Immutable OAuth client authorization epochs (migration 0100; unreleased)
+
+A disabled registered OAuth client must not regain previously issued access
+simply because an operator switches it back on. Likewise, changing a client's
+registered OAuth callback must invalidate every grant and pending code issued
+against its earlier callback/registration. `0100_remote_mcp_oauth_client_epochs.sql`
+adds a random UUID `registration_epoch` to each registered OAuth client and a
+PostgreSQL trigger that **rotates this epoch on actual `enabled` or
+`redirect_uri` changes**. Ordinary display-name edits preserve the epoch.
+
+The consent request snapshots the current epoch in its authorization record;
+subsequent consent decisions and single-use PKCE code redemption re-check the
+**same exact epoch**. Issued, signed JWT grants snapshot that epoch as well,
+and **every** live grant check requires an enabled client's current epoch to
+match the grant's original epoch. The browser's connected OAuth clients list
+likewise excludes invalidated old epochs. A disabled/re-enabled client,
+changed callback, or deleted-and-recreated client identity therefore cannot
+silently resurrect any prior authorization, even before its JWT has expired.
+The issuer identity, immutable GitHub user, scope, client ID and single
+canonical MCP resource restrictions still apply independently.
+
+**Fail-closed upgrade:** `client_registration_epoch` is intentionally nullable
+for *pre-migration* code/grant rows and those legacy records are **not
+backfilled**. They will fail verification and must be explicitly authorized
+again; this is safer than silently carrying old credentials across a trust
+boundary migration. PostgreSQL's built-in UUID generator produces the client
+epoch; no private key or token is stored. Release preflight now checks the
+three required columns **and** the rotation trigger in addition to the
+existing 0095–0099 tables/indexes; missing migration 0100 blocks readiness.
+
+A disposable PostgreSQL 17 acceptance test performs real token issuance,
+client disable/re-enable, callback change, pending-code redemption and fresh
+post-rotation issuance. It proves old grants/codes cannot revive while newly
+approved grants remain usable; display-only changes leave valid access alone.
+**Migration 0100 has not been applied to production**, and the hosted MCP/OAuth
+feature gates remain disabled. Do not push, deploy, or apply the migration
+without the explicit final release decision.

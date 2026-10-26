@@ -29,6 +29,7 @@ export async function isRemoteMcpGrantActive(
          and g.revoked_at is null and g.expires_at > now()
          and g.audience = $3 and g.client_id = $4 and g.issuer = $5
          and g.scope = $6 and c.enabled = true
+         and g.client_registration_epoch = c.registration_epoch
        limit 1`,
       [grantId, githubUserId, remoteMcpResource, clientId, issuer, scope],
     );

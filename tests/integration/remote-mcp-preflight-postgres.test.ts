@@ -24,6 +24,7 @@ describePg("release preflight against real read-only OAuth database state", () =
       "0097_remote_mcp_oauth_abuse_controls.sql",
       "0098_remote_mcp_oauth_login_resumptions.sql",
       "0099_remote_mcp_oauth_retention_indexes.sql",
+      "0100_remote_mcp_oauth_client_epochs.sql",
     ]) {
       const sql = await readFile(new URL(`../../packages/db/migrations/${filename}`, import.meta.url), "utf8");
       await query(sql);

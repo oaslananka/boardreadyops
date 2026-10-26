@@ -54,6 +54,7 @@ describe("remote MCP durable grant checks", () => {
     expect(db.query.mock.calls[0]?.[0]).toContain("g.scope = $6");
     expect(db.query.mock.calls[0]?.[0]).toContain("revoked_at is null");
     expect(db.query.mock.calls[0]?.[0]).toContain("c.enabled = true");
+    expect(db.query.mock.calls[0]?.[0]).toContain("g.client_registration_epoch = c.registration_epoch");
     expect(db.query.mock.calls[0]?.[0]).toContain("expires_at > now()");
     db.query.mockResolvedValue({ rows: [] });
     expect(await isRemoteMcpGrantActive(db as never, jti, ghUser, clientId, issuer, "review:read")).toBe(false);

@@ -19,7 +19,7 @@ const fullEnvironment = {
   SESSION_SECRET: "opaque-private-session-value-".repeat(3),
   DATABASE_URL: "postgresql://fixture_username:fixture_password@localhost/not-used",
 };
-const presence = Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`p${index}`, true]));
+const presence = Object.fromEntries(Array.from({ length: 12 }, (_, index) => [`p${index}`, true]));
 const clientRows = [
   {
     client_id: "https://chatgpt.com/oauth/client.json",
@@ -64,6 +64,20 @@ describe("MCP operator preflight is always an evidence-only release blocker", ()
     expect(get(report.checks, "mcp_release_switch")).toBe("blocked");
     expect(get(report.checks, "oauth_database_schema")).toBe("not_checked");
     expect(get(report.checks, "enabled_exact_client_registrations")).toBe("not_checked");
+  });
+
+  it.each([
+    [8, "client epoch column"],
+    [9, "authorization epoch column"],
+    [10, "grant epoch column"],
+    [11, "client epoch rotation trigger"],
+  ] as const)("blocks a partial v100 migration missing %s: %s", async (missing) => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ ...presence, [`p${missing}`]: false }] });
+    const result = await inspectRemoteMcpReleasePrerequisites(fullEnvironment, query);
+    expect(get(result.checks, "oauth_database_schema")).toBe("blocked");
+    expect(get(result.checks, "enabled_exact_client_registrations")).toBe("blocked");
+    expect(result.publicMcpReleaseApproved).toBe(false);
+    expect(query).toHaveBeenCalledOnce();
   });
 
   it("handles missing migration and SQL failures without leaking database diagnostics", async () => {
