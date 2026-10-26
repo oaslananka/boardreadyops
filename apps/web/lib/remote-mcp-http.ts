@@ -15,6 +15,19 @@ interface RemoteMcpReadDependencies {
   checkCurrentPermission: CheckLiveRepositoryPermission;
 }
 
+/** Reject mismatched routes and untrusted browser origins BEFORE any grant lookup.
+ * Never trust Host/Forwarded headers to construct the canonical MCP resource.
+ */
+function trustedRemoteMcpHttpTarget(request: Request): boolean {
+  try {
+    const url = new URL(request.url);
+    const origin = request.headers.get("origin");
+    return url.href === "https://boardreadyops.com/mcp" && (origin === null || origin === "https://boardreadyops.com");
+  } catch {
+    return false;
+  }
+}
+
 /** Internal, stateless MCP v2 HTTP handler. Every request is authorized before
  * constructing the MCP server. Use only in tests until the OAuth release gate passes.
  */
@@ -23,6 +36,9 @@ export async function handleAuthorizedRemoteMcpHttp(
   principal: RemoteMcpPrincipal,
   dependencies: RemoteMcpReadDependencies,
 ): Promise<Response> {
+  if (!trustedRemoteMcpHttpTarget(request)) {
+    return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
+  }
   const handler = createMcpHandler(
     () => {
       const server = new McpServer(
@@ -64,14 +80,6 @@ export async function handleAuthorizedRemoteMcpHttp(
     { legacy: "stateless", maxRequestBodySize: 64 * 1024 },
   );
 
-  const url = new URL(request.url);
-  if (url.protocol !== "https:" || url.host !== "boardreadyops.com" || url.pathname !== "/mcp") {
-    return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
-  }
-  const origin = request.headers.get("origin");
-  if (origin && origin !== "https://boardreadyops.com") {
-    return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
-  }
   const response = await handler.fetch(request);
   const headers = new Headers(response.headers);
   headers.set("cache-control", "private, no-store");
@@ -85,6 +93,9 @@ export async function handleRemoteMcpWithVerifiedGrant(
   request: Request,
   config: { issuer: string; verifier: RemoteMcpTokenVerifier } & RemoteMcpReadDependencies,
 ): Promise<Response> {
+  if (!trustedRemoteMcpHttpTarget(request)) {
+    return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
+  }
   const principal = await authenticateRemoteMcpRequest(request, config.issuer, config.verifier);
   if (!principal) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {

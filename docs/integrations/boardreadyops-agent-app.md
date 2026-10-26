@@ -440,3 +440,44 @@ parameters, path-bearing issuers, untrusted hosts and insecure schemes. JWKS
 configuration is not learned from untrusted JWT headers. The HTTP `/mcp`
 release hold remains unchanged: no client credentials have been enrolled or
 production token validation enabled yet.
+
+### Offline-JWKS production request adapter (26 October 2026, unreleased)
+
+`apps/web/lib/remote-mcp-production.ts` now composes the existing OAuth
+issuer, the deterministic MCP v2 stateless request handler, PostgreSQL durable
+grant checks, and a live GitHub App repository permission verifier. It accepts
+**only trusted server-configured local JWKS** from the signing issuer, including
+previous public RS256 keys during deliberate rollover. Neither JWT headers nor
+client metadata may select another JWKS, issuer, tenant or verification URL.
+The verification path never needs an outbound HTTP fetch to the site's own
+JWKS endpoint; malformed/duplicate/private-key JWK fields fail closed.
+
+The production-shaped handler checks the canonical `https://boardreadyops.com/mcp`
+URL and exact allowed Origin **before** signature verification or PostgreSQL
+lookups. JWT issuer, audience, expiry, client, GitHub subject and exact signed
+scope must match an unrevoked, unexpired durable grant belonging to a currently
+enabled, pre-registered client, on every MCP request. Each grant lookup opens
+and closes its own database connection; permitted Review tool calls open a
+separate connection, check current GitHub user and repository permissions via
+the registered GitHub App and return only allowlisted read-only facts.
+Unavailable/missing/unauthorized Reviews are indistinguishable to the caller;
+GitHub App errors, token failures and SQL errors do not grant access.
+
+**Two independent guards:** `BOARDREADYOPS_REMOTE_MCP_OAUTH_ENABLED=true`
+controls the in-process OAuth issuer; the additional
+`BOARDREADYOPS_REMOTE_MCP_HANDLER_READY=true` is required before production
+adapter composition, along with valid OAuth signing keys and the GitHub App
+identity. **Neither flag mounts the MCP route**: `/mcp` still unconditionally
+returns HTTP 503 in `apps/web/app/mcp/route.ts`. Do not set either flag in
+production or modify that route until the final audited enablement, real
+GitHub App installation-token access and ChatGPT/Claude OAuth/MCP client
+acceptance are independently verified.
+
+Unit tests exercise real local RS256 JWT signatures, private/duplicate key
+rejection, HTTP Origin/URL denial before any DB connection, repeated durable
+grant lookup, revoked grants and per-call GitHub permission checks. A separate
+isolated PostgreSQL 17 integration test exercises the production-shaped
+adapter with persisted OAuth grants, real revocation SQL and the modern MCP v2
+wire format. The **GitHub App permission outcome is injected in these tests**:
+this verifies composition and fail-closed authorization, **not** the live GitHub
+installation-token API or provider cloud acceptance.

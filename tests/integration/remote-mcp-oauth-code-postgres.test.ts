@@ -21,6 +21,7 @@ import {
   recordRemoteMcpOAuthEvent,
   takeRemoteMcpOAuthRateLimit,
 } from "../../apps/web/lib/remote-mcp-oauth-abuse.js";
+import { prepareRemoteMcpProductionHandler } from "../../apps/web/lib/remote-mcp-production.js";
 import { handleRemoteMcpTokenRequest } from "../../apps/web/lib/remote-mcp-token-http.js";
 import {
   createRemoteMcpTokenIssuer,
@@ -745,6 +746,137 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     expect(revoked.status).toBe(401);
     expect(revoked.headers.get("www-authenticate")).toContain("oauth-protected-resource/mcp");
     expect(openDb).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses the production-shaped offline-JWKS adapter against durable PostgreSQL grants and current repository access", async () => {
+    const origin = "https://boardreadyops.com";
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const signing = createRemoteMcpTokenIssuer({
+      issuer: origin,
+      privateKeyPem: privateKey.export({ format: "pem", type: "pkcs8" }).toString(),
+      keyId: "production-pg-local-key",
+    });
+    const started = await consent();
+    const approved = await decideRemoteMcpConsent(
+      executor(),
+      githubUserId,
+      started.authorizationId,
+      started.csrfNonce,
+      true,
+    );
+    const exchanged = await exchangeRemoteMcpAuthorizationCode(
+      executor(),
+      {
+        code: required(required(approved).code),
+        clientId,
+        redirectUri,
+        codeVerifier: verifier,
+      },
+      origin,
+      signing.sign,
+    );
+    const token = required(exchanged).access_token;
+    const reviewId = randomUUID();
+    const livePermission = vi.fn().mockResolvedValue(true);
+    const close = vi.fn().mockResolvedValue(undefined);
+    const query = vi.fn().mockImplementation((sql: string, values?: readonly unknown[]) => {
+      if (sql.includes("from reviews"))
+        return Promise.resolve({
+          rows: [
+            {
+              id: reviewId,
+              repository_id: "private-internal",
+              head_run_id: "run-1",
+              current_revision_id: "revision-1",
+              status: "active",
+              decision: "pending",
+              owner: "sensitive-owner",
+              name: "sensitive-repository",
+              github_repo_id: "456",
+              github_installation_id: "789",
+            },
+          ],
+        });
+      if (sql.includes("from review_revisions"))
+        return Promise.resolve({
+          rows: [
+            {
+              head_commit_sha: "a".repeat(40),
+              evidence_digest: "b".repeat(64),
+            },
+          ],
+        });
+      return executor().query(sql, values);
+    });
+    const openDb = vi.fn().mockImplementation(async () => ({ query, close }));
+    const handler = prepareRemoteMcpProductionHandler({
+      issuer: origin,
+      publicJwks: await signing.publicJwks(),
+      openDb,
+      checkCurrentPermission: livePermission,
+    });
+    expect(handler).not.toBeNull();
+    if (!handler) throw new Error("Offline OAuth adapter was not created");
+    const request = (method: string, args: Record<string, unknown> = {}) =>
+      new Request(remoteMcpResource, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          "Mcp-Protocol-Version": "2026-07-28",
+          "Mcp-Method": method,
+          ...(method === "tools/call" ? { "Mcp-Name": "boardreadyops_review_get" } : {}),
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method,
+          params: {
+            ...args,
+            _meta: {
+              "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+              "io.modelcontextprotocol/clientCapabilities": {},
+              "io.modelcontextprotocol/clientInfo": { name: "pg-acceptance", version: "1" },
+            },
+          },
+        }),
+      });
+    const listed = await handler(request("tools/list"));
+    expect(listed.status).toBe(200);
+    expect(await listed.text()).toContain("boardreadyops_review_get");
+    expect(livePermission).not.toHaveBeenCalled();
+    const allowed = await handler(
+      request("tools/call", {
+        name: "boardreadyops_review_get",
+        arguments: { reviewId },
+      }),
+    );
+    const result = await allowed.text();
+    expect(allowed.status, result).toBe(200);
+    expect(result).toContain("not-evaluated");
+    expect(result).not.toContain("sensitive-owner");
+    expect(livePermission).toHaveBeenCalledOnce();
+    livePermission.mockResolvedValue(false);
+    const denied = await handler(
+      request("tools/call", {
+        name: "boardreadyops_review_get",
+        arguments: { reviewId },
+      }),
+    );
+    expect(await denied.text()).toContain("Review unavailable");
+    expect(livePermission).toHaveBeenCalledTimes(2);
+    const grantRow = await executor().query(
+      "select jti from remote_mcp_oauth_grants where issuer = $1 and client_id = $2 and github_user_id = $3 and revoked_at is null order by created_at desc limit 1",
+      [origin, clientId, githubUserId],
+    );
+    const grantId = (grantRow as { rows: { jti: string }[] }).rows[0]?.jti;
+    expect(grantId).toBeTruthy();
+    expect(await revokeRemoteMcpGrant(executor(), required(grantId), githubUserId)).toBe(true);
+    const revoked = await handler(request("tools/list"));
+    expect(revoked.status).toBe(401);
+    expect(query.mock.calls.filter(([sql]) => sql.includes("remote_mcp_oauth_grants"))).toHaveLength(4);
+    expect(close).toHaveBeenCalledTimes(6);
   });
 
   it("announces only supported discovery features, not dynamic registration", () => {
