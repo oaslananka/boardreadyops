@@ -64,6 +64,15 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@electric-sql/pglite-tools@0.3.3`
   - Description: Tools for working with PGlite databases
   - Homepage: https://pglite.dev
+- `@modelcontextprotocol/client@2.3.1`
+  - Description: Model Context Protocol implementation for TypeScript - Client package
+  - Homepage: https://modelcontextprotocol.io
+- `@modelcontextprotocol/core@2.3.1`
+  - Description: Model Context Protocol for TypeScript — public Zod schemas (spec + OAuth/OpenID)
+  - Homepage: https://modelcontextprotocol.io
+- `@modelcontextprotocol/server@2.3.1`
+  - Description: Model Context Protocol implementation for TypeScript - Server package
+  - Homepage: https://modelcontextprotocol.io
 - `@opentelemetry/api@1.9.1`
   - Description: Public API for OpenTelemetry
   - Homepage: https://github.com/open-telemetry/opentelemetry-js/tree/main/api
@@ -888,6 +897,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@jridgewell/trace-mapping@0.3.31`
   - Description: Trace the original position through a source map
   - Homepage: https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping
+- `@modelcontextprotocol/ext-apps@2.0.3`
+  - Description: MCP Apps SDK — Enable MCP servers to display interactive user interfaces in conversational clients.
+  - Homepage: https://github.com/modelcontextprotocol/ext-apps
 - `@modelcontextprotocol/sdk@1.32.0`
   - Description: Model Context Protocol implementation for TypeScript
   - Homepage: https://modelcontextprotocol.io
