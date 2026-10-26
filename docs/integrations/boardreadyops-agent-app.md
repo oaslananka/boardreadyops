@@ -158,3 +158,33 @@ request, token/grant activity and repository permission must be checked anew.
 
 Primary API references: https://docs.github.com/en/rest/users/users and
 https://docs.github.com/en/rest/collaborators/collaborators.
+
+## 2026-10-26 remote MCP resource-server increment (local only)
+
+- The remote HTTP implementation now uses official stable
+  `@modelcontextprotocol/server@2.3.1` (the newer 2.4.0 cannot pass the
+  repository's minimum-release-age policy). It serves the modern 2026-07-28
+  era and stateless legacy clients from one tool registry. The existing stdio
+  MCP package is unchanged.
+- A **test-only injected route** exposes `boardreadyops_review_get` with bounded
+  schema-validated input, an allowlisted facts-only response, a generic
+  unavailable result and fresh per-call repository permission checks.
+  Unauthorized HTTP requests receive a `401` OAuth metadata challenge. The
+  production `/mcp` route is still deliberately `503`.
+- `jose` checks trusted issuer, MCP-specific audience, asymmetric RS256/ES256
+  signatures, expiry, user identity and client binding. The durable
+  `remote_mcp_oauth_grants` table additionally binds active JTI, user, client,
+  issuer, audience and one-hour expiry, and supports immediate revocation.
+  No raw access token is stored in the grant table. Migration 0095 was exercised
+  on a disposable, network-isolated PostgreSQL 17 instance; **it has not been
+  applied to staging or production**.
+- The caller cannot substitute a browser cookie or existing repository API
+  token. Host and Origin are conservatively restricted in the injected HTTP
+  adapter until cross-client acceptance establishes a safe deployment policy.
+- **Still missing:** consent screen, OAuth authorization-code issuance/exchange,
+  PKCE-bound single-use codes, verified client metadata/redirect allowlisting,
+  signing-key/JWKS lifecycle, discoverable live OAuth endpoints, audit/rate
+  limits and real ChatGPT/Claude OAuth/UI tests. No production enablement,
+  directory listing or auto-approval is authorized by this increment.
+
+Reference: https://ts.sdk.modelcontextprotocol.io/v2/migration/support-2026-07-28

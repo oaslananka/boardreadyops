@@ -189,6 +189,7 @@
     "happy-dom": "21.0.4",
     "html-validate": "11.8.0",
     "husky": "9.1.7",
+    "jose": "6.2.10",
     "js-yaml": "5.4.3",
     "knip": "6.32.3",
     "lighthouse": "13.5.0",

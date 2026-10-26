@@ -24,6 +24,7 @@ const valid: SignedRemoteMcpClaims = {
   nbf: now - 100,
   scope: "review:read evidence:read",
   githubUserId: 123,
+  clientId: "https://client.example/client.json",
 };
 
 function request(headers: HeadersInit = { authorization: "Bearer signed.jwt.value" }, url = remoteMcpResource) {
