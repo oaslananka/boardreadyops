@@ -48,7 +48,7 @@ describe("container action release surfaces", () => {
     expect(dockerfile).toContain("# renovate: datasource=docker depName=ubuntu currentValue=26.04");
     expect(dockerfile).toMatch(/^FROM ubuntu@sha256:[a-f0-9]{64}$/mu);
     expect(dockerfile).not.toMatch(/^FROM [^\n]+:[^\s]+@sha256:/mu);
-    expect(dockerfile).toContain("ARG NODE_VERSION=24.21.0");
+    expect(dockerfile).toContain("ARG NODE_VERSION=24.22.1");
     expect(dockerfile).toContain("ARG BOARDREADYOPS_VERSION");
     expect(dockerfile).not.toContain("ARG BOARDREADYOPS_VERSION=latest");
     expect(dockerfile).toContain("BOARDREADYOPS_VERSION must be an exact semantic version");
@@ -115,7 +115,7 @@ describe("container action release surfaces", () => {
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
-        "node-version": "24.21.0",
+        "node-version": "24.22.1",
       },
     ]);
   });
