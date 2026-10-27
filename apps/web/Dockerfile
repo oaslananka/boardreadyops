@@ -56,6 +56,10 @@ COPY --chown=node:node --from=build /app/apps/web/.next/migrate.mjs ./migrate.mj
 COPY --chown=node:node --from=build /app/apps/web/public ./apps/web/public
 COPY apps/web/docker-entrypoint.sh /usr/local/bin/boardreadyops-entrypoint
 RUN chmod 0755 /usr/local/bin/boardreadyops-entrypoint
+# Docker copies this directory's ownership and mode into a *new* named volume.
+# Keep the runtime as the unprivileged node user; existing volumes need a
+# separately authorized operator-owned permission reconciliation.
+RUN install -d -o node -g node -m 0700 /data/artifacts
 
 USER node
 
