@@ -4,6 +4,10 @@ export interface CiRiskProfileOptions {
 }
 
 export interface CiRiskProfile {
+  readonly domain_engine: boolean;
+  readonly domain_cloud: boolean;
+  readonly domain_integrations: boolean;
+  readonly needs_web_standalone: boolean;
   readonly changed_files: string;
   readonly docs_only: boolean;
   readonly code_changed: boolean;

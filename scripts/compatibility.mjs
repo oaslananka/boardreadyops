@@ -475,7 +475,7 @@ function nodeSupportStatus(config, version) {
     return "Minimum supported runtime";
   }
   if (version === config.node.recommended) {
-    return "Recommended Active LTS runtime";
+    return "Recommended LTS runtime";
   }
   return "Supported LTS runtime";
 }
