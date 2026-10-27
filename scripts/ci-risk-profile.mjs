@@ -125,6 +125,33 @@ const VISUAL_PATTERNS = [
 ];
 // Mirrors the vitest coverage `include` set so the coverage gate runs whenever a
 // measured source file (or any test/config that affects it) changes.
+// Deployment/review domains are independent; these classifications are additive
+// to the existing required test, security, KiCad, coverage and release gates.
+const SHARED_RUNTIME_PATTERNS = [
+  /^\.github\/workflows\//,
+  /^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|toolchain\.json|\.nvmrc)$/,
+  /^scripts\//,
+  /^vitest(?:\.cloud)?\.config\.[cm]?ts$/,
+];
+const ENGINE_DOMAIN_PATTERNS = [
+  /^src\//,
+  /^tests\/(?:unit\/(?:core|rules|kicad|report|cli|multicad|bom|pinmap)\/|fixtures\/projects\/|benchmark\/)/,
+];
+const CLOUD_DOMAIN_PATTERNS = [
+  /^apps\/web\//,
+  /^packages\/(?:cloud-core|db|contracts)\//,
+  /^deploy\//,
+  /^tests\/(?:integration\/|e2e\/|unit\/(?:web|db|cloud)\/)/,
+  /^src\/report\//,
+];
+const INTEGRATIONS_DOMAIN_PATTERNS = [
+  /^packages\/(?:mcp-server|plugin-sdk)\//,
+  /^src\/(?:action|runner)\//,
+  /^tests\/(?:action\/|unit\/(?:action|runner|mcp)\/)/,
+  /^examples\/plugin-/,
+  /^action\.yml$/,
+];
+
 const COVERAGE_PATTERNS = [
   /^src\/(core|rules|bom|pinmap|report|kicad|notifiers)\//,
   /^src\/action\/inputs\.ts$/,
@@ -179,6 +206,12 @@ export function classifyChangedFiles(files, options = {}) {
   const reportChanged = forceFull || changedFiles.some((file) => matchesAny(file, REPORT_PATTERNS));
   const webUiChanged = forceFull || changedFiles.some((file) => matchesAny(file, WEB_UI_PATTERNS));
 
+  const sharedRuntimeChanged = forceFull || changedFiles.some((file) => matchesAny(file, SHARED_RUNTIME_PATTERNS));
+  const engineChanged = sharedRuntimeChanged || changedFiles.some((file) => matchesAny(file, ENGINE_DOMAIN_PATTERNS));
+  const cloudChanged = sharedRuntimeChanged || changedFiles.some((file) => matchesAny(file, CLOUD_DOMAIN_PATTERNS));
+  const integrationsChanged =
+    sharedRuntimeChanged || changedFiles.some((file) => matchesAny(file, INTEGRATIONS_DOMAIN_PATTERNS));
+
   const docsOnly = hasChanges && !forceFull && changedFiles.every(isDocsOnlyFile);
   const codeChanged =
     forceFull ||
@@ -192,6 +225,12 @@ export function classifyChangedFiles(files, options = {}) {
     changedFiles.some((file) => file.startsWith("src/core/") || file === "scripts/check-mutation-thresholds.mjs");
 
   return {
+    // Domain indicators inform release ownership and target one non-required
+    // Windows web packaging job; no required CI context uses them to turn off a gate.
+    domain_engine: engineChanged,
+    domain_cloud: cloudChanged,
+    domain_integrations: integrationsChanged,
+    needs_web_standalone: cloudChanged,
     changed_files: changedFiles.join(","),
     docs_only: docsOnly,
     code_changed: codeChanged,
@@ -260,6 +299,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     "",
     `Changed files: ${profile.changed_files || "(none)"}`,
     `Docs only: ${profile.docs_only}`,
+    `Engine/CLI changed: ${profile.domain_engine}`,
+    `Cloud/control plane changed: ${profile.domain_cloud}`,
+    `Integrations/SDK changed: ${profile.domain_integrations}`,
+    `Needs Windows web standalone: ${profile.needs_web_standalone}`,
     `Needs unit matrix: ${profile.needs_unit_matrix}`,
     `Needs integration: ${profile.needs_integration}`,
     `Needs KiCad CLI: ${profile.needs_kicad}`,
