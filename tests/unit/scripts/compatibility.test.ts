@@ -407,6 +407,11 @@ describe("compatibility matrix", () => {
     const config = yaml.load(await readFile("docs/compatibility.yaml", "utf8")) as CompatibilityConfig;
     const workflow = yaml.load(await readFile(".github/workflows/ci.yml", "utf8")) as Workflow;
     const integration = workflow.jobs?.["test-int"];
+    const unitMatrix = workflow.jobs?.["test-unit-matrix"]?.strategy?.matrix as
+      | { "node-version"?: number[]; os?: string[] }
+      | undefined;
+    expect(unitMatrix?.["node-version"]).toEqual([24]);
+    expect(unitMatrix?.os).toEqual(["ubuntu-24.04", "windows-2025-vs2026", "macos-latest"]);
     const crossPlatform = workflow.jobs?.["cross-platform-paths"];
     const lintRuns = (workflow.jobs?.lint?.steps ?? []).map((step) => step.run ?? "").join("\n");
     const integrationRuns = (integration?.steps ?? []).map((step) => step.run ?? "").join("\n");
