@@ -75,11 +75,10 @@ describe("compatibility matrix", () => {
       node: { preferred: string; engines: string; supportedMajors: number[] };
     };
 
-    expect(config.node.minimumVersion).toBe("22.14.0");
-    expect(config.node.supported).toEqual(["22", "24"]);
+    expect(config.node.minimumVersion).toBe("24.0.0");
+    expect(config.node.supported).toEqual(["24"]);
     expect(config.node.current).toEqual(["26"]);
     expect(config.node.tested).toEqual({
-      "22": "22.23.4",
       "24": "24.22.1",
     });
     const verifiedNodeSource = config.source_checked as typeof config.source_checked & {
@@ -87,8 +86,8 @@ describe("compatibility matrix", () => {
     };
     expect(verifiedNodeSource.node.checkedAt).toBe("2026-10-27");
     expect(toolchain.node.preferred).toBe("24.22.1");
-    expect(toolchain.node.engines).toBe("^22.14.0 || ^24.0.0");
-    expect(toolchain.node.supportedMajors).toEqual([22, 24]);
+    expect(toolchain.node.engines).toBe("^24.0.0");
+    expect(toolchain.node.supportedMajors).toEqual([24]);
     expect(config.node.tested?.["24"]).toBe(toolchain.node.preferred);
   });
 
@@ -103,8 +102,8 @@ describe("compatibility matrix", () => {
     expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line | 10.0.7 |");
     expect(supportMatrix).not.toContain("| KiCad | 9.1 | Supported |");
     expect(supportMatrix).not.toContain("| KiCad | 10.1 | Supported |");
-    expect(supportMatrix).toContain("| Node.js | 22 | Minimum supported runtime |");
-    expect(supportMatrix).toContain("| Node.js | 24 | Recommended LTS runtime |");
+    expect(supportMatrix).not.toContain("| Node.js | 22 |");
+    expect(supportMatrix).toContain("| Node.js | 24 | Minimum supported and recommended LTS runtime |");
     expect(supportMatrix).toContain("| Node.js | 26 | Current, not supported |");
     expect(supportMatrix).toContain("| CycloneDX JSON | 1.7 | Pinned HBOM contract |");
     expect(config.cyclonedx.schemaUrl).toBe("https://cyclonedx.org/schema/bom-1.7.schema.json");
@@ -419,18 +418,13 @@ describe("compatibility matrix", () => {
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
-        "node-version": 22,
-        "postgres-version": "16",
-        "postgres-image": "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
-      },
-      {
-        "kicad-version": "10.0",
-        "kicad-ppa-series": "10.0",
         "node-version": 24,
         "postgres-version": "17",
         "postgres-image": "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
       },
     ]);
+    expect(integration?.strategy?.matrix?.include).toHaveLength(1);
+    expect(integrationRuns).not.toContain("Install PostgreSQL 16 client");
     expect(integration?.env?.DATABASE_URL).toBe("postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test");
     expect(integration?.services?.postgres).toMatchObject({
       image: "${" + "{ matrix.postgres-image }}",
@@ -477,7 +471,7 @@ describe("compatibility matrix", () => {
     expect(config.source_checked.date).toBe("2026-10-12");
     expect(config.source_checked.kicad.release).toBe("https://www.kicad.org/blog/2026/10/KiCad-10.0.7-Release/");
     expect(config.kicad.latestVerified).toBe("10.0.7");
-    expect(config.node.supported).toEqual(["22", "24"]);
+    expect(config.node.supported).toEqual(["24"]);
     expect(config.node.current).toEqual(["26"]);
     expect(crossPlatform?.strategy?.matrix?.os).toEqual(["ubuntu-24.04", "macos-latest", "windows-2025-vs2026"]);
     expect(lintRuns).toContain("pnpm run compatibility:check");
@@ -494,7 +488,7 @@ describe("compatibility matrix", () => {
     const dockerfile = await readFile("apps/container/Dockerfile", "utf8");
     const toolchain = JSON.parse(await readFile("toolchain.json", "utf8")) as { node: { preferred: string } };
 
-    expect(packageJson.engines?.node).toBe("^22.14.0 || ^24.0.0");
+    expect(packageJson.engines?.node).toBe("^24.0.0");
     expect(packageJson.engines?.node).not.toContain("26");
     expect(toolchain.node.preferred.split(".")[0]).toBe(config.node.recommended);
     expect(binaryWorkflow.env?.NODE_VERSION).toBe(toolchain.node.preferred);
@@ -502,7 +496,7 @@ describe("compatibility matrix", () => {
     expect(containerWorkflow.env?.KICAD_PPA_SERIES).toBe(config.kicad.recommended);
     expect(dockerfile).toContain(`ARG NODE_VERSION=${config.node.tested?.[config.node.recommended]}`);
     expect(dockerfile).toContain(`ARG KICAD_PPA_SERIES=${config.kicad.recommended}`);
-    expect(readme).toContain("Node.js 22.14+ and 24");
+    expect(readme).toContain("Node.js 24 LTS only");
     expect(readme).toMatch(/Node\.js 26\s+Current is tracked but not supported/);
     expect(readme).toContain("CI-tested on KiCad 10.0");
     expect(readme).toMatch(/10\.0\.6 as the latest\s+verified patch/);

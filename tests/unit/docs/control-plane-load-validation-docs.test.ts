@@ -65,7 +65,7 @@ describe("control-plane load validation documentation", () => {
     expect(workflow).toContain("BOARDREADYOPS_LOAD_WORKER_FLEET_SIZE");
     expect(workflow).toContain("github-api-interruption");
     expect(workflow).toContain("BOARDREADYOPS_LOAD_PROFILE");
-    expect(workflow).toContain("postgres:16-alpine");
+    expect(workflow).toContain("postgres:17-alpine");
     expect(workflow).toContain("POSTGRES_HOST_AUTH_METHOD: trust");
     expect(workflow).toContain("pnpm install --frozen-lockfile --ignore-scripts");
     expect(workflow).toContain("BOARDREADYOPS_LOAD_REPORT_PATH: control-plane-load-report.json");
@@ -75,7 +75,7 @@ describe("control-plane load validation documentation", () => {
 
     expect(scaleWorkflow).toContain("workflow_dispatch:");
     expect(scaleWorkflow).toContain("preset: [baseline, medium, high]");
-    expect(scaleWorkflow).toContain("postgres:16-alpine");
+    expect(scaleWorkflow).toContain("postgres:17-alpine");
     expect(scaleWorkflow).toContain("control-plane-scale-envelope.mjs env");
     expect(scaleWorkflow).toContain("control-plane-scale-envelope.mjs summarize");
     expect(scaleWorkflow).toContain("actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c");

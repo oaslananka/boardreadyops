@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "node": {
     "preferred": "24.22.1",
-    "engines": "^22.14.0 || ^24.0.0",
-    "supportedMajors": [22, 24]
+    "engines": "^24.0.0",
+    "supportedMajors": [24]
   },
   "pnpm": {
     "version": "11.11.0"

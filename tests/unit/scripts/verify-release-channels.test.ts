@@ -17,11 +17,11 @@ const binaryDigests = {
 function healthySnapshot(overrides: Record<string, unknown> = {}) {
   return {
     version,
-    expectedNodeEngines: "^22.14.0 || ^24.0.0",
+    expectedNodeEngines: "^24.0.0",
     npm: {
       version,
       latest: version,
-      engines: "^22.14.0 || ^24.0.0",
+      engines: "^24.0.0",
     },
     release: {
       tag: `v${version}`,

@@ -91,7 +91,7 @@ describe("container action release surfaces", () => {
     const workflowNodeMajor = Number(requireMatch(workflow, /^\s+NODE_VERSION: "(\d+)\./m));
     const engineRange = packageJson.engines?.node ?? "";
 
-    expect(engineRange).toBe("^22.14.0 || ^24.0.0");
+    expect(engineRange).toBe("^24.0.0");
     expect(workflowNodeMajor).toBe(dockerNodeMajor);
     expect(engineAllowsMajor(engineRange, dockerNodeMajor)).toBe(true);
     expect(engineAllowsMajor(engineRange, 24)).toBe(true);
