@@ -202,7 +202,7 @@ describe("hosted read-only MCP finding pages", () => {
         noncanonical,
         principal,
         reviewId,
-        (cursor ?? "") + "=",
+        `${cursor ?? ""}=`,
         vi.fn().mockResolvedValue(true),
       ),
     ).toBeNull();
