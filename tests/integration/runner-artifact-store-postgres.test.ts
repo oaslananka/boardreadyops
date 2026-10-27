@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { connect, createServer, type Socket } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -285,6 +286,101 @@ async function persistRealDraftArtifact(
   return artifactId;
 }
 
+/**
+ * Drop an actual PostgreSQL TCP response *after* ReadyForQuery confirms that
+ * the finalization statement has completed. Unlike throwing from a query
+ * wrapper, this exercises the pg driver's real lost-acknowledgement behavior.
+ *
+ * Only accept a loopback disposable database; never proxy a shared/remote DB.
+ */
+async function startLostFinalizationReplyProxy(databaseUrl: string) {
+  const target = new URL(databaseUrl);
+  if (target.hostname !== "127.0.0.1" || !target.port) {
+    throw new Error("lost-reply integration test requires a disposable loopback PostgreSQL endpoint");
+  }
+
+  let droppedReply = false;
+  const sockets = new Set<Socket>();
+  const queryMarker = Buffer.from("boardreadyops_complete_artifact_upload");
+  const server = createServer((client) => {
+    const postgres = connect(Number(target.port), target.hostname);
+    sockets.add(client);
+    sockets.add(postgres);
+    let armed = false;
+    let sentTail = Buffer.alloc(0);
+    let buffered = Buffer.alloc(0);
+
+    client.on("data", (chunk: Buffer) => {
+      // Preserve the marker across TCP packet boundaries without storing
+      // request secrets or recording their values in test output.
+      const sent = Buffer.concat([sentTail, chunk]);
+      if (sent.includes(queryMarker)) armed = true;
+      sentTail = sent.subarray(-(queryMarker.length - 1));
+      if (!postgres.destroyed) postgres.write(chunk);
+    });
+    postgres.on("data", (chunk: Buffer) => {
+      buffered = Buffer.concat([buffered, chunk]);
+      // PostgreSQL backend messages: one type byte, length (including the
+      // length word), and payload. The final Z/ReadyForQuery follows commit.
+      while (buffered.length >= 5) {
+        const length = buffered.readUInt32BE(1);
+        if (length < 4 || length > 16 * 1024 * 1024) {
+          client.destroy();
+          postgres.destroy();
+          return;
+        }
+        const total = length + 1;
+        if (buffered.length < total) break;
+        const packet = buffered.subarray(0, total);
+        buffered = buffered.subarray(total);
+        if (armed) {
+          // Withhold the complete result, including command completion.
+          // Destroy the real socket only after PostgreSQL reports readiness.
+          if (packet[0] === 90) {
+            droppedReply = true;
+            client.destroy();
+            postgres.destroy();
+            return;
+          }
+          continue;
+        }
+        client.write(packet);
+      }
+    });
+    client.on("error", () => postgres.destroy());
+    postgres.on("error", () => client.destroy());
+    client.on("close", () => {
+      sockets.delete(client);
+      postgres.destroy();
+    });
+    postgres.on("close", () => {
+      sockets.delete(postgres);
+      client.destroy();
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("PostgreSQL test proxy has no TCP address");
+  const proxyUrl = new URL(databaseUrl);
+  proxyUrl.hostname = "127.0.0.1";
+  proxyUrl.port = String(address.port);
+  return {
+    connectionString: proxyUrl.toString(),
+    droppedReply: () => droppedReply,
+    async close() {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    },
+  };
+}
+
 describeDatabase("runner artifact capability PostgreSQL store", () => {
   it("issues digest-only capabilities and completes an artifact exactly once", async () => {
     const fixture = await setup("artifact-test-complete");
@@ -506,6 +602,101 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       }
     },
   );
+
+  it("keeps a committed artifact when a real PostgreSQL TCP acknowledgement is lost", async () => {
+    if (!connectionString) throw new Error("disposable PostgreSQL is required");
+    const fixture = await setup(`artifact-test-tcp-lost-ack-${randomUUID().slice(0, 8)}`);
+    const artifactId = randomUUID();
+    const uploadToken = token(`tcp-lost-ack-${artifactId}`);
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "bro-upload-tcp-lost-ack-"));
+    const proxy = await startLostFinalizationReplyProxy(connectionString);
+    const interruptedExecutor = createPgQueryExecutor({ connectionString: proxy.connectionString, max: 1 });
+    try {
+      const issued = await createSqlRunnerArtifactStore(requireExecutor(), {
+        now: () => at(fixture.base, 10),
+        id: () => artifactId,
+        uploadToken: () => uploadToken,
+      }).issueCapabilities({
+        workerClass: "managed",
+        managedRunnerIdentityId: fixture.managedIdentityId,
+        requestTimestamp: requestTimestamp(at(fixture.base, 10)),
+        requestNonce: nonce(`tcp-lost-ack-${artifactId}`),
+        runId: fixture.runId,
+        executionAttemptId: fixture.attemptId,
+        leaseId: fixture.leaseId,
+        leaseToken: fixture.leaseToken,
+        artifacts: [
+          {
+            kind: "report",
+            name: "report.json",
+            role: "machine",
+            bytes: 5,
+            sha256: fingerprint("hello"),
+            contentType: "application/json",
+          },
+        ],
+      });
+      expect(issued.status).toBe("accepted");
+
+      const response = await handleRunnerArtifactUploadRequest(
+        new Request(`https://boardreadyops.test/upload?cap=${uploadToken}`, {
+          method: "PUT",
+          body: "hello",
+        }),
+        artifactId,
+        {
+          environment: { ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot },
+          now: () => at(fixture.base, 20),
+          queryExecutor: requireExecutor,
+          createArtifactStore: (database) =>
+            createSqlRunnerArtifactStore(
+              {
+                ...database,
+                query: (sql, params = []) =>
+                  sql.includes("boardreadyops_complete_artifact_upload")
+                    ? interruptedExecutor.query(sql, params)
+                    : database.query(sql, params),
+              },
+              { now: () => at(fixture.base, 20) },
+            ),
+        },
+      );
+
+      expect(proxy.droppedReply()).toBe(true);
+      expect(response.status).toBe(503);
+      const record = rows(
+        await requireExecutor().query(
+          "select a.id, a.storage_path, a.sha256, c.status from artifacts a join runner_artifact_upload_capabilities c on c.artifact_id = a.id where a.id = $1",
+          [artifactId],
+        ),
+      )[0];
+      expect(record).toMatchObject({ id: artifactId, sha256: fingerprint("hello"), status: "uploaded" });
+      const finalFile = path.join(storageRoot, String(record?.storage_path));
+      expect(await readFile(finalFile, "utf8")).toBe("hello");
+
+      const retry = await handleRunnerArtifactUploadRequest(
+        new Request(`https://boardreadyops.test/upload?cap=${uploadToken}`, {
+          method: "PUT",
+          body: "hello",
+        }),
+        artifactId,
+        {
+          environment: { ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot },
+          now: () => at(fixture.base, 25),
+          queryExecutor: requireExecutor,
+          createArtifactStore: (database) =>
+            createSqlRunnerArtifactStore(database, { now: () => at(fixture.base, 25) }),
+        },
+      );
+      expect(retry.status).toBe(409);
+      expect(await readFile(finalFile, "utf8")).toBe("hello");
+    } finally {
+      await interruptedExecutor.close();
+      await proxy.close();
+      await cleanupTenant(fixture.tenant, fixture.managedIdentityId);
+      await rm(storageRoot, { recursive: true, force: true });
+    }
+  });
 
   it("persists a real KiCad draft through HTTP and PostgreSQL without enabling fabrication delivery", async (context) => {
     const cli = await detectKicadCli();
