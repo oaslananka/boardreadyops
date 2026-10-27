@@ -131,6 +131,8 @@ const SHARED_RUNTIME_PATTERNS = [
   /^\.github\/workflows\//,
   /^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|toolchain\.json|\.nvmrc)$/,
   /^scripts\//,
+  // The cloud TypeScript project extends the root configuration.
+  /^tsconfig(?:\.[^/]+)?\.json$/,
   /^vitest(?:\.cloud)?\.config\.[cm]?ts$/,
 ];
 const ENGINE_DOMAIN_PATTERNS = [

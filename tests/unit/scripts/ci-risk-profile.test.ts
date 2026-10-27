@@ -255,6 +255,8 @@ describe("ci-risk-profile", () => {
       "package.json",
       "pnpm-lock.yaml",
       "toolchain.json",
+      "tsconfig.json",
+      "tsconfig.build.json",
       ".github/workflows/ci.yml",
       ".github/workflows/benchmark.yml",
       "scripts/ci-risk-profile.mjs",
@@ -327,6 +329,9 @@ describe("ci-risk-profile", () => {
     expect(bench).toContain("      - main");
     expect(bench).toContain("node-version-file: .nvmrc");
     expect(bench).toContain("Benchmark / informational");
+    expect(bench).toContain("shell: bash");
+    expect(bench).toContain("set -euo pipefail");
+    expect(bench).toContain("pnpm run benchmark | tee benchmark.txt");
   });
 
   it("rejects changed-file list paths that escape the repository root", async () => {

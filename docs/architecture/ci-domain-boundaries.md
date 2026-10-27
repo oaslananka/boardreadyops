@@ -10,8 +10,8 @@ the signed CLI/runner and hosted evidence contracts.
 | Cloud/control plane | `apps/web/`, `packages/cloud-core/`, `packages/db/`, `packages/contracts/`, `deploy/` | Independent protected cloud deployment and database acceptance |
 | Integrations/SDK | `packages/mcp-server/`, `packages/plugin-sdk/`, `src/action/` and `src/runner/` | Explicit package/API compatibility and protocol validation |
 
-Shared dependency, workflow and toolchain changes conservatively mark **all
-three** domains. Some files legitimately affect more than one domain. The
+Shared dependency, workflow, root TypeScript configuration and toolchain changes
+conservatively mark **all three** domains. Some files legitimately affect more than one domain. The
 `ci / risk-profile` step outputs `domain_engine`, `domain_cloud` and
 `domain_integrations` so PR owners can see the impacted surfaces.
 
@@ -38,6 +38,8 @@ gate, which is not part of this repository's free-only infrastructure.
 benchmarks: push to `main`, manual dispatch, and targeted PRs changing
 engine/benchmark/runtime input. Results are stored as short-lived artifacts
 for inspection **without claiming stable cross-runner regression thresholds**.
+The benchmark command uses Bash \`pipefail\` so unsuccessful measurements remain
+failed checks even when output is captured via \`tee\`.
 No new runner, subscription, secret or release privilege is introduced.
 
 Removing the workflow and its plugin prevents future repository-originated
