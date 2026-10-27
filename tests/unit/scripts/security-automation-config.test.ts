@@ -648,7 +648,7 @@ describe("dependency and security automation configuration", () => {
       "'ip-address@<10.7.4':",
       "'next@<16.4.1':",
       "'undici@>=8.0.0 <8.11.0':",
-      "'qs@>=6.11.1 <6.16.0':",
+      "'qs@>=6.7.0 <6.16.1':",
       "js-yaml@>=4 <4.3.2:",
       "linkify-it@>=5 <5.0.2:",
       "ws@>=8 <8.21.1:",
