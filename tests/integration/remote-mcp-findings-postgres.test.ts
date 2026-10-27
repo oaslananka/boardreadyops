@@ -133,6 +133,27 @@ describePg("live-authorized MCP finding pagination against PostgreSQL", () => {
     expect(exported).not.toContain("private.legacy");
   });
 
+  it("rejects revision-supplied commit metadata that disagrees with the authoritative run", async () => {
+    const checkLive = vi.fn().mockResolvedValue(true);
+    await executor().query("update review_revisions set head_commit_sha = $1 where id = $2", [
+      "c".repeat(40),
+      revisionId,
+    ]);
+    try {
+      const page = await loadAuthorizedRemoteFindings(executor(), principal, reviewId, undefined, checkLive);
+      expect(page).toBeNull();
+      expect(checkLive).toHaveBeenCalledOnce();
+    } finally {
+      await executor().query("update review_revisions set head_commit_sha = $1 where id = $2", [
+        "a".repeat(40),
+        revisionId,
+      ]);
+    }
+    expect(
+      await loadAuthorizedRemoteFindings(executor(), principal, reviewId, undefined, vi.fn().mockResolvedValue(true)),
+    ).not.toBeNull();
+  });
+
   it("denies a revoked user before querying the finding table", async () => {
     const denied = await loadAuthorizedRemoteFindings(
       executor(),

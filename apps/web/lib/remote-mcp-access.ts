@@ -210,10 +210,17 @@ export async function loadAuthorizedRemoteReviewSnapshot(
   if (!permitted) return null;
 
   const revision = await db.query(
-    `select head_commit_sha, evidence_digest from review_revisions
-      where id = $1 and review_id = $2 and head_run_id = $3
+    `select review_revisions.head_commit_sha, review_revisions.evidence_digest
+       from review_revisions
+       join release_runs as revision_head_run
+         on revision_head_run.id = review_revisions.head_run_id
+        and revision_head_run.repository_id = $4
+        and revision_head_run.commit_sha = review_revisions.head_commit_sha
+      where review_revisions.id = $1
+        and review_revisions.review_id = $2
+        and review_revisions.head_run_id = $3
       limit 1`,
-    [row.current_revision_id, row.id, row.head_run_id],
+    [row.current_revision_id, row.id, row.head_run_id, row.repository_id],
   );
   const current = ((revision as { rows?: AuthorizedRevisionRow[] }).rows ?? [])[0];
   if (!current) return null;
