@@ -30,6 +30,10 @@ jobs:
       needs_typecheck: ${{ steps.classify.outputs.needs_typecheck }}
       needs_unit: ${{ steps.classify.outputs.needs_unit }}
       needs_unit_matrix: ${{ steps.classify.outputs.needs_unit_matrix }}
+      domain_engine: ${{ steps.classify.outputs.domain_engine }}
+      domain_cloud: ${{ steps.classify.outputs.domain_cloud }}
+      domain_integrations: ${{ steps.classify.outputs.domain_integrations }}
+      needs_web_standalone: ${{ steps.classify.outputs.needs_web_standalone }}
       needs_integration: ${{ steps.classify.outputs.needs_integration }}
       needs_kicad: ${{ steps.classify.outputs.needs_kicad }}
       needs_cross_platform: ${{ steps.classify.outputs.needs_cross_platform }}
@@ -702,7 +706,9 @@ jobs:
       - run: pnpm run build
         if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
       - name: Build cloud application
-        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
+        # CLI/engine-only changes are still built by the required job above.
+        # Cloud and shared-runtime changes retain full cloud build acceptance.
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' && needs.risk-profile.outputs.needs_web_standalone == 'true' }}
         run: pnpm run cloud:build
       - name: Upload Codecov bundle analysis
         if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
@@ -714,7 +720,7 @@ jobs:
   web-standalone-windows:
     needs: risk-profile
     if: >-
-      (needs.risk-profile.outputs.needs_build == 'true' || needs.risk-profile.outputs.needs_integration == 'true')
+      needs.risk-profile.outputs.needs_web_standalone == 'true'
     name: ci / web-standalone-windows
     runs-on: windows-2025-vs2026
     timeout-minutes: 20
