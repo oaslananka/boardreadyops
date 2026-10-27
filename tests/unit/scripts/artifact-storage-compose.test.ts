@@ -28,7 +28,7 @@ describe("local artifact storage deployment boundary", () => {
   });
 
   it("seeds new volume ownership for unprivileged node before changing USER", () => {
-    const install = "RUN install -d -o node -g node -m 0700 /data/artifacts";
+    const install = "install -d -o node -g node -m 0700 /data/artifacts";
     const installAt = dockerfile.indexOf(install);
     const runtimeUserAt = dockerfile.indexOf("\nUSER node\n");
     expect(installAt).toBeGreaterThan(-1);

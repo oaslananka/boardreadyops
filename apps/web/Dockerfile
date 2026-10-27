@@ -1,4 +1,5 @@
-FROM node:24.22.1-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS base
+# Node 24.22.1-slim (digest-pinned); both runtime stages use the same immutable image.
+FROM node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
@@ -21,7 +22,7 @@ FROM deps AS build
 COPY . .
 RUN pnpm --filter @boardreadyops/web build
 
-FROM node:24.22.1-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS runner
+FROM node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS runner
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG VERSION=dev
@@ -55,11 +56,10 @@ COPY --chown=node:node --from=build /app/apps/web/.next/worker.mjs ./worker.mjs
 COPY --chown=node:node --from=build /app/apps/web/.next/migrate.mjs ./migrate.mjs
 COPY --chown=node:node --from=build /app/apps/web/public ./apps/web/public
 COPY apps/web/docker-entrypoint.sh /usr/local/bin/boardreadyops-entrypoint
-RUN chmod 0755 /usr/local/bin/boardreadyops-entrypoint
-# Docker copies this directory's ownership and mode into a *new* named volume.
-# Keep the runtime as the unprivileged node user; existing volumes need a
-# separately authorized operator-owned permission reconciliation.
-RUN install -d -o node -g node -m 0700 /data/artifacts
+# A fresh named volume inherits the artifact directory's unprivileged owner.
+# Existing data/permissions require separately authorized operator validation.
+RUN chmod 0755 /usr/local/bin/boardreadyops-entrypoint \
+    && install -d -o node -g node -m 0700 /data/artifacts
 
 USER node
 
