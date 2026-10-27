@@ -316,7 +316,7 @@ describe("ci-risk-profile", () => {
       if (name === "security / gate") continue; // independent security workflow owns this gate
       expect(ci).toContain(`name: ${name}`);
     }
-    expect(ci).toContain("needs_web_standalone: ${{ steps.classify.outputs.needs_web_standalone }}");
+    expect(ci).toContain(`needs_web_standalone: \${{ steps.classify.outputs.needs_web_standalone }}`);
     expect(ci).toContain("needs.risk-profile.outputs.needs_web_standalone == 'true'");
     expect(ci).toContain(
       "needs.risk-profile.outputs.needs_build == 'true' && needs.risk-profile.outputs.needs_web_standalone == 'true'",
