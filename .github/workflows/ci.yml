@@ -17,7 +17,7 @@ permissions:
 env:
   ALLOW_MAJOR_RELEASE: "true"
   DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain
-  NODE_VERSION: "24.21.0"
+  NODE_VERSION: "24.22.1"
   UV_VERSION: "0.11.16"
 
 jobs:
@@ -30,6 +30,10 @@ jobs:
       needs_typecheck: ${{ steps.classify.outputs.needs_typecheck }}
       needs_unit: ${{ steps.classify.outputs.needs_unit }}
       needs_unit_matrix: ${{ steps.classify.outputs.needs_unit_matrix }}
+      domain_engine: ${{ steps.classify.outputs.domain_engine }}
+      domain_cloud: ${{ steps.classify.outputs.domain_cloud }}
+      domain_integrations: ${{ steps.classify.outputs.domain_integrations }}
+      needs_web_standalone: ${{ steps.classify.outputs.needs_web_standalone }}
       needs_integration: ${{ steps.classify.outputs.needs_integration }}
       needs_kicad: ${{ steps.classify.outputs.needs_kicad }}
       needs_cross_platform: ${{ steps.classify.outputs.needs_cross_platform }}
@@ -252,7 +256,6 @@ jobs:
           - windows-2025-vs2026
           - macos-latest
         node-version:
-          - 22
           - 24
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -325,11 +328,6 @@ jobs:
         include:
           - kicad-version: "10.0"
             kicad-ppa-series: "10.0"
-            node-version: 22
-            postgres-version: "16"
-            postgres-image: "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
-          - kicad-version: "10.0"
-            kicad-ppa-series: "10.0"
             node-version: 24
             postgres-version: "17"
             postgres-image: "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
@@ -343,18 +341,14 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
-      # Only production's Node 24/PG 17 lane installs KiCad when required.
-      # PG-backed billing PRs still exercise Node 22/24 and PostgreSQL 16/17
-      # without a dependency on Launchpad KiCad package availability.
+      # Single supported Node 24 / PostgreSQL 17 lane; install real KiCad
+      # only when required by the existing fail-closed PR risk classifier.
       - name: Install KiCad ${{ matrix.kicad-version }}
         if: ${{ needs.risk-profile.outputs.needs_kicad == 'true' && matrix.node-version == 24 && matrix.postgres-version == '17' }}
         env:
           BRO_KICAD_VERSION: ${{ matrix.kicad-version }}
           BRO_KICAD_PPA_SERIES: ${{ matrix.kicad-ppa-series }}
         run: bash scripts/install-kicad-ci.sh
-      - name: Install PostgreSQL 16 client
-        if: matrix.postgres-version == '16'
-        run: sudo apt-get install --yes postgresql-client
       - name: Prepare PostgreSQL 17 client wrappers
         if: matrix.postgres-version == '17'
         shell: bash
@@ -702,7 +696,9 @@ jobs:
       - run: pnpm run build
         if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
       - name: Build cloud application
-        if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
+        # CLI/engine-only changes are still built by the required job above.
+        # Cloud and shared-runtime changes retain full cloud build acceptance.
+        if: ${{ needs.risk-profile.outputs.needs_build == 'true' && needs.risk-profile.outputs.needs_web_standalone == 'true' }}
         run: pnpm run cloud:build
       - name: Upload Codecov bundle analysis
         if: ${{ needs.risk-profile.outputs.needs_build == 'true' }}
@@ -714,7 +710,7 @@ jobs:
   web-standalone-windows:
     needs: risk-profile
     if: >-
-      (needs.risk-profile.outputs.needs_build == 'true' || needs.risk-profile.outputs.needs_integration == 'true')
+      needs.risk-profile.outputs.needs_web_standalone == 'true'
     name: ci / web-standalone-windows
     runs-on: windows-2025-vs2026
     timeout-minutes: 20

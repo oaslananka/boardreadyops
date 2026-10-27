@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { type CliRunner, createCliRunner } from "./cli-runner.ts";
-import { runCheckTool, runPlanTool, runVerifyBundleTool, type ToolResult } from "./tools.ts";
+import { runCheckTool, runFootprintSummaryTool, runPlanTool, runVerifyBundleTool, type ToolResult } from "./tools.ts";
 
 const failOnShape = z.enum(["critical", "high", "medium", "low", "never"]).optional();
 
@@ -48,6 +48,22 @@ export function createBoardReadyOpsMcpServer(runCli: CliRunner = createCliRunner
       },
     },
     async (input) => toolResponse(await runPlanTool(input, runCli)),
+  );
+
+  server.registerTool(
+    "boardreadyops_footprint_summary",
+    {
+      description:
+        "Compare two committed KiCad PCB revisions offline; return only verified footprint change counts and source digests, not CAD source, object placements, or a fabrication verdict.",
+      inputSchema: {
+        path: z.string().optional().describe("Local Git repository checkout (defaults to current directory)."),
+        base: z.string().min(1).describe("Base Git ref resolved inside the checkout."),
+        head: z.string().min(1).describe("Head Git ref resolved inside the checkout."),
+        pcb: z.string().min(1).describe("Tracked repository-relative .kicad_pcb path."),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    },
+    async (input) => toolResponse(await runFootprintSummaryTool(input, runCli)),
   );
 
   server.registerTool(

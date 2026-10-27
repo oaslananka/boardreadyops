@@ -282,7 +282,7 @@ describe("dependency and security automation configuration", () => {
     const ubuntuMatch = new RegExp(ubuntuManager?.matchStrings?.[0] ?? "(?!)", "u").exec(actionDockerfilePin);
     expect(ubuntuMatch?.groups).toMatchObject({
       currentValue: "26.04",
-      currentDigest: "sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7",
+      currentDigest: "sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944",
     });
     expect(ubuntuManager?.autoReplaceStringTemplate).toBe(
       "# renovate: datasource=docker depName=ubuntu currentValue={{{newValue}}}\nFROM ubuntu@{{{newDigest}}}",
@@ -648,7 +648,7 @@ describe("dependency and security automation configuration", () => {
       "'ip-address@<10.7.4':",
       "'next@<16.4.1':",
       "'undici@>=8.0.0 <8.11.0':",
-      "'qs@>=6.11.1 <6.16.0':",
+      "'qs@>=6.7.0 <6.16.1':",
       "js-yaml@>=4 <4.3.2:",
       "linkify-it@>=5 <5.0.2:",
       "ws@>=8 <8.21.1:",

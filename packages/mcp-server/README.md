@@ -25,6 +25,14 @@ running the same command by hand.
 | `boardreadyops_check` | `boardreadyops check --format json` | `path?`, `config?`, `failOn?` |
 | `boardreadyops_plan` | `boardreadyops plan` | `path?`, `config?`, `failOn?` |
 | `boardreadyops_verify_bundle` | `boardreadyops release verify --format json` | `bundleDir`, `trustedKey?` |
+| `boardreadyops_footprint_summary` | `boardreadyops review footprint-diff --format summary-json` | `path?`, `base`, `head`, `pcb` |
+
+`boardreadyops_footprint_summary` reads **two immutable local Git revisions**. It returns only
+verified footprint change counts, source hashes and commit/blob identities: **no KiCad source,
+per-footprint data, exact positions, electrical risk or production decision**. If the source is
+unavailable/ambiguous, the tool preserves the CLI's `status: "unavailable"` result rather than
+filling gaps. You must specify the repository-relative tracked `.kicad_pcb` path explicitly.
+This is a **local stdio MCP tool**, not a remote cloud endpoint.
 
 Each tool returns `{ ok: true, result: <parsed CLI JSON output> }` on success, or
 `{ ok: false, error: string, exitCode: number }` when the underlying CLI invocation itself failed
@@ -35,18 +43,35 @@ CLI's own JSON output.
 
 ## Usage
 
-Configure your MCP client to run:
+**Current source-checkout setup:** The `@boardreadyops/mcp-server` package has **not**
+been confirmed published to npm. Do not use `npx -y @boardreadyops/mcp-server` until a
+verified release exists. For local use, clone the project, run `corepack pnpm install
+--frozen-lockfile` and `corepack pnpm run build`, then configure an MCP-capable editor
+or Claude Desktop to launch the checked-in entrypoint:
 
 ```json
 {
   "mcpServers": {
     "boardreadyops": {
-      "command": "npx",
-      "args": ["-y", "@boardreadyops/mcp-server"]
+      "command": "node",
+      "args": ["/absolute/path/to/boardreadyops/packages/mcp-server/bin/boardreadyops-mcp.js"]
     }
   }
 }
 ```
+
+Use the actual absolute repository path on your computer; the source checkout must keep its
+installed dependencies. This is a **local** MCP connection, not a Claude.ai web connector.
+Remote ChatGPT and Claude.ai integrations require a separately deployed, authenticated HTTPS
+MCP service.
+
+## Next integration phase
+
+The proposed ChatGPT / Claude integration will reuse this deterministic tool layer and the
+existing hosted Review contracts. Its **remote MCP** and **interactive MCP Apps UI** must first
+pass the per-tenant OAuth authorization, private-design IP minimization, and hosted evidence
+security gates described in [the integration plan](../../docs/integrations/boardreadyops-agent-app.md).
+Neither a public remote MCP URL nor a published ChatGPT App is shipped in this package today.
 
 ## What's not here yet
 

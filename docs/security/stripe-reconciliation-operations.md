@@ -103,8 +103,9 @@ then re-enable only that single row within a controlled transaction. Never
 blindly replay large batches or manually change customer entitlements. Keep the
 audit trail of the original event and incident outside the public issue/PR.
 
-**Deployment HOLD:** migration 0096 depends on 0095. Before deploying, reconcile
-with the separate, still-HOLD legal-hold migration 0094. Stop all legacy
+**Deployment HOLD:** migration 0103 depends on 0102. Before deploying, reconcile
+with the separate, still-HOLD legal-hold PR #1080 (its draft 0097 migration
+number conflicts with main and must be renumbered before any rollout). Stop all legacy
 inline entitlement-mutating webhook instances before enabling the new worker;
 a mixed-version rollout bypasses the new transactional protocol. Verify schema,
 worker readiness, no legacy writers, replay isolation, alarms, and genuine

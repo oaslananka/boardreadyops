@@ -59,6 +59,7 @@ import {
   runNotificationDeliveryPass,
   runNotificationScanPass,
 } from "./lib/notification-worker.js";
+import { purgeExpiredRemoteMcpOAuthSecurityData } from "./lib/remote-mcp-oauth-abuse.js";
 import { createProductionRepositorySetupLifecycleExecutor } from "./lib/repository-setup-automation.js";
 import { runRetentionMaintenanceCleanup } from "./lib/retention-maintenance-worker.js";
 import { createRunnerClient } from "./lib/runner-client.js";
@@ -777,6 +778,7 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
   const result = await runRetentionMaintenanceCleanup({
     purgeWebhookInbox: () => jobs.purgeExpired({ limit: retentionCleanupBatchSize }),
     purgeRunnerRequestNonces: () => retentionMaintenance.purgeExpiredRunnerRequestNonces(),
+    purgeRemoteMcpOAuth: () => purgeExpiredRemoteMcpOAuthSecurityData(executor, retentionCleanupBatchSize),
     expireArtifactUploadCapabilities: () => retentionMaintenance.expireArtifactUploadCapabilities(),
     revokeExpiredRunnerRegistrationEnrollments: () => retentionMaintenance.revokeExpiredRunnerRegistrationEnrollments(),
     expireRepositorySetupProbes: () => retentionMaintenance.expireRepositorySetupProbes(),
@@ -808,6 +810,11 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
   if (
     result.webhookInboxPurged > 0 ||
     result.runnerRequestNoncesPurged > 0 ||
+    result.remoteMcpRateLimitBucketsPurged > 0 ||
+    result.remoteMcpSecurityEventsPurged > 0 ||
+    result.remoteMcpLoginResumptionsPurged > 0 ||
+    result.remoteMcpExpiredGrantsPurged > 0 ||
+    result.remoteMcpExpiredAuthorizationsPurged > 0 ||
     result.artifactUploadCapabilitiesExpired > 0 ||
     result.runnerRegistrationEnrollmentsRevoked > 0 ||
     result.repositorySetupProbesExpired > 0 ||
@@ -823,6 +830,11 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
     log("info", "worker.retention_cleanup", {
       webhookInboxPurged: result.webhookInboxPurged,
       runnerRequestNoncesPurged: result.runnerRequestNoncesPurged,
+      remoteMcpRateLimitBucketsPurged: result.remoteMcpRateLimitBucketsPurged,
+      remoteMcpSecurityEventsPurged: result.remoteMcpSecurityEventsPurged,
+      remoteMcpLoginResumptionsPurged: result.remoteMcpLoginResumptionsPurged,
+      remoteMcpExpiredGrantsPurged: result.remoteMcpExpiredGrantsPurged,
+      remoteMcpExpiredAuthorizationsPurged: result.remoteMcpExpiredAuthorizationsPurged,
       artifactUploadCapabilitiesExpired: result.artifactUploadCapabilitiesExpired,
       runnerRegistrationEnrollmentsRevoked: result.runnerRegistrationEnrollmentsRevoked,
       repositorySetupProbesExpired: result.repositorySetupProbesExpired,

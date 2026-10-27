@@ -110,11 +110,15 @@ Fixture expectations live under `tests/fixtures/projects/**/expected-findings.js
 When adding or changing a fixture, include the rule coverage reason, expected
 findings, and any generated outputs needed by the rule under test.
 
-Benchmarks live in `tests/benchmark/*.bench.ts`. The `codspeed` workflow runs
-them on every pull request and push to `main` with CodSpeed's CPU simulation
-instrument and reports regressions on the pull request. To measure locally with
-the same instrument, install the [CodSpeed CLI](https://codspeed.io/docs/cli)
-and run `codspeed run --mode simulation -- corepack pnpm exec vitest bench --run`.
+Benchmarks live in `tests/benchmark/*.bench.ts`. The native
+`.github/workflows/benchmark.yml` workflow runs them on pushes to `main`,
+manually, and on PRs changing benchmark-relevant engine, fixture or runtime files.
+It saves raw Vitest output as a seven-day artifact. On shared GitHub runners,
+these results are **informational**, not a comparable timing regression gate.
+Run `corepack pnpm run benchmark` to inspect locally. The previous third-party
+CodSpeed simulation was removed because its I/O-heavy benchmarks excluded system
+call time and its cross-runner comparisons produced repeated unverified regressions.
+See `docs/architecture/ci-domain-boundaries.md` for change impact and release gates.
 
 ## Adding A Rule
 

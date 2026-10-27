@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -98,8 +98,8 @@ describe("ci-risk-profile", () => {
   it("keeps billing/database PRs off KiCad PPA while exercising PostgreSQL integration", () => {
     for (const file of [
       "packages/db/src/billing-store.ts",
-      "packages/db/migrations/0096_stripe_reconciliation_claims.sql",
-      "packages/db/migrations/0095_pending_stripe_customer_events_index.sql",
+      "packages/db/migrations/0103_stripe_reconciliation_claims.sql",
+      "packages/db/migrations/0102_pending_stripe_customer_events_index.sql",
       "packages/cloud-core/src/stripe-service.ts",
       "apps/web/lib/stripe-entitlement-worker.ts",
       "apps/web/app/api/v1/billing/webhook/route.ts",
@@ -208,6 +208,130 @@ describe("ci-risk-profile", () => {
     expect(profile.needs_unit).toBe(true);
     expect(profile.needs_coverage).toBe(false);
     expect(profile.needs_mutation).toBe(false);
+  });
+
+  it("marks engine-only changes without triggering an unrelated Windows cloud package build", () => {
+    for (const changed of ["src/core/pipeline.ts", "src/kicad/snapshots.ts", "tests/unit/kicad/pcb.test.ts"]) {
+      const profile = classifyChangedFiles([changed], { eventName: "pull_request" });
+      expect(profile.domain_engine, changed).toBe(true);
+      expect(profile.domain_cloud, changed).toBe(false);
+      expect(profile.domain_integrations, changed).toBe(false);
+      expect(profile.needs_web_standalone, changed).toBe(false);
+      expect(profile.needs_unit, changed).toBe(true);
+      expect(profile.needs_build, changed).toBe(true);
+    }
+  });
+
+  it("routes cloud, shared contracts and SQL changes to independent web acceptance", () => {
+    for (const changed of [
+      "apps/web/lib/remote-mcp-http.ts",
+      "packages/db/migrations/0101_hosted_review_findings_pagination_index.sql",
+      "packages/contracts/src/review.ts",
+      "packages/cloud-core/src/lifecycle-executor.ts",
+      "deploy/Caddyfile",
+      "tests/integration/remote-mcp-findings-postgres.test.ts",
+      "src/report/html-render.ts",
+    ]) {
+      const profile = classifyChangedFiles([changed], { eventName: "pull_request" });
+      expect(profile.domain_cloud, changed).toBe(true);
+      expect(profile.needs_web_standalone, changed).toBe(true);
+    }
+  });
+
+  it("keeps the MCP/SDK integration domain independent of the Windows cloud bundle", () => {
+    for (const changed of [
+      "packages/mcp-server/src/index.ts",
+      "packages/plugin-sdk/src/index.ts",
+      "src/runner/client.ts",
+    ]) {
+      const profile = classifyChangedFiles([changed], { eventName: "pull_request" });
+      expect(profile.domain_integrations, changed).toBe(true);
+      expect(profile.needs_web_standalone, changed).toBe(false);
+    }
+  });
+
+  it("conservatively treats shared runtime, workflow and main pushes as affecting every domain", () => {
+    for (const changed of [
+      "package.json",
+      "pnpm-lock.yaml",
+      "toolchain.json",
+      "tsconfig.json",
+      "tsconfig.build.json",
+      ".github/workflows/ci.yml",
+      ".github/workflows/benchmark.yml",
+      "scripts/ci-risk-profile.mjs",
+    ]) {
+      const profile = classifyChangedFiles([changed], { eventName: "pull_request" });
+      expect(profile.domain_engine, changed).toBe(true);
+      expect(profile.domain_cloud, changed).toBe(true);
+      expect(profile.domain_integrations, changed).toBe(true);
+      expect(profile.needs_web_standalone, changed).toBe(true);
+      // Security eligibility remains governed by the existing independent risk profile.
+      if (
+        ["package.json", "pnpm-lock.yaml", ".github/workflows/ci.yml", ".github/workflows/benchmark.yml"].includes(
+          changed,
+        )
+      ) {
+        expect(profile.needs_security, changed).toBe(true);
+      }
+    }
+    const main = classifyChangedFiles(["README.md"], { eventName: "push" });
+    expect(main.domain_cloud).toBe(true);
+    expect(main.needs_web_standalone).toBe(true);
+    expect(main.needs_kicad).toBe(true);
+    expect(main.needs_coverage).toBe(true);
+    expect(main.needs_security).toBe(true);
+    const docs = classifyChangedFiles(["README.md"], { eventName: "pull_request" });
+    expect(docs.domain_engine).toBe(false);
+    expect(docs.domain_cloud).toBe(false);
+    expect(docs.domain_integrations).toBe(false);
+    expect(docs.needs_web_standalone).toBe(false);
+  });
+
+  it("preserves all previously required gates for mixed engine, cloud and integrations changes", () => {
+    const p = classifyChangedFiles(
+      ["src/rules/manufacturing/fiducials.ts", "apps/web/app/mcp/route.ts", "packages/mcp-server/src/index.ts"],
+      { eventName: "pull_request" },
+    );
+    expect([p.domain_engine, p.domain_cloud, p.domain_integrations]).toEqual([true, true, true]);
+    expect(p.needs_web_standalone).toBe(true);
+    expect(p.needs_integration).toBe(true);
+    expect(p.needs_kicad).toBe(true);
+    expect(p.needs_coverage).toBe(true);
+    expect(p.needs_typecheck).toBe(true);
+  });
+
+  it("keeps required CI checks while targeting native benchmarks to relevant PRs", async () => {
+    const ci = await readFile(".github/workflows/ci.yml", "utf8");
+    const bench = await readFile(".github/workflows/benchmark.yml", "utf8");
+    for (const name of [
+      "ci / risk-profile",
+      "ci / lint",
+      "ci / typecheck",
+      "ci / test-unit",
+      "ci / unit-matrix-gate",
+      "ci / build",
+      "ci / verify-dist",
+      "ci / coverage-gate",
+      "security / gate",
+    ]) {
+      if (name === "security / gate") continue; // independent security workflow owns this gate
+      expect(ci).toContain(`name: ${name}`);
+    }
+    expect(ci).toContain(`needs_web_standalone: \${{ steps.classify.outputs.needs_web_standalone }}`);
+    expect(ci).toContain("needs.risk-profile.outputs.needs_web_standalone == 'true'");
+    expect(ci).toContain(
+      "needs.risk-profile.outputs.needs_build == 'true' && needs.risk-profile.outputs.needs_web_standalone == 'true'",
+    );
+    expect(bench).toContain("  pull_request:");
+    expect(bench).toContain('      - "tests/benchmark/**"');
+    expect(bench).toContain("  push:");
+    expect(bench).toContain("      - main");
+    expect(bench).toContain("node-version-file: .nvmrc");
+    expect(bench).toContain("Benchmark / informational");
+    expect(bench).toContain("shell: bash");
+    expect(bench).toContain("set -euo pipefail");
+    expect(bench).toContain("pnpm run benchmark | tee benchmark.txt");
   });
 
   it("rejects changed-file list paths that escape the repository root", async () => {
