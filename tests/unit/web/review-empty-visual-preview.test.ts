@@ -17,13 +17,26 @@ describe("visual-first hardware onboarding", () => {
     const html = renderToStaticMarkup(createElement(ReviewEmptyVisualPreview, { mode: "onboarding" }));
     expect(html).toContain("Your next hardware review starts with the board");
     expect(html).toContain("Example only");
-    expect(html).toContain("/demo/zaptrace-sample-pcb.png");
-    expect(html).toContain("/demo/zaptrace-sample-schematic.png");
+    expect(html).toContain("/demo/royalblue54l-pcb.webp");
+    expect(html).toContain("/demo/royalblue54l-schematic.webp");
     expect(html).toContain("not your repository, not recorded findings or manufacturing approval");
     expect(html).toContain('aria-label="From design to production review"');
     expect(html).toContain('href="/setup"');
     expect(html).toContain("Connect a repository");
     expect(html).not.toContain('href="/reviews#publish-review"');
+  });
+
+  it("keeps the original source-faithful example plots inspectable and clearly labeled", () => {
+    const html = renderToStaticMarkup(createElement(ReviewEmptyVisualPreview, { mode: "onboarding" }));
+    expect(html).toContain('href="/demo/royalblue54l-pcb.webp"');
+    expect(html).toContain('href="/demo/royalblue54l-schematic.webp"');
+    expect(html.match(/target="_blank"/gu)).toHaveLength(3);
+    expect(html.match(/rel="noopener noreferrer"/gu)).toHaveLength(3);
+    expect(html).toContain("not customer data");
+    expect(html).toContain("RoyalBlue54L Feather by LordsBoards");
+    expect(html).toContain("CERN-OHL-P-2.0");
+    expect(html).toContain("Native KiCad export cropped for legibility");
+    expect(html).not.toContain("Snapshot marker available");
   });
 
   it("uses explicit sign-in routing for signed-out visitors while keeping example labeling", () => {
