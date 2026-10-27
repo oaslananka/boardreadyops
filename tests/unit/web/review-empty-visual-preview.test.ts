@@ -26,6 +26,17 @@ describe("visual-first hardware onboarding", () => {
     expect(html).not.toContain('href="/reviews#publish-review"');
   });
 
+  it("keeps the original source-faithful example plots inspectable and clearly labeled", () => {
+    const html = renderToStaticMarkup(createElement(ReviewEmptyVisualPreview, { mode: "onboarding" }));
+    expect(html).toContain('href="/demo/zaptrace-sample-pcb.png"');
+    expect(html).toContain('href="/demo/zaptrace-sample-schematic.png"');
+    expect(html.match(/target="_blank"/gu)).toHaveLength(2);
+    expect(html.match(/rel="noopener noreferrer"/gu)).toHaveLength(2);
+    expect(html).toContain("not an analyzed customer board");
+    expect(html).toContain("unmodified source plot");
+    expect(html).not.toContain("Snapshot marker available");
+  });
+
   it("uses explicit sign-in routing for signed-out visitors while keeping example labeling", () => {
     const html = renderToStaticMarkup(
       createElement(ReviewEmptyVisualPreview, {

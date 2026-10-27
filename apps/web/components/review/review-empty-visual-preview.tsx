@@ -48,30 +48,74 @@ export function ReviewEmptyVisualPreview({
           Example only
         </span>
       </header>
-      <div className="grid min-w-0 gap-3 p-3 sm:p-4 lg:grid-cols-2">
-        <figure className="min-w-0 overflow-hidden rounded-lg border border-border bg-[#0b1220]">
-          <div className="flex items-center justify-between gap-3 border-b border-white/15 px-3 py-2 text-white">
-            <figcaption className="text-xs font-semibold">PCB · copper &amp; components</figcaption>
-            <span className="text-[11px] text-white/65">Native KiCad plot</span>
+      <div className="grid min-w-0 gap-4 p-4 sm:p-6 xl:grid-cols-2">
+        <figure className="group min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#101827] shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-slate-100">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-300">01 / Board layout</p>
+              <figcaption className="mt-1 text-sm font-semibold">PCB · copper and components</figcaption>
+            </div>
+            <span className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-slate-300">
+              KiCad sample
+            </span>
           </div>
-          {/* biome-ignore lint/performance/noImgElement: Static render of the first-party sample KiCad plot. */}
-          <img
-            src="/demo/zaptrace-sample-pcb.png"
-            alt="Example KiCad PCB drawing with copper traces, pads and connectors"
-            className="h-60 w-full object-contain p-3 sm:h-72"
-          />
+          <a
+            href="/demo/zaptrace-sample-pcb.png"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open full-resolution example PCB plot"
+            className="relative block overflow-hidden bg-[#0b1220] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-indigo-400"
+          >
+            {/* biome-ignore lint/performance/noImgElement: Source-faithful native KiCad sample plot. */}
+            <img
+              src="/demo/zaptrace-sample-pcb.png"
+              alt="Illustrative KiCad PCB routing, pads and component outlines"
+              loading="lazy"
+              decoding="async"
+              className="h-72 w-full object-cover object-center transition-transform duration-300 motion-safe:group-hover:scale-[1.08] sm:h-80"
+            />
+            <span className="absolute bottom-3 right-3 rounded-md border border-white/20 bg-[#080e1c]/90 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm">
+              Full plot ↗
+            </span>
+          </a>
+          <p className="border-t border-white/10 px-4 py-3 text-xs leading-relaxed text-slate-300">
+            Source-rendered example, not an analyzed customer board or a passing manufacturing result.
+          </p>
         </figure>
-        <figure className="min-w-0 overflow-hidden rounded-lg border border-border bg-[#faf9f5]">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 text-slate-800">
-            <figcaption className="text-xs font-semibold">Schematic · nets &amp; symbols</figcaption>
-            <span className="text-[11px] text-slate-500">Native KiCad plot</span>
+        <figure className="group min-w-0 overflow-hidden rounded-xl border border-border bg-[#f7f6f2] shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 text-slate-900">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
+                02 / Circuit logic
+              </p>
+              <figcaption className="mt-1 text-sm font-semibold">Schematic · nets and symbols</figcaption>
+            </div>
+            <span className="rounded-full border border-slate-300 px-2.5 py-1 text-[11px] text-slate-600">
+              KiCad sample
+            </span>
           </div>
-          {/* biome-ignore lint/performance/noImgElement: Static render of the first-party sample KiCad plot. */}
-          <img
-            src="/demo/zaptrace-sample-schematic.png"
-            alt="Example KiCad schematic with ESP32, I2C components and net labels"
-            className="h-60 w-full object-contain p-3 sm:h-72"
-          />
+          <a
+            href="/demo/zaptrace-sample-schematic.png"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open full-resolution example schematic plot"
+            className="relative block overflow-hidden bg-[#f7f6f2] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-indigo-600"
+          >
+            {/* biome-ignore lint/performance/noImgElement: Source-faithful native KiCad sample plot. */}
+            <img
+              src="/demo/zaptrace-sample-schematic.png"
+              alt="Illustrative KiCad circuit schematic with symbols and net labels"
+              loading="lazy"
+              decoding="async"
+              className="h-72 w-full object-cover object-center transition-transform duration-300 motion-safe:group-hover:scale-[1.08] sm:h-80"
+            />
+            <span className="absolute bottom-3 right-3 rounded-md border border-slate-300 bg-white/95 px-2.5 py-1.5 text-xs font-medium text-slate-900 shadow-sm">
+              Full plot ↗
+            </span>
+          </a>
+          <p className="border-t border-slate-200 px-4 py-3 text-xs leading-relaxed text-slate-700">
+            View the unmodified source plot before connecting your own review evidence.
+          </p>
         </figure>
       </div>
       {onboarding ? (
