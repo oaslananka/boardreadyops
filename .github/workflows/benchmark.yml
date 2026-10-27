@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/benchmark/**"
+      - "tests/fixtures/projects/**"
+      - "vitest.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".nvmrc"
+      - ".github/workflows/benchmark.yml"
   workflow_dispatch:
 
 concurrency:
@@ -15,6 +25,8 @@ permissions:
 
 jobs:
   benchmark:
+    name: Benchmark / informational
+    # Timing on shared GitHub runners is evidence, not a reliable regression gate.
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -23,12 +35,16 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           package-manager-cache: false
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
       - run: corepack pnpm run deps:install-ci
-      - run: pnpm run benchmark | tee benchmark.txt
+      - name: Execute native benchmark suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run benchmark | tee benchmark.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: benchmark

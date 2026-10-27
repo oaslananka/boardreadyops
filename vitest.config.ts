@@ -1,5 +1,4 @@
 import { fileURLToPath } from "node:url";
-import codspeedPlugin from "@codspeed/vitest-plugin";
 import { transform } from "esbuild";
 import { defineConfig } from "vitest/config";
 
@@ -7,7 +6,6 @@ const PIPELINE_TEST_TIMEOUT_MS = 15_000;
 
 export default defineConfig({
   plugins: [
-    codspeedPlugin(),
     {
       name: "web-tsx-tests",
       enforce: "pre",
