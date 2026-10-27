@@ -28,20 +28,17 @@ ordering and concurrency semantics.
 
 ## CI integration scope and supported runtimes
 
-The PR risk classifier runs the PostgreSQL-backed integration suites on **Node 22
-+ PostgreSQL 16** and **Node 24 + PostgreSQL 17**, covering the supported
-runtime lines and the production baseline. These jobs do not install KiCad for
-recognized billing/database-only changes. Database-only suites include the
-PostgreSQL tests and backup/restore checks; the real KiCad ZIP upload suite is
-reserved for the full integration lane.
+The PR risk classifier runs PostgreSQL-backed integration tests on the
+**single supported Node 24 + PostgreSQL 17** lane. Billing/database-only
+changes skip KiCad installation while retaining the real PostgreSQL migrations,
+database integration and backup/restore tests.
 
 Changes affecting KiCad, manufacturing/exports, unknown integration contracts,
-dependencies, or CI workflow policy fail closed into a full real-KiCad 10
-integration run on Node 24 / PostgreSQL 17. Every main push and manual CI
-dispatch also runs that full suite. This does **not** reduce supported versions:
-Node 22/24 and PostgreSQL 16/17 are still exercised, and no KiCad-dependent
-test may be silently skipped on manufacturing/main validation. The former
-Node 24 + PostgreSQL 16 duplicate integration lane is no longer run.
+dependencies, or CI workflow policy fail closed into the full real-KiCad 10
+integration suite. Every main push and manual CI dispatch runs the same
+production-baseline lane. This removes the former Node 22 / PostgreSQL 16
+compatibility lane; it does not disable the required integration or security
+gates.
 
 ## Required evidence in PRs
 
@@ -64,7 +61,7 @@ Cloud coverage is measured separately with `corepack pnpm run coverage:cloud`. T
 
 Database-backed files under `tests/integration/*-postgres.test.ts` require:
 
-1. PostgreSQL 16 or newer reachable from the test host.
+1. PostgreSQL 17 reachable from the test host (the CI/release-tested baseline).
 2. A disposable database owned by the test user, with permission to create schemas, tables, functions, triggers, and extensions used by migrations.
 3. `DATABASE_URL` set to that database, for example `postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test`.
 4. No production or shared database credentials. The suites apply migrations and delete test fixtures.

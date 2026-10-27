@@ -30,16 +30,22 @@ describe("createBoardReadyOpsMcpServer", () => {
       check: { exitCode: 0, stdout: `${JSON.stringify({ summary: { total: 0, failed: false } })}\n`, stderr: "" },
       plan: { exitCode: 0, stdout: `${JSON.stringify({ nextActions: [] })}\n`, stderr: "" },
       "release verify": { exitCode: 0, stdout: `${JSON.stringify({ ok: true, checked: 2 })}\n`, stderr: "" },
+      review: {
+        exitCode: 0,
+        stdout: `${JSON.stringify({ schemaVersion: 1, scope: "pcb-footprints-only", changes: { added: 1, removed: 0, modified: 0 } })}\n`,
+        stderr: "",
+      },
     });
   });
 
-  it("advertises exactly the three read-only tools, with no mutating capability", async () => {
+  it("advertises exactly four read-only tools, with no mutating capability", async () => {
     const client = await connectedClient(runner);
 
     const { tools } = await client.listTools();
 
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       "boardreadyops_check",
+      "boardreadyops_footprint_summary",
       "boardreadyops_plan",
       "boardreadyops_verify_bundle",
     ]);
@@ -67,6 +73,43 @@ describe("createBoardReadyOpsMcpServer", () => {
     expect(runner).toHaveBeenCalledWith(["check", "--format", "json", "/board"]);
     const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? "";
     expect(JSON.parse(text)).toEqual({ ok: true, result: { summary: { total: 0, failed: false } } });
+  });
+
+  it("boardreadyops_footprint_summary returns only the CLI's summary evidence", async () => {
+    const client = await connectedClient(runner);
+    const result = await client.callTool({
+      name: "boardreadyops_footprint_summary",
+      arguments: { path: "/board", base: "HEAD~1", head: "HEAD", pcb: "test.kicad_pcb" },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(runner).toHaveBeenCalledWith([
+      "review",
+      "footprint-diff",
+      "--base",
+      "HEAD~1",
+      "--head",
+      "HEAD",
+      "--pcb",
+      "test.kicad_pcb",
+      "--format",
+      "summary-json",
+      "/board",
+    ]);
+    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? "";
+    expect(JSON.parse(text)).toEqual({
+      ok: true,
+      result: { schemaVersion: 1, scope: "pcb-footprints-only", changes: { added: 1, removed: 0, modified: 0 } },
+    });
+  });
+
+  it("requires source, base and head identities before invoking any subprocess", async () => {
+    const client = await connectedClient(runner);
+    const result = await client.callTool({
+      name: "boardreadyops_footprint_summary",
+      arguments: { base: "HEAD" },
+    });
+    expect(result.isError).toBe(true);
+    expect(runner).not.toHaveBeenCalled();
   });
 
   it("boardreadyops_verify_bundle requires bundleDir per its schema", async () => {

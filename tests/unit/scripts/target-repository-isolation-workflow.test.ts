@@ -14,7 +14,7 @@ describe("target-repository two-installation isolation workflow", () => {
 
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("contents: read");
-    expect(workflow).toContain("postgres:16-alpine");
+    expect(workflow).toContain("postgres:17-alpine");
     expect(workflow).toContain("POSTGRES_HOST_AUTH_METHOD: trust");
     expect(workflow).toContain('BOARDREADYOPS_POSTGRES_TESTS: "true"');
     expect(workflow).toContain("BOARDREADYOPS_ISOLATION_EVIDENCE_PATH");

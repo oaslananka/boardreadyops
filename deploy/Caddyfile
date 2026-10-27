@@ -1,4 +1,9 @@
 {$BOARDREADYOPS_CADDY_HOST} {
   encode zstd gzip
-  reverse_proxy web:3000
+  # Never forward a client-supplied value. This value comes from Caddy's
+  # network peer (or explicitly configured trusted proxy IP policy).
+  # The web OAuth handlers reject missing/unparseable verified sources.
+  reverse_proxy web:3000 {
+    header_up X-BoardReadyOps-Verified-Client-IP {client_ip}
+  }
 }

@@ -47,8 +47,8 @@ describe("first-use visual-first routes", () => {
     expect(html.indexOf("Your next hardware review starts with the board")).toBeLessThan(
       html.indexOf("Sign in required"),
     );
-    expect(html).toContain("zaptrace-sample-pcb.png");
-    expect(html).toContain("zaptrace-sample-schematic.png");
+    expect(html).toContain("royalblue54l-pcb.webp");
+    expect(html).toContain("royalblue54l-schematic.webp");
     expect(html).toContain('href="/api/auth/github/login"');
   });
 

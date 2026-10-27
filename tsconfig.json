@@ -4,6 +4,7 @@
     "lib": ["ES2024"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "paths": { "next/headers": ["./apps/web/node_modules/next/headers.d.ts"] },
     "rootDir": ".",
     "outDir": ".tsbuild",
     "strict": true,

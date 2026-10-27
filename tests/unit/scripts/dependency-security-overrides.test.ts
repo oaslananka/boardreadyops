@@ -63,8 +63,11 @@ describe("dependency security overrides", () => {
     expect(
       undiciMajor > 8 || (undiciMajor === 8 && (undiciMinor > 11 || (undiciMinor === 11 && undiciPatch >= 0))),
     ).toBe(true);
-    expect(workspace.overrides?.["qs@>=6.11.1 <6.16.0"]).toBe("6.16.0");
-    expect(workspace.minimumReleaseAgeExclude).toEqual(expect.arrayContaining(["fast-uri@3.1.9", "qs@6.16.0"]));
+    expect(workspace.overrides?.["qs@>=6.7.0 <6.16.1"]).toBe("6.16.1");
+    expect(workspace.minimumReleaseAgeExclude).toEqual(expect.arrayContaining(["fast-uri@3.1.9", "qs@6.16.1"]));
+    expect(workspace.minimumReleaseAgeExclude).not.toContain("qs@6.16.0");
+    expect(lockfile).toContain("qs@6.16.1:");
+    expect(lockfile).not.toContain("qs@6.16.0:");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("ip-address@10.7.1");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("next@16.3.8");
     expect(workspace.overrides?.["next@<16.4.1"]).toBe("16.4.1");

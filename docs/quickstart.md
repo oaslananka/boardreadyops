@@ -8,7 +8,7 @@ BoardReadyOps is the **trust layer between KiCad commits and manufacturing relea
 
 ## 1. Prerequisites
 
-- **Node.js**: `^22.14.0 || ^24.0.0` (Node 24 LTS recommended). Verify with `node --version`.
+- **Node.js**: `^24.0.0` (Node 24 LTS required). Verify with `node --version`.
 - **KiCad (Optional for DRC/ERC preflight)**: KiCad 9 or KiCad 10 with `kicad-cli` available on PATH. Core design, BOM, pinmap, and release evidence checks run without KiCad installed.
 
 ---

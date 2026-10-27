@@ -365,5 +365,5 @@ $$;
 
 
 insert into public.cloud_schema_migrations (version)
-values ('0097_durable_artifact_unlink_fences')
+values ('0104_durable_artifact_unlink_fences')
 on conflict (version) do nothing;

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CliRunner, CliRunResult } from "../../../packages/mcp-server/src/cli-runner.js";
-import { runCheckTool, runPlanTool, runVerifyBundleTool } from "../../../packages/mcp-server/src/tools.js";
+import {
+  runCheckTool,
+  runFootprintSummaryTool,
+  runPlanTool,
+  runVerifyBundleTool,
+} from "../../../packages/mcp-server/src/tools.js";
 
 function fakeRunner(result: Partial<CliRunResult>): CliRunner {
   return vi.fn().mockResolvedValue({ exitCode: 0, stdout: "", stderr: "", ...result });
@@ -136,5 +141,56 @@ describe("runVerifyBundleTool", () => {
 
     expect(result).toEqual({ ok: false, error: expect.stringContaining("must not start with '-'"), exitCode: 1 });
     expect(runner).not.toHaveBeenCalled();
+  });
+});
+
+describe("runFootprintSummaryTool", () => {
+  const input = { path: "/board", base: "f".repeat(40), head: "HEAD", pcb: "hardware/main.kicad_pcb" };
+
+  it("passes pinned Git revisions and uses summary-json rather than source-bearing full JSON", async () => {
+    const summary = { schemaVersion: 1, scope: "pcb-footprints-only", changes: { added: 1, removed: 0, modified: 1 } };
+    const runner = fakeRunner({ exitCode: 0, stdout: `${JSON.stringify(summary)}\n` });
+    expect(await runFootprintSummaryTool(input, runner)).toEqual({ ok: true, result: summary });
+    expect(runner).toHaveBeenCalledWith([
+      "review",
+      "footprint-diff",
+      "--base",
+      input.base,
+      "--head",
+      "HEAD",
+      "--pcb",
+      "hardware/main.kicad_pcb",
+      "--format",
+      "summary-json",
+      "/board",
+    ]);
+  });
+
+  it("preserves unavailable provenance as a non-success evidence result, not a fabricated diff", async () => {
+    const unavailable = { schemaVersion: 1, status: "unavailable", reason: "missing-source-identity" };
+    const runner = fakeRunner({ exitCode: 1, stdout: JSON.stringify(unavailable) });
+    expect(await runFootprintSummaryTool(input, runner)).toEqual({ ok: true, result: unavailable });
+  });
+
+  it.each([
+    { base: "--help" },
+    { head: "--format=json" },
+    { pcb: "--public-key=secret" },
+    { path: "--server=http://attacker" },
+    { base: "" },
+    { pcb: "some\nfile.kicad_pcb" },
+  ])("rejects flag-shaped, empty or control-character inputs: %j", async (override) => {
+    const runner = fakeRunner({ stdout: "{}" });
+    expect((await runFootprintSummaryTool({ ...input, ...override }, runner)).ok).toBe(false);
+    expect(runner).not.toHaveBeenCalled();
+  });
+
+  it("returns real CLI execution failures as tool errors", async () => {
+    const runner = fakeRunner({ exitCode: 2, stdout: "", stderr: "not a git repository" });
+    expect(await runFootprintSummaryTool(input, runner)).toEqual({
+      ok: false,
+      exitCode: 2,
+      error: "not a git repository",
+    });
   });
 });

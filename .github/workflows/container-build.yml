@@ -30,7 +30,7 @@ permissions:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/boardreadyops-full
-  NODE_VERSION: "24.21.0"
+  NODE_VERSION: "24.22.1"
   KICAD_PPA_SERIES: "10.0"
 
 jobs:
@@ -44,7 +44,7 @@ jobs:
         include:
           - kicad-version: "10.0"
             kicad-ppa-series: "10.0"
-            node-version: "24.21.0"
+            node-version: "24.22.1"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -55,13 +55,23 @@ jobs:
           MANUAL_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if [ -n "${MANUAL_VERSION}" ]; then
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            # A prepared source version is not necessarily published yet. PR smoke
+            # exercises the container and toolchain against npm's published stable CLI;
+            # release and explicitly selected versions keep their exact-version gate.
+            version="$(npm view boardreadyops dist-tags.latest --json | jq -er 'select(type == "string")')"
+            if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::npm latest dist-tag must resolve to a stable semantic version"
+              exit 1
+            fi
+          elif [ -n "${MANUAL_VERSION}" ]; then
             version="${MANUAL_VERSION#v}"
           elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             version="${GITHUB_REF_NAME#v}"
           else
             version="$(jq -er '.version' package.json)"
           fi
+          echo "Container smoke selected boardreadyops@${version}; published package is verified below"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
       - name: Wait for npm package availability
         env:
