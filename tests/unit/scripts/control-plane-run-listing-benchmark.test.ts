@@ -151,7 +151,7 @@ describe("run-listing benchmark repository hygiene", () => {
     expect(workflow).toContain("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
     expect(workflow).toContain("actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e");
     expect(workflow).toContain("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a");
-    expect(workflow).toContain("image: postgres:16-alpine");
+    expect(workflow).toContain("image: postgres:17-alpine");
     expect(workflow).toContain("BOARDREADYOPS_LOAD_CONFIRMATION: isolated-disposable-database");
     expect(workflow).toContain("pnpm --filter @boardreadyops/db db:migrate");
     expect(workflow).toContain("pnpm run cloud:run-listing-benchmark:verify");

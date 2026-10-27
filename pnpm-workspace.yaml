@@ -29,7 +29,7 @@ minimumReleaseAgeExclude:
   - 'zod@4.6.6'
   - 'happy-dom@21.0.4'
   # Renovate security update: qs@6.16.1
-  - 'qs@6.16.0 || 6.16.1'
+  - 'qs@6.16.1'
   - 'renovate@43.272.4'
 trustPolicy: no-downgrade
 trustPolicyExclude:
@@ -78,7 +78,7 @@ overrides:
   diff@>=6.0.0 <8.0.3: '>=8.0.3'
   esbuild@<=0.24.2: '>=0.25.0'
   glob@>=10.0.0 <13.0.6: 13.0.6
-  'qs@>=6.11.1 <6.16.0': 6.16.1
+  'qs@>=6.7.0 <6.16.1': 6.16.1
   'undici@>=8.0.0 <8.11.0': 8.12.2
   'undici@>=6 <6.29.1': 6.29.1
   vite@<=6.4.1: '>=6.4.2'

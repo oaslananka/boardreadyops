@@ -15,12 +15,11 @@ Minimum supported KiCad: **9.0**. Recommended KiCad line: **10.0**. Latest verif
 
 ## Node.js
 
-Minimum supported Node.js: **22.14.0**. Recommended Node.js major: **24**.
+Minimum supported Node.js: **24.0.0**. Recommended Node.js major: **24**.
 
 | Runtime | Version | Status | Tested latest | Policy |
 | --- | --- | --- | --- | --- |
-| Node.js | 22 | Minimum supported runtime | 22.23.3 | Maintenance LTS. Supported from 22.14.0 upward for existing users and tested in unit and KiCad integration jobs. |
-| Node.js | 24 | Recommended Active LTS runtime | 24.21.0 | Active LTS and recommended runtime. Used by default CI jobs, binary builds, GitHub Action runtime, and KiCad 10.0 integration jobs. |
+| Node.js | 24 | Minimum supported and recommended LTS runtime | 24.22.1 | Maintenance LTS and recommended runtime. Used by default CI jobs, binary builds, GitHub Action runtime, and KiCad 10.0 integration jobs. |
 | Node.js | 26 | Current, not supported |  | Current release line. Tracked by drift guard but not in package engines or CI until it reaches LTS and dependency/tooling validation is added. |
 
 ## CycloneDX HBOM

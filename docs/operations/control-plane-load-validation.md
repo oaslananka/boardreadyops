@@ -47,7 +47,7 @@ Crossing a latency or throughput limit fails the run with a stable signal name. 
 
 ## Run locally
 
-Use PostgreSQL 16 with an empty database that contains only the current BoardReadyOps schema. Apply migrations first:
+Use PostgreSQL 17 with an empty database that contains only the current BoardReadyOps schema. Apply migrations first:
 
 ```bash
 export DATABASE_URL='postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_load'
@@ -114,11 +114,11 @@ Capacity decisions remain tied to the authoritative `github-cloud-ga-v1` SLO pol
 - stale attempts above zero for two snapshots or terminal failure rate above 500 basis points with at least 20 terminal runs blocks blind scale-out and requires failure analysis;
 - a failed high-tier envelope, any threshold signal, invariant drift, or cross-tenant mismatch blocks raising the validated envelope.
 
-The manual `control-plane-scale-envelope` workflow runs baseline, medium, and high tiers against separate disposable PostgreSQL 16 services and creates one mode `0600`, aggregate-only `control-plane-scale-envelope.json` artifact. The report contains preset counts and aggregate timings only; it excludes database URLs, tenant identifiers, payloads, response bodies, credentials, and raw errors.
+The manual `control-plane-scale-envelope` workflow runs baseline, medium, and high tiers against separate disposable PostgreSQL 17 services and creates one mode `0600`, aggregate-only `control-plane-scale-envelope.json` artifact. The report contains preset counts and aggregate timings only; it excludes database URLs, tenant identifiers, payloads, response bodies, credentials, and raw errors.
 
 ## GitHub Actions evidence
 
-Run the `control-plane-load` workflow manually. It provisions an isolated PostgreSQL 16 service, applies every repository migration, executes the selected scenario, and uploads `control-plane-load-report.json` for 30 days. The workflow uses no repository secret and has read-only repository permissions.
+Run the `control-plane-load` workflow manually. It provisions an isolated PostgreSQL 17 service, applies every repository migration, executes the selected scenario, and uploads `control-plane-load-report.json` for 30 days. The workflow uses no repository secret and has read-only repository permissions.
 
 Keep the report with the GA-readiness evidence for issue #222. The representative profile covers bounded load and tenant isolation. The `soak-recovery` profile adds bounded repeated worker-lease expiry, transient delivery retry, uncertain-delivery classification, delayed callback convergence, and stale-attempt rejection. The `database-interruption` profile adds real PostgreSQL backend termination, atomic rollback, replacement connection, and post-interruption convergence. The `worker-process-interruption` profile covers one bounded child-process death and lease reclaim. The `worker-fleet-interruption` profile covers bounded full process-fleet loss on one isolated runner and attempt-two convergence. The `github-api-interruption` profile covers status-level HTTP fault injection through the real reconciliation client. This evidence does not by itself satisfy hours-long soak, host or availability-zone loss, whole-service or regional PostgreSQL outage, real GitHub production or shared-rate-limit behavior, or final GA sign-off.
 
@@ -138,7 +138,7 @@ This tool still does not by itself prove host/availability-zone loss, whole-serv
 
 For each `(dataset size, page size)` tier the report records p50/p95/p99/maximum page latency (via the same `percentile`/`summarizeDurations` helpers `control-plane-load.mjs` uses) and a depth-degradation ratio: the p95 latency of the last quarter of pages walked divided by the p95 latency of the first quarter. A tier fails with a stable signal if its p95 exceeds the configured limit or if that ratio exceeds the configured maximum, which is how offset-shaped depth degradation would show up if it existed.
 
-Run locally against the same isolated, disposable PostgreSQL 16 database used above:
+Run locally against the same isolated, disposable PostgreSQL 17 database used above:
 
 ```bash
 export DATABASE_URL='postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_load'
@@ -158,6 +158,6 @@ BOARDREADYOPS_RUN_LISTING_P95_MS=500
 BOARDREADYOPS_RUN_LISTING_DEPTH_DEGRADATION_RATIO_MAX=3
 ```
 
-The generated report is mode `0600` and contains only the pagination style found, per-tier scenario sizes, aggregate timing, and threshold signals; it never includes tenant identifiers, session material, or database connection details. The manual `control-plane-run-listing-benchmark` GitHub Actions workflow provisions an isolated PostgreSQL 16 service, applies every repository migration, runs this benchmark, and uploads `control-plane-run-listing-benchmark-report.json` for 30 days, mirroring the `control-plane-load` workflow above.
+The generated report is mode `0600` and contains only the pagination style found, per-tier scenario sizes, aggregate timing, and threshold signals; it never includes tenant identifiers, session material, or database connection details. The manual `control-plane-run-listing-benchmark` GitHub Actions workflow provisions an isolated PostgreSQL 17 service, applies every repository migration, runs this benchmark, and uploads `control-plane-run-listing-benchmark-report.json` for 30 days, mirroring the `control-plane-load` workflow above.
 
 **Verified local measurement (2026-09-04):** the PostgreSQL-backed benchmark was run end-to-end against a freshly migrated, disposable Docker PostgreSQL 16.15 instance with the default 200 / 20,000-run datasets, page sizes 10/25/100, and page depth 20. The 20,000-run tiers reported p95 page latency of 49.417 ms (10 rows), 46.47 ms (25 rows), and 46.808 ms (100 rows), with depth-degradation ratios of 0.99, 0.97, and 0.78 respectively; all threshold signals were empty. The paired integration test passed and the database/container were destroyed after the run. These are reproducibility/canary measurements for the disposable local environment, **not** a production latency SLO or a claim about hosted PostgreSQL performance. The manual workflow remains the repeatable CI path for future measurements.

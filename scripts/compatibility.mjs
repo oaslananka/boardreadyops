@@ -471,11 +471,14 @@ function kicadSupportStatus(config, version) {
 }
 
 function nodeSupportStatus(config, version) {
+  if (version === config.node.minimum && version === config.node.recommended) {
+    return "Minimum supported and recommended LTS runtime";
+  }
   if (version === config.node.minimum) {
     return "Minimum supported runtime";
   }
   if (version === config.node.recommended) {
-    return "Recommended Active LTS runtime";
+    return "Recommended LTS runtime";
   }
   return "Supported LTS runtime";
 }

@@ -48,7 +48,7 @@ describe("container action release surfaces", () => {
     expect(dockerfile).toContain("# renovate: datasource=docker depName=ubuntu currentValue=26.04");
     expect(dockerfile).toMatch(/^FROM ubuntu@sha256:[a-f0-9]{64}$/mu);
     expect(dockerfile).not.toMatch(/^FROM [^\n]+:[^\s]+@sha256:/mu);
-    expect(dockerfile).toContain("ARG NODE_VERSION=24.21.0");
+    expect(dockerfile).toContain("ARG NODE_VERSION=24.22.1");
     expect(dockerfile).toContain("ARG BOARDREADYOPS_VERSION");
     expect(dockerfile).not.toContain("ARG BOARDREADYOPS_VERSION=latest");
     expect(dockerfile).toContain("BOARDREADYOPS_VERSION must be an exact semantic version");
@@ -91,7 +91,7 @@ describe("container action release surfaces", () => {
     const workflowNodeMajor = Number(requireMatch(workflow, /^\s+NODE_VERSION: "(\d+)\./m));
     const engineRange = packageJson.engines?.node ?? "";
 
-    expect(engineRange).toBe("^22.14.0 || ^24.0.0");
+    expect(engineRange).toBe("^24.0.0");
     expect(workflowNodeMajor).toBe(dockerNodeMajor);
     expect(engineAllowsMajor(engineRange, dockerNodeMajor)).toBe(true);
     expect(engineAllowsMajor(engineRange, 24)).toBe(true);
@@ -115,7 +115,7 @@ describe("container action release surfaces", () => {
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
-        "node-version": "24.21.0",
+        "node-version": "24.22.1",
       },
     ]);
   });
@@ -165,6 +165,27 @@ describe("container action release surfaces", () => {
     expect(workflow).not.toContain("npm pack --pack-destination apps/container");
     expect(workflow).not.toContain("file:boardreadyops-");
     expect(workflow).toContain(`BOARDREADYOPS_VERSION=\${{ steps.package.outputs.version }}`);
+  });
+
+  it("uses the current published stable npm release for PR smoke, not an unpublished prepared version", async () => {
+    const metadata = (await loadActionMetadata(".github/workflows/container-build.yml")) as {
+      jobs?: { smoke?: { steps?: Array<{ name?: string; run?: string; env?: Record<string, string> }> } };
+    };
+    const steps = metadata.jobs?.smoke?.steps ?? [];
+    const resolution = steps.find((step) => step.name === "Resolve package version")?.run ?? "";
+    const waiting = steps.find((step) => step.name === "Wait for npm package availability")?.run ?? "";
+    const publish = metadata.jobs?.smoke?.steps?.find((step) => step.name === "Build local smoke image");
+
+    expect(resolution).toContain("GITHUB_EVENT_NAME");
+    expect(resolution).toContain("pull_request");
+    expect(resolution).toContain("npm view boardreadyops dist-tags.latest --json");
+    expect(resolution).toContain('select(type == "string")');
+    expect(resolution).toContain("npm latest dist-tag must resolve to a stable semantic version");
+    expect(resolution.indexOf("pull_request")).toBeLessThan(resolution.indexOf("GITHUB_REF_TYPE"));
+    expect(resolution).toContain("GITHUB_REF_NAME#v");
+    expect(waiting).toContain("PACKAGE_VERSION");
+    expect(publish).toBeDefined();
+    expect(resolution).not.toContain("npm pack");
   });
 
   it("waits for npm package availability before release smoke builds", async () => {

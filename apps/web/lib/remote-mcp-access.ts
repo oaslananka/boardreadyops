@@ -159,12 +159,12 @@ function validGitHubId(input: string | number): number | null {
  *
  * Missing data and denied access both return null (avoid cross-tenant enumeration).
  */
-export async function loadAuthorizedRemoteReview(
+export async function loadAuthorizedRemoteReviewSnapshot(
   db: Pick<SqlQueryExecutor, "query">,
   principal: RemoteMcpPrincipal,
   reviewId: string,
   checkCurrentPermission: CheckLiveRepositoryPermission,
-): Promise<ReturnType<typeof remoteReviewFacts> | null> {
+): Promise<{ facts: ReturnType<typeof remoteReviewFacts>; headRunId: string } | null> {
   if (!principal.scopes.includes("review:read") || !/^[a-f0-9-]{36}$/iu.test(reviewId)) return null;
   const result = await db.query(
     `select reviews.id, reviews.repository_id, reviews.head_run_id, reviews.current_revision_id,
@@ -172,6 +172,8 @@ export async function loadAuthorizedRemoteReview(
             repositories.github_repo_id, installations.github_installation_id
        from reviews
        join repositories on repositories.id = reviews.repository_id
+       join release_runs as head_run on head_run.id = reviews.head_run_id
+         and head_run.repository_id = reviews.repository_id
        join installations on installations.id = repositories.installation_id
       where reviews.id = $1
         and repositories.disabled_at is null
@@ -181,7 +183,14 @@ export async function loadAuthorizedRemoteReview(
     [reviewId],
   );
   const row = ((result as { rows?: AuthorizedReviewRow[] }).rows ?? [])[0];
-  if (!row || row.id !== reviewId || !row.current_revision_id) return null;
+  if (
+    row?.id !== reviewId ||
+    !row.current_revision_id ||
+    typeof row.head_run_id !== "string" ||
+    row.head_run_id.length < 1 ||
+    row.head_run_id.length > 128
+  )
+    return null;
   const githubRepositoryId = validGitHubId(row.github_repo_id);
   const githubInstallationId = validGitHubId(row.github_installation_id);
   if (!githubRepositoryId || !githubInstallationId) return null;
@@ -201,17 +210,38 @@ export async function loadAuthorizedRemoteReview(
   if (!permitted) return null;
 
   const revision = await db.query(
-    `select head_commit_sha, evidence_digest from review_revisions
-      where id = $1 and review_id = $2 and head_run_id = $3
+    `select review_revisions.head_commit_sha, review_revisions.evidence_digest
+       from review_revisions
+       join release_runs as revision_head_run
+         on revision_head_run.id = review_revisions.head_run_id
+        and revision_head_run.repository_id = $4
+        and revision_head_run.commit_sha = review_revisions.head_commit_sha
+      where review_revisions.id = $1
+        and review_revisions.review_id = $2
+        and review_revisions.head_run_id = $3
       limit 1`,
-    [row.current_revision_id, row.id, row.head_run_id],
+    [row.current_revision_id, row.id, row.head_run_id, row.repository_id],
   );
   const current = ((revision as { rows?: AuthorizedRevisionRow[] }).rows ?? [])[0];
   if (!current) return null;
-  return remoteReviewFacts({
-    status: row.status as Parameters<typeof remoteReviewFacts>[0]["status"],
-    decision: row.decision as Parameters<typeof remoteReviewFacts>[0]["decision"],
-    headCommitSha: current.head_commit_sha,
-    evidenceDigest: current.evidence_digest,
-  });
+  return {
+    headRunId: row.head_run_id,
+    facts: remoteReviewFacts({
+      status: row.status as Parameters<typeof remoteReviewFacts>[0]["status"],
+      decision: row.decision as Parameters<typeof remoteReviewFacts>[0]["decision"],
+      headCommitSha: current.head_commit_sha,
+      evidenceDigest: current.evidence_digest,
+    }),
+  };
+}
+
+/** Public MCP review reads expose only the allowlisted facts, never DB IDs. */
+export async function loadAuthorizedRemoteReview(
+  db: Pick<SqlQueryExecutor, "query">,
+  principal: RemoteMcpPrincipal,
+  reviewId: string,
+  checkCurrentPermission: CheckLiveRepositoryPermission,
+): Promise<ReturnType<typeof remoteReviewFacts> | null> {
+  const authorized = await loadAuthorizedRemoteReviewSnapshot(db, principal, reviewId, checkCurrentPermission);
+  return authorized?.facts ?? null;
 }

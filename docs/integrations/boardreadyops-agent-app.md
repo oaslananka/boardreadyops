@@ -57,8 +57,8 @@ It is not a cloud-hosted MCP endpoint.
 
 | Tool | Inputs | Authorized response | State |
 | --- | --- | --- | --- |
-| `boardreadyops_review_get` | `reviewId` | State, explicitly qualified coverage, authorized repository and PR link | Planned |
-| `boardreadyops_review_findings` | `reviewId`, `cursor?` | Bounded deterministic findings, evidence fingerprint, page cursor | Planned |
+| `boardreadyops_review_get` | `reviewId` | Allowlisted Review status, decision and current head/evidence digests; no release approval | Guarded in source; not deployed |
+| `boardreadyops_review_findings` | `reviewId`, `cursor?` | At most 30 current-run rule IDs, severity, kind and optional fingerprint, with opaque page cursor; no messages, paths or CAD | Guarded in source; not deployed |
 | `boardreadyops_review_footprint_summary` | `reviewId` | Consented source-bound digest/count facts, or `unavailable` | Planned |
 | `boardreadyops_evidence_get` | `evidenceId` | Metadata/hash and authorized in-app link, not raw design bytes | Planned |
 
@@ -872,3 +872,38 @@ The merge is prepared in an isolated integration worktree, not the production
 checkout. Deployment, migration and provider enrollment require the
 separate live acceptance documented in
 `boardreadyops-live-acceptance-20261026.md`.
+
+
+## Hosted finding page implementation — source-only (27 October 2026)
+
+The disabled-by-default hosted MCP handler also registers
+`boardreadyops_review_findings` for `review:read` grants. It requires the
+same verified OAuth grant and live user-specific GitHub collaborator authority
+as `review_get`. The query uses only the currently authorized Review revision's
+head-run ID, sorted by finding ID with a maximum of 30 records per page and
+a server-bound 31-row lookahead. **All 31 retrieved records are validated**
+before any page is declared available. The optional versioned, opaque cursor
+binds the Review ID and head-run identity by digest alongside a validated
+finding ID, never disclosing the raw run ID. If the Review advances to a
+different head run between requests, the old cursor is rejected as unavailable
+and the client must restart from the first page. The cursor is used solely as
+a parameterized keyset boundary; it does not authorize a Review.
+
+The output is deliberately **not** a copy of the finding object: rule ID,
+severity, kind and optional fingerprint are allowlisted, and unavailable legacy
+fingerprints remain `null`. A versioned digest and head commit identify the
+current Review snapshot. Source messages, file paths, component coordinates,
+raw KiCad files, tenant names and manufacturing verdicts are not queried or
+returned. Failed permissions, missing revisions and malformed finding data
+fail closed as generic unavailable responses; a missing repository is not
+distinguishable from a denied repository. Disposable PostgreSQL and unit
+tests validate pagination and no cross-run leakage. Additive migration
+`0101_hosted_review_findings_pagination_index.sql` supplies a run-prefixed
+`(run_id, id)` index for bounded cursor scans. Migration runner transactions
+mean this non-concurrent index may briefly block writers on a large live
+`findings` table; staging review and a separately approved production
+migration window are still required. **No production migration was run.**
+
+This is a reviewable code increment only. Current-host acceptance with ChatGPT
+and Claude, actual product installation-token revocation tests, deployment,
+secret/key lifecycle and both production release switches remain blocked.

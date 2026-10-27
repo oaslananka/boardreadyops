@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 // package can ship as plain .ts source (matching this monorepo's other internal packages)
 // without a separate compiled build artifact. Explicit --experimental-strip-types rather than
 // relying on unflagged native TS support keeps this working on the minimum supported engine
-// (Node 22.14, where stripping exists behind the flag) as well as newer runtimes.
+// (Node 24 LTS) without an older compatibility runtime.
 import { fileURLToPath } from "node:url";
 
 const entrypoint = fileURLToPath(new URL("../src/stdio.ts", import.meta.url));

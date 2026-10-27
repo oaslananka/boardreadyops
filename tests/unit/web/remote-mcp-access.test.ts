@@ -166,6 +166,12 @@ describe("remote MCP live repository gate", () => {
     expect(sql).toContain("repositories.disabled_at is null");
     expect(sql).toContain("installations.suspended_at is null");
     expect(sql).toContain("github_marketplace_subscriptions.status = 'canceled'");
+    const revisionSql = vi.mocked(store.query).mock.calls[1]?.[0] as string;
+    const revisionArgs = vi.mocked(store.query).mock.calls[1]?.[1] as unknown[];
+    expect(revisionSql).toContain("join release_runs as revision_head_run");
+    expect(revisionSql).toContain("revision_head_run.commit_sha = review_revisions.head_commit_sha");
+    expect(revisionSql).toContain("revision_head_run.repository_id = $4");
+    expect(revisionArgs).toEqual(["revision-1", reviewId, "head-run-1", "another-internal-id"]);
   });
 
   it("rejects cross-tenant IDs and never infers access from a GitHub App installation", async () => {
