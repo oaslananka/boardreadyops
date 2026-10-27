@@ -1,3 +1,5 @@
+/* tsqllint-disable set-quoted-identifier */
+-- PostgreSQL migration: SQL Server SET QUOTED_IDENTIFIER is not valid here.
 -- Index-only, additive support for bounded remote MCP Review finding keyset reads.
 -- A current Review is authorized against its head run before the query executes;
 -- keeping the index run-prefixed avoids scanning findings from other runs.

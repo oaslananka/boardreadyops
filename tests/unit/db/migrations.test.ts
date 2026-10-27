@@ -820,6 +820,9 @@ describe("BoardReadyOps Cloud migrations", () => {
   it("indexes bounded remote Review finding keyset reads in additive schema v101", async () => {
     const sql = await readFile(join(migrationsDir, "0101_hosted_review_findings_pagination_index.sql"), "utf8");
     expect(sql).toContain("create index if not exists findings_run_id_idx");
+    // TSQLLint's SQL Server-only rule is suppressed for this PostgreSQL script,
+    // without disabling other Codacy tools or adding invalid SQL Server syntax.
+    expect(sql).toMatch(/^\/\* tsqllint-disable set-quoted-identifier \*\//u);
     expect(sql).toContain("on findings(run_id, id)");
     expect(sql).not.toMatch(/drop\s+(?:index|table)|alter\s+table/iu);
   });
