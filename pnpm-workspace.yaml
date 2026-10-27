@@ -19,14 +19,12 @@ minimumReleaseAgeExclude:
   - 'sharp@0.35.5'
   - 'proxy-addr@2.0.8'
   - 'source-map-js@1.2.2'
-  - '@modelcontextprotocol/sdk@1.32.0'
   - 'vite@8.2.4'
   # Security advisory fixes from latest OSV scan. Review exclusions after normal age window.
   - 'fast-uri@3.1.9'
   - 'body-parser@2.4.0'
   # Renovate security update: undici@8.12.2
   - 'undici@6.29.1 || 8.12.2'
-  - 'zod@4.6.6'
   - 'happy-dom@21.0.4'
   # Renovate security update: qs@6.16.1
   - 'qs@6.16.1'
@@ -69,7 +67,7 @@ overrides:
   '@hono/node-server@<2.0.12': 2.0.12
   'postcss@<8.5.23': 8.5.26
   sharp: 0.35.5
-  '@modelcontextprotocol/sdk@<1.32.0': 1.32.0
+  '@modelcontextprotocol/sdk@<1.32.0': 1.32.1
   'proxy-addr@<2.0.8': 2.0.8
   'source-map-js@<1.2.2': 1.2.2
   '@octokit/plugin-paginate-rest@>=1.0.0 <9.2.2': '>=9.2.2'
@@ -89,7 +87,7 @@ overrides:
   'hono@<4.13.7': 4.13.13
   'body-parser@>=2 <2.4.0': 2.4.0
   # Explicit compatibility probes required: both upstream tools still declare Zod 3.
-  '@codecov/bundler-plugin-core>zod': 4.6.6
+  '@codecov/bundler-plugin-core>zod': 4.6.7
   'chromium-bidi>zod': 4.6.6
   'markdown-it@<14.3.3': 14.3.3
   'next@<16.4.1': 16.4.1
