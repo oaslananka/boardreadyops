@@ -497,6 +497,22 @@ describe("MCP v2 stateless web request boundary", () => {
     expect(response).not.toContain("PRIVATE_CONN_STRING");
   });
 
+  it("rejects the old bare-ID cursor at the public MCP schema without opening the datastore", async () => {
+    const openDb = vi.fn();
+    const response = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/call", {
+        name: "boardreadyops_review_findings",
+        arguments: { reviewId, cursor: "000030" },
+      }),
+      { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] },
+      { openDb, checkCurrentPermission: vi.fn() },
+    );
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(body).not.toContain("drc.clearance");
+    expect(openDb).not.toHaveBeenCalled();
+  });
+
   it("returns identical generic unavailable errors for unauthorized or missing finding Reviews", async () => {
     const principal = { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] };
     for (const rows of [

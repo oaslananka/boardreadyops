@@ -101,7 +101,9 @@ describe("hosted read-only MCP finding pages", () => {
       vi.fn().mockResolvedValue(true),
     );
     expect(result?.findings).toHaveLength(30);
-    expect(result?.nextCursor).toBe("000030");
+    expect(result?.nextCursor).toMatch(/^v1\.[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]+$/u);
+    expect(result?.nextCursor).not.toContain("head-run-now");
+    expect(result?.nextCursor).not.toContain("000030");
     const paged = store([row(31)]);
     const next = await loadAuthorizedRemoteFindings(
       paged,
@@ -115,6 +117,98 @@ describe("hosted read-only MCP finding pages", () => {
     expect(next?.nextCursor).toBeNull();
   });
 
+  it("accepts legitimate 256-character rule IDs but rejects 257-character IDs", async () => {
+    const valid = await loadAuthorizedRemoteFindings(
+      store([{ ...row(1), rule_id: "R".repeat(256) }]),
+      principal,
+      reviewId,
+      undefined,
+      vi.fn().mockResolvedValue(true),
+    );
+    expect(valid?.findings[0]?.ruleId).toHaveLength(256);
+    const invalid = await loadAuthorizedRemoteFindings(
+      store([{ ...row(1), rule_id: "R".repeat(257) }]),
+      principal,
+      reviewId,
+      undefined,
+      vi.fn().mockResolvedValue(true),
+    );
+    expect(invalid).toBeNull();
+  });
+
+  it("rejects a cursor after the Review head run changes without querying findings", async () => {
+    const first = await loadAuthorizedRemoteFindings(
+      store(Array.from({ length: 31 }, (_, i) => row(i + 1))),
+      principal,
+      reviewId,
+      undefined,
+      vi.fn().mockResolvedValue(true),
+    );
+    expect(first?.nextCursor).not.toBeNull();
+    const moved = store();
+    moved.query
+      .mockReset()
+      .mockResolvedValueOnce({ rows: [{ ...review, head_run_id: "new-head-run" }] })
+      .mockResolvedValueOnce({ rows: [revision] });
+    expect(
+      await loadAuthorizedRemoteFindings(
+        moved,
+        principal,
+        reviewId,
+        first?.nextCursor ?? undefined,
+        vi.fn().mockResolvedValue(true),
+      ),
+    ).toBeNull();
+    expect(moved.query).toHaveBeenCalledTimes(2);
+
+    const otherReviewId = "123e4567-e89b-42d3-a456-426614174111";
+    const reused = store();
+    reused.query
+      .mockReset()
+      .mockResolvedValueOnce({ rows: [{ ...review, id: otherReviewId }] })
+      .mockResolvedValueOnce({ rows: [revision] });
+    expect(
+      await loadAuthorizedRemoteFindings(
+        reused,
+        principal,
+        otherReviewId,
+        first?.nextCursor ?? undefined,
+        vi.fn().mockResolvedValue(true),
+      ),
+    ).toBeNull();
+    expect(reused.query).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects tampered and non-canonical cursor encodings after authorization", async () => {
+    const first = await loadAuthorizedRemoteFindings(
+      store(Array.from({ length: 31 }, (_, i) => row(i + 1))),
+      principal,
+      reviewId,
+      undefined,
+      vi.fn().mockResolvedValue(true),
+    );
+    const cursor = first?.nextCursor;
+    expect(cursor).toBeTruthy();
+    const parts = (cursor ?? "").split(".");
+    const forged = ["v1", parts[1], Buffer.from("../bad").toString("base64url")].join(".");
+    const invalid = store();
+    expect(
+      await loadAuthorizedRemoteFindings(invalid, principal, reviewId, forged, vi.fn().mockResolvedValue(true)),
+    ).toBeNull();
+    expect(invalid.query).toHaveBeenCalledTimes(2);
+    const noncanonical = store();
+    expect(
+      await loadAuthorizedRemoteFindings(
+        noncanonical,
+        principal,
+        reviewId,
+        (cursor ?? "") + "=",
+        vi.fn().mockResolvedValue(true),
+      ),
+    ).toBeNull();
+    expect(noncanonical.query).not.toHaveBeenCalled();
+  });
+
   it("preserves unavailable legacy fingerprints without inventing a digest", async () => {
     const db = store([{ ...row(1), fingerprint: null, kind: null }]);
     const result = await loadAuthorizedRemoteFindings(
@@ -125,6 +219,14 @@ describe("hosted read-only MCP finding pages", () => {
       vi.fn().mockResolvedValue(true),
     );
     expect(result?.findings[0]).toEqual({ ruleId: "drc.clearance", severity: "error", fingerprint: null, kind: null });
+  });
+
+  it("rejects malformed lookahead row 31 instead of advertising a broken next page", async () => {
+    const rows = Array.from({ length: 31 }, (_, i) => row(i + 1));
+    rows[30] = { ...row(31), kind: "<script>" };
+    expect(
+      await loadAuthorizedRemoteFindings(store(rows), principal, reviewId, undefined, vi.fn().mockResolvedValue(true)),
+    ).toBeNull();
   });
 
   it("fails closed on unavailable database rows instead of claiming a finding-free Review", async () => {

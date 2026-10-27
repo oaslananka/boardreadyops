@@ -881,8 +881,13 @@ The disabled-by-default hosted MCP handler also registers
 same verified OAuth grant and live user-specific GitHub collaborator authority
 as `review_get`. The query uses only the currently authorized Review revision's
 head-run ID, sorted by finding ID with a maximum of 30 records per page and
-a server-bound 31-row lookahead. The optional cursor is validated and used
-solely as a parameterized keyset boundary. It does not authorize a Review.
+a server-bound 31-row lookahead. **All 31 retrieved records are validated**
+before any page is declared available. The optional versioned, opaque cursor
+binds the Review ID and head-run identity by digest alongside a validated
+finding ID, never disclosing the raw run ID. If the Review advances to a
+different head run between requests, the old cursor is rejected as unavailable
+and the client must restart from the first page. The cursor is used solely as
+a parameterized keyset boundary; it does not authorize a Review.
 
 The output is deliberately **not** a copy of the finding object: rule ID,
 severity, kind and optional fingerprint are allowlisted, and unavailable legacy

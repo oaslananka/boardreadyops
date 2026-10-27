@@ -10,7 +10,7 @@ import {
   type RemoteMcpPrincipal,
   type RemoteMcpTokenVerifier,
 } from "./remote-mcp-access.js";
-import { loadAuthorizedRemoteFindings } from "./remote-mcp-findings.js";
+import { loadAuthorizedRemoteFindings, remoteFindingCursorFormat } from "./remote-mcp-findings.js";
 import { remoteMcpMetadataUrl } from "./remote-mcp-foundation.js";
 
 /** Keep this limit synchronized with createMcpHandler.maxRequestBodySize.
@@ -113,10 +113,7 @@ export async function handleAuthorizedRemoteMcpHttp(
             inputSchema: z
               .object({
                 reviewId: z.string().uuid(),
-                cursor: z
-                  .string()
-                  .regex(/^[A-Za-z0-9_-]{1,120}$/u)
-                  .optional(),
+                cursor: z.string().regex(remoteFindingCursorFormat).optional(),
               })
               .strict(),
             annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },

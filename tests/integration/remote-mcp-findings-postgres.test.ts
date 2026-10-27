@@ -107,7 +107,8 @@ describePg("live-authorized MCP finding pagination against PostgreSQL", () => {
     const canRead = vi.fn().mockResolvedValue(true);
     const first = await loadAuthorizedRemoteFindings(executor(), principal, reviewId, undefined, canRead);
     expect(first?.findings).toHaveLength(30);
-    expect(first?.nextCursor).toBe("000030");
+    expect(first?.nextCursor).toMatch(/^v1\.[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]+$/u);
+    expect(first?.nextCursor).not.toContain(runId);
     expect(canRead).toHaveBeenCalledWith({
       githubUserId: userId,
       githubRepositoryId: 20261027002,
