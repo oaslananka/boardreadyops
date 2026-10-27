@@ -41,11 +41,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 ## Apache-2.0
 
-- `@apm-js-collab/code-transformer@0.18.1`
-  - Homepage: https://github.com/nodejs/orchestrion-js#readme
-- `@apm-js-collab/tracing-hooks@0.13.0`
-  - Description: CJS and ESM hooks for orchestrion
-  - Homepage: https://github.com/apm-js-collab/tracing-hooks#readme
 - `@bufbuild/protoplugin@2.12.0`
   - Description: Helps to create your own Protocol Buffers code generators.
   - Homepage: https://github.com/bufbuild/protobuf-es#readme
@@ -274,9 +269,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `rxjs@7.8.2`
   - Description: Reactive Extensions for modern JavaScript
   - Homepage: https://rxjs.dev
-- `semifies@1.0.0`
-  - Description: Slimmed down satisfies from semver
-  - Homepage: https://github.com/holepunchto/semifies
 - `sharp@0.35.5`
   - Description: High performance Node.js image processing, the fastest module to resize JPEG, PNG, WebP, GIF, AVIF and TIFF images
   - Homepage: https://sharp.pixelplumbing.com
@@ -364,9 +356,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `devtools-protocol@0.0.1666840`, `devtools-protocol@0.0.1687809`
   - Description: The Chrome DevTools Protocol JSON
   - Homepage: https://github.com/ChromeDevTools/devtools-protocol#readme
-- `esquery@1.7.0`
-  - Description: A query library for ECMAScript AST using a CSS selector like query language.
-  - Homepage: https://github.com/estools/esquery/
 - `fast-uri@3.1.9`
   - Description: Dependency-free RFC 3986 URI toolbox
   - Homepage: https://github.com/fastify/fast-uri
@@ -503,9 +492,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `lucide-react@1.35.0`
   - Description: A Lucide icon library package for React applications.
   - Homepage: https://lucide.dev
-- `meriyah@6.1.4`
-  - Description: A 100% compliant, self-hosted javascript parser with high focus on both performance and stability
-  - Homepage: https://github.com/meriyah/meriyah
 - `minimalistic-assert@1.0.1`
   - Description: minimalistic-assert ===
   - Homepage: https://github.com/calvinmetcalf/minimalistic-assert
@@ -596,9 +582,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@alloc/quick-lru@5.2.0`
   - Description: Simple “Least Recently Used” (LRU) cache
   - Homepage: https://github.com/sindresorhus/quick-lru#readme
-- `@apm-js-collab/code-transformer-bundler-plugins@0.7.4`
-  - Description: A universal plugin that uses '@apm-js-collab/code-transformer' to instrument JavaScript code at build time
-  - Homepage: https://github.com/apm-js-collab/code-transformer-bundler-plugins#readme
 - `@azure/abort-controller@2.1.2`
   - Description: Microsoft Azure SDK for JavaScript - Aborter
   - Homepage: https://github.com/Azure/azure-sdk-for-js/tree/main/sdk/core/abort-controller/README.md
@@ -1109,7 +1092,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/main/packages/bundler-plugins
 - `@sentry/conventions@0.16.0`
   - Homepage: https://github.com/getsentry/sentry-conventions#readme
-- `@sentry/core@10.71.0`, `@sentry/core@10.76.2`
+- `@sentry/core@10.76.2`
   - Description: Base implementation for all Sentry JavaScript SDKs
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/core
 - `@sentry/feedback@10.76.2`
@@ -1118,13 +1101,13 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@sentry/nextjs@10.76.2`
   - Description: Official Sentry SDK for Next.js
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/nextjs
-- `@sentry/node@10.71.0`, `@sentry/node@10.76.2`
+- `@sentry/node@10.76.2`
   - Description: Sentry Node SDK using OpenTelemetry for performance instrumentation
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/node
-- `@sentry/node-core@10.71.0`, `@sentry/node-core@10.76.2`
+- `@sentry/node-core@10.76.2`
   - Description: Sentry Node-Core SDK
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/node-core
-- `@sentry/opentelemetry@10.71.0`, `@sentry/opentelemetry@10.76.2`
+- `@sentry/opentelemetry@10.76.2`
   - Description: Official Sentry utilities for OpenTelemetry
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/opentelemetry
 - `@sentry/react@10.76.2`
@@ -1136,7 +1119,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@sentry/replay-canvas@10.76.2`
   - Description: Replay canvas integration
   - Homepage: https://docs.sentry.io/platforms/javascript/session-replay/
-- `@sentry/server-utils@10.71.0`, `@sentry/server-utils@10.76.2`
+- `@sentry/server-utils@10.76.2`
   - Description: Server Utilities for all Sentry JavaScript SDKs
   - Homepage: https://github.com/getsentry/sentry-javascript/tree/master/packages/server-utils
 - `@sentry/vercel-edge@10.76.2`
@@ -1404,9 +1387,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `ast-v8-to-istanbul@1.0.0`
   - Description: AST-aware v8-to-istanbul
   - Homepage: https://github.com/AriPerkkio/ast-v8-to-istanbul
-- `astring@1.9.0`
-  - Description: JavaScript code generator from an ESTree-compliant AST.
-  - Homepage: https://github.com/davidbonnet/astring#readme
 - `async@3.2.6`
   - Description: Higher-order functions and common patterns for asynchronous code
   - Homepage: https://caolan.github.io/async/
@@ -1811,7 +1791,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `has-tostringtag@1.0.2`
   - Description: Determine if the JS environment has `Symbol.toStringTag` support. Supports spec, or shams.
   - Homepage: https://github.com/inspect-js/has-tostringtag#readme
-- `hasown@2.0.3`, `hasown@2.0.4`
+- `hasown@2.0.4`
   - Description: A robust, ES3 compatible, "has own property" predicate.
   - Homepage: https://github.com/inspect-js/hasOwn#readme
 - `hono@4.13.13`
@@ -2540,7 +2520,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `zip-stream@6.0.1`
   - Description: a streaming zip archive generator.
   - Homepage: https://github.com/archiverjs/node-zip-stream
-- `zod@4.6.6`
+- `zod@4.6.6`, `zod@4.6.7`
   - Description: TypeScript-first schema declaration and validation library with static type inference
   - Homepage: https://zod.dev
 
