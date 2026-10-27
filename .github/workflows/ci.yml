@@ -256,7 +256,6 @@ jobs:
           - windows-2025-vs2026
           - macos-latest
         node-version:
-          - 22
           - 24
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -329,11 +328,6 @@ jobs:
         include:
           - kicad-version: "10.0"
             kicad-ppa-series: "10.0"
-            node-version: 22
-            postgres-version: "16"
-            postgres-image: "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
-          - kicad-version: "10.0"
-            kicad-ppa-series: "10.0"
             node-version: 24
             postgres-version: "17"
             postgres-image: "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
@@ -347,18 +341,14 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
-      # Only production's Node 24/PG 17 lane installs KiCad when required.
-      # PG-backed billing PRs still exercise Node 22/24 and PostgreSQL 16/17
-      # without a dependency on Launchpad KiCad package availability.
+      # Single supported Node 24 / PostgreSQL 17 lane; install real KiCad
+      # only when required by the existing fail-closed PR risk classifier.
       - name: Install KiCad ${{ matrix.kicad-version }}
         if: ${{ needs.risk-profile.outputs.needs_kicad == 'true' && matrix.node-version == 24 && matrix.postgres-version == '17' }}
         env:
           BRO_KICAD_VERSION: ${{ matrix.kicad-version }}
           BRO_KICAD_PPA_SERIES: ${{ matrix.kicad-ppa-series }}
         run: bash scripts/install-kicad-ci.sh
-      - name: Install PostgreSQL 16 client
-        if: matrix.postgres-version == '16'
-        run: sudo apt-get install --yes postgresql-client
       - name: Prepare PostgreSQL 17 client wrappers
         if: matrix.postgres-version == '17'
         shell: bash

@@ -68,6 +68,6 @@ See [Testing Policy](testing-policy.md) and [Self-hosted deployment](../deployme
 
 ## CI compatibility and caching
 
-The preferred Node release is pinned exactly in `.nvmrc` and workflow `NODE_VERSION` variables. Node 22 remains in compatibility matrices because `package.json` supports `^22.14.0 || ^24.0.0`. Python and validation-tool versions are checked against `toolchain.json` by unit tests.
+The preferred Node release is pinned exactly in `.nvmrc` and workflow `NODE_VERSION` variables. Only Node 24 is supported in the active compatibility and CI matrix; `package.json` requires `^24.0.0`. Python and validation-tool versions are checked against `toolchain.json` by unit tests.
 
 GitHub-hosted jobs deliberately keep clean dependency installation as the authoritative gate. User-scoped pnpm, pre-commit, Puppeteer, and Next.js caches may be reused because generated bundles, clean-tree checks, and committed-dist verification still rebuild and compare outputs.

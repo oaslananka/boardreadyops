@@ -52,10 +52,9 @@ for historical verified snapshots and outstanding follow-ups.
 
 ## Runtime Support
 
-BoardReadyOps supports Node.js 22.14+ and 24. Node.js 24 is the recommended Active
-LTS runtime; Node.js 22.14+ remains supported for Maintenance LTS users. Node.js 26
-Current is tracked but not supported in `engines.node` or CI until it reaches
-LTS and dependency validation is added.
+BoardReadyOps supports **Node.js 24 LTS only**. Earlier Node major versions
+are no longer supported or CI-tested. Node.js 26 Current is tracked but not supported
+in engines.node or CI until it reaches LTS and dependency validation is added.
 
 KiCad CLI compatibility is CI-tested on KiCad 10.0, with 10.0.6 as the latest
 verified patch. KiCad 9.0 remains the minimum supported line but is upstream EOL
