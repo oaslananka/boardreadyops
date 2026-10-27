@@ -103,11 +103,15 @@ then re-enable only that single row within a controlled transaction. Never
 blindly replay large batches or manually change customer entitlements. Keep the
 audit trail of the original event and incident outside the public issue/PR.
 
-**Deployment HOLD:** migration 0103 depends on 0102. Before deploying, reconcile
-with the separate, still-HOLD legal-hold PR #1080 (its draft 0097 migration
-number conflicts with main and must be renumbered before any rollout). Stop all legacy
-inline entitlement-mutating webhook instances before enabling the new worker;
-a mixed-version rollout bypasses the new transactional protocol. Verify schema,
-worker readiness, no legacy writers, replay isolation, alarms, and genuine
-Stripe test-mode deliveries before enabling production paid billing. Merge
-approval alone does not authorize a live billing rollout.
+**Deployment HOLD:** migration 0103 depends on 0102. Separate, still-HOLD
+legal-hold Draft PR #1080 now uses additive migration 0104 after main's
+0095–0101 and this Stripe Draft's 0102–0103. A noncolliding migration sequence
+is only schema compatibility evidence, **not** approval to combine rollouts or
+proof that old physical-unlink workers are safe. The legal-hold rollout requires
+independent operator authorization, a complete worker inventory and quiescence
+of all pre-fencing unlink actors before its migration and worker cutover.
+Stop all legacy inline entitlement-mutating webhook instances before enabling
+the new Stripe worker; a mixed-version rollout bypasses its transactional
+protocol. Verify schema, worker readiness, no legacy writers, replay isolation,
+alarms, and genuine Stripe test-mode deliveries before enabling production paid
+billing. Neither green CI nor merge approval authorizes either live rollout.
