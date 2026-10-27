@@ -79,10 +79,14 @@ describe("compatibility matrix", () => {
     expect(config.node.supported).toEqual(["22", "24"]);
     expect(config.node.current).toEqual(["26"]);
     expect(config.node.tested).toEqual({
-      "22": "22.23.3",
-      "24": "24.21.0",
+      "22": "22.23.4",
+      "24": "24.22.1",
     });
-    expect(toolchain.node.preferred).toBe("24.21.0");
+    const verifiedNodeSource = config.source_checked as typeof config.source_checked & {
+      node: { checkedAt: string };
+    };
+    expect(verifiedNodeSource.node.checkedAt).toBe("2026-10-27");
+    expect(toolchain.node.preferred).toBe("24.22.1");
     expect(toolchain.node.engines).toBe("^22.14.0 || ^24.0.0");
     expect(toolchain.node.supportedMajors).toEqual([22, 24]);
     expect(config.node.tested?.["24"]).toBe(toolchain.node.preferred);
@@ -100,7 +104,7 @@ describe("compatibility matrix", () => {
     expect(supportMatrix).not.toContain("| KiCad | 9.1 | Supported |");
     expect(supportMatrix).not.toContain("| KiCad | 10.1 | Supported |");
     expect(supportMatrix).toContain("| Node.js | 22 | Minimum supported runtime |");
-    expect(supportMatrix).toContain("| Node.js | 24 | Recommended Active LTS runtime |");
+    expect(supportMatrix).toContain("| Node.js | 24 | Recommended LTS runtime |");
     expect(supportMatrix).toContain("| Node.js | 26 | Current, not supported |");
     expect(supportMatrix).toContain("| CycloneDX JSON | 1.7 | Pinned HBOM contract |");
     expect(config.cyclonedx.schemaUrl).toBe("https://cyclonedx.org/schema/bom-1.7.schema.json");
