@@ -374,7 +374,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `qs@6.16.1`
   - Description: A querystring parser that supports nesting and arrays, with a depth limit
   - Homepage: https://github.com/ljharb/qs
-- `smol-toml@1.9.0`
+- `smol-toml@1.9.1`
   - Description: A small, fast, and correct TOML parser/serializer
   - Homepage: https://github.com/squirrelchat/smol-toml#readme
 - `source-map@0.6.1`, `source-map@0.7.6`
