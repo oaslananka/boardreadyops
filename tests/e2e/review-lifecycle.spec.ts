@@ -38,13 +38,13 @@ test.describe("Review lifecycle", () => {
   test("1. Reviews list renders decision-ready summaries per repository/PR", async ({ page }) => {
     await page.goto("/reviews");
     await expect(page.getByRole("heading", { name: "Hardware Reviews" })).toBeVisible();
-    // Match the review's own link, not any text on the page. The filter bar's repository
-    // <select> carries an <option> with the same name, so a bare getByText resolves to two
-    // elements and fails strict mode -- it was only ever unambiguous because the filter did
-    // not exist yet. Asserting the link is also the stronger claim: the row is there and it
-    // goes somewhere.
-    await expect(page.getByRole("link", { name: /acme-hardware\/industrial-iot-gateway/ })).toBeVisible();
-    await expect(page.getByText("PR #42")).toBeVisible();
+    // The review link has an explicit accessible name based on its title, while repository
+    // and PR metadata live inside the same link. Assert both without matching the unrelated
+    // repository filter option or relying on non-accessible concatenated link text.
+    const review = page.getByRole("link", { name: /Open review: Upgrade PMIC to MP2617/ });
+    await expect(review).toBeVisible();
+    await expect(review.getByText("acme-hardware/industrial-iot-gateway", { exact: true })).toBeVisible();
+    await expect(review.getByText("PR #42", { exact: true })).toBeVisible();
   });
 
   test("2. Base/head diff renders real canvas snapshots and BOM deltas, not a static mockup", async ({ page }) => {
