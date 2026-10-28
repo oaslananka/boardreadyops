@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
 
@@ -32,7 +32,12 @@ export async function checkoutRunnerSource(options: CheckoutRunnerSourceOptions)
   // Validate the mirror locator before creating a checkout workspace.
   const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
   const workspaceRoot = path.resolve(options.workspaceRoot);
+  // Do not follow customer-controlled symlinks when preparing a source directory.
+  // Check both before mkdir (which could otherwise create outside the intended
+  // root) and after creation (before chmod and Git write operations).
+  await assertRunnerWorkspaceDirectories(workspaceRoot);
   await mkdir(workspaceRoot, { recursive: true, mode: 0o700 });
+  await assertRunnerWorkspaceDirectories(workspaceRoot);
   if (process.platform !== "win32") await chmod(workspaceRoot, 0o700);
   const workspace = await mkdtemp(path.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
@@ -62,6 +67,23 @@ export async function checkoutRunnerSource(options: CheckoutRunnerSourceOptions)
   } catch (error) {
     await rm(workspace, { recursive: true, force: true });
     throw error;
+  }
+}
+
+export async function assertRunnerWorkspaceDirectories(workspaceRoot: string): Promise<void> {
+  const { root } = path.parse(workspaceRoot);
+  const parts = path.relative(root, workspaceRoot).split(path.sep).filter(Boolean);
+  let directory = root;
+  for (const part of parts) {
+    directory = path.join(directory, part);
+    const info = await lstat(directory).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined;
+      throw error;
+    });
+    if (!info) continue;
+    if (info.isSymbolicLink() || !info.isDirectory()) {
+      throw new Error("runner workspace path contains a symlink or non-directory component");
+    }
   }
 }
 

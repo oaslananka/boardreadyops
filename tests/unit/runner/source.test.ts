@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -34,6 +34,45 @@ afterEach(async () => {
 });
 
 describe("checkoutRunnerSource", () => {
+  it.skipIf(process.platform === "win32")("rejects a workspace root symlink before modifying its target", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-link-root-"));
+    roots.push(root);
+    const outside = path.join(root, "customer-owned");
+    await mkdir(outside, { mode: 0o755 });
+    const link = path.join(root, "runner-workspaces");
+    await symlink(outside, link, "dir");
+    const before = (await lstat(outside)).mode & 0o777;
+    const execute = vi.fn<RunnerCommandExecutor>(async (_command, args) => ({
+      stdout: args.includes("rev-parse") ? commitSha : "",
+      stderr: "",
+    }));
+
+    await expect(checkoutRunnerSource({ job: job(), workspaceRoot: link, execute })).rejects.toThrow(
+      /workspace.*symlink|workspace.*symbolic/u,
+    );
+    expect(execute).not.toHaveBeenCalled();
+    expect((await lstat(outside)).mode & 0o777).toBe(before);
+    await expect(readdir(outside)).resolves.toEqual([]);
+  });
+
+  it.skipIf(process.platform === "win32")("rejects a symlinked ancestor of a workspace root", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-link-ancestor-"));
+    roots.push(root);
+    const outside = path.join(root, "external");
+    await mkdir(outside);
+    const link = path.join(root, "redirect");
+    await symlink(outside, link, "dir");
+    const execute = vi.fn<RunnerCommandExecutor>(async (_command, args) => ({
+      stdout: args.includes("rev-parse") ? commitSha : "",
+      stderr: "",
+    }));
+    await expect(
+      checkoutRunnerSource({ job: job(), workspaceRoot: path.join(link, "workspaces"), execute }),
+    ).rejects.toThrow(/workspace.*symlink|workspace.*symbolic/u);
+    expect(execute).not.toHaveBeenCalled();
+    await expect(readdir(outside)).resolves.toEqual([]);
+  });
+
   it("checks out the exact server-assigned commit using customer-controlled Git credentials", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-source-"));
     roots.push(root);
