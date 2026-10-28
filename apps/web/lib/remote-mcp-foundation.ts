@@ -10,12 +10,12 @@ import { pcbFootprintSummarySchema } from "@boardreadyops/contracts/pcb-footprin
  * headers or arbitrary environment URLs. Staging is a separate, opt-in deployment;
  * the default preserves the existing production issuer and audience exactly.
  */
-export const productionRemoteMcpOrigin = "https://boardreadyops.com";
+const productionRemoteMcpOrigin = "https://boardreadyops.com";
 export const stagingRemoteMcpOrigin = "https://staging.boardreadyops.com";
 export const remoteMcpOrigin =
   process.env.BOARDREADYOPS_REMOTE_MCP_STAGING_ENABLED === "true" ? stagingRemoteMcpOrigin : productionRemoteMcpOrigin;
-export const remoteMcpResource = remoteMcpOrigin + "/mcp";
-export const remoteMcpMetadataUrl = remoteMcpOrigin + "/.well-known/oauth-protected-resource/mcp";
+export const remoteMcpResource = `${remoteMcpOrigin}/mcp`;
+export const remoteMcpMetadataUrl = `${remoteMcpOrigin}/.well-known/oauth-protected-resource/mcp`;
 
 /** These scopes are reserved for a future user-bound OAuth grant; API tokens are not accepted. */
 const remoteMcpScopes = ["review:read", "evidence:read"] as const;

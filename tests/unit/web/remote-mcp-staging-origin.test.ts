@@ -15,8 +15,8 @@ describe("remote MCP staging resource boundary", () => {
     vi.resetModules();
     const foundation = await import("../../../apps/web/lib/remote-mcp-foundation.js");
     expect(foundation.remoteMcpOrigin).toBe(productionOrigin);
-    expect(foundation.remoteMcpResource).toBe(productionOrigin + "/mcp");
-    expect(foundation.remoteMcpMetadataUrl).toBe(productionOrigin + "/.well-known/oauth-protected-resource/mcp");
+    expect(foundation.remoteMcpResource).toBe(`${productionOrigin}/mcp`);
+    expect(foundation.remoteMcpMetadataUrl).toBe(`${productionOrigin}/.well-known/oauth-protected-resource/mcp`);
   });
 
   it("binds staging metadata, tokens and HTTP to only the staging origin", async () => {
@@ -30,9 +30,9 @@ describe("remote MCP staging resource boundary", () => {
     const { createLocalJWKSet } = await import("jose");
 
     expect(foundation.remoteMcpOrigin).toBe(stagingOrigin);
-    expect(foundation.remoteMcpResource).toBe(stagingOrigin + "/mcp");
+    expect(foundation.remoteMcpResource).toBe(`${stagingOrigin}/mcp`);
     expect(foundation.protectedResourceMetadata(stagingOrigin)).toMatchObject({
-      resource: stagingOrigin + "/mcp",
+      resource: `${stagingOrigin}/mcp`,
       authorization_servers: [stagingOrigin],
     });
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -57,11 +57,11 @@ describe("remote MCP staging resource boundary", () => {
       verifyKey: createLocalJWKSet(keys),
       activeGrant,
     });
-    expect((await verifier.verifySignedAccessToken(token))?.aud).toBe(stagingOrigin + "/mcp");
+    expect((await verifier.verifySignedAccessToken(token))?.aud).toBe(`${stagingOrigin}/mcp`);
     expect(
       (
         await authenticateRemoteMcpRequest(
-          new Request(stagingOrigin + "/mcp", { headers: { authorization: "Bearer " + token } }),
+          new Request(`${stagingOrigin}/mcp`, { headers: { authorization: `Bearer ${token}` } }),
           stagingOrigin,
           verifier,
         )
@@ -70,7 +70,7 @@ describe("remote MCP staging resource boundary", () => {
     expect(activeGrant).toHaveBeenCalledTimes(1);
     expect(
       await authenticateRemoteMcpRequest(
-        new Request(stagingOrigin + "/mcp", { headers: { authorization: "Bearer " + token } }),
+        new Request(`${stagingOrigin}/mcp`, { headers: { authorization: `Bearer ${token}` } }),
         productionOrigin,
         verifier,
       ),
@@ -82,20 +82,20 @@ describe("remote MCP staging resource boundary", () => {
     const handler = prepareRemoteMcpProductionHandler(opts);
     expect(handler).not.toBeNull();
     if (!handler) throw new Error("Expected locally prepared staging handler");
-    expect((await handler(new Request(productionOrigin + "/mcp"))).status).toBe(403);
+    expect((await handler(new Request(`${productionOrigin}/mcp`))).status).toBe(403);
     expect(
       (
         await handler(
-          new Request(stagingOrigin + "/mcp", {
+          new Request(`${stagingOrigin}/mcp`, {
             headers: { origin: productionOrigin },
           }),
         )
       ).status,
     ).toBe(403);
-    const unauthorized = await handler(new Request(stagingOrigin + "/mcp"));
+    const unauthorized = await handler(new Request(`${stagingOrigin}/mcp`));
     expect(unauthorized.status).toBe(401);
     expect(unauthorized.headers.get("www-authenticate")).toContain(
-      stagingOrigin + "/.well-known/oauth-protected-resource/mcp",
+      `${stagingOrigin}/.well-known/oauth-protected-resource/mcp`,
     );
     expect(openDb).not.toHaveBeenCalled();
   });
