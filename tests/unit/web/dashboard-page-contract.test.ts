@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
-  viewerAuthorization: vi.fn(async () => ({ session: { login: "octocat" } })),
+  viewerAuthorization: vi.fn(async () => ({ session: { login: "octocat", installationIds: [123] } })),
 }));
 vi.mock("../../../apps/web/lib/repository-dashboard.js", () => ({
   loadViewerRepositories: vi.fn(async () => [
@@ -38,8 +38,59 @@ const { default: DashboardPage } = await import("../../../apps/web/app/dashboard
 const { loadViewerRepositories, summarizeViewerRepositories } = await import(
   "../../../apps/web/lib/repository-dashboard.js"
 );
+const { viewerAuthorization } = await import("../../../apps/web/lib/viewer-authorization.js");
 
 describe("dashboard operational hierarchy", () => {
+  it("does not claim the GitHub App was installed when a signed-in user has no installations", async () => {
+    vi.mocked(viewerAuthorization).mockResolvedValueOnce({
+      session: {
+        login: "octocat",
+        userId: 1,
+        installationIds: [],
+        issuedAt: "2026-10-28T00:00:00Z",
+        expiresAt: "2026-10-28T08:00:00Z",
+      },
+      authorizeRepository: async () => false,
+      authorizeInstallation: async () => false,
+    });
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 0,
+      repositoriesWithOpenFindings: 0,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 0,
+      watchedBoards: 0,
+    });
+    const html = renderToStaticMarkup(await DashboardPage());
+    expect(html).toContain("Get your first board reviewed — 3 steps left");
+    expect(html).toContain('href="https://github.com/apps/boardreadyops/installations/new"');
+    expect(html).not.toMatch(/line-through[^>]*>Connect the BoardReadyOps GitHub App/u);
+  });
+
+  it("marks the app step complete only for a session with a recorded installation", async () => {
+    vi.mocked(viewerAuthorization).mockResolvedValueOnce({
+      session: {
+        login: "octocat",
+        userId: 1,
+        installationIds: [123],
+        issuedAt: "2026-10-28T00:00:00Z",
+        expiresAt: "2026-10-28T08:00:00Z",
+      },
+      authorizeRepository: async () => false,
+      authorizeInstallation: async () => false,
+    });
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 0,
+      repositoriesWithOpenFindings: 0,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 0,
+      watchedBoards: 0,
+    });
+    const html = renderToStaticMarkup(await DashboardPage());
+    expect(html).toContain("Get your first board reviewed — 2 steps left");
+    expect(html).toMatch(/line-through[^>]*>Connect the BoardReadyOps GitHub App/u);
+    expect(html).toContain('href="/setup"');
+  });
+
   it("derives a compact summary from the loaded repository groups", async () => {
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).toContain("Engineering status");
