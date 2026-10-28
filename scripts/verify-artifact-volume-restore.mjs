@@ -20,7 +20,9 @@ async function rootDirectory(input) {
   const state = await lstat(input);
   if (!state.isDirectory() || state.isSymbolicLink()) throw Error("unsafe_entry");
   const resolved = await realpath(input);
-  if (resolved !== input) throw Error("unsafe_entry");
+  // /var -> /private/var on macOS and normalized drive paths on Windows
+  // can change an ancestor without making the root itself a symlink.
+  // lstat above rejects symlinked roots; use canonical paths for traversal.
   return { resolved, state };
 }
 
