@@ -34,6 +34,20 @@ afterEach(async () => {
 });
 
 describe("checkoutRunnerSource", () => {
+  it.skipIf(process.platform !== "darwin")(
+    "accepts macOS protected system aliases while keeping the actual workspace private",
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-macos-"));
+      roots.push(root);
+      const execute: RunnerCommandExecutor = vi.fn(async (_command, args) => ({
+        stdout: args.includes("rev-parse") ? commitSha : "",
+        stderr: "",
+      }));
+      const workspace = await checkoutRunnerSource({ job: job(), workspaceRoot: root, execute });
+      expect(workspace).toMatch(new RegExp(job().runId, "u"));
+    },
+  );
+
   it.skipIf(process.platform === "win32")("rejects a workspace root symlink before modifying its target", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-link-root-"));
     roots.push(root);

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { chmod, lstat, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
 
@@ -81,7 +81,22 @@ export async function assertRunnerWorkspaceDirectories(workspaceRoot: string): P
       throw error;
     });
     if (!info) continue;
-    if (info.isSymbolicLink() || !info.isDirectory()) {
+    if (info.isSymbolicLink()) {
+      // macOS provides root-owned /var and /tmp aliases under protected root
+      // directories. Those platform aliases are not customer-controlled
+      // redirects; refuse every other symlink, including runner-owned links.
+      const parent = await lstat(path.dirname(directory));
+      const target = await stat(directory);
+      const protectedSystemAlias =
+        process.platform === "darwin" &&
+        info.uid === 0 &&
+        parent.uid === 0 &&
+        (parent.mode & 0o022) === 0 &&
+        target.isDirectory();
+      if (!protectedSystemAlias) {
+        throw new Error("runner workspace path contains a symlink or non-directory component");
+      }
+    } else if (!info.isDirectory()) {
       throw new Error("runner workspace path contains a symlink or non-directory component");
     }
   }

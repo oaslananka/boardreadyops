@@ -12715,8 +12715,8 @@ var require_util2 = __commonJS({
     }
     async function isDirectory(path85) {
       try {
-        const stat3 = await fs_1.promises.stat(path85);
-        return stat3.isDirectory();
+        const stat4 = await fs_1.promises.stat(path85);
+        return stat4.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
           return false;
@@ -12726,8 +12726,8 @@ var require_util2 = __commonJS({
     }
     function isDirectorySync(path85) {
       try {
-        const stat3 = fs_1.default.statSync(path85);
-        return stat3.isDirectory();
+        const stat4 = fs_1.default.statSync(path85);
+        return stat4.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
           return false;
@@ -35659,17 +35659,17 @@ function recordOutputFile(result, relative) {
 async function recordOutputEntry(current, name, root, manifestPath, expectedDirectories, pending, result) {
   const relative = current.relative ? `${current.relative}/${name}` : name;
   const absolute = import_node_path36.default.join(current.absolute, name);
-  const stat3 = await import_promises13.default.lstat(absolute);
-  if (stat3.isSymbolicLink()) {
+  const stat4 = await import_promises13.default.lstat(absolute);
+  if (stat4.isSymbolicLink()) {
     result.reasons.push(`Symlink in generated output: ${relative}`);
-  } else if (stat3.isDirectory()) {
+  } else if (stat4.isDirectory()) {
     if (!expectedDirectories.has(relative)) result.reasons.push(`Undeclared generated directory: ${relative}`);
     if (current.depth >= MAX_OUTPUT_DEPTH) throw new Error(`Output tree scan exceeds depth ${MAX_OUTPUT_DEPTH}.`);
     if (await import_promises13.default.realpath(absolute) !== import_node_path36.default.resolve(root, relative)) {
       throw new Error(`Generated directory has a noncanonical real path: ${relative}`);
     }
     pending.push({ absolute, relative, depth: current.depth + 1 });
-  } else if (!stat3.isFile()) {
+  } else if (!stat4.isFile()) {
     result.reasons.push(`Non-file entry in generated output: ${relative}`);
   } else if (absolute !== manifestPath) {
     recordOutputFile(result, relative);
@@ -37851,14 +37851,14 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
       "Release output overlaps a project, Git metadata, or a filesystem ancestor; choose a safe --output path."
     );
   }
-  let stat3;
+  let stat4;
   try {
-    stat3 = await import_promises26.default.lstat(output2);
+    stat4 = await import_promises26.default.lstat(output2);
   } catch (error62) {
     if (error62.code === "ENOENT") return;
     throw error62;
   }
-  if (!stat3.isDirectory() || stat3.isSymbolicLink()) {
+  if (!stat4.isDirectory() || stat4.isSymbolicLink()) {
     throw new Error("Release output must be a real directory, not a file or symlink.");
   }
   if ((await import_promises26.default.readdir(output2)).length === 0) return;
@@ -48670,8 +48670,8 @@ function aggregateLabels(rootFiles, sheets) {
 }
 async function fileExists(file2) {
   try {
-    const stat3 = await import_promises10.default.stat(file2);
-    return stat3.isFile();
+    const stat4 = await import_promises10.default.stat(file2);
+    return stat4.isFile();
   } catch {
     return false;
   }
@@ -54213,8 +54213,8 @@ async function discoverProjects(root, explicitProject) {
 async function explicitProjectFiles(root, explicitProject) {
   const target = import_node_path46.default.resolve(root, normalizePathInput(explicitProject));
   try {
-    const stat3 = await import_promises15.default.stat(target);
-    if (stat3.isDirectory()) {
+    const stat4 = await import_promises15.default.stat(target);
+    if (stat4.isDirectory()) {
       const files = await globFiles(target, ["**/*.kicad_pro"]);
       return files.map((file2) => import_node_path46.default.resolve(file2));
     }
@@ -59627,13 +59627,13 @@ function isPreviousArtifact(value) {
 }
 async function readManagedOutputManifest(directory) {
   const filename = import_node_path61.default.join(directory, "manifest.json");
-  let stat3;
+  let stat4;
   try {
-    stat3 = await import_promises22.default.lstat(filename);
+    stat4 = await import_promises22.default.lstat(filename);
   } catch {
     throw new Error("Output directory is not an identifiable BoardReadyOps generation; choose a fresh --output path.");
   }
-  if (!stat3.isFile() || stat3.size > MAX_MANIFEST_BYTES) {
+  if (!stat4.isFile() || stat4.size > MAX_MANIFEST_BYTES) {
     throw new Error("Existing generation manifest is missing, unsafe or too large; choose a fresh --output path.");
   }
   let manifest;
@@ -59659,8 +59659,8 @@ async function readManagedOutputManifest(directory) {
 async function verifyExistingArtifactBytes(directory, artifacts) {
   for (const artifact of artifacts) {
     const filename = import_node_path61.default.join(directory, artifact.path);
-    const stat3 = await import_promises22.default.lstat(filename);
-    if (!stat3.isFile() || stat3.size !== artifact.bytes) {
+    const stat4 = await import_promises22.default.lstat(filename);
+    if (!stat4.isFile() || stat4.size !== artifact.bytes) {
       throw new Error("A previously generated artifact has changed; choose a fresh --output path.");
     }
     const hash2 = (0, import_node_crypto8.createHash)("sha256");
@@ -59706,14 +59706,14 @@ async function assertSafeGenerateOutputCleanup(outputDirectory2, inputs) {
       throw new Error("Refusing to delete repository Git metadata as generated output.");
     }
   }
-  let stat3;
+  let stat4;
   try {
-    stat3 = await import_promises22.default.lstat(output2);
+    stat4 = await import_promises22.default.lstat(output2);
   } catch (error62) {
     if (isNoEntry2(error62)) return;
     throw error62;
   }
-  if (!stat3.isDirectory()) {
+  if (!stat4.isDirectory()) {
     throw new Error("Generated output must be a real directory, not a file or symlink.");
   }
   const entries = await import_promises22.default.readdir(output2);
@@ -59914,14 +59914,14 @@ async function assertReviewedSource(options) {
   }
 }
 async function assertFreshReviewedOutput(outputDir) {
-  let stat3;
+  let stat4;
   try {
-    stat3 = await import_promises23.default.lstat(outputDir);
+    stat4 = await import_promises23.default.lstat(outputDir);
   } catch (error62) {
     if (error62.code === "ENOENT") return;
     throw error62;
   }
-  if (!stat3.isDirectory() || (await import_promises23.default.readdir(outputDir)).length !== 0) {
+  if (!stat4.isDirectory() || (await import_promises23.default.readdir(outputDir)).length !== 0) {
     throw new Error("Reviewed export requires a new or empty generated-output directory.");
   }
 }
@@ -61693,8 +61693,8 @@ async function releaseAuditClausesCommand(passportFile, options, streams) {
   const maxInputBytes = 1024 * 1024;
   async function readJsonFile(file2) {
     const source = import_node_path72.default.resolve(normalizePathInput(file2));
-    const stat3 = await import_promises29.default.stat(source);
-    if (!stat3.isFile() || stat3.size > maxInputBytes) {
+    const stat4 = await import_promises29.default.stat(source);
+    if (!stat4.isFile() || stat4.size > maxInputBytes) {
       throw new Error("Audit clause input must be a regular JSON file no larger than 1 MiB.");
     }
     return JSON.parse(await import_promises29.default.readFile(source, "utf8"));
@@ -64615,7 +64615,14 @@ async function assertRunnerWorkspaceDirectories(workspaceRoot) {
       throw error62;
     });
     if (!info) continue;
-    if (info.isSymbolicLink() || !info.isDirectory()) {
+    if (info.isSymbolicLink()) {
+      const parent = await (0, import_promises36.lstat)(import_node_path79.default.dirname(directory));
+      const target = await (0, import_promises36.stat)(directory);
+      const protectedSystemAlias = process.platform === "darwin" && info.uid === 0 && parent.uid === 0 && (parent.mode & 18) === 0 && target.isDirectory();
+      if (!protectedSystemAlias) {
+        throw new Error("runner workspace path contains a symlink or non-directory component");
+      }
+    } else if (!info.isDirectory()) {
       throw new Error("runner workspace path contains a symlink or non-directory component");
     }
   }
