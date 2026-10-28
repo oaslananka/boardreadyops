@@ -61,6 +61,43 @@ describe("run design visual inspection", () => {
     expect(html).toContain("Supply a verifiable manufacturer part number");
   });
 
+  it("lets reviewers navigate every page of recorded findings alongside the source artwork", () => {
+    const html = renderToStaticMarkup(
+      createElement(RunDesignView, {
+        runId: "run-1",
+        snapshots: [visual],
+        findings: [
+          {
+            id: "finding-on-third-page",
+            fingerprint: "fp-third",
+            ruleId: "design.board-outline",
+            severity: "high",
+            message: "Third-page outline finding.",
+            path: "board.kicad_pcb",
+          },
+        ],
+        totalFindings: 63,
+        findingsPage: { page: 3, totalPages: 4 },
+      }),
+    );
+    expect(html).toContain("Third-page outline finding.");
+    expect(html).toContain("1 of 63");
+    expect(html).toContain("Page");
+    expect(html).toContain('href="/runs/run-1/design?findingsPage=2"');
+    expect(html).toContain('href="/runs/run-1/design?findingsPage=4"');
+  });
+
+  it("does not show pagination for a single findings page", () => {
+    const html = renderToStaticMarkup(
+      createElement(RunDesignView, {
+        runId: "run-1",
+        snapshots: [visual],
+        findingsPage: { page: 1, totalPages: 1 },
+      }),
+    );
+    expect(html).not.toContain('aria-label="Pagination"');
+  });
+
   it("exposes a real recorded base only as a visual comparison, never an engineering verdict", () => {
     const html = renderToStaticMarkup(
       createElement(RunDesignView, {

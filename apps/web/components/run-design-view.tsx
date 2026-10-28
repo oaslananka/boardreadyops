@@ -2,6 +2,7 @@ import type { SnapshotArtifact } from "@boardreadyops/contracts";
 import Link from "next/link";
 import type { RunDetail } from "../lib/run-dashboard.js";
 import { RunDesignWorkspace } from "./run-design-workspace.js";
+import { Pagination } from "./ui.js";
 
 export function RunDesignView({
   runId,
@@ -9,6 +10,7 @@ export function RunDesignView({
   baseSnapshots = [],
   reviewId,
   findings = [],
+  findingsPage,
   totalFindings = 0,
   repository = "",
   commitSha = "",
@@ -18,6 +20,7 @@ export function RunDesignView({
   baseSnapshots?: SnapshotArtifact[];
   reviewId?: string;
   findings?: RunDetail["findings"];
+  findingsPage?: Pick<RunDetail["findingsPage"], "page" | "totalPages">;
   totalFindings?: number;
   repository?: string;
   commitSha?: string;
@@ -43,6 +46,8 @@ export function RunDesignView({
       {snapshots.length ? (
         <>
           <RunDesignWorkspace
+            // A new findings page must reset the selected row and its marker.
+            key={findingsPage?.page ?? 1}
             snapshots={snapshots}
             baseSnapshots={baseSnapshots}
             findings={findings}
@@ -50,6 +55,21 @@ export function RunDesignView({
             repository={repository}
             commitSha={commitSha}
           />
+          {findingsPage && findingsPage.totalPages > 1 ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Only findings on the current page can be selected in the artwork. Switch pages to investigate the
+                remaining recorded findings.
+              </p>
+              <Pagination
+                basePath={`/runs/${encodeURIComponent(runId)}/design`}
+                page={findingsPage.page}
+                totalPages={findingsPage.totalPages}
+                pageParameter="findingsPage"
+                searchParameters={{}}
+              />
+            </div>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             {native
               ? "KiCad-native artwork shows source-derived design geometry. Other views may be summary diagrams."

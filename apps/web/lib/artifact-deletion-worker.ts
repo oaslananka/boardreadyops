@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Stats } from "node:fs";
 import { lstat, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -16,11 +17,13 @@ const nodeArtifactFilesystem: LocalArtifactFilesystem = { lstat, realpath, unlin
 
 export class ArtifactObjectDeletionError extends Error {
   readonly retryable: boolean;
+  readonly beforeUnlink: boolean;
 
-  constructor(message: string, options: { retryable: boolean; cause?: unknown }) {
+  constructor(message: string, options: { retryable: boolean; beforeUnlink?: boolean; cause?: unknown }) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = "ArtifactObjectDeletionError";
     this.retryable = options.retryable;
+    this.beforeUnlink = options.beforeUnlink ?? false;
   }
 }
 
@@ -39,7 +42,11 @@ async function resolveStorageRoot(storageRoot: string, filesystem: LocalArtifact
   try {
     return await filesystem.realpath(path.resolve(storageRoot));
   } catch (error) {
-    throw new ArtifactObjectDeletionError("artifact storage root is unavailable", { retryable: true, cause: error });
+    throw new ArtifactObjectDeletionError("artifact storage root is unavailable", {
+      retryable: true,
+      beforeUnlink: true,
+      cause: error,
+    });
   }
 }
 
@@ -51,7 +58,11 @@ async function resolveArtifactParent(
     return await filesystem.realpath(path.dirname(lexicalPath));
   } catch (error) {
     if (errorCode(error) === "ENOENT") return undefined;
-    throw new ArtifactObjectDeletionError("artifact object parent is unavailable", { retryable: true, cause: error });
+    throw new ArtifactObjectDeletionError("artifact object parent is unavailable", {
+      retryable: true,
+      beforeUnlink: true,
+      cause: error,
+    });
   }
 }
 
@@ -60,7 +71,11 @@ async function readArtifactStat(lexicalPath: string, filesystem: LocalArtifactFi
     return await filesystem.lstat(lexicalPath);
   } catch (error) {
     if (errorCode(error) === "ENOENT") return undefined;
-    throw new ArtifactObjectDeletionError("artifact object metadata is unavailable", { retryable: true, cause: error });
+    throw new ArtifactObjectDeletionError("artifact object metadata is unavailable", {
+      retryable: true,
+      beforeUnlink: true,
+      cause: error,
+    });
   }
 }
 
@@ -72,13 +87,17 @@ async function resolveArtifactObject(
     return await filesystem.realpath(lexicalPath);
   } catch (error) {
     if (errorCode(error) === "ENOENT") return undefined;
-    throw new ArtifactObjectDeletionError("artifact object path cannot be resolved", { retryable: true, cause: error });
+    throw new ArtifactObjectDeletionError("artifact object path cannot be resolved", {
+      retryable: true,
+      beforeUnlink: true,
+      cause: error,
+    });
   }
 }
 
 function assertInsideStorageRoot(root: string, candidate: string, message: string): void {
   if (!isInside(root, candidate)) {
-    throw new ArtifactObjectDeletionError(message, { retryable: false });
+    throw new ArtifactObjectDeletionError(message, { retryable: false, beforeUnlink: true });
   }
 }
 
@@ -104,6 +123,7 @@ export async function deleteLocalArtifactObject(
   if (!lexicalPath) {
     throw new ArtifactObjectDeletionError("artifact object path is outside the configured storage root", {
       retryable: false,
+      beforeUnlink: true,
     });
   }
 
@@ -115,7 +135,10 @@ export async function deleteLocalArtifactObject(
   const fileStat = await readArtifactStat(lexicalPath, filesystem);
   if (!fileStat) return "missing";
   if (fileStat.isDirectory()) {
-    throw new ArtifactObjectDeletionError("artifact deletion target is not a file", { retryable: false });
+    throw new ArtifactObjectDeletionError("artifact deletion target is not a file", {
+      retryable: false,
+      beforeUnlink: true,
+    });
   }
 
   if (!fileStat.isSymbolicLink()) {
@@ -170,26 +193,46 @@ export async function processArtifactDeletion(
     return { ...base, status };
   }
 
+  // The per-attempt token is persisted before any external unlink begins.
+  const fenceToken = randomUUID();
+  let authorized = false;
+  let physicalOutcome: ArtifactObjectDeletionOutcome | "failed" | undefined;
   try {
-    // Recheck after claiming, immediately before attempting filesystem deletion.
-    // This narrows the enqueue-to-unlink gap but does not eliminate holds added
-    // concurrently after the check; no implicit erasure requeue is performed.
-    const authorization = await dependencies.store.authorizeOrDeferDeletion({
+    const authorization = await dependencies.store.beginPhysicalDeletion({
       deletionJobId: job.deletionJobId,
       workerId: dependencies.workerId,
+      fenceToken,
     });
     if (authorization !== "authorized") return { ...base, status: authorization };
+    authorized = true;
 
     const outcome = await (dependencies.deleteLocalObject ?? deleteLocalArtifactObject)(
       dependencies.storageRoot,
       job.storagePath,
-    );
+    ).catch((error: unknown) => {
+      // A rejected unlink Promise is NOT proof that the filesystem did not
+      // remove the object. Settle only a trusted pre-unlink rejection; any
+      // ambiguous post-attempt failure retains its durable fence.
+      if (!dependencies.deleteLocalObject && error instanceof ArtifactObjectDeletionError && error.beforeUnlink) {
+        physicalOutcome = "failed";
+      }
+      throw error;
+    });
+    physicalOutcome = outcome;
     const status = await dependencies.store.completeDeletion({
       deletionJobId: job.deletionJobId,
       workerId: dependencies.workerId,
       outcome,
     });
-    return { ...base, status, ...(status === "completed" ? { outcome } : {}) };
+    if (status !== "completed") return { ...base, status };
+    const settled = await dependencies.store.settlePhysicalDeletion({
+      deletionJobId: job.deletionJobId,
+      workerId: dependencies.workerId,
+      fenceToken,
+      outcome,
+    });
+    if (settled !== "settled") return { ...base, status: "stale" };
+    return { ...base, status: "completed", outcome };
   } catch (error) {
     const retryable = error instanceof ArtifactObjectDeletionError ? error.retryable : true;
     const status = await dependencies.store.failDeletion({
@@ -200,6 +243,17 @@ export async function processArtifactDeletion(
       errorClass: error instanceof Error ? error.name : "UnknownError",
       errorMessage: "Artifact object deletion did not reach a terminal state.",
     });
+    if (authorized && physicalOutcome === "failed" && (status === "retry" || status === "dead_letter")) {
+      // Only settle on an observed filesystem rejection and a committed
+      // failure transition. An unknown DB outcome preserves the fence.
+      const settled = await dependencies.store.settlePhysicalDeletion({
+        deletionJobId: job.deletionJobId,
+        workerId: dependencies.workerId,
+        fenceToken,
+        outcome: "failed",
+      });
+      if (settled !== "settled") return { ...base, status: "stale" };
+    }
     return { ...base, status };
   }
 }

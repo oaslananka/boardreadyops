@@ -1,4 +1,10 @@
-import type { DataLifecycleStore, LegalHold, RepositoryRetentionPolicy, RetentionPolicy } from "@boardreadyops/db";
+import {
+  type DataLifecycleStore,
+  type LegalHold,
+  LegalHoldAdmissionConflictError,
+  type RepositoryRetentionPolicy,
+  type RetentionPolicy,
+} from "@boardreadyops/db";
 import { type ActionResult, fail, ok } from "./action-result.js";
 import {
   resolveSettingsTenantScope,
@@ -339,6 +345,13 @@ export async function createLegalHoldForViewer(
       scopeId: scopeId ?? null,
     });
     return ok({ holdId: hold.id }, "Legal hold created.");
+  } catch (error) {
+    if (error instanceof LegalHoldAdmissionConflictError) {
+      return fail(
+        "Physical deletion is in progress; hold was NOT created. Contact an operator to resolve the deletion before retrying.",
+      );
+    }
+    throw error;
   } finally {
     await opened.close();
   }

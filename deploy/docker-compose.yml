@@ -76,6 +76,10 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
       BOARDREADYOPS_WORKER_HEALTH_PORT: 3001
+      # The deletion worker must resolve the same files that web uploads.
+      ARTIFACT_STORAGE_ROOT: /data/artifacts
+    volumes:
+      - boardreadyops_artifacts:/data/artifacts
     expose:
       - "3001"
     depends_on:
