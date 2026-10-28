@@ -1,17 +1,20 @@
+import { catalogRules, type RuleCategory } from "./rule-catalog.js";
+
 /**
  * Guidance is deliberately advisory. We never infer a KiCad coordinate, net,
  * component, or source line that the runner did not report.
  */
-export type FindingDomain =
-  | "electrical"
-  | "manufacturability"
-  | "assembly"
-  | "sourcing"
-  | "release"
-  | "testability"
-  | "unclassified";
+export type FindingDomain = RuleCategory;
+
+// The generated engine catalogue is authoritative for known rule categories.
+// Prefix-based fallback remains for older or plugin-defined findings that are
+// not present in the versioned catalogue, without pretending a known rule is
+// in an unrelated domain.
+const knownRuleDomains = new Map(catalogRules.map((rule) => [rule.id, rule.category]));
 
 export function findingDomainFromRule(ruleId: string): FindingDomain {
+  const known = knownRuleDomains.get(ruleId);
+  if (known) return known;
   if (
     ruleId.startsWith("erc.") ||
     ruleId.startsWith("drc.") ||
