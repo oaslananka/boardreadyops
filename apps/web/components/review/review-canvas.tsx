@@ -733,6 +733,7 @@ export function ReviewCanvas({
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
+        aria-description="Focus the canvas to pan with arrow keys; plus and minus zoom, and zero resets. Shortcuts do not affect other fields."
         // biome-ignore lint/a11y/noNoninteractiveTabindex: this interactive PCB review canvas needs keyboard focus for scoped pan/zoom shortcuts.
         tabIndex={0}
         onKeyDown={handleCanvasKeyDown}
@@ -778,9 +779,6 @@ export function ReviewCanvas({
           )}
         </div>
       </section>
-      <p className="text-xs text-muted-foreground">
-        Focus the canvas to pan with arrow keys; use +/− to zoom and 0 to reset. Shortcuts do not affect other fields.
-      </p>
     </div>
   );
 }

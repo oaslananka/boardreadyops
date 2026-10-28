@@ -72,7 +72,7 @@ describe("source review canvas keyboard focus", () => {
     if (!first || !second) throw new Error("missing test canvas");
     expect(first.tabIndex).toBe(0);
     expect(first.className).toContain("focus-visible:outline-primary");
-    expect(host.textContent).toContain("Focus the canvas to pan with arrow keys");
+    expect(first.getAttribute("aria-description")).toContain("Focus the canvas to pan with arrow keys");
     first.focus();
     expect(await press(first, "ArrowRight")).toBe(true);
     expect(imageTransform(first)).toContain("translate(-20px, 0px)");
