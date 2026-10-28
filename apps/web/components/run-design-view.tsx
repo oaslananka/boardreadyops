@@ -69,6 +69,12 @@ export function RunDesignView({
             publishing. Native KiCad artwork requires the explicit --native-visuals option because it may disclose
             proprietary PCB and schematic details.
           </p>
+          <Link
+            href="/reviews#publish-review"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-2"
+          >
+            How to publish a Review →
+          </Link>
         </div>
       )}
       <div className="flex flex-wrap gap-3 text-sm">
