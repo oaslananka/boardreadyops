@@ -1,7 +1,7 @@
 "use client";
 
 import type { CanvasAnchor, SnapshotArtifact } from "@boardreadyops/contracts";
-import { type PointerEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import type { DemoComment, DemoFinding } from "../../lib/demo-data.js";
 
 export interface ReviewCanvasProps {
@@ -495,6 +495,10 @@ export function ReviewCanvas({
 
   const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    // Keep marker buttons and other embedded controls keyboard-operable.
+    if (e.target instanceof Element && e.target.closest("button, a, input, textarea, select, [contenteditable=true]"))
+      return;
+    e.currentTarget.focus({ preventScroll: true });
     setIsDragging(true);
     setHasMoved(false);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
@@ -524,29 +528,40 @@ export function ReviewCanvas({
     }
   };
 
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "+" || e.key === "=") {
+  // Review shortcuts are local to the focused canvas. Global listeners used
+  // to pan *every* canvas when users typed in search fields or dialog inputs.
+  const handleCanvasKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || e.altKey || e.ctrlKey || e.metaKey) return;
+    switch (e.key) {
+      case "+":
+      case "=":
         setZoom((z) => Math.min(z * 1.25, 5));
-      } else if (e.key === "-" || e.key === "_") {
+        break;
+      case "-":
+      case "_":
         setZoom((z) => Math.max(z / 1.25, 0.2));
-      } else if (e.key === "0") {
+        break;
+      case "0":
         setZoom(1);
         setPan({ x: 0, y: 0 });
-      } else if (e.key === "ArrowLeft") {
+        break;
+      case "ArrowLeft":
         setPan((p) => ({ ...p, x: p.x + 20 }));
-      } else if (e.key === "ArrowRight") {
+        break;
+      case "ArrowRight":
         setPan((p) => ({ ...p, x: p.x - 20 }));
-      } else if (e.key === "ArrowUp") {
+        break;
+      case "ArrowUp":
         setPan((p) => ({ ...p, y: p.y + 20 }));
-      } else if (e.key === "ArrowDown") {
+        break;
+      case "ArrowDown":
         setPan((p) => ({ ...p, y: p.y - 20 }));
-      }
-    };
-
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, []);
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+  };
 
   const sheetAnchors = currentHeadSnapshot?.anchors ?? [];
   const relevantFindings = findings.filter(
@@ -718,7 +733,10 @@ export function ReviewCanvas({
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
-        className={`relative ${canvasHeightClass} overflow-hidden rounded-md border border-border bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: this interactive PCB review canvas needs keyboard focus for scoped pan/zoom shortcuts.
+        tabIndex={0}
+        onKeyDown={handleCanvasKeyDown}
+        className={`relative ${canvasHeightClass} overflow-hidden rounded-md border border-border bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -760,6 +778,9 @@ export function ReviewCanvas({
           )}
         </div>
       </section>
+      <p className="text-xs text-muted-foreground">
+        Focus the canvas to pan with arrow keys; use +/− to zoom and 0 to reset. Shortcuts do not affect other fields.
+      </p>
     </div>
   );
 }
