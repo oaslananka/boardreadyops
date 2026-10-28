@@ -36,7 +36,8 @@ const job: ClaimedArtifactDeletion = {
 
 function store(): ArtifactDeletionStore {
   return {
-    authorizeOrDeferDeletion: vi.fn(async () => "authorized" as const),
+    beginPhysicalDeletion: vi.fn(async () => "authorized" as const),
+    settlePhysicalDeletion: vi.fn(async () => "settled" as const),
     claimDeletions: vi.fn(),
     completeDeletion: vi.fn(async () => "completed" as const),
     failDeletion: vi.fn(async () => "retry" as const),
@@ -59,7 +60,7 @@ afterEach(async () => {
 describe("artifact deletion worker", () => {
   it.each(["held", "stale"] as const)("never unlinks when a post-claim check returns %s", async (authorization) => {
     const deletionStore = store();
-    vi.mocked(deletionStore.authorizeOrDeferDeletion).mockResolvedValue(authorization);
+    vi.mocked(deletionStore.beginPhysicalDeletion).mockResolvedValue(authorization);
     const deleteLocalObject = vi.fn(async () => "deleted" as const);
     await expect(
       processArtifactDeletion(job, {
@@ -69,9 +70,10 @@ describe("artifact deletion worker", () => {
         deleteLocalObject,
       }),
     ).resolves.toMatchObject({ status: authorization });
-    expect(deletionStore.authorizeOrDeferDeletion).toHaveBeenCalledWith({
+    expect(deletionStore.beginPhysicalDeletion).toHaveBeenCalledWith({
       deletionJobId: job.deletionJobId,
       workerId: "worker-1",
+      fenceToken: expect.any(String),
     });
     expect(deleteLocalObject).not.toHaveBeenCalled();
     expect(deletionStore.completeDeletion).not.toHaveBeenCalled();
@@ -80,7 +82,7 @@ describe("artifact deletion worker", () => {
 
   it("retries an authorization-query failure without unlinking", async () => {
     const deletionStore = store();
-    vi.mocked(deletionStore.authorizeOrDeferDeletion).mockRejectedValue(new Error("postgres temporary outage"));
+    vi.mocked(deletionStore.beginPhysicalDeletion).mockRejectedValue(new Error("postgres temporary outage"));
     const deleteLocalObject = vi.fn(async () => "deleted" as const);
     await expect(
       processArtifactDeletion(job, {
@@ -327,6 +329,82 @@ describe("artifact deletion worker", () => {
       workerId: "worker-1",
       outcome: "deleted",
     });
+  });
+
+  it("quarantines an unresolved fence when database completion is lost after unlink", async () => {
+    const deletionStore = store();
+    vi.mocked(deletionStore.completeDeletion).mockRejectedValueOnce(new Error("connection lost"));
+    vi.mocked(deletionStore.failDeletion).mockResolvedValue("stale");
+    const deleteLocalObject = vi.fn(async () => "deleted" as const);
+    const result = await processArtifactDeletion(job, {
+      workerId: "worker-1",
+      storageRoot: "/data",
+      store: deletionStore,
+      deleteLocalObject,
+    });
+    expect(result.status).toBe("stale");
+    expect(deleteLocalObject).toHaveBeenCalledTimes(1);
+    expect(deletionStore.settlePhysicalDeletion).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unresolved fence if even a committed completion cannot settle its token", async () => {
+    const deletionStore = store();
+    vi.mocked(deletionStore.settlePhysicalDeletion).mockResolvedValueOnce("stale");
+    const result = await processArtifactDeletion(job, {
+      workerId: "worker-1",
+      storageRoot: "/data",
+      store: deletionStore,
+      deleteLocalObject: async () => "missing",
+    });
+    expect(result.status).toBe("stale");
+  });
+
+  it("settles a proven pre-unlink failure only after a committed failure transition", async () => {
+    const deletionStore = store();
+    const root = await storageRoot();
+    const result = await processArtifactDeletion(
+      { ...job, storagePath: "../unsafe.bin" },
+      { workerId: "worker-1", storageRoot: root, store: deletionStore },
+    );
+    expect(result.status).toBe("retry");
+    expect(deletionStore.settlePhysicalDeletion).toHaveBeenCalledWith(
+      expect.objectContaining({ deletionJobId: "job-1", workerId: "worker-1", outcome: "failed" }),
+    );
+  });
+
+  it("quarantines an ambiguous unlink rejection even after synthetic file removal", async () => {
+    const deletionStore = store();
+    const root = await storageRoot();
+    const objectPath = path.join(root, job.storagePath);
+    await mkdir(path.dirname(objectPath), { recursive: true });
+    await writeFile(objectPath, "SYNTHETIC DATA ONLY");
+    const result = await processArtifactDeletion(job, {
+      workerId: "worker-1",
+      storageRoot: root,
+      store: deletionStore,
+      deleteLocalObject: async () => {
+        await unlink(objectPath);
+        throw filesystemError("EIO");
+      },
+    });
+    expect(result.status).toBe("retry");
+    await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(deletionStore.failDeletion).toHaveBeenCalledOnce();
+    expect(deletionStore.settlePhysicalDeletion).not.toHaveBeenCalled();
+  });
+
+  it("does not trust a caller-supplied pre-unlink claim after an irreversible unlink", async () => {
+    const deletionStore = store();
+    const result = await processArtifactDeletion(job, {
+      workerId: "worker-1",
+      storageRoot: "/data",
+      store: deletionStore,
+      deleteLocalObject: async () => {
+        throw new ArtifactObjectDeletionError("untrusted injection", { retryable: true, beforeUnlink: true });
+      },
+    });
+    expect(result.status).toBe("retry");
+    expect(deletionStore.settlePhysicalDeletion).not.toHaveBeenCalled();
   });
 
   it("retries a local deletion when the storage root is not configured", async () => {

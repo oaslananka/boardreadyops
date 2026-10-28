@@ -153,6 +153,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0099_remote_mcp_oauth_retention_indexes.sql",
       "0100_remote_mcp_oauth_client_epochs.sql",
       "0101_hosted_review_findings_pagination_index.sql",
+      "0104_durable_artifact_unlink_fences.sql",
     ]);
   });
 
