@@ -64571,7 +64571,9 @@ async function checkoutRunnerSource(options) {
   }
   const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
   const workspaceRoot = import_node_path79.default.resolve(options.workspaceRoot);
+  await assertRunnerWorkspaceDirectories(workspaceRoot);
   await (0, import_promises36.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
+  await assertRunnerWorkspaceDirectories(workspaceRoot);
   if (process.platform !== "win32") await (0, import_promises36.chmod)(workspaceRoot, 448);
   const workspace = await (0, import_promises36.mkdtemp)(import_node_path79.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
@@ -64600,6 +64602,22 @@ async function checkoutRunnerSource(options) {
   } catch (error62) {
     await (0, import_promises36.rm)(workspace, { recursive: true, force: true });
     throw error62;
+  }
+}
+async function assertRunnerWorkspaceDirectories(workspaceRoot) {
+  const { root } = import_node_path79.default.parse(workspaceRoot);
+  const parts = import_node_path79.default.relative(root, workspaceRoot).split(import_node_path79.default.sep).filter(Boolean);
+  let directory = root;
+  for (const part of parts) {
+    directory = import_node_path79.default.join(directory, part);
+    const info = await (0, import_promises36.lstat)(directory).catch((error62) => {
+      if (error62.code === "ENOENT") return void 0;
+      throw error62;
+    });
+    if (!info) continue;
+    if (info.isSymbolicLink() || !info.isDirectory()) {
+      throw new Error("runner workspace path contains a symlink or non-directory component");
+    }
   }
 }
 async function executeRunnerCommand(command, args, options) {
@@ -65111,6 +65129,7 @@ function runnerActiveWorkspaceRoot(workspaceRoot, runnerId) {
 }
 async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
   const root = import_node_path80.default.resolve(workspaceRoot);
+  await assertRunnerWorkspaceDirectories(root);
   const namespace = import_node_path80.default.join(root, ".boardreadyops-active");
   const namespaceInfo = await (0, import_promises37.lstat)(namespace).catch((error62) => {
     if (error62.code === "ENOENT") return void 0;
