@@ -4,6 +4,12 @@ Customer-operated execution workers are deployed separately from the control pla
 
 This guide describes a generic self-hosted BoardReadyOps Cloud control-plane deployment. It intentionally does not name a current production machine or IP address. Select the deployment host and the **operator-selected HTTPS origin** before commissioning, and keep those environment-specific values in the operations system rather than in the public repository.
 
+### Quiesced worker release for artifact fencing
+
+For a planned local-storage fencing migration, an operator may stop the **old worker** only after recording an encrypted backup, confirming no active artifact deletion or unresolved legal hold, and enumerating all old unlink actors. Select **`dry_run=false` and `pre_quiesced_worker=true`** in the production `cloud-deploy` dispatch. The default remains `false`: ordinary releases still require one running, healthy web and worker on the same immutable image.
+
+This explicit mode requires a healthy running web container and **exactly one stopped Compose worker** that exited cleanly, both referencing the identical image. An absent/extra worker, running worker, abnormal exit or mismatched image fails closed. This does not automatically stop workers or waive backups, live queue checks, release-policy mounts, readiness or HTTPS smoke. After a fencing migration, do not restart an old pre-fence worker on rollback; preserve unresolved fences and recover using the new fenced worker.
+
 ## Target topology
 
 ```text
@@ -67,6 +73,14 @@ and monitor host disk/inode use. Do **not** truncate Docker-managed log files
 directly; preserve any incident evidence required by retention policy.
 
 Docker Engine and Docker Compose are the host runtime requirements. Host Node.js is not required for the Compose build path: the production web image performs its Node.js build inside Docker. The web and control-plane worker processes have independent healthchecks, and PostgreSQL and Redis healthchecks are defined in `deploy/docker-compose.yml`.
+
+### Local artifact volume permissions and worker reachability
+
+With `ARTIFACT_STORAGE_DRIVER=local`, **both** the web process (which hard-links validated uploads) and the deletion worker (which resolves the stored path before unlink) need the **same** `boardreadyops_artifacts` named volume mounted at `/data/artifacts`. The generic Compose topology supplies that mount to both services and configures `ARTIFACT_STORAGE_ROOT=/data/artifacts` for each. The image runs both processes as the unprivileged `node` user (UID/GID 1000) and creates `/data/artifacts` as that user with mode `0700` **in the image**, so a *new* empty named volume can inherit appropriate ownership when Docker initializes it. Neither container should run as root, and the entrypoint must not automatically change volume permissions.
+
+**Existing named volumes require independent verification.** In isolated Docker tests, a fresh or completely empty named volume inherited image-directory ownership; a **nonempty, root-owned** existing volume retained its own `root:root`/`0755` permissions. Do not assume an upgrade will fix any deployed volume automatically. Before *any separately authorized deployment*, an operator must inspect the current volume's ownership, mode, free space, mount identity, tenant/hold obligations, and backup/rollback evidence; also verify that the same intended volume is mounted on both services and that the effective application UID can read/write the root. A running web/worker healthcheck does **not** establish artifact upload or deletion readiness. If an existing volume is owned by root with mode `0755`, `node` cannot write it. **Stop the rollout** and obtain separate change approval for a narrowly scoped, audited permission repair with appropriate worker quiescence and legal-hold protection; do not indiscriminately run recursive `chown`, change host paths, rebuild the volume, clear deletion jobs, or enable a new worker merely because Compose config validates. Restore/rollback must not expose old unfenced physical-unlink workers while holds are active.
+
+For read-only, non-sensitive preflight, inspect container user IDs and mount destinations through `docker inspect`, and test existence and writability as the actual application user without creating a file. Follow [ambiguous artifact upload operator evidence](../operations/artifact-upload-uncertain-finalization.md) and the [artifact hold/unlink coordination contract](../security/artifact-hold-unlink-coordination.md). Actual PostgreSQL row/hold reconciliation requires a separately approved **least-privileged read-only** database identity; neither this image change nor green source CI authorizes production data queries, migration, permission repair, deployment or deletion.
 
 ## Production maintenance service
 

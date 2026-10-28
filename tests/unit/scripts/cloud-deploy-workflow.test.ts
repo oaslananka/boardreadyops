@@ -140,6 +140,19 @@ describe("cloud-deploy topology preflight", () => {
     expect(documentation).toContain("verified rollback pin");
   });
 
+  it("supports an explicitly quiesced deletion worker without relaxing the default release check", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+    expect(workflow).toContain("pre_quiesced_worker:");
+    expect(workflow).toContain("default: false");
+    expect(workflow).toContain("inputs.pre_quiesced_worker && '1' || '0'");
+    expect(workflow).toContain('quiesced_worker="$3"');
+    expect(workflow).toContain("--worker-quiesced");
+    expect(workflow).toContain("run_deploy up -d --build migrate web worker");
+    expect(documentation).toContain("pre_quiesced_worker=true");
+    expect(documentation).toContain("old worker");
+  });
+
   it("pins the last healthy runtime before real replacement, then retires only after browser smoke", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
