@@ -1,13 +1,14 @@
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createLocalJWKSet } from "jose";
 import type { CheckLiveRepositoryPermission } from "./remote-mcp-access.js";
+import { remoteMcpOrigin } from "./remote-mcp-foundation.js";
 import { createProductionLiveGitHubRepositoryAccess } from "./remote-mcp-github-permission.js";
 import { isRemoteMcpGrantActive } from "./remote-mcp-grant-store.js";
 import { handleRemoteMcpWithVerifiedGrant } from "./remote-mcp-http.js";
 import { createRemoteMcpJwtVerifier } from "./remote-mcp-jwt-verifier.js";
 import { configuredRemoteMcpOAuth } from "./remote-mcp-oauth-config.js";
 
-const canonicalIssuer = "https://boardreadyops.com";
+const canonicalIssuer = remoteMcpOrigin;
 type ReadDatabase = Pick<PgQueryExecutor, "query" | "close">;
 
 export interface PreparedRemoteMcpProductionOptions {

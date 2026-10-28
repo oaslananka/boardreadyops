@@ -6,9 +6,16 @@ import {
 } from "@boardreadyops/contracts";
 import { pcbFootprintSummarySchema } from "@boardreadyops/contracts/pcb-footprint-summary";
 
-/** Canonical OAuth resource identifier: never derive this from untrusted Host/Forwarded headers. */
-export const remoteMcpResource = "https://boardreadyops.com/mcp";
-export const remoteMcpMetadataUrl = "https://boardreadyops.com/.well-known/oauth-protected-resource/mcp";
+/** Two operator-owned origins only. Never derive OAuth identifiers from Host/Forwarded
+ * headers or arbitrary environment URLs. Staging is a separate, opt-in deployment;
+ * the default preserves the existing production issuer and audience exactly.
+ */
+export const productionRemoteMcpOrigin = "https://boardreadyops.com";
+export const stagingRemoteMcpOrigin = "https://staging.boardreadyops.com";
+export const remoteMcpOrigin =
+  process.env.BOARDREADYOPS_REMOTE_MCP_STAGING_ENABLED === "true" ? stagingRemoteMcpOrigin : productionRemoteMcpOrigin;
+export const remoteMcpResource = remoteMcpOrigin + "/mcp";
+export const remoteMcpMetadataUrl = remoteMcpOrigin + "/.well-known/oauth-protected-resource/mcp";
 
 /** These scopes are reserved for a future user-bound OAuth grant; API tokens are not accepted. */
 const remoteMcpScopes = ["review:read", "evidence:read"] as const;
