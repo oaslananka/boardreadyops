@@ -25,19 +25,34 @@ check_revision() {
 }
 
 running_image() {
+  local allow_quiesced_worker="${1:-0}"
   local service cid ref status image_id first_image_id=''
   for service in web worker; do
     local ids_list
-    ids_list="$(docker ps --filter "label=com.docker.compose.project=${project}" \
-      --filter "label=com.docker.compose.service=${service}" --format '{{.ID}}')" || fail "cannot list ${service} containers"
-    [[ -n "$ids_list" && "$ids_list" != *$'\n'* ]] || fail "expected exactly one running ${service} container"
+    if [[ "$service" == worker && "$allow_quiesced_worker" == 1 ]]; then
+      # Preserve exactly one known, stopped Compose worker for controlled
+      # fencing upgrades; never treat an absent worker as authorization.
+      ids_list="$(docker ps -aq --filter "label=com.docker.compose.project=$project" \
+        --filter "label=com.docker.compose.service=$service")" || fail "cannot list stopped worker containers"
+    else
+      ids_list="$(docker ps --filter "label=com.docker.compose.project=$project" \
+        --filter "label=com.docker.compose.service=$service" --format '{{.ID}}')" || fail "cannot list $service containers"
+    fi
+    [[ -n "$ids_list" && "$ids_list" != *$'\n'* ]] || fail "expected exactly one running $service container"
     cid="$ids_list"
-    ref="$(docker inspect "$cid" --format '{{.Config.Image}}')" || fail "cannot inspect ${service} image"
-    [[ "$ref" =~ ^boardreadyops-web-runtime:[0-9a-f]{40}$ ]] || fail "unexpected ${service} image reference"
-    status="$(docker inspect "$cid" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}')" || fail "cannot check ${service} health"
-    [[ "$status" == healthy ]] || fail "${service} is not healthy (${status})"
-    image_id="$(docker inspect "$cid" --format '{{.Image}}')" || fail "cannot read ${service} image ID"
-    [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || fail "invalid ${service} image ID"
+    ref="$(docker inspect "$cid" --format '{{.Config.Image}}')" || fail "cannot inspect $service image"
+    [[ "$ref" =~ ^boardreadyops-web-runtime:[0-9a-f]{40}$ ]] || fail "unexpected $service image reference"
+
+    if [[ "$service" == worker && "$allow_quiesced_worker" == 1 ]]; then
+      [[ "$(docker inspect "$cid" --format '{{.State.Running}}')" == false ]] || fail 'worker must already be stopped'
+      [[ "$(docker inspect "$cid" --format '{{.State.ExitCode}}')" == 0 ]] || fail 'worker did not exit cleanly'
+    else
+      status="$(docker inspect "$cid" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}')" || fail "cannot check $service health"
+      [[ "$status" == healthy ]] || fail "$service is not healthy ($status)"
+    fi
+
+    image_id="$(docker inspect "$cid" --format '{{.Image}}')" || fail "cannot read $service image ID"
+    [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || fail "invalid $service image ID"
     [[ -z "$first_image_id" || "$first_image_id" == "$image_id" ]] || fail 'web and worker use different images'
     first_image_id="$image_id"
   done
@@ -47,9 +62,12 @@ running_image() {
 mode="${1:-}"
 case "$mode" in
   pin)
-    [[ "$#" -eq 2 && "$2" =~ ^[0-9a-f]{40}$ ]] || fail 'usage: pin <target-revision>'
+    [[ "$#" -ge 2 && "$2" =~ ^[0-9a-f]{40}$ ]] || fail 'usage: pin <target-revision> [--worker-quiesced]'
+    [[ "$#" -eq 2 || ( "$#" -eq 3 && "$3" == --worker-quiesced ) ]] || fail 'usage: pin <target-revision> [--worker-quiesced]'
     target_revision="$2"
-    active="$(running_image)"
+    allow_quiesced_worker=0
+    if [[ "${3:-}" == --worker-quiesced ]]; then allow_quiesced_worker=1; fi
+    active="$(running_image "$allow_quiesced_worker")"
     check_revision "$active"
     active_revision="$(docker image inspect "$active" --format "$revision_format")" || fail 'cannot inspect active revision'
     known="$(docker image inspect "$successful" --format "$id_format" 2>/dev/null || true)"

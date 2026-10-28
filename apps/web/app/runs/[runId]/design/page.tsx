@@ -1,6 +1,11 @@
 import { notFound } from "next/navigation";
 import { RunDesignView } from "../../../../components/run-design-view.js";
-import { RunPageFrame, RunUnavailable } from "../../../../components/run-investigation.js";
+import {
+  filtersFromSearchParameters,
+  RunPageFrame,
+  RunUnavailable,
+  type SearchParameterMap,
+} from "../../../../components/run-investigation.js";
 import {
   loadRunDashboard,
   resolveRunPageTitle,
@@ -12,7 +17,10 @@ import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
 export const dynamic = "force-dynamic";
 
-type RunDesignPageProps = { params: Promise<{ runId: string }> };
+type RunDesignPageProps = {
+  params: Promise<{ runId: string }>;
+  searchParams: Promise<SearchParameterMap>;
+};
 
 export async function generateMetadata({ params }: RunDesignPageProps) {
   const { runId } = await params;
@@ -20,13 +28,13 @@ export async function generateMetadata({ params }: RunDesignPageProps) {
   return { title: await resolveRunPageTitle(runId, "Design", viewer.authorizeRepository) };
 }
 
-export default async function RunDesignPage({ params }: Readonly<RunDesignPageProps>) {
-  const { runId } = await params;
+export default async function RunDesignPage({ params, searchParams }: Readonly<RunDesignPageProps>) {
+  const [{ runId }, query] = await Promise.all([params, searchParams]);
   const viewer = await viewerAuthorization();
   const result = await loadRunDashboard(
     runId,
     process.env,
-    {},
+    { findingsPage: filtersFromSearchParameters(query).findingsPage ?? 1 },
     {
       ...runDashboardLoaderDependencies,
       authorizeRepository: viewer.authorizeRepository,
@@ -45,6 +53,7 @@ export default async function RunDesignPage({ params }: Readonly<RunDesignPagePr
         snapshots={snapshots}
         baseSnapshots={baseSnapshots}
         findings={result.run.findings}
+        findingsPage={result.run.findingsPage}
         totalFindings={result.run.findingsPage.total}
         repository={result.run.repository}
         commitSha={result.run.commitSha}

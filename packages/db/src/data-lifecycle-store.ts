@@ -40,6 +40,13 @@ export type ErasureRequest = {
   createdAt: string;
 };
 
+export class LegalHoldAdmissionConflictError extends Error {
+  constructor() {
+    super("Physical deletion is in progress; legal hold was not established. Retry after operator reconciliation.");
+    this.name = "LegalHoldAdmissionConflictError";
+  }
+}
+
 export type LegalHold = {
   id: string;
   tenantId: string;
@@ -455,10 +462,23 @@ export class DataLifecycleStore {
     validateLifecycleScope(input.scope, input.scopeId);
     if (input.reason.trim().length < 10) throw new Error("Legal hold reason must be at least 10 characters");
     const id = randomUUID();
-    const r = (await this.db.query(
-      `INSERT INTO legal_holds (id, tenant_id, created_by, reason, scope, scope_id, active, created_at) VALUES ($1,$2,$3,$4,$5,$6,TRUE,NOW()) RETURNING *`,
-      [id, input.tenantId, input.createdBy, input.reason.trim(), input.scope, input.scopeId ?? null],
-    )) as { rows?: Array<Record<string, unknown>> };
+    let r: { rows?: Array<Record<string, unknown>> };
+    try {
+      r = (await this.db.query(
+        `INSERT INTO legal_holds (id, tenant_id, created_by, reason, scope, scope_id, active, created_at) VALUES ($1,$2,$3,$4,$5,$6,TRUE,NOW()) RETURNING *`,
+        [id, input.tenantId, input.createdBy, input.reason.trim(), input.scope, input.scopeId ?? null],
+      )) as { rows?: Array<Record<string, unknown>> };
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error.code === "B4401" || error.code === "55P03")
+      ) {
+        throw new LegalHoldAdmissionConflictError();
+      }
+      throw error;
+    }
     const row = r.rows?.[0];
     if (!row) throw new Error("insert failed");
     return {

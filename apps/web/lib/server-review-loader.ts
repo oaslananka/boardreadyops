@@ -312,30 +312,36 @@ async function loadHeadSnapshots(executor: PgQueryExecutor, headRunId: string): 
 }
 
 /**
- * Snapshots for the revision's base commit, best-effort: only available when some prior run
- * against this repository happened to publish review-canvas snapshots for that exact commit
- * (e.g. a previous `review publish` on the base branch). Never fabricated -- absent when no
- * matching run is found, so the canvas honestly falls back to head-only view.
+ * Snapshots for the authorized revision's exact base commit. Prefer the Review's
+ * explicitly pinned base run when present; legacy unpinned revisions select only
+ * from runs that actually published images. A more recent snapshotless rerun
+ * must never hide earlier real source evidence. A mismatched pinned run fails
+ * closed instead of silently substituting a different provenance.
  */
 async function loadBaseSnapshots(
   executor: PgQueryExecutor,
   repositoryId: string,
   baseCommitSha: string | null,
+  baseRunId: string | null,
+  headRunId: string,
 ): Promise<SnapshotArtifact[]> {
   if (!baseCommitSha) return [];
 
   const runResult = await executor.query(
-    `SELECT id FROM release_runs
-     WHERE repository_id = $1 AND commit_sha = $2
-     ORDER BY completed_at DESC NULLS LAST, started_at DESC
+    `SELECT base.id FROM release_runs AS base
+     WHERE base.repository_id = $1 AND base.commit_sha = $2
+       AND ($3::text IS NULL OR base.id = $3)
+       AND base.id <> $4
+       AND EXISTS (SELECT 1 FROM run_snapshots AS s WHERE s.run_id = base.id)
+     ORDER BY base.completed_at DESC NULLS LAST, base.started_at DESC, base.id DESC
      LIMIT 1`,
-    [repositoryId, baseCommitSha],
+    [repositoryId, baseCommitSha, baseRunId, headRunId],
   );
   const runRows = (runResult as { rows?: { id: string }[] }).rows ?? [];
-  const baseRunId = runRows[0]?.id;
-  if (!baseRunId) return [];
+  const selectedBaseRunId = runRows[0]?.id;
+  if (!selectedBaseRunId) return [];
 
-  return loadHeadSnapshots(executor, baseRunId);
+  return loadHeadSnapshots(executor, selectedBaseRunId);
 }
 
 async function loadReviewGovernanceData(
@@ -494,7 +500,13 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
         loadEvidenceArtifacts(executor, revision.head_run_id),
         loadReviewGovernanceData(executor, reviewId, row.repository_id),
         loadHeadSnapshots(executor, revision.head_run_id),
-        loadBaseSnapshots(executor, row.repository_id, revision.base_commit_sha),
+        loadBaseSnapshots(
+          executor,
+          row.repository_id,
+          revision.base_commit_sha,
+          revision.base_run_id,
+          revision.head_run_id,
+        ),
         session
           ? resolveReviewEffectivePolicy({ executor, repositoryId: row.repository_id, tenantId: row.account_login })
           : Promise.resolve(null),

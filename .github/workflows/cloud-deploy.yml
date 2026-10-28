@@ -8,6 +8,11 @@ on:
         required: false
         default: true
         type: boolean
+      pre_quiesced_worker:
+        description: Allow a pre-stopped clean-exit worker only for a planned fencing upgrade with backup and queue checks.
+        required: false
+        default: false
+        type: boolean
       retire_superseded_images:
         description: On low disk only, reclaim old runtime images if a previous successfully deployed rollback image is already pinned.
         required: false
@@ -85,6 +90,7 @@ jobs:
           # documented `build`-only usage (builds the image, touches no running
           # container) instead of the real `up -d --build` (replaces web/worker/migrate).
           DEPLOY_ARGS: ${{ inputs.dry_run && 'build migrate web worker' || 'up -d --build migrate web worker' }}
+          QUIESCED_WORKER_FLAG: ${{ inputs.pre_quiesced_worker && '1' || '0' }}
           RETIRE_SUPERSEDED_IMAGES: ${{ inputs.retire_superseded_images && '1' || '0' }}
         run: |
           set -euo pipefail
@@ -97,7 +103,7 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
             "ubuntu@${ssh_host}" \
-            "bash -s -- '${DEPLOY_ARGS}' '${RETIRE_SUPERSEDED_IMAGES}'" <<'REMOTE_DEPLOY'
+            "bash -s -- '${DEPLOY_ARGS}' '${RETIRE_SUPERSEDED_IMAGES}' '${QUIESCED_WORKER_FLAG}'" <<'REMOTE_DEPLOY'
           set -euo pipefail
           deploy_root=/home/ubuntu/boardreadyops-cloud
           repo_dir="${deploy_root}/repo"
@@ -108,6 +114,15 @@ jobs:
           container_policy_path="/run/policies/repositories"
           deploy_args="$1"
           retire_superseded_images="$2"
+          quiesced_worker="$3"
+          case "$quiesced_worker" in
+            0|1) ;;
+            *) printf '%s\n' 'cloud-deploy preflight: invalid quiesced-worker mode' >&2; exit 78 ;;
+          esac
+          if [ "$quiesced_worker" = 1 ] && [ "$deploy_args" != "up -d --build migrate web worker" ]; then
+            printf '%s\n' 'cloud-deploy preflight: quiesced worker requires real deploy' >&2
+            exit 78
+          fi
 
           test -d "${repo_dir}/.git" || {
             printf '%s\n' 'cloud-deploy preflight: deployment checkout is not commissioned; follow docs/deployment/self-hosted.md before retrying' >&2
@@ -305,7 +320,11 @@ jobs:
               # Verify the old running web + worker health and pin that exact image
               # before compose can replace either container. If deployment or browser
               # smoke fails, do not delete any image from this attempt.
-              "${repo_dir}/scripts/cloud-runtime-image-retention.sh" pin "$(git -C "${repo_dir}" rev-parse HEAD)"
+              if [ "$quiesced_worker" = 1 ]; then
+                "${repo_dir}/scripts/cloud-runtime-image-retention.sh" pin "$(git -C "${repo_dir}" rev-parse HEAD)" --worker-quiesced
+              else
+                "${repo_dir}/scripts/cloud-runtime-image-retention.sh" pin "$(git -C "${repo_dir}" rev-parse HEAD)"
+              fi
               run_deploy up -d --build migrate web worker
               verify_release_policy_mount
 

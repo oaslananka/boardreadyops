@@ -1,11 +1,14 @@
+import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { build } from "esbuild";
+import pg from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { processArtifactDeletion } from "../../apps/web/lib/artifact-deletion-worker.js";
 import { createSqlArtifactDeletionStore } from "../../packages/db/src/artifact-deletion-store.js";
-import { DataLifecycleStore } from "../../packages/db/src/data-lifecycle-store.js";
+import { DataLifecycleStore, LegalHoldAdmissionConflictError } from "../../packages/db/src/data-lifecycle-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -72,6 +75,24 @@ async function insertJob(input: Awaited<ReturnType<typeof fixture>>, artifactId:
   return deletionJobId;
 }
 
+// Wait for the actual competing PostgreSQL backend to block on our advisory
+// lock, not merely for an elapsed sleep. A deadline avoids flaky failures on
+// loaded CI machines without weakening the concurrency assertion.
+async function waitForAdvisoryWait(applicationName: string, timeoutMs = 10_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const observed = rows(
+      await requireExecutor().query(
+        "select wait_event from pg_stat_activity where application_name=$1 and wait_event_type='Lock'",
+        [applicationName],
+      ),
+    );
+    if (observed.some((row) => row.wait_event === "advisory")) return true;
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+  }
+  return false;
+}
+
 afterAll(async () => {
   if (executor && createdInstallationIds.length > 0) {
     // Cascades to repositories/release_runs/artifact_deletion_jobs. Without this the fixed-
@@ -104,12 +125,8 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       scope: "organization",
     });
     try {
-      expect(
-        await store.authorizeOrDeferDeletion({
-          deletionJobId: jobId,
-          workerId: "worker-hold-check",
-        }),
-      ).toBe("authorized");
+      await expect(lifecycle.hasActiveHold(otherTenant, "organization")).resolves.toBe(true);
+      await expect(lifecycle.hasActiveHold(`artifact-delete-${label}`, "organization")).resolves.toBe(false);
 
       // A matching repository hold arriving after the claim must suspend
       // the job without unlinking or burning its bounded retry budget.
@@ -122,15 +139,17 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       });
       try {
         expect(
-          await store.authorizeOrDeferDeletion({
+          await store.beginPhysicalDeletion({
             deletionJobId: jobId,
             workerId: "wrong-worker",
+            fenceToken: randomUUID(),
           }),
         ).toBe("stale");
         expect(
-          await store.authorizeOrDeferDeletion({
+          await store.beginPhysicalDeletion({
             deletionJobId: jobId,
             workerId: "worker-hold-check",
+            fenceToken: randomUUID(),
           }),
         ).toBe("held");
 
@@ -147,6 +166,14 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
             last_error_class: "legal_hold",
           },
         ]);
+        expect(
+          rows(
+            await requireExecutor().query(
+              "select token from artifact_unlink_fences where deletion_job_id=$1 and settled_at is null",
+              [jobId],
+            ),
+          ),
+        ).toHaveLength(0);
         expect(await store.claimDeletions({ workerId: "worker-hold-check", limit: 1 })).toEqual([]);
       } finally {
         await lifecycle.releaseLegalHold(`artifact-delete-${label}`, held.id, "authorized-operator");
@@ -157,10 +184,12 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       });
       const resumed = await afterBackoff.claimDeletions({ workerId: "worker-hold-check", limit: 1 });
       expect(resumed[0]?.deletionJobId).toBe(jobId);
+      const fenceToken = randomUUID();
       expect(
-        await afterBackoff.authorizeOrDeferDeletion({
+        await afterBackoff.beginPhysicalDeletion({
           deletionJobId: jobId,
           workerId: "worker-hold-check",
+          fenceToken,
         }),
       ).toBe("authorized");
       expect(
@@ -170,6 +199,14 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
           outcome: "missing",
         }),
       ).toBe("completed");
+      await expect(
+        afterBackoff.settlePhysicalDeletion({
+          deletionJobId: jobId,
+          workerId: "worker-hold-check",
+          fenceToken,
+          outcome: "missing",
+        }),
+      ).resolves.toBe("settled");
     } finally {
       await lifecycle.releaseLegalHold(otherTenant, unrelated.id, "authorized-operator");
       await requireExecutor().query("delete from legal_holds where tenant_id = $1", [otherTenant]);
@@ -202,9 +239,10 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
         now: () => oneYearBehind,
       });
       await expect(
-        skewedStore.authorizeOrDeferDeletion({
+        skewedStore.beginPhysicalDeletion({
           deletionJobId: jobId,
           workerId: "clock-skew-worker",
+          fenceToken: randomUUID(),
         }),
       ).resolves.toBe("stale");
       expect(
@@ -242,13 +280,6 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       // Unrelated holds still cannot suppress the correct tenant's lease.
       const claimed = await store.claimDeletions({ workerId: "case-worker", limit: 1 });
       expect(claimed[0]?.deletionJobId).toBe(jobId);
-      await expect(
-        store.authorizeOrDeferDeletion({
-          deletionJobId: jobId,
-          workerId: "case-worker",
-        }),
-      ).resolves.toBe("authorized");
-
       const protectedHold = await lifecycle.createLegalHold({
         tenantId: differentCase,
         createdBy: "operator-case",
@@ -268,9 +299,10 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
       erasureId = erasure.id;
       expect(erasure.status).toBe("blocked_by_hold");
       await expect(
-        store.authorizeOrDeferDeletion({
+        store.beginPhysicalDeletion({
           deletionJobId: jobId,
           workerId: "case-worker",
+          fenceToken: randomUUID(),
         }),
       ).resolves.toBe("held");
 
@@ -304,19 +336,608 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     }
   });
 
-  it("KNOWN-RISK: a committed hold after authorization does not prevent synthetic unlink", async () => {
-    if (!connectionString) throw new Error("Disposable PostgreSQL connection required");
+  it("linearizes a concurrent hold INSERT behind an uncommitted unlink admission", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL required");
+    const label = `gate-order-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const tenantId = `artifact-delete-${label}`;
+    const jobId = await insertJob(tenant, randomUUID());
+    const workerId = "fenced-deletion-session";
+    const token = randomUUID();
+    const store = createSqlArtifactDeletionStore(requireExecutor(), { now: () => new Date(Date.now() + 1_000) });
+    expect((await store.claimDeletions({ workerId, limit: 1 }))[0]?.deletionJobId).toBe(jobId);
+    const writer = new pg.Client({ connectionString });
+    const waiterName = `hold-wait-${randomUUID().slice(0, 8)}`;
+    const hold = new pg.Client({ connectionString, application_name: waiterName });
+    await writer.connect();
+    await hold.connect();
+    let writeResult: Promise<{ ok: true } | { ok: false; error: unknown }> | undefined;
+    let committed = false;
+    try {
+      await writer.query("begin");
+      expect(
+        (
+          await writer.query("select boardreadyops_begin_artifact_unlink($1,$2,$3::uuid) as outcome", [
+            jobId,
+            workerId,
+            token,
+          ])
+        ).rows[0]?.outcome,
+      ).toBe("authorized");
+      // Start a true second backend's INSERT before the writer commits.
+      // Observe a possible rejection immediately: PostgreSQL can reject the
+      // blocked INSERT before the polling loop reaches its later assertion.
+      writeResult = hold
+        .query(
+          "insert into legal_holds (id,tenant_id,created_by,reason,scope) values ($1,$2,'operator','Hold must not acknowledge during unlink','organization')",
+          [randomUUID(), tenantId],
+        )
+        .then(
+          () => ({ ok: true as const }),
+          (error: unknown) => ({ ok: false as const, error }),
+        );
+      expect(await waitForAdvisoryWait(waiterName)).toBe(true);
+      await writer.query("commit");
+      committed = true;
+      await expect(writeResult).resolves.toMatchObject({ ok: false, error: { code: "B4401" } });
+      await expect(
+        store.completeDeletion({
+          deletionJobId: jobId,
+          workerId,
+          outcome: "missing",
+        }),
+      ).resolves.toBe("completed");
+      await expect(
+        store.settlePhysicalDeletion({
+          deletionJobId: jobId,
+          workerId,
+          fenceToken: token,
+          outcome: "missing",
+        }),
+      ).resolves.toBe("settled");
+    } finally {
+      if (!committed) await writer.query("rollback").catch(() => {});
+      await writeResult;
+      await writer.end();
+      await hold.end();
+      await requireExecutor().query("delete from legal_holds where tenant_id=$1", [tenantId]);
+    }
+  });
+
+  it("linearizes a concurrent deletion behind a committed hold in the opposite order", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL required");
+    const label = `gate-reverse-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const tenantId = `artifact-delete-${label}`;
+    const jobId = await insertJob(tenant, randomUUID());
+    const workerId = "fenced-hold-first-worker";
+    const token = randomUUID();
+    const store = createSqlArtifactDeletionStore(requireExecutor(), { now: () => new Date(Date.now() + 1_000) });
+    expect((await store.claimDeletions({ workerId, limit: 1 }))[0]?.deletionJobId).toBe(jobId);
+    const writer = new pg.Client({ connectionString });
+    const waiterName = `delete-wait-${randomUUID().slice(0, 8)}`;
+    const waiter = new pg.Client({ connectionString, application_name: waiterName });
+    await writer.connect();
+    await waiter.connect();
+    let blockedQuery: Promise<pg.QueryResult> | undefined;
+    let committed = false;
+    try {
+      await writer.query("begin");
+      const holdId = randomUUID();
+      await writer.query(
+        "insert into legal_holds (id,tenant_id,created_by,reason,scope) values ($1,$2,'operator','Retain while concurrent deletion starts','organization')",
+        [holdId, tenantId],
+      );
+      blockedQuery = waiter.query("select boardreadyops_begin_artifact_unlink($1,$2,$3::uuid) as outcome", [
+        jobId,
+        workerId,
+        token,
+      ]);
+      expect(await waitForAdvisoryWait(waiterName)).toBe(true);
+      await writer.query("commit");
+      committed = true;
+      expect((await blockedQuery).rows[0]?.outcome).toBe("held");
+      expect(
+        rows(
+          await requireExecutor().query(
+            "select token from artifact_unlink_fences where deletion_job_id=$1 and settled_at is null",
+            [jobId],
+          ),
+        ),
+      ).toHaveLength(0);
+    } finally {
+      if (!committed) await writer.query("rollback").catch(() => {});
+      await blockedQuery?.catch(() => {});
+      await writer.end();
+      await waiter.end();
+      await requireExecutor().query("delete from legal_holds where tenant_id=$1", [tenantId]);
+    }
+  });
+
+  it("rejects inactive-hold reactivation and installation deletion while a tenant unlink fence is unresolved", async () => {
+    const label = `hold-reactivate-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const tenantId = `artifact-delete-${label}`;
+    const workerId = "hold-reactivate-worker";
+    const jobId = await insertJob(tenant, randomUUID());
+    const token = randomUUID();
+    const store = createSqlArtifactDeletionStore(requireExecutor(), { now: () => new Date(Date.now() + 1_000) });
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    const hold = await lifecycle.createLegalHold({
+      tenantId,
+      createdBy: "operator",
+      reason: "Initial hold, later reactivated",
+      scope: "organization",
+    });
+
+    try {
+      await expect(lifecycle.releaseLegalHold(tenantId, hold.id, "operator")).resolves.toBe(true);
+      expect((await store.claimDeletions({ workerId, limit: 1 }))[0]?.deletionJobId).toBe(jobId);
+      await expect(store.beginPhysicalDeletion({ deletionJobId: jobId, workerId, fenceToken: token })).resolves.toBe(
+        "authorized",
+      );
+
+      // Reactivating an existing hold is another hold admission, not a bypass
+      // just because the hold record was already in the table.
+      await expect(
+        requireExecutor().query("update legal_holds set active=true where id=$1", [hold.id]),
+      ).rejects.toMatchObject({ code: "B4401" });
+      expect(rows(await requireExecutor().query("select active from legal_holds where id=$1", [hold.id]))).toEqual([
+        { active: false },
+      ]);
+
+      // Installation removal cannot invalidate the canonical tenant key
+      // while this external I/O outcome is still uncertain.
+      await expect(
+        requireExecutor().query("delete from installations where id=$1", [tenant.installationId]),
+      ).rejects.toMatchObject({ code: "B4401" });
+      expect(
+        rows(await requireExecutor().query("select id from installations where id=$1", [tenant.installationId])),
+      ).toHaveLength(1);
+
+      await expect(
+        store.completeDeletion({
+          deletionJobId: jobId,
+          workerId,
+          outcome: "missing",
+        }),
+      ).resolves.toBe("completed");
+      await expect(
+        store.settlePhysicalDeletion({
+          deletionJobId: jobId,
+          workerId,
+          fenceToken: token,
+          outcome: "missing",
+        }),
+      ).resolves.toBe("settled");
+      await expect(
+        requireExecutor().query("update legal_holds set active=true where id=$1 returning active", [hold.id]),
+      ).resolves.toMatchObject({ rows: [{ active: true }] });
+    } finally {
+      // Disposable-only test fixture; the local PG installation is never production.
+      await requireExecutor().query("delete from legal_holds where id=$1", [hold.id]);
+    }
+  });
+
+  it("preserves unresolved fences across repository/run cascades and direct job mutations", async () => {
+    const tenant = await fixture(`fence-ownership-${randomUUID().slice(0, 8)}`);
+    const jobId = await insertJob(tenant, randomUUID());
+    const token = randomUUID();
+    const workerId = "fence-ownership-worker";
+    const store = createSqlArtifactDeletionStore(requireExecutor(), { now: () => new Date(Date.now() + 1_000) });
+    expect((await store.claimDeletions({ workerId, limit: 1 }))[0]?.deletionJobId).toBe(jobId);
+    await expect(store.beginPhysicalDeletion({ deletionJobId: jobId, workerId, fenceToken: token })).resolves.toBe(
+      "authorized",
+    );
+    for (const [sql, params] of [
+      ["delete from artifact_deletion_jobs where id = $1", [jobId]],
+      ["delete from release_runs where id = $1", [tenant.runId]],
+      ["delete from repositories where id = $1", [tenant.repositoryId]],
+      ["update artifact_deletion_jobs set storage_path = $2 where id = $1", [jobId, "changed.bin"]],
+    ] as const) {
+      await expect(requireExecutor().query(sql, [...params])).rejects.toMatchObject({ code: "B4401" });
+    }
+    await expect(requireExecutor().query("truncate artifact_deletion_jobs cascade")).rejects.toMatchObject({
+      code: "B4401",
+    });
+    expect(rows(await requireExecutor().query("select id from artifact_deletion_jobs where id=$1", [jobId]))).toEqual([
+      { id: jobId },
+    ]);
+    expect(
+      rows(
+        await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+          jobId,
+        ]),
+      ),
+    ).toEqual([{ settled_at: null }]);
+    await expect(store.completeDeletion({ deletionJobId: jobId, workerId, outcome: "missing" })).resolves.toBe(
+      "completed",
+    );
+    await expect(
+      store.settlePhysicalDeletion({ deletionJobId: jobId, workerId, fenceToken: token, outcome: "missing" }),
+    ).resolves.toBe("settled");
+    await expect(
+      requireExecutor().query("delete from artifact_deletion_jobs where id=$1", [jobId]),
+    ).resolves.toMatchObject({
+      rowCount: 1,
+    });
+  });
+
+  it("keeps the durable fence after a client disconnect and simulated crash before audit completion", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL required");
+    const label = `crash-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const artifactId = randomUUID();
+    const jobId = await insertJob(tenant, artifactId);
+    const tenantId = `artifact-delete-${label}`;
+    const workerId = "crash-before-audit-worker";
+    const token = randomUUID();
+    const originalConnection = createPgQueryExecutor({ connectionString, max: 1 });
+    const beforeDisconnect = createSqlArtifactDeletionStore(originalConnection, {
+      now: () => new Date(Date.now() + 1_000),
+    });
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    const root = await mkdtemp(path.join(tmpdir(), "boardreadyops-fence-crash-"));
+    const objectPath = path.join(root, tenant.runId, `${artifactId}.bin`);
+    await mkdir(path.dirname(objectPath), { recursive: true });
+    await writeFile(objectPath, "DISPOSABLE SYNTHETIC OBJECT");
+    try {
+      expect((await beforeDisconnect.claimDeletions({ workerId, limit: 1 }))[0]?.deletionJobId).toBe(jobId);
+      await expect(
+        beforeDisconnect.beginPhysicalDeletion({
+          deletionJobId: jobId,
+          workerId,
+          fenceToken: token,
+        }),
+      ).resolves.toBe("authorized");
+      // A fully committed DB fence is independent of the original PG pool.
+      await originalConnection.close();
+      await unlink(objectPath); // Simulated crash after unlink, before audit/settlement.
+
+      await expect(
+        lifecycle.createLegalHold({
+          tenantId,
+          createdBy: "legal-operator",
+          reason: "Hold should fail closed after crash",
+          scope: "organization",
+        }),
+      ).rejects.toBeInstanceOf(LegalHoldAdmissionConflictError);
+      await expect(
+        requireExecutor().query(
+          "insert into legal_holds (id, tenant_id, created_by, reason, scope) values ($1,$2,'raw-writer','Raw direct hold must be fenced','organization')",
+          [randomUUID(), tenantId.toUpperCase()],
+        ),
+      ).rejects.toMatchObject({ code: "B4401" });
+      const recovered = createSqlArtifactDeletionStore(requireExecutor(), {
+        now: () => new Date(Date.now() + 60_000),
+      });
+      await requireExecutor().query(
+        "update artifact_deletion_jobs set lease_expires_at=clock_timestamp()-interval '1 second' where id=$1",
+        [jobId],
+      );
+      await expect(recovered.claimDeletions({ workerId: "new-worker", limit: 1 })).resolves.toEqual([]);
+      await expect(
+        recovered.settlePhysicalDeletion({
+          deletionJobId: jobId,
+          workerId,
+          fenceToken: token,
+          outcome: "deleted",
+        }),
+      ).resolves.toBe("stale");
+
+      // Synthetic operator proof establishes the missing object; the original
+      // lease owner can then persist audit and settle the fence intentionally.
+      await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(
+        recovered.completeDeletion({
+          deletionJobId: jobId,
+          workerId,
+          outcome: "deleted",
+        }),
+      ).resolves.toBe("completed");
+      await expect(
+        recovered.settlePhysicalDeletion({
+          deletionJobId: jobId,
+          workerId,
+          fenceToken: token,
+          outcome: "deleted",
+        }),
+      ).resolves.toBe("settled");
+      const hold = await lifecycle.createLegalHold({
+        tenantId,
+        createdBy: "legal-operator",
+        reason: "Only after the resolved deletion is terminal",
+        scope: "organization",
+      });
+      expect(hold.active).toBe(true);
+      await lifecycle.releaseLegalHold(tenantId, hold.id, "legal-operator");
+    } finally {
+      await originalConnection.close().catch(() => {});
+      await requireExecutor().query("delete from legal_holds where lower(tenant_id)=lower($1)", [tenantId]);
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves a committed fence after a real child process is SIGKILLed before audit", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL required");
+    const label = `sigkill-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const artifactId = randomUUID();
+    const jobId = await insertJob(tenant, artifactId);
+    const tenantId = `artifact-delete-${label}`;
+    const workerId = `sigkill-worker-${randomUUID().slice(0, 8)}`;
+    const token = randomUUID();
+    const store = createSqlArtifactDeletionStore(requireExecutor(), {
+      now: () => new Date(Date.now() + 1_000),
+      leaseSeconds: 120,
+    });
+    expect((await store.claimDeletions({ workerId, limit: 1 }))[0]?.deletionJobId).toBe(jobId);
+    const root = await mkdtemp(path.join(tmpdir(), "boardreadyops-real-kill-"));
+    const objectPath = path.join(root, tenant.runId, `${artifactId}.bin`);
+    await mkdir(path.dirname(objectPath), { recursive: true });
+    await writeFile(objectPath, "DISPOSABLE PROCESS-CRASH ACCEPTANCE ONLY");
+
+    // The test child is an independent Node process and PostgreSQL session,
+    // exercising the exact admission SQL invoked by the production store.
+    // This is not a boot of the complete production worker. SIGKILL occurs
+    // AFTER unlink and BEFORE audit/settlement.
+    const childScript = `
+      const { Client } = require('pg');
+      const { unlink } = require('node:fs/promises');
+      (async () => {
+        const client = new Client({ connectionString: process.env.DATABASE_URL });
+        await client.connect();
+        const result = await client.query(
+          'select boardreadyops_begin_artifact_unlink($1, $2, $3::uuid) as outcome',
+          [process.argv[1], process.argv[2], process.argv[3]],
+        );
+        if (result.rows[0]?.outcome !== 'authorized') throw new Error('fence not authorized');
+        await unlink(process.argv[4]);
+        if (process.send) process.send({ phase: 'unlinked' });
+        setInterval(() => {}, 1000);
+      })().catch(() => { if (process.send) process.send({ phase: 'error' }); process.exit(1); });
+    `;
+    const child = spawn(process.execPath, ["-e", childScript, jobId, workerId, token, objectPath], {
+      cwd: process.cwd(),
+      env: { ...process.env, DATABASE_URL: connectionString },
+      stdio: ["ignore", "ignore", "ignore", "ipc"],
+    });
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    try {
+      const phase = await new Promise<string>((resolve, reject) => {
+        child.once("message", (message: unknown) => {
+          const value = message && typeof message === "object" && "phase" in message ? message.phase : undefined;
+          resolve(typeof value === "string" ? value : "invalid-message");
+        });
+        child.once("error", reject);
+        child.once("exit", () => reject(new Error("unlink child exited before acknowledging filesystem state")));
+      });
+      expect(phase).toBe("unlinked");
+      child.kill("SIGKILL");
+      const exitSignal = await new Promise<NodeJS.Signals | null>((resolve) => {
+        child.once("exit", (_code, signal) => resolve(signal));
+      });
+      expect(exitSignal).toBe("SIGKILL");
+      await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+
+      const fence = rows(
+        await requireExecutor().query("select token, settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+          jobId,
+        ]),
+      );
+      expect(fence).toEqual([{ token, settled_at: null }]);
+      await expect(
+        lifecycle.createLegalHold({
+          tenantId,
+          createdBy: "authorized-operator",
+          reason: "Hold must not acknowledge after a real SIGKILL",
+          scope: "organization",
+        }),
+      ).rejects.toBeInstanceOf(LegalHoldAdmissionConflictError);
+
+      await requireExecutor().query(
+        "update artifact_deletion_jobs set lease_expires_at=clock_timestamp()-interval '1 second' where id=$1",
+        [jobId],
+      );
+      const recovering = createSqlArtifactDeletionStore(requireExecutor(), {
+        now: () => new Date(Date.now() + 60_000),
+      });
+      await expect(recovering.claimDeletions({ workerId: "sigkill-recovery", limit: 1 })).resolves.toEqual([]);
+      await expect(
+        recovering.settlePhysicalDeletion({
+          deletionJobId: jobId,
+          workerId,
+          fenceToken: token,
+          outcome: "deleted",
+        }),
+      ).resolves.toBe("stale");
+
+      // Deliberately do NOT settle an ambiguous crash as part of automated
+      // recovery. An authenticated operator needs separate evidence and audit.
+      expect(
+        rows(
+          await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+            jobId,
+          ]),
+        ),
+      ).toEqual([{ settled_at: null }]);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      // Test-only cleanup settles the known, disposable fixture before the
+      // afterAll installation cascade; not a model for production recovery.
+      await store.completeDeletion({ deletionJobId: jobId, workerId, outcome: "deleted" });
+      await store.settlePhysicalDeletion({ deletionJobId: jobId, workerId, fenceToken: token, outcome: "deleted" });
+      await requireExecutor().query("delete from legal_holds where tenant_id=$1", [tenantId]);
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps a durable fence when the actual deletion worker crashes after unlink", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL required");
+    const label = `full-worker-kill-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const artifactId = randomUUID();
+    const deletionJobId = await insertJob(tenant, artifactId);
+    const workerId = `full-worker-${randomUUID().slice(0, 8)}`;
+    const tenantId = `artifact-delete-${label}`;
+    const store = createSqlArtifactDeletionStore(requireExecutor(), {
+      now: () => new Date(Date.now() + 1_000),
+      leaseSeconds: 120,
+    });
+    const claimed = (await store.claimDeletions({ workerId, limit: 1 }))[0];
+    expect(claimed?.deletionJobId).toBe(deletionJobId);
+    if (!claimed) throw new Error("Expected an isolated claimed deletion job");
+    const root = await mkdtemp(path.join(tmpdir(), "boardreadyops-worker-kill-"));
+    const objectPath = path.join(root, claimed.storagePath);
+    await mkdir(path.dirname(objectPath), { recursive: true });
+    await writeFile(objectPath, "DISPOSABLE FULL WORKER CRASH TEST");
+
+    // Bundle production worker/store implementation into a standalone subprocess.
+    // The only injected seam is the filesystem operation callback: it executes
+    // the actual production local unlink implementation, then holds the process
+    // precisely before the worker can commit completion or settle the fence.
+    const childSource = `
+      import { processArtifactDeletion, deleteLocalArtifactObject } from './apps/web/lib/artifact-deletion-worker.ts';
+      import { createSqlArtifactDeletionStore } from './packages/db/src/artifact-deletion-store.ts';
+      import { createPgQueryExecutor } from './packages/db/src/pg-executor.ts';
+      async function run() {
+        const executor = createPgQueryExecutor({ connectionString: process.env.DATABASE_URL, max: 2 });
+        const store = createSqlArtifactDeletionStore(executor);
+        await processArtifactDeletion(JSON.parse(process.env.WORKER_CLAIM), {
+          workerId: process.env.WORKER_ID,
+          storageRoot: process.env.WORKER_ROOT,
+          store,
+          deleteLocalObject: async (storageRoot, storagePath) => {
+            const result = await deleteLocalArtifactObject(storageRoot, storagePath);
+            process.send?.({ phase: 'unlinked', result });
+            await new Promise(() => {});
+            return result;
+          },
+        });
+        throw new Error('Worker unexpectedly completed past the crash boundary');
+      }
+      run().catch((error) => { process.send?.({ phase: 'error', message: String(error) }); process.exitCode = 1; });
+    `;
+    const bundled = await build({
+      stdin: {
+        contents: childSource,
+        resolveDir: process.cwd(),
+        sourcefile: "artifact-worker-crash-child.ts",
+        loader: "ts",
+      },
+      bundle: true,
+      platform: "node",
+      format: "cjs",
+      packages: "external",
+      write: false,
+      logLevel: "silent",
+    });
+    // Windows process command lines are length-limited; run the bundle from a
+    // temporary file under node_modules so the external pg module also resolves.
+    const childBundle = bundled.outputFiles[0]?.text;
+    if (!childBundle) throw new Error("Expected a built worker test bundle");
+    const childPath = path.join(process.cwd(), "node_modules", ".cache", `artifact-worker-${randomUUID()}.cjs`);
+    await mkdir(path.dirname(childPath), { recursive: true });
+    await writeFile(childPath, childBundle);
+    const child = spawn(process.execPath, [childPath], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        DATABASE_URL: connectionString,
+        WORKER_CLAIM: JSON.stringify(claimed),
+        WORKER_ID: workerId,
+        WORKER_ROOT: root,
+      },
+      stdio: ["ignore", "ignore", "ignore", "ipc"],
+    });
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    try {
+      const phase = await new Promise<unknown>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Worker did not reach unlink crash boundary")), 20_000);
+        child.once("message", (message) => {
+          clearTimeout(timeout);
+          resolve(message);
+        });
+        child.once("error", (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+        child.once("exit", () => {
+          clearTimeout(timeout);
+          reject(new Error("Worker exited before unlink boundary"));
+        });
+      });
+      expect(phase).toEqual({ phase: "unlinked", result: "deleted" });
+      child.kill("SIGKILL");
+      const signal = await new Promise<NodeJS.Signals | null>((resolve) => {
+        child.once("exit", (_code, exitSignal) => resolve(exitSignal));
+      });
+      expect(signal).toBe("SIGKILL");
+      await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+      const fence = rows(
+        await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+          deletionJobId,
+        ]),
+      );
+      expect(fence).toEqual([{ settled_at: null }]);
+      const jobs = rows(
+        await requireExecutor().query("select status from artifact_deletion_jobs where id=$1", [deletionJobId]),
+      );
+      expect(jobs).toEqual([{ status: "leased" }]);
+      await expect(
+        lifecycle.createLegalHold({
+          tenantId,
+          createdBy: "authorized-operator",
+          reason: "Full worker died after physical unlink and before durable completion",
+          scope: "organization",
+        }),
+      ).rejects.toBeInstanceOf(LegalHoldAdmissionConflictError);
+      await requireExecutor().query(
+        "update artifact_deletion_jobs set lease_expires_at=clock_timestamp()-interval '1 second' where id=$1",
+        [deletionJobId],
+      );
+      const nextWorker = createSqlArtifactDeletionStore(requireExecutor(), {
+        now: () => new Date(Date.now() + 60_000),
+      });
+      await expect(nextWorker.claimDeletions({ workerId: "post-sigkill-worker", limit: 1 })).resolves.toEqual([]);
+      expect(
+        rows(
+          await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+            deletionJobId,
+          ]),
+        ),
+      ).toEqual([{ settled_at: null }]);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      // Known synthetic object only: never use automated settlement for an
+      // unknown production filesystem outcome.
+      await store.completeDeletion({ deletionJobId, workerId, outcome: "deleted" });
+      const tokenRows = rows(
+        await requireExecutor().query("select token from artifact_unlink_fences where deletion_job_id=$1", [
+          deletionJobId,
+        ]),
+      );
+      const token = tokenRows[0]?.token;
+      if (typeof token === "string") {
+        await store.settlePhysicalDeletion({ deletionJobId, workerId, fenceToken: token, outcome: "deleted" });
+      }
+      await requireExecutor().query("delete from legal_holds where tenant_id=$1", [tenantId]);
+      await rm(childPath, { force: true });
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("prevents hold acknowledgement during irreversible unlink, then admits after settlement", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL required");
     const label = `race-${randomUUID().slice(0, 8)}`;
     const tenant = await fixture(label);
     const artifactId = randomUUID();
     const jobId = await insertJob(tenant, artifactId);
-    const now = new Date(Date.now() + 1_000);
-    const store = createSqlArtifactDeletionStore(requireExecutor(), { now: () => now });
+    const store = createSqlArtifactDeletionStore(requireExecutor(), { now: () => new Date(Date.now() + 1_000) });
     const claimed = await store.claimDeletions({ workerId: "hold-race-worker", limit: 1 });
     expect(claimed).toHaveLength(1);
     const claimedJob = claimed[0];
-    if (!claimedJob) throw new Error("Expected a claimed synthetic deletion job.");
-    expect(claimedJob.deletionJobId).toBe(jobId);
+    if (!claimedJob) throw new Error("Expected a claimed job.");
 
     const otherSession = createPgQueryExecutor({ connectionString, max: 1 });
     const lifecycle = new DataLifecycleStore(otherSession);
@@ -324,8 +945,7 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     const root = await mkdtemp(path.join(tmpdir(), "boardreadyops-hold-race-"));
     const objectPath = path.join(root, tenant.runId, `${artifactId}.bin`);
     await mkdir(path.dirname(objectPath), { recursive: true });
-    await writeFile(objectPath, "SYNTHETIC TEST DATA ONLY");
-    let holdId: string | undefined;
+    await writeFile(objectPath, "SYNTHETIC DATA ONLY");
     let reached!: () => void;
     let resume!: () => void;
     const atUnlink = new Promise<void>((resolve) => {
@@ -334,13 +954,11 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     const canUnlink = new Promise<void>((resolve) => {
       resume = resolve;
     });
-
     const deletion = processArtifactDeletion(claimedJob, {
       workerId: "hold-race-worker",
       store,
       storageRoot: root,
       deleteLocalObject: async () => {
-        // Current store query already completed; no DB lock spans this callback.
         reached();
         await canUnlink;
         await unlink(objectPath);
@@ -349,36 +967,64 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
     });
     try {
       await atUnlink;
-      const deletionPid = rows(await requireExecutor().query("select pg_backend_pid() as pid"))[0]?.pid;
-      const holdPid = rows(await otherSession.query("select pg_backend_pid() as pid"))[0]?.pid;
-      expect(deletionPid).not.toBe(holdPid);
+      const barriers = rows(
+        await otherSession.query("select token, settled_at from artifact_unlink_fences where deletion_job_id=$1", [
+          jobId,
+        ]),
+      );
+      expect(barriers).toHaveLength(1);
+      expect(barriers[0]?.settled_at).toBeNull();
 
-      const hold = await lifecycle.createLegalHold({
-        tenantId,
-        createdBy: "synthetic-audit-operator",
-        reason: "Preserve the synthetic file while deletion is in flight.",
-        scope: "organization",
-      });
-      holdId = hold.id;
-      // Observe the hold commit from another PostgreSQL pool.
+      // This formerly passed and allowed deleting under an acknowledged hold.
+      // A durable active fence now rejects success from a second PG pool.
+      await expect(
+        lifecycle.createLegalHold({
+          tenantId,
+          createdBy: "synthetic-operator",
+          reason: "Retain synthetic artifact during unlink",
+          scope: "organization",
+        }),
+      ).rejects.toBeInstanceOf(LegalHoldAdmissionConflictError);
       expect(
-        rows(
-          await requireExecutor().query("select id from legal_holds where id=$1 and tenant_id=$2 and active=true", [
-            hold.id,
-            tenantId,
-          ]),
-        ),
-      ).toHaveLength(1);
+        rows(await otherSession.query("select id from legal_holds where tenant_id=$1 and active=true", [tenantId])),
+      ).toHaveLength(0);
+      await expect(readFile(objectPath)).resolves.toBeInstanceOf(Buffer);
+
+      await requireExecutor().query(
+        "update artifact_deletion_jobs set lease_expires_at=clock_timestamp()-interval '1 second' where id=$1",
+        [jobId],
+      );
+      const recovering = createSqlArtifactDeletionStore(otherSession, { now: () => new Date(Date.now() + 60_000) });
+      await expect(recovering.claimDeletions({ workerId: "reclaim-worker", limit: 1 })).resolves.toEqual([]);
+      await expect(
+        otherSession.query("update installations set account_login=$2 where id=$1", [
+          tenant.installationId,
+          `renamed-${randomUUID()}`,
+        ]),
+      ).rejects.toMatchObject({ code: "B4401" });
 
       resume();
-      // A CHARACTERIZATION OF THE DEFECT, never a safety assertion.
-      // Invert/remove once serialization of holds with unlink is implemented.
       expect(await deletion).toMatchObject({ status: "completed", outcome: "deleted" });
       await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(
+        rows(
+          await otherSession.query(
+            "select settled_at is not null as settled from artifact_unlink_fences where deletion_job_id=$1",
+            [jobId],
+          ),
+        ),
+      ).toEqual([{ settled: true }]);
+      const accepted = await lifecycle.createLegalHold({
+        tenantId,
+        createdBy: "synthetic-operator",
+        reason: "Hold acknowledged after previous unlink completed",
+        scope: "organization",
+      });
+      expect(accepted.active).toBe(true);
+      await lifecycle.releaseLegalHold(tenantId, accepted.id, "synthetic-operator");
     } finally {
       resume();
       await deletion.catch(() => {});
-      if (holdId) await lifecycle.releaseLegalHold(tenantId, holdId, "synthetic-audit-operator");
       await otherSession.query("delete from legal_holds where tenant_id=$1", [tenantId]);
       await otherSession.close();
       await rm(root, { recursive: true, force: true });
@@ -464,6 +1110,64 @@ describeDatabase("artifact deletion PostgreSQL store", () => {
         metadata: expect.objectContaining({ errorClass: "lease_expired", attemptCount: 1 }),
       }),
     ]);
+  });
+
+  it("quarantines an ambiguous unlink after synthetic removal and blocks subsequent holds and reclaim", async () => {
+    const label = `unlink-ambiguous-${randomUUID().slice(0, 8)}`;
+    const tenant = await fixture(label);
+    const tenantId = `artifact-delete-${label}`;
+    const artifactId = randomUUID();
+    const deletionJobId = await insertJob(tenant, artifactId);
+    let at = new Date(Date.now() + 1_000);
+    const deletionStore = createSqlArtifactDeletionStore(requireExecutor(), {
+      now: () => at,
+      retryBaseSeconds: 1,
+    });
+    const [job] = await deletionStore.claimDeletions({ workerId: "uncertain-unlink-worker", limit: 1 });
+    expect(job?.deletionJobId).toBe(deletionJobId);
+    if (!job) throw new Error("Expected claimed test deletion.");
+
+    const root = await mkdtemp(path.join(tmpdir(), "boardreadyops-uncertain-unlink-"));
+    const objectPath = path.join(root, job.storagePath);
+    const lifecycle = new DataLifecycleStore(requireExecutor());
+    try {
+      await mkdir(path.dirname(objectPath), { recursive: true });
+      await writeFile(objectPath, "SYNTHETIC DATA ONLY");
+      const result = await processArtifactDeletion(job, {
+        workerId: "uncertain-unlink-worker",
+        storageRoot: root,
+        store: deletionStore,
+        deleteLocalObject: async () => {
+          // The physical effect occurred but the caller observed a rejection.
+          await unlink(objectPath);
+          throw new Error("ambiguous error after irreversible unlink");
+        },
+      });
+      expect(result.status).toBe("retry");
+      await expect(readFile(objectPath)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(
+        rows(
+          await requireExecutor().query("select settled_at from artifact_unlink_fences where deletion_job_id = $1", [
+            deletionJobId,
+          ]),
+        ),
+      ).toEqual([{ settled_at: null }]);
+      await expect(
+        lifecycle.createLegalHold({
+          tenantId,
+          createdBy: "operator",
+          reason: "Reject a false hold admission after ambiguous unlink",
+          scope: "organization",
+        }),
+      ).rejects.toBeInstanceOf(LegalHoldAdmissionConflictError);
+      at = new Date(at.valueOf() + 5_000);
+      await expect(deletionStore.claimDeletions({ workerId: "other-worker", limit: 1 })).resolves.toEqual([]);
+    } finally {
+      // All objects and rows are disposable test fixtures; no production data.
+      await requireExecutor().query("delete from artifact_unlink_fences where deletion_job_id = $1", [deletionJobId]);
+      await requireExecutor().query("delete from artifact_deletion_jobs where id = $1", [deletionJobId]);
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("retries transient failures and dead-letters permanent failures with audit proof", async () => {

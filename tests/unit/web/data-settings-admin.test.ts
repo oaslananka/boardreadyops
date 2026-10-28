@@ -1,4 +1,4 @@
-import type { DataLifecycleStore } from "@boardreadyops/db";
+import { type DataLifecycleStore, LegalHoldAdmissionConflictError } from "@boardreadyops/db";
 import { describe, expect, it, vi } from "vitest";
 import {
   createLegalHoldForViewer,
@@ -253,6 +253,18 @@ describe("data settings admin", () => {
     );
     expect(result).toMatchObject({ status: "error" });
     expect(store.createErasure).not.toHaveBeenCalled();
+  });
+
+  it("does not falsely report that a legal hold exists while irreversible deletion is in flight", async () => {
+    const { store, dependencies } = deps();
+    vi.mocked(store.createLegalHold).mockRejectedValueOnce(new LegalHoldAdmissionConflictError());
+    const result = await createLegalHoldForViewer(
+      session,
+      { installationId: "inst-a", scope: "organization", reason: "Preserve incident evidence" },
+      dependencies,
+    );
+    expect(result).toMatchObject({ status: "error" });
+    expect(result.status === "error" ? result.error : "").toContain("hold was NOT created");
   });
 
   it("creates and releases holds against the authorized tenant", async () => {
