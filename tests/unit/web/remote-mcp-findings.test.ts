@@ -26,11 +26,12 @@ const row = (index: number) => ({
   path: "/mnt/secret-board.kicad_pcb",
 });
 function store(findings: unknown[] = [row(1)]) {
-  const query = vi
-    .fn()
-    .mockResolvedValueOnce({ rows: [review] })
-    .mockResolvedValueOnce({ rows: [revision] })
-    .mockResolvedValueOnce({ rows: findings });
+  const query = vi.fn().mockImplementation(async (sql: string) => {
+    if (sql.includes("from reviews")) return { rows: [review] };
+    if (sql.includes("from review_revisions")) return { rows: [revision] };
+    if (sql.includes("from findings")) return { rows: findings };
+    throw new Error("Unexpected query");
+  });
   return { query };
 }
 
@@ -54,7 +55,7 @@ describe("hosted read-only MCP finding pages", () => {
       owner: "secret-owner",
       name: "private-board",
     });
-    expect(db.query).toHaveBeenCalledTimes(3);
+    expect(db.query).toHaveBeenCalledTimes(5);
     expect(db.query.mock.calls[0]?.[0]).toContain("head_run.repository_id = reviews.repository_id");
     const [sql, params] = db.query.mock.calls[2] ?? [];
     expect(sql).toContain("from findings");
@@ -74,6 +75,37 @@ describe("hosted read-only MCP finding pages", () => {
       expect(await loadAuthorizedRemoteFindings(db, principal, reviewId, undefined, access)).toBeNull();
       expect(db.query).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it("fails closed when live repository access is revoked during a findings read", async () => {
+    const db = store();
+    const access = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect(await loadAuthorizedRemoteFindings(db, principal, reviewId, undefined, access)).toBeNull();
+    expect(access).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a Review head that changes after findings were fetched", async () => {
+    const db = store();
+    let reviewReads = 0;
+    db.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("from reviews")) {
+        return { rows: [reviewReads++ === 0 ? review : { ...review, head_run_id: "new-head-run" }] };
+      }
+      if (sql.includes("from review_revisions")) return { rows: [revision] };
+      if (sql.includes("from findings")) return { rows: [row(1)] };
+      throw new Error("Unexpected query");
+    });
+    expect(
+      await loadAuthorizedRemoteFindings(db, principal, reviewId, undefined, vi.fn().mockResolvedValue(true)),
+    ).toBeNull();
+    expect(reviewReads).toBe(2);
+  });
+
+  it("fails closed when the live GitHub permission check becomes unavailable after a read", async () => {
+    const db = store();
+    const access = vi.fn().mockResolvedValueOnce(true).mockRejectedValueOnce(new Error("GitHub unavailable"));
+    expect(await loadAuthorizedRemoteFindings(db, principal, reviewId, undefined, access)).toBeNull();
+    expect(access).toHaveBeenCalledTimes(2);
   });
 
   it("rejects malformed IDs, cursors and missing scopes without DB/network", async () => {
