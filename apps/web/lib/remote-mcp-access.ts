@@ -243,5 +243,18 @@ export async function loadAuthorizedRemoteReview(
   checkCurrentPermission: CheckLiveRepositoryPermission,
 ): Promise<ReturnType<typeof remoteReviewFacts> | null> {
   const authorized = await loadAuthorizedRemoteReviewSnapshot(db, principal, reviewId, checkCurrentPermission);
-  return authorized?.facts ?? null;
+  if (!authorized) return null;
+  // Authorization and the current Review head can change during the revision
+  // lookup. Revalidate both before returning any source-bound facts.
+  const current = await loadAuthorizedRemoteReviewSnapshot(db, principal, reviewId, checkCurrentPermission);
+  if (
+    !current ||
+    current.headRunId !== authorized.headRunId ||
+    current.facts.headCommitSha !== authorized.facts.headCommitSha ||
+    current.facts.evidenceDigest !== authorized.facts.evidenceDigest ||
+    current.facts.status !== authorized.facts.status ||
+    current.facts.decision !== authorized.facts.decision
+  )
+    return null;
+  return authorized.facts;
 }
