@@ -437,36 +437,37 @@ describe("MCP v2 stateless web request boundary", () => {
 
   it("returns a source-minimized findings page through the authenticated MCP transport", async () => {
     const close = vi.fn().mockResolvedValue(undefined);
-    const query = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: reviewId,
-            repository_id: "private-repo",
-            head_run_id: "head-run",
-            current_revision_id: "current-revision",
-            status: "active",
-            decision: "pending",
-            owner: "secret-owner",
-            name: "secret-repo",
-            github_repo_id: "456",
-            github_installation_id: "789",
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ head_commit_sha: "a".repeat(40), evidence_digest: "b".repeat(64) }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: "000001",
-            rule_id: "drc.clearance",
-            severity: "error",
-            kind: "electrical",
-            fingerprint: "fp_1",
-          },
-        ],
-      });
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("from reviews")) {
+        return {
+          rows: [
+            {
+              id: reviewId,
+              repository_id: "private-repo",
+              head_run_id: "head-run",
+              current_revision_id: "current-revision",
+              status: "active",
+              decision: "pending",
+              owner: "secret-owner",
+              name: "secret-repo",
+              github_repo_id: "456",
+              github_installation_id: "789",
+            },
+          ],
+        };
+      }
+      if (sql.includes("from review_revisions")) {
+        return { rows: [{ head_commit_sha: "a".repeat(40), evidence_digest: "b".repeat(64) }] };
+      }
+      if (sql.includes("from findings")) {
+        return {
+          rows: [
+            { id: "000001", rule_id: "drc.clearance", severity: "error", kind: "electrical", fingerprint: "fp_1" },
+          ],
+        };
+      }
+      throw new Error("Unexpected query");
+    });
     const openDb = vi.fn().mockResolvedValue({ query, close });
     const access = vi.fn().mockResolvedValue(true);
     const response = await handleAuthorizedRemoteMcpHttp(
@@ -480,7 +481,7 @@ describe("MCP v2 stateless web request boundary", () => {
     expect(body).toContain("fp_1");
     expect(body).not.toContain("secret-owner");
     expect(body).not.toContain("secret-repo");
-    expect(access).toHaveBeenCalledOnce();
+    expect(access).toHaveBeenCalledTimes(2);
     expect(close).toHaveBeenCalledOnce();
   });
 
