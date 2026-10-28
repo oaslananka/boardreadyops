@@ -489,7 +489,7 @@ export default async function DashboardPage() {
         </header>
         <DashboardBody
           hasSession={Boolean(viewer.session)}
-          hasInstallation={Boolean(viewer.session?.installationIds.length)}
+          hasInstallation={Boolean(viewer.session?.installationIds?.length)}
           groups={groups}
           summary={summary}
         />
