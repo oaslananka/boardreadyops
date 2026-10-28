@@ -24,7 +24,7 @@ overrides:
   esbuild@<=0.24.2: '>=0.25.0'
   glob@>=10.0.0 <13.0.6: 13.0.6
   qs@>=6.7.0 <6.16.1: 6.16.1
-  undici@>=8.0.0 <8.11.0: 8.12.2
+  undici@>=8.0.0 <8.11.0: 8.12.3
   undici@>=6 <6.29.1: 6.29.1
   vite@<=6.4.1: '>=6.4.2'
   vite@^8.0.0: 8.2.4
@@ -37,7 +37,7 @@ overrides:
   chromium-bidi>zod: 4.6.6
   markdown-it@<14.3.3: 14.3.3
   next@<16.4.1: 16.4.1
-  smol-toml@<1.9.0: 1.9.0
+  smol-toml@<1.9.0: 1.9.1
   ip-address@<10.7.4: 10.7.4
   nanoid@<3.3.17: 3.3.20
   js-yaml@>=4 <4.3.2: 4.3.2
@@ -5407,8 +5407,8 @@ packages:
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
-  smol-toml@1.9.0:
-    resolution: {integrity: sha512-hpd+HLON7HdZXqYchMM/+LaTTbdK0AU3NngIJ4KVyWbY9bfQqdL9cD+4yf6dUoU2Ap4VsU0JkQi6FxAI1B2mXQ==}
+  smol-toml@1.9.1:
+    resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
     engines: {node: '>= 18'}
 
   source-map-js@1.2.2:
@@ -10121,7 +10121,7 @@ snapshots:
       oxc-parser: 0.143.0
       oxc-resolver: 11.24.2
       picomatch: 4.0.7
-      smol-toml: 1.9.0
+      smol-toml: 1.9.1
       strip-json-comments: 5.0.3
       tinyglobby: 0.2.17
       unbash: 4.0.10
@@ -11163,7 +11163,7 @@ snapshots:
 
   sisteransi@1.0.5: {}
 
-  smol-toml@1.9.0: {}
+  smol-toml@1.9.1: {}
 
   source-map-js@1.2.2: {}
 
