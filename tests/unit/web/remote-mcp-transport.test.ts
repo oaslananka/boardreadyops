@@ -548,25 +548,30 @@ describe("MCP v2 stateless web request boundary", () => {
 
   it("returns only authorized review facts and closes the database for tools/call", async () => {
     const close = vi.fn().mockResolvedValue(undefined);
-    const query = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: reviewId,
-            repository_id: "private-repo",
-            head_run_id: "run-1",
-            current_revision_id: "revision-1",
-            status: "active",
-            decision: "pending",
-            owner: "secret-owner",
-            name: "secret-board",
-            github_repo_id: "456",
-            github_installation_id: "789",
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ head_commit_sha: "a".repeat(40), evidence_digest: "b".repeat(64) }] });
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("from reviews")) {
+        return {
+          rows: [
+            {
+              id: reviewId,
+              repository_id: "private-repo",
+              head_run_id: "run-1",
+              current_revision_id: "revision-1",
+              status: "active",
+              decision: "pending",
+              owner: "secret-owner",
+              name: "secret-board",
+              github_repo_id: "456",
+              github_installation_id: "789",
+            },
+          ],
+        };
+      }
+      if (sql.includes("from review_revisions")) {
+        return { rows: [{ head_commit_sha: "a".repeat(40), evidence_digest: "b".repeat(64) }] };
+      }
+      throw new Error("Unexpected query");
+    });
     const openDb = vi.fn().mockResolvedValue({ query, close });
     const checkCurrentPermission = vi.fn().mockResolvedValue(true);
     const response = await handleAuthorizedRemoteMcpHttp(
@@ -580,7 +585,7 @@ describe("MCP v2 stateless web request boundary", () => {
     expect(body).toContain("active");
     expect(body).not.toContain("secret-owner");
     expect(body).not.toContain("secret-board");
-    expect(checkCurrentPermission).toHaveBeenCalledOnce();
+    expect(checkCurrentPermission).toHaveBeenCalledTimes(2);
     expect(close).toHaveBeenCalledOnce();
   });
 

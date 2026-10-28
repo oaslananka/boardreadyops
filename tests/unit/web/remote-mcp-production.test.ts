@@ -153,7 +153,7 @@ describe("production MCP request adapter is not publicly mounted", () => {
     expect(body).toContain("not-evaluated");
     expect(body).not.toContain("secret-owner");
     expect(body).not.toContain("private-repo-id");
-    expect(checkCurrentPermission).toHaveBeenCalledOnce();
+    expect(checkCurrentPermission).toHaveBeenCalledTimes(2);
     expect(openDb).toHaveBeenCalledTimes(3);
     expect(close).toHaveBeenCalledTimes(3);
 
@@ -165,7 +165,7 @@ describe("production MCP request adapter is not publicly mounted", () => {
       }),
     );
     expect(await denied.text()).toContain("Review unavailable");
-    expect(checkCurrentPermission).toHaveBeenCalledTimes(2);
+    expect(checkCurrentPermission).toHaveBeenCalledTimes(3);
     active = false;
     const revoked = await handler(mcpRequest("tools/list", token));
     expect(revoked.status).toBe(401);
