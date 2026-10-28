@@ -25,15 +25,21 @@ const obsoleteTag = 'boardreadyops-web-runtime:'+'c'.repeat(40);
 const out = text => { process.stdout.write(text+'\n'); };
 const exit = code => process.exit(code);
 if (a[0] === 'ps') {
+  if (a.includes('-aq') && a.some(x => x.includes('service=worker'))) { out('bbb222'); exit(0); }
   if (a.includes('-aq')) { if (process.env.TEST_PS_FAIL === '1') exit(1); out('aaa111\nbbb222\nccc333'); exit(0); }
   if (a.some(x => x.includes('service=web'))) { out('aaa111'); exit(0); }
-  if (a.some(x => x.includes('service=worker'))) { out('bbb222'); exit(0); }
+  if (a.some(x => x.includes('service=worker'))) {
+    if (process.env.TEST_WORKER_STOPPED === '1') exit(0);
+    out('bbb222'); exit(0);
+  }
 }
 if (a[0] === 'inspect') {
   const fmt = a[a.indexOf('--format')+1];
   if (a[1] === 'aaa111' && a[2] === 'bbb222') { out([active,active,stopped].join('\n')); exit(0); }
   if (a[1] === 'aaa111' || a[1] === 'bbb222') {
     if (fmt.includes('.Config.Image')) { out(currentTag); exit(0); }
+    if (fmt.includes('.State.Running')) { out(a[1] === 'bbb222' && process.env.TEST_WORKER_STOPPED === '1' ? 'false' : 'true'); exit(0); }
+    if (fmt.includes('.State.ExitCode')) { out(process.env.TEST_BAD_STOP_EXIT === '1' ? '137' : '0'); exit(0); }
     if (fmt.includes('.State.Health')) { out(process.env.TEST_BAD_HEALTH === '1' ? 'unhealthy' : 'healthy'); exit(0); }
     if (fmt.includes('.Image')) { out(a[1] === 'bbb222' && process.env.TEST_MISMATCH === '1' ? obsolete : active); exit(0); }
   }
@@ -90,6 +96,33 @@ describe("BoardReadyOps runtime image retention", () => {
     const run = runRetention(["pin", "b".repeat(40)]);
     expect(run.status).toBe(0);
     expect(run.dockerCalls).toContain(`image tag ${active} boardreadyops-rollback-safety:verified`);
+  });
+
+  it("refuses a stopped worker by default even if the web is healthy", () => {
+    const run = runRetention(["pin", "b".repeat(40)], { TEST_WORKER_STOPPED: "1" });
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain("expected exactly one running worker");
+    expect(run.dockerCalls).toBe("");
+  });
+
+  it("permits a deliberately quiesced clean-exit worker only with explicit pin opt-in", () => {
+    const run = runRetention(["pin", "b".repeat(40), "--worker-quiesced"], {
+      TEST_WORKER_STOPPED: "1",
+    });
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.dockerCalls).toContain(`image tag ${active} boardreadyops-rollback-safety:verified`);
+  });
+
+  it.each([
+    [{ TEST_WORKER_STOPPED: "1", TEST_BAD_STOP_EXIT: "1" }, "did not exit cleanly"],
+    [{ TEST_WORKER_STOPPED: "1", TEST_MISMATCH: "1" }, "different images"],
+    [{ TEST_WORKER_STOPPED: "1", TEST_BAD_HEALTH: "1" }, "not healthy"],
+    [{}, "must already be stopped"],
+  ])("fails closed for a non-verifiable quiesced worker", (vars, message) => {
+    const run = runRetention(["pin", "b".repeat(40), "--worker-quiesced"], vars);
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain(message);
+    expect(run.dockerCalls).toBe("");
   });
 
   it("establishes a proven baseline only on first commissioning", () => {

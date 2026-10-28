@@ -4,6 +4,12 @@ Customer-operated execution workers are deployed separately from the control pla
 
 This guide describes a generic self-hosted BoardReadyOps Cloud control-plane deployment. It intentionally does not name a current production machine or IP address. Select the deployment host and the **operator-selected HTTPS origin** before commissioning, and keep those environment-specific values in the operations system rather than in the public repository.
 
+### Quiesced worker release for artifact fencing
+
+For a planned local-storage fencing migration, an operator may stop the **old worker** only after recording an encrypted backup, confirming no active artifact deletion or unresolved legal hold, and enumerating all old unlink actors. Select **`dry_run=false` and `pre_quiesced_worker=true`** in the production `cloud-deploy` dispatch. The default remains `false`: ordinary releases still require one running, healthy web and worker on the same immutable image.
+
+This explicit mode requires a healthy running web container and **exactly one stopped Compose worker** that exited cleanly, both referencing the identical image. An absent/extra worker, running worker, abnormal exit or mismatched image fails closed. This does not automatically stop workers or waive backups, live queue checks, release-policy mounts, readiness or HTTPS smoke. After a fencing migration, do not restart an old pre-fence worker on rollback; preserve unresolved fences and recover using the new fenced worker.
+
 ## Target topology
 
 ```text
