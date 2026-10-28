@@ -328,7 +328,10 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
     expect(review?.headSnapshots?.[0]?.anchors).toHaveLength(1);
   });
 
-  it("populates baseSnapshots by looking up a prior run recorded for the revision's base commit", async () => {
+  it.each([
+    { scenario: "unbound legacy revision", baseRunId: null },
+    { scenario: "explicit pinned base run", baseRunId: "run-hw-104-base" },
+  ])("loads a snapshot-bearing exact base revision for $scenario", async ({ baseRunId }) => {
     vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
       mode: "postgres",
       databaseUrl: "postgresql://postgres:postgres@localhost:5432/boardreadyops",
@@ -378,7 +381,7 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
             {
               id: "rev_db_v1",
               sequence: 1,
-              base_run_id: null,
+              base_run_id: baseRunId,
               head_run_id: "run-hw-105",
               base_commit_sha: baseCommitSha,
               head_commit_sha: "1".repeat(40),
@@ -388,8 +391,11 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
         };
       }
 
-      if (norm.includes("from release_runs where repository_id = $1 and commit_sha = $2")) {
-        expect(params).toEqual(["repo-hw-prod", baseCommitSha]);
+      if (norm.includes("from release_runs")) {
+        expect(params).toEqual(["repo-hw-prod", baseCommitSha, baseRunId, "run-hw-105"]);
+        expect(norm).toContain("exists (select 1 from run_snapshots");
+        expect(norm).toContain("base.id = $3");
+        expect(norm).toContain("base.id <> $4");
         return { rows: [{ id: "run-hw-104-base" }] };
       }
 

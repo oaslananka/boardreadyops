@@ -650,10 +650,18 @@ describe("run dashboard data", () => {
     expect(query.mock.calls[7]?.[1]).toEqual(["run-123", "%release%", "primary", "release-archive", 10, 0]);
     expect(artifactSql).not.toContain("storage_path");
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
+    expect(categoryBreakdownSql).toContain("$2::jsonb ->> rule_id");
+    const registeredCategories = JSON.parse(String(query.mock.calls[8]?.[1]?.[1])) as Record<string, string>;
+    expect(registeredCategories["bom.dnp-consistency"]).toBe("assembly");
+    expect(registeredCategories["bom.footprint-mismatch"]).toBe("manufacturability");
+    expect(registeredCategories["manufacturing.test-points"]).toBe("testability");
+    expect(registeredCategories["firmware.dependency-identification"]).toBe("sourcing");
+    expect(Object.keys(registeredCategories)).toHaveLength(49);
+    expect(categoryBreakdownSql).toContain("coalesce(nullif(category, 'unclassified')");
     expect(categoryBreakdownSql).toContain("when rule_id like 'erc.%' or rule_id like 'drc.%'");
     expect(categoryBreakdownSql).toContain("when rule_id like 'release.%' then 'release'");
     expect(categoryBreakdownSql).toContain("group by 1");
-    expect(query.mock.calls[8]?.[1]).toEqual(["run-123"]);
+    expect(query.mock.calls[8]?.[1]).toEqual(["run-123", JSON.stringify(registeredCategories)]);
     expect(query).toHaveBeenCalledTimes(12);
   });
 

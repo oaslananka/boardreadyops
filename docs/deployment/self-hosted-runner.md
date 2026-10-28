@@ -142,6 +142,8 @@ The runner performs a normal HTTPS Git fetch of the exact commit SHA assigned by
 
 The worker sets `GIT_TERMINAL_PROMPT=0`, removes inherited `GIT_DIR`, `GIT_WORK_TREE`, and related variables, disables hooks and commit signing, performs a detached checkout, verifies the resulting SHA, and removes the remote from the temporary worktree.
 
+The `--workspace-root` path and its existing parent directories must not contain customer-controlled symlinks. The runner rejects those redirects before checkout and crash-recovery deletion, while allowing macOS root-owned system path aliases under protected root-owned parents (such as `/var`). Provision a dedicated runner-owned workspace directory; do not redirect it through a customer-controlled symlink. This check does not make a hostile, concurrently writable host filesystem safe; isolate the runner OS account and protect its workspace parents from other writers.
+
 A local mirror avoids repository credentials in the worker process:
 
 ```bash

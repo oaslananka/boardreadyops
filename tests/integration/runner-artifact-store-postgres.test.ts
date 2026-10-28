@@ -4,6 +4,7 @@ import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { connect, createServer, type Socket } from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { afterAll, describe, expect, it } from "vitest";
 import { handleRunnerArtifactUploadRequest } from "../../apps/web/lib/runner-artifact-routes.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
@@ -602,6 +603,122 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       }
     },
   );
+
+  it("preserves uploaded bytes when the real PostgreSQL backend disconnects with finalization in flight", async () => {
+    if (!connectionString) throw new Error("disposable PostgreSQL is required");
+    const fixture = await setup(`artifact-test-inflight-${randomUUID().slice(0, 8)}`);
+    const artifactId = randomUUID();
+    const uploadToken = token(`inflight-${artifactId}`);
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "bro-upload-inflight-"));
+    const applicationName = `br-1215-inflight-${randomUUID()}`;
+    const isolatedUrl = new URL(connectionString);
+    isolatedUrl.searchParams.set("application_name", applicationName);
+    const interruptedExecutor = createPgQueryExecutor({ connectionString: isolatedUrl.toString(), max: 1 });
+    try {
+      const issued = await createSqlRunnerArtifactStore(requireExecutor(), {
+        now: () => at(fixture.base, 10),
+        id: () => artifactId,
+        uploadToken: () => uploadToken,
+      }).issueCapabilities({
+        workerClass: "managed",
+        managedRunnerIdentityId: fixture.managedIdentityId,
+        requestTimestamp: requestTimestamp(at(fixture.base, 10)),
+        requestNonce: nonce(`inflight-${artifactId}`),
+        runId: fixture.runId,
+        executionAttemptId: fixture.attemptId,
+        leaseId: fixture.leaseId,
+        leaseToken: fixture.leaseToken,
+        artifacts: [
+          {
+            kind: "report",
+            name: "report.json",
+            role: "machine",
+            bytes: 5,
+            sha256: fingerprint("hello"),
+            contentType: "application/json",
+          },
+        ],
+      });
+      expect(issued.status).toBe("accepted");
+      const responsePromise = handleRunnerArtifactUploadRequest(
+        new Request(`https://boardreadyops.test/upload?cap=${uploadToken}`, {
+          method: "PUT",
+          body: "hello",
+        }),
+        artifactId,
+        {
+          environment: { ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot },
+          now: () => at(fixture.base, 20),
+          queryExecutor: requireExecutor,
+          createArtifactStore: (database) =>
+            createSqlRunnerArtifactStore(
+              {
+                ...database,
+                query: (sql, params = []) => {
+                  if (!sql.includes("boardreadyops_complete_artifact_upload")) return database.query(sql, params);
+                  // One actual PostgreSQL statement. Force a materialized pause
+                  // before the finalization function, so the backend is inside
+                  // the statement when its real TCP connection is terminated.
+                  const wrapped = `with pause as materialized (select pg_sleep(30))\n${sql} from pause`;
+                  return interruptedExecutor.query(wrapped, params);
+                },
+              },
+              { now: () => at(fixture.base, 20) },
+            ),
+        },
+      );
+      let backend: number | undefined;
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const active = rows(
+          await requireExecutor().query(
+            `select pid from pg_stat_activity where application_name = $1
+             and state = 'active' and wait_event = 'PgSleep'`,
+            [applicationName],
+          ),
+        );
+        if (typeof active[0]?.pid === "number") {
+          backend = active[0].pid;
+          break;
+        }
+        await sleep(50);
+      }
+      expect(backend).toBeDefined();
+      if (backend === undefined) throw new Error("finalization was never observed in flight");
+      const terminated = rows(
+        await requireExecutor().query("select pg_terminate_backend($1::integer) as stopped", [backend]),
+      );
+      expect(terminated[0]?.stopped).toBe(true);
+      const response = await responsePromise;
+      expect(response.status).toBe(503);
+      const capability = rows(
+        await requireExecutor().query(
+          "select status, storage_path from runner_artifact_upload_capabilities where artifact_id = $1",
+          [artifactId],
+        ),
+      )[0];
+      expect(capability?.status).toBe("uploading");
+      expect(rows(await requireExecutor().query("select id from artifacts where id = $1", [artifactId]))).toEqual([]);
+      const finalPath = path.join(storageRoot, String(capability?.storage_path));
+      await expect(readFile(finalPath, "utf8")).resolves.toBe("hello");
+      const retry = await handleRunnerArtifactUploadRequest(
+        new Request(`https://boardreadyops.test/upload?cap=${uploadToken}`, { method: "PUT", body: "hello" }),
+        artifactId,
+        {
+          environment: { ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot },
+          now: () => at(fixture.base, 25),
+          queryExecutor: requireExecutor,
+          createArtifactStore: (database) =>
+            createSqlRunnerArtifactStore(database, { now: () => at(fixture.base, 25) }),
+        },
+      );
+      expect(retry.status).toBe(409);
+      await expect(readFile(finalPath, "utf8")).resolves.toBe("hello");
+    } finally {
+      await interruptedExecutor.close();
+      await cleanupTenant(fixture.tenant, fixture.managedIdentityId);
+      await rm(storageRoot, { recursive: true, force: true });
+    }
+  }, 15_000);
 
   it("keeps a committed artifact when a real PostgreSQL TCP acknowledgement is lost", async () => {
     if (!connectionString) throw new Error("disposable PostgreSQL is required");

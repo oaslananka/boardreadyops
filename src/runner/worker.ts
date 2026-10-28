@@ -14,7 +14,7 @@ import { loadRunnerPrivateKey, RunnerControlPlaneClient } from "./client.js";
 import { persistCustomerRunnerArtifacts } from "./customer-artifacts.js";
 import { createManufacturingDraftReceiptArtifact } from "./draft-attestation.js";
 import { type LoadedRunnerIdentity, loadRunnerIdentity } from "./identity.js";
-import { checkoutRunnerSource } from "./source.js";
+import { assertRunnerWorkspaceDirectories, checkoutRunnerSource } from "./source.js";
 
 type RunnerArtifactMode = "control-plane" | "metadata-only" | "customer-managed";
 
@@ -663,6 +663,9 @@ function runnerActiveWorkspaceRoot(workspaceRoot: string, runnerId: string): str
 
 async function recoverRunnerCrashWorkspaces(workspaceRoot: string, runnerId: string): Promise<number> {
   const root = path.resolve(workspaceRoot);
+  // lstat on a nested namespace follows any symlinked ancestor. Reject such
+  // roots before enumerating or recursively removing crash leftovers.
+  await assertRunnerWorkspaceDirectories(root);
   const namespace = path.join(root, ".boardreadyops-active");
   const namespaceInfo = await lstat(namespace).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined;
