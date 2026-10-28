@@ -4,6 +4,11 @@ import {
   artifactDownloadUrl,
   configuredArtifactDownloadSigningKey,
 } from "./artifact-downloads.js";
+import { catalogRules } from "./rule-catalog.js";
+
+const registeredRuleCategoriesJson = JSON.stringify(
+  Object.fromEntries(catalogRules.map(({ id, category }) => [id, category])),
+);
 
 type RunTrustMode = "safe" | "standard";
 type RunSafeModeReason = "draft-pull-request" | "fork-pull-request" | "private-repository";
@@ -818,6 +823,7 @@ export async function lookupRunDashboard(
     // "show me the filtered detail". lower(severity) equivalences mirror findingOrder() below.
     executor.query(
       `select coalesce(nullif(category, 'unclassified'),
+                $2::jsonb ->> rule_id,
                 case
                   when rule_id like 'erc.%' or rule_id like 'drc.%'
                     or rule_id like 'firmware.%' or rule_id like 'pinmap.%' then 'electrical'
@@ -836,7 +842,7 @@ export async function lookupRunDashboard(
         where run_id = $1
         group by 1
         order by 1`,
-      [runId],
+      [runId, registeredRuleCategoriesJson],
     ),
     executor.query(
       `select production_batches.id,
