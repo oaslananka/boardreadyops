@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -1105,6 +1105,32 @@ describe("serveRunnerWorker", () => {
     });
     expect(runnerClient.claim).toHaveBeenCalledTimes(1);
   });
+
+  it.skipIf(process.platform === "win32")(
+    "refuses crash cleanup through a symlinked workspace root without deleting customer files",
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-recovery-link-"));
+      roots.push(root);
+      const outside = path.join(root, "customer-owned");
+      const orphan = path.join(outside, ".boardreadyops-active", runnerId, "customer-data");
+      await mkdir(orphan, { recursive: true });
+      const file = path.join(orphan, "must-not-delete.kicad_pcb");
+      await writeFile(file, "customer-source");
+      const link = path.join(root, "workspace-redirect");
+      await symlink(outside, link, "dir");
+      const runnerClient = client(null);
+      const overrides = dependencies(runnerClient.value);
+
+      await expect(
+        serveRunnerWorker(
+          { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", workspaceRoot: link },
+          overrides,
+        ),
+      ).rejects.toThrow(/workspace.*symlink|workspace.*symbolic/u);
+      await expect(readFile(file, "utf8")).resolves.toBe("customer-source");
+      expect(runnerClient.claim).not.toHaveBeenCalled();
+    },
+  );
 
   it("fails closed before polling when the managed workspace namespace is not a directory", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-recovery-invalid-"));
