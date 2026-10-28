@@ -202,7 +202,11 @@ describe("reproducible contributor toolchain", () => {
     expect(ci).toContain(`UV_VERSION: "${config.python.uv}"`);
     expect(security).toContain(`semgrep==${config.validation.semgrep}`);
     expect(security).toContain(`GITLEAKS_VERSION: ${config.validation.gitleaks}`);
-    expect(await repositoryFile("apps/web/Dockerfile")).toContain(`FROM node:${config.node.preferred}-slim`);
+    const webDockerfile = await repositoryFile("apps/web/Dockerfile");
+    expect(webDockerfile).toContain(`# Node ${config.node.preferred}-slim (digest-pinned)`);
+    const pinnedImageReferences = webDockerfile.match(/FROM node@sha256:[a-f0-9]{64} AS (?:base|runner)/gu);
+    expect(pinnedImageReferences).toHaveLength(2);
+    expect(pinnedImageReferences?.[0]?.split(" AS ")[0]).toBe(pinnedImageReferences?.[1]?.split(" AS ")[0]);
     expect(JSON.parse(await repositoryFile("biome.json")).files.includes).toContain("!.boardreadyops");
     expect(JSON.parse(await repositoryFile("knip.json")).ignoreBinaries).not.toContain("mkdocs");
   });
