@@ -47,6 +47,20 @@ describe("isolated nonempty artifact byte restore proof", () => {
     expect(JSON.stringify(result)).not.toMatch(/board\.zip|run\/artifacts|sha256|manifest/);
   });
 
+  it("accepts a canonicalized parent directory alias without accepting a symlink root", async () => {
+    await writeFile(path.join(sourceDir, "artifact"), "bytes");
+    await writeFile(path.join(restoredDir, "artifact"), "bytes");
+    const alias = path.join(tempDir, "parent-alias");
+    await symlink(tempDir, alias, "dir");
+    await expect(
+      verifyArtifactVolumeRestore({
+        sourceDir: path.join(alias, "snapshot"),
+        restoredDir: path.join(alias, "restored"),
+        confirmation: ARTIFACT_RESTORE_CONFIRMATION,
+      }),
+    ).resolves.toEqual({ status: "verified", fileCount: 1, totalBytes: 5 });
+  });
+
   it("refuses empty volumes", async () => {
     await expect(proof()).rejects.toThrow("empty_volume");
   });

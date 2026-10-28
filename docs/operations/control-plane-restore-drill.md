@@ -38,7 +38,7 @@ node scripts/verify-artifact-volume-restore.mjs --source-dir /isolated/snapshot-
 ```
 
 The tool is **read-only** and refuses empty volumes, overlapping roots,
-symlinks, special files, mismatched relative paths, file size or SHA-256
+symlinked roots or entries (but not trusted canonicalized ancestor paths),\nspecial files, mismatched relative paths, file size or SHA-256
 discrepancies, and files modified during reading. The output contains only
 aggregate file count and total byte count, with no file names, hashes or
 contents; failures return a generic `unknown` and nonzero exit status.
