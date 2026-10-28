@@ -52,6 +52,34 @@ where settled_at is null
 group by tenant_key;
 ```
 
+### Bounded read-only operator inventory
+
+For an authorized operator with **read access to `started_at` and `settled_at`**
+on `public.artifact_unlink_fences`, run:
+
+```sh
+node scripts/inspect-artifact-unlink-fences.mjs
+```
+
+Supply `DATABASE_URL` through the operator's existing secret-handling mechanism
+(not as an argument, printed command, support ticket or committed environment
+file). The script opens `BEGIN READ ONLY`, uses bounded statement/lock
+timeouts, checks that the table is not RLS-filtered, and returns only the
+unresolved fence count and oldest timestamp. On missing credentials, absent
+grant/schema, row-level security or a query error, it returns
+`{"status":"unknown","reason":"..."}` with nonzero exit status. **Unknown is not
+zero**. No tenant identifiers, file paths, worker IDs or raw database errors
+are returned.
+
+The production `boardreadyops_evidence_reader` role has been observed to lack
+the necessary access. This documentation does **not** authorize changing its
+privileges or creating a privileged `SECURITY DEFINER` endpoint. A separate
+approved DBA/security change must provision the least-privilege observation
+grant, or an already-authorized read-only operator account must be used. Do
+not use this command with a production write-capable service identity merely
+to bypass the evidence-reader restriction. In any case this is point-in-time
+evidence only, not a hold-release or deletion authorization.
+
 An unresolved fence is **quarantined**, not an automatically retryable job.
 Before authenticated manual reconciliation, prove all old workers were stopped
 and cannot resume, verify local-file outcome using bounded path/symlink guards,
