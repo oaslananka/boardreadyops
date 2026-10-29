@@ -11,7 +11,7 @@ import {
   type RemoteMcpTokenVerifier,
 } from "./remote-mcp-access.js";
 import { loadAuthorizedRemoteFindings, remoteFindingCursorFormat } from "./remote-mcp-findings.js";
-import { remoteMcpMetadataUrl } from "./remote-mcp-foundation.js";
+import { remoteMcpMetadataUrl, remoteMcpOrigin, remoteMcpResource } from "./remote-mcp-foundation.js";
 
 /** Keep this limit synchronized with createMcpHandler.maxRequestBodySize.
  * SDK 2.3.1 enforces the *actual streamed bytes* at this same limit; this
@@ -50,7 +50,7 @@ function trustedRemoteMcpHttpTarget(request: Request): boolean {
   try {
     const url = new URL(request.url);
     const origin = request.headers.get("origin");
-    return url.href === "https://boardreadyops.com/mcp" && (origin === null || origin === "https://boardreadyops.com");
+    return url.href === remoteMcpResource && (origin === null || origin === remoteMcpOrigin);
   } catch {
     return false;
   }

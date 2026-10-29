@@ -1,8 +1,9 @@
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { remoteMcpOrigin, stagingRemoteMcpOrigin } from "./remote-mcp-foundation.js";
 import { createRemoteMcpTokenIssuer } from "./remote-mcp-token-issuer.js";
 import { configuredSessionSecret } from "./user-session.js";
 
-const issuer = "https://boardreadyops.com";
+const issuer = remoteMcpOrigin;
 
 function parseRetiredPublicJwks(raw: string): unknown {
   if (raw.length > 12000) throw new Error("Previous JWKS is too large");
@@ -27,6 +28,13 @@ function parseRetiredPublicJwks(raw: string): unknown {
 export function configuredRemoteMcpOAuth(environment: Readonly<Record<string, string | undefined>>) {
   if (
     environment.BOARDREADYOPS_REMOTE_MCP_OAUTH_ENABLED !== "true" ||
+    // Runtime mode must match this process's preloaded resource identity.
+    // A mismatched injection, startup setting or staging/production mix fails closed.
+    (environment.BOARDREADYOPS_REMOTE_MCP_STAGING_ENABLED !== undefined &&
+      environment.BOARDREADYOPS_REMOTE_MCP_STAGING_ENABLED !== "false" &&
+      environment.BOARDREADYOPS_REMOTE_MCP_STAGING_ENABLED !== "true") ||
+    (environment.BOARDREADYOPS_REMOTE_MCP_STAGING_ENABLED === "true") !==
+      (remoteMcpOrigin === stagingRemoteMcpOrigin) ||
     environment.BOARDREADYOPS_REMOTE_MCP_OAUTH_ISSUER !== issuer ||
     !environment.DATABASE_URL ||
     !configuredSessionSecret(environment) ||

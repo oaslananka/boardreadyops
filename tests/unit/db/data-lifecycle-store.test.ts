@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DataLifecycleStore } from "../../../packages/db/src/data-lifecycle-store.js";
+import { DataLifecycleStore, LegalHoldAdmissionConflictError } from "../../../packages/db/src/data-lifecycle-store.js";
 
 describe("data lifecycle administration", () => {
   it("uses case-insensitive GitHub tenant identity for legal hold visibility and erasure admission", async () => {
@@ -275,6 +275,20 @@ describe("data lifecycle administration", () => {
       }),
     ).rejects.toThrow("database temporarily unavailable");
     expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["B4401", "55P03"])("never acknowledges a hold when the physical deletion gate returns %s", async (code) => {
+    const query = vi.fn().mockRejectedValue(Object.assign(new Error("database guard blocked"), { code }));
+    const store = new DataLifecycleStore({ query });
+    await expect(
+      store.createLegalHold({
+        tenantId: "acme",
+        createdBy: "alice",
+        reason: "Preserve user evidence for legal review",
+        scope: "organization",
+      }),
+    ).rejects.toBeInstanceOf(LegalHoldAdmissionConflictError);
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it("rejects malformed erasure and hold scopes before querying, including missing scoped identifiers", async () => {

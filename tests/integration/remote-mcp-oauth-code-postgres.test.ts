@@ -972,7 +972,8 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     expect(allowed.status, result).toBe(200);
     expect(result).toContain("not-evaluated");
     expect(result).not.toContain("sensitive-owner");
-    expect(livePermission).toHaveBeenCalledOnce();
+    // Every successful Review facts read checks the live GitHub grant twice.
+    expect(livePermission).toHaveBeenCalledTimes(2);
     livePermission.mockResolvedValue(false);
     const denied = await handler(
       request("tools/call", {
@@ -981,7 +982,7 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
       }),
     );
     expect(await denied.text()).toContain("Review unavailable");
-    expect(livePermission).toHaveBeenCalledTimes(2);
+    expect(livePermission).toHaveBeenCalledTimes(3);
     const grantRow = await executor().query(
       "select jti from remote_mcp_oauth_grants where issuer = $1 and client_id = $2 and github_user_id = $3 and revoked_at is null order by created_at desc limit 1",
       [origin, clientId, githubUserId],

@@ -374,7 +374,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `qs@6.16.1`
   - Description: A querystring parser that supports nesting and arrays, with a depth limit
   - Homepage: https://github.com/ljharb/qs
-- `smol-toml@1.9.0`
+- `smol-toml@1.9.1`
   - Description: A small, fast, and correct TOML parser/serializer
   - Homepage: https://github.com/squirrelchat/smol-toml#readme
 - `source-map@0.6.1`, `source-map@0.7.6`
@@ -716,16 +716,16 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/bcoe/v8-coverage#readme
 - `@codecov/bundler-plugin-core@2.0.1`
   - Description: Official Codecov Bundler Plugin Core
-- `@commitlint/cli@21.2.3`
+- `@commitlint/cli@21.2.4`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/config-conventional@21.2.3`
+- `@commitlint/config-conventional@21.2.4`
   - Description: Shareable commitlint config enforcing conventional commits
   - Homepage: https://commitlint.js.org/
 - `@commitlint/config-validator@21.2.3`
   - Description: config validator for commitlint.config.js
   - Homepage: https://commitlint.js.org/
-- `@commitlint/ensure@21.2.3`
+- `@commitlint/ensure@21.2.4`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
 - `@commitlint/execute-rule@21.0.1`
@@ -737,10 +737,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@commitlint/is-ignored@21.2.3`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/lint@21.2.3`
+- `@commitlint/lint@21.2.4`
   - Description: Lint a string against commitlint rules
   - Homepage: https://commitlint.js.org/
-- `@commitlint/load@21.2.3`
+- `@commitlint/load@21.2.4`
   - Description: Load shared commitlint configuration
   - Homepage: https://commitlint.js.org/
 - `@commitlint/message@21.2.0`
@@ -755,7 +755,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@commitlint/resolve-extends@21.2.3`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
-- `@commitlint/rules@21.2.3`
+- `@commitlint/rules@21.2.4`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
 - `@commitlint/to-lines@21.0.1`
@@ -800,7 +800,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/formatjs/formatjs#readme
 - `@gerrit0/mini-shiki@3.23.0`
   - Homepage: https://github.com/Gerrit0/mini-shiki#readme
-- `@hono/node-server@2.0.12`
+- `@hono/node-server@2.1.3`
   - Description: Node.js Adapter for Hono
   - Homepage: https://github.com/honojs/node-server
 - `@html-validate/stylish@6.0.0`
@@ -877,7 +877,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@modelcontextprotocol/ext-apps@2.0.3`
   - Description: MCP Apps SDK — Enable MCP servers to display interactive user interfaces in conversational clients.
   - Homepage: https://github.com/modelcontextprotocol/ext-apps
-- `@modelcontextprotocol/sdk@1.32.0`
+- `@modelcontextprotocol/sdk@1.32.0`, `@modelcontextprotocol/sdk@1.32.1`
   - Description: Model Context Protocol implementation for TypeScript
   - Homepage: https://modelcontextprotocol.io
 - `@next/env@16.4.1`
@@ -1518,9 +1518,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `cosmiconfig@9.0.2`
   - Description: Find and load configuration from a package.json property, rc file, TypeScript module, and more!
   - Homepage: https://github.com/cosmiconfig/cosmiconfig#readme
-- `cosmiconfig-typescript-loader@6.3.0`
-  - Description: TypeScript loader for cosmiconfig
-  - Homepage: https://github.com/Codex-/cosmiconfig-typescript-loader#readme
 - `crc32-stream@6.0.0`
   - Description: a streaming CRC32 checksumer
   - Homepage: https://github.com/archiverjs/node-crc32-stream
@@ -1844,10 +1841,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/juliangruber/isarray
 - `jest-worker@27.5.1`
   - Homepage: https://github.com/facebook/jest#readme
-- `jiti@2.6.1`, `jiti@2.7.0`
+- `jiti@2.7.0`
   - Description: Runtime typescript and ESM support for Node.js
   - Homepage: https://github.com/unjs/jiti#readme
-- `jose@6.2.10`
+- `jose@6.2.10`, `jose@6.2.13`
   - Description: JWA, JWS, JWE, JWT, JWK, JWKS for Node.js, Browser, Cloudflare Workers, Deno, Bun, and other Web-interoperable runtimes
   - Homepage: https://github.com/panva/jose
 - `js-library-detector@6.7.0`
@@ -2100,7 +2097,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `pkg-types@2.3.1`
   - Description: Node.js utilities and TypeScript definitions for `package.json` and `tsconfig.json`
   - Homepage: https://github.com/unjs/pkg-types#readme
-- `postcss@8.5.23`, `postcss@8.5.26`
+- `postcss@8.5.23`, `postcss@8.5.31`
   - Description: Tool for transforming styles with JS plugins
   - Homepage: https://postcss.org/
 - `postgres-array@2.0.0`
@@ -2156,10 +2153,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `rc9@3.0.1`
   - Description: Read/Write config couldn't be easier!
   - Homepage: https://github.com/unjs/rc9#readme
-- `react@19.2.8`
+- `react@19.2.9`
   - Description: React is a JavaScript library for building user interfaces.
   - Homepage: https://react.dev/
-- `react-dom@19.2.8`
+- `react-dom@19.2.9`
   - Description: React package for working with the DOM.
   - Homepage: https://react.dev/
 - `react-remove-scroll@2.7.2`

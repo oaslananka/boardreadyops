@@ -54,7 +54,11 @@ function db(
   revisionRows: unknown[] = [{ head_commit_sha: sha40, evidence_digest: sha64 }],
 ) {
   return {
-    query: vi.fn().mockResolvedValueOnce({ rows: reviewRows }).mockResolvedValueOnce({ rows: revisionRows }),
+    query: vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("from reviews")) return { rows: reviewRows };
+      if (sql.includes("from review_revisions")) return { rows: revisionRows };
+      throw new Error("Unexpected query");
+    }),
   };
 }
 
@@ -191,18 +195,42 @@ describe("remote MCP live repository gate", () => {
   });
 
   it("checks live user access on every read, including after membership is revoked", async () => {
-    const store = {
-      query: vi
-        .fn()
-        .mockResolvedValueOnce({ rows: [ownerReview] })
-        .mockResolvedValueOnce({ rows: [{ head_commit_sha: sha40, evidence_digest: sha64 }] })
-        .mockResolvedValueOnce({ rows: [ownerReview] }),
-    };
-    const checkLive = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const store = db();
+    const checkLive = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     expect(await loadAuthorizedRemoteReview(store, authorized, reviewId, checkLive)).not.toBeNull();
     expect(await loadAuthorizedRemoteReview(store, authorized, reviewId, checkLive)).toBeNull();
+    expect(checkLive).toHaveBeenCalledTimes(3);
+    expect(store.query).toHaveBeenCalledTimes(5);
+  });
+
+  it("fails closed when live repository permission is revoked while Review facts are read", async () => {
+    const store = db();
+    const checkLive = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect(await loadAuthorizedRemoteReview(store, authorized, reviewId, checkLive)).toBeNull();
     expect(checkLive).toHaveBeenCalledTimes(2);
-    expect(store.query).toHaveBeenCalledTimes(3);
+  });
+
+  it("fails closed when the current Review head changes after the first snapshot", async () => {
+    const store = db();
+    let reads = 0;
+    store.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("from reviews")) {
+        return { rows: [reads++ === 0 ? ownerReview : { ...ownerReview, head_run_id: "new-run" }] };
+      }
+      if (sql.includes("from review_revisions")) {
+        return { rows: [{ head_commit_sha: sha40, evidence_digest: sha64 }] };
+      }
+      throw new Error("Unexpected query");
+    });
+    expect(await loadAuthorizedRemoteReview(store, authorized, reviewId, vi.fn().mockResolvedValue(true))).toBeNull();
+    expect(reads).toBe(2);
+  });
+
+  it("fails closed when the live permission provider becomes unavailable after reading", async () => {
+    const store = db();
+    const checkLive = vi.fn().mockResolvedValueOnce(true).mockRejectedValueOnce(new Error("GitHub unavailable"));
+    expect(await loadAuthorizedRemoteReview(store, authorized, reviewId, checkLive)).toBeNull();
+    expect(checkLive).toHaveBeenCalledTimes(2);
   });
 
   it("rejects missing OAuth scopes and malformed review IDs without database lookups", async () => {

@@ -21,13 +21,24 @@ export type ArtifactDeletionMetrics = {
 
 export type ArtifactDeletionStore = {
   /**
-   * Check a live lease and defer a newly held tenant before unlink.
-   * This is a pre-unlink defense, NOT cross-transaction hold/unlink exclusion.
+   * Commit a durable tenant fencing record BEFORE irreversible filesystem I/O.
+   * A hold cannot be acknowledged while the record remains unsettled.
    */
-  authorizeOrDeferDeletion(input: {
+  beginPhysicalDeletion(input: {
     deletionJobId: string;
     workerId: string;
+    fenceToken: string;
   }): Promise<"authorized" | "held" | "stale">;
+  /**
+   * Settle only after filesystem I/O AND its completion/failure audit committed.
+   * Crash or DB disconnect leaves the fence unresolved, never auto-released.
+   */
+  settlePhysicalDeletion(input: {
+    deletionJobId: string;
+    workerId: string;
+    fenceToken: string;
+    outcome: "deleted" | "missing" | "failed";
+  }): Promise<"settled" | "stale">;
   claimDeletions(input: { workerId: string; limit?: number }): Promise<ClaimedArtifactDeletion[]>;
   completeDeletion(input: {
     deletionJobId: string;
@@ -52,6 +63,7 @@ export type ArtifactDeletionStoreOptions = {
 };
 
 const workerIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const credentialAssignment = /\b(authorization|password|private[_-]?key|secret|token)\s*[=:]\s*[^\s,;]+/giu;
 
 function rows(result: unknown): readonly Record<string, unknown>[] {
@@ -134,47 +146,26 @@ export function createSqlArtifactDeletionStore(
   const retryBaseSeconds = positiveInteger(options.retryBaseSeconds, 15, "retryBaseSeconds");
 
   return {
-    async authorizeOrDeferDeletion(input) {
+    async beginPhysicalDeletion(input) {
       if (!workerIdPattern.test(input.workerId)) throw new Error("invalid artifact deletion worker id");
-      // The job's live lease is the authority: PostgreSQL's clock, not a
-      // potentially skewed worker clock, determines expiry before unlink.
-      // A hold created AFTER this transaction but BEFORE filesystem unlink is
-      // still a separate race requiring coordinated transactions/locking.
-      const result = await executor.query(
-        `with claimed as materialized (
-           select jobs.id, installations.account_login
-             from artifact_deletion_jobs as jobs
-             join installations on installations.id = jobs.installation_id
-            where jobs.id = $1
-              and jobs.status = 'leased'
-              and jobs.lease_owner = $2
-              and jobs.lease_expires_at > clock_timestamp()
-            for update of jobs
-         ), matching_hold as materialized (
-           select 1 from legal_holds
-           join claimed on lower(legal_holds.tenant_id) = lower(claimed.account_login)
-           where legal_holds.active = true
-           limit 1
-         ), deferred as (
-           update artifact_deletion_jobs
-              set status = 'available',
-                  available_at = clock_timestamp() + interval '30 minutes',
-                  lease_owner = null, lease_expires_at = null,
-                  attempt_count = greatest(0, attempt_count - 1),
-                  last_error_class = 'legal_hold',
-                  last_error_message = 'Deletion deferred by active legal hold.'
-            where id in (select id from claimed) and exists (select 1 from matching_hold)
-            returning id
-         )
-         select case
-           when exists (select 1 from deferred) then 'held'
-           when exists (select 1 from claimed) and not exists (select 1 from matching_hold) then 'authorized'
-           else 'stale'
-         end as outcome`,
-        [input.deletionJobId, input.workerId],
-      );
+      if (!uuidPattern.test(input.fenceToken)) throw new Error("invalid artifact unlink fence token");
+      const result = await executor.query("select boardreadyops_begin_artifact_unlink($1, $2, $3::uuid) as outcome", [
+        input.deletionJobId,
+        input.workerId,
+        input.fenceToken,
+      ]);
       const outcome = text(rows(result)[0], "outcome");
       return outcome === "authorized" || outcome === "held" ? outcome : "stale";
+    },
+
+    async settlePhysicalDeletion(input) {
+      if (!workerIdPattern.test(input.workerId)) throw new Error("invalid artifact deletion worker id");
+      if (!uuidPattern.test(input.fenceToken)) throw new Error("invalid artifact unlink fence token");
+      const result = await executor.query(
+        "select boardreadyops_settle_artifact_unlink($1, $2, $3::uuid, $4) as outcome",
+        [input.deletionJobId, input.workerId, input.fenceToken, input.outcome],
+      );
+      return text(rows(result)[0], "outcome") === "settled" ? "settled" : "stale";
     },
 
     async claimDeletions(input) {

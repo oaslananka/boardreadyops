@@ -6,6 +6,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_mutation:
+        description: "Also run the optional mutation suite (up to 90 minutes)"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -856,7 +862,7 @@ jobs:
     name: ci / mutation
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    if: needs.risk-profile.outputs.needs_mutation == 'true' && github.event_name == 'workflow_dispatch'
+    if: needs.risk-profile.outputs.needs_mutation == 'true' && github.event_name == 'workflow_dispatch' && inputs.run_mutation == true
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:

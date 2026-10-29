@@ -125,7 +125,8 @@ describePg("live-authorized MCP finding pagination against PostgreSQL", () => {
     );
     expect(last?.findings).toHaveLength(2);
     expect(last?.nextCursor).toBeNull();
-    expect(canRead).toHaveBeenCalledTimes(2);
+    // Each page revalidates the live repository grant before returning facts.
+    expect(canRead).toHaveBeenCalledTimes(4);
     const exported = JSON.stringify([first, last]);
     expect(exported).not.toContain("PRIVATE DESIGN");
     expect(exported).not.toContain("/secret/");
