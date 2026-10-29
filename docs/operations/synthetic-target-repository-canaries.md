@@ -27,7 +27,7 @@ Provision exactly these repositories under the `oaslananka-dev` organization:
 | `oaslananka-dev/boardreadyops-canary-public` | public | `17 */6 * * *` |
 | `oaslananka-dev/boardreadyops-canary-private` | private | `47 */6 * * *` |
 
-The stagger keeps the two observations from starting together while providing four public and four private observations per day.
+The stagger keeps the two observations from starting together while providing four public and four private observations per day. These are **two repositories under the same GitHub organization**, not two independent GitHub App owners/installations; successful public/private canaries do **not** satisfy the two-owner acceptance required by [#154](https://github.com/oaslananka/boardreadyops/issues/154).
 
 Each repository must contain:
 
@@ -147,7 +147,7 @@ For each repository:
 1. Verify the repository name and public/private visibility exactly match the inventory table.
 2. Verify the live App registration matches the documented least-privilege profile and has no organization or account permissions.
 3. Install the production BoardReadyOps GitHub App on only the two canary repositories.
-4. Confirm the installation has Metadata read, Pull requests read, Checks read/write, and Actions read/write, with no Contents permission.
+4. Compare the installation's live grants with `githubAppPermissionProfile`: Metadata read; Checks write, Actions write, Pull requests write, Contents write, Workflows write, and Issues write. Contents and Workflows are declared capability-scoped grants for reviewed setup PRs, not an unauthorized escalation. If a capability-scoped grant is missing, record the degraded setup/comment capability and follow the manual setup path; do not silently grant permissions or treat the installation as having that capability.
 5. Add the reviewed `readiness-runner.yml` to the default branch at `.github/workflows/readiness-runner.yml`.
 6. Add a minimal passing KiCad project and `boardreadyops.yml` to the default branch.
 7. Add `canary/nonce.txt` with an initial informational value.
@@ -208,7 +208,7 @@ For any failed canary:
 9. For Check Run publication drift, follow the Check Run reconciliation procedure; the accepted signed result remains authoritative.
 10. Retry with `workflow_dispatch` only after the suspected configuration or service condition is corrected.
 
-Do not fix a canary by granting the production App Contents write, moving private source to a central workflow repository, bypassing OIDC, fabricating a Check Run, manually changing a release result, or enabling a persistent BoardReadyOps-operated KiCad worker.
+Do not fix a canary by widening App permissions beyond `githubAppPermissionProfile`, silently altering an installation's approved grants, moving private source to a central workflow repository, bypassing OIDC, fabricating a Check Run, manually changing a release result, or enabling a persistent BoardReadyOps-operated KiCad worker. The declared Contents write grant is not a workaround for dispatch failure.
 
 ## Recovery and upgrade
 

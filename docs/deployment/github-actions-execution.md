@@ -196,4 +196,4 @@ For continuous production-path validation across both repository visibility clas
 | Check remains in progress | Workflow stopped before callback or callback exhausted retries |
 | Workflow fails with findings | BoardReadyOps correctly returned a blocking readiness decision |
 
-Do not work around dispatch failures by granting the App Contents write, placing customer source in a central public workflow repository, or enabling a shared VPS worker without an explicit execution-mode decision.
+Do not work around dispatch failures by widening the App beyond the declared `githubAppPermissionProfile`, placing customer source in a central public workflow repository, or enabling a shared VPS worker without an explicit execution-mode decision. The declared Contents write grant supports reviewed setup PRs; it does not repair target workflow dispatch failures.
