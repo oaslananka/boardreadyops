@@ -140,6 +140,42 @@ describe("checkoutRunnerSource", () => {
     expect(remoteAdd?.at(-1)).toBe(path.join(mirror, "octo-org", "private-board.git"));
   });
 
+  it.skipIf(process.platform === "win32")("refuses a mirror owner symlink before checkout", async () => {
+    const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "runner-mirror-work-"));
+    const mirrorRoot = await mkdtemp(path.join(os.tmpdir(), "runner-mirror-root-"));
+    const outside = await mkdtemp(path.join(os.tmpdir(), "runner-mirror-outside-"));
+    roots.push(workspaceRoot, mirrorRoot, outside);
+    await mkdir(path.join(outside, "private-board.git"));
+    await symlink(outside, path.join(mirrorRoot, "octo-org"), "dir");
+    const execute = vi.fn<RunnerCommandExecutor>(async (_cmd, args) => ({
+      stdout: args.includes("rev-parse") ? commitSha : "",
+      stderr: "",
+    }));
+    await expect(
+      checkoutRunnerSource({ job: job(), workspaceRoot, repositoryMirrorRoot: mirrorRoot, execute }),
+    ).rejects.toThrow(/symlink/u);
+    expect(execute).not.toHaveBeenCalled();
+    await expect(readdir(workspaceRoot)).resolves.toEqual([]);
+  });
+
+  it.skipIf(process.platform === "win32")("refuses a symlinked bare mirror repository", async () => {
+    const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "runner-mirror-work-"));
+    const mirrorRoot = await mkdtemp(path.join(os.tmpdir(), "runner-mirror-root-"));
+    const outside = await mkdtemp(path.join(os.tmpdir(), "runner-mirror-external-"));
+    roots.push(workspaceRoot, mirrorRoot, outside);
+    await mkdir(path.join(mirrorRoot, "octo-org"));
+    await symlink(outside, path.join(mirrorRoot, "octo-org", "private-board.git"), "dir");
+    const execute = vi.fn<RunnerCommandExecutor>(async (_cmd, args) => ({
+      stdout: args.includes("rev-parse") ? commitSha : "",
+      stderr: "",
+    }));
+    await expect(
+      checkoutRunnerSource({ job: job(), workspaceRoot, repositoryMirrorRoot: mirrorRoot, execute }),
+    ).rejects.toThrow(/symlink/u);
+    expect(execute).not.toHaveBeenCalled();
+    await expect(readdir(workspaceRoot)).resolves.toEqual([]);
+  });
+
   it("rejects broker source assignments before creating a workspace or running Git", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-source-"));
     roots.push(root);
