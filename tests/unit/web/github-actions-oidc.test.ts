@@ -85,6 +85,41 @@ describe("GitHub Actions OIDC verification", () => {
     );
   });
 
+  it("binds the target commit in the audience without confusing it with the workflow ref commit", async () => {
+    const targetSha = "a".repeat(40);
+    const workflowSha = "b".repeat(40);
+    const audience = `boardreadyops-cloud:${runId}:${executionAttemptId}:${targetSha}:safe:private-repository`;
+    const fetchImpl = jwksFetch();
+
+    // workflow_dispatch runs on the default branch, while the checkout target
+    // may be a different commit. GitHub's JWT sha is the dispatch ref SHA.
+    await expect(
+      verifyGitHubActionsOidcToken(token({ aud: audience, sha: workflowSha }), {
+        runId,
+        executionAttemptId,
+        audience,
+        repositoryId,
+        targetSha,
+        fetchImpl,
+        now: () => nowMs,
+      }),
+    ).resolves.toBe(true);
+
+    // A different requested target commit is not authorized merely because
+    // the GitHub workflow identity, ref and JWT sha still match.
+    await expect(
+      verifyGitHubActionsOidcToken(token({ aud: audience.replace(targetSha, "c".repeat(40)), sha: workflowSha }), {
+        runId,
+        executionAttemptId,
+        audience,
+        repositoryId,
+        targetSha,
+        fetchImpl,
+        now: () => nowMs,
+      }),
+    ).resolves.toBe(false);
+  });
+
   it("accepts an explicit setup-probe audience while retaining repository claim binding", async () => {
     const fetchImpl = jwksFetch();
     const audience = `boardreadyops-setup:${runId}`;
