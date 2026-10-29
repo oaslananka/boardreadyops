@@ -83865,11 +83865,25 @@ async function boundedResponseText(response) {
   if (declaredLength && /^\d+$/u.test(declaredLength) && Number(declaredLength) > responseBodyLimitBytes) {
     throw new Error("runner control-plane response exceeded the maximum permitted size");
   }
-  const body = await response.text();
-  if (Buffer.byteLength(body, "utf8") > responseBodyLimitBytes) {
-    throw new Error("runner control-plane response exceeded the maximum permitted size");
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > responseBodyLimitBytes) {
+        await reader.cancel().catch(() => void 0);
+        throw new Error("runner control-plane response exceeded the maximum permitted size");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return body;
+  return new TextDecoder().decode(Buffer.concat(chunks, totalBytes));
 }
 function positiveInteger4(value, name) {
   if (!Number.isSafeInteger(value) || value <= 0) {
