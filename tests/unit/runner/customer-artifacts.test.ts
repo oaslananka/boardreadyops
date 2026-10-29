@@ -164,8 +164,28 @@ describe("persistCustomerRunnerArtifacts", () => {
         job: job(),
         artifacts: [f.artifact],
       }),
-    ).rejects.toThrow(/not a regular directory/u);
+    ).rejects.toThrow(/symlink|not a regular directory/u);
   });
+  it.skipIf(process.platform === "win32")(
+    "rejects a symlinked ancestor of the customer artifact root before creating a destination",
+    async () => {
+      const f = await fixture();
+      const alias = path.join(f.base, "storage-parent-alias");
+      await symlink(f.root, alias, "dir");
+      const redirectedRoot = path.join(alias, "retained");
+
+      await expect(
+        persistCustomerRunnerArtifacts({
+          root: redirectedRoot,
+          workspace: f.workspace,
+          job: job(),
+          artifacts: [f.artifact],
+        }),
+      ).rejects.toThrow(/symlink/u);
+      await expect(readdir(f.root)).resolves.toEqual([]);
+    },
+  );
+
   it("refuses pre-aborted storage without creating an attempt", async () => {
     const f = await fixture();
     const controller = new AbortController();

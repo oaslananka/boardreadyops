@@ -84065,214 +84065,13 @@ init_src();
 // src/runner/customer-artifacts.ts
 var import_node_crypto26 = require("node:crypto");
 var import_node_fs11 = require("node:fs");
-var import_promises34 = require("node:fs/promises");
-var import_node_path77 = __toESM(require("node:path"), 1);
-var maximumLocalArtifactBytes = 64 * 1024 * 1024;
-var uuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-function inside(parent, candidate) {
-  const relative = import_node_path77.default.relative(parent, candidate);
-  return relative === "" || relative !== ".." && !relative.startsWith(`..${import_node_path77.default.sep}`) && !import_node_path77.default.isAbsolute(relative);
-}
-async function privateDirectory(directory) {
-  const info = await (0, import_promises34.lstat)(directory);
-  if (!info.isDirectory() || info.isSymbolicLink()) {
-    throw new Error("customer artifact directory is not a regular directory");
-  }
-  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
-    throw new Error("customer artifact directory must not be accessible by group or others");
-  }
-}
-async function persistCustomerRunnerArtifacts(input3) {
-  input3.signal?.throwIfAborted();
-  if (!uuidPattern2.test(input3.job.runId) || !uuidPattern2.test(input3.job.executionAttemptId)) {
-    throw new Error("customer artifact destination requires canonical run and attempt UUIDs");
-  }
-  if (input3.artifacts.length > 100) throw new Error("too many customer artifacts");
-  const root = import_node_path77.default.resolve(input3.root);
-  const workspace = await (0, import_promises34.realpath)(input3.workspace);
-  await (0, import_promises34.mkdir)(root, { recursive: true, mode: 448 });
-  await privateDirectory(root);
-  const realRoot = await (0, import_promises34.realpath)(root);
-  if (inside(realRoot, workspace) || inside(workspace, realRoot)) {
-    throw new Error("customer artifact root must not overlap the temporary source workspace");
-  }
-  const runRoot = import_node_path77.default.join(root, input3.job.runId);
-  await (0, import_promises34.mkdir)(runRoot, { mode: 448 }).catch((error123) => {
-    if (error123.code !== "EEXIST") throw error123;
-  });
-  await privateDirectory(runRoot);
-  const claimPath = import_node_path77.default.join(runRoot, `.claim-${input3.job.executionAttemptId}`);
-  let claim3;
-  try {
-    claim3 = await (0, import_promises34.open)(claimPath, "wx", 384);
-  } catch (error123) {
-    if (error123.code === "EEXIST") {
-      throw new Error("customer artifact attempt is already claimed; inspect before retrying");
-    }
-    throw error123;
-  }
-  try {
-    await claim3.close();
-    const destination = import_node_path77.default.join(runRoot, input3.job.executionAttemptId);
-    const existing = await (0, import_promises34.lstat)(destination).catch((error123) => {
-      if (error123.code === "ENOENT") return void 0;
-      throw error123;
-    });
-    if (existing) throw new Error("customer artifacts for this run attempt already exist");
-    const staging = await (0, import_promises34.mkdtemp)(import_node_path77.default.join(runRoot, ".pending-"));
-    try {
-      const manifestArtifacts = [];
-      for (const [index, artifact] of input3.artifacts.entries()) {
-        input3.signal?.throwIfAborted();
-        const realSource = await (0, import_promises34.realpath)(artifact.filePath);
-        if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-        const handle = await (0, import_promises34.open)(artifact.filePath, import_node_fs11.constants.O_RDONLY | (import_node_fs11.constants.O_NOFOLLOW ?? 0));
-        let content;
-        try {
-          const stats = await handle.stat();
-          if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
-            throw new Error("runner artifact is not a bounded regular file");
-          }
-          content = await handle.readFile();
-        } finally {
-          await handle.close();
-        }
-        const digest3 = (0, import_node_crypto26.createHash)("sha256").update(content).digest("hex");
-        if (content.length !== artifact.bytes || digest3 !== artifact.sha256) {
-          throw new Error("runner artifact bytes do not match its declaration");
-        }
-        const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
-        await (0, import_promises34.writeFile)(import_node_path77.default.join(staging, filename), content, { flag: "wx", mode: 384 });
-        manifestArtifacts.push({
-          filename,
-          kind: artifact.kind,
-          name: artifact.name,
-          role: artifact.role,
-          bytes: artifact.bytes,
-          sha256: artifact.sha256
-        });
-      }
-      const manifest = {
-        version: 1,
-        repository: `${input3.job.repository.owner}/${input3.job.repository.name}`,
-        commitSha: input3.job.repository.commitSha,
-        runId: input3.job.runId,
-        executionAttemptId: input3.job.executionAttemptId,
-        artifacts: manifestArtifacts
-      };
-      await (0, import_promises34.writeFile)(import_node_path77.default.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}
-`, {
-        flag: "wx",
-        mode: 384
-      });
-      input3.signal?.throwIfAborted();
-      await (0, import_promises34.rename)(staging, destination);
-      return input3.artifacts.length;
-    } catch (error123) {
-      await (0, import_promises34.rm)(staging, { recursive: true, force: true });
-      throw error123;
-    }
-  } finally {
-    await (0, import_promises34.rm)(claimPath, { force: true });
-  }
-}
-
-// src/runner/draft-attestation.ts
-var import_node_crypto27 = require("node:crypto");
-var import_node_fs12 = require("node:fs");
 var import_promises35 = require("node:fs/promises");
 var import_node_path78 = __toESM(require("node:path"), 1);
-var domain3 = "boardreadyops-runner-draft-receipt-v1\n";
-var uuid8 = external_exports.string().uuid();
-var sha2563 = external_exports.string().regex(/^[0-9a-f]{64}$/u);
-var payloadSchema = external_exports.object({
-  version: external_exports.literal(1),
-  purpose: external_exports.literal("manufacturing-draft"),
-  runnerId: uuid8,
-  runId: uuid8,
-  executionAttemptId: uuid8,
-  repository: external_exports.string().min(3).max(300).regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
-  sourceCommitSha: external_exports.string().regex(/^[0-9a-f]{40}$/u),
-  archiveSha256: sha2563,
-  archiveBytes: external_exports.number().int().positive().max(64 * 1024 * 1024)
-}).strict();
-var signedSchema = external_exports.object({
-  payload: payloadSchema,
-  algorithm: external_exports.literal("Ed25519"),
-  signature: external_exports.string().regex(/^[A-Za-z0-9_-]{86}$/u)
-}).strict();
-function signedBytes(payload) {
-  return Buffer.from(domain3 + JSON.stringify(payload), "utf8");
-}
-function signManufacturingDraftReceipt(payload, privateKey) {
-  const normalized = payloadSchema.parse(payload);
-  return signedSchema.parse({
-    payload: normalized,
-    algorithm: "Ed25519",
-    signature: (0, import_node_crypto27.sign)(null, signedBytes(normalized), privateKey).toString("base64url")
-  });
-}
-async function createManufacturingDraftReceiptArtifact(input3) {
-  const { archive, job } = input3;
-  if (job.safeMode.enabled || job.repository.private || job.sourceMode !== "customer_checkout") {
-    throw new Error("draft provenance requires an authorized public source checkout");
-  }
-  if (archive.kind !== "archive" || archive.role !== "draft-manufacturing" || archive.contentType !== "application/zip") {
-    throw new Error("draft provenance must reference a draft manufacturing ZIP");
-  }
-  const workspace = await (0, import_promises35.realpath)(import_node_path78.default.resolve(input3.workspace));
-  const archivePath = await (0, import_promises35.realpath)(import_node_path78.default.resolve(archive.filePath));
-  const relative = import_node_path78.default.relative(workspace, archivePath);
-  if (!relative || relative.startsWith("..") || import_node_path78.default.isAbsolute(relative) || relative.split(import_node_path78.default.sep).includes("..")) {
-    throw new Error("draft archive escaped the disposable runner checkout");
-  }
-  const handle = await (0, import_promises35.open)(archivePath, import_node_fs12.constants.O_RDONLY | (import_node_fs12.constants.O_NOFOLLOW ?? 0));
-  let data;
-  try {
-    const stats = await handle.stat();
-    if (!stats.isFile() || stats.size === 0 || stats.size > 64 * 1024 * 1024) {
-      throw new Error("draft archive must be a bounded regular file");
-    }
-    data = await handle.readFile();
-  } finally {
-    await handle.close();
-  }
-  if (data.byteLength !== archive.bytes || (0, import_node_crypto27.createHash)("sha256").update(data).digest("hex") !== archive.sha256) {
-    throw new Error("draft archive digest changed before runner signing");
-  }
-  const receipt = signManufacturingDraftReceipt(
-    {
-      version: 1,
-      purpose: "manufacturing-draft",
-      runnerId: input3.runnerId,
-      runId: job.runId,
-      executionAttemptId: job.executionAttemptId,
-      repository: `${job.repository.owner}/${job.repository.name}`,
-      sourceCommitSha: job.repository.commitSha,
-      archiveSha256: archive.sha256,
-      archiveBytes: archive.bytes
-    },
-    input3.privateKey
-  );
-  const content = Buffer.from(`${JSON.stringify(receipt)}
-`, "utf8");
-  const filePath = import_node_path78.default.join(import_node_path78.default.dirname(archivePath), "manufacturing-draft-receipt.json");
-  await (0, import_promises35.writeFile)(filePath, content, { flag: "wx", mode: 384 });
-  return {
-    kind: "attestation",
-    role: "draft-provenance",
-    name: "boardreadyops-manufacturing-draft-receipt.json",
-    contentType: "application/json",
-    filePath,
-    bytes: content.byteLength,
-    sha256: (0, import_node_crypto27.createHash)("sha256").update(content).digest("hex")
-  };
-}
 
 // src/runner/source.ts
 var import_node_child_process7 = require("node:child_process");
-var import_promises36 = require("node:fs/promises");
-var import_node_path79 = __toESM(require("node:path"), 1);
+var import_promises34 = require("node:fs/promises");
+var import_node_path77 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
 async function checkoutRunnerSource(options) {
   options.signal?.throwIfAborted();
@@ -84280,12 +84079,12 @@ async function checkoutRunnerSource(options) {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
   const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
-  const workspaceRoot = import_node_path79.default.resolve(options.workspaceRoot);
+  const workspaceRoot = import_node_path77.default.resolve(options.workspaceRoot);
   await assertRunnerWorkspaceDirectories(workspaceRoot);
-  await (0, import_promises36.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
+  await (0, import_promises34.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
   await assertRunnerWorkspaceDirectories(workspaceRoot);
-  if (process.platform !== "win32") await (0, import_promises36.chmod)(workspaceRoot, 448);
-  const workspace = await (0, import_promises36.mkdtemp)(import_node_path79.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
+  if (process.platform !== "win32") await (0, import_promises34.chmod)(workspaceRoot, 448);
+  const workspace = await (0, import_promises34.mkdtemp)(import_node_path77.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
   const git2 = async (args) => {
@@ -84297,7 +84096,7 @@ async function checkoutRunnerSource(options) {
     });
   };
   try {
-    if (process.platform !== "win32") await (0, import_promises36.chmod)(workspace, 448);
+    if (process.platform !== "win32") await (0, import_promises34.chmod)(workspace, 448);
     await git2(["init", "--quiet"]);
     await git2(["remote", "add", "origin", repository]);
     await git2(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
@@ -84310,24 +84109,24 @@ async function checkoutRunnerSource(options) {
     options.signal?.throwIfAborted();
     return workspace;
   } catch (error123) {
-    await (0, import_promises36.rm)(workspace, { recursive: true, force: true });
+    await (0, import_promises34.rm)(workspace, { recursive: true, force: true });
     throw error123;
   }
 }
 async function assertRunnerWorkspaceDirectories(workspaceRoot) {
-  const { root } = import_node_path79.default.parse(workspaceRoot);
-  const parts = import_node_path79.default.relative(root, workspaceRoot).split(import_node_path79.default.sep).filter(Boolean);
+  const { root } = import_node_path77.default.parse(workspaceRoot);
+  const parts = import_node_path77.default.relative(root, workspaceRoot).split(import_node_path77.default.sep).filter(Boolean);
   let directory = root;
   for (const part of parts) {
-    directory = import_node_path79.default.join(directory, part);
-    const info = await (0, import_promises36.lstat)(directory).catch((error123) => {
+    directory = import_node_path77.default.join(directory, part);
+    const info = await (0, import_promises34.lstat)(directory).catch((error123) => {
       if (error123.code === "ENOENT") return void 0;
       throw error123;
     });
     if (!info) continue;
     if (info.isSymbolicLink()) {
-      const parent = await (0, import_promises36.lstat)(import_node_path79.default.dirname(directory));
-      const target = await (0, import_promises36.stat)(directory);
+      const parent = await (0, import_promises34.lstat)(import_node_path77.default.dirname(directory));
+      const target = await (0, import_promises34.stat)(directory);
       const protectedSystemAlias = process.platform === "darwin" && info.uid === 0 && parent.uid === 0 && (parent.mode & 18) === 0 && target.isDirectory();
       if (!protectedSystemAlias) {
         throw new Error("runner workspace path contains a symlink or non-directory component");
@@ -84400,9 +84199,9 @@ function repositoryRemote(job, repositoryMirrorRoot) {
   if (!repositoryMirrorRoot) {
     return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
   }
-  const root = import_node_path79.default.resolve(repositoryMirrorRoot);
-  const candidate = import_node_path79.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
-  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path79.default.sep}`)) {
+  const root = import_node_path77.default.resolve(repositoryMirrorRoot);
+  const candidate = import_node_path77.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
+  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path77.default.sep}`)) {
     throw new Error("repository mirror path escaped the configured mirror root");
   }
   return candidate;
@@ -84420,6 +84219,211 @@ function sanitizedGitEnvironment(environment) {
     delete sanitized[name];
   }
   return sanitized;
+}
+
+// src/runner/customer-artifacts.ts
+var maximumLocalArtifactBytes = 64 * 1024 * 1024;
+var uuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+function inside(parent, candidate) {
+  const relative = import_node_path78.default.relative(parent, candidate);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${import_node_path78.default.sep}`) && !import_node_path78.default.isAbsolute(relative);
+}
+async function privateDirectory(directory) {
+  const info = await (0, import_promises35.lstat)(directory);
+  if (!info.isDirectory() || info.isSymbolicLink()) {
+    throw new Error("customer artifact directory is not a regular directory");
+  }
+  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
+    throw new Error("customer artifact directory must not be accessible by group or others");
+  }
+}
+async function persistCustomerRunnerArtifacts(input3) {
+  input3.signal?.throwIfAborted();
+  if (!uuidPattern2.test(input3.job.runId) || !uuidPattern2.test(input3.job.executionAttemptId)) {
+    throw new Error("customer artifact destination requires canonical run and attempt UUIDs");
+  }
+  if (input3.artifacts.length > 100) throw new Error("too many customer artifacts");
+  const root = import_node_path78.default.resolve(input3.root);
+  const workspace = await (0, import_promises35.realpath)(input3.workspace);
+  await assertRunnerWorkspaceDirectories(root);
+  await (0, import_promises35.mkdir)(root, { recursive: true, mode: 448 });
+  await assertRunnerWorkspaceDirectories(root);
+  await privateDirectory(root);
+  const realRoot = await (0, import_promises35.realpath)(root);
+  if (inside(realRoot, workspace) || inside(workspace, realRoot)) {
+    throw new Error("customer artifact root must not overlap the temporary source workspace");
+  }
+  const runRoot = import_node_path78.default.join(root, input3.job.runId);
+  await (0, import_promises35.mkdir)(runRoot, { mode: 448 }).catch((error123) => {
+    if (error123.code !== "EEXIST") throw error123;
+  });
+  await privateDirectory(runRoot);
+  const claimPath = import_node_path78.default.join(runRoot, `.claim-${input3.job.executionAttemptId}`);
+  let claim3;
+  try {
+    claim3 = await (0, import_promises35.open)(claimPath, "wx", 384);
+  } catch (error123) {
+    if (error123.code === "EEXIST") {
+      throw new Error("customer artifact attempt is already claimed; inspect before retrying");
+    }
+    throw error123;
+  }
+  try {
+    await claim3.close();
+    const destination = import_node_path78.default.join(runRoot, input3.job.executionAttemptId);
+    const existing = await (0, import_promises35.lstat)(destination).catch((error123) => {
+      if (error123.code === "ENOENT") return void 0;
+      throw error123;
+    });
+    if (existing) throw new Error("customer artifacts for this run attempt already exist");
+    const staging = await (0, import_promises35.mkdtemp)(import_node_path78.default.join(runRoot, ".pending-"));
+    try {
+      const manifestArtifacts = [];
+      for (const [index, artifact] of input3.artifacts.entries()) {
+        input3.signal?.throwIfAborted();
+        const realSource = await (0, import_promises35.realpath)(artifact.filePath);
+        if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
+        const handle = await (0, import_promises35.open)(artifact.filePath, import_node_fs11.constants.O_RDONLY | (import_node_fs11.constants.O_NOFOLLOW ?? 0));
+        let content;
+        try {
+          const stats = await handle.stat();
+          if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
+            throw new Error("runner artifact is not a bounded regular file");
+          }
+          content = await handle.readFile();
+        } finally {
+          await handle.close();
+        }
+        const digest3 = (0, import_node_crypto26.createHash)("sha256").update(content).digest("hex");
+        if (content.length !== artifact.bytes || digest3 !== artifact.sha256) {
+          throw new Error("runner artifact bytes do not match its declaration");
+        }
+        const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
+        await (0, import_promises35.writeFile)(import_node_path78.default.join(staging, filename), content, { flag: "wx", mode: 384 });
+        manifestArtifacts.push({
+          filename,
+          kind: artifact.kind,
+          name: artifact.name,
+          role: artifact.role,
+          bytes: artifact.bytes,
+          sha256: artifact.sha256
+        });
+      }
+      const manifest = {
+        version: 1,
+        repository: `${input3.job.repository.owner}/${input3.job.repository.name}`,
+        commitSha: input3.job.repository.commitSha,
+        runId: input3.job.runId,
+        executionAttemptId: input3.job.executionAttemptId,
+        artifacts: manifestArtifacts
+      };
+      await (0, import_promises35.writeFile)(import_node_path78.default.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}
+`, {
+        flag: "wx",
+        mode: 384
+      });
+      input3.signal?.throwIfAborted();
+      await (0, import_promises35.rename)(staging, destination);
+      return input3.artifacts.length;
+    } catch (error123) {
+      await (0, import_promises35.rm)(staging, { recursive: true, force: true });
+      throw error123;
+    }
+  } finally {
+    await (0, import_promises35.rm)(claimPath, { force: true });
+  }
+}
+
+// src/runner/draft-attestation.ts
+var import_node_crypto27 = require("node:crypto");
+var import_node_fs12 = require("node:fs");
+var import_promises36 = require("node:fs/promises");
+var import_node_path79 = __toESM(require("node:path"), 1);
+var domain3 = "boardreadyops-runner-draft-receipt-v1\n";
+var uuid8 = external_exports.string().uuid();
+var sha2563 = external_exports.string().regex(/^[0-9a-f]{64}$/u);
+var payloadSchema = external_exports.object({
+  version: external_exports.literal(1),
+  purpose: external_exports.literal("manufacturing-draft"),
+  runnerId: uuid8,
+  runId: uuid8,
+  executionAttemptId: uuid8,
+  repository: external_exports.string().min(3).max(300).regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
+  sourceCommitSha: external_exports.string().regex(/^[0-9a-f]{40}$/u),
+  archiveSha256: sha2563,
+  archiveBytes: external_exports.number().int().positive().max(64 * 1024 * 1024)
+}).strict();
+var signedSchema = external_exports.object({
+  payload: payloadSchema,
+  algorithm: external_exports.literal("Ed25519"),
+  signature: external_exports.string().regex(/^[A-Za-z0-9_-]{86}$/u)
+}).strict();
+function signedBytes(payload) {
+  return Buffer.from(domain3 + JSON.stringify(payload), "utf8");
+}
+function signManufacturingDraftReceipt(payload, privateKey) {
+  const normalized = payloadSchema.parse(payload);
+  return signedSchema.parse({
+    payload: normalized,
+    algorithm: "Ed25519",
+    signature: (0, import_node_crypto27.sign)(null, signedBytes(normalized), privateKey).toString("base64url")
+  });
+}
+async function createManufacturingDraftReceiptArtifact(input3) {
+  const { archive, job } = input3;
+  if (job.safeMode.enabled || job.repository.private || job.sourceMode !== "customer_checkout") {
+    throw new Error("draft provenance requires an authorized public source checkout");
+  }
+  if (archive.kind !== "archive" || archive.role !== "draft-manufacturing" || archive.contentType !== "application/zip") {
+    throw new Error("draft provenance must reference a draft manufacturing ZIP");
+  }
+  const workspace = await (0, import_promises36.realpath)(import_node_path79.default.resolve(input3.workspace));
+  const archivePath = await (0, import_promises36.realpath)(import_node_path79.default.resolve(archive.filePath));
+  const relative = import_node_path79.default.relative(workspace, archivePath);
+  if (!relative || relative.startsWith("..") || import_node_path79.default.isAbsolute(relative) || relative.split(import_node_path79.default.sep).includes("..")) {
+    throw new Error("draft archive escaped the disposable runner checkout");
+  }
+  const handle = await (0, import_promises36.open)(archivePath, import_node_fs12.constants.O_RDONLY | (import_node_fs12.constants.O_NOFOLLOW ?? 0));
+  let data;
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile() || stats.size === 0 || stats.size > 64 * 1024 * 1024) {
+      throw new Error("draft archive must be a bounded regular file");
+    }
+    data = await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+  if (data.byteLength !== archive.bytes || (0, import_node_crypto27.createHash)("sha256").update(data).digest("hex") !== archive.sha256) {
+    throw new Error("draft archive digest changed before runner signing");
+  }
+  const receipt = signManufacturingDraftReceipt(
+    {
+      version: 1,
+      purpose: "manufacturing-draft",
+      runnerId: input3.runnerId,
+      runId: job.runId,
+      executionAttemptId: job.executionAttemptId,
+      repository: `${job.repository.owner}/${job.repository.name}`,
+      sourceCommitSha: job.repository.commitSha,
+      archiveSha256: archive.sha256,
+      archiveBytes: archive.bytes
+    },
+    input3.privateKey
+  );
+  const content = Buffer.from(`${JSON.stringify(receipt)}
+`, "utf8");
+  const filePath = import_node_path79.default.join(import_node_path79.default.dirname(archivePath), "manufacturing-draft-receipt.json");
+  await (0, import_promises36.writeFile)(filePath, content, { flag: "wx", mode: 384 });
+  return {
+    kind: "attestation",
+    role: "draft-provenance",
+    name: "boardreadyops-manufacturing-draft-receipt.json",
+    contentType: "application/json",
+    filePath,
+    bytes: content.byteLength,
+    sha256: (0, import_node_crypto27.createHash)("sha256").update(content).digest("hex")
+  };
 }
 
 // src/runner/worker.ts
