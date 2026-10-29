@@ -25,11 +25,11 @@ never implicitly clear a destructive reservation.
 
 ## Source implementation: persisted, fail-closed deletion intent
 
-The [0104 schema barrier](../../packages/db/migrations/0104_durable_artifact_unlink_fences.sql),
-[deletion store](../../packages/db/src/artifact-deletion-store.ts) and
-[local deletion worker](../../apps/web/lib/artifact-deletion-worker.ts) implement
+The [0104 schema barrier](https://github.com/oaslananka/boardreadyops/blob/main/packages/db/migrations/0104_durable_artifact_unlink_fences.sql),
+[deletion store](https://github.com/oaslananka/boardreadyops/blob/main/packages/db/src/artifact-deletion-store.ts) and
+[local deletion worker](https://github.com/oaslananka/boardreadyops/blob/main/apps/web/lib/artifact-deletion-worker.ts) implement
 the fenced path. This source implementation is exercised by the
-[PostgreSQL integration tests](../../tests/integration/artifact-deletion-store-postgres.test.ts),
+[PostgreSQL integration tests](https://github.com/oaslananka/boardreadyops/blob/main/tests/integration/artifact-deletion-store-postgres.test.ts),
 including independent hold writers, lease expiry, unlink and crash scenarios.
 Tests are not a substitute for deployment/worker-topology verification.
 
