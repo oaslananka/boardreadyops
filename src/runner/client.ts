@@ -318,6 +318,8 @@ function leaseContext(input: {
 async function boundedResponseText(response: Response): Promise<string> {
   const declaredLength = response.headers.get("content-length");
   if (declaredLength && /^\d+$/u.test(declaredLength) && Number(declaredLength) > responseBodyLimitBytes) {
+    // An early header rejection must also stop the unread response stream.
+    await response.body?.cancel().catch(() => undefined);
     throw new Error("runner control-plane response exceeded the maximum permitted size");
   }
   if (!response.body) return "";

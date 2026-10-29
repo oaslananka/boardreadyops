@@ -295,6 +295,38 @@ describe("RunnerControlPlaneClient", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("cancels a response declared oversized without consuming its body", async () => {
+    let cancelled = false;
+    let chunksDelivered = 0;
+    const responseStream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        chunksDelivered += 1;
+        controller.enqueue(new Uint8Array(128));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const client = new RunnerControlPlaneClient({
+      baseUrl: "https://control.example",
+      runnerId,
+      runnerVersion: boardReadyVersion,
+      privateKey: keys.privateKey,
+      fetch: vi.fn(
+        async () =>
+          new Response(responseStream, {
+            headers: { "content-length": String(2 * 1024 * 1024) },
+          }),
+      ) as typeof fetch,
+    });
+
+    await expect(
+      client.claim({ protocolVersion: 1, workerClass: "self_hosted", capabilities: [], labels: [] }),
+    ).rejects.toThrow(/maximum permitted size/u);
+    expect(cancelled).toBe(true);
+    expect(chunksDelivered).toBeLessThan(2);
+  });
+
   it("stops reading an oversized undeclared response before buffering the entire stream", async () => {
     let chunksRead = 0;
     let streamCancelled = false;

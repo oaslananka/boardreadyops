@@ -83863,6 +83863,7 @@ function leaseContext(input3) {
 async function boundedResponseText(response) {
   const declaredLength = response.headers.get("content-length");
   if (declaredLength && /^\d+$/u.test(declaredLength) && Number(declaredLength) > responseBodyLimitBytes) {
+    await response.body?.cancel().catch(() => void 0);
     throw new Error("runner control-plane response exceeded the maximum permitted size");
   }
   if (!response.body) return "";
