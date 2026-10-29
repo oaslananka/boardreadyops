@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -107,6 +107,85 @@ describe("runner identity onboarding", () => {
     ).rejects.toThrow();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.skipIf(process.platform === "win32")(
+    "rejects a symlinked parent when creating an Ed25519 identity, before enrollment",
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-identity-parent-"));
+      roots.push(root);
+      const actualParent = path.join(root, "actual-parent");
+      await mkdir(actualParent, { mode: 0o700 });
+      const alias = path.join(root, "identity-parent-alias");
+      await symlink(actualParent, alias, "dir");
+      const tokenFile = await privateFile(root, "enrollment-token", "e".repeat(43));
+      const fetchMock = vi.fn(async () =>
+        Response.json({ protocolVersion: 1, status: "activated", registrationId: runnerId }),
+      );
+
+      await expect(
+        activateRunnerIdentity({
+          controlPlaneUrl: "https://control.example",
+          enrollmentTokenFile: tokenFile,
+          identityDirectory: path.join(alias, "identity"),
+          fetch: fetchMock as typeof fetch,
+        }),
+      ).rejects.toThrow(/symlink/u);
+      expect(fetchMock).not.toHaveBeenCalled();
+      await expect(readdir(actualParent)).resolves.toEqual([]);
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "rejects an existing identity loaded through a symlinked ancestor",
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-identity-load-parent-"));
+      roots.push(root);
+      const actualParent = path.join(root, "real-parent");
+      await mkdir(actualParent, { mode: 0o700 });
+      const tokenFile = await privateFile(root, "enrollment-token", "e".repeat(43));
+      const activated = await activateRunnerIdentity({
+        controlPlaneUrl: "https://control.example",
+        enrollmentTokenFile: tokenFile,
+        identityDirectory: path.join(actualParent, "identity"),
+        fetch: vi.fn(async () =>
+          Response.json({ protocolVersion: 1, status: "activated", registrationId: runnerId }),
+        ) as typeof fetch,
+      });
+      const alias = path.join(root, "identity-parent-alias");
+      await symlink(actualParent, alias, "dir");
+      await expect(loadRunnerIdentity(path.join(alias, "identity", "runner.json"))).rejects.toThrow(/symlink/u);
+      await expect(loadRunnerIdentity(activated.identityFile)).resolves.toMatchObject({ runnerId });
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "does not load an Ed25519 private key through a nested identity symlink",
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-identity-key-parent-"));
+      roots.push(root);
+      const tokenFile = await privateFile(root, "enrollment-token", "e".repeat(43));
+      const identityDirectory = path.join(root, "identity");
+      const activated = await activateRunnerIdentity({
+        controlPlaneUrl: "https://control.example",
+        enrollmentTokenFile: tokenFile,
+        identityDirectory,
+        fetch: vi.fn(async () =>
+          Response.json({ protocolVersion: 1, status: "activated", registrationId: runnerId }),
+        ) as typeof fetch,
+      });
+      const keyDirectory = path.join(root, "external-keys");
+      await mkdir(keyDirectory, { mode: 0o700 });
+      await writeFile(path.join(keyDirectory, "private.pem"), await readFile(activated.privateKeyFile), {
+        mode: 0o600,
+      });
+      await symlink(keyDirectory, path.join(identityDirectory, "external-keys"), "dir");
+      const config = JSON.parse(await readFile(activated.identityFile, "utf8")) as Record<string, unknown>;
+      config.privateKeyFile = "external-keys/private.pem";
+      await writeFile(activated.identityFile, JSON.stringify(config), "utf8");
+
+      await expect(loadRunnerIdentity(activated.identityFile)).rejects.toThrow(/symlink/u);
+    },
+  );
 
   it("rejects identity directories accessible by other users", async () => {
     if (process.platform === "win32") return;

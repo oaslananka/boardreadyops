@@ -83612,9 +83612,9 @@ init_version();
 
 // src/runner/identity.ts
 var import_node_crypto25 = require("node:crypto");
-var import_promises33 = require("node:fs/promises");
+var import_promises34 = require("node:fs/promises");
 var import_node_os6 = __toESM(require("node:os"), 1);
-var import_node_path76 = __toESM(require("node:path"), 1);
+var import_node_path77 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/client.ts
@@ -83871,207 +83871,10 @@ function positiveInteger4(value, name) {
   return value;
 }
 
-// src/runner/identity.ts
-var privateKeyName = "runner-private-key.pem";
-var publicKeyName = "runner-public-key.pem";
-var identityFileName = "runner.json";
-function defaultRunnerIdentityDirectory() {
-  return import_node_path76.default.join(import_node_os6.default.homedir(), ".config", "boardreadyops", "runner");
-}
-async function activateRunnerIdentity(options) {
-  const controlPlaneUrl = normalizeControlPlaneUrl(options.controlPlaneUrl).origin;
-  const enrollmentTokenFile = import_node_path76.default.resolve(options.enrollmentTokenFile);
-  await assertPrivateFile2(enrollmentTokenFile, "runner enrollment token file");
-  const enrollmentToken = (await (0, import_promises33.readFile)(enrollmentTokenFile, "utf8")).trim();
-  if (enrollmentToken.length < 43 || enrollmentToken.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(enrollmentToken)) {
-    throw new Error("runner enrollment token file does not contain a valid enrollment token");
-  }
-  const capabilities = normalizeCapabilities(options.capabilities ?? []);
-  const labels = normalizeCapabilities(options.labels ?? []);
-  const identityDirectory = import_node_path76.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
-  await prepareIdentityDirectory(identityDirectory);
-  const identityFile = import_node_path76.default.join(identityDirectory, identityFileName);
-  const privateKeyFile = import_node_path76.default.join(identityDirectory, privateKeyName);
-  const publicKeyFile = import_node_path76.default.join(identityDirectory, publicKeyName);
-  await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
-  const generated = (0, import_node_crypto25.generateKeyPairSync)("ed25519");
-  const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-  const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
-  const activated = await activateRunner({
-    baseUrl: controlPlaneUrl,
-    enrollmentToken,
-    publicKey,
-    capabilities,
-    ...options.fetch === void 0 ? {} : { fetch: options.fetch }
-  });
-  const activatedAt = (options.now ?? (() => /* @__PURE__ */ new Date()))().toISOString();
-  const identity = {
-    version: 1,
-    controlPlaneUrl,
-    runnerId: activated.registrationId,
-    workerClass: "self_hosted",
-    privateKeyFile: privateKeyName,
-    publicKeyFile: publicKeyName,
-    capabilities,
-    labels,
-    activatedAt
-  };
-  const written = [];
-  try {
-    await writeExclusive(privateKeyFile, privateKey, 384);
-    written.push(privateKeyFile);
-    await writeExclusive(publicKeyFile, publicKey, 384);
-    written.push(publicKeyFile);
-    await writeExclusive(identityFile, `${JSON.stringify(identity, null, 2)}
-`, 384);
-    written.push(identityFile);
-  } catch (error123) {
-    await Promise.all(written.map((file3) => (0, import_promises33.unlink)(file3).catch(() => void 0)));
-    throw error123;
-  }
-  return {
-    identityFile,
-    privateKeyFile,
-    publicKeyFile,
-    runnerId: activated.registrationId,
-    status: activated.status
-  };
-}
-async function loadRunnerIdentity(identityFileInput) {
-  const identityFile = import_node_path76.default.resolve(identityFileInput);
-  await assertPrivateDirectory(import_node_path76.default.dirname(identityFile), "runner identity directory");
-  await assertPrivateFile2(identityFile, "runner identity file");
-  let value;
-  try {
-    value = JSON.parse(await (0, import_promises33.readFile)(identityFile, "utf8"));
-  } catch {
-    throw new Error("runner identity file is not valid JSON");
-  }
-  const identity = parseIdentity(value);
-  const directory = import_node_path76.default.dirname(identityFile);
-  const privateKeyPath = resolveIdentityChild(directory, identity.privateKeyFile, "privateKeyFile");
-  const publicKeyPath = resolveIdentityChild(directory, identity.publicKeyFile, "publicKeyFile");
-  await assertPrivateFile2(privateKeyPath, "runner private key file");
-  await assertPrivateFile2(publicKeyPath, "runner public key file");
-  await loadRunnerPrivateKey(privateKeyPath);
-  return {
-    ...identity,
-    identityFile,
-    privateKeyPath,
-    publicKeyPath
-  };
-}
-function parseIdentity(value) {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("runner identity file must contain an object");
-  }
-  const record3 = value;
-  if (record3.version !== 1 || record3.workerClass !== "self_hosted") {
-    throw new Error("runner identity file has an unsupported version or worker class");
-  }
-  const runnerId = runnerIdentifierSchema.safeParse(record3.runnerId);
-  if (!runnerId.success) throw new Error("runner identity file contains an invalid runner id");
-  const controlPlaneUrl = typeof record3.controlPlaneUrl === "string" ? normalizeControlPlaneUrl(record3.controlPlaneUrl).origin : void 0;
-  if (!controlPlaneUrl) throw new Error("runner identity file contains an invalid control-plane URL");
-  const privateKeyFile = relativeFile(record3.privateKeyFile, "privateKeyFile");
-  const publicKeyFile = relativeFile(record3.publicKeyFile, "publicKeyFile");
-  const capabilities = normalizeCapabilities(arrayOfStrings(record3.capabilities, "capabilities"));
-  const labels = normalizeCapabilities(arrayOfStrings(record3.labels, "labels"));
-  if (typeof record3.activatedAt !== "string" || Number.isNaN(Date.parse(record3.activatedAt))) {
-    throw new TypeError("runner identity file contains an invalid activation timestamp");
-  }
-  return {
-    version: 1,
-    controlPlaneUrl,
-    runnerId: runnerId.data,
-    workerClass: "self_hosted",
-    privateKeyFile,
-    publicKeyFile,
-    capabilities,
-    labels,
-    activatedAt: new Date(record3.activatedAt).toISOString()
-  };
-}
-function arrayOfStrings(value, name) {
-  if (!Array.isArray(value) || value.some((item2) => typeof item2 !== "string")) {
-    throw new Error(`runner identity ${name} must be an array of strings`);
-  }
-  return value;
-}
-function normalizeCapabilities(values) {
-  const normalized = Array.from(new Set(values.map((value) => runnerCapabilitySchema.parse(value)))).sort(
-    (left, right) => left.localeCompare(right)
-  );
-  if (normalized.length > 64) throw new Error("runner identity may declare at most 64 capabilities or labels");
-  return normalized;
-}
-function relativeFile(value, name) {
-  if (typeof value !== "string" || value.length < 1 || import_node_path76.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
-    throw new Error(`runner identity ${name} must be a relative file within the identity directory`);
-  }
-  return value;
-}
-function resolveIdentityChild(directory, relative, name) {
-  const resolved = import_node_path76.default.resolve(directory, relative);
-  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path76.default.sep}`)) {
-    throw new Error(`runner identity ${name} escapes the identity directory`);
-  }
-  return resolved;
-}
-async function prepareIdentityDirectory(directory) {
-  const existing = await (0, import_promises33.lstat)(directory).catch(() => void 0);
-  if (existing && (existing.isSymbolicLink() || !existing.isDirectory())) {
-    throw new Error(`runner identity directory is not a directory: ${directory}`);
-  }
-  if (!existing) {
-    await (0, import_promises33.mkdir)(directory, { recursive: true, mode: 448 });
-  }
-  if (process.platform !== "win32") await (0, import_promises33.chmod)(directory, 448);
-}
-async function assertPrivateDirectory(directory, label) {
-  const info = await (0, import_promises33.lstat)(directory).catch(() => void 0);
-  if (!info?.isDirectory() || info.isSymbolicLink()) {
-    throw new Error(`${label} does not exist or is not a regular directory`);
-  }
-  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
-    throw new Error(`${label} must not be accessible by group or other users`);
-  }
-}
-async function assertPrivateFile2(filePath, label) {
-  const info = await (0, import_promises33.lstat)(filePath).catch(() => void 0);
-  if (!info?.isFile() || info.isSymbolicLink()) throw new Error(`${label} does not exist or is not a regular file`);
-  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
-    throw new Error(`${label} must not be readable or writable by group or other users`);
-  }
-}
-async function assertTargetsDoNotExist(files) {
-  for (const file3 of files) {
-    if (await (0, import_promises33.lstat)(file3).catch(() => void 0)) {
-      throw new Error(`refusing to overwrite existing runner identity material: ${file3}`);
-    }
-  }
-}
-async function writeExclusive(filePath, content, mode) {
-  await (0, import_promises33.writeFile)(filePath, content, { encoding: "utf8", flag: "wx", mode });
-  if (process.platform !== "win32") await (0, import_promises33.chmod)(filePath, mode);
-}
-
-// src/runner/worker.ts
-var import_promises37 = require("node:fs/promises");
-var import_node_os7 = __toESM(require("node:os"), 1);
-var import_node_path80 = __toESM(require("node:path"), 1);
-init_src();
-
-// src/runner/customer-artifacts.ts
-var import_node_crypto26 = require("node:crypto");
-var import_node_fs11 = require("node:fs");
-var import_promises35 = require("node:fs/promises");
-var import_node_path78 = __toESM(require("node:path"), 1);
-
 // src/runner/source.ts
 var import_node_child_process7 = require("node:child_process");
-var import_promises34 = require("node:fs/promises");
-var import_node_path77 = __toESM(require("node:path"), 1);
+var import_promises33 = require("node:fs/promises");
+var import_node_path76 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
 async function checkoutRunnerSource(options) {
   options.signal?.throwIfAborted();
@@ -84079,12 +83882,12 @@ async function checkoutRunnerSource(options) {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
   const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
-  const workspaceRoot = import_node_path77.default.resolve(options.workspaceRoot);
+  const workspaceRoot = import_node_path76.default.resolve(options.workspaceRoot);
   await assertRunnerWorkspaceDirectories(workspaceRoot);
-  await (0, import_promises34.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
+  await (0, import_promises33.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
   await assertRunnerWorkspaceDirectories(workspaceRoot);
-  if (process.platform !== "win32") await (0, import_promises34.chmod)(workspaceRoot, 448);
-  const workspace = await (0, import_promises34.mkdtemp)(import_node_path77.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
+  if (process.platform !== "win32") await (0, import_promises33.chmod)(workspaceRoot, 448);
+  const workspace = await (0, import_promises33.mkdtemp)(import_node_path76.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
   const git2 = async (args) => {
@@ -84096,7 +83899,7 @@ async function checkoutRunnerSource(options) {
     });
   };
   try {
-    if (process.platform !== "win32") await (0, import_promises34.chmod)(workspace, 448);
+    if (process.platform !== "win32") await (0, import_promises33.chmod)(workspace, 448);
     await git2(["init", "--quiet"]);
     await git2(["remote", "add", "origin", repository]);
     await git2(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
@@ -84109,24 +83912,24 @@ async function checkoutRunnerSource(options) {
     options.signal?.throwIfAborted();
     return workspace;
   } catch (error123) {
-    await (0, import_promises34.rm)(workspace, { recursive: true, force: true });
+    await (0, import_promises33.rm)(workspace, { recursive: true, force: true });
     throw error123;
   }
 }
 async function assertRunnerWorkspaceDirectories(workspaceRoot) {
-  const { root } = import_node_path77.default.parse(workspaceRoot);
-  const parts = import_node_path77.default.relative(root, workspaceRoot).split(import_node_path77.default.sep).filter(Boolean);
+  const { root } = import_node_path76.default.parse(workspaceRoot);
+  const parts = import_node_path76.default.relative(root, workspaceRoot).split(import_node_path76.default.sep).filter(Boolean);
   let directory = root;
   for (const part of parts) {
-    directory = import_node_path77.default.join(directory, part);
-    const info = await (0, import_promises34.lstat)(directory).catch((error123) => {
+    directory = import_node_path76.default.join(directory, part);
+    const info = await (0, import_promises33.lstat)(directory).catch((error123) => {
       if (error123.code === "ENOENT") return void 0;
       throw error123;
     });
     if (!info) continue;
     if (info.isSymbolicLink()) {
-      const parent = await (0, import_promises34.lstat)(import_node_path77.default.dirname(directory));
-      const target = await (0, import_promises34.stat)(directory);
+      const parent = await (0, import_promises33.lstat)(import_node_path76.default.dirname(directory));
+      const target = await (0, import_promises33.stat)(directory);
       const protectedSystemAlias = process.platform === "darwin" && info.uid === 0 && parent.uid === 0 && (parent.mode & 18) === 0 && target.isDirectory();
       if (!protectedSystemAlias) {
         throw new Error("runner workspace path contains a symlink or non-directory component");
@@ -84199,9 +84002,9 @@ function repositoryRemote(job, repositoryMirrorRoot) {
   if (!repositoryMirrorRoot) {
     return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
   }
-  const root = import_node_path77.default.resolve(repositoryMirrorRoot);
-  const candidate = import_node_path77.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
-  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path77.default.sep}`)) {
+  const root = import_node_path76.default.resolve(repositoryMirrorRoot);
+  const candidate = import_node_path76.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
+  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path76.default.sep}`)) {
     throw new Error("repository mirror path escaped the configured mirror root");
   }
   return candidate;
@@ -84221,7 +84024,207 @@ function sanitizedGitEnvironment(environment) {
   return sanitized;
 }
 
+// src/runner/identity.ts
+var privateKeyName = "runner-private-key.pem";
+var publicKeyName = "runner-public-key.pem";
+var identityFileName = "runner.json";
+function defaultRunnerIdentityDirectory() {
+  return import_node_path77.default.join(import_node_os6.default.homedir(), ".config", "boardreadyops", "runner");
+}
+async function activateRunnerIdentity(options) {
+  const controlPlaneUrl = normalizeControlPlaneUrl(options.controlPlaneUrl).origin;
+  const enrollmentTokenFile = import_node_path77.default.resolve(options.enrollmentTokenFile);
+  await assertPrivateFile2(enrollmentTokenFile, "runner enrollment token file");
+  const enrollmentToken = (await (0, import_promises34.readFile)(enrollmentTokenFile, "utf8")).trim();
+  if (enrollmentToken.length < 43 || enrollmentToken.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(enrollmentToken)) {
+    throw new Error("runner enrollment token file does not contain a valid enrollment token");
+  }
+  const capabilities = normalizeCapabilities(options.capabilities ?? []);
+  const labels = normalizeCapabilities(options.labels ?? []);
+  const identityDirectory = import_node_path77.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
+  await prepareIdentityDirectory(identityDirectory);
+  const identityFile = import_node_path77.default.join(identityDirectory, identityFileName);
+  const privateKeyFile = import_node_path77.default.join(identityDirectory, privateKeyName);
+  const publicKeyFile = import_node_path77.default.join(identityDirectory, publicKeyName);
+  await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
+  const generated = (0, import_node_crypto25.generateKeyPairSync)("ed25519");
+  const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const activated = await activateRunner({
+    baseUrl: controlPlaneUrl,
+    enrollmentToken,
+    publicKey,
+    capabilities,
+    ...options.fetch === void 0 ? {} : { fetch: options.fetch }
+  });
+  const activatedAt = (options.now ?? (() => /* @__PURE__ */ new Date()))().toISOString();
+  const identity = {
+    version: 1,
+    controlPlaneUrl,
+    runnerId: activated.registrationId,
+    workerClass: "self_hosted",
+    privateKeyFile: privateKeyName,
+    publicKeyFile: publicKeyName,
+    capabilities,
+    labels,
+    activatedAt
+  };
+  const written = [];
+  try {
+    await writeExclusive(privateKeyFile, privateKey, 384);
+    written.push(privateKeyFile);
+    await writeExclusive(publicKeyFile, publicKey, 384);
+    written.push(publicKeyFile);
+    await writeExclusive(identityFile, `${JSON.stringify(identity, null, 2)}
+`, 384);
+    written.push(identityFile);
+  } catch (error123) {
+    await Promise.all(written.map((file3) => (0, import_promises34.unlink)(file3).catch(() => void 0)));
+    throw error123;
+  }
+  return {
+    identityFile,
+    privateKeyFile,
+    publicKeyFile,
+    runnerId: activated.registrationId,
+    status: activated.status
+  };
+}
+async function loadRunnerIdentity(identityFileInput) {
+  const identityFile = import_node_path77.default.resolve(identityFileInput);
+  await assertRunnerWorkspaceDirectories(import_node_path77.default.dirname(identityFile));
+  await assertPrivateDirectory(import_node_path77.default.dirname(identityFile), "runner identity directory");
+  await assertPrivateFile2(identityFile, "runner identity file");
+  let value;
+  try {
+    value = JSON.parse(await (0, import_promises34.readFile)(identityFile, "utf8"));
+  } catch {
+    throw new Error("runner identity file is not valid JSON");
+  }
+  const identity = parseIdentity(value);
+  const directory = import_node_path77.default.dirname(identityFile);
+  const privateKeyPath = resolveIdentityChild(directory, identity.privateKeyFile, "privateKeyFile");
+  const publicKeyPath = resolveIdentityChild(directory, identity.publicKeyFile, "publicKeyFile");
+  await assertRunnerWorkspaceDirectories(import_node_path77.default.dirname(privateKeyPath));
+  await assertRunnerWorkspaceDirectories(import_node_path77.default.dirname(publicKeyPath));
+  await assertPrivateFile2(privateKeyPath, "runner private key file");
+  await assertPrivateFile2(publicKeyPath, "runner public key file");
+  await loadRunnerPrivateKey(privateKeyPath);
+  return {
+    ...identity,
+    identityFile,
+    privateKeyPath,
+    publicKeyPath
+  };
+}
+function parseIdentity(value) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("runner identity file must contain an object");
+  }
+  const record3 = value;
+  if (record3.version !== 1 || record3.workerClass !== "self_hosted") {
+    throw new Error("runner identity file has an unsupported version or worker class");
+  }
+  const runnerId = runnerIdentifierSchema.safeParse(record3.runnerId);
+  if (!runnerId.success) throw new Error("runner identity file contains an invalid runner id");
+  const controlPlaneUrl = typeof record3.controlPlaneUrl === "string" ? normalizeControlPlaneUrl(record3.controlPlaneUrl).origin : void 0;
+  if (!controlPlaneUrl) throw new Error("runner identity file contains an invalid control-plane URL");
+  const privateKeyFile = relativeFile(record3.privateKeyFile, "privateKeyFile");
+  const publicKeyFile = relativeFile(record3.publicKeyFile, "publicKeyFile");
+  const capabilities = normalizeCapabilities(arrayOfStrings(record3.capabilities, "capabilities"));
+  const labels = normalizeCapabilities(arrayOfStrings(record3.labels, "labels"));
+  if (typeof record3.activatedAt !== "string" || Number.isNaN(Date.parse(record3.activatedAt))) {
+    throw new TypeError("runner identity file contains an invalid activation timestamp");
+  }
+  return {
+    version: 1,
+    controlPlaneUrl,
+    runnerId: runnerId.data,
+    workerClass: "self_hosted",
+    privateKeyFile,
+    publicKeyFile,
+    capabilities,
+    labels,
+    activatedAt: new Date(record3.activatedAt).toISOString()
+  };
+}
+function arrayOfStrings(value, name) {
+  if (!Array.isArray(value) || value.some((item2) => typeof item2 !== "string")) {
+    throw new Error(`runner identity ${name} must be an array of strings`);
+  }
+  return value;
+}
+function normalizeCapabilities(values) {
+  const normalized = Array.from(new Set(values.map((value) => runnerCapabilitySchema.parse(value)))).sort(
+    (left, right) => left.localeCompare(right)
+  );
+  if (normalized.length > 64) throw new Error("runner identity may declare at most 64 capabilities or labels");
+  return normalized;
+}
+function relativeFile(value, name) {
+  if (typeof value !== "string" || value.length < 1 || import_node_path77.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
+    throw new Error(`runner identity ${name} must be a relative file within the identity directory`);
+  }
+  return value;
+}
+function resolveIdentityChild(directory, relative, name) {
+  const resolved = import_node_path77.default.resolve(directory, relative);
+  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path77.default.sep}`)) {
+    throw new Error(`runner identity ${name} escapes the identity directory`);
+  }
+  return resolved;
+}
+async function prepareIdentityDirectory(directory) {
+  await assertRunnerWorkspaceDirectories(directory);
+  const existing = await (0, import_promises34.lstat)(directory).catch(() => void 0);
+  if (existing && (existing.isSymbolicLink() || !existing.isDirectory())) {
+    throw new Error(`runner identity directory is not a directory: ${directory}`);
+  }
+  if (!existing) {
+    await (0, import_promises34.mkdir)(directory, { recursive: true, mode: 448 });
+  }
+  await assertRunnerWorkspaceDirectories(directory);
+  if (process.platform !== "win32") await (0, import_promises34.chmod)(directory, 448);
+}
+async function assertPrivateDirectory(directory, label) {
+  const info = await (0, import_promises34.lstat)(directory).catch(() => void 0);
+  if (!info?.isDirectory() || info.isSymbolicLink()) {
+    throw new Error(`${label} does not exist or is not a regular directory`);
+  }
+  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
+    throw new Error(`${label} must not be accessible by group or other users`);
+  }
+}
+async function assertPrivateFile2(filePath, label) {
+  const info = await (0, import_promises34.lstat)(filePath).catch(() => void 0);
+  if (!info?.isFile() || info.isSymbolicLink()) throw new Error(`${label} does not exist or is not a regular file`);
+  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
+    throw new Error(`${label} must not be readable or writable by group or other users`);
+  }
+}
+async function assertTargetsDoNotExist(files) {
+  for (const file3 of files) {
+    if (await (0, import_promises34.lstat)(file3).catch(() => void 0)) {
+      throw new Error(`refusing to overwrite existing runner identity material: ${file3}`);
+    }
+  }
+}
+async function writeExclusive(filePath, content, mode) {
+  await (0, import_promises34.writeFile)(filePath, content, { encoding: "utf8", flag: "wx", mode });
+  if (process.platform !== "win32") await (0, import_promises34.chmod)(filePath, mode);
+}
+
+// src/runner/worker.ts
+var import_promises37 = require("node:fs/promises");
+var import_node_os7 = __toESM(require("node:os"), 1);
+var import_node_path80 = __toESM(require("node:path"), 1);
+init_src();
+
 // src/runner/customer-artifacts.ts
+var import_node_crypto26 = require("node:crypto");
+var import_node_fs11 = require("node:fs");
+var import_promises35 = require("node:fs/promises");
+var import_node_path78 = __toESM(require("node:path"), 1);
 var maximumLocalArtifactBytes = 64 * 1024 * 1024;
 var uuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 function inside(parent, candidate) {
