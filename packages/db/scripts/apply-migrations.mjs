@@ -18,10 +18,20 @@ function envFlag(name) {
 export async function listMigrationFiles(directory = migrationsDir) {
   const entries = await readdir(directory, { withFileTypes: true });
 
-  return entries
+  const files = entries
     .filter((entry) => entry.isFile() && /^\d+_.+\.sql$/u.test(entry.name))
     .map((entry) => entry.name)
     .sort();
+  const sequenceNames = new Map();
+  for (const name of files) {
+    const sequence = name.slice(0, name.indexOf("_"));
+    const previous = sequenceNames.get(sequence);
+    if (previous) {
+      throw new Error(`Duplicate cloud migration sequence ${sequence}: ${previous} and ${name}`);
+    }
+    sequenceNames.set(sequence, name);
+  }
+  return files;
 }
 
 async function appliedVersions(client) {

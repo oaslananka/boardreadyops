@@ -907,3 +907,23 @@ migration window are still required. **No production migration was run.**
 This is a reviewable code increment only. Current-host acceptance with ChatGPT
 and Claude, actual product installation-token revocation tests, deployment,
 secret/key lifecycle and both production release switches remain blocked.
+
+
+## Isolated staging-origin source preparation (#1248; not deployed)
+
+A staging-only deployment can select the fixed MCP issuer/resource origin
+https://staging.boardreadyops.com with BOARDREADYOPS_REMOTE_MCP_STAGING_ENABLED=true.
+Without that flag, the existing production issuer and audience remain exactly
+https://boardreadyops.com. The flag is evaluated at server-process module import;
+restart the isolated staging process after changing it. The configured OAuth issuer
+BOARDREADYOPS_REMOTE_MCP_OAUTH_ISSUER must match the selected origin exactly;
+mismatched settings fail closed. The separate OAuth and MCP handler release
+switches both remain disabled by default. Host/Forwarded headers never select
+the issuer or JWT audience.
+
+This source change does NOT provision staging: it creates no DNS or tunnel route,
+database, secrets, client registrations, or ChatGPT/Claude connection.
+Staging requires separate explicit authorization, disposable test data,
+independent database/volumes/keys and memory limits on the existing VPS.
+Do not set staging flags or change release switches on production services.
+Real cross-client acceptance and production release remain blocked.

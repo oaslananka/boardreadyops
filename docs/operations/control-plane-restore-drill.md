@@ -26,6 +26,32 @@ pnpm run cloud:restore:verify
 
 The command refuses a non-absolute backup path, identical source/restore database identities, a pre-existing backup file, a non-empty restore database, or a source database containing existing control-plane tenant/run work. The temporary dump is removed after the drill; the restored database is deliberately left intact so service-readiness checks can run against it before the disposable environment is destroyed.
 
+## Separate nonempty managed-artifact byte proof
+
+PostgreSQL restore verification does **not** prove that physically stored
+artifact bytes survived. Once an independently authorized, **isolated**
+backup/restore drill has populated two stable and operator-controlled local
+directories (snapshot and separately restored bytes), compare them:
+
+```sh
+node scripts/verify-artifact-volume-restore.mjs --source-dir /isolated/snapshot-artifacts --restored-dir /isolated/restored-artifacts --confirmation isolated-restored-artifacts
+```
+
+The tool is **read-only** and refuses empty volumes, overlapping roots,
+symlinked roots or entries (but not trusted canonicalized ancestor paths),\nspecial files, mismatched relative paths, file size or SHA-256
+discrepancies, and files modified during reading. The output contains only
+aggregate file count and total byte count, with no file names, hashes or
+contents; failures return a generic `unknown` and nonzero exit status.
+Default limits are 10,000 files and 1 GiB per directory.
+
+This proof does **not** create or restore any backup, access a database,
+quiesce a live worker or authorize deletion. Do not point it at the mutable
+production artifact volume or claim a production recovery from synthetic
+fixtures. #1215 still separately needs authenticated database ownership,
+run/attempt linkage, worker handoff, legal-hold and unlink-fence checks,
+encrypted archive integrity, nonempty isolated restore, and off-host DR
+evidence.
+
 ## Boundaries and remaining GA evidence
 
 This drill closes the repeatable isolated backup/restore plus real web/worker readiness gap. It **does not prove** provider backup scheduling meets the 15-minute RPO, that a regional database or availability-zone outage meets the 60-minute RTO, or that the separately defined local managed-artifact byte recovery objective is met; that still requires an encrypted artifact-volume backup/restore drill. Non-local object-storage drivers have no GA recovery claim in the current deployment profile. An hours-long production-shape soak and real GitHub shared-rate-limit behavior also remain separate GA evidence items in issue #222.

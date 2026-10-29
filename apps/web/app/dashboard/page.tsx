@@ -34,18 +34,24 @@ function SignInRequiredPanel() {
   );
 }
 
-function NoRepositoriesPanel() {
+function NoRepositoriesPanel({ hasInstallation }: Readonly<{ hasInstallation: boolean }>) {
   return (
     <GuidedChecklist
-      heading="Get your first board reviewed — 2 steps left"
+      heading={`Get your first board reviewed — ${hasInstallation ? 2 : 3} steps left`}
       steps={[
-        { id: "install", label: "Connect the BoardReadyOps GitHub App", status: "done" },
+        {
+          id: "install",
+          label: "Connect the BoardReadyOps GitHub App",
+          status: hasInstallation ? "done" : "current",
+          ...(!hasInstallation
+            ? { href: "https://github.com/apps/boardreadyops/installations/new", actionLabel: "Install" }
+            : {}),
+        },
         {
           id: "link",
           label: "Link a repository with a hardware project",
-          status: "current",
-          href: "/setup",
-          actionLabel: "Start",
+          status: hasInstallation ? "current" : "upcoming",
+          ...(hasInstallation ? { href: "/setup", actionLabel: "Start" } : {}),
         },
         { id: "pr", label: "Open a pull request to trigger the first run", status: "upcoming" },
       ]}
@@ -398,10 +404,12 @@ function RepositorySections({ groups }: Readonly<{ groups: RepositoryGroup[] }>)
 
 function DashboardBody({
   hasSession,
+  hasInstallation,
   groups,
   summary,
 }: Readonly<{
   hasSession: boolean;
+  hasInstallation: boolean;
   groups: RepositoryGroup[];
   summary: DashboardRepositorySummary;
 }>) {
@@ -421,7 +429,7 @@ function DashboardBody({
     return (
       <div className="flex flex-col gap-4">
         <ReviewEmptyVisualPreview mode="onboarding" actionLabel="Connect your first board" />
-        <NoRepositoriesPanel />
+        <NoRepositoriesPanel hasInstallation={hasInstallation} />
       </div>
     );
   }
@@ -479,7 +487,12 @@ export default async function DashboardPage() {
             Repositories BoardReadyOps is watching, with the latest release readiness for each.
           </p>
         </header>
-        <DashboardBody hasSession={Boolean(viewer.session)} groups={groups} summary={summary} />
+        <DashboardBody
+          hasSession={Boolean(viewer.session)}
+          hasInstallation={Boolean(viewer.session?.installationIds?.length)}
+          groups={groups}
+          summary={summary}
+        />
       </main>
     </AppShell>
   );

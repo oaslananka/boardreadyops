@@ -4,8 +4,26 @@ import {
   findingGuidance,
   githubFindingSourceUrl,
 } from "../../../apps/web/lib/finding-guidance.js";
+import { catalogRules } from "../../../apps/web/lib/rule-catalog.js";
 
 describe("finding remediation guidance", () => {
+  it("uses the engine's declared category for every known rule instead of a misleading prefix", () => {
+    const mismatches = catalogRules
+      .filter((rule) => findingDomainFromRule(rule.id) !== rule.category)
+      .map((rule) => ({ id: rule.id, expected: rule.category, actual: findingDomainFromRule(rule.id) }));
+    expect(mismatches).toEqual([]);
+  });
+
+  it.each([
+    ["bom.dnp-consistency", "assembly"],
+    ["bom.footprint-mismatch", "manufacturability"],
+    ["design.unique-references", "assembly"],
+    ["firmware.dependency-identification", "sourcing"],
+    ["manufacturing.test-points", "testability"],
+  ])("shows the authoritative category for %s", (ruleId, category) => {
+    expect(findingDomainFromRule(ruleId)).toBe(category);
+  });
+
   it.each([
     ["erc.footprint_filter", "electrical", "Footprint Filters"],
     ["erc.four_way_junction", "electrical", "four-way junction"],
