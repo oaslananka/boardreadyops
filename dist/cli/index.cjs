@@ -12715,8 +12715,8 @@ var require_util2 = __commonJS({
     }
     async function isDirectory(path85) {
       try {
-        const stat4 = await fs_1.promises.stat(path85);
-        return stat4.isDirectory();
+        const stat5 = await fs_1.promises.stat(path85);
+        return stat5.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
           return false;
@@ -12726,8 +12726,8 @@ var require_util2 = __commonJS({
     }
     function isDirectorySync(path85) {
       try {
-        const stat4 = fs_1.default.statSync(path85);
-        return stat4.isDirectory();
+        const stat5 = fs_1.default.statSync(path85);
+        return stat5.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
           return false;
@@ -15251,17 +15251,17 @@ function recordOutputFile(result, relative) {
 async function recordOutputEntry(current, name, root, manifestPath, expectedDirectories, pending, result) {
   const relative = current.relative ? `${current.relative}/${name}` : name;
   const absolute = import_node_path36.default.join(current.absolute, name);
-  const stat4 = await import_promises13.default.lstat(absolute);
-  if (stat4.isSymbolicLink()) {
+  const stat5 = await import_promises13.default.lstat(absolute);
+  if (stat5.isSymbolicLink()) {
     result.reasons.push(`Symlink in generated output: ${relative}`);
-  } else if (stat4.isDirectory()) {
+  } else if (stat5.isDirectory()) {
     if (!expectedDirectories.has(relative)) result.reasons.push(`Undeclared generated directory: ${relative}`);
     if (current.depth >= MAX_OUTPUT_DEPTH) throw new Error(`Output tree scan exceeds depth ${MAX_OUTPUT_DEPTH}.`);
     if (await import_promises13.default.realpath(absolute) !== import_node_path36.default.resolve(root, relative)) {
       throw new Error(`Generated directory has a noncanonical real path: ${relative}`);
     }
     pending.push({ absolute, relative, depth: current.depth + 1 });
-  } else if (!stat4.isFile()) {
+  } else if (!stat5.isFile()) {
     result.reasons.push(`Non-file entry in generated output: ${relative}`);
   } else if (absolute !== manifestPath) {
     recordOutputFile(result, relative);
@@ -37851,14 +37851,14 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
       "Release output overlaps a project, Git metadata, or a filesystem ancestor; choose a safe --output path."
     );
   }
-  let stat4;
+  let stat5;
   try {
-    stat4 = await import_promises26.default.lstat(output3);
+    stat5 = await import_promises26.default.lstat(output3);
   } catch (error123) {
     if (error123.code === "ENOENT") return;
     throw error123;
   }
-  if (!stat4.isDirectory() || stat4.isSymbolicLink()) {
+  if (!stat5.isDirectory() || stat5.isSymbolicLink()) {
     throw new Error("Release output must be a real directory, not a file or symlink.");
   }
   if ((await import_promises26.default.readdir(output3)).length === 0) return;
@@ -68383,8 +68383,8 @@ function aggregateLabels(rootFiles, sheets) {
 }
 async function fileExists(file3) {
   try {
-    const stat4 = await import_promises10.default.stat(file3);
-    return stat4.isFile();
+    const stat5 = await import_promises10.default.stat(file3);
+    return stat5.isFile();
   } catch {
     return false;
   }
@@ -73925,8 +73925,8 @@ async function discoverProjects(root, explicitProject) {
 async function explicitProjectFiles(root, explicitProject) {
   const target = import_node_path46.default.resolve(root, normalizePathInput(explicitProject));
   try {
-    const stat4 = await import_promises15.default.stat(target);
-    if (stat4.isDirectory()) {
+    const stat5 = await import_promises15.default.stat(target);
+    if (stat5.isDirectory()) {
       const files = await globFiles(target, ["**/*.kicad_pro"]);
       return files.map((file3) => import_node_path46.default.resolve(file3));
     }
@@ -79338,13 +79338,13 @@ function isPreviousArtifact(value) {
 }
 async function readManagedOutputManifest(directory) {
   const filename = import_node_path61.default.join(directory, "manifest.json");
-  let stat4;
+  let stat5;
   try {
-    stat4 = await import_promises22.default.lstat(filename);
+    stat5 = await import_promises22.default.lstat(filename);
   } catch {
     throw new Error("Output directory is not an identifiable BoardReadyOps generation; choose a fresh --output path.");
   }
-  if (!stat4.isFile() || stat4.size > MAX_MANIFEST_BYTES) {
+  if (!stat5.isFile() || stat5.size > MAX_MANIFEST_BYTES) {
     throw new Error("Existing generation manifest is missing, unsafe or too large; choose a fresh --output path.");
   }
   let manifest;
@@ -79370,8 +79370,8 @@ async function readManagedOutputManifest(directory) {
 async function verifyExistingArtifactBytes(directory, artifacts) {
   for (const artifact of artifacts) {
     const filename = import_node_path61.default.join(directory, artifact.path);
-    const stat4 = await import_promises22.default.lstat(filename);
-    if (!stat4.isFile() || stat4.size !== artifact.bytes) {
+    const stat5 = await import_promises22.default.lstat(filename);
+    if (!stat5.isFile() || stat5.size !== artifact.bytes) {
       throw new Error("A previously generated artifact has changed; choose a fresh --output path.");
     }
     const hash3 = (0, import_node_crypto8.createHash)("sha256");
@@ -79417,14 +79417,14 @@ async function assertSafeGenerateOutputCleanup(outputDirectory2, inputs) {
       throw new Error("Refusing to delete repository Git metadata as generated output.");
     }
   }
-  let stat4;
+  let stat5;
   try {
-    stat4 = await import_promises22.default.lstat(output3);
+    stat5 = await import_promises22.default.lstat(output3);
   } catch (error123) {
     if (isNoEntry2(error123)) return;
     throw error123;
   }
-  if (!stat4.isDirectory()) {
+  if (!stat5.isDirectory()) {
     throw new Error("Generated output must be a real directory, not a file or symlink.");
   }
   const entries = await import_promises22.default.readdir(output3);
@@ -79625,14 +79625,14 @@ async function assertReviewedSource(options) {
   }
 }
 async function assertFreshReviewedOutput(outputDir) {
-  let stat4;
+  let stat5;
   try {
-    stat4 = await import_promises23.default.lstat(outputDir);
+    stat5 = await import_promises23.default.lstat(outputDir);
   } catch (error123) {
     if (error123.code === "ENOENT") return;
     throw error123;
   }
-  if (!stat4.isDirectory() || (await import_promises23.default.readdir(outputDir)).length !== 0) {
+  if (!stat5.isDirectory() || (await import_promises23.default.readdir(outputDir)).length !== 0) {
     throw new Error("Reviewed export requires a new or empty generated-output directory.");
   }
 }
@@ -81404,8 +81404,8 @@ async function releaseAuditClausesCommand(passportFile, options, streams) {
   const maxInputBytes = 1024 * 1024;
   async function readJsonFile(file3) {
     const source = import_node_path72.default.resolve(normalizePathInput(file3));
-    const stat4 = await import_promises29.default.stat(source);
-    if (!stat4.isFile() || stat4.size > maxInputBytes) {
+    const stat5 = await import_promises29.default.stat(source);
+    if (!stat5.isFile() || stat5.size > maxInputBytes) {
       throw new Error("Audit clause input must be a regular JSON file no larger than 1 MiB.");
     }
     return JSON.parse(await import_promises29.default.readFile(source, "utf8"));
@@ -83687,6 +83687,13 @@ var RunnerControlPlaneClient = class {
     const url3 = normalizeUploadUrl(uploadUrl);
     if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
       throw new Error("artifact upload SHA-256 declaration is invalid");
+    }
+    const file3 = await (0, import_promises32.stat)(filePath);
+    if (!file3.isFile()) {
+      throw new Error("artifact is not a regular file");
+    }
+    if (file3.size !== maximumBytes) {
+      throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${file3.size}`);
     }
     const content = await (0, import_promises32.readFile)(filePath);
     if (content.byteLength !== maximumBytes) {

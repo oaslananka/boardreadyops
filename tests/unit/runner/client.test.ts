@@ -258,6 +258,23 @@ describe("RunnerControlPlaneClient", () => {
     );
   });
 
+  it("rejects a non-regular artifact path before attempting a full-file read", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-not-file-"));
+    roots.push(root);
+    const fetchMock = vi.fn();
+    const client = new RunnerControlPlaneClient({
+      baseUrl: "https://control.example",
+      runnerId,
+      runnerVersion: boardReadyVersion,
+      privateKey: keys.privateKey,
+      fetch: fetchMock as typeof fetch,
+    });
+    await expect(
+      client.uploadArtifact("https://control.example/upload?cap=x", root, 5, "a".repeat(64)),
+    ).rejects.toThrow(/artifact is not a regular file/u);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("does not upload an artifact whose size changed after capability issuance", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-client-"));
     roots.push(root);
