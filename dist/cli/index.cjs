@@ -84555,7 +84555,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
         artifacts: customerStored
       });
     }
-    const uploadedArtifacts = execution.report ? await resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat) : [];
+    const uploadedArtifacts = execution.report ? await resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat, workspace) : [];
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
     const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode, customerStored);
@@ -84604,7 +84604,7 @@ async function validateClaimedRunnerJob(client, job, signal) {
     throw new Error("runner shutdown requested before job execution");
   }
 }
-async function resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat) {
+async function resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat, workspace) {
   if (job.safeMode.enabled || artifactMode !== "control-plane") {
     if (execution.artifacts.length > 0) {
       dependencies.log("runner.artifacts.suppressed", {
@@ -84619,7 +84619,7 @@ async function resolveExecutionArtifacts(dependencies, client, job, execution, a
   }
   heartbeat.setStage("uploading_artifacts");
   await heartbeat.pulse();
-  const uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts);
+  const uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts, workspace);
   heartbeat.assertLeaseActive();
   return uploadedArtifacts;
 }
@@ -84714,15 +84714,31 @@ function createHeartbeatController(client, job, heartbeatSeconds, log) {
     }
   };
 }
-async function publishArtifacts(client, job, artifacts) {
+async function publishArtifacts(client, job, artifacts, workspace) {
   if (artifacts.length === 0) return [];
+  const workspacePath2 = await (0, import_promises37.realpath)(workspace);
+  const validatedArtifacts = await Promise.all(
+    artifacts.map(async (artifact) => {
+      await assertRunnerWorkspaceDirectories(import_node_path80.default.dirname(import_node_path80.default.resolve(artifact.filePath)));
+      const actualPath = await (0, import_promises37.realpath)(artifact.filePath);
+      const relative = import_node_path80.default.relative(workspacePath2, actualPath);
+      if (relative === "" || relative === ".." || relative.startsWith(`..${import_node_path80.default.sep}`) || import_node_path80.default.isAbsolute(relative)) {
+        throw new Error("runner cloud artifact escaped the source workspace");
+      }
+      const info = await (0, import_promises37.lstat)(artifact.filePath);
+      if (!info.isFile() || info.isSymbolicLink()) {
+        throw new Error("runner cloud artifact is not a regular non-symlink file");
+      }
+      return { ...artifact, filePath: actualPath };
+    })
+  );
   const request = {
     protocolVersion: 1,
     runId: job.runId,
     executionAttemptId: job.executionAttemptId,
     leaseId: job.leaseId,
     leaseToken: job.leaseToken,
-    artifacts: artifacts.map((artifact) => ({
+    artifacts: validatedArtifacts.map((artifact) => ({
       kind: artifact.kind,
       name: artifact.name,
       role: artifact.role,
@@ -84736,7 +84752,7 @@ async function publishArtifacts(client, job, artifacts) {
     throw new Error("artifact capability response did not match the artifact declaration count");
   }
   const published = [];
-  for (const [index, artifact] of artifacts.entries()) {
+  for (const [index, artifact] of validatedArtifacts.entries()) {
     const capability = capabilities.uploads[index];
     if (capability?.maximumBytes !== artifact.bytes) {
       throw new Error("artifact capability did not match the declared artifact size");

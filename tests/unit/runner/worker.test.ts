@@ -312,6 +312,80 @@ describe("runRunnerWorkerOnce", () => {
     expect(runnerClient.relinquish).not.toHaveBeenCalled();
   });
 
+  it("refuses to issue cloud upload capabilities for an artifact outside the runner workspace", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-upload-workspace-"));
+    const outside = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-upload-outside-"));
+    roots.push(workspace, outside);
+    const artifactFile = path.join(outside, "customer-secret.bin");
+    await writeFile(artifactFile, "hello", "utf8");
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(async () => ({
+        exitCode: 0,
+        report: { summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 }, findings: [] },
+        artifacts: [
+          {
+            kind: "report/json",
+            name: "customer-secret.bin",
+            role: "primary",
+            filePath: artifactFile,
+            bytes: 5,
+            sha256: createHash("sha256").update("hello").digest("hex"),
+          },
+        ],
+      })),
+    });
+
+    await expect(
+      runRunnerWorkerOnce({ identityFile: "/identity/runner.json", runnerVersion: "1.26.1" }, overrides),
+    ).rejects.toThrow(/artifact.*workspace/u);
+    expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+    expect(runnerClient.uploadArtifact).not.toHaveBeenCalled();
+    expect(runnerClient.publishTerminalResult).not.toHaveBeenCalled();
+    expect(runnerClient.relinquish).toHaveBeenCalledWith(expect.objectContaining({ reason: "job_error" }));
+    await expect(readFile(artifactFile, "utf8")).resolves.toBe("hello");
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "rejects a cloud artifact symlink redirected to a file outside the workspace",
+    async () => {
+      const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-upload-symlink-workspace-"));
+      const outside = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-upload-symlink-outside-"));
+      roots.push(workspace, outside);
+      const outsidePath = path.join(outside, "sensitive-report.bin");
+      await writeFile(outsidePath, "hello");
+      const artifactPath = path.join(workspace, "report.bin");
+      await symlink(outsidePath, artifactPath);
+      const runnerClient = client();
+      const overrides = dependencies(runnerClient.value);
+      Object.assign(overrides, {
+        checkoutSource: vi.fn(async () => workspace),
+        executePipeline: vi.fn(async () => ({
+          exitCode: 0,
+          report: { summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 }, findings: [] },
+          artifacts: [
+            {
+              kind: "report/json",
+              name: "report.bin",
+              role: "primary",
+              filePath: artifactPath,
+              bytes: 5,
+              sha256: createHash("sha256").update("hello").digest("hex"),
+            },
+          ],
+        })),
+      });
+      await expect(
+        runRunnerWorkerOnce({ identityFile: "/identity/runner.json", runnerVersion: "1.26.1" }, overrides),
+      ).rejects.toThrow(/artifact.*workspace/u);
+      expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+      expect(runnerClient.uploadArtifact).not.toHaveBeenCalled();
+      expect(runnerClient.publishTerminalResult).not.toHaveBeenCalled();
+    },
+  );
+
   it("suppresses artifact uploads in explicit metadata-only mode for a standard job", async () => {
     const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-metadata-only-"));
     roots.push(workspace);
