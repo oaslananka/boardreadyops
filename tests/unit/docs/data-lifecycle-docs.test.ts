@@ -22,7 +22,9 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("ARTIFACT_STORAGE_DRIVER=local");
     expect(lifecycle).toContain("Replacement and age-based retention");
     expect(lifecycle).toContain("Age-based managed-artifact retention");
-    expect(lifecycle).toContain("Draft migration 0104 introduces a persisted unresolved-unlink fence");
+    expect(lifecycle).toContain(
+      "Schema migration 0104 (merged into source `main`) introduces a persisted unresolved-unlink fence",
+    );
     expect(lifecycle).toContain("not proof that all runtime workers have been upgraded");
     expect(lifecycle).toContain("mandatory quiescing and quarantine procedures");
     expect(lifecycle).toContain("bounded destructive expiry");
