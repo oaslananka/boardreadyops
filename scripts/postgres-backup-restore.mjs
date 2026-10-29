@@ -194,8 +194,19 @@ async function defaultRunCommand({ command, args, environment, outputPath }) {
     }
     succeeded = true;
   } finally {
+    // Exclusive creation can fail if another operator creates the path after
+    // the preflight check. Never unlink a file this process did not create.
+    const createdFile = !succeeded && output ? await output.stat().catch(() => undefined) : undefined;
     await output?.close();
-    if (!succeeded && outputPath) await rm(outputPath, { force: true });
+    if (createdFile && outputPath) {
+      // Also leave another file intact if the created path was replaced while
+      // pg_dump was running. A failed dump is safer to retain than to unlink
+      // a file with an ownership identity we cannot verify.
+      const onDisk = await lstat(outputPath).catch(() => undefined);
+      if (onDisk?.isFile() && onDisk.dev === createdFile.dev && onDisk.ino === createdFile.ino) {
+        await rm(outputPath, { force: true });
+      }
+    }
   }
 }
 

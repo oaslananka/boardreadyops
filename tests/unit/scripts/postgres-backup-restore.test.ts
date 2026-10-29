@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import {
   BACKUP_RESTORE_CONFIRMATION,
   buildPostgresBackupRestorePlan,
@@ -132,6 +135,78 @@ function databaseExecutor(input: {
     async close() {},
   };
 }
+
+describe("PostgreSQL backup output ownership", () => {
+  const emptyExecutor = () => databaseExecutor({ tables: [] });
+  const backupInput = (outputPath: string) => ({
+    sourceUrl,
+    restoreUrl,
+    backupPath: outputPath,
+    confirmation: BACKUP_RESTORE_CONFIRMATION,
+  });
+  const fakeDependencies = {
+    createExecutor: emptyExecutor,
+    readMigrationFiles: async () => [],
+    // Model a second process creating the file after the initial existence check.
+    backupPathExists: async () => false,
+  };
+
+  it("does not delete a pre-existing backup when exclusive creation loses a race", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "boardreadyops-backup-race-"));
+    const output = path.join(dir, "existing.dump");
+    try {
+      await writeFile(output, "preserve-existing-operator-backup");
+      await expect(verifyPostgresBackupRestore(backupInput(output), fakeDependencies)).rejects.toThrow(
+        "backup path already exists",
+      );
+      expect(await readFile(output, "utf8")).toBe("preserve-existing-operator-backup");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "preserves a different file placed at the dump path before cleanup",
+    async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), "boardreadyops-backup-replaced-"));
+      const output = path.join(dir, "swapped.dump");
+      const dumpCommand = path.join(dir, "pg_dump");
+      try {
+        // A second actor replaces the inode during a failed dump: only the
+        // original inode was created by this run, not the replacement.
+        await writeFile(
+          dumpCommand,
+          `#!/bin/sh\n/bin/mv "${output}" "${output}.original"\nprintf 'preserve-replacement' > "${output}"\nexit 9\n`,
+          { mode: 0o700 },
+        );
+        vi.stubEnv("PATH", dir);
+        await expect(verifyPostgresBackupRestore(backupInput(output), fakeDependencies)).rejects.toThrow(
+          "pg_dump failed with exit code 9",
+        );
+        expect(await readFile(output, "utf8")).toBe("preserve-replacement");
+        await expect(access(`${output}.original`)).resolves.toBeUndefined();
+      } finally {
+        vi.unstubAllEnvs();
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("removes only the backup it created when the dump executable fails", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "boardreadyops-backup-failure-"));
+    const output = path.join(dir, "failed.dump");
+    try {
+      vi.stubEnv("PATH", dir);
+      await expect(verifyPostgresBackupRestore(backupInput(output), fakeDependencies)).rejects.toThrow(
+        "pg_dump could not be started",
+      );
+      await expect(access(output)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      vi.unstubAllEnvs();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("PostgreSQL backup restore verification", () => {
   it("runs a custom-format dump, restores it, and compares schema plus representative state", async () => {
