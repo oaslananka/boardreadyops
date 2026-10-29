@@ -83881,7 +83881,7 @@ async function checkoutRunnerSource(options) {
   if (options.job.sourceMode !== "customer_checkout") {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
-  const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
+  const repository = await repositoryRemote(options.job, options.repositoryMirrorRoot);
   const workspaceRoot = import_node_path76.default.resolve(options.workspaceRoot);
   await assertRunnerWorkspaceDirectories(workspaceRoot);
   await (0, import_promises33.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
@@ -83998,7 +83998,7 @@ async function executeRunnerCommand(command, args, options) {
     });
   });
 }
-function repositoryRemote(job, repositoryMirrorRoot) {
+async function repositoryRemote(job, repositoryMirrorRoot) {
   if (!repositoryMirrorRoot) {
     return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
   }
@@ -84007,6 +84007,7 @@ function repositoryRemote(job, repositoryMirrorRoot) {
   if (candidate !== root && !candidate.startsWith(`${root}${import_node_path76.default.sep}`)) {
     throw new Error("repository mirror path escaped the configured mirror root");
   }
+  await assertRunnerWorkspaceDirectories(candidate);
   return candidate;
 }
 function sanitizedGitEnvironment(environment) {
