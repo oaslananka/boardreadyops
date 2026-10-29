@@ -25,6 +25,29 @@ describe("repository setup documentation", () => {
     expect(content).not.toContain("least-privilege alternative to granting the GitHub App Contents write");
     expect(content).not.toContain("Do not grant the App Contents write");
   });
+  it("keeps two-installation commissioning permissions aligned with the declared App profile", async () => {
+    const record = declaredPermissionRecord();
+    const commissioning = await readFile(
+      new URL("../../docs/operations/synthetic-target-repository-canaries.md", import.meta.url),
+      "utf8",
+    );
+    const execution = await readFile(
+      new URL("../../docs/deployment/github-actions-execution.md", import.meta.url),
+      "utf8",
+    );
+
+    expect(record.contents).toBe("write");
+    expect(record.workflows).toBe("write");
+    expect(record.actions).toBe("write");
+    expect(record.checks).toBe("write");
+    expect(commissioning).toContain("Contents write, Workflows write");
+    expect(commissioning).toContain("githubAppPermissionProfile");
+    expect(commissioning).toContain("not two independent GitHub App owners/installations");
+    expect(commissioning).not.toContain("with no Contents permission");
+    expect(commissioning).not.toContain("granting the production App Contents write");
+    expect(execution).not.toContain("by granting the App Contents write");
+  });
+
   it("distinguishes immediate permission reduction from approval-gated expansion", async () => {
     const content = await readFile(new URL("../../docs/security/github-app-permissions.md", import.meta.url), "utf8");
     const normalized = content.replace(/\s+/g, " ").toLowerCase();
