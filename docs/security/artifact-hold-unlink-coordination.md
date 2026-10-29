@@ -1,15 +1,21 @@
 # Legal-hold admission versus irreversible artifact unlink: safety contract
 
-Status: **design contract / implementation pending**. This document defines acceptance
-criteria for #44, not an implemented guarantee, migration instruction or permission
-to perform production deletion. The current pre-unlink hold check remains best-effort.
+Status: **source-level barrier implemented; production rollout and operational acceptance pending**.
+Migration `0104_durable_artifact_unlink_fences.sql` and the corresponding local
+artifact-deletion worker code implement a persistent, fail-closed unlink fence.
+This is neither permission to deploy, unlink customer artifacts or change legal
+holds, nor evidence that every production worker uses the guarded path.
+See the [operator rollout and recovery contract](durable-artifact-unlink-operations.md).
 
 ## Hazard and required ordering
 
-The worker authorizes a leased deletion with one PostgreSQL statement, returns the
-DB client to the pool, then unlinks a local file. A separate transaction can
-acknowledge a new tenant legal hold in between. A disposable two-client PostgreSQL
-test reproduces the loss; its passing status characterizes the defect, not safety.
+The original pre-fence worker authorized a leased deletion in one PostgreSQL
+statement, returned the connection to the pool, and then unlinked a local file.
+A concurrent transaction could acknowledge a tenant legal hold before the
+physical unlink completed. The earlier disposable two-client reproduction
+characterized that defect; it is **historical baseline evidence**, not the
+current source behavior. Older or independently deployed workers can still
+present this risk unless explicitly quiesced during a controlled rollout.
 
 **Required invariant:** A successfully acknowledged applicable legal hold cannot
 coexist with an in-flight, unaccounted irreversible unlink of the protected object.
@@ -17,7 +23,15 @@ An unlink already in progress must finish before hold acknowledgement *or* force
 a truthful, actionable hold-admission rejection. Connection failure or retry must
 never implicitly clear a destructive reservation.
 
-## Selected design direction: persisted, fail-closed deletion intent
+## Source implementation: persisted, fail-closed deletion intent
+
+The [0104 schema barrier](../../packages/db/migrations/0104_durable_artifact_unlink_fences.sql),
+[deletion store](../../packages/db/src/artifact-deletion-store.ts) and
+[local deletion worker](../../apps/web/lib/artifact-deletion-worker.ts) implement
+the fenced path. This source implementation is exercised by the
+[PostgreSQL integration tests](../../tests/integration/artifact-deletion-store-postgres.test.ts),
+including independent hold writers, lease expiry, unlink and crash scenarios.
+Tests are not a substitute for deployment/worker-topology verification.
 
 A short transaction-scoped lock by itself does not cover an external filesystem
 call: PostgreSQL releases that lock on disconnect even if unlink continues.
@@ -49,7 +63,12 @@ transactions and explicit terminal recovery:
 A second ordinary SQL check, process-local mutex, or session lock around unlink
 cannot on its own satisfy the disconnect and crash invariants.
 
-## Staged engineering and proof requirements
+## Staged engineering and remaining acceptance evidence
+
+The schema, store and worker changes are present in `main` and have source-level
+PostgreSQL regression coverage. **Production cutover is not accepted** solely
+because the migration and tests exist. The table is the complete safety and
+release checklist; source-complete items still require live verification.
 
 | Stage | Required evidence |
 | --- | --- |
