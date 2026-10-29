@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { runnerCapabilitySchema, runnerIdentifierSchema } from "../../packages/contracts/src/index.js";
 import { activateRunner, loadRunnerPrivateKey, normalizeControlPlaneUrl, type RunnerFetch } from "./client.js";
+import { assertRunnerWorkspaceDirectories } from "./source.js";
 
 type RunnerIdentityFile = {
   version: 1;
@@ -115,6 +116,7 @@ export async function activateRunnerIdentity(options: ActivateRunnerIdentityOpti
 
 export async function loadRunnerIdentity(identityFileInput: string): Promise<LoadedRunnerIdentity> {
   const identityFile = path.resolve(identityFileInput);
+  await assertRunnerWorkspaceDirectories(path.dirname(identityFile));
   await assertPrivateDirectory(path.dirname(identityFile), "runner identity directory");
   await assertPrivateFile(identityFile, "runner identity file");
   let value: unknown;
@@ -127,6 +129,8 @@ export async function loadRunnerIdentity(identityFileInput: string): Promise<Loa
   const directory = path.dirname(identityFile);
   const privateKeyPath = resolveIdentityChild(directory, identity.privateKeyFile, "privateKeyFile");
   const publicKeyPath = resolveIdentityChild(directory, identity.publicKeyFile, "publicKeyFile");
+  await assertRunnerWorkspaceDirectories(path.dirname(privateKeyPath));
+  await assertRunnerWorkspaceDirectories(path.dirname(publicKeyPath));
   await assertPrivateFile(privateKeyPath, "runner private key file");
   await assertPrivateFile(publicKeyPath, "runner public key file");
   await loadRunnerPrivateKey(privateKeyPath);
@@ -202,6 +206,7 @@ function resolveIdentityChild(directory: string, relative: string, name: string)
 }
 
 async function prepareIdentityDirectory(directory: string): Promise<void> {
+  await assertRunnerWorkspaceDirectories(directory);
   const existing = await lstat(directory).catch(() => undefined);
   if (existing && (existing.isSymbolicLink() || !existing.isDirectory())) {
     throw new Error(`runner identity directory is not a directory: ${directory}`);
@@ -209,6 +214,7 @@ async function prepareIdentityDirectory(directory: string): Promise<void> {
   if (!existing) {
     await mkdir(directory, { recursive: true, mode: 0o700 });
   }
+  await assertRunnerWorkspaceDirectories(directory);
   if (process.platform !== "win32") await chmod(directory, 0o700);
 }
 
