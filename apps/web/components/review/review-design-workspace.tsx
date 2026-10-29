@@ -77,6 +77,9 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
     findings.find(isBlocking)?.fingerprint ?? findings[0]?.fingerprint,
   );
   const selected = visibleFindings.find((finding) => finding.fingerprint === selectedFingerprint) ?? visibleFindings[0];
+  // Filter changes can hide the stored fingerprint; the inspector, row and canvas
+  // must all reflect the same visible selection rather than a stale marker.
+  const activeFingerprint = selected?.fingerprint;
   const snapshots = review.headSnapshots ?? [];
   const nativeViews = snapshots.filter((snapshot) => snapshot.name.startsWith("kicad_native_")).length;
   const optionalBaseSnapshots = review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {};
@@ -91,7 +94,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
   };
 
   const renderFindingButton = (finding: DemoFinding) => {
-    const active = finding.fingerprint === selectedFingerprint;
+    const active = finding.fingerprint === activeFingerprint;
     return (
       <button
         key={finding.fingerprint}
@@ -251,7 +254,7 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
                 {...optionalBaseSnapshots}
                 findings={review.findings}
                 comments={review.comments}
-                selectedFindingFingerprint={selectedFingerprint}
+                selectedFindingFingerprint={activeFingerprint}
                 onSelectFinding={selectCanvasFinding}
               />
               <VerifiedObjectPositions
