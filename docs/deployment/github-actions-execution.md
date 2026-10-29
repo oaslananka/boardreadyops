@@ -152,7 +152,7 @@ The shipped workflow:
 8. runs the exact BoardReadyOps Action commit pinned in the reviewed workflow;
 9. uploads JSON, SARIF, and Markdown reports as GitHub Actions artifacts;
 10. maps the JSON report to the version-one cloud result contract; and
-11. obtains an OIDC token with audience `boardreadyops-cloud:<run-id>:<attempt-id>` and retries the callback up to three times.
+11. obtains an OIDC token with audience `boardreadyops-cloud:<run-id>:<attempt-id>:<target-sha>:<trust-mode>:<safe-mode-reasons-or-none>` and retries the callback up to three times. The final field is the canonical comma-separated safe-mode reason list, or `none` when empty; the control plane derives and validates the same audience from the persisted run, current attempt, commit and trust snapshot.
 
 Blocking findings complete the cloud run with decision `fail` and fail the GitHub Actions workflow. Operational errors complete it with decision `error` when a callback can be sent.
 

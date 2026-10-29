@@ -3,8 +3,28 @@ import { describe, expect, it } from "vitest";
 
 const workflowPath = ".github/workflows/target-repository-isolation.yml";
 const documentationPath = "docs/deployment/github-actions-execution.md";
+const targetWorkflowPath = ".github/workflows/readiness-runner.yml";
+const serverOidcExpectationsPath = "apps/web/lib/result-oidc-expectations.ts";
 
 describe("target-repository two-installation isolation workflow", () => {
+  it("documents the exact OIDC audience shared by the target workflow and server", () => {
+    const workflow = fs.readFileSync(targetWorkflowPath, "utf8");
+    const serverExpectations = fs.readFileSync(serverOidcExpectationsPath, "utf8");
+    const documentation = fs.readFileSync(documentationPath, "utf8");
+
+    expect(workflow).toMatch(
+      /boardreadyops-cloud:\$\{runId\}:\$\{executionAttemptId\}:\$\{targetSha\}:\$\{trustMode\}:\$\{safeModeReasons \|\| "none"\}/u,
+    );
+    expect(serverExpectations).toMatch(
+      /boardreadyops-cloud:\$\{runId\}:\$\{executionAttemptId \?\? "none"\}:\$\{sha\}:\$\{trust\.trustMode\}:/u,
+    );
+    expect(documentation).toContain(
+      "boardreadyops-cloud:<run-id>:<attempt-id>:<target-sha>:<trust-mode>:<safe-mode-reasons-or-none>",
+    );
+    expect(documentation).toContain("the control plane derives and validates the same audience");
+    expect(documentation).not.toContain("audience `boardreadyops-cloud:<run-id>:<attempt-id>`");
+  });
+
   it("runs the PostgreSQL adversarial proof with read-only repository permissions and aggregate evidence", () => {
     expect(fs.existsSync(workflowPath)).toBe(true);
     const workflow = fs.readFileSync(workflowPath, "utf8");
