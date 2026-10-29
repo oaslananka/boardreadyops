@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -268,7 +268,7 @@ describe("runRunnerWorkerOnce", () => {
     );
     expect(runnerClient.uploadArtifact).toHaveBeenCalledWith(
       expect.stringContaining(`/artifacts/${artifactId}/upload`),
-      artifactFile,
+      await realpath(artifactFile),
       5,
       execution.artifacts[0]?.sha256,
     );
