@@ -9,7 +9,10 @@ import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 import { prepareRunnerManufacturingDraft } from "../../src/cli/runner-manufacturing-draft.js";
-import { signManufacturingDraftReceipt } from "../../src/runner/draft-attestation.js";
+import {
+  createManufacturingDraftReceiptArtifact,
+  signManufacturingDraftReceipt,
+} from "../../src/runner/draft-attestation.js";
 
 const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
@@ -41,7 +44,8 @@ afterAll(async () => {
 
 // Explicit opt-in connects actual KiCad ZIP generation to PostgreSQL receipt
 // verification. The default PG integration needs no KiCad installation.
-async function generateRealKicadDraft(): Promise<{ zip: Buffer; sourceSha: string }> {
+type GeneratedKicadDraft = { zip: Buffer; sourceSha: string; receipt: Buffer; publicKey: string };
+async function generateRealKicadDraft(): Promise<GeneratedKicadDraft> {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "bro-draft-kicad-pg-"));
   rootPaths.push(workspace);
   await cp(path.resolve("tests/fixtures/projects/safe-basic"), workspace, { recursive: true });
@@ -49,7 +53,7 @@ async function generateRealKicadDraft(): Promise<{ zip: Buffer; sourceSha: strin
   execFileSync("git", ["add", "."], { cwd: workspace });
   execFileSync(
     "git",
-    ["-c", "user.name=Osman Aslan", "-c", "user.email=info@oaslananka.dev", "commit", "--quiet", "-m", "test fixture"],
+    ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "test fixture"],
     { cwd: workspace },
   );
   const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: workspace, encoding: "utf8" }).trim();
@@ -69,12 +73,35 @@ async function generateRealKicadDraft(): Promise<{ zip: Buffer; sourceSha: strin
   if (archive.role !== "draft-manufacturing" || archive.sha256 !== digest(zip) || archive.bytes !== zip.length) {
     throw new Error("KiCad export did not produce the expected verified draft archive");
   }
-  return { zip, sourceSha };
+  // Exercise the same detached receipt writer invoked by runner/worker.ts,
+  // rather than crafting a receipt directly in the integration fixture.
+  const key = generateKeyPairSync("ed25519");
+  const attestation = await createManufacturingDraftReceiptArtifact({
+    workspace,
+    job,
+    runnerId: runner,
+    privateKey: key.privateKey,
+    archive,
+  });
+  const receipt = await readFile(attestation.filePath);
+  if (
+    attestation.role !== "draft-provenance" ||
+    attestation.bytes !== receipt.length ||
+    attestation.sha256 !== digest(receipt)
+  ) {
+    throw new Error("Runner did not sign the expected draft receipt bytes");
+  }
+  return {
+    zip,
+    sourceSha,
+    receipt,
+    publicKey: key.publicKey.export({ type: "spki", format: "pem" }).toString(),
+  };
 }
 
-async function prepareDraftFixture(db: NonNullable<typeof executor>, generated?: { zip: Buffer; sourceSha: string }) {
+async function prepareDraftFixture(db: NonNullable<typeof executor>, generated?: GeneratedKicadDraft) {
   const key = generateKeyPairSync("ed25519");
-  const publicKey = key.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const publicKey = generated?.publicKey ?? key.publicKey.export({ type: "spki", format: "pem" }).toString();
   const folder = await mkdtemp(path.join(os.tmpdir(), "bro-draft-real-pg-"));
   rootPaths.push(folder);
   const sourceSha = generated?.sourceSha ?? "a".repeat(40);
@@ -84,24 +111,26 @@ async function prepareDraftFixture(db: NonNullable<typeof executor>, generated?:
       "UEsDBBQAAAAIAKRtVV0z7c5VJwAAACUAAAAWAAAAZmFicmljYXRpb24vUkVBRE1FLnR4dHMJcnQLUfD384lU0FXw8w9RcHN0CvJ0dgzx9PdTcAwICPIPc/QBAFBLAQIUAxQAAAAIAKRtVV0z7c5VJwAAACUAAAAWAAAAAAAAAAAAAACAAQAAAABmYWJyaWNhdGlvbi9SRUFETUUudHh0UEsFBgAAAAABAAEARAAAAFsAAAAAAA==",
       "base64",
     );
-  const receipt = Buffer.from(
-    JSON.stringify(
-      signManufacturingDraftReceipt(
-        {
-          version: 1,
-          purpose: "manufacturing-draft",
-          runnerId: runner,
-          runId: run,
-          executionAttemptId: attempt,
-          repository: "verify-fixture/pcb",
-          sourceCommitSha: sourceSha,
-          archiveSha256: digest(zip),
-          archiveBytes: zip.length,
-        },
-        key.privateKey,
+  const receipt =
+    generated?.receipt ??
+    Buffer.from(
+      JSON.stringify(
+        signManufacturingDraftReceipt(
+          {
+            version: 1,
+            purpose: "manufacturing-draft",
+            runnerId: runner,
+            runId: run,
+            executionAttemptId: attempt,
+            repository: "verify-fixture/pcb",
+            sourceCommitSha: sourceSha,
+            archiveSha256: digest(zip),
+            archiveBytes: zip.length,
+          },
+          key.privateKey,
+        ),
       ),
-    ),
-  );
+    );
   await writeFile(path.join(folder, "archive.zip"), zip);
   await writeFile(path.join(folder, "receipt.json"), receipt);
 
