@@ -142,6 +142,12 @@ its query string and returns metadata, not a signed archive. For each request th
 server resolves that GitHub App installation against the current authenticated
 viewer's active authorized installations; an absent identifier returns 400 and
 a foreign or disabled installation returns 403 without writing a request.
+The status read also checks the persisted live installation and the exact
+repository scope in SQL: a different installation with the same tenant login,
+a suspended installation, or a disabled repository cannot read that request.
+Historical unbound organization/repository requests are not assigned an
+installation by guessing; legacy unbound user-scoped status remains available
+for compatibility but creates no preparable/downloadable package.
 The persisted tenant is the resolved installation's account login, not the
 human operator's personal GitHub login. Direct organization/repository export
 intake is additionally bound to that persisted installation and checks current

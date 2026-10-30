@@ -381,11 +381,46 @@ export class DataLifecycleStore {
     };
   }
 
-  async getExport(tenantId: string, exportId: string): Promise<DataExport | null> {
-    const r = (await this.db.query(`SELECT * FROM data_exports WHERE id=$1 AND tenant_id=$2 LIMIT 1`, [
-      exportId,
-      tenantId,
-    ])) as { rows?: Array<Record<string, unknown>> };
+  /**
+   * Exact live installation authorization for export status reads.
+   * The tenant account login alone is insufficient: installations may be
+   * replaced or multiple same-account installations may coexist.
+   * Historical user-scope rows remain visible as metadata only, but unbound
+   * organization/repository rows cannot be attributed to an installation.
+   */
+  async getExport(tenantId: string, exportId: string, installationId: string): Promise<DataExport | null> {
+    if (
+      !tenantId ||
+      !exportId ||
+      !installationId ||
+      tenantId !== tenantId.trim() ||
+      exportId !== exportId.trim() ||
+      installationId !== installationId.trim()
+    )
+      return null;
+    const r = (await this.db.query(
+      `SELECT data_exports.*
+         FROM data_exports
+         JOIN installations ON installations.id = $3
+          AND installations.suspended_at IS NULL
+          AND lower(installations.account_login) = lower($2)
+        WHERE data_exports.id = $1
+          AND lower(data_exports.tenant_id) = lower(installations.account_login)
+          AND (
+            (data_exports.installation_id = installations.id AND (
+              (data_exports.scope = 'organization' AND data_exports.scope_id IS NULL)
+              OR (data_exports.scope = 'repository' AND EXISTS (
+                SELECT 1 FROM repositories
+                 WHERE repositories.id = data_exports.scope_id
+                   AND repositories.installation_id = installations.id
+                   AND repositories.disabled_at IS NULL
+              ))
+            ))
+            OR (data_exports.installation_id IS NULL AND data_exports.scope = 'user')
+          )
+        LIMIT 1`,
+      [exportId, tenantId, installationId],
+    )) as { rows?: Array<Record<string, unknown>> };
     const row = r.rows?.[0];
     if (!row) return null;
     return {
