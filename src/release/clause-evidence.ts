@@ -190,10 +190,10 @@ export function exportPassportAuditClausesMarkdown(
   const escapeCell = (value: string): string =>
     value
       .replace(/\s+/gu, " ")
-      .replace(/&/gu, "&amp;")
-      .replace(/</gu, "&lt;")
-      .replace(/>/gu, "&gt;")
-      .replace(/([\\`*_{}[\]()#+.!|~-])/gu, "\\$1");
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replace(/([\\`*_{}[\]()#+.!|~-])/gu, String.raw`\$1`);
   const fields = (values: readonly string[]): string => (values.length > 0 ? values.map(escapeCell).join(", ") : "—");
 
   const lines = [
