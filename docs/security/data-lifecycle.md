@@ -143,8 +143,16 @@ server resolves that GitHub App installation against the current authenticated
 viewer's active authorized installations; an absent identifier returns 400 and
 a foreign or disabled installation returns 403 without writing a request.
 The persisted tenant is the resolved installation's account login, not the
-human operator's personal GitHub login. These are intake and status endpoints,
-not export materialization or deletion executors.
+human operator's personal GitHub login. Direct organization/repository export
+intake is additionally bound to that persisted installation and checks current
+repository ownership and enablement in SQL. The resulting pending record can
+enter the existing claim-based read-only preparation flow; this does **not**
+automatically generate, complete, or deliver a downloadable archive. Legacy
+user-scoped export intake remains pending but is not supported by the bounded
+repository-metadata manifest preparer. Uninstall export intake for suspended
+installations is also separate and must not reactivate access.
+These are intake and status endpoints, not export materialization or deletion
+executors.
 
 Installations are the top-level tenant boundary. Repository, run, artifact, runner,
 replay, reconciliation, transition, and deletion records are validated against
