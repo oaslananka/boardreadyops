@@ -2,6 +2,7 @@ import { DataLifecycleStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
+import { lifecycleScopeRefinement } from "../../../../lib/data-lifecycle-scope-refinement.js";
 import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
 export const runtime = "nodejs";
@@ -12,19 +13,7 @@ const erasureSchema = z
     scopeId: z.string().optional(),
     dryRun: z.boolean().optional().default(false),
   })
-  .superRefine((data, ctx) => {
-    if (data.scope === "organization") {
-      if (data.scopeId !== undefined) {
-        ctx.addIssue({ code: "custom", path: ["scopeId"], message: "Organization erasure must not have a scope id." });
-      }
-    } else if (!data.scopeId?.trim() || data.scopeId !== data.scopeId.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["scopeId"],
-        message: "Repository and user erasures require a canonical scope id.",
-      });
-    }
-  });
+  .superRefine(lifecycleScopeRefinement("erasure"));
 
 export async function POST(request: Request): Promise<Response> {
   const viewer = await viewerAuthorization();

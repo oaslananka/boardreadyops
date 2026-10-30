@@ -14,6 +14,7 @@ vi.mock("@boardreadyops/db/pg-executor", () => ({
   createPgQueryExecutor,
 }));
 
+import { POST as postExport } from "../../../apps/web/app/api/v1/data-exports/route.js";
 import { POST } from "../../../apps/web/app/api/v1/erasure-requests/route.js";
 
 function request(payload: unknown): Request {
@@ -75,5 +76,49 @@ describe("erasure request scope boundary", () => {
     const unauthorized = await POST(request({ scope: "organization" }));
     expect(unauthorized.status).toBe(401);
     expect(persistence).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("export request scope boundary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    viewerAuthorization.mockResolvedValue({
+      session: { userId: 42, login: "acme", installationIds: [10] },
+    });
+    persistence.mockReturnValue({ mode: "memory" });
+  });
+
+  it("rejects invalid scopes before selecting a database", async () => {
+    for (const scope of ["repository", "user"]) {
+      for (const scopeId of [undefined, "", " ", " padded ", "\tvalue"]) {
+        const response = await postExport(request({ scope, scopeId }));
+        expect(response.status).toBe(400);
+        expect((await response.json()) as unknown).toMatchObject({
+          ok: false,
+          issues: [expect.objectContaining({ path: ["scopeId"] })],
+        });
+      }
+    }
+    for (const scopeId of ["", "repo-1"]) {
+      expect((await postExport(request({ scope: "organization", scopeId }))).status).toBe(400);
+    }
+    expect((await postExport(request({ scope: "tenant", scopeId: "repo-1" }))).status).toBe(400);
+    expect(persistence).not.toHaveBeenCalled();
+    expect(createPgQueryExecutor).not.toHaveBeenCalled();
+  });
+
+  it("preserves valid scopes, the default organization scope and authentication", async () => {
+    for (const payload of [
+      {},
+      { scope: "organization" },
+      { scope: "repository", scopeId: "repo-1" },
+      { scope: "user", scopeId: "alice" },
+    ]) {
+      expect((await postExport(request(payload))).status).toBe(503);
+    }
+    expect(persistence).toHaveBeenCalledTimes(4);
+    viewerAuthorization.mockResolvedValueOnce({ session: undefined });
+    expect((await postExport(request({ scope: "organization" }))).status).toBe(401);
+    expect(createPgQueryExecutor).not.toHaveBeenCalled();
   });
 });
