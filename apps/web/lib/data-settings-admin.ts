@@ -268,7 +268,7 @@ export async function requestExportForViewer(
     });
     return ok(
       { exportId: record.id, status: record.status },
-      "Export requested. It is generated asynchronously and the download link is time-limited.",
+      "Export request recorded; creating a downloadable pack requires operator processing.",
     );
   } finally {
     await opened.close();
@@ -310,8 +310,8 @@ export async function requestErasureForViewer(
     return ok(
       { erasureId: record.id, status: record.status, dryRun: record.dryRun },
       record.dryRun
-        ? "Preview recorded. Nothing was deleted — review the scope before running it for real."
-        : "Erasure requested. It is processed asynchronously and cannot be undone.",
+        ? "Preview recorded. No records were deleted or enumerated; review the requested scope."
+        : "Erasure request recorded; no records have been deleted. Completion requires an authorized operator workflow.",
     );
   } finally {
     await opened.close();
