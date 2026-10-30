@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { planLimits, planTierOf } from "@boardreadyops/cloud-core/entitlements";
 import { findingsToCheckRunAnnotations } from "@boardreadyops/cloud-core/lifecycle-executor";
+import { emitTelemetryEvent, type TelemetryEvent } from "@boardreadyops/cloud-core/telemetry";
 import { type ReleaseRunResult, releaseRunResultSchema } from "@boardreadyops/contracts";
 import { createSqlBoardBomStore } from "@boardreadyops/db/board-bom-store";
 import { createSqlFirmwareSnapshotStore } from "@boardreadyops/db/firmware-snapshot-store";
@@ -33,6 +34,7 @@ export type ResultRouteDependencies = {
   authenticationVerified?: boolean;
   verifiedLeaseId?: string;
   artifactStorageDriver?: () => string;
+  emitTelemetry?: (event: TelemetryEvent) => void;
 };
 
 const resultKeyEnvName = "BOARDREADYOPS" + "_RUNNER_RESULT_KEY";
@@ -309,6 +311,148 @@ function releaseDecisionAuditMetadata(result: ReleaseRunResult, githubCheckConcl
         }
       : {}),
   };
+}
+
+/**
+ * Stable, privacy-free event key per persisted installation/repository pair.
+ * An exact runner replay or concurrent successful Check Run can insert it only once.
+ */
+function firstUsefulFindingAuditId(installationId: string, repositoryId: string): string {
+  const bytes = createHash("sha256")
+    .update("boardreadyops:first-useful-finding")
+    .update("\0")
+    .update(installationId)
+    .update("\0")
+    .update(repositoryId)
+    .digest()
+    .subarray(0, 16);
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function validGitHubNumericId(value: NumberLikeCell): number | undefined {
+  const number = typeof value === "string" ? Number(value) : value;
+  return Number.isSafeInteger(number) && number !== undefined && number > 0 ? number : undefined;
+}
+
+const FIRST_USEFUL_FINDING_AUDIT_SQL = `with authorized_run as materialized (
+         select run.id, run.commit_sha, run.github_check_run_id,
+                repo.id as repository_id, repo.installation_id
+           from release_runs as run
+           join repositories as repo on repo.id = run.repository_id
+           join installations as install on install.id = repo.installation_id
+           join release_run_results as result on result.run_id = run.id
+          where run.id = $1
+            and run.commit_sha = $2
+            and install.github_installation_id = $3::bigint
+            and repo.github_repo_id = $4::bigint
+            and result.github_check_published_at is not null
+            and run.github_check_run_id is not null
+       ),
+       qualified as (
+         select run.id, run.repository_id, run.installation_id,
+                finding.severity, finding.rule_category,
+                greatest(installed.created_at, coalesce(selected.created_at, installed.created_at)) as started_at
+           from authorized_run as run
+           cross join lateral (
+             select lower(severity) as severity,
+                    split_part(rule_id, '.', 1) as rule_category
+               from findings
+              where findings.run_id = run.id
+                and findings.waived_at is null
+                and lower(severity) in ('critical', 'error', 'high', 'medium')
+                and split_part(rule_id, '.', 1) ~ '^[a-z][a-z0-9_-]{0,31}$'
+              order by case lower(severity)
+                         when 'critical' then 0 when 'error' then 1
+                         when 'high' then 2 else 3 end, rule_id
+              limit 1
+           ) as finding
+           join lateral (
+             select min(created_at) as created_at
+               from audit_events
+              where installation_id = run.installation_id
+                and event_type = 'github_app.installation.enabled'
+           ) as installed on installed.created_at is not null
+           left join lateral (
+             select min(created_at) as created_at
+               from audit_events
+              where installation_id = run.installation_id
+                and repository_id = run.repository_id
+                and event_type = 'github_app.repository.enabled'
+           ) as selected on true
+       ),
+       recorded as (
+         insert into audit_events (
+           id, installation_id, event_type, actor_type, subject_type,
+           subject_id, repository_id, release_run_id, metadata, created_at
+         )
+         select $5, installation_id, 'onboarding.first_useful_finding.published',
+                'system', 'release_run', id, repository_id, id,
+                jsonb_build_object(
+                  'ruleCategory', rule_category,
+                  'severity', severity,
+                  'timeToFindingSeconds',
+                  floor(extract(epoch from (statement_timestamp() - started_at)))::integer
+                ),
+                statement_timestamp()
+           from qualified
+          where started_at <= statement_timestamp()
+         on conflict (id) do nothing
+         returning metadata
+       )
+       select metadata->>'ruleCategory' as rule_category,
+              metadata->>'severity' as severity,
+              (metadata->>'timeToFindingSeconds')::integer as time_to_finding_seconds
+         from recorded`;
+
+/** The result and Check Run publication have already committed. Failure to record a
+ * measurement must never reclassify successful GitHub publication as a failure. */
+async function recordFirstUsefulFinding(
+  executor: ResultQueryExecutor,
+  dependencies: ResultRouteDependencies,
+  input: ParsedResultRequest,
+  row: QueryRow,
+): Promise<void> {
+  if (!input.result.findings.some((finding) => ["critical", "error", "high", "medium"].includes(finding.severity))) {
+    return;
+  }
+  const installationId = stringCell(row, "installation_id");
+  const repositoryId = stringCell(row, "repository_id");
+  const commitSha = stringCell(row, "commit_sha");
+  const githubInstallationId = validGitHubNumericId(numberLikeCell(row, "github_installation_id"));
+  const githubRepositoryId = validGitHubNumericId(numberLikeCell(row, "github_repository_id"));
+  if (!installationId || !repositoryId || !commitSha || !githubInstallationId || !githubRepositoryId) return;
+
+  try {
+    const recorded = await executor.query(FIRST_USEFUL_FINDING_AUDIT_SQL, [
+      input.runId,
+      commitSha,
+      githubInstallationId,
+      githubRepositoryId,
+      firstUsefulFindingAuditId(installationId, repositoryId),
+    ]);
+    const recordedEvent = rows(recorded)[0];
+    const ruleCategory = stringCell(recordedEvent ?? {}, "rule_category");
+    const severity = stringCell(recordedEvent ?? {}, "severity");
+    const seconds = numberCell(recordedEvent ?? {}, "time_to_finding_seconds");
+    if (!ruleCategory || !severity || seconds === undefined || !Number.isSafeInteger(seconds) || seconds < 0) return;
+    try {
+      (dependencies.emitTelemetry ?? emitTelemetryEvent)({
+        event: "first_useful_finding_produced",
+        installationId: githubInstallationId,
+        repositoryId: githubRepositoryId,
+        ruleCategory,
+        severity,
+        timeToFindingSeconds: seconds,
+      });
+    } catch {
+      // Never turn a published Check Run into a callback failure because of telemetry.
+    }
+  } catch {
+    // Existing durable Check Run publication stays authoritative on metric outages.
+  }
 }
 
 function publicationErrorMessage(error: unknown): string {
@@ -1051,6 +1195,7 @@ async function persistRunnerResult(
             repositories.name,
             repositories.installation_id,
             installations.github_installation_id,
+            repositories.github_repo_id as github_repository_id,
             installations.plan_tier,
             effective.trust_mode,
             effective.safe_mode_reasons,
@@ -1273,6 +1418,11 @@ async function publishTerminalResult(
     pullRequestCommentCreated: comment.created,
     errors: [...blockingPublicationErrors, ...publicationWarnings],
   });
+  // Count first value only after GitHub acknowledges the completed native Check Run
+  // and the publication state has been persisted, not when a runner merely uploads.
+  if (checkRun.updated) {
+    await recordFirstUsefulFinding(executor, dependencies, input, row);
+  }
   if (blockingPublicationErrors.length > 0) {
     return {
       checkRunUpdated: checkRun.updated,
