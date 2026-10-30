@@ -159,7 +159,7 @@ The expected mirror layout is:
 /srv/git-mirrors/<owner>/<repository>.git
 ```
 
-Mirror synchronization is outside the worker loop and remains customer-controlled.
+Mirror synchronization is outside the worker loop and remains customer-controlled. The configured mirror root and existing owner/repository path components must not redirect through customer-controlled symlinks; the worker validates them before creating a checkout workspace. Keep bare mirrors under the declared root (macOS protected system path aliases remain supported).
 
 ## Process one job
 

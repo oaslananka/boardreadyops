@@ -497,6 +497,47 @@ describeDatabase("GitHub Marketplace billing PostgreSQL integration", () => {
       }),
     ).resolves.toBe(false);
   });
+  it("blocks whole-organization Marketplace cancellation under a repository-scoped legal hold", async () => {
+    const scopedTenant = `marketplace-scoped-${randomUUID()}`;
+    const scopedHoldId = randomUUID();
+    const scopedAccountId = 20_000_000 + Math.floor(Math.random() * 1_000_000);
+    try {
+      await database().query(
+        `INSERT INTO legal_holds (id, tenant_id, created_by, reason, scope, scope_id, active)
+         VALUES ($1,$2,'integration','Preserve repository audit evidence','repository','held-board',TRUE)`,
+        [scopedHoldId, scopedTenant.toUpperCase()],
+      );
+      const cancelled = await new BillingStore(database()).processMarketplaceEvent({
+        deliveryId: randomUUID(),
+        action: "cancelled",
+        githubAccountId: scopedAccountId,
+        accountLogin: scopedTenant,
+        accountType: "Organization",
+        planId: 101,
+        planName: "Community",
+        planTier: "free",
+        effectiveDate: "2026-09-08T00:00:00.000Z",
+        payload: { action: "cancelled" },
+      });
+      expect(cancelled).toEqual({ outcome: "applied", stateChanged: true, erasureQueued: true });
+      expect(
+        rows(
+          await database().query(
+            "SELECT scope, status FROM erasure_requests WHERE tenant_id=$1 AND requested_by='github_marketplace'",
+            [scopedTenant],
+          ),
+        ),
+      ).toEqual([{ scope: "organization", status: "blocked_by_hold" }]);
+    } finally {
+      await database().query("DELETE FROM erasure_requests WHERE tenant_id=$1", [scopedTenant]);
+      await database().query("DELETE FROM legal_holds WHERE id=$1", [scopedHoldId]);
+      await database().query("DELETE FROM billing_events WHERE tenant_id=$1", [scopedTenant]);
+      await database().query("DELETE FROM github_marketplace_subscriptions WHERE github_account_id=$1", [
+        scopedAccountId,
+      ]);
+    }
+  });
+
   it("uses the current user tenant for personal Marketplace erasure scope and legal holds after a rename", async () => {
     await database().query(
       `INSERT INTO installations (id, github_installation_id, account_login, account_type, plan_tier)

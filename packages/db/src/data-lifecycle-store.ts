@@ -360,6 +360,7 @@ export class DataLifecycleStore {
     scope: string;
     scopeId?: string | null;
   }): Promise<DataExport> {
+    validateLifecycleScope(input.scope, input.scopeId);
     const id = randomUUID();
     const r = (await this.db.query(
       `INSERT INTO data_exports (id, tenant_id, requested_by, status, scope, scope_id, created_at) VALUES ($1,$2,$3,'pending',$4,$5,NOW()) RETURNING *`,
@@ -421,6 +422,7 @@ export class DataLifecycleStore {
             AND active=TRUE
             AND (
               scope='organization'
+              OR $4='organization'
               OR (scope=$4 AND (scope_id=$5 OR ($4='user' AND lower(scope_id)=lower($5)) OR scope_id IS NULL))
             )
           LIMIT 1
@@ -506,7 +508,7 @@ export class DataLifecycleStore {
   async hasActiveHold(tenantId: string, scope: string, scopeId?: string | null): Promise<boolean> {
     validateLifecycleScope(scope, scopeId);
     const r = (await this.db.query(
-      `SELECT 1 FROM legal_holds WHERE lower(tenant_id)=lower($1) AND active=TRUE AND (scope='organization' OR (scope=$2 AND (scope_id=$3 OR ($2='user' AND lower(scope_id)=lower($3)) OR scope_id IS NULL))) LIMIT 1`,
+      `SELECT 1 FROM legal_holds WHERE lower(tenant_id)=lower($1) AND active=TRUE AND (scope='organization' OR $2='organization' OR (scope=$2 AND (scope_id=$3 OR ($2='user' AND lower(scope_id)=lower($3)) OR scope_id IS NULL))) LIMIT 1`,
       [tenantId, scope, scopeId ?? null],
     )) as { rows?: unknown[] };
     return (r.rows?.length ?? 0) > 0;

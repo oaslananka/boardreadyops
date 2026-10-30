@@ -128,7 +128,7 @@ The callback endpoint is:
 POST /api/v1/runs/github-actions-result?run_id=<uuid>&attempt_id=<uuid>
 ```
 
-The endpoint accepts GitHub Actions OIDC only. It resolves the expected repository, numeric repository ID, workflow file, default branch, exact commit SHA, run ID, execution-attempt ID, and immutable trust snapshot from PostgreSQL before verifying the token. It then delegates to the normal result persistence and Check Run publication path.
+The endpoint accepts GitHub Actions OIDC only. It resolves the expected repository, numeric repository ID, workflow file, default branch, exact target commit SHA, run ID, execution-attempt ID, and immutable trust snapshot from PostgreSQL before verifying the token. The target commit SHA is bound in the **OIDC audience**, not by requiring it to equal the JWT `sha` claim: `workflow_dispatch` runs on the persisted default-branch ref, so the GitHub-issued JWT `sha` identifies that workflow ref's commit, which can differ from the separately checked-out target commit. Comparing those two SHAs would reject valid readiness callbacks. The verifier still checks the GitHub-issued workflow/repository/ref/event claims and exact persisted audience. It then delegates to the normal result persistence and Check Run publication path.
 
 ## Two-installation adversarial validation
 
@@ -152,7 +152,7 @@ The shipped workflow:
 8. runs the exact BoardReadyOps Action commit pinned in the reviewed workflow;
 9. uploads JSON, SARIF, and Markdown reports as GitHub Actions artifacts;
 10. maps the JSON report to the version-one cloud result contract; and
-11. obtains an OIDC token with audience `boardreadyops-cloud:<run-id>:<attempt-id>` and retries the callback up to three times.
+11. obtains an OIDC token with audience `boardreadyops-cloud:<run-id>:<attempt-id>:<target-sha>:<trust-mode>:<safe-mode-reasons-or-none>` and retries the callback up to three times. The final field is the canonical comma-separated safe-mode reason list, or `none` when empty; the control plane derives and validates the same audience from the persisted run, current attempt, commit and trust snapshot.
 
 Blocking findings complete the cloud run with decision `fail` and fail the GitHub Actions workflow. Operational errors complete it with decision `error` when a callback can be sent.
 
@@ -196,4 +196,4 @@ For continuous production-path validation across both repository visibility clas
 | Check remains in progress | Workflow stopped before callback or callback exhausted retries |
 | Workflow fails with findings | BoardReadyOps correctly returned a blocking readiness decision |
 
-Do not work around dispatch failures by granting the App Contents write, placing customer source in a central public workflow repository, or enabling a shared VPS worker without an explicit execution-mode decision.
+Do not work around dispatch failures by widening the App beyond the declared `githubAppPermissionProfile`, placing customer source in a central public workflow repository, or enabling a shared VPS worker without an explicit execution-mode decision. The declared Contents write grant supports reviewed setup PRs; it does not repair target workflow dispatch failures.

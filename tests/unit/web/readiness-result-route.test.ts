@@ -237,6 +237,107 @@ describe("readiness result route authentication and publication", () => {
     const [persistenceSql] = query.mock.calls[0] as [string, unknown[]];
     expect(persistenceSql).toContain("effective.trust_mode");
     expect(persistenceSql).toContain("effective.safe_mode_reasons");
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("onboarding.first_useful_finding.published"))).toBe(
+      false,
+    );
+  });
+
+  it("records a first useful finding only after a completed published Check Run", async () => {
+    const events = vi.fn();
+    const queryForFinding = vi
+      .fn(async (sql: string) =>
+        sql.includes("onboarding.first_useful_finding.published")
+          ? { rows: [{ rule_category: "bom", severity: "high", time_to_finding_seconds: 79 }] }
+          : { rows: [] },
+      )
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "run-123",
+            persistence_outcome: "accepted",
+            github_check_run_id: 987,
+            pull_request_number: 42,
+            owner: "octo-org",
+            name: "hardware-board",
+            commit_sha: "a".repeat(40),
+            installation_id: "internal-installation-123",
+            repository_id: "internal-repository-456",
+            github_installation_id: 12345,
+            github_repository_id: 98765,
+          },
+        ],
+      });
+    const response = await handleResultRequest(
+      resultRequest({
+        body: JSON.stringify({
+          status: "completed",
+          conclusion: "failure",
+          decision: "fail",
+          findings: [{ ruleId: "bom.missing-mpn", severity: "high", message: "private part description" }],
+        }),
+      }),
+      { ...dependencies, queryExecutor: () => ({ query: queryForFinding }), emitTelemetry: events },
+    );
+    expect(response.status).toBe(202);
+    expect(completeCheckRun).toHaveBeenCalledOnce();
+    const auditCall = queryForFinding.mock.calls.find(([sql]) =>
+      sql.includes("onboarding.first_useful_finding.published"),
+    );
+    expect(auditCall).toBeDefined();
+    const [auditSql, params] = auditCall as [string, unknown[]];
+    expect(auditSql).toContain("first_useful_finding");
+    expect(auditSql).toContain("github_check_published_at");
+    expect(auditSql).toContain("on conflict (id) do nothing");
+    expect(auditSql).toContain("github_app.installation.enabled");
+    expect(auditSql).toContain("github_app.repository.enabled");
+    expect(auditSql).toContain("commit_sha");
+    expect(params).toEqual(["run-123", "a".repeat(40), 12345, 98765, expect.stringMatching(/^[0-9a-f-]{36}$/u)]);
+    expect(events).toHaveBeenCalledExactlyOnceWith({
+      event: "first_useful_finding_produced",
+      installationId: 12345,
+      repositoryId: 98765,
+      ruleCategory: "bom",
+      severity: "high",
+      timeToFindingSeconds: 79,
+    });
+    expect(JSON.stringify(events.mock.calls)).not.toContain("private part");
+  });
+
+  it("skips first-useful telemetry on replayed audits, missing evidence, and telemetry outage", async () => {
+    const events = vi.fn(() => {
+      throw new Error("metric sink unavailable");
+    });
+    const queryForFinding = vi
+      .fn(async (_sql: string) => ({ rows: [] }))
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "run-123",
+            github_check_run_id: 987,
+            pull_request_number: 42,
+            owner: "octo-org",
+            name: "hardware-board",
+            commit_sha: "a".repeat(40),
+            installation_id: "internal-installation-123",
+            repository_id: "internal-repository-456",
+            github_installation_id: 12345,
+            github_repository_id: 98765,
+          },
+        ],
+      });
+    const response = await handleResultRequest(
+      resultRequest({
+        body: JSON.stringify({
+          status: "completed",
+          conclusion: "failure",
+          decision: "fail",
+          findings: [{ ruleId: "bom.missing-mpn", severity: "high", message: "private" }],
+        }),
+      }),
+      { ...dependencies, queryExecutor: () => ({ query: queryForFinding }), emitTelemetry: events },
+    );
+    expect(response.status).toBe(202);
+    expect(events).not.toHaveBeenCalled();
   });
 
   it("publishes validated hardware impact through both GitHub output surfaces", async () => {

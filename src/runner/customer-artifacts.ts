@@ -3,6 +3,7 @@ import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
+import { assertRunnerWorkspaceDirectories } from "./source.js";
 
 type CustomerRunnerArtifact = {
   kind: string;
@@ -50,7 +51,11 @@ export async function persistCustomerRunnerArtifacts(input: {
   if (input.artifacts.length > 100) throw new Error("too many customer artifacts");
   const root = path.resolve(input.root);
   const workspace = await realpath(input.workspace);
+  // A symlinked ancestor must not redirect the configured retained root before
+  // mkdir can create files outside the operator-selected directory tree.
+  await assertRunnerWorkspaceDirectories(root);
   await mkdir(root, { recursive: true, mode: 0o700 });
+  await assertRunnerWorkspaceDirectories(root);
   await privateDirectory(root);
   const realRoot = await realpath(root);
   if (inside(realRoot, workspace) || inside(workspace, realRoot)) {

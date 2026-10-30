@@ -13,5 +13,5 @@ ALTER TABLE billing_customers
 CREATE INDEX IF NOT EXISTS idx_billing_events_due_stripe
   ON billing_events (available_at, created_at, id)
   WHERE provider='stripe' AND processed_at IS NULL AND dead_letter_at IS NULL;
--- The existing idx_billing_events_pending_stripe_customer (0105) remains
+-- The existing idx_billing_events_pending_stripe_customer (0106) remains
 -- the targeted lookup for reawakening pre-checkout subscription/invoice events.

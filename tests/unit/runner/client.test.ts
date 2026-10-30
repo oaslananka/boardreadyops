@@ -258,6 +258,23 @@ describe("RunnerControlPlaneClient", () => {
     );
   });
 
+  it("rejects a non-regular artifact path before attempting a full-file read", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-not-file-"));
+    roots.push(root);
+    const fetchMock = vi.fn();
+    const client = new RunnerControlPlaneClient({
+      baseUrl: "https://control.example",
+      runnerId,
+      runnerVersion: boardReadyVersion,
+      privateKey: keys.privateKey,
+      fetch: fetchMock as typeof fetch,
+    });
+    await expect(
+      client.uploadArtifact("https://control.example/upload?cap=x", root, 5, "a".repeat(64)),
+    ).rejects.toThrow(/artifact is not a regular file/u);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("does not upload an artifact whose size changed after capability issuance", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-client-"));
     roots.push(root);
@@ -276,6 +293,70 @@ describe("RunnerControlPlaneClient", () => {
       client.uploadArtifact("https://control.example/upload?cap=x", artifact, 5, "a".repeat(64)),
     ).rejects.toThrow(/artifact size changed/u);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("cancels a response declared oversized without consuming its body", async () => {
+    let cancelled = false;
+    let chunksDelivered = 0;
+    const responseStream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        chunksDelivered += 1;
+        controller.enqueue(new Uint8Array(128));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const client = new RunnerControlPlaneClient({
+      baseUrl: "https://control.example",
+      runnerId,
+      runnerVersion: boardReadyVersion,
+      privateKey: keys.privateKey,
+      fetch: vi.fn(
+        async () =>
+          new Response(responseStream, {
+            headers: { "content-length": String(2 * 1024 * 1024) },
+          }),
+      ) as typeof fetch,
+    });
+
+    await expect(
+      client.claim({ protocolVersion: 1, workerClass: "self_hosted", capabilities: [], labels: [] }),
+    ).rejects.toThrow(/maximum permitted size/u);
+    expect(cancelled).toBe(true);
+    expect(chunksDelivered).toBeLessThan(2);
+  });
+
+  it("stops reading an oversized undeclared response before buffering the entire stream", async () => {
+    let chunksRead = 0;
+    let streamCancelled = false;
+    const totalChunks = 16;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (chunksRead === totalChunks) {
+          controller.close();
+          return;
+        }
+        chunksRead += 1;
+        controller.enqueue(new Uint8Array(128 * 1024));
+      },
+      cancel() {
+        streamCancelled = true;
+      },
+    });
+    const client = new RunnerControlPlaneClient({
+      baseUrl: "https://control.example",
+      runnerId,
+      runnerVersion: boardReadyVersion,
+      privateKey: keys.privateKey,
+      fetch: vi.fn(async () => new Response(stream, { status: 200 })) as typeof fetch,
+    });
+
+    await expect(
+      client.claim({ protocolVersion: 1, workerClass: "self_hosted", capabilities: [], labels: [] }),
+    ).rejects.toThrow(/maximum permitted size/u);
+    expect(chunksRead).toBeLessThan(totalChunks);
+    expect(streamCancelled).toBe(true);
   });
 
   it("returns bounded HTTP failure metadata without exposing it through the message", async () => {

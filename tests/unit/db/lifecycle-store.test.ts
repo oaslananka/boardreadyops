@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createSqlGitHubAppMetadataStore,
   lifecycleAuditEventForAction,
@@ -355,6 +355,78 @@ describe("SQL GitHub lifecycle audit writes", () => {
     ]);
   });
 
+  it("emits T0 only once when the trusted installation.created audit is newly persisted", async () => {
+    const metric = vi.fn();
+    const database = vi.fn(async (_sql: string, _params?: readonly unknown[]) => ({
+      rows: [{ id: "existing-installation", installation_audit_created: true }],
+    }));
+    const store = createSqlGitHubAppMetadataStore({ query: database }, { emitTelemetry: metric });
+    const createdAction = { type: "installation.upsert" as const, installation };
+    const createdContext = {
+      deliveryId: "delivery-created",
+      eventType: "installation",
+      eventAction: "created",
+    };
+
+    await store.upsertInstallation(createdAction, createdContext);
+    expect(metric).toHaveBeenCalledExactlyOnceWith({
+      event: "app_installed",
+      installationId: 12345,
+      accountType: "Organization",
+    });
+    expect(database.mock.calls[0]?.[0]).toContain("returning id");
+    expect(database.mock.calls[0]?.[0]).toContain("installation_audit_created");
+    expect(JSON.stringify(metric.mock.calls)).not.toContain("octo-org");
+
+    database.mockResolvedValue({ rows: [{ id: "existing-installation", installation_audit_created: false }] });
+    await store.upsertInstallation(createdAction, createdContext);
+    await store.upsertInstallation(createdAction, {
+      deliveryId: "other-delivery",
+      eventType: "installation",
+      eventAction: "new_permissions_accepted",
+    });
+    expect(metric).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not emit installation metrics for a failed DB write or non-created event", async () => {
+    const metric = vi.fn();
+    const database = vi.fn(async () => ({ rows: [] }));
+    const store = createSqlGitHubAppMetadataStore({ query: database }, { emitTelemetry: metric });
+
+    await store.upsertInstallation(
+      { type: "installation.upsert", installation },
+      { deliveryId: "delivery-created", eventType: "installation", eventAction: "created" },
+    );
+    expect(metric).not.toHaveBeenCalled();
+
+    database.mockRejectedValue(new Error("DB write failed"));
+    await expect(
+      store.upsertInstallation(
+        { type: "installation.upsert", installation },
+        { deliveryId: "delivery-failed", eventType: "installation", eventAction: "created" },
+      ),
+    ).rejects.toThrow("DB write failed");
+    expect(metric).not.toHaveBeenCalled();
+  });
+
+  it("keeps persisted installation creation successful when the metric sink is down", async () => {
+    const database = vi.fn(async () => ({ rows: [{ id: "persisted", installation_audit_created: true }] }));
+    const store = createSqlGitHubAppMetadataStore(
+      { query: database },
+      {
+        emitTelemetry() {
+          throw new Error("telemetry is down");
+        },
+      },
+    );
+    await expect(
+      store.upsertInstallation(
+        { type: "installation.upsert", installation },
+        { deliveryId: "delivery-created", eventType: "installation", eventAction: "created" },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
   it("persists guarded installation suspension transitions and audit events atomically", async () => {
     const { calls, executor } = recordingExecutor();
     const store = createSqlGitHubAppMetadataStore(executor, {
@@ -490,6 +562,7 @@ describe("SQL GitHub lifecycle audit writes", () => {
     expect(sql).toContain("'pending'");
     expect(sql).toContain("from erasure_scope");
     expect(sql).toContain("lower(erasure_scope.tenant_id) = lower(legal_holds.tenant_id)");
+    expect(sql).toContain("erasure_scope.scope = 'organization'");
     expect(sql).toContain(
       "erasure_scope.scope = 'user' and lower(legal_holds.scope_id) = lower(erasure_scope.scope_id)",
     );

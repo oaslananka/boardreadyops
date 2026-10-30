@@ -103,13 +103,14 @@ then re-enable only that single row within a controlled transaction. Never
 blindly replay large batches or manually change customer entitlements. Keep the
 audit trail of the original event and incident outside the public issue/PR.
 
-**Deployment HOLD:** Stripe migration 0106 depends on 0105. The previously
-separate durable-unlink barrier from PR #1080 was merged into `main` as
-migration 0104 on 2026-10-28. The still-unmerged Stripe migrations are therefore
-new additive 0105–0106, following the existing main history. Their isolated
-PostgreSQL migration and worker tests are not permission to combine production
-rollouts, nor evidence that every old physical-unlink worker has been retired.
-The durable-unlink release requires its own verified operator safety and
+**Deployment HOLD:** Stripe migration 0107 depends on Stripe index migration 0106.
+The durable-unlink barrier was merged earlier as migration 0104, and the
+installation-bound export preparation foundation now owns migration 0105 in
+protected `main`. The unmerged Stripe migrations therefore occupy the new
+additive 0106–0107 slots, without modifying either already-merged migration.
+Isolated PostgreSQL migration and worker tests are not permission to combine
+production rollouts or proof that all older physical-unlink workers are retired.
+The durable-unlink release requires independently verified operator safety and
 quiescence acceptance.
 Stop all legacy inline entitlement-mutating webhook instances before enabling
 the new Stripe worker; a mixed-version rollout bypasses its transactional

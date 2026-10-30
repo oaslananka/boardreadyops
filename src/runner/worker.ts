@@ -1,4 +1,4 @@
-import { lstat, readdir, rm } from "node:fs/promises";
+import { lstat, readdir, realpath, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -263,7 +263,7 @@ export async function runRunnerWorkerOnce(
     // Without a valid result report, even a zero exit code cannot authorize
     // uploading generated artifacts or publishing a successful release verdict.
     const uploadedArtifacts = execution.report
-      ? await resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat)
+      ? await resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat, workspace)
       : [];
 
     heartbeat.setStage("reporting");
@@ -327,6 +327,7 @@ async function resolveExecutionArtifacts(
   execution: RunnerExecutionOutput,
   artifactMode: RunnerArtifactMode,
   heartbeat: ReturnType<typeof createHeartbeatController>,
+  workspace: string,
 ): Promise<ReleaseRunResult["artifacts"]> {
   if (job.safeMode.enabled || artifactMode !== "control-plane") {
     if (execution.artifacts.length > 0) {
@@ -343,7 +344,7 @@ async function resolveExecutionArtifacts(
 
   heartbeat.setStage("uploading_artifacts");
   await heartbeat.pulse();
-  const uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts);
+  const uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts, workspace);
   heartbeat.assertLeaseActive();
   return uploadedArtifacts;
 }
@@ -468,15 +469,34 @@ async function publishArtifacts(
   client: RunnerWorkerClient,
   job: RunnerClaimedJob,
   artifacts: readonly RunnerExecutionArtifact[],
+  workspace: string,
 ): Promise<ReleaseRunResult["artifacts"]> {
   if (artifacts.length === 0) return [];
+  // Pipeline output is not an authorization to upload arbitrary local files.
+  // Resolve and verify every artifact before requesting any upload capability.
+  const workspacePath = await realpath(workspace);
+  const validatedArtifacts = await Promise.all(
+    artifacts.map(async (artifact) => {
+      await assertRunnerWorkspaceDirectories(path.dirname(path.resolve(artifact.filePath)));
+      const actualPath = await realpath(artifact.filePath);
+      const relative = path.relative(workspacePath, actualPath);
+      if (relative === "" || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        throw new Error("runner cloud artifact escaped the source workspace");
+      }
+      const info = await lstat(artifact.filePath);
+      if (!info.isFile() || info.isSymbolicLink()) {
+        throw new Error("runner cloud artifact is not a regular non-symlink file");
+      }
+      return { ...artifact, filePath: actualPath };
+    }),
+  );
   const request: RunnerArtifactCapabilityRequest = {
     protocolVersion: 1,
     runId: job.runId,
     executionAttemptId: job.executionAttemptId,
     leaseId: job.leaseId,
     leaseToken: job.leaseToken,
-    artifacts: artifacts.map((artifact) => ({
+    artifacts: validatedArtifacts.map((artifact) => ({
       kind: artifact.kind,
       name: artifact.name,
       role: artifact.role,
@@ -490,7 +510,7 @@ async function publishArtifacts(
     throw new Error("artifact capability response did not match the artifact declaration count");
   }
   const published: ReleaseRunResult["artifacts"] = [];
-  for (const [index, artifact] of artifacts.entries()) {
+  for (const [index, artifact] of validatedArtifacts.entries()) {
     const capability = capabilities.uploads[index];
     if (capability?.maximumBytes !== artifact.bytes) {
       throw new Error("artifact capability did not match the declared artifact size");

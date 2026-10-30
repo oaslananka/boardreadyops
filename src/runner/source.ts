@@ -30,7 +30,7 @@ export async function checkoutRunnerSource(options: CheckoutRunnerSourceOptions)
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
   // Validate the mirror locator before creating a checkout workspace.
-  const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
+  const repository = await repositoryRemote(options.job, options.repositoryMirrorRoot);
   const workspaceRoot = path.resolve(options.workspaceRoot);
   // Do not follow customer-controlled symlinks when preparing a source directory.
   // Check both before mkdir (which could otherwise create outside the intended
@@ -167,7 +167,7 @@ async function executeRunnerCommand(
   });
 }
 
-function repositoryRemote(job: RunnerClaimedJob, repositoryMirrorRoot: string | undefined): string {
+async function repositoryRemote(job: RunnerClaimedJob, repositoryMirrorRoot: string | undefined): Promise<string> {
   if (!repositoryMirrorRoot) {
     return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
   }
@@ -176,6 +176,9 @@ function repositoryRemote(job: RunnerClaimedJob, repositoryMirrorRoot: string | 
   if (candidate !== root && !candidate.startsWith(`${root}${path.sep}`)) {
     throw new Error("repository mirror path escaped the configured mirror root");
   }
+  // The lexical mirror-root check alone does not prevent redirects through
+  // symlinks in existing owner or repository components.
+  await assertRunnerWorkspaceDirectories(candidate);
   return candidate;
 }
 
