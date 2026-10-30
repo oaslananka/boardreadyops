@@ -62,6 +62,32 @@ describe("installation-bound export preparation contract", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects malformed staged identities before reading or writing a package", async () => {
+    const { store, query } = fixture();
+    const input = { exportId: "e", tenantId, installationId, workerId, token };
+    await expect(store.stageClaimedManifest({ ...input, token: " " })).rejects.toThrow(ExportPreparationInputError);
+    await expect(store.readStagedManifest({ ...input, workerId: "worker spaces" })).rejects.toThrow(
+      ExportPreparationInputError,
+    );
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("verifies stored bytes against their digest, refusing corrupted output", async () => {
+    const bytes = Buffer.from('{"kind":"boardreadyops.repository-metadata-export"}', "utf8");
+    const { store, query } = fixture([{ prepared_manifest_bytes: bytes, prepared_manifest_sha256: "0".repeat(64) }]);
+    await expect(
+      store.readStagedManifest({
+        exportId: "e",
+        tenantId,
+        installationId,
+        workerId,
+        token,
+      }),
+    ).rejects.toThrow("Persisted export manifest failed integrity verification");
+    expect(query.mock.calls[0]?.[0]).toContain("preparation_lease_until > NOW()");
+    expect(query.mock.calls[0]?.[0]).toContain("installations.suspended_at IS NULL");
+  });
+
   it("rejects invalid worker or installation before claiming a lease", async () => {
     const { store, query } = fixture();
     for (const input of [

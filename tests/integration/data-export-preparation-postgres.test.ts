@@ -233,6 +233,90 @@ describeDatabase("installation-bound read-only export preparation claims (Postgr
     ).toBe(false);
   });
 
+  it("persists a bounded manifest under its original unexpired lease without completing or publishing it", async () => {
+    const id = await store().createBoundPendingExport({
+      tenantId: tenant,
+      installationId: installations[1],
+      requestedBy: "operator",
+      scope: "repository",
+      scopeId: repositories[1],
+    });
+    expect(id).toBeTruthy();
+    if (!id) throw new Error("expected installation-bound export");
+    exported.push(id);
+    const claim = await store().claimNext({ installationId: installations[1], workerId: "stage-worker" });
+    expect(claim).toMatchObject({ exportId: id, tenantId: tenant, scope: "repository" });
+    if (!claim) throw new Error("expected lease");
+    const input = {
+      exportId: claim.exportId,
+      tenantId: claim.tenantId,
+      installationId: claim.installationId,
+      workerId: claim.workerId,
+      token: claim.token,
+    };
+    const prepared = await store().stageClaimedManifest(input);
+    expect(prepared?.sha256).toMatch(/^[a-f0-9]{64}$/u);
+    expect(prepared?.byteLength).toBeGreaterThan(0);
+    const read = await otherStore().readStagedManifest(input);
+    expect(read?.bytes.byteLength).toBe(prepared?.byteLength);
+    expect(read?.sha256).toBe(prepared?.sha256);
+    expect(JSON.parse(read?.bytes.toString("utf8") ?? "{}")).toMatchObject({
+      formatVersion: 1,
+      kind: "boardreadyops.repository-metadata-export",
+      exportId: id,
+      tenantId: tenant,
+      scope: "repository",
+      scopeId: repositories[1],
+    });
+    const persisted = await db().query(
+      "SELECT status,prepared_manifest_bytes,prepared_manifest_sha256,download_url,completed_at FROM data_exports WHERE id=$1",
+      [id],
+    );
+    const record = (
+      persisted as {
+        rows: Array<{
+          status: string;
+          prepared_manifest_bytes: Buffer;
+          prepared_manifest_sha256: string;
+          download_url: string | null;
+          completed_at: Date | null;
+        }>;
+      }
+    ).rows[0];
+    expect(record).toMatchObject({ status: "running", download_url: null, completed_at: null });
+    expect(record?.prepared_manifest_bytes.equals(read?.bytes ?? Buffer.alloc(0))).toBe(true);
+    expect(record?.prepared_manifest_sha256).toBe(read?.sha256);
+    // The DB itself rejects inconsistent metadata and over-limit package bytes.
+    await expect(
+      db().query("UPDATE data_exports SET prepared_manifest_sha256=NULL WHERE id=$1", [id]),
+    ).rejects.toMatchObject({ code: "23514" });
+    await expect(
+      db().query("UPDATE data_exports SET prepared_manifest_bytes=$2 WHERE id=$1", [id, Buffer.alloc(65537)]),
+    ).rejects.toMatchObject({ code: "23514" });
+    // A syntactically valid but corrupted checksum must fail readback as well.
+    await db().query("UPDATE data_exports SET prepared_manifest_sha256=$2 WHERE id=$1", [id, "0".repeat(64)]);
+    await expect(otherStore().readStagedManifest(input)).rejects.toThrow(
+      "Persisted export manifest failed integrity verification",
+    );
+    await db().query("UPDATE data_exports SET prepared_manifest_sha256=$2 WHERE id=$1", [id, prepared?.sha256]);
+    expect((await otherStore().readStagedManifest(input))?.sha256).toBe(prepared?.sha256);
+    expect(await store().stageClaimedManifest(input)).toBeNull();
+    expect(await store().releaseReadOnlyClaim(input)).toBe(false);
+    expect(await store().readStagedManifest({ ...input, token: "stolen-claim" })).toBeNull();
+    expect(await otherStore().readStagedManifest({ ...input, installationId: installations[0] })).toBeNull();
+    await db().query("UPDATE installations SET suspended_at=NOW() WHERE id=$1", [installations[1]]);
+    expect(await otherStore().readStagedManifest(input)).toBeNull();
+    expect(await store().stageClaimedManifest(input)).toBeNull();
+    await db().query("UPDATE installations SET suspended_at=NULL WHERE id=$1", [installations[1]]);
+    await db().query("UPDATE data_exports SET preparation_lease_until=NOW()-interval '1 second' WHERE id=$1", [id]);
+    expect(await otherStore().readStagedManifest(input)).toBeNull();
+    expect(await store().releaseReadOnlyClaim(input)).toBe(false);
+    const after = await db().query("SELECT status,prepared_manifest_bytes FROM data_exports WHERE id=$1", [id]);
+    expect((after as { rows: Array<{ status: string; prepared_manifest_bytes: Buffer }> }).rows[0]).toMatchObject({
+      status: "running",
+    });
+  });
+
   it("refuses new reservations after suspension without erasing prior requests", async () => {
     await db().query("UPDATE installations SET suspended_at=NOW() WHERE id=$1", [installations[1]]);
     expect(

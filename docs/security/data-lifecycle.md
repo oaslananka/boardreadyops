@@ -154,6 +154,17 @@ installations is also separate and must not reactivate access.
 These are intake and status endpoints, not export materialization or deletion
 executors.
 
+An **operator-only, unexposed preparation stage** can now persist a verified,
+allowlisted, repository-metadata manifest of at most 64 KiB in the existing
+PostgreSQL export row while a valid installation-bound preparation lease is
+held. It verifies the stored SHA-256 by reading the persisted bytes back under
+the same live lease. The export **remains running**, not completed; no
+customer download URL, delivery capability, auto worker or data deletion is
+created. Staged or expired claims are not automatically released or reclaimed;
+manual audited recovery and explicit deliverability/expiration validation
+are prerequisites for any future customer-facing export feature.
+
+
 Installations are the top-level tenant boundary. Repository, run, artifact, runner,
 replay, reconciliation, transition, and deletion records are validated against
 that boundary by foreign keys and scope-validation functions. Operational database
