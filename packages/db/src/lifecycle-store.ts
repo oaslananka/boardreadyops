@@ -364,6 +364,7 @@ export function createSqlGitHubAppMetadataStore(
             where legal_holds.active = true
               and (
                 legal_holds.scope = 'organization'
+                or erasure_scope.scope = 'organization'
                 or (
                   legal_holds.scope = erasure_scope.scope
                   and (legal_holds.scope_id = erasure_scope.scope_id

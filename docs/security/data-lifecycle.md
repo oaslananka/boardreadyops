@@ -123,7 +123,9 @@ This is an intake contract, not automatic purge. Export request intake is automa
 
 **An organization-wide erasure request overlaps every active legal hold within
 its tenant**, including repository- and user-scoped holds. The request is recorded
-as `blocked_by_hold` even if no organization-scoped hold exists. A narrower
+as `blocked_by_hold` even if no organization-scoped hold exists. This applies to
+manual intake, GitHub App uninstall, and GitHub Marketplace cancellation.
+A narrower
 repository or user erasure request still checks organization holds and holds
 matching that narrower scope; another tenant's holds cannot block it. These are
 intake-time safeguards, not a completed erasure executor. Any future executor

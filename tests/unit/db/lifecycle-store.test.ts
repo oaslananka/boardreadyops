@@ -490,6 +490,7 @@ describe("SQL GitHub lifecycle audit writes", () => {
     expect(sql).toContain("'pending'");
     expect(sql).toContain("from erasure_scope");
     expect(sql).toContain("lower(erasure_scope.tenant_id) = lower(legal_holds.tenant_id)");
+    expect(sql).toContain("erasure_scope.scope = 'organization'");
     expect(sql).toContain(
       "erasure_scope.scope = 'user' and lower(legal_holds.scope_id) = lower(erasure_scope.scope_id)",
     );
