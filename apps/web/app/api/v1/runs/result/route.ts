@@ -337,27 +337,7 @@ function validGitHubNumericId(value: NumberLikeCell): number | undefined {
   return Number.isSafeInteger(number) && number !== undefined && number > 0 ? number : undefined;
 }
 
-/** The result and Check Run publication have already committed. Failure to record a
- * measurement must never reclassify successful GitHub publication as a failure. */
-async function recordFirstUsefulFinding(
-  executor: ResultQueryExecutor,
-  dependencies: ResultRouteDependencies,
-  input: ParsedResultRequest,
-  row: QueryRow,
-): Promise<void> {
-  if (!input.result.findings.some((finding) => ["critical", "error", "high", "medium"].includes(finding.severity))) {
-    return;
-  }
-  const installationId = stringCell(row, "installation_id");
-  const repositoryId = stringCell(row, "repository_id");
-  const commitSha = stringCell(row, "commit_sha");
-  const githubInstallationId = validGitHubNumericId(numberLikeCell(row, "github_installation_id"));
-  const githubRepositoryId = validGitHubNumericId(numberLikeCell(row, "github_repository_id"));
-  if (!installationId || !repositoryId || !commitSha || !githubInstallationId || !githubRepositoryId) return;
-
-  try {
-    const recorded = await executor.query(
-      `with authorized_run as materialized (
+const FIRST_USEFUL_FINDING_AUDIT_SQL = `with authorized_run as materialized (
          select run.id, run.commit_sha, run.github_check_run_id,
                 repo.id as repository_id, repo.installation_id
            from release_runs as run
@@ -425,15 +405,34 @@ async function recordFirstUsefulFinding(
        select metadata->>'ruleCategory' as rule_category,
               metadata->>'severity' as severity,
               (metadata->>'timeToFindingSeconds')::integer as time_to_finding_seconds
-         from recorded`,
-      [
-        input.runId,
-        commitSha,
-        githubInstallationId,
-        githubRepositoryId,
-        firstUsefulFindingAuditId(installationId, repositoryId),
-      ],
-    );
+         from recorded`;
+
+/** The result and Check Run publication have already committed. Failure to record a
+ * measurement must never reclassify successful GitHub publication as a failure. */
+async function recordFirstUsefulFinding(
+  executor: ResultQueryExecutor,
+  dependencies: ResultRouteDependencies,
+  input: ParsedResultRequest,
+  row: QueryRow,
+): Promise<void> {
+  if (!input.result.findings.some((finding) => ["critical", "error", "high", "medium"].includes(finding.severity))) {
+    return;
+  }
+  const installationId = stringCell(row, "installation_id");
+  const repositoryId = stringCell(row, "repository_id");
+  const commitSha = stringCell(row, "commit_sha");
+  const githubInstallationId = validGitHubNumericId(numberLikeCell(row, "github_installation_id"));
+  const githubRepositoryId = validGitHubNumericId(numberLikeCell(row, "github_repository_id"));
+  if (!installationId || !repositoryId || !commitSha || !githubInstallationId || !githubRepositoryId) return;
+
+  try {
+    const recorded = await executor.query(FIRST_USEFUL_FINDING_AUDIT_SQL, [
+      input.runId,
+      commitSha,
+      githubInstallationId,
+      githubRepositoryId,
+      firstUsefulFindingAuditId(installationId, repositoryId),
+    ]);
     const recordedEvent = rows(recorded)[0];
     const ruleCategory = stringCell(recordedEvent ?? {}, "rule_category");
     const severity = stringCell(recordedEvent ?? {}, "severity");
