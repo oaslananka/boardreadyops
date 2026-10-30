@@ -39,6 +39,83 @@ const review = {
 };
 
 describe("Review finding filter and canvas selection", () => {
+  it("keeps a grouped native KiCad marker highlighted while cycling distinct findings", async () => {
+    const secondary = {
+      ...blocker,
+      fingerprint: `${blocker.fingerprint}-same-object`,
+      message: "Another violation on the same KiCad object",
+    };
+    const sourceUuid = "bf7f5122-bc89-413e-aa3e-f19064ff92f7";
+    const anchors = [blocker, secondary].map((finding, index) => ({
+      id: `sw2-${index}`,
+      kind: "finding" as const,
+      targetRef: "SW2",
+      x: 0.4,
+      y: 0.6,
+      layer: "F.Cu",
+      metadata: {
+        fingerprint: finding.fingerprint,
+        sourceUuid,
+        provenance: "kicad-json-object-position",
+        ruleId: finding.ruleId,
+        message: finding.message,
+        severity: finding.severity,
+      },
+    }));
+    const sourceSnapshot = review.headSnapshots[0];
+    if (!sourceSnapshot) throw new Error("Review source snapshot missing");
+    const sourceReview = {
+      ...review,
+      findings: [blocker, secondary],
+      headSnapshots: [
+        {
+          ...sourceSnapshot,
+          name: "kicad_native_board.svg",
+          anchors,
+        },
+      ],
+    };
+    const previousWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    const previousHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+    const previousResizeObserver = globalThis.ResizeObserver;
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 420 });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 320 });
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    try {
+      await act(async () => root.render(createElement(ReviewDesignWorkspace, { review: sourceReview })));
+      const marker = container.querySelector('button[aria-label*="source findings; click to cycle"]');
+      expect(marker).not.toBeNull();
+      expect(marker?.className).toContain("ring-2 ring-primary");
+      await act(async () => (marker as HTMLButtonElement).click());
+      expect(container.querySelector('aside[aria-label="Selected finding inspector"]')?.textContent).toContain(
+        secondary.message,
+      );
+      expect(marker?.className).toContain("ring-2 ring-primary");
+      await act(async () => (marker as HTMLButtonElement).click());
+      expect(container.querySelector('aside[aria-label="Selected finding inspector"]')?.textContent).toContain(
+        blocker.message,
+      );
+      expect(marker?.className).toContain("ring-2 ring-primary");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      if (previousWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", previousWidth);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientWidth;
+      if (previousHeight) Object.defineProperty(HTMLElement.prototype, "clientHeight", previousHeight);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
+      globalThis.ResizeObserver = previousResizeObserver;
+      delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+    }
+  });
+
   it("reveals a selected canvas finding nested in a collapsed finding group", async () => {
     const repeats = [
       blocker,
