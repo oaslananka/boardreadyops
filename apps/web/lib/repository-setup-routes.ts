@@ -11,6 +11,7 @@ import {
   repositorySetupPresets,
   repositorySetupPresetVersion,
 } from "@boardreadyops/cloud-core/repository-setup";
+import { emitTelemetryEvent, type TelemetryEvent } from "@boardreadyops/cloud-core/telemetry";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import {
@@ -35,6 +36,7 @@ export type RepositorySetupRouteDependencies = {
   githubClient(): RepositorySetupGitHubClient;
   mutationService?(githubInstallationId: number): GitHubMutationService;
   now(): Date;
+  emitTelemetry?(event: TelemetryEvent): void;
 };
 
 function createRepositorySetupRouteDependencies(
@@ -448,6 +450,7 @@ async function createSetupPr(
     return controlPlaneJsonError("GitHub mutation service is not configured", 503);
   }
 
+  const startedAt = performance.now();
   try {
     const result = await mutationService.execute({
       installationId: context.githubInstallationId,
@@ -476,6 +479,21 @@ async function createSetupPr(
       configStatus: "unknown",
       diagnostics: [`Setup PR #${result.pullRequestNumber} (${result.outcome}): ${result.pullRequestUrl}`],
     });
+
+    // Report only a *new* PR with an accepted setup revision. Replays and failed writes
+    // are not activations; this elapsed time is setup-PR latency, NOT end-to-end TTFUF.
+    if (result.outcome === "created" && setupRevision.outcome === "applied") {
+      try {
+        (dependencies.emitTelemetry ?? emitTelemetryEvent)({
+          event: "setup_pr_opened",
+          installationId: context.githubInstallationId,
+          repositoryId: context.githubRepositoryId,
+          latencyMs: Math.max(0, performance.now() - startedAt),
+        });
+      } catch {
+        // A telemetry outage must not turn a successfully created PR into a failed request.
+      }
+    }
 
     return controlPlaneJsonResponse(
       {
