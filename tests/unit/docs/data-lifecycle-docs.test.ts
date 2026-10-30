@@ -50,6 +50,8 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("repository authorization");
     expect(lifecycle).toContain("Complete erasure execution remains an operator workflow");
     expect(lifecycle).toContain("organization, repository, and user erasure **request intake** exists");
+    expect(lifecycle).toContain("server resolves that GitHub App installation");
+    expect(lifecycle).toContain("The persisted tenant is the resolved installation");
     expect(lifecycle).toContain("GitHub App uninstall immediately suspends the persisted installation");
     expect(lifecycle).toContain("revokes its repository API tokens");
     expect(lifecycle).toContain("at most one active `github_app_uninstall` erasure request");

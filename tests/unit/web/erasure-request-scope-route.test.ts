@@ -16,6 +16,7 @@ vi.mock("@boardreadyops/db/pg-executor", () => ({
 }));
 vi.mock("../../../apps/web/lib/settings-tenant.js", () => ({ resolveSettingsTenantScope: resolveTenant }));
 
+import { GET as getExport } from "../../../apps/web/app/api/v1/data-exports/[exportId]/route.js";
 import { POST as postExport } from "../../../apps/web/app/api/v1/data-exports/route.js";
 import { POST } from "../../../apps/web/app/api/v1/erasure-requests/route.js";
 
@@ -23,7 +24,7 @@ function request(payload: unknown): Request {
   return new Request("https://boardreadyops.test/api/v1/erasure-requests", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ installationId: "inst-a", ...(payload as Record<string, unknown>) }),
   });
 }
 
@@ -34,6 +35,10 @@ describe("erasure request scope boundary", () => {
       session: { userId: 42, login: "acme", installationIds: [10] },
     });
     persistence.mockReturnValue({ mode: "memory" });
+    resolveTenant.mockResolvedValue({
+      selected: { id: "inst-a", accountLogin: "organization-a" },
+      installations: [{ id: "inst-a", accountLogin: "organization-a" }],
+    });
   });
 
   it("rejects missing, blank and noncanonical scoped IDs before selecting any database", async () => {
@@ -89,8 +94,8 @@ describe("shared lifecycle request transport boundary", () => {
     });
     persistence.mockReturnValue({ mode: "memory" });
     resolveTenant.mockResolvedValue({
-      selected: { id: "inst-a", accountLogin: "acme" },
-      installations: [{ id: "inst-a", accountLogin: "acme" }],
+      selected: { id: "inst-a", accountLogin: "organization-a" },
+      installations: [{ id: "inst-a", accountLogin: "organization-a" }],
     });
   });
 
@@ -123,8 +128,8 @@ describe("shared lifecycle request transport boundary", () => {
     expect(await erasureResponse.json()).toMatchObject({ ok: true, erasure: { id: "record-1", status: "pending" } });
     expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls.map(([, values]) => values.slice(1, 5))).toEqual([
-      ["acme", "acme", "organization", null],
-      ["acme", "acme", "organization", null],
+      ["organization-a", "acme", "organization", null],
+      ["organization-a", "acme", "organization", null],
     ]);
     expect(close).toHaveBeenCalledTimes(2);
   });
@@ -135,7 +140,7 @@ describe("shared lifecycle request transport boundary", () => {
       rows: [
         {
           id: "erasure-1",
-          tenant_id: "acme",
+          tenant_id: "organization-a",
           requested_by: "acme",
           scope: "organization",
           scope_id: null,
@@ -207,6 +212,10 @@ describe("export request scope boundary", () => {
       session: { userId: 42, login: "acme", installationIds: [10] },
     });
     persistence.mockReturnValue({ mode: "memory" });
+    resolveTenant.mockResolvedValue({
+      selected: { id: "inst-a", accountLogin: "organization-a" },
+      installations: [{ id: "inst-a", accountLogin: "organization-a" }],
+    });
   });
 
   it("rejects invalid scopes before selecting a database", async () => {
@@ -241,5 +250,116 @@ describe("export request scope boundary", () => {
     viewerAuthorization.mockResolvedValueOnce({ session: undefined });
     expect((await postExport(request({ scope: "organization" }))).status).toBe(401);
     expect(createPgQueryExecutor).not.toHaveBeenCalled();
+  });
+});
+
+describe("tenant-authorized lifecycle routes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    viewerAuthorization.mockResolvedValue({
+      session: { userId: 42, login: "human-operator", installationIds: [10] },
+    });
+    resolveTenant.mockResolvedValue({
+      selected: { id: "inst-a", accountLogin: "organization-a" },
+      installations: [{ id: "inst-a", accountLogin: "organization-a" }],
+    });
+    persistence.mockReturnValue({ mode: "postgres", databaseUrl: "postgres://disposable.invalid/test" });
+  });
+
+  it("requires an installation identifier on both write APIs before database access", async () => {
+    for (const post of [POST, postExport]) {
+      const response = await post(
+        new Request("https://boardreadyops.test/api/v1/lifecycle", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ scope: "organization" }),
+        }),
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+    }
+    expect(resolveTenant).not.toHaveBeenCalled();
+    expect(createPgQueryExecutor).not.toHaveBeenCalled();
+  });
+
+  it("refuses other installations for both writes without executing SQL", async () => {
+    resolveTenant.mockResolvedValue({ selected: undefined, installations: [] });
+    for (const post of [POST, postExport]) {
+      const response = await post(request({ scope: "organization", installationId: "foreign-installation" }));
+      expect(response.status).toBe(403);
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+    }
+    expect(createPgQueryExecutor).not.toHaveBeenCalled();
+  });
+
+  it("uses authorized installation tenant for persisted export and erasure, never the human login", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: "request-a",
+          tenant_id: "organization-a",
+          requested_by: "human-operator",
+          scope: "organization",
+          scope_id: null,
+          status: "pending",
+          dry_run: false,
+          download_url: null,
+          created_at: new Date("2026-10-30T00:00:00.000Z"),
+        },
+      ],
+    });
+    const close = vi.fn().mockResolvedValue(undefined);
+    createPgQueryExecutor.mockReturnValue({ query, close });
+    expect((await postExport(request({ scope: "organization" }))).status).toBe(201);
+    expect((await POST(request({ scope: "organization" }))).status).toBe(201);
+    expect(query).toHaveBeenCalledTimes(2);
+    for (const [, values] of query.mock.calls) {
+      expect(values).toEqual(expect.arrayContaining(["organization-a", "human-operator"]));
+    }
+    expect(close).toHaveBeenCalledTimes(2);
+    expect(resolveTenant).toHaveBeenCalledWith(expect.objectContaining({ login: "human-operator" }), "inst-a");
+  });
+
+  it("GET export metadata rejects missing or foreign installation and reads the authorized tenant", async () => {
+    const context = { params: Promise.resolve({ exportId: "ex-1" }) };
+    const noInstallation = await getExport(new Request("https://boardreadyops.test/api/v1/data-exports/ex-1"), context);
+    expect(noInstallation.status).toBe(400);
+    const noncanonical = await getExport(
+      new Request("https://boardreadyops.test/api/v1/data-exports/ex-1?installationId=%20inst-a%20"),
+      context,
+    );
+    expect(noncanonical.status).toBe(400);
+
+    resolveTenant.mockResolvedValueOnce({ selected: undefined, installations: [] });
+    const denied = await getExport(
+      new Request("https://boardreadyops.test/api/v1/data-exports/ex-1?installationId=other"),
+      context,
+    );
+    expect(denied.status).toBe(403);
+    expect(createPgQueryExecutor).not.toHaveBeenCalled();
+
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: "ex-1",
+          tenant_id: "organization-a",
+          requested_by: "human-operator",
+          status: "pending",
+          scope: "organization",
+          scope_id: null,
+          created_at: new Date("2026-10-30T00:00:00.000Z"),
+        },
+      ],
+    });
+    createPgQueryExecutor.mockReturnValue({ query, close: vi.fn().mockResolvedValue(undefined) });
+    const response = await getExport(
+      new Request("https://boardreadyops.test/api/v1/data-exports/ex-1?installationId=inst-a"),
+      context,
+    );
+    expect(response.status).toBe(200);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("SELECT * FROM data_exports"), [
+      "ex-1",
+      "organization-a",
+    ]);
   });
 });

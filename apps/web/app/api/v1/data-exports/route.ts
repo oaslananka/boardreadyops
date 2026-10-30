@@ -8,6 +8,11 @@ export const runtime = "nodejs";
 
 const createExportSchema = z
   .object({
+    installationId: z
+      .string()
+      .min(1)
+      .max(128)
+      .refine((id) => id === id.trim(), "Canonical installation id required."),
     scope: z.enum(["organization", "repository", "user"]).default("organization"),
     scopeId: z.string().optional(),
   })
@@ -19,7 +24,7 @@ export async function POST(request: Request): Promise<Response> {
   const executor = createPgQueryExecutor({ connectionString: prepared.databaseUrl });
   try {
     const store = new DataLifecycleStore(executor);
-    const tenantId = prepared.actorLogin;
+    const tenantId = prepared.tenantId;
     const exp = await store.createExport({
       tenantId,
       requestedBy: prepared.actorLogin,
