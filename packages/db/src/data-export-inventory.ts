@@ -55,9 +55,41 @@ export class DataExportInventoryStore {
     tenantId: string;
     installationId: string;
   }): Promise<PendingExportInventory | null> {
-    if (![input.exportId, input.tenantId, input.installationId].every(validIdentifier)) {
+    return this.readScopedExport(input);
+  }
+
+  /**
+   * A reservation can be read only by its current unexpired owner. The token,
+   * installation, current tenant name, and status are checked together in SQL.
+   * This creates bytes in memory only; no delivery permission is implied.
+   */
+  async previewClaimedExport(input: {
+    exportId: string;
+    tenantId: string;
+    installationId: string;
+    workerId: string;
+    token: string;
+  }): Promise<PendingExportInventory | null> {
+    return this.readScopedExport(input, { workerId: input.workerId, token: input.token });
+  }
+
+  private async readScopedExport(
+    input: { exportId: string; tenantId: string; installationId: string },
+    claim?: { workerId: string; token: string },
+  ): Promise<PendingExportInventory | null> {
+    if (
+      ![input.exportId, input.tenantId, input.installationId].every(validIdentifier) ||
+      (claim && ![claim.workerId, claim.token].every(validIdentifier))
+    ) {
       throw new ExportInventoryUnavailableError();
     }
+    const statusCondition = claim
+      ? `data_exports.status = 'running'
+            AND data_exports.installation_id = installations.id
+            AND data_exports.preparation_worker = $4
+            AND data_exports.preparation_token = $5
+            AND data_exports.preparation_lease_until > NOW()`
+      : "data_exports.status = 'pending'";
     const result = (await this.db.query(
       `WITH allowed_request AS MATERIALIZED (
          SELECT data_exports.id, data_exports.tenant_id, data_exports.scope,
@@ -65,11 +97,12 @@ export class DataExportInventoryStore {
            FROM data_exports
            JOIN installations
              ON installations.id = $3
+            AND data_exports.installation_id = installations.id
             AND lower(installations.account_login) = lower(data_exports.tenant_id)
             AND installations.suspended_at IS NULL
           WHERE data_exports.id = $1
             AND lower(data_exports.tenant_id) = lower($2)
-            AND data_exports.status = 'pending'
+            AND ${statusCondition}
        ), selected_repositories AS (
          SELECT repositories.id, repositories.github_repo_id::text AS github_repo_id,
                 repositories.owner, repositories.name, repositories.private,
@@ -96,7 +129,7 @@ export class DataExportInventoryStore {
                 ) FROM selected_repositories
               ), '[]'::jsonb) AS repositories
          FROM allowed_request`,
-      [input.exportId, input.tenantId, input.installationId],
+      [input.exportId, input.tenantId, input.installationId, ...(claim ? [claim.workerId, claim.token] : [])],
     )) as { rows?: InventoryRow[] };
 
     const row = result.rows?.[0];

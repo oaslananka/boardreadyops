@@ -123,3 +123,16 @@ export async function preparePendingExportManifest(
   const inventory = await store.previewPendingExport(input);
   return inventory ? buildPendingExportManifest(inventory) : null;
 }
+
+/**
+ * Prepare an in-memory snapshot only for the current unexpired reservation.
+ * Expiry, lost ownership or a suspended installation returns null, never bytes.
+ * Callers must NOT publish a download or mark status completed from this alone.
+ */
+export async function prepareClaimedExportManifest(
+  store: Pick<DataExportInventoryStore, "previewClaimedExport">,
+  input: { exportId: string; tenantId: string; installationId: string; workerId: string; token: string },
+): Promise<PreparedExportManifest | null> {
+  const inventory = await store.previewClaimedExport(input);
+  return inventory ? buildPendingExportManifest(inventory) : null;
+}

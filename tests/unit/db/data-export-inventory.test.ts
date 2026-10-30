@@ -53,6 +53,7 @@ describe("preparation-only data export inventory", () => {
     const [sql, params] = query.mock.calls[0] as [string, unknown[]];
     expect(params).toEqual(["exp-1", "ExampleOrg", "installation-a"]);
     expect(sql).toContain("installations.id = $3");
+    expect(sql).toContain("data_exports.installation_id = installations.id");
     expect(sql).toContain("repositories.installation_id = allowed_request.installation_id");
     expect(sql).toContain("lower(installations.account_login) = lower(data_exports.tenant_id)");
     expect(sql).toContain("data_exports.status = 'pending'");

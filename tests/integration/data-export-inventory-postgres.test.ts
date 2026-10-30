@@ -65,9 +65,16 @@ beforeAll(async () => {
   ];
   for (const item of cases) {
     await database().query(
-      `INSERT INTO data_exports (id, tenant_id, requested_by, status, scope, scope_id)
-       VALUES ($1, $2, 'integration', $3, $4, $5)`,
-      [item.id, item.owner, item.status, item.scope, item.scopeId],
+      `INSERT INTO data_exports (id, tenant_id, installation_id, requested_by, status, scope, scope_id)
+       VALUES ($1, $2, $3, 'integration', $4, $5, $6)`,
+      [
+        item.id,
+        item.owner,
+        item.id === exports[2] ? installations[1] : installations[0],
+        item.status,
+        item.scope,
+        item.scopeId,
+      ],
     );
   }
 });
@@ -121,13 +128,20 @@ describeDatabase("pending data export inventory boundary (PostgreSQL)", () => {
     });
   });
 
-  it("does not confuse two installations sharing an account login", async () => {
-    const inventory = await store().previewPendingExport({
-      exportId: exports[0],
+  it("never lets a different installation sharing the same account login read the request", async () => {
+    await expect(
+      store().previewPendingExport({
+        exportId: exports[0],
+        tenantId: tenant,
+        installationId: installations[1],
+      }),
+    ).resolves.toBeNull();
+    const own = await store().previewPendingExport({
+      exportId: exports[2],
       tenantId: tenant,
       installationId: installations[1],
     });
-    expect(inventory?.repositories.map((r) => r.repositoryId)).toEqual([repositories[1]]);
+    expect(own?.repositories.map((r) => r.repositoryId)).toEqual([repositories[1]]);
   });
 
   it("does not read another tenant, unknown installation or completed export", async () => {
@@ -151,6 +165,16 @@ describeDatabase("pending data export inventory boundary (PostgreSQL)", () => {
       installationId: installations[0],
     });
     expect(correct?.repositories.map((r) => r.repositoryId)).toEqual([repositories[0]]);
+    await expect(
+      store().previewPendingExport({
+        exportId: exports[2],
+        tenantId: tenant,
+        installationId: installations[0],
+      }),
+    ).resolves.toBeNull();
+    // Even an inconsistent legacy row pinned to this installation cannot
+    // widen a repository-scoped export into a different installation's repo.
+    await database().query("UPDATE data_exports SET installation_id=$1 WHERE id=$2", [installations[0], exports[2]]);
     await expect(
       store().previewPendingExport({
         exportId: exports[2],
