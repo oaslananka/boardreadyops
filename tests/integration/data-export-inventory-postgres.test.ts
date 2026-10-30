@@ -4,6 +4,7 @@ import {
   DataExportInventoryStore,
   ExportInventoryUnavailableError,
 } from "../../packages/db/src/data-export-inventory.js";
+import { preparePendingExportManifest } from "../../packages/db/src/data-export-manifest.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -97,6 +98,27 @@ describeDatabase("pending data export inventory boundary (PostgreSQL)", () => {
     });
     expect(inventory?.repositories).toHaveLength(1);
     expect(JSON.stringify(inventory)).not.toContain("storage_path");
+  });
+
+  it("prepares a stable, allowlisted JSON manifest from persisted tenant-owned data without changing export status", async () => {
+    const request = { exportId: exports[0], tenantId: tenant, installationId: installations[0] };
+    const first = await preparePendingExportManifest(store(), request);
+    const second = await preparePendingExportManifest(store(), request);
+    expect(first).not.toBeNull();
+    expect(first?.sha256).toBe(second?.sha256);
+    const body = JSON.parse(first?.bytes.toString("utf8") ?? "") as Record<string, unknown>;
+    expect(body).toMatchObject({
+      kind: "boardreadyops.repository-metadata-export",
+      coverage: "selected-installation-repositories-only",
+      repositories: [{ repositoryId: repositories[0], private: true }],
+    });
+    expect(JSON.stringify(body)).not.toContain("repo-1");
+    expect(JSON.stringify(body)).not.toContain("storage_path");
+    const persisted = await database().query("SELECT status, download_url FROM data_exports WHERE id=$1", [exports[0]]);
+    expect((persisted as { rows: Array<{ status: string; download_url: string | null }> }).rows[0]).toEqual({
+      status: "pending",
+      download_url: null,
+    });
   });
 
   it("does not confuse two installations sharing an account login", async () => {
