@@ -33,6 +33,38 @@ describe("public manufacturing evidence claims (#445 / #771)", () => {
     expect(source).not.toContain("documented, auditable compliance");
   });
 
+  it("describes electrical checks without promising independent cross-netlist verification", () => {
+    expect(source).toContain("runs KiCad ERC on schematics and DRC on PCB layouts");
+    expect(source).toContain("do not independently prove schematic-to-PCB netlist equivalence");
+    expect(source).not.toContain("deep structural netlist comparison");
+    expect(source).not.toContain("missing pull-up resistor triggers a blocking finding");
+  });
+
+  it("keeps exchange-format and assembly claims within implemented checks", () => {
+    expect(source).toContain("supported IPC-2581 data");
+    expect(source).toContain("ODB++ schema validation");
+    expect(source).toContain("can flag custom footprints for manual pin-1 marker review");
+    expect(source).not.toContain("BoardReadyOps validates schema conformance and cross-checks layer definitions");
+    expect(source).not.toContain("verifies pin 1 rotation conventions");
+  });
+
+  it("describes mask coverage and stackup count without promising fab geometry certification", () => {
+    expect(source).toContain("matching solder-mask layers on copper sides");
+    expect(source).toContain("does not measure solder-mask web clearance");
+    expect(source).toContain("compares the parsed PCB stackup layer count");
+    expect(source).toContain("does not independently verify impedance");
+    expect(source).not.toContain("catches tight-pitch pad clearances that violate vendor mask capability");
+    expect(source).not.toContain("verifies that PCB stackup tables in drawings match");
+  });
+
+  it("limits Gerber geometry, Check Run annotations and evidence claims to available evidence", () => {
+    expect(source).toContain("complex Gerber aperture macros and blocks may remain unmodelled");
+    expect(source).toContain("annotates supported findings when a source file and line location are available");
+    expect(source).toContain("where those details are recorded");
+    expect(source).not.toContain("Every verification assertion records timestamp");
+    expect(source).not.toContain("Annotations appear inline on changed layout or schematic files");
+  });
+
   it("keeps reproducible source fixtures and setup paths discoverable", () => {
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/fixed");
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/broken");

@@ -74,17 +74,12 @@ export function ExportRequestForm({
             </Button>
           </div>
           {issued ? (
-            <AlertRoot variant="success">
-              <AlertTitle>Export {customerStatusLabel(issued.status)}</AlertTitle>
+            <AlertRoot variant="info">
+              <AlertTitle>Export request {customerStatusLabel(issued.status)}</AlertTitle>
               <AlertDescription>
-                Reference <code className="font-mono">{issued.exportId}</code>. Download it from{" "}
-                <a
-                  className="text-primary underline underline-offset-2"
-                  href={`/api/v1/data-exports/${issued.exportId}`}
-                >
-                  the export endpoint
-                </a>{" "}
-                once it finishes; the link is signed and time-limited.
+                Reference <code className="font-mono">{issued.exportId}</code>. No downloadable archive is created
+                automatically. This is a recorded request, not a completed export; an authorized operator must prepare
+                and arrange delivery before a file becomes available.
               </AlertDescription>
             </AlertRoot>
           ) : null}
@@ -148,10 +143,10 @@ export function ErasureRequestForm({
             />
             <span>
               <label className="block" htmlFor={`${idPrefix}-dry-run`}>
-                Preview what would be deleted
+                Record a dry-run request
               </label>
               <span id={`${idPrefix}-dry-run-hint`} className="block text-meta text-muted-foreground">
-                Records the request and reports the scope without removing anything.
+                Preview records the requested scope; it does not list matching records. Nothing is deleted.
               </span>
             </span>
           </div>
@@ -208,8 +203,8 @@ export function ErasureRequestForm({
               </AlertTitle>
               <AlertDescription>
                 {outcome.dryRun
-                  ? "Nothing was deleted. Uncheck the preview box to run it for real."
-                  : "Processing happens asynchronously and cannot be undone."}
+                  ? "This is a request preview only; no records were deleted or enumerated."
+                  : "A non-preview request is only recorded for an authorized operator workflow. No records have been deleted by this submission."}
               </AlertDescription>
             </AlertRoot>
           ) : null}
