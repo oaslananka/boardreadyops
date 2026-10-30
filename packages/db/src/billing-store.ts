@@ -432,6 +432,7 @@ export class BillingStore {
                 AND active = TRUE
                 AND (
                   scope = 'organization'
+                  OR $16::text = 'organization'
                   OR (
                     scope = $16::text
                     AND (

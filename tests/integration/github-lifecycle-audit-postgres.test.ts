@@ -306,9 +306,14 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
     ]);
   });
 
-  it.each(["Organization", "User"] as const)(
-    "blocks %s uninstall erasure when a scoped hold differs only by GitHub login casing",
-    async (accountType) => {
+  it.each([
+    { accountType: "Organization", holdScope: "organization", holdScopeId: null },
+    { accountType: "Organization", holdScope: "repository", holdScopeId: "retained-board" },
+    { accountType: "Organization", holdScope: "user", holdScopeId: "account-member" },
+    { accountType: "User", holdScope: "user", holdScopeId: null },
+  ] as const)(
+    "blocks $accountType uninstall erasure under a $holdScope-scoped legal hold",
+    async ({ accountType, holdScope, holdScopeId }) => {
       const externalId = randomBytes(6).readUIntBE(0, 6) + 1;
       const tenant = `uninstall-case-${randomUUID()}`;
       const legalHoldId = randomUUID();
@@ -324,12 +329,7 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
         await database().query(
           `insert into legal_holds (id, tenant_id, created_by, reason, scope, scope_id, active)
          values ($1, $2, 'integration', 'Case-insensitive uninstall retention hold', $3, $4, true)`,
-          [
-            legalHoldId,
-            tenant.toUpperCase(),
-            accountType === "User" ? "user" : "organization",
-            accountType === "User" ? tenant.toUpperCase() : null,
-          ],
+          [legalHoldId, tenant.toUpperCase(), holdScope, accountType === "User" ? tenant.toUpperCase() : holdScopeId],
         );
         await planGitHubAppLifecycleActions([{ type: "installation.deleted", installation: installed }], lifecycle, {
           deliveryId: randomUUID(),

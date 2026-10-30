@@ -42,6 +42,8 @@ describe("data lifecycle administration", () => {
     expect(holdSql).toContain("($2='user' AND lower(scope_id)=lower($3))");
     expect(erasureSql).toContain("scope_id=$5");
     expect(holdSql).toContain("scope_id=$3");
+    expect(erasureSql).toContain("$4='organization'");
+    expect(holdSql).toContain("$2='organization'");
   });
 
   it("releases only the selected tenant hold without requeuing blocked erasure requests", async () => {
@@ -343,11 +345,11 @@ describe("data lifecycle administration", () => {
     const store = new DataLifecycleStore({ query });
     await expect(store.hasActiveHold("acme", "repository", "repo-1")).resolves.toBe(true);
     await expect(store.hasActiveHold("acme", "organization")).resolves.toBe(true);
-    expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining("scope='organization' OR (scope=$2"), [
-      "acme",
-      "repository",
-      "repo-1",
-    ]);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("scope='organization' OR $2='organization' OR (scope=$2"),
+      ["acme", "repository", "repo-1"],
+    );
     expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("lower(tenant_id)=lower($1)"), [
       "acme",
       "organization",
