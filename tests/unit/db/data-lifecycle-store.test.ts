@@ -291,6 +291,34 @@ describe("data lifecycle administration", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects malformed export scopes before inserting pending requests", async () => {
+    const query = vi.fn();
+    const store = new DataLifecycleStore({ query });
+    for (const scope of ["unknown", "", "organization ", "repository "]) {
+      await expect(store.createExport({ tenantId: "acme", requestedBy: "alice", scope })).rejects.toThrow(
+        "Invalid lifecycle scope",
+      );
+    }
+    for (const scope of ["repository", "user"]) {
+      for (const scopeId of [null, undefined, "", " ", " padded ", "\trepo"]) {
+        await expect(
+          store.createExport({
+            tenantId: "acme",
+            requestedBy: "alice",
+            scope,
+            ...(scopeId === undefined ? {} : { scopeId }),
+          }),
+        ).rejects.toThrow("require a canonical scope id");
+      }
+    }
+    for (const scopeId of ["", "repo-1", " "]) {
+      await expect(
+        store.createExport({ tenantId: "acme", requestedBy: "alice", scope: "organization", scopeId }),
+      ).rejects.toThrow("must not have a scope id");
+    }
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("rejects malformed erasure and hold scopes before querying, including missing scoped identifiers", async () => {
     const query = vi.fn();
     const store = new DataLifecycleStore({ query });
