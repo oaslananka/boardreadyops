@@ -155,6 +155,8 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0101_hosted_review_findings_pagination_index.sql",
       "0104_durable_artifact_unlink_fences.sql",
       "0105_data_export_preparation_claims.sql",
+      "0106_pending_stripe_customer_events_index.sql",
+      "0107_stripe_reconciliation_claims.sql",
     ]);
   });
 

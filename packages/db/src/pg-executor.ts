@@ -12,7 +12,10 @@ export type PgLifecycleExecutorOptions = {
 export type PgQueryExecutor = SqlQueryExecutor & {
   close(): Promise<void>;
   /** Pins every statement in one logical write to a single PG client. */
-  withTransaction<T>(work: (transaction: SqlQueryExecutor) => Promise<T>): Promise<T>;
+  withTransaction<T>(
+    work: (transaction: SqlQueryExecutor) => Promise<T>,
+    options?: { statementTimeoutMs?: number },
+  ): Promise<T>;
 };
 
 export function createPgQueryExecutor(options: PgLifecycleExecutorOptions): PgQueryExecutor {
@@ -26,10 +29,23 @@ export function createPgQueryExecutor(options: PgLifecycleExecutorOptions): PgQu
     async query(sql, params = []) {
       return await pool.query(sql, [...params]);
     },
-    async withTransaction<T>(work: (transaction: SqlQueryExecutor) => Promise<T>): Promise<T> {
+    async withTransaction<T>(
+      work: (transaction: SqlQueryExecutor) => Promise<T>,
+      options?: { statementTimeoutMs?: number },
+    ): Promise<T> {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
+        if (options?.statementTimeoutMs !== undefined) {
+          if (
+            !Number.isInteger(options.statementTimeoutMs) ||
+            options.statementTimeoutMs <= 0 ||
+            options.statementTimeoutMs > 60000
+          ) {
+            throw new Error("Invalid transaction statement timeout");
+          }
+          await client.query("SELECT set_config('statement_timeout', $1, true)", [String(options.statementTimeoutMs)]);
+        }
         const transaction: SqlQueryExecutor = {
           async query(sql, params = []) {
             return await client.query(sql, [...params]);

@@ -25,15 +25,28 @@ describe("BillingStore Stripe subscription projection", () => {
 
     const customer = await store.linkStripeCustomer({ tenantId: "octo-org", stripeCustomerId: "cus_123" });
 
-    expect(customer.tenantId).toBe("octo-org");
-    expect(customer.stripeCustomerId).toBe("cus_123");
+    expect(customer?.tenantId).toBe("octo-org");
+    expect(customer?.stripeCustomerId).toBe("cus_123");
 
     const [sql, params] = query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("INSERT INTO billing_customers");
     expect(sql).toContain("ON CONFLICT (tenant_id) DO UPDATE SET");
     expect(sql).not.toContain("tier=EXCLUDED.tier");
+    expect(sql).toContain("foreign_customer");
+    expect(sql).toContain("billing_customers.stripe_customer_id IS NULL");
+    expect(sql).toContain("billing_customers.stripe_customer_id = EXCLUDED.stripe_customer_id");
     expect(params[1]).toBe("octo-org");
     expect(params[2]).toBe("cus_123");
+  });
+
+  it("returns an explicit conflict when a completed checkout would replace a customer or reuse another tenant's customer", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = new BillingStore({ query } as unknown as SqlQueryExecutor);
+    await expect(
+      store.linkStripeCustomer({ tenantId: "octo-org", stripeCustomerId: "cus_unrelated" }),
+    ).resolves.toBeNull();
+    expect(String(query.mock.calls[0]?.[0])).toContain("WHERE NOT EXISTS (SELECT 1 FROM foreign_customer)");
+    expect(String(query.mock.calls[0]?.[0])).toContain("ON CONFLICT (tenant_id) DO UPDATE");
   });
 
   it("resolves a tenant id from a Stripe customer id", async () => {

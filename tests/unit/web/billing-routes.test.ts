@@ -47,7 +47,7 @@ describe("POST /api/v1/billing/webhook", () => {
     expect(res.status).toBe(400);
   });
 
-  it("accepts a correctly signed request and durably records the event without a real database", async () => {
+  it("refuses to acknowledge a signed event when durable storage is disabled", async () => {
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_secret_1234567890";
     process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
     const request = signedRequest(
@@ -57,9 +57,9 @@ describe("POST /api/v1/billing/webhook", () => {
 
     const res = await webhookPost(request);
 
-    expect(res.status).toBe(200);
-    const json = (await res.json()) as { ok: boolean; mode?: string };
-    expect(json.ok).toBe(true);
+    expect(res.status).toBe(503);
+    const json = (await res.json()) as { ok: boolean };
+    expect(json.ok).toBe(false);
   });
 
   it("rejects malformed JSON even with a valid signature", async () => {
