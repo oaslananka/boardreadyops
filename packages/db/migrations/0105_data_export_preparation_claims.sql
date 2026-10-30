@@ -1,3 +1,5 @@
+/* tsqllint-disable set-quoted-identifier */
+-- PostgreSQL migration: SQL Server SET QUOTED_IDENTIFIER is not valid here.
 -- Opt-in, preparation-only export reservations. Existing/unbound requests are
 -- intentionally not migrated to an installation: a tenant login does not
 -- uniquely identify which installation owns a historical export.
