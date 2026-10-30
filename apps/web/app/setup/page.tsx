@@ -83,7 +83,7 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
   const selected =
     repositorySetupPreset(isSelectableRepositorySetupPresetId(selectedValue) ? selectedValue : "prototype") ??
     defaultPreset;
-  const workflowSource = `https://github.com/oaslananka/boardreadyops/blob/v1/.github/workflows/${repositorySetupWorkflowPath}`;
+  const workflowSource = `https://github.com/oaslananka/boardreadyops/blob/main/.github/workflows/${repositorySetupWorkflowPath}`;
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Repository setup" }]}>
