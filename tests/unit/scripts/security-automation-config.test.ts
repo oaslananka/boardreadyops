@@ -458,6 +458,7 @@ describe("dependency and security automation configuration", () => {
       "json-with-bigint",
       "linkify-it",
       "markdown-it",
+      "minimatch",
       "mysql2",
       "nanoid",
       "next",
