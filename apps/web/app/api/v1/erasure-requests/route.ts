@@ -8,6 +8,11 @@ export const runtime = "nodejs";
 
 const erasureSchema = z
   .object({
+    installationId: z
+      .string()
+      .min(1)
+      .max(128)
+      .refine((id) => id === id.trim(), "Canonical installation id required."),
     scope: z.enum(["organization", "repository", "user"]),
     scopeId: z.string().optional(),
     dryRun: z.boolean().optional().default(false),
@@ -20,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
   const executor = createPgQueryExecutor({ connectionString: prepared.databaseUrl });
   try {
     const store = new DataLifecycleStore(executor);
-    const tenantId = prepared.actorLogin;
+    const tenantId = prepared.tenantId;
     const erasure = await store.createErasure({
       tenantId,
       requestedBy: prepared.actorLogin,

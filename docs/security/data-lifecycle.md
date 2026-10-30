@@ -125,6 +125,17 @@ This is an intake contract, not automatic purge. Export request intake is automa
 
 ### Tenant scope and auditability
 
+The direct lifecycle endpoints `POST /api/v1/data-exports` and
+`POST /api/v1/erasure-requests` require an internal `installationId` in the
+JSON body. `GET /api/v1/data-exports/:exportId` requires the same identifier in
+its query string and returns metadata, not a signed archive. For each request the
+server resolves that GitHub App installation against the current authenticated
+viewer's active authorized installations; an absent identifier returns 400 and
+a foreign or disabled installation returns 403 without writing a request.
+The persisted tenant is the resolved installation's account login, not the
+human operator's personal GitHub login. These are intake and status endpoints,
+not export materialization or deletion executors.
+
 Installations are the top-level tenant boundary. Repository, run, artifact, runner,
 replay, reconciliation, transition, and deletion records are validated against
 that boundary by foreign keys and scope-validation functions. Operational database

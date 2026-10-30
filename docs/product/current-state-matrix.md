@@ -111,8 +111,9 @@
 | `/api/v1/runs/result` | POST | `available` | Ingests CLI/Action release run results. | [`apps/web/app/api/v1/runs/result/route.ts`](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/apps/web/app/api/v1/runs/result/route.ts) |
 | `/api/v1/runs/github-actions-result` | POST | `available` | Ingests GitHub Actions run with OIDC verification. | [`apps/web/app/api/v1/runs/github-actions-result/route.ts`](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/apps/web/app/api/v1/runs/github-actions-result/route.ts) |
 | `/api/v1/runner/*` | POST | `available` | Self-hosted runner protocol (jobs, leases, results). | [`apps/web/app/api/v1/runner/jobs/claim/route.ts`](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/apps/web/app/api/v1/runner/jobs/claim/route.ts) |
-| `/api/v1/data-exports` | GET/POST | `available` | Tenant-scoped data export requests. | [`apps/web/app/api/v1/data-exports/route.ts`](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/apps/web/app/api/v1/data-exports/route.ts) |
-| `/api/v1/erasure-requests` | POST | `available` | GDPR/tenant erasure intake with legal hold check. | [`apps/web/app/api/v1/erasure-requests/route.ts`](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/apps/web/app/api/v1/erasure-requests/route.ts) |
+| `/api/v1/data-exports` | POST | `available` | Records an export request only for an explicitly authorized installation (`installationId` required); no archive is generated automatically. | [`apps/web/app/api/v1/data-exports/route.ts`](../../apps/web/app/api/v1/data-exports/route.ts) |
+| `/api/v1/data-exports/:exportId` | GET | `available` | Returns export request metadata (not a downloadable file); the required `installationId` query must select an installation authorized for the current session. | [`apps/web/app/api/v1/data-exports/[exportId]/route.ts`](../../apps/web/app/api/v1/data-exports/[exportId]/route.ts) |
+| `/api/v1/erasure-requests` | POST | `available` | Records a legal-hold-aware erasure request for an authorized `installationId`; submission does not delete records. | [`apps/web/app/api/v1/erasure-requests/route.ts`](../../apps/web/app/api/v1/erasure-requests/route.ts) |
 
 ---
 

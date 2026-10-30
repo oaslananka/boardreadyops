@@ -1,9 +1,10 @@
 import type { output, ZodType } from "zod";
 import { resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
+import { resolveSettingsTenantScope } from "./settings-tenant.js";
 import { viewerAuthorization } from "./viewer-authorization.js";
 
 type PreparedLifecyclePost<T extends ZodType> =
-  | { ok: true; actorLogin: string; data: output<T>; databaseUrl: string }
+  | { ok: true; actorLogin: string; tenantId: string; data: output<T>; databaseUrl: string }
   | { ok: false; response: Response };
 
 /** Shared authentication, bounded parse errors and persistence prerequisites for lifecycle intake routes. */
@@ -54,5 +55,26 @@ export async function prepareLifecyclePost<T extends ZodType>(
       ),
     };
   }
-  return { ok: true, actorLogin: viewer.session.login, data: parsed.data, databaseUrl: config.databaseUrl };
+  // The tenant belongs to the authorized GitHub App installation, not to the
+  // human operator's personal GitHub login.
+  const selected = (
+    await resolveSettingsTenantScope(viewer.session, (parsed.data as { installationId?: string }).installationId)
+  ).selected;
+  const tenantLogin = selected?.accountLogin.trim();
+  if (!tenantLogin || tenantLogin.startsWith("Installation #")) {
+    return {
+      ok: false,
+      response: Response.json(
+        { ok: false, error: "installation access denied" },
+        { status: 403, headers: { "cache-control": "private, no-store" } },
+      ),
+    };
+  }
+  return {
+    ok: true,
+    actorLogin: viewer.session.login,
+    tenantId: tenantLogin,
+    data: parsed.data,
+    databaseUrl: config.databaseUrl,
+  };
 }
