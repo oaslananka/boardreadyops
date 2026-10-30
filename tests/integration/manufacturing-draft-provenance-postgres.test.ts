@@ -1,12 +1,18 @@
+import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, randomInt, randomUUID } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { verifyStoredManufacturingDraftClaim } from "../../apps/web/lib/manufacturing-draft-provenance.js";
+import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
-import { signManufacturingDraftReceipt } from "../../src/runner/draft-attestation.js";
+import { prepareRunnerManufacturingDraft } from "../../src/cli/runner-manufacturing-draft.js";
+import {
+  createManufacturingDraftReceiptArtifact,
+  signManufacturingDraftReceipt,
+} from "../../src/runner/draft-attestation.js";
 
 const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
@@ -36,33 +42,95 @@ afterAll(async () => {
   }
 });
 
-async function prepareDraftFixture(db: NonNullable<typeof executor>) {
+// Explicit opt-in connects actual KiCad ZIP generation to PostgreSQL receipt
+// verification. The default PG integration needs no KiCad installation.
+type GeneratedKicadDraft = { zip: Buffer; sourceSha: string; receipt: Buffer; publicKey: string };
+async function generateRealKicadDraft(): Promise<GeneratedKicadDraft> {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "bro-draft-kicad-pg-"));
+  rootPaths.push(workspace);
+  await cp(path.resolve("tests/fixtures/projects/safe-basic"), workspace, { recursive: true });
+  execFileSync("git", ["init", "--quiet"], { cwd: workspace });
+  execFileSync("git", ["add", "."], { cwd: workspace });
+  execFileSync(
+    "git",
+    ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "test fixture"],
+    { cwd: workspace },
+  );
+  const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: workspace, encoding: "utf8" }).trim();
+  const job: RunnerClaimedJob = {
+    leaseId: lease,
+    leaseToken: "l".repeat(43),
+    runId: run,
+    executionAttemptId: attempt,
+    leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    maximumLeaseExpiresAt: new Date(Date.now() + 120_000).toISOString(),
+    sourceMode: "customer_checkout",
+    repository: { owner: "verify-fixture", name: "pcb", commitSha: sourceSha, private: false },
+    safeMode: { enabled: false, reasons: [] },
+  };
+  const archive = await prepareRunnerManufacturingDraft(workspace, job, { requireKicad: true });
+  const zip = await readFile(archive.filePath);
+  if (archive.role !== "draft-manufacturing" || archive.sha256 !== digest(zip) || archive.bytes !== zip.length) {
+    throw new Error("KiCad export did not produce the expected verified draft archive");
+  }
+  // Exercise the same detached receipt writer invoked by runner/worker.ts,
+  // rather than crafting a receipt directly in the integration fixture.
   const key = generateKeyPairSync("ed25519");
-  const publicKey = key.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const attestation = await createManufacturingDraftReceiptArtifact({
+    workspace,
+    job,
+    runnerId: runner,
+    privateKey: key.privateKey,
+    archive,
+  });
+  const receipt = await readFile(attestation.filePath);
+  if (
+    attestation.role !== "draft-provenance" ||
+    attestation.bytes !== receipt.length ||
+    attestation.sha256 !== digest(receipt)
+  ) {
+    throw new Error("Runner did not sign the expected draft receipt bytes");
+  }
+  return {
+    zip,
+    sourceSha,
+    receipt,
+    publicKey: key.publicKey.export({ type: "spki", format: "pem" }).toString(),
+  };
+}
+
+async function prepareDraftFixture(db: NonNullable<typeof executor>, generated?: GeneratedKicadDraft) {
+  const key = generateKeyPairSync("ed25519");
+  const publicKey = generated?.publicKey ?? key.publicKey.export({ type: "spki", format: "pem" }).toString();
   const folder = await mkdtemp(path.join(os.tmpdir(), "bro-draft-real-pg-"));
   rootPaths.push(folder);
-  const zip = Buffer.from(
-    "UEsDBBQAAAAIAKRtVV0z7c5VJwAAACUAAAAWAAAAZmFicmljYXRpb24vUkVBRE1FLnR4dHMJcnQLUfD384lU0FXw8w9RcHN0CvJ0dgzx9PdTcAwICPIPc/QBAFBLAQIUAxQAAAAIAKRtVV0z7c5VJwAAACUAAAAWAAAAAAAAAAAAAACAAQAAAABmYWJyaWNhdGlvbi9SRUFETUUudHh0UEsFBgAAAAABAAEARAAAAFsAAAAAAA==",
-    "base64",
-  );
-  const receipt = Buffer.from(
-    JSON.stringify(
-      signManufacturingDraftReceipt(
-        {
-          version: 1,
-          purpose: "manufacturing-draft",
-          runnerId: runner,
-          runId: run,
-          executionAttemptId: attempt,
-          repository: "verify-fixture/pcb",
-          sourceCommitSha: "a".repeat(40),
-          archiveSha256: digest(zip),
-          archiveBytes: zip.length,
-        },
-        key.privateKey,
+  const sourceSha = generated?.sourceSha ?? "a".repeat(40);
+  const zip =
+    generated?.zip ??
+    Buffer.from(
+      "UEsDBBQAAAAIAKRtVV0z7c5VJwAAACUAAAAWAAAAZmFicmljYXRpb24vUkVBRE1FLnR4dHMJcnQLUfD384lU0FXw8w9RcHN0CvJ0dgzx9PdTcAwICPIPc/QBAFBLAQIUAxQAAAAIAKRtVV0z7c5VJwAAACUAAAAWAAAAAAAAAAAAAACAAQAAAABmYWJyaWNhdGlvbi9SRUFETUUudHh0UEsFBgAAAAABAAEARAAAAFsAAAAAAA==",
+      "base64",
+    );
+  const receipt =
+    generated?.receipt ??
+    Buffer.from(
+      JSON.stringify(
+        signManufacturingDraftReceipt(
+          {
+            version: 1,
+            purpose: "manufacturing-draft",
+            runnerId: runner,
+            runId: run,
+            executionAttemptId: attempt,
+            repository: "verify-fixture/pcb",
+            sourceCommitSha: sourceSha,
+            archiveSha256: digest(zip),
+            archiveBytes: zip.length,
+          },
+          key.privateKey,
+        ),
       ),
-    ),
-  );
+    );
   await writeFile(path.join(folder, "archive.zip"), zip);
   await writeFile(path.join(folder, "receipt.json"), receipt);
 
@@ -76,7 +144,7 @@ async function prepareDraftFixture(db: NonNullable<typeof executor>) {
   );
   await db.query(
     "insert into release_runs (id, repository_id, commit_sha, ref, trigger_kind, status, decision, started_at, completed_at) values ($1, $2, $3, 'refs/heads/main', 'push', 'completed', 'pass', now(), now())",
-    [run, repository, "a".repeat(40)],
+    [run, repository, sourceSha],
   );
   await db.query(
     "insert into release_run_attempts (id, run_id, attempt_number, status, started_at, completed_at) values ($1, $2, 1, 'completed', now(), now())",
@@ -96,7 +164,14 @@ async function prepareDraftFixture(db: NonNullable<typeof executor>) {
   );
 
   await insertDraftArtifactRows(db, zip, receipt);
-  return { executor: db, runId: run, executionAttemptId: attempt, storageRoot: folder, storageDriver: "local" };
+  return {
+    executor: db,
+    runId: run,
+    executionAttemptId: attempt,
+    storageRoot: folder,
+    storageDriver: "local",
+    sourceSha,
+  };
 }
 
 async function insertDraftArtifactRows(db: NonNullable<typeof executor>, zip: Buffer, receipt: Buffer) {
@@ -147,7 +222,8 @@ async function insertDraftArtifactRows(db: NonNullable<typeof executor>, zip: Bu
 describeDatabase("real PostgreSQL runner draft provenance verification", () => {
   it("verifies server-owned identity and persisted capability against actual local archive bytes", async () => {
     if (!executor) throw new Error("isolated PostgreSQL is required");
-    const input = await prepareDraftFixture(executor);
+    const generated = process.env.BOARDREADYOPS_KICAD_TESTS === "true" ? await generateRealKicadDraft() : undefined;
+    const input = await prepareDraftFixture(executor, generated);
     expect(await verifyStoredManufacturingDraftClaim(input)).toMatchObject({
       status: "verified-runner-claim",
       archiveArtifactId: zipArtifact,
@@ -191,7 +267,7 @@ describeDatabase("real PostgreSQL runner draft provenance verification", () => {
     await executor.query("update runner_registrations set status='active', disabled_at=null where id=$1", [runner]);
     await executor.query("update release_runs set commit_sha=$1 where id=$2", ["b".repeat(40), run]);
     expect((await verifyStoredManufacturingDraftClaim(input)).status).toBe("unverified");
-    await executor.query("update release_runs set commit_sha=$1 where id=$2", ["a".repeat(40), run]);
+    await executor.query("update release_runs set commit_sha=$1 where id=$2", [input.sourceSha, run]);
     await writeFile(path.join(input.storageRoot, "archive.zip"), Buffer.from("modified payload"));
     expect((await verifyStoredManufacturingDraftClaim(input)).status).toBe("unverified");
   });
