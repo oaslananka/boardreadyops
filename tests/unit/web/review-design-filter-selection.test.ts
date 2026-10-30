@@ -39,6 +39,60 @@ const review = {
 };
 
 describe("Review finding filter and canvas selection", () => {
+  it("reveals a selected canvas finding nested in a collapsed finding group", async () => {
+    const repeats = [
+      blocker,
+      { ...blocker, fingerprint: `${blocker.fingerprint}-second`, message: "Second repeated blocker" },
+      { ...blocker, fingerprint: `${blocker.fingerprint}-third`, message: "Third repeated blocker" },
+    ];
+    const repeatedReview = {
+      ...review,
+      findings: repeats,
+      headSnapshots: review.headSnapshots.map((snapshot) => ({
+        ...snapshot,
+        anchors: repeats.map((finding, index) => ({
+          id: `repeated-${index}`,
+          kind: "finding" as const,
+          targetRef: finding.component,
+          x: 0.2 + index * 0.3,
+          y: 0.5,
+          metadata: {
+            fingerprint: finding.fingerprint,
+            ruleId: finding.ruleId,
+            severity: finding.severity,
+            message: finding.message,
+          },
+        })),
+      })),
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    try {
+      await act(async () => root.render(createElement(ReviewDesignWorkspace, { review: repeatedReview })));
+      const group = container.querySelector("details");
+      expect(group).not.toBeNull();
+      expect(group?.open).toBe(false);
+      const thirdMarker = [...container.querySelectorAll('button[title^="Finding:"]')].find((node) =>
+        node.getAttribute("title")?.includes("Third repeated blocker"),
+      );
+      expect(thirdMarker).toBeDefined();
+      await act(async () => thirdMarker?.click());
+      const inspector = container.querySelector('aside[aria-label="Selected finding inspector"]');
+      expect(inspector?.textContent).toContain("Third repeated blocker");
+      const thirdRow = [...container.querySelectorAll("button[aria-pressed]")].find((node) =>
+        node.textContent?.includes("Third repeated blocker"),
+      );
+      expect(thirdRow?.getAttribute("aria-pressed")).toBe("true");
+      expect(group?.open).toBe(true);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+    }
+  });
+
   it("highlights only the visible inspected finding when a filter hides the previously selected marker", async () => {
     const container = document.createElement("div");
     document.body.append(container);

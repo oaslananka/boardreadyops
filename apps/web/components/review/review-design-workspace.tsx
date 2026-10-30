@@ -219,7 +219,10 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
                     ) : null}
                     {group.findings.slice(0, 2).map(renderFindingButton)}
                     {group.findings.length > 2 ? (
-                      <details className="rounded-md border border-border p-2">
+                      <details
+                        open={group.findings.slice(2).some((finding) => finding.fingerprint === activeFingerprint)}
+                        className="rounded-md border border-border p-2"
+                      >
                         <summary className="min-h-10 cursor-pointer py-2 text-sm font-medium text-primary">
                           Show {group.findings.length - 2} more {group.ruleId} findings
                         </summary>
