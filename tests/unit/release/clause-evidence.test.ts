@@ -4,7 +4,11 @@ import { join } from "node:path";
 import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { releaseAuditClausesCommand } from "../../../src/cli/commands/release.js";
-import { exportPassportAuditClausesJson, projectPassportAuditClauses } from "../../../src/release/clause-evidence.js";
+import {
+  exportPassportAuditClausesJson,
+  exportPassportAuditClausesMarkdown,
+  projectPassportAuditClauses,
+} from "../../../src/release/clause-evidence.js";
 import { buildReleasePassport } from "../../../src/release/passport.js";
 
 const base = {
@@ -119,6 +123,32 @@ describe("non-normative audit-clause recording projection", () => {
     expect(() => exportPassportAuditClausesJson(passport, maps)).toThrow("digest check failed");
   });
 
+  it("renders the same deterministic field-presence gaps as a reviewer-facing Markdown table", () => {
+    const passport = buildReleasePassport({ ...base, releaseId: "release | <unsafe>" });
+    const maps = [
+      { standard: "ISO 13485" as const, clause: "X.1", requiredEvidence: ["reviewed_revision" as const] },
+      {
+        standard: "AS9100" as const,
+        clause: "Y.2",
+        requiredEvidence: ["review_approval" as const, "bom_snapshot" as const],
+      },
+    ];
+    const markdown = exportPassportAuditClausesMarkdown(passport, maps);
+    expect(exportPassportAuditClausesMarkdown(passport, [...maps].reverse())).toBe(markdown);
+    expect(markdown).toContain("Release: release \\| &lt;unsafe&gt;");
+    expect(markdown).toContain("not independently verified evidence, compliance, certification, or audit success");
+    expect(markdown).toContain("| AS9100 | Y\\.2 | bom\\_snapshot | review\\_approval | partial |");
+    expect(markdown).toContain("| ISO 13485 | X\\.1 | reviewed\\_revision | — | recorded |");
+    expect(markdown).not.toContain("<unsafe>");
+    expect(markdown.endsWith("\n")).toBe(true);
+    const missingSource = buildReleasePassport({ ...base, gitDirty: true });
+    expect(exportPassportAuditClausesMarkdown(missingSource, maps)).toContain(
+      "Source commit claim (unverified): not recorded",
+    );
+    passport.release.id = "changed";
+    expect(() => exportPassportAuditClausesMarkdown(passport, maps)).toThrow("digest check failed");
+  });
+
   it("exposes an offline stdout-only export and fails closed on unreadable or unsupported mapping input", async () => {
     const dir = mkdtempSync(join(tmpdir(), "boardreadyops-clause-export-"));
     try {
@@ -151,6 +181,17 @@ describe("non-normative audit-clause recording projection", () => {
         missingEvidence: ["risk_waiver"],
       });
       expect(stderr).toBe("");
+      stdout = "";
+      expect(
+        await releaseAuditClausesCommand(passportFile, { mappings: mappingFile, format: "markdown" }, streams),
+      ).toBe(0);
+      expect(stdout).toContain("| AS9100 | X\\.1 | release\\_decision | risk\\_waiver | partial |");
+      expect(stdout).not.toContain('"format":');
+      stdout = "";
+      expect(
+        await releaseAuditClausesCommand(passportFile, { mappings: mappingFile, format: "yaml" as never }, streams),
+      ).toBe(2);
+      expect(stdout).toBe("");
       writeFileSync(
         mappingFile,
         JSON.stringify([{ standard: "DO-254", clause: "../bad", requiredEvidence: ["firmware_snapshot"] }]),

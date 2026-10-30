@@ -7,7 +7,11 @@ import { canonicalRoot, runPipeline } from "../../core/pipeline.js";
 import { resolveLocale, t } from "../../i18n/t.js";
 import { detectKicadCli } from "../../kicad/cli.js";
 import { runJobset } from "../../kicad/jobset.js";
-import { type AuditClauseMapping, exportPassportAuditClausesJson } from "../../release/clause-evidence.js";
+import {
+  type AuditClauseMapping,
+  exportPassportAuditClausesJson,
+  exportPassportAuditClausesMarkdown,
+} from "../../release/clause-evidence.js";
 import { diffReleases, formatReleaseDiffText, type ReleaseSnapshot } from "../../release/diff.js";
 import {
   formatReleaseCertificateText,
@@ -81,6 +85,7 @@ export interface ReleaseHandoffOptions {
 
 export interface ReleaseAuditClausesOptions {
   mappings: string;
+  format?: "json" | "markdown";
 }
 
 /**
@@ -113,7 +118,13 @@ export async function releaseAuditClausesCommand(
     ) {
       throw new Error("Audit clause inputs must be a passport object and an array of mapping objects.");
     }
-    const output = exportPassportAuditClausesJson(passport as ReleasePassport, mappings as AuditClauseMapping[]);
+    if (options.format !== undefined && options.format !== "json" && options.format !== "markdown") {
+      throw new Error("Unsupported audit clause export format.");
+    }
+    const output =
+      options.format === "markdown"
+        ? exportPassportAuditClausesMarkdown(passport as ReleasePassport, mappings as AuditClauseMapping[])
+        : exportPassportAuditClausesJson(passport as ReleasePassport, mappings as AuditClauseMapping[]);
     streams.stdout.write(output);
     return 0;
   } catch {
