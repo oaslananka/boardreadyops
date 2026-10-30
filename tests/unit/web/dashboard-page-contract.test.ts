@@ -132,11 +132,14 @@ describe("dashboard operational hierarchy", () => {
     });
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).toContain("Attention required");
-    expect(markup).toContain("Setup in progress");
-    expect(markup).toContain("36 repositories are waiting for an initial release");
-    expect(markup).toContain("Review setup workflow and dispatch probe");
-    expect(markup.indexOf("Attention required")).toBeLessThan(markup.indexOf("Setup in progress"));
-    expect(markup.indexOf("Setup in progress")).toBeLessThan(markup.indexOf("Browse all 37 connected repositories"));
+    expect(markup).toContain("First readiness check needed");
+    expect(markup).not.toContain("Setup in progress");
+    expect(markup).toContain("36 repositories have no recorded readiness run yet.");
+    expect(markup).toContain("Review setup and run the first check");
+    expect(markup.indexOf("Attention required")).toBeLessThan(markup.indexOf("First readiness check needed"));
+    expect(markup.indexOf("First readiness check needed")).toBeLessThan(
+      markup.indexOf("Browse all 37 connected repositories"),
+    );
   });
 
   it("keeps first-run setup available when recorded supply alerts also need review", async () => {
@@ -188,9 +191,10 @@ describe("dashboard operational hierarchy", () => {
     });
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).toContain("Review supply alerts");
-    expect(markup).toContain("Setup in progress");
-    expect(markup).toContain("1 repository is waiting for an initial release");
-    expect(markup.indexOf("Review supply alerts")).toBeLessThan(markup.indexOf("Setup in progress"));
+    expect(markup).toContain("First readiness check needed");
+    expect(markup).not.toContain("Setup in progress");
+    expect(markup).toContain("1 repository has no recorded readiness run yet.");
+    expect(markup.indexOf("Review supply alerts")).toBeLessThan(markup.indexOf("First readiness check needed"));
     expect(markup).toContain('href="/setup"');
   });
 

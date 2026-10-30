@@ -281,17 +281,17 @@ function SetupInProgressBanner({ summary }: Readonly<{ summary: DashboardReposit
   return (
     <output className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-info/40 bg-info-surface px-5 py-4">
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-info">Setup in progress</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-info">First readiness check needed</p>
         <strong className="text-sm font-semibold text-foreground">
           {summary.repositoriesWithoutRuns}{" "}
-          {summary.repositoriesWithoutRuns === 1 ? "repository is" : "repositories are"} waiting for an initial release
-          check.
+          {summary.repositoriesWithoutRuns === 1 ? "repository has" : "repositories have"} no recorded readiness run
+          yet.
         </strong>
       </div>
       <div className="flex items-center gap-2 text-sm">
         <span className="rounded-full bg-info/20 px-2 py-0.5 text-xs font-bold text-info">Next action</span>
         <Link href="/setup" className="font-medium text-info hover:underline">
-          Review setup workflow and dispatch probe →
+          Review setup and run the first check →
         </Link>
       </div>
     </output>
