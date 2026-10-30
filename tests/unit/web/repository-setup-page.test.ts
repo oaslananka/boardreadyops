@@ -62,6 +62,14 @@ describe("repository setup preview page", () => {
     expect(markup).not.toContain("installation-token");
   });
 
+  it("links manual setup to the current canonical workflow instead of the stale v1 release tag", async () => {
+    const markup = await render({ preset: "prototype" });
+    expect(markup).toContain(
+      'href="https://github.com/oaslananka/boardreadyops/blob/main/.github/workflows/readiness-runner.yml"',
+    );
+    expect(markup).not.toContain("/blob/v1/.github/workflows/readiness-runner.yml");
+  });
+
   it("does not revive the legacy contract-design preset through a query parameter", async () => {
     const markup = await render({ preset: "contract-design" });
     expect(markup).toContain("Active: Prototype fabrication");
