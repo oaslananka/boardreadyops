@@ -122,6 +122,78 @@ describe("dashboard operational hierarchy", () => {
     );
   });
 
+  it("keeps first-run setup visible beside an existing repository finding", async () => {
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 37,
+      repositoriesWithOpenFindings: 1,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 36,
+      watchedBoards: 0,
+    });
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("Attention required");
+    expect(markup).toContain("Setup in progress");
+    expect(markup).toContain("36 repositories are waiting for an initial release");
+    expect(markup).toContain("Review setup workflow and dispatch probe");
+    expect(markup.indexOf("Attention required")).toBeLessThan(markup.indexOf("Setup in progress"));
+    expect(markup.indexOf("Setup in progress")).toBeLessThan(markup.indexOf("Browse all 37 connected repositories"));
+  });
+
+  it("keeps first-run setup available when recorded supply alerts also need review", async () => {
+    vi.mocked(loadViewerRepositories).mockResolvedValueOnce([
+      {
+        accountLogin: "octocat",
+        repositories: [
+          {
+            id: "repo-2",
+            installationId: "installation-2",
+            githubInstallationId: 123,
+            accountLogin: "octocat",
+            owner: "octocat",
+            name: "power",
+            private: true,
+            latestRunId: "run-2",
+            latestRunStatus: "completed",
+            latestRunDecision: "pass",
+            latestRunAt: "2026-09-05T00:00:00.000Z",
+            openFindings: 0,
+            watchedBoards: 1,
+            openSupplyFindings: 2,
+          },
+          {
+            id: "repo-3",
+            installationId: "installation-2",
+            githubInstallationId: 123,
+            accountLogin: "octocat",
+            owner: "octocat",
+            name: "new-board",
+            private: true,
+            latestRunId: undefined,
+            latestRunStatus: undefined,
+            latestRunDecision: undefined,
+            latestRunAt: undefined,
+            openFindings: 0,
+            watchedBoards: 0,
+            openSupplyFindings: 0,
+          },
+        ],
+      },
+    ]);
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 2,
+      repositoriesWithOpenFindings: 0,
+      supplyAlerts: 2,
+      repositoriesWithoutRuns: 1,
+      watchedBoards: 1,
+    });
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("Review supply alerts");
+    expect(markup).toContain("Setup in progress");
+    expect(markup).toContain("1 repository is waiting for an initial release");
+    expect(markup.indexOf("Review supply alerts")).toBeLessThan(markup.indexOf("Setup in progress"));
+    expect(markup).toContain('href="/setup"');
+  });
+
   it("prioritizes verified repository work above sample artwork without inventing a risk score", async () => {
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).toContain("Pick up your hardware work");

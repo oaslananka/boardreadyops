@@ -302,13 +302,16 @@ function AttentionBanner({
   summary,
   groups,
 }: Readonly<{ summary: DashboardRepositorySummary; groups: RepositoryGroup[] }>) {
-  if (summary.repositoriesWithOpenFindings > 0 || summary.supplyAlerts > 0) {
-    return <FindingsAttentionBanner summary={summary} groups={groups} />;
+  const hasFindingsOrAlerts = summary.repositoriesWithOpenFindings > 0 || summary.supplyAlerts > 0;
+  if (!hasFindingsOrAlerts) {
+    return summary.repositoriesWithoutRuns > 0 ? <SetupInProgressBanner summary={summary} /> : null;
   }
-  if (summary.repositoriesWithoutRuns > 0) {
-    return <SetupInProgressBanner summary={summary} />;
-  }
-  return null;
+  return (
+    <>
+      <FindingsAttentionBanner summary={summary} groups={groups} />
+      {summary.repositoriesWithoutRuns > 0 ? <SetupInProgressBanner summary={summary} /> : null}
+    </>
+  );
 }
 
 type RepositoryRow = RepositoryGroup["repositories"][number];
