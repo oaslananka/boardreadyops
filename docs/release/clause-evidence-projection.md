@@ -24,7 +24,7 @@ Provide a self-consistent Release Passport JSON and a separately reviewed clause
 boardreadyops release audit-clauses release-passport.json --mappings reviewed-clauses.json > clause-records.json
 ```
 
-The deterministic output is a machine-readable **record-presence projection**, grouped
+The default deterministic JSON output is a machine-readable **record-presence projection**, grouped
 by the supplied standard and clause identity. It reports `recordedEvidence`,
 `missingEvidence`, and `recordCoverage` (`recorded`, `partial`, or `absent`). It
 includes the self-reported passport digest and only a valid, clean source commit
@@ -35,3 +35,14 @@ and fails closed on invalid passport digests, unsupported clause identities, or
 duplicated requirements. Pipe its JSON to a file for review. No online catalogue,
 normative requirement text, third-party signature validation, or certification
 claim is built into this export.
+
+For a bounded, human-readable review table (same field presence, gaps and unverified
+source claim), run:
+
+```bash
+boardreadyops release audit-clauses release-passport.json --mappings reviewed-clauses.json --format markdown > clause-records.md
+```
+
+The Markdown output is an offline convenience for a reviewer, not a clause-by-clause
+audit conclusion, evidence signature or authorized link to an external artifact.
+JSON remains the default for existing integrations.
