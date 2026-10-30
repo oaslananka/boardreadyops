@@ -124,6 +124,31 @@ describe("preparation-only data export inventory", () => {
     );
   });
 
+  it("rejects a repository-scoped export if that repository was disabled after request creation", async () => {
+    const disabledScope = {
+      ...scopeRow,
+      scope: "repository",
+      scope_id: "repo-a",
+      repositories: [{ ...scopeRow.repositories[0], disabled: true }],
+    };
+    const query = vi.fn().mockResolvedValue({ rows: [disabledScope] });
+    const store = new DataExportInventoryStore({ query });
+
+    await expect(store.previewPendingExport(input)).rejects.toBeInstanceOf(ExportInventoryUnavailableError);
+    await expect(
+      store.previewClaimedExport({ ...input, workerId: "worker-a", token: "lease-token" }),
+    ).rejects.toBeInstanceOf(ExportInventoryUnavailableError);
+    expect(query).toHaveBeenCalledTimes(2);
+    for (const [sql] of query.mock.calls as [string, unknown[]][]) {
+      expect(sql).toMatch(/allowed_request\.scope = 'repository'[\s\S]*?repositories\.disabled_at IS NULL/u);
+    }
+
+    // An organization-level inventory is allowed to report that a repository is disabled.
+    query.mockResolvedValueOnce({ rows: [{ ...disabledScope, scope: "organization", scope_id: null }] });
+    const organizationInventory = await store.previewPendingExport(input);
+    expect(organizationInventory?.repositories[0]?.disabled).toBe(true);
+  });
+
   it("rejects inventories larger than the bounded limit rather than silently truncating", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [

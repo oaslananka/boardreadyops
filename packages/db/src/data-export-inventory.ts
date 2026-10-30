@@ -110,7 +110,9 @@ export class DataExportInventoryStore {
            FROM repositories
            JOIN allowed_request ON repositories.installation_id = allowed_request.installation_id
           WHERE allowed_request.scope = 'organization'
-             OR (allowed_request.scope = 'repository' AND repositories.id = allowed_request.scope_id)
+             OR (allowed_request.scope = 'repository'
+                 AND repositories.id = allowed_request.scope_id
+                 AND repositories.disabled_at IS NULL)
           ORDER BY repositories.id
           LIMIT 101
        )
@@ -145,7 +147,8 @@ export class DataExportInventoryStore {
     }
     if (
       (row.scope === "organization" && row.scope_id !== null) ||
-      (row.scope === "repository" && (typeof row.scope_id !== "string" || row.repositories.length !== 1))
+      (row.scope === "repository" &&
+        (typeof row.scope_id !== "string" || row.repositories.length !== 1 || row.repositories[0]?.disabled !== false))
     ) {
       throw new ExportInventoryUnavailableError();
     }
