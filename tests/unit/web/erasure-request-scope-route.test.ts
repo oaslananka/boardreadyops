@@ -88,6 +88,28 @@ describe("shared lifecycle request transport boundary", () => {
     persistence.mockReturnValue({ mode: "memory" });
   });
 
+  it("rejects oversized JSON intake payloads before reading or using persistence", async () => {
+    for (const post of [POST, postExport]) {
+      for (const headers of [
+        { "content-type": "application/json" },
+        { "content-type": "application/json", "content-length": "65536" },
+      ]) {
+        const response = await post(
+          new Request("https://boardreadyops.test/api/v1/lifecycle", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ scope: "organization", unused: "x".repeat(16 * 1024) }),
+          }),
+        );
+        expect(response.status).toBe(413);
+        expect(response.headers.get("cache-control")).toBe("private, no-store");
+        expect(await response.json()).toMatchObject({ ok: false, error: "Request payload too large" });
+      }
+    }
+    expect(persistence).not.toHaveBeenCalled();
+    expect(createPgQueryExecutor).not.toHaveBeenCalled();
+  });
+
   it("rejects malformed JSON for both routes without touching persistence", async () => {
     for (const post of [POST, postExport]) {
       const response = await post(
