@@ -124,7 +124,7 @@ describe("non-normative audit-clause recording projection", () => {
   });
 
   it("renders the same deterministic field-presence gaps as a reviewer-facing Markdown table", () => {
-    const passport = buildReleasePassport({ ...base, releaseId: "release | <unsafe>" });
+    const passport = buildReleasePassport({ ...base, releaseId: "release | <unsafe> & docs" });
     const maps = [
       { standard: "ISO 13485" as const, clause: "X.1", requiredEvidence: ["reviewed_revision" as const] },
       {
@@ -135,7 +135,7 @@ describe("non-normative audit-clause recording projection", () => {
     ];
     const markdown = exportPassportAuditClausesMarkdown(passport, maps);
     expect(exportPassportAuditClausesMarkdown(passport, [...maps].reverse())).toBe(markdown);
-    expect(markdown).toContain("Release: release \\| &lt;unsafe&gt;");
+    expect(markdown).toContain("Release: release \\| &lt;unsafe&gt; &amp; docs");
     expect(markdown).toContain("not independently verified evidence, compliance, certification, or audit success");
     expect(markdown).toContain("| AS9100 | Y\\.2 | bom\\_snapshot | review\\_approval | partial |");
     expect(markdown).toContain("| ISO 13485 | X\\.1 | reviewed\\_revision | — | recorded |");

@@ -80822,7 +80822,7 @@ function exportPassportAuditClausesJson(passport, mappings2) {
 }
 function exportPassportAuditClausesMarkdown(passport, mappings2) {
   const report = JSON.parse(exportPassportAuditClausesJson(passport, mappings2));
-  const escapeCell = (value) => value.replace(/\s+/gu, " ").replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/([\\`*_{}[\]()#+.!|~-])/gu, "\\$1");
+  const escapeCell = (value) => value.replace(/\s+/gu, " ").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replace(/([\\`*_{}[\]()#+.!|~-])/gu, String.raw`\$1`);
   const fields = (values) => values.length > 0 ? values.map(escapeCell).join(", ") : "\u2014";
   const lines = [
     "# Release Passport clause records (self-reported)",
