@@ -7,6 +7,7 @@ import {
 import {
   buildPendingExportManifest,
   ExportManifestPreparationError,
+  prepareClaimedExportManifest,
   preparePendingExportManifest,
 } from "../../../packages/db/src/data-export-manifest.js";
 
@@ -101,6 +102,41 @@ describe("preparation-only export manifest", () => {
     expect(() => buildPendingExportManifest({ ...inventory(), scope: "user" as "organization" })).toThrow(
       ExportManifestPreparationError,
     );
+  });
+
+  it("builds claimed bytes only from the exact reservation-scoped preview", async () => {
+    const previewClaimedExport = vi.fn().mockResolvedValue(inventory([repo("repo-a")]));
+    const store = { previewClaimedExport };
+    const claim = {
+      exportId: "export-123",
+      tenantId: "ExampleOrg",
+      installationId: "inst-1",
+      workerId: "worker-1",
+      token: "lease-token",
+    };
+    const prepared = await prepareClaimedExportManifest(store, claim);
+    expect(previewClaimedExport).toHaveBeenCalledExactlyOnceWith(claim);
+    expect(JSON.parse(prepared?.bytes.toString("utf8") ?? "null").repositories).toEqual([repo("repo-a")]);
+    expect(Object.keys(store)).toEqual(["previewClaimedExport"]);
+
+    // The store can deny expired, stolen or suspended reservations without producing bytes.
+    previewClaimedExport.mockResolvedValueOnce(null);
+    await expect(prepareClaimedExportManifest(store, { ...claim, token: "wrong-token" })).resolves.toBeNull();
+    previewClaimedExport.mockResolvedValueOnce({ ...inventory(), coverage: "unsupported" });
+    await expect(prepareClaimedExportManifest(store, claim)).rejects.toThrow(ExportManifestPreparationError);
+  });
+
+  it("rejects duplicate GitHub IDs and non-decimal or malformed metadata", () => {
+    const first = repo("repo-a");
+    const invalid = [
+      inventory([first, { ...repo("repo-b"), githubRepositoryId: first.githubRepositoryId }]),
+      inventory([{ ...first, githubRepositoryId: "1e4" }]),
+      inventory([{ ...first, private: "true" as unknown as boolean }]),
+      inventory([{ ...first, disabled: null as unknown as boolean }]),
+    ];
+    for (const candidate of invalid) {
+      expect(() => buildPendingExportManifest(candidate)).toThrow(ExportManifestPreparationError);
+    }
   });
 
   it("builds only from the pending, installation-scoped store and never changes status", async () => {

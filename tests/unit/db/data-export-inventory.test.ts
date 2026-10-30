@@ -61,6 +61,46 @@ describe("preparation-only data export inventory", () => {
     expect(sql).not.toMatch(/from findings|from artifacts|from api_tokens|storage_path/iu);
   });
 
+  it("reads a claimed export only through the worker/token and unexpired lease predicates", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [scopeRow] });
+    const store = new DataExportInventoryStore({ query });
+    const claim = { ...input, workerId: "worker-a", token: "reservation-a" };
+    const found = await store.previewClaimedExport(claim);
+    expect(found?.repositories).toHaveLength(1);
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(params).toEqual(["exp-1", "ExampleOrg", "installation-a", "worker-a", "reservation-a"]);
+    expect(sql).toContain("data_exports.status = 'running'");
+    expect(sql).toContain("data_exports.preparation_worker = $4");
+    expect(sql).toContain("data_exports.preparation_token = $5");
+    expect(sql).toContain("data_exports.preparation_lease_until > NOW()");
+    expect(sql).toContain("installations.suspended_at IS NULL");
+
+    query.mockResolvedValueOnce({ rows: [] });
+    await expect(store.previewClaimedExport({ ...claim, token: "wrong-token" })).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(2);
+    await expect(store.previewClaimedExport({ ...claim, workerId: " padded " })).rejects.toBeInstanceOf(
+      ExportInventoryUnavailableError,
+    );
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects invalid database rows rather than returning partial or unsafe metadata", async () => {
+    const badRows = [
+      { ...scopeRow, id: null },
+      { ...scopeRow, repositories: {} },
+      { ...scopeRow, scope: "repository", scope_id: "repo-a", repositories: [] },
+      { ...scopeRow, repositories: [{ ...scopeRow.repositories[0], private: "true" }] },
+      { ...scopeRow, repositories: [null] },
+    ];
+    const query = vi.fn();
+    const store = new DataExportInventoryStore({ query });
+    for (const bad of badRows) {
+      query.mockResolvedValueOnce({ rows: [bad] });
+      await expect(store.previewPendingExport(input)).rejects.toBeInstanceOf(ExportInventoryUnavailableError);
+    }
+    expect(query).toHaveBeenCalledTimes(badRows.length);
+  });
+
   it("fails closed when the export is absent or cannot be attributed to the selected installation", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
     await expect(new DataExportInventoryStore({ query }).previewPendingExport(input)).resolves.toBeNull();
