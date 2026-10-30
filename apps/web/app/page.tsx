@@ -85,12 +85,12 @@ const glossaryTerms = [
   {
     term: "Release evidence",
     definition:
-      "Versioned facts used to justify a hardware release decision: check results, manifests, hashes, reports, workflow runs, and manufacturing outputs. Evidence is useful only when a reviewer can trace it back to the exact source revision and see whether it is still current. Every verification assertion records timestamp, Git commit SHA, exit status, and SHA-256 artifact signatures.",
+      "Versioned facts used to justify a hardware release decision include check results, manifests, hashes, reports, workflow runs, and manufacturing outputs. Reviewers can follow run timestamps, commit context, execution outcomes, and artifact SHA-256 digests where those details are recorded. Individual findings or assertions do not necessarily contain every kind of evidence.",
   },
   {
     term: "Check Run",
     definition:
-      "GitHub's native status-and-detail record for a commit. BoardReadyOps publishes a concise readiness conclusion there, then links deeper findings and artifacts so an engineer can start with the decision without losing the audit trail behind it. Annotations appear inline on changed layout or schematic files so hardware reviewers stay in their core pull request workflow.",
+      "GitHub's native status-and-detail record for a commit. BoardReadyOps publishes a concise readiness conclusion and links findings, workflow records, and available artifacts for review. It annotates supported findings when a source file and line location are available; findings without line locations remain accessible in the linked report.",
   },
   {
     term: "Exact-commit evaluation",
@@ -115,7 +115,7 @@ const glossaryTerms = [
   {
     term: "Gerbers (RS-274X & X2)",
     definition:
-      "The standard vector artwork format for printed circuit board fabrication, describing copper conductors, solder mask openings, silkscreen legends, and mechanical outlines. BoardReadyOps inspects layer assignments, aperture macros, coordinate precision, and perimeter continuity to prevent manufacturing delays at the PCB fabrication plant.",
+      "Gerber vector artwork represents PCB copper, solder mask, silkscreen, and board outlines. BoardReadyOps reads layer roles, coordinate declarations, supported aperture definitions, and representable outline contours; complex Gerber aperture macros and blocks may remain unmodelled and are reported as incomplete geometry. This evidence helps reviewers spot fabrication-package issues but does not certify a manufacturable board.",
   },
   {
     term: "IPC-2581 & ODB++",

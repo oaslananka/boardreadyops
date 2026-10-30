@@ -57,6 +57,14 @@ describe("public manufacturing evidence claims (#445 / #771)", () => {
     expect(source).not.toContain("verifies that PCB stackup tables in drawings match");
   });
 
+  it("limits Gerber geometry, Check Run annotations and evidence claims to available evidence", () => {
+    expect(source).toContain("complex Gerber aperture macros and blocks may remain unmodelled");
+    expect(source).toContain("annotates supported findings when a source file and line location are available");
+    expect(source).toContain("where those details are recorded");
+    expect(source).not.toContain("Every verification assertion records timestamp");
+    expect(source).not.toContain("Annotations appear inline on changed layout or schematic files");
+  });
+
   it("keeps reproducible source fixtures and setup paths discoverable", () => {
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/fixed");
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/broken");
