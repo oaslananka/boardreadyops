@@ -121,6 +121,16 @@ Both uninstall requests use the persisted installation `account_login` and `acco
 
 This is an intake contract, not automatic purge. Export request intake is automatic and is intentionally not blocked by legal hold; export pack materialization/download expiry still use the existing export operator/executor workflow. The 30-day period applies to destructive erasure, which remains legal-hold aware. BoardReadyOps does not yet automatically purge every relational data class, delete non-local managed objects, or expire backup/platform copies when the deletion deadline arrives.
 
+**An organization-wide erasure request overlaps every active legal hold within
+its tenant**, including repository- and user-scoped holds. The request is recorded
+as `blocked_by_hold` even if no organization-scoped hold exists. This applies to
+manual intake, GitHub App uninstall, and GitHub Marketplace cancellation.
+A narrower
+repository or user erasure request still checks organization holds and holds
+matching that narrower scope; another tenant's holds cannot block it. These are
+intake-time safeguards, not a completed erasure executor. Any future executor
+must independently recheck overlapping holds before destructive work.
+
 **Legal-hold release is not erasure resumption.** Releasing a hold deactivates only that hold and records who released it. Requests already marked `blocked_by_hold` remain blocked; release does not automatically requeue them, change their deadlines, or initiate deletion. A supported requeue operation is not implemented. Before one can be introduced, it must require an explicit, audited, tenant-authorized action against a selected request, atomically recheck scope and all overlapping active holds, and retain export and reinstall-cancellation evidence. Operators must not treat release as authorization to purge.
 
 ### Tenant scope and auditability

@@ -66,6 +66,7 @@ describe("data lifecycle documentation", () => {
       "complete erasure execution across relational data and managed objects is not automated",
     );
     expect(lifecycle).toContain("tenant-scoped legal holds can be created, released, and enforced");
+    expect(lifecycle).toContain("An organization-wide erasure request overlaps every active legal hold");
     expect(lifecycle).toContain("backup and platform-log expiry remain operator responsibilities");
   });
 

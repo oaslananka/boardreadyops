@@ -318,13 +318,30 @@ function leaseContext(input: {
 async function boundedResponseText(response: Response): Promise<string> {
   const declaredLength = response.headers.get("content-length");
   if (declaredLength && /^\d+$/u.test(declaredLength) && Number(declaredLength) > responseBodyLimitBytes) {
+    // An early header rejection must also stop the unread response stream.
+    await response.body?.cancel().catch(() => undefined);
     throw new Error("runner control-plane response exceeded the maximum permitted size");
   }
-  const body = await response.text();
-  if (Buffer.byteLength(body, "utf8") > responseBodyLimitBytes) {
-    throw new Error("runner control-plane response exceeded the maximum permitted size");
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > responseBodyLimitBytes) {
+        // Stop receiving data before buffering an unbounded response body.
+        await reader.cancel().catch(() => undefined);
+        throw new Error("runner control-plane response exceeded the maximum permitted size");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return body;
+  return new TextDecoder().decode(Buffer.concat(chunks, totalBytes));
 }
 
 function positiveInteger(value: number, name: string): number {

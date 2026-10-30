@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "@boardreadyops/cloud-core/lifecycle";
 import type { GitHubAppLifecycleStore } from "@boardreadyops/cloud-core/lifecycle-executor";
+import { emitTelemetryEvent, type TelemetryEvent } from "@boardreadyops/cloud-core/telemetry";
 
 export type SqlQueryResult = {
   rows?: readonly Record<string, unknown>[];
@@ -20,6 +21,7 @@ export type SqlLifecycleStoreOptions = {
   now?: () => Date;
   id?: () => string;
   releaseRepositoryRolloutPolicy?: ReleaseRepositoryRolloutPolicy;
+  emitTelemetry?: (event: TelemetryEvent) => void;
 };
 
 export type GitHubAppMetadataStore = Pick<
@@ -253,7 +255,7 @@ export function createSqlGitHubAppMetadataStore(
     async upsertInstallation(action, context) {
       const at = iso(now);
       const audit = lifecycleAuditEventForAction(action, context);
-      await executor.query(
+      const result = await executor.query(
         `with existing_installation as materialized (
            select account_login as previous_account_login
              from installations
@@ -306,8 +308,11 @@ export function createSqlGitHubAppMetadataStore(
            from persisted
            where $6::text is not null
            on conflict (id) do nothing
+           returning id
          )
-         select id from persisted`,
+         select persisted.id,
+                exists(select 1 from audited) as installation_audit_created
+           from persisted`,
         [
           id(),
           action.installation.id,
@@ -317,6 +322,27 @@ export function createSqlGitHubAppMetadataStore(
           ...auditParameters(audit),
         ],
       );
+
+      // The existing unique audit row is the durable first-install fact. A replay or
+      // account refresh must not count as a second installation. Log only after the
+      // transaction has successfully committed, without affecting webhook retry safety.
+      const rows =
+        typeof result === "object" && result !== null && "rows" in result ? (result as SqlQueryResult).rows : undefined;
+      if (
+        audit?.eventType === "github_app.installation.enabled" &&
+        rows?.[0]?.installation_audit_created === true &&
+        action.installation.accountType
+      ) {
+        try {
+          (options.emitTelemetry ?? emitTelemetryEvent)({
+            event: "app_installed",
+            installationId: action.installation.id,
+            accountType: action.installation.accountType,
+          });
+        } catch {
+          // Observability must not turn a completed installation write into a replay.
+        }
+      }
     },
 
     async deleteInstallation(action, context) {
@@ -364,6 +390,7 @@ export function createSqlGitHubAppMetadataStore(
             where legal_holds.active = true
               and (
                 legal_holds.scope = 'organization'
+                or erasure_scope.scope = 'organization'
                 or (
                   legal_holds.scope = erasure_scope.scope
                   and (legal_holds.scope_id = erasure_scope.scope_id
