@@ -6,6 +6,7 @@ import {
   DataExportPreparationStore,
   ExportPreparationInputError,
 } from "../../packages/db/src/data-export-preparation-store.js";
+import { DataLifecycleStore } from "../../packages/db/src/data-lifecycle-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -117,6 +118,62 @@ describeDatabase("installation-bound read-only export preparation claims (Postgr
       // Avoid leaking a fixture from this scope test into the claim-order test.
       await db().query("DELETE FROM data_exports WHERE id = $1", [row.id]);
     }
+  });
+
+  it("shows export metadata only to the owning live installation, not a same-tenant sibling", async () => {
+    const id = await created("repository", repositories[0]);
+    expect(id).toBeTruthy();
+    if (!id) throw new Error("expected repo-bound export");
+    const status = new DataLifecycleStore(db());
+    expect(await status.getExport(tenant, id, installations[0])).toMatchObject({
+      id,
+      tenantId: tenant,
+      scope: "repository",
+      scopeId: repositories[0],
+      status: "pending",
+    });
+    // Both installations belong to the same tenant, but the claim belongs to exactly one.
+    expect(await status.getExport(tenant, id, installations[1])).toBeNull();
+    expect(await status.getExport(outsider, id, installations[0])).toBeNull();
+    expect(await status.getExport(tenant, id, installations[2])).toBeNull();
+
+    await db().query("UPDATE repositories SET disabled_at=NOW() WHERE id=$1", [repositories[0]]);
+    try {
+      expect(await status.getExport(tenant, id, installations[0])).toBeNull();
+    } finally {
+      await db().query("UPDATE repositories SET disabled_at=NULL WHERE id=$1", [repositories[0]]);
+    }
+    await db().query("UPDATE installations SET suspended_at=NOW() WHERE id=$1", [installations[0]]);
+    try {
+      expect(await status.getExport(tenant, id, installations[0])).toBeNull();
+    } finally {
+      await db().query("UPDATE installations SET suspended_at=NULL WHERE id=$1", [installations[0]]);
+    }
+    expect(await status.getExport(tenant, id, installations[0])).toMatchObject({ id });
+
+    // The historical unbound organization request cannot be attributed safely.
+    const old = randomUUID();
+    exported.push(old);
+    await db().query(
+      "INSERT INTO data_exports(id,tenant_id,requested_by,status,scope) VALUES ($1,$2,'operator','pending','organization')",
+      [old, tenant],
+    );
+    expect(await status.getExport(tenant, old, installations[0])).toBeNull();
+
+    // Legacy unbound user-scope status remains visible without claiming package delivery.
+    const user = randomUUID();
+    exported.push(user);
+    await db().query(
+      "INSERT INTO data_exports(id,tenant_id,requested_by,status,scope,scope_id) VALUES ($1,$2,'operator','pending','user','operator')",
+      [user, tenant],
+    );
+    expect(await status.getExport(tenant, user, installations[0])).toMatchObject({
+      id: user,
+      status: "pending",
+      scope: "user",
+    });
+    // Do not leave an extra pending export for the following claim-order test.
+    await db().query("DELETE FROM data_exports WHERE id=ANY($1::text[])", [[id, old, user]]);
   });
 
   it("claims only installation-bound requests; old unbound rows remain untouched", async () => {

@@ -40,7 +40,7 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
   try {
     const store = new DataLifecycleStore(executor);
     const tenantId = tenantLogin;
-    const exp = await store.getExport(tenantId, exportId);
+    const exp = await store.getExport(tenantId, exportId, canonicalInstallationId);
     if (!exp)
       return Response.json(
         { ok: false, error: "not found" },

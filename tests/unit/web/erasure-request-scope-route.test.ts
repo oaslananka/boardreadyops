@@ -408,9 +408,16 @@ describe("tenant-authorized lifecycle routes", () => {
       context,
     );
     expect(response.status).toBe(200);
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("SELECT * FROM data_exports"), [
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM data_exports"), [
       "ex-1",
       "organization-a",
+      "inst-a",
     ]);
+    const sql = query.mock.calls[0]?.[0];
+    expect(sql).toContain("installations.suspended_at IS NULL");
+    expect(sql).toContain("data_exports.installation_id = installations.id");
+    expect(sql).toContain("repositories.installation_id = installations.id");
+    expect(sql).toContain("repositories.disabled_at IS NULL");
+    expect(sql).toContain("data_exports.installation_id IS NULL AND data_exports.scope = 'user'");
   });
 });
