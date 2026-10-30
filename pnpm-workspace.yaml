@@ -21,6 +21,12 @@ minimumReleaseAgeExclude:
   - 'proxy-addr@2.0.8'
   - 'source-map-js@1.2.2'
   - 'vite@8.2.4'
+  # Two freshly published DoS fixes; keep release-age exception exact and short-lived.
+  - 'glob@14.0.2'
+  - 'minimatch@11.0.1'
+  # Exact newly required transitive versions in patched glob 14.
+  - '@isaacs/nonrecursive-glob-match@1.0.1'
+  - 'path-scurry@3.0.0'
   # Security advisory fixes from latest OSV scan. Review exclusions after normal age window.
   - 'fast-uri@3.1.9'
   - 'body-parser@2.4.0'
@@ -76,7 +82,9 @@ overrides:
   '@octokit/request@>=1.0.0 <8.4.1': '>=8.4.1'
   diff@>=6.0.0 <8.0.3: '>=8.0.3'
   esbuild@<=0.24.2: '>=0.25.0'
-  glob@>=10.0.0 <13.0.6: 13.0.6
+  # Oct 29 OSV DoS advisories: avoid the vulnerable glob 13/minimatch 10 tree.
+  glob@>=10.0.0 <14.0.2: 14.0.2
+  minimatch@>=10.0.0 <11.0.1: 11.0.1
   'qs@>=6.7.0 <6.16.1': 6.16.1
   'undici@>=8.0.0 <8.11.0': 8.12.3
   'undici@>=6 <6.29.1': 6.29.1
