@@ -48,6 +48,15 @@ describe("public manufacturing evidence claims (#445 / #771)", () => {
     expect(source).not.toContain("verifies pin 1 rotation conventions");
   });
 
+  it("describes mask coverage and stackup count without promising fab geometry certification", () => {
+    expect(source).toContain("matching solder-mask layers on copper sides");
+    expect(source).toContain("does not measure solder-mask web clearance");
+    expect(source).toContain("compares the parsed PCB stackup layer count");
+    expect(source).toContain("does not independently verify impedance");
+    expect(source).not.toContain("catches tight-pitch pad clearances that violate vendor mask capability");
+    expect(source).not.toContain("verifies that PCB stackup tables in drawings match");
+  });
+
   it("keeps reproducible source fixtures and setup paths discoverable", () => {
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/fixed");
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/broken");

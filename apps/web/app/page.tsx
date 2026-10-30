@@ -130,12 +130,12 @@ const glossaryTerms = [
   {
     term: "Solder Mask Dam & Web Clearance",
     definition:
-      "The minimum physical bridge of solder mask material between adjacent surface mount pads. Missing or undersized solder mask webs cause solder bridging and short circuits during convection reflow assembly. BoardReadyOps catches tight-pitch pad clearances that violate vendor mask capability.",
+      "The minimum physical bridge of solder mask material between adjacent surface-mount pads. Missing or undersized webs can increase solder-bridging risk. BoardReadyOps checks for matching solder-mask layers on copper sides in a Gerber package, but does not measure solder-mask web clearance or certify it against a fabricator's process limits.",
   },
   {
     term: "Impedance & Layer Stackup",
     definition:
-      "Controlled dielectric heights, copper weights, and trace geometries required for high-speed differential pairs, USB, Ethernet, and RF routing. Release validation verifies that PCB stackup tables in drawings match the physical layer definitions exported in Gerber and drill archives.",
+      "Controlled dielectric heights, copper weights, and trace geometries matter for high-speed, RF, and differential-pair routing. BoardReadyOps compares the parsed PCB stackup layer count with the configured expected copper-layer count. This does not independently verify impedance, dielectric properties, or drawing-to-Gerber stackup equivalence; those require engineering and fabrication review.",
   },
 ] as const;
 
