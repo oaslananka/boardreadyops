@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -138,6 +139,45 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).not.toContain("docker volume prune");
     expect(documentation).toContain("explicit operator opt-in");
     expect(documentation).toContain("verified rollback pin");
+  });
+
+  it("rejects a quiesced dry-run before loading secrets or establishing remote access", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    const validation = workflow.indexOf("      - name: Validate deployment mode");
+    const doppler = workflow.indexOf("      - name: Install Doppler CLI");
+    const tailscale = workflow.indexOf("      - name: Connect Tailscale");
+    const ssh = workflow.indexOf("      - name: Run production deploy runbook");
+
+    expect(validation).toBeGreaterThan(0);
+    expect(validation).toBeLessThan(doppler);
+    expect(doppler).toBeLessThan(tailscale);
+    expect(tailscale).toBeLessThan(ssh);
+    expect(workflow).toContain("DRY_RUN: $" + "{{ inputs.dry_run }}");
+    expect(workflow).toContain("PRE_QUIESCED_WORKER: $" + "{{ inputs.pre_quiesced_worker }}");
+    // Preserve the remote fail-closed check as a second guard.
+    expect(workflow).toContain(
+      'if [ "$quiesced_worker" = 1 ] && [ "$deploy_args" != "up -d --build migrate web worker" ]; then',
+    );
+
+    const step = workflow.slice(validation, doppler);
+    const script = step.match(/ {8}run: \|\n((?: {10}.*\n)+)/u)?.[1];
+    expect(script).toBeDefined();
+    const commands = script?.replace(/^ {10}/gmu, "") ?? "";
+    for (const [dryRun, quiesced, expectedStatus] of [
+      ["true", "true", 78],
+      ["true", "false", 0],
+      ["false", "false", 0],
+      ["false", "true", 0],
+    ] as const) {
+      const result = spawnSync("bash", ["-c", commands], {
+        env: { ...process.env, DRY_RUN: dryRun, PRE_QUIESCED_WORKER: quiesced },
+        encoding: "utf8",
+      });
+      expect(result.status).toBe(expectedStatus);
+      if (expectedStatus !== 0) {
+        expect(result.stderr).toContain("pre_quiesced_worker=true requires dry_run=false");
+      }
+    }
   });
 
   it("supports an explicitly quiesced deletion worker without relaxing the default release check", () => {
