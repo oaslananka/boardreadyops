@@ -79,6 +79,33 @@ describe("erasure request scope boundary", () => {
   });
 });
 
+describe("shared lifecycle request transport boundary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    viewerAuthorization.mockResolvedValue({
+      session: { userId: 42, login: "acme", installationIds: [10] },
+    });
+    persistence.mockReturnValue({ mode: "memory" });
+  });
+
+  it("rejects malformed JSON for both routes without touching persistence", async () => {
+    for (const post of [POST, postExport]) {
+      const response = await post(
+        new Request("https://boardreadyops.test/api/v1/lifecycle", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{",
+        }),
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(await response.json()).toMatchObject({ ok: false, error: "Invalid JSON" });
+    }
+    expect(persistence).not.toHaveBeenCalled();
+    expect(createPgQueryExecutor).not.toHaveBeenCalled();
+  });
+});
+
 describe("export request scope boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
