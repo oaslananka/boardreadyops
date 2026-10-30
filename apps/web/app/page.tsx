@@ -100,7 +100,7 @@ const glossaryTerms = [
   {
     term: "CPL / position file",
     definition:
-      "The component placement list used by an assembler to place parts on the PCB. Coordinates, rotation, side, reference designators, and package identity need to agree with the released board and BOM; stale placement data can make an otherwise clean design impossible to assemble correctly. BoardReadyOps verifies pin 1 rotation conventions and coordinate origins across SMD footprints.",
+      "The component placement list used by an assembler to place parts on the PCB. Coordinates, rotation, side, reference designators, and package identity need to agree with the released board and BOM. BoardReadyOps checks whether configured position outputs cover populated references and can flag custom footprints for manual pin-1 marker review. It does not certify placement rotations or coordinate origins.",
   },
   {
     term: "Waiver",
@@ -120,7 +120,7 @@ const glossaryTerms = [
   {
     term: "IPC-2581 & ODB++",
     definition:
-      "Intelligent manufacturing data exchange formats consolidating layer stackup, drill definitions, component placement data, and electrical netlists into a single digital container. BoardReadyOps validates schema conformance and cross-checks layer definitions against board physical stackup parameters.",
+      "IPC-2581 and ODB++ are manufacturing exchange formats that can carry layer, drill, component placement, and electrical netlist data. BoardReadyOps can detect and parse supported IPC-2581 data. ODB++ schema validation and comprehensive exchange-format-to-board-stackup verification are not part of the current release-readiness checks.",
   },
   {
     term: "Annular Ring & Drill Breakout",
@@ -184,9 +184,9 @@ const releaseFaq = [
       "The handoff needs more than a folder of outputs. It needs a traceable source revision, a manifest or equivalent inventory, hashes for important files, the policy that was evaluated, and a workflow record showing how the evidence was produced and checked. BoardReadyOps organizes those facts around the release decision so another engineer can reconstruct why the board was considered ready without relying on somebody's local workstation state. Audit logs preserve the complete verification trail.",
   },
   {
-    question: "How does BoardReadyOps verify schematic and layout synchronization?",
+    question: "What electrical connectivity checks does BoardReadyOps provide?",
     answer:
-      "BoardReadyOps extracts electrical netlists from both the schematic (via kicad-cli or eeschema exports) and the routed PCB layout (via pcbnew exports) and performs a deep structural netlist comparison. Any pin disconnect, unintended net merger, swapped differential polarity, or missing pull-up resistor triggers a blocking finding with exact component designators and schematic sheet references.",
+      "When enabled and KiCad CLI is available, BoardReadyOps runs KiCad ERC on schematics and DRC on PCB layouts, tying their diagnostics to the evaluated revision. Optional pinmap rules compare configured pin assignments and net names with parsed schematic data. These checks do not independently prove schematic-to-PCB netlist equivalence, differential-pair polarity, or the presence of required pull-up resistors; engineering review remains necessary.",
   },
 ] as const;
 

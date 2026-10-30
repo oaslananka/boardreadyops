@@ -33,6 +33,21 @@ describe("public manufacturing evidence claims (#445 / #771)", () => {
     expect(source).not.toContain("documented, auditable compliance");
   });
 
+  it("describes electrical checks without promising independent cross-netlist verification", () => {
+    expect(source).toContain("runs KiCad ERC on schematics and DRC on PCB layouts");
+    expect(source).toContain("do not independently prove schematic-to-PCB netlist equivalence");
+    expect(source).not.toContain("deep structural netlist comparison");
+    expect(source).not.toContain("missing pull-up resistor triggers a blocking finding");
+  });
+
+  it("keeps exchange-format and assembly claims within implemented checks", () => {
+    expect(source).toContain("supported IPC-2581 data");
+    expect(source).toContain("ODB++ schema validation");
+    expect(source).toContain("can flag custom footprints for manual pin-1 marker review");
+    expect(source).not.toContain("BoardReadyOps validates schema conformance and cross-checks layer definitions");
+    expect(source).not.toContain("verifies pin 1 rotation conventions");
+  });
+
   it("keeps reproducible source fixtures and setup paths discoverable", () => {
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/fixed");
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/broken");
