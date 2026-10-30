@@ -11,10 +11,10 @@ vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
 vi.mock("../../../apps/web/lib/cloud-runtime-config.js", () => ({
   resolveCloudPersistenceConfiguration: persistence,
 }));
-vi.mock("../../../apps/web/lib/settings-tenant.js", () => ({ resolveSettingsTenantScope: resolveTenant }));
 vi.mock("@boardreadyops/db/pg-executor", () => ({
   createPgQueryExecutor,
 }));
+vi.mock("../../../apps/web/lib/settings-tenant.js", () => ({ resolveSettingsTenantScope: resolveTenant }));
 
 import { GET as getExport } from "../../../apps/web/app/api/v1/data-exports/[exportId]/route.js";
 import { POST as postExport } from "../../../apps/web/app/api/v1/data-exports/route.js";
@@ -97,6 +97,94 @@ describe("shared lifecycle request transport boundary", () => {
       selected: { id: "inst-a", accountLogin: "organization-a" },
       installations: [{ id: "inst-a", accountLogin: "organization-a" }],
     });
+  });
+
+  it("records bounded export and erasure intake and closes the database executor", async () => {
+    persistence.mockReturnValue({ mode: "postgres", databaseUrl: "postgres://invalid.test/mock" });
+    const query = vi.fn().mockImplementation(async (_statement: string, values: readonly unknown[]) => ({
+      rows: [
+        {
+          id: "record-1",
+          tenant_id: values[1],
+          requested_by: values[2],
+          status: "pending",
+          scope: values[3],
+          scope_id: values[4],
+          dry_run: false,
+          created_at: new Date("2026-10-30T00:00:00Z"),
+        },
+      ],
+    }));
+    const close = vi.fn().mockResolvedValue(undefined);
+    createPgQueryExecutor.mockReturnValue({ query, close });
+
+    const exportResponse = await postExport(request({ installationId: "inst-a", scope: "organization" }));
+    expect(exportResponse.status).toBe(201);
+    expect(exportResponse.headers.get("cache-control")).toBe("private, no-store");
+    expect(await exportResponse.json()).toMatchObject({ ok: true, exportId: "record-1", status: "pending" });
+
+    const erasureResponse = await POST(request({ installationId: "inst-a", scope: "organization" }));
+    expect(erasureResponse.status).toBe(201);
+    expect(await erasureResponse.json()).toMatchObject({ ok: true, erasure: { id: "record-1", status: "pending" } });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls.map(([, values]) => values.slice(1, 5))).toEqual([
+      ["organization-a", "acme", "organization", null],
+      ["organization-a", "acme", "organization", null],
+    ]);
+    expect(close).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns a legal-hold conflict and still releases the database connection", async () => {
+    persistence.mockReturnValue({ mode: "postgres", databaseUrl: "postgres://invalid.test/mock" });
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: "erasure-1",
+          tenant_id: "organization-a",
+          requested_by: "acme",
+          scope: "organization",
+          scope_id: null,
+          status: "blocked_by_hold",
+          dry_run: true,
+          created_at: new Date("2026-10-30T00:00:00Z"),
+        },
+      ],
+    });
+    const close = vi.fn().mockResolvedValue(undefined);
+    createPgQueryExecutor.mockReturnValue({ query, close });
+
+    const response = await POST(request({ installationId: "inst-a", scope: "organization", dryRun: true }));
+    expect(response.status).toBe(409);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: "Blocked by legal hold",
+      erasure: { id: "erasure-1", status: "blocked_by_hold" },
+    });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("rejects oversized JSON intake payloads before reading or using persistence", async () => {
+    for (const post of [POST, postExport]) {
+      for (const headers of [
+        { "content-type": "application/json" },
+        { "content-type": "application/json", "content-length": "65536" },
+      ]) {
+        const response = await post(
+          new Request("https://boardreadyops.test/api/v1/lifecycle", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ scope: "organization", unused: "x".repeat(16 * 1024) }),
+          }),
+        );
+        expect(response.status).toBe(413);
+        expect(response.headers.get("cache-control")).toBe("private, no-store");
+        expect(await response.json()).toMatchObject({ ok: false, error: "Request payload too large" });
+      }
+    }
+    expect(persistence).not.toHaveBeenCalled();
+    expect(createPgQueryExecutor).not.toHaveBeenCalled();
   });
 
   it("rejects malformed JSON for both routes without touching persistence", async () => {

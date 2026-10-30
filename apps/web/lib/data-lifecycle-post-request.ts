@@ -1,7 +1,10 @@
 import type { output, ZodType } from "zod";
+import { RequestBodyTooLargeError, readBoundedRequestBody } from "./bounded-request-body.js";
 import { resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
 import { resolveSettingsTenantScope } from "./settings-tenant.js";
 import { viewerAuthorization } from "./viewer-authorization.js";
+
+const maximumLifecycleBodyBytes = 16 * 1024;
 
 type PreparedLifecyclePost<T extends ZodType> =
   | { ok: true; actorLogin: string; tenantId: string; data: output<T>; databaseUrl: string }
@@ -24,14 +27,15 @@ export async function prepareLifecyclePost<T extends ZodType>(
   }
   let body: unknown = {};
   try {
-    const text = await request.text();
+    const text = (await readBoundedRequestBody(request, maximumLifecycleBodyBytes)).toString("utf8");
     if (text) body = JSON.parse(text) as unknown;
-  } catch {
+  } catch (error) {
+    const tooLarge = error instanceof RequestBodyTooLargeError;
     return {
       ok: false,
       response: Response.json(
-        { ok: false, error: "Invalid JSON" },
-        { status: 400, headers: { "cache-control": "private, no-store" } },
+        { ok: false, error: tooLarge ? "Request payload too large" : "Invalid JSON" },
+        { status: tooLarge ? 413 : 400, headers: { "cache-control": "private, no-store" } },
       ),
     };
   }
