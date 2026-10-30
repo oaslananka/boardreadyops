@@ -222,7 +222,7 @@ export class DataExportPreparationStore {
     if (rows(result).length !== 1) return null;
     // Verify actual persisted bytes and digest, never call this "completed".
     const persisted = await this.readStagedManifest(input);
-    if (!persisted || persisted.sha256 !== prepared.sha256 || persisted.byteLength !== prepared.byteLength)
+    if (persisted?.sha256 !== prepared.sha256 || persisted?.byteLength !== prepared.byteLength)
       throw new Error("Persisted export manifest failed integrity verification");
     return { sha256: persisted.sha256, byteLength: persisted.byteLength };
   }
