@@ -174,12 +174,16 @@ function CanvasMarkersLayer({
       {sheetAnchors.map((anchor) => {
         if (anchor.kind === "finding" && anchor.metadata?.fingerprint) {
           const fp = String(anchor.metadata.fingerprint);
-          const isSelected = fp === selectedFindingFingerprint;
           const sev = String(anchor.metadata.severity ?? "warning");
           const position = markerPosition(anchor);
           const key = nativeAnchorKey(anchor);
           const group = key ? sourceGroups.get(key) : undefined;
           if (group && group.length > 1 && group[0]?.id !== anchor.id) return null;
+          // A grouped marker represents every source finding at this object,
+          // not only the fingerprint on its first visible anchor.
+          const isSelected = group
+            ? group.some((item) => item.metadata?.fingerprint === selectedFindingFingerprint)
+            : fp === selectedFindingFingerprint;
           const nextFp = nextSourceFindingFingerprint(group ?? [anchor], selectedFindingFingerprint) ?? fp;
           // Until the real image viewport is measured, native markers are not positioned.
           if (anchor.metadata.provenance === "kicad-json-object-position" && !position) return null;
