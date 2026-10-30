@@ -236,6 +236,11 @@ describe("tenant-authorized lifecycle routes", () => {
     const context = { params: Promise.resolve({ exportId: "ex-1" }) };
     const noInstallation = await getExport(new Request("https://boardreadyops.test/api/v1/data-exports/ex-1"), context);
     expect(noInstallation.status).toBe(400);
+    const noncanonical = await getExport(
+      new Request("https://boardreadyops.test/api/v1/data-exports/ex-1?installationId=%20inst-a%20"),
+      context,
+    );
+    expect(noncanonical.status).toBe(400);
 
     resolveTenant.mockResolvedValueOnce({ selected: undefined, installations: [] });
     const denied = await getExport(

@@ -14,7 +14,8 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
       { status: 401, headers: { "cache-control": "private, no-store" } },
     );
   const installationId = new URL(request.url).searchParams.get("installationId");
-  if (!installationId || installationId !== installationId.trim()) {
+  const canonicalInstallationId = installationId?.trim();
+  if (!canonicalInstallationId || canonicalInstallationId !== installationId) {
     return Response.json(
       { ok: false, error: "installationId is required" },
       { status: 400, headers: { "cache-control": "private, no-store" } },
@@ -27,7 +28,7 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
       { ok: false, error: "Database not configured" },
       { status: 503, headers: { "cache-control": "private, no-store" } },
     );
-  const selected = (await resolveSettingsTenantScope(viewer.session, installationId)).selected;
+  const selected = (await resolveSettingsTenantScope(viewer.session, canonicalInstallationId)).selected;
   const tenantLogin = selected?.accountLogin.trim();
   if (!tenantLogin || tenantLogin.startsWith("Installation #")) {
     return Response.json(
