@@ -57,7 +57,7 @@ export function buildPendingExportManifest(inventory: PendingExportInventory): P
       !row ||
       !textIdentifier(row.repositoryId) ||
       !textIdentifier(row.githubRepositoryId, 20) ||
-      !/^[0-9]+$/u.test(row.githubRepositoryId) ||
+      !/^\d+$/u.test(row.githubRepositoryId) ||
       !textIdentifier(row.owner, 256) ||
       !textIdentifier(row.name, 1024) ||
       typeof row.private !== "boolean" ||
@@ -87,7 +87,11 @@ export function buildPendingExportManifest(inventory: PendingExportInventory): P
     throw new ExportManifestPreparationError();
   }
 
-  repositories.sort((a, b) => (a.repositoryId < b.repositoryId ? -1 : a.repositoryId > b.repositoryId ? 1 : 0));
+  repositories.sort((a, b) => {
+    if (a.repositoryId < b.repositoryId) return -1;
+    if (a.repositoryId > b.repositoryId) return 1;
+    return 0;
+  });
   const bytes = Buffer.from(
     `${JSON.stringify({
       formatVersion: 1,
