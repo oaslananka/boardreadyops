@@ -127,11 +127,62 @@ describe("shared lifecycle request transport boundary", () => {
     expect(erasureResponse.status).toBe(201);
     expect(await erasureResponse.json()).toMatchObject({ ok: true, erasure: { id: "record-1", status: "pending" } });
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls.map(([, values]) => values.slice(1, 5))).toEqual([
-      ["organization-a", "acme", "organization", null],
-      ["organization-a", "acme", "organization", null],
-    ]);
+    expect(query.mock.calls[0]?.[0]).toContain("repositories.installation_id = owned_installation.id");
+    expect(query.mock.calls[0]?.[0]).toContain("suspended_at IS NULL");
+    expect(query.mock.calls[0]?.[1]?.slice(1)).toEqual(["inst-a", "organization-a", "acme", "organization", null]);
+    expect(query.mock.calls[1]?.[1]?.slice(1)).toEqual(["organization-a", "acme", "organization", null, false]);
     expect(close).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves user-scoped request intake without claiming that a preparable package exists", async () => {
+    persistence.mockReturnValue({ mode: "postgres", databaseUrl: "postgres://invalid.test/mock" });
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: "legacy-user",
+          tenant_id: "organization-a",
+          requested_by: "acme",
+          status: "pending",
+          scope: "user",
+          scope_id: "acme",
+          created_at: new Date("2026-10-30T00:00:00Z"),
+        },
+      ],
+    });
+    const close = vi.fn().mockResolvedValue(undefined);
+    createPgQueryExecutor.mockReturnValue({ query, close });
+    const response = await postExport(request({ scope: "user", scopeId: "acme" }));
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ ok: true, exportId: "legacy-user", status: "pending" });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO data_exports"), [
+      expect.any(String),
+      "organization-a",
+      "acme",
+      "user",
+      "acme",
+    ]);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed when persisted installation or repository authorization disappears after session resolution", async () => {
+    persistence.mockReturnValue({ mode: "postgres", databaseUrl: "postgres://invalid.test/mock" });
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const close = vi.fn().mockResolvedValue(undefined);
+    createPgQueryExecutor.mockReturnValue({ query, close });
+    const result = await postExport(request({ scope: "repository", scopeId: "foreign-repo" }));
+    expect(result.status).toBe(403);
+    expect(result.headers.get("cache-control")).toBe("private, no-store");
+    expect(await result.json()).toMatchObject({ ok: false, error: "installation or repository access denied" });
+    expect(query).toHaveBeenCalledOnce();
+    expect(query.mock.calls[0]?.[0]).toContain("repositories.installation_id = owned_installation.id");
+    expect(query.mock.calls[0]?.[1]?.slice(1)).toEqual([
+      "inst-a",
+      "organization-a",
+      "acme",
+      "repository",
+      "foreign-repo",
+    ]);
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it("returns a legal-hold conflict and still releases the database connection", async () => {

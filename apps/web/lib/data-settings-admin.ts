@@ -1,4 +1,5 @@
 import {
+  type DataExportPreparationStore,
   type DataLifecycleStore,
   type LegalHold,
   LegalHoldAdmissionConflictError,
@@ -43,7 +44,8 @@ type DataSettingsStore = Pick<
   | "releaseLegalHold"
   | "createExport"
   | "createErasure"
->;
+> &
+  Pick<DataExportPreparationStore, "createBoundPendingExport">;
 
 type OpenedStore = { readonly store: DataSettingsStore; readonly close: () => Promise<void> };
 
@@ -58,12 +60,20 @@ export type DataSettingsAdminDependencies = {
 async function openDefaultStore(): Promise<OpenedStore | undefined> {
   const connectionString = process.env.DATABASE_URL?.trim();
   if (!connectionString) return undefined;
-  const [{ DataLifecycleStore }, { createPgQueryExecutor }] = await Promise.all([
+  const [{ DataExportPreparationStore, DataLifecycleStore }, { createPgQueryExecutor }] = await Promise.all([
     import("@boardreadyops/db"),
     import("@boardreadyops/db/pg-executor"),
   ]);
   const executor = createPgQueryExecutor({ connectionString, max: 1 });
-  return { store: new DataLifecycleStore(executor), close: () => executor.close() };
+  const store = new DataLifecycleStore(executor);
+  const exportStore = new DataExportPreparationStore(executor);
+  return {
+    store: Object.assign(store, {
+      createBoundPendingExport: (input: Parameters<DataExportPreparationStore["createBoundPendingExport"]>[0]) =>
+        exportStore.createBoundPendingExport(input),
+    }),
+    close: () => executor.close(),
+  };
 }
 
 const defaultDependencies: DataSettingsAdminDependencies = {
@@ -260,6 +270,22 @@ export async function requestExportForViewer(
   const opened = await dependencies.openStore();
   if (!opened) return fail("This deployment has no database configured.");
   try {
+    if (input.scope !== "user") {
+      const exportId = await opened.store.createBoundPendingExport({
+        tenantId: selected.accountLogin,
+        installationId: selected.id,
+        requestedBy: session.login,
+        scope: input.scope,
+        scopeId: scopeId ?? null,
+      });
+      if (!exportId) return fail("The selected installation or repository is no longer available.");
+      return ok(
+        { exportId, status: "pending" },
+        "Export request recorded; creating a downloadable pack requires operator processing.",
+      );
+    }
+    // Legacy user-scope intake remains pending; user-scope package
+    // preparation is not currently implemented.
     const record = await opened.store.createExport({
       tenantId: selected.accountLogin,
       requestedBy: session.login,
