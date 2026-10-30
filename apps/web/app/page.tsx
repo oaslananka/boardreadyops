@@ -85,12 +85,12 @@ const glossaryTerms = [
   {
     term: "Release evidence",
     definition:
-      "Versioned facts used to justify a hardware release decision: check results, manifests, hashes, reports, workflow runs, and manufacturing outputs. Evidence is useful only when a reviewer can trace it back to the exact source revision and see whether it is still current. Every verification assertion records timestamp, Git commit SHA, exit status, and SHA-256 artifact signatures.",
+      "Versioned facts used to justify a hardware release decision include check results, manifests, hashes, reports, workflow runs, and manufacturing outputs. Reviewers can follow run timestamps, commit context, execution outcomes, and artifact SHA-256 digests where those details are recorded. Individual findings or assertions do not necessarily contain every kind of evidence.",
   },
   {
     term: "Check Run",
     definition:
-      "GitHub's native status-and-detail record for a commit. BoardReadyOps publishes a concise readiness conclusion there, then links deeper findings and artifacts so an engineer can start with the decision without losing the audit trail behind it. Annotations appear inline on changed layout or schematic files so hardware reviewers stay in their core pull request workflow.",
+      "GitHub's native status-and-detail record for a commit. BoardReadyOps publishes a concise readiness conclusion and links findings, workflow records, and available artifacts for review. It annotates supported findings when a source file and line location are available; findings without line locations remain accessible in the linked report.",
   },
   {
     term: "Exact-commit evaluation",
@@ -100,7 +100,7 @@ const glossaryTerms = [
   {
     term: "CPL / position file",
     definition:
-      "The component placement list used by an assembler to place parts on the PCB. Coordinates, rotation, side, reference designators, and package identity need to agree with the released board and BOM; stale placement data can make an otherwise clean design impossible to assemble correctly. BoardReadyOps verifies pin 1 rotation conventions and coordinate origins across SMD footprints.",
+      "The component placement list used by an assembler to place parts on the PCB. Coordinates, rotation, side, reference designators, and package identity need to agree with the released board and BOM. BoardReadyOps checks whether configured position outputs cover populated references and can flag custom footprints for manual pin-1 marker review. It does not certify placement rotations or coordinate origins.",
   },
   {
     term: "Waiver",
@@ -115,12 +115,12 @@ const glossaryTerms = [
   {
     term: "Gerbers (RS-274X & X2)",
     definition:
-      "The standard vector artwork format for printed circuit board fabrication, describing copper conductors, solder mask openings, silkscreen legends, and mechanical outlines. BoardReadyOps inspects layer assignments, aperture macros, coordinate precision, and perimeter continuity to prevent manufacturing delays at the PCB fabrication plant.",
+      "Gerber vector artwork represents PCB copper, solder mask, silkscreen, and board outlines. BoardReadyOps reads layer roles, coordinate declarations, supported aperture definitions, and representable outline contours; complex Gerber aperture macros and blocks may remain unmodelled and are reported as incomplete geometry. This evidence helps reviewers spot fabrication-package issues but does not certify a manufacturable board.",
   },
   {
     term: "IPC-2581 & ODB++",
     definition:
-      "Intelligent manufacturing data exchange formats consolidating layer stackup, drill definitions, component placement data, and electrical netlists into a single digital container. BoardReadyOps validates schema conformance and cross-checks layer definitions against board physical stackup parameters.",
+      "IPC-2581 and ODB++ are manufacturing exchange formats that can carry layer, drill, component placement, and electrical netlist data. BoardReadyOps can detect and parse supported IPC-2581 data. ODB++ schema validation and comprehensive exchange-format-to-board-stackup verification are not part of the current release-readiness checks.",
   },
   {
     term: "Annular Ring & Drill Breakout",
@@ -130,12 +130,12 @@ const glossaryTerms = [
   {
     term: "Solder Mask Dam & Web Clearance",
     definition:
-      "The minimum physical bridge of solder mask material between adjacent surface mount pads. Missing or undersized solder mask webs cause solder bridging and short circuits during convection reflow assembly. BoardReadyOps catches tight-pitch pad clearances that violate vendor mask capability.",
+      "The minimum physical bridge of solder mask material between adjacent surface-mount pads. Missing or undersized webs can increase solder-bridging risk. BoardReadyOps checks for matching solder-mask layers on copper sides in a Gerber package, but does not measure solder-mask web clearance or certify it against a fabricator's process limits.",
   },
   {
     term: "Impedance & Layer Stackup",
     definition:
-      "Controlled dielectric heights, copper weights, and trace geometries required for high-speed differential pairs, USB, Ethernet, and RF routing. Release validation verifies that PCB stackup tables in drawings match the physical layer definitions exported in Gerber and drill archives.",
+      "Controlled dielectric heights, copper weights, and trace geometries matter for high-speed, RF, and differential-pair routing. BoardReadyOps compares the parsed PCB stackup layer count with the configured expected copper-layer count. This does not independently verify impedance, dielectric properties, or drawing-to-Gerber stackup equivalence; those require engineering and fabrication review.",
   },
 ] as const;
 
@@ -184,9 +184,9 @@ const releaseFaq = [
       "The handoff needs more than a folder of outputs. It needs a traceable source revision, a manifest or equivalent inventory, hashes for important files, the policy that was evaluated, and a workflow record showing how the evidence was produced and checked. BoardReadyOps organizes those facts around the release decision so another engineer can reconstruct why the board was considered ready without relying on somebody's local workstation state. Audit logs preserve the complete verification trail.",
   },
   {
-    question: "How does BoardReadyOps verify schematic and layout synchronization?",
+    question: "What electrical connectivity checks does BoardReadyOps provide?",
     answer:
-      "BoardReadyOps extracts electrical netlists from both the schematic (via kicad-cli or eeschema exports) and the routed PCB layout (via pcbnew exports) and performs a deep structural netlist comparison. Any pin disconnect, unintended net merger, swapped differential polarity, or missing pull-up resistor triggers a blocking finding with exact component designators and schematic sheet references.",
+      "When enabled and KiCad CLI is available, BoardReadyOps runs KiCad ERC on schematics and DRC on PCB layouts, tying their diagnostics to the evaluated revision. Optional pinmap rules compare configured pin assignments and net names with parsed schematic data. These checks do not independently prove schematic-to-PCB netlist equivalence, differential-pair polarity, or the presence of required pull-up resistors; engineering review remains necessary.",
   },
 ] as const;
 

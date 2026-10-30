@@ -360,6 +360,7 @@ export class DataLifecycleStore {
     scope: string;
     scopeId?: string | null;
   }): Promise<DataExport> {
+    validateLifecycleScope(input.scope, input.scopeId);
     const id = randomUUID();
     const r = (await this.db.query(
       `INSERT INTO data_exports (id, tenant_id, requested_by, status, scope, scope_id, created_at) VALUES ($1,$2,$3,'pending',$4,$5,NOW()) RETURNING *`,
