@@ -8,7 +8,7 @@ import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.
 
 const bytes = Buffer.from('{"kind":"boardreadyops.repository-metadata-export"}', "utf8");
 const sha256 = createHash("sha256").update(bytes).digest("hex");
-const request = { exportId: "export-1", tenantId: "tenant-a", installationId: "install-a" };
+const request = { exportId: "export-1", tenantId: "tenant-a", installationId: "install-a", actorLogin: "operator" };
 const lease = { ...request, workerId: "worker-a", token: "claim-a" };
 const expiry = new Date("2030-01-01T12:00:00.000Z");
 function storeWithQueries(rows: Record<string, unknown>[][]) {
@@ -70,8 +70,9 @@ describe("metadata preview publication, authorization, expiry and revocation", (
       byteLength: bytes.length,
       bytes,
     });
-    expect(query.mock.calls[0]?.[1]).toEqual(["export-1", "tenant-a", "install-a"]);
+    expect(query.mock.calls[0]?.[1]).toEqual(["export-1", "tenant-a", "install-a", "operator"]);
     const sql = query.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("lower(data_exports.requested_by)=lower($4)");
     expect(sql).toContain("manifest_preview_expires_at > NOW()");
     expect(sql).toContain("manifest_preview_revoked_at IS NULL");
     expect(sql).toContain("installations.suspended_at IS NULL");

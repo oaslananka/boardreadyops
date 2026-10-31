@@ -331,8 +331,9 @@ export class DataExportPreparationStore {
     exportId: string;
     tenantId: string;
     installationId: string;
+    actorLogin: string;
   }): Promise<PreparedExportManifest | null> {
-    if (![input.exportId, input.tenantId, input.installationId].every((v) => canonical(v)))
+    if (![input.exportId, input.tenantId, input.installationId, input.actorLogin].every((v) => canonical(v)))
       throw new ExportPreparationInputError();
     const result = await this.db.query(
       `SELECT data_exports.prepared_manifest_bytes,
@@ -340,7 +341,8 @@ export class DataExportPreparationStore {
        FROM data_exports
        JOIN installations ON installations.id=data_exports.installation_id
        WHERE data_exports.id=$1 AND lower(data_exports.tenant_id)=lower($2)
-         AND data_exports.installation_id=$3 AND data_exports.status='running'
+         AND data_exports.installation_id=$3 AND lower(data_exports.requested_by)=lower($4)
+         AND data_exports.status='running'
          AND data_exports.manifest_preview_expires_at > NOW()
          AND data_exports.manifest_preview_revoked_at IS NULL
          AND installations.suspended_at IS NULL
@@ -350,7 +352,7 @@ export class DataExportPreparationStore {
              SELECT 1 FROM repositories WHERE repositories.id=data_exports.scope_id
                AND repositories.installation_id=installations.id
                AND repositories.disabled_at IS NULL))) LIMIT 1`,
-      [input.exportId, input.tenantId, input.installationId],
+      [input.exportId, input.tenantId, input.installationId, input.actorLogin],
     );
     const row = rows(result)[0];
     return row ? checkedManifestBytes(row) : null;

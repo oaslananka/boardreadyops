@@ -174,7 +174,7 @@ A **metadata-only preview** can be explicitly published by the current internal
 preparation worker while its original lease remains valid; it is not dispatched
 automatically. This opens a single 15-minute availability window for the
 bounded, SHA-256-verified repository metadata manifest already stored in
-PostgreSQL. An authorized signed-in installation viewer may retrieve it via
+PostgreSQL. Only the signed-in user who originally requested the export, with continuing installation access, may retrieve it via
 GET /api/v1/data-exports/:exportId?installationId=:id&download=metadata-manifest.
 Every read rechecks the persisted live installation, repository enablement,
 expiry, revocation and content integrity; responses have private/no-store,

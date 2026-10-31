@@ -55,6 +55,7 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
         exportId,
         tenantId: tenantLogin,
         installationId: canonicalInstallationId,
+        actorLogin: viewer.session.login,
       });
       if (!preview)
         return Response.json(

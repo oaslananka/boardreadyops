@@ -44,8 +44,9 @@ describe("authenticated bounded metadata preview download and revocation", () =>
     expect(response.headers.get("content-disposition")).toContain(`boardreadyops-metadata-${exportId}.json`);
     expect(Buffer.from(await response.arrayBuffer())).toEqual(bytes);
     expect(query).toHaveBeenCalledOnce();
-    expect(query.mock.calls[0]?.[1]).toEqual([exportId, "organization-a", "inst-a"]);
+    expect(query.mock.calls[0]?.[1]).toEqual([exportId, "organization-a", "inst-a", "operator"]);
     const sql = query.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("lower(data_exports.requested_by)=lower($4)");
     expect(sql).toContain("manifest_preview_expires_at > NOW()");
     expect(sql).toContain("manifest_preview_revoked_at IS NULL");
     expect(sql).toContain("installations.suspended_at IS NULL");

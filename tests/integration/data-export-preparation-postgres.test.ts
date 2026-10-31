@@ -395,7 +395,7 @@ describeDatabase("installation-bound read-only export preparation claims (Postgr
       workerId: claim.workerId,
       token: claim.token,
     };
-    const viewer = { exportId: id, tenantId: tenant, installationId: installations[1] };
+    const viewer = { exportId: id, tenantId: tenant, installationId: installations[1], actorLogin: "operator" };
     expect(await otherStore().readPublishedManifestPreview(viewer)).toBeNull();
     const stage = await store().stageClaimedManifest(lease);
     expect(stage?.sha256).toMatch(/^[a-f0-9]{64}$/u);
@@ -412,6 +412,7 @@ describeDatabase("installation-bound read-only export preparation claims (Postgr
     });
     expect(await store().readPublishedManifestPreview({ ...viewer, installationId: installations[0] })).toBeNull();
     expect(await store().readPublishedManifestPreview({ ...viewer, tenantId: outsider })).toBeNull();
+    expect(await store().readPublishedManifestPreview({ ...viewer, actorLogin: "another-user" })).toBeNull();
     await db().query("UPDATE repositories SET disabled_at=NOW() WHERE id=$1", [repositories[1]]);
     expect(await store().readPublishedManifestPreview(viewer)).toBeNull();
     await db().query("UPDATE repositories SET disabled_at=NULL WHERE id=$1", [repositories[1]]);
