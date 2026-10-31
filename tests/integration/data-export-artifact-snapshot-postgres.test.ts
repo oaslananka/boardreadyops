@@ -107,6 +107,50 @@ describeDatabase("claimed artifact metadata PostgreSQL isolation", () => {
     });
   });
 
+  it("isolates organization-scope artifacts to its installation and omits disabled repositories", async () => {
+    const organizationExport = await new DataExportPreparationStore(executor()).createBoundPendingExport({
+      tenantId: tenant,
+      installationId: installations[0],
+      requestedBy: "operator",
+      scope: "organization",
+    });
+    expect(organizationExport).toBeTruthy();
+    if (!organizationExport) throw new Error("Expected separate organization export");
+    try {
+      const claimed = await new DataExportPreparationStore(executor()).claimNext({
+        installationId: installations[0],
+        workerId: "organization-worker",
+      });
+      expect(claimed?.exportId).toBe(organizationExport);
+      if (!claimed) throw new Error("Expected organization worker claim");
+      const input = {
+        exportId: organizationExport,
+        installationId: installations[0],
+        tenantId: tenant,
+        workerId: claimed.workerId,
+        token: claimed.token,
+      };
+      const all = await prepareClaimedArtifactMetadataSnapshot(executor(), input);
+      const allIds = JSON.parse(all?.bytes.toString("utf8") ?? "{}").artifacts.map((item: { id: string }) => item.id);
+      expect(allIds).toEqual([artifacts[0], artifacts[1]].sort());
+      expect(allIds).not.toContain(artifacts[2]);
+      expect(all?.bytes.toString("utf8")).not.toContain("private-path-");
+
+      await executor().query("UPDATE repositories SET disabled_at=NOW() WHERE id=$1", [repositories[1]]);
+      try {
+        const withoutDisabled = await prepareClaimedArtifactMetadataSnapshot(executor(), input);
+        expect(JSON.parse(withoutDisabled?.bytes.toString("utf8") ?? "{}").artifacts).toEqual([
+          expect.objectContaining({ id: artifacts[0] }),
+        ]);
+      } finally {
+        await executor().query("UPDATE repositories SET disabled_at=NULL WHERE id=$1", [repositories[1]]);
+      }
+      expect(await prepareClaimedArtifactMetadataSnapshot(executor(), { ...input, workerId: "wrong" })).toBeNull();
+    } finally {
+      await executor().query("DELETE FROM data_exports WHERE id=$1", [organizationExport]);
+    }
+  });
+
   it("rejects suspended or disabled scopes and expired worker leases", async () => {
     await executor().query("UPDATE repositories SET disabled_at=NOW() WHERE id=$1", [repositories[0]]);
     try {
