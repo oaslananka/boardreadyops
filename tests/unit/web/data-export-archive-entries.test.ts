@@ -261,10 +261,18 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
       const child = {
         id: "record_1",
         repositoryId: "repo_1",
-        ...(["reviewAudit"].includes(key) ? {} : { reviewId: "review_1" }),
+        ...(key === "reviewAudit" ? {} : { reviewId: "review_1" }),
+        ...(field === "approvals" ? { revisionId: "revision_1" } : {}),
       };
       const updated = slice({ ...original, [field]: [child] });
-      const audit = key === "reviewAudit" ? updated : slice({ ...originalAudit, reviews: [linkedReview] });
+      const audit =
+        key === "reviewAudit"
+          ? updated
+          : slice({
+              ...originalAudit,
+              reviews: [linkedReview],
+              revisions: [{ id: "revision_1", reviewId: "review_1" }],
+            });
       expect(
         () =>
           prepareClaimedArchiveEntries({
@@ -392,7 +400,12 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
     ] as const;
     for (const [key, field] of cases) {
       const original = JSON.parse(input.slices[key].bytes.toString("utf8")) as Record<string, unknown>;
-      const row = { id: "child_1", repositoryId: "repo_1", reviewId: "review_1" };
+      const row = {
+        id: "child_1",
+        repositoryId: "repo_1",
+        reviewId: "review_1",
+        ...(field === "approvals" ? { revisionId: "revision_1" } : {}),
+      };
       expect(
         () =>
           prepareClaimedArchiveEntries({
@@ -402,6 +415,58 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
         `${key}.${field}`,
       ).not.toThrow();
     }
+  });
+
+  it("rejects an approval targeting a missing or another review's revision", () => {
+    const { input } = fixture();
+    const audit = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
+    input.slices.reviewAudit = slice({
+      ...audit,
+      reviews: [
+        { id: "review_1", repositoryId: "repo_1", headRunId: "run_1" },
+        { id: "review_2", repositoryId: "repo_1", headRunId: "run_1" },
+      ],
+      revisions: [
+        { id: "revision_1", reviewId: "review_1" },
+        { id: "revision_2", reviewId: "review_2" },
+      ],
+    });
+    const workflow = JSON.parse(input.slices.reviewWorkflow.bytes.toString("utf8")) as Record<string, unknown>;
+    for (const revisionId of ["revision_2", "missing_revision", "", null]) {
+      const changed = slice({
+        ...workflow,
+        approvals: [{ id: "approval_1", repositoryId: "repo_1", reviewId: "review_1", revisionId }],
+      });
+      expect(
+        () =>
+          prepareClaimedArchiveEntries({
+            ...input,
+            slices: { ...input.slices, reviewWorkflow: changed },
+          }),
+        String(revisionId),
+      ).toThrow(ExportArchivePreflightError);
+    }
+  });
+
+  it("allows an approval only when its revision belongs to the referenced review", () => {
+    const { input } = fixture();
+    const audit = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
+    input.slices.reviewAudit = slice({
+      ...audit,
+      reviews: [{ id: "review_1", repositoryId: "repo_1", headRunId: "run_1" }],
+      revisions: [{ id: "revision_1", reviewId: "review_1" }],
+    });
+    const workflow = JSON.parse(input.slices.reviewWorkflow.bytes.toString("utf8")) as Record<string, unknown>;
+    const updated = slice({
+      ...workflow,
+      approvals: [{ id: "approval_1", repositoryId: "repo_1", reviewId: "review_1", revisionId: "revision_1" }],
+    });
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: { ...input.slices, reviewWorkflow: updated },
+      }),
+    ).not.toThrow();
   });
 
   it("rejects foreign-repository records in every review and collaboration slice", () => {

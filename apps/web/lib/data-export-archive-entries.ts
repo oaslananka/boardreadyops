@@ -228,17 +228,17 @@ export function prepareClaimedArchiveEntries(input: {
     }
     reviewRepositories.set(review.id, review.repositoryId);
   }
-  const revisionIds = new Set<string>();
+  const revisionReviewIds = new Map<string, string>();
   for (const revision of audit.revisions) {
     if (
       !validReviewLink(revision?.id) ||
       !validReviewLink(revision.reviewId) ||
       !reviewRepositories.has(revision.reviewId) ||
-      revisionIds.has(revision.id)
+      revisionReviewIds.has(revision.id)
     ) {
       throw new ExportArchivePreflightError();
     }
-    revisionIds.add(revision.id);
+    revisionReviewIds.set(revision.id, revision.reviewId);
   }
 
   // Every child may be individually repository-scoped but still reference
@@ -252,12 +252,18 @@ export function prepareClaimedArchiveEntries(input: {
   for (const childSlice of childSlices) {
     const document = decoded<Record<string, unknown>>(childSlice.bytes);
     for (const field of childSlice.fields) {
-      const children = document[field] as Array<{ reviewId?: unknown; repositoryId?: unknown }>;
+      const children = document[field] as Array<{
+        reviewId?: unknown;
+        repositoryId?: unknown;
+        revisionId?: unknown;
+      }>;
       for (const child of children) {
         if (
           !child ||
           !validReviewLink(child.reviewId) ||
-          reviewRepositories.get(child.reviewId) !== child.repositoryId
+          reviewRepositories.get(child.reviewId) !== child.repositoryId ||
+          (field === "approvals" &&
+            (!validReviewLink(child.revisionId) || revisionReviewIds.get(child.revisionId) !== child.reviewId))
         ) {
           throw new ExportArchivePreflightError();
         }
