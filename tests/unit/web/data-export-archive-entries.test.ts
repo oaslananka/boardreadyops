@@ -188,6 +188,48 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
     }
   });
 
+  it("rejects a foreign run even when the archive has no artifact bytes", () => {
+    const { input } = fixture();
+    const metadataOnly = {
+      ...input,
+      verifiedObjects: [],
+      slices: {
+        ...input.slices,
+        artifactMetadata: slice({
+          kind: "boardreadyops.claimed-artifact-metadata-snapshot",
+          artifacts: [],
+        }),
+        records: slice({
+          kind: "boardreadyops.claimed-run-finding-snapshot",
+          runs: [{ id: "run_1", repositoryId: "foreign-repo" }],
+          findings: [],
+        }),
+      },
+    };
+    expect(() => prepareClaimedArchiveEntries(metadataOnly)).toThrow(ExportArchivePreflightError);
+  });
+
+  it("rejects findings referring to a missing release run without any artifacts", () => {
+    const { input } = fixture();
+    const metadataOnly = {
+      ...input,
+      verifiedObjects: [],
+      slices: {
+        ...input.slices,
+        artifactMetadata: slice({
+          kind: "boardreadyops.claimed-artifact-metadata-snapshot",
+          artifacts: [],
+        }),
+        records: slice({
+          kind: "boardreadyops.claimed-run-finding-snapshot",
+          runs: [{ id: "run_1", repositoryId: "repo_1" }],
+          findings: [{ id: "finding_1", runId: "run_unknown" }],
+        }),
+      },
+    };
+    expect(() => prepareClaimedArchiveEntries(metadataOnly)).toThrow(ExportArchivePreflightError);
+  });
+
   it("rejects artifacts attached to out-of-scope runs or repositories", () => {
     const { input } = fixture();
     input.slices.records = slice({

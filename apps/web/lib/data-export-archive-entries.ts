@@ -136,14 +136,20 @@ export function prepareClaimedArchiveEntries(input: {
     throw new ExportArchivePreflightError();
   }
   const inventory = decoded<{ repositories: Array<{ repositoryId: string }> }>(entryBytes[0]?.bytes);
-  const records = decoded<{ runs: Array<{ id: string; repositoryId: string }> }>(entryBytes[1]?.bytes);
+  const records = decoded<{
+    runs: Array<{ id: string; repositoryId: string }>;
+    findings: Array<{ id: string; runId: string }>;
+  }>(entryBytes[1]?.bytes);
   const artifacts = decoded<{
     artifacts: Array<{ id: string; runId: string; sha256: string; byteLength: number }>;
   }>(entryBytes[6]?.bytes);
   if (
     !Array.isArray(inventory?.repositories) ||
     !Array.isArray(records?.runs) ||
+    !Array.isArray(records?.findings) ||
     !Array.isArray(artifacts?.artifacts) ||
+    records.runs.length > 100 ||
+    records.findings.length > 100 ||
     artifacts.artifacts.length > maxArtifactCount ||
     input.verifiedObjects.length !== artifacts.artifacts.length
   ) {
@@ -158,8 +164,24 @@ export function prepareClaimedArchiveEntries(input: {
   }
   const permittedRepositories = new Set(inventory.repositories.map((item) => item.repositoryId));
   const runs = new Map(records.runs.map((item) => [item.id, item.repositoryId]));
-  if (runs.size !== records.runs.length || permittedRepositories.size !== inventory.repositories.length) {
+  if (
+    runs.size !== records.runs.length ||
+    permittedRepositories.size !== inventory.repositories.length ||
+    records.runs.some((run) => !permittedRepositories.has(run.repositoryId))
+  ) {
     throw new ExportArchivePreflightError();
+  }
+  const findingIds = new Set<string>();
+  for (const finding of records.findings) {
+    if (
+      !safeEntryId(finding?.id) ||
+      !safeEntryId(finding.runId) ||
+      !runs.has(finding.runId) ||
+      findingIds.has(finding.id)
+    ) {
+      throw new ExportArchivePreflightError();
+    }
+    findingIds.add(finding.id);
   }
   const verified = new Map<string, VerifiedArchiveObject>();
   for (const candidate of input.verifiedObjects) {
