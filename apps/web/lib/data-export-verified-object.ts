@@ -1,6 +1,8 @@
 import {
   type ClaimedExportObject,
   lookupClaimedExportObject,
+  releaseClaimedExportObjectCopy,
+  reserveClaimedExportObjectCopy,
 } from "@boardreadyops/db/data-export-object-authorization";
 import type { ExportRecordClaim } from "@boardreadyops/db/data-export-record-snapshot";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
@@ -21,14 +23,26 @@ export async function readClaimedVerifiedLocalExportObject(input: {
   storageRoot: string;
 }): Promise<{ object: ClaimedExportObject; bytes: Buffer } | null> {
   const initial = await lookupClaimedExportObject(input.db, input.claim, input.artifactId);
-  if (!initial) return null;
-  const bytes = await readVerifiedLocalExportObject({
-    storageDriver: input.storageDriver,
-    storageRoot: input.storageRoot,
-    object: initial,
-  });
-  if (!bytes) return null;
-  const current = await lookupClaimedExportObject(input.db, input.claim, input.artifactId);
-  if (!current || JSON.stringify(current) !== JSON.stringify(initial)) return null;
-  return { object: current, bytes };
+  if (!initial || input.storageDriver !== "local") return null;
+  // The SQL admission and physical unlink share a persistent path-wide fence.
+  // Unlike an ordinary SELECT, this reservation survives pooled DB disconnects.
+  const copyToken = await reserveClaimedExportObjectCopy(input.db, input.claim, initial);
+  if (!copyToken) return null;
+  try {
+    const currentBeforeRead = await lookupClaimedExportObject(input.db, input.claim, input.artifactId);
+    if (!currentBeforeRead || JSON.stringify(currentBeforeRead) !== JSON.stringify(initial)) return null;
+    const bytes = await readVerifiedLocalExportObject({
+      storageDriver: input.storageDriver,
+      storageRoot: input.storageRoot,
+      object: initial,
+    });
+    if (!bytes) return null;
+    const current = await lookupClaimedExportObject(input.db, input.claim, input.artifactId);
+    if (!current || JSON.stringify(current) !== JSON.stringify(initial)) return null;
+    return { object: current, bytes };
+  } finally {
+    // Never release while IO is unresolved. If the DB cannot confirm release,
+    // the durable copy marker stays quarantined instead of permitting unlink.
+    await releaseClaimedExportObjectCopy(input.db, input.claim, copyToken);
+  }
 }
