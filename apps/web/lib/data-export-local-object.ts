@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { constants } from "node:fs";
+import { constants, type Stats } from "node:fs";
 import { type FileHandle, open } from "node:fs/promises";
 import { resolveLocalArtifactFile } from "./artifact-downloads.js";
 
@@ -11,6 +11,48 @@ export type LocalExportObjectReference = {
   sha256: string;
   byteLength: number;
 };
+
+function validRequest(input: {
+  storageDriver: string;
+  storageRoot: string;
+  object: LocalExportObjectReference;
+}): boolean {
+  const { storageDriver, storageRoot, object } = input;
+  return (
+    storageDriver === "local" &&
+    Boolean(storageRoot) &&
+    Boolean(object) &&
+    typeof object.storagePath === "string" &&
+    Boolean(object.storagePath) &&
+    typeof object.sha256 === "string" &&
+    /^[a-f0-9]{64}$/u.test(object.sha256) &&
+    Number.isSafeInteger(object.byteLength) &&
+    object.byteLength >= 0 &&
+    object.byteLength <= maxLocalExportObjectBytes
+  );
+}
+
+function sameStableFile(before: Stats, after: Stats): boolean {
+  return (
+    after.isFile() &&
+    after.size === before.size &&
+    after.dev === before.dev &&
+    after.ino === before.ino &&
+    after.mtimeMs === before.mtimeMs &&
+    after.ctimeMs === before.ctimeMs
+  );
+}
+
+async function readExactBytes(handle: FileHandle, length: number): Promise<Buffer | null> {
+  const bytes = Buffer.alloc(length);
+  let offset = 0;
+  while (offset < bytes.length) {
+    const { bytesRead } = await handle.read(bytes, offset, Math.min(64 * 1024, bytes.length - offset), offset);
+    if (!bytesRead) return null;
+    offset += bytesRead;
+  }
+  return bytes;
+}
 
 /**
  * Read back the exact bytes of an ALREADY authorized local managed object.
@@ -25,20 +67,8 @@ export async function readVerifiedLocalExportObject(input: {
   storageRoot: string;
   object: LocalExportObjectReference;
 }): Promise<Buffer | null> {
-  const { storageDriver, storageRoot, object } = input;
-  if (
-    storageDriver !== "local" ||
-    !storageRoot ||
-    !object ||
-    typeof object.storagePath !== "string" ||
-    !object.storagePath ||
-    typeof object.sha256 !== "string" ||
-    !/^[a-f0-9]{64}$/u.test(object.sha256) ||
-    !Number.isSafeInteger(object.byteLength) ||
-    object.byteLength < 0 ||
-    object.byteLength > maxLocalExportObjectBytes
-  )
-    return null;
+  if (!validRequest(input)) return null;
+  const { storageRoot, object } = input;
 
   const resolution = await resolveLocalArtifactFile(storageRoot, object.storagePath);
   if (resolution.state !== "resolved") return null;
@@ -51,24 +81,11 @@ export async function readVerifiedLocalExportObject(input: {
   try {
     const before = await handle.stat();
     if (!before.isFile() || before.size !== object.byteLength) return null;
-    const bytes = Buffer.alloc(object.byteLength);
-    let offset = 0;
-    while (offset < bytes.length) {
-      const { bytesRead } = await handle.read(bytes, offset, Math.min(64 * 1024, bytes.length - offset), offset);
-      if (!bytesRead) return null;
-      offset += bytesRead;
-    }
+    const bytes = await readExactBytes(handle, object.byteLength);
+    if (!bytes) return null;
     const after = await handle.stat();
-    if (
-      !after.isFile() ||
-      after.size !== before.size ||
-      after.dev !== before.dev ||
-      after.ino !== before.ino ||
-      after.mtimeMs !== before.mtimeMs ||
-      after.ctimeMs !== before.ctimeMs ||
-      createHash("sha256").update(bytes).digest("hex") !== object.sha256
-    )
-      return null;
+    if (!sameStableFile(before, after)) return null;
+    if (createHash("sha256").update(bytes).digest("hex") !== object.sha256) return null;
     return bytes;
   } catch {
     return null;
