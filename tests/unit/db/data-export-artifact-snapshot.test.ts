@@ -81,6 +81,29 @@ describe("claimed artifact metadata is not a deliverable export", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it("includes exactly 100 valid artifacts without silently truncating", async () => {
+    const rows = Array.from({ length: 100 }, (_, index) => ({ ...artifact, id: `artifact-${index}` }));
+    const output = await prepareClaimedArtifactMetadataSnapshot(withArtifacts([{ artifacts: rows }]).db, claim);
+    const decoded = JSON.parse(output?.bytes.toString("utf8") ?? "{}");
+    expect(decoded.artifacts).toHaveLength(100);
+    expect(decoded.artifacts[99].id).toBe("artifact-99");
+    expect(output?.byteLength).toBeLessThanOrEqual(256 * 1024);
+  });
+
+  it("fails closed when individually bounded values expand beyond the total JSON byte budget", async () => {
+    const inflated = Array.from({ length: 100 }, (_, index) => ({
+      ...artifact,
+      id: `artifact-${index}`,
+      name: "\\\\".repeat(1024),
+      kind: "\\\\".repeat(256),
+      role: "\\\\".repeat(256),
+      content_type: "\\\\".repeat(256),
+    }));
+    await expect(
+      prepareClaimedArtifactMetadataSnapshot(withArtifacts([{ artifacts: inflated }]).db, claim),
+    ).rejects.toThrow(ExportArtifactSnapshotUnavailableError);
+  });
+
   it("rejects malformed, unbounded or duplicate artifact metadata without truncating", async () => {
     const invalidRows = [
       [{ ...artifact, sha256: "not-a-digest" }],
