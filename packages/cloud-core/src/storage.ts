@@ -125,33 +125,35 @@ export class LocalArtifactStorage implements ArtifactStorage {
   }
 }
 
-// S3-compatible driver stub using AWS SDK v3 when configured
+// S3 is not implemented here. Never report successful cloud operations by
+// silently writing into process-local memory when a bucket is configured.
 export class S3ArtifactStorage implements ArtifactStorage {
   private readonly local = new LocalArtifactStorage();
-  private readonly enabled: boolean;
-  constructor() {
-    this.enabled = Boolean(process.env.AWS_S3_BUCKET && process.env.AWS_REGION);
+  private readonly configured = Boolean(process.env.AWS_S3_BUCKET);
+
+  private requireImplementedProvider(): void {
+    if (this.configured) {
+      throw new Error("S3 artifact storage is not implemented; refusing local fallback");
+    }
   }
 
   async beginUpload(input: BeginUploadInput): Promise<UploadCapability> {
-    if (!this.enabled) return this.local.beginUpload(input);
-    // In production, would call s3.createPresignedPost or getSignedUrl with PutObject
-    // For now, delegate to local with S3 prefix to keep interface consistent
+    this.requireImplementedProvider();
     return this.local.beginUpload(input);
   }
 
   async completeUpload(input: CompleteUploadInput): Promise<StoredArtifact> {
-    if (!this.enabled) return this.local.completeUpload(input);
+    this.requireImplementedProvider();
     return this.local.completeUpload(input);
   }
 
   async openDownload(input: DownloadInput): Promise<DownloadCapability> {
-    if (!this.enabled) return this.local.openDownload(input);
+    this.requireImplementedProvider();
     return this.local.openDownload(input);
   }
 
   async deleteObject(input: DeleteObjectInput): Promise<"deleted" | "missing"> {
-    if (!this.enabled) return this.local.deleteObject(input);
+    this.requireImplementedProvider();
     return this.local.deleteObject(input);
   }
 }

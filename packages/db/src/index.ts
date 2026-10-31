@@ -64,6 +64,7 @@ export type CloudDatabaseModel = (typeof cloudDatabaseModels)[number];
 
 export * from "./api-token-store.js";
 export * from "./billing-store.js";
+export * from "./data-export-artifact-snapshot.js";
 export * from "./data-export-consistent-snapshot.js";
 export * from "./data-export-inventory.js";
 export * from "./data-export-manifest.js";
