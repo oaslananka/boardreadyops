@@ -36,7 +36,14 @@ export function prepareClaimedArchiveZip(input: Parameters<typeof prepareClaimed
   // Reuse the repository's established ZIP writer; no external service, disk,
   // secret or database mutation. Fail closed if ZIP framing exceeds the budget.
   const bytes = createZipBuffer(
-    entries.map((entry) => ({ name: entry.path, data: entry.bytes })),
+    entries.map((entry) => ({
+      name: entry.path,
+      data: entry.bytes,
+      // Managed bytes may be legitimate but extremely compressible. Storing
+      // them avoids the ZIP-bomb ratio rejection in independent extractors
+      // without changing their security thresholds or shared writer defaults.
+      store: entry.path.startsWith("objects/"),
+    })),
     archiveTimestamp,
   );
   if (bytes.length > maxArchiveBytes) throw new ExportArchivePreflightError();
