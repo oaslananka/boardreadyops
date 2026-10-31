@@ -9,7 +9,9 @@ const sha256 = (value: Buffer): string => createHash("sha256").update(value).dig
 const slice = (value: unknown) => {
   const bytes = Buffer.from(
     JSON.stringify(
-      value && typeof value === "object" && !Array.isArray(value) ? { exportId: "export-1", ...value } : value,
+      value && typeof value === "object" && !Array.isArray(value)
+        ? { formatVersion: 1, exportId: "export-1", ...value }
+        : value,
     ),
   );
   return { bytes, byteLength: bytes.length, sha256: sha256(bytes), contentType: "application/json" as const };
@@ -25,13 +27,21 @@ function fixture() {
     byteLength: bytes.length,
   };
   const slices = {
-    repositories: slice({ repositories: [{ repositoryId: "repo_1" }] }),
-    records: slice({ runs: [{ id: "run_1", repositoryId: "repo_1" }], findings: [] }),
-    reviewAudit: slice({ reviews: [], auditEvents: [] }),
-    reviewComments: slice({ comments: [] }),
-    reviewWorkflow: slice({ approvals: [] }),
-    findingCollaboration: slice({ decisions: [] }),
+    repositories: slice({
+      coverage: "selected-installation-repositories-only",
+      repositories: [{ repositoryId: "repo_1" }],
+    }),
+    records: slice({
+      kind: "boardreadyops.claimed-run-finding-snapshot",
+      runs: [{ id: "run_1", repositoryId: "repo_1" }],
+      findings: [],
+    }),
+    reviewAudit: slice({ kind: "boardreadyops.claimed-review-audit-snapshot", reviews: [], auditEvents: [] }),
+    reviewComments: slice({ kind: "boardreadyops.claimed-review-comments-snapshot", comments: [] }),
+    reviewWorkflow: slice({ kind: "boardreadyops.claimed-review-workflow-snapshot", approvals: [] }),
+    findingCollaboration: slice({ kind: "boardreadyops.claimed-finding-collaboration-snapshot", decisions: [] }),
     artifactMetadata: slice({
+      kind: "boardreadyops.claimed-artifact-metadata-snapshot",
       artifacts: [
         { id: artifact.artifactId, runId: artifact.runId, sha256: artifact.sha256, byteLength: bytes.length },
       ],
@@ -54,7 +64,9 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
     const files = new Map(result.files.map(({ path, data }) => [path, data]));
     expect(files.get("objects/artifact_1.bin")).toEqual(bytes);
     expect(JSON.parse(files.get("metadata/repositories.json")?.toString("utf8") ?? "{}")).toEqual({
+      formatVersion: 1,
       exportId: "export-1",
+      coverage: "selected-installation-repositories-only",
       repositories: [{ repositoryId: "repo_1" }],
     });
     expect([...files.keys()].filter((name) => name.startsWith("metadata/"))).toHaveLength(7);
@@ -64,7 +76,10 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
 
   it("can assemble a metadata-only ZIP without inventing artifact content", () => {
     const { input } = fixture();
-    input.slices.artifactMetadata = slice({ artifacts: [] });
+    input.slices.artifactMetadata = slice({
+      ...JSON.parse(input.slices.artifactMetadata.bytes.toString("utf8")),
+      artifacts: [],
+    });
     input.verifiedObjects = [];
     const prepared = prepareClaimedArchiveZip(input);
     expect(prepared.files).toBe(7);

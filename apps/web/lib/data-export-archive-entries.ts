@@ -95,6 +95,32 @@ export function prepareClaimedArchiveEntries(input: {
     path,
     bytes: checkedMetadata(content),
   }));
+  // A valid hash or exportId does not establish the meaning of each blob.
+  // Bind every slot to the versioned schema emitted by its snapshot builder,
+  // so valid but mislabelled review/audit evidence cannot be silently swapped.
+  const expectedKinds = [
+    null, // Repository inventory has a coverage label instead of a kind.
+    "boardreadyops.claimed-run-finding-snapshot",
+    "boardreadyops.claimed-review-audit-snapshot",
+    "boardreadyops.claimed-review-comments-snapshot",
+    "boardreadyops.claimed-review-workflow-snapshot",
+    "boardreadyops.claimed-finding-collaboration-snapshot",
+    "boardreadyops.claimed-artifact-metadata-snapshot",
+  ] as const;
+  const headers = entryBytes.map((entry) =>
+    decoded<{ formatVersion?: unknown; kind?: unknown; coverage?: unknown }>(entry.bytes),
+  );
+  if (
+    headers.some(
+      (header, index) =>
+        header?.formatVersion !== 1 ||
+        (index === 0
+          ? header.coverage !== "selected-installation-repositories-only"
+          : header.kind !== expectedKinds[index]),
+    )
+  ) {
+    throw new ExportArchivePreflightError();
+  }
   // The seven slices carry an exportId independently. A valid digest alone
   // must never permit content from two different export reservations to be
   // spliced into one archive, even when repository/run IDs happen to match.

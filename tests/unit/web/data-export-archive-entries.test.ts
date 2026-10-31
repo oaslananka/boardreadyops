@@ -9,7 +9,11 @@ type Input = Parameters<typeof prepareClaimedArchiveEntries>[0];
 const hash = (bytes: Buffer): string => createHash("sha256").update(bytes).digest("hex");
 const slice = (data: unknown) => {
   const bytes = Buffer.from(
-    JSON.stringify(data && typeof data === "object" && !Array.isArray(data) ? { exportId: "export-1", ...data } : data),
+    JSON.stringify(
+      data && typeof data === "object" && !Array.isArray(data)
+        ? { formatVersion: 1, exportId: "export-1", ...data }
+        : data,
+    ),
   );
   return { bytes, byteLength: bytes.length, sha256: hash(bytes), contentType: "application/json" as const };
 };
@@ -31,13 +35,20 @@ function fixture() {
     byteLength: object.byteLength,
   };
   const slices = {
-    repositories: slice({ repositories: [{ repositoryId: "repo_1" }] }),
-    records: slice({ runs: [{ id: "run_1", repositoryId: "repo_1" }], findings: [] }),
-    reviewAudit: slice({ reviews: [], auditEvents: [] }),
-    reviewComments: slice({ comments: [] }),
-    reviewWorkflow: slice({ approvals: [] }),
-    findingCollaboration: slice({ decisions: [] }),
-    artifactMetadata: slice({ artifacts: [metadata] }),
+    repositories: slice({
+      coverage: "selected-installation-repositories-only",
+      repositories: [{ repositoryId: "repo_1" }],
+    }),
+    records: slice({
+      kind: "boardreadyops.claimed-run-finding-snapshot",
+      runs: [{ id: "run_1", repositoryId: "repo_1" }],
+      findings: [],
+    }),
+    reviewAudit: slice({ kind: "boardreadyops.claimed-review-audit-snapshot", reviews: [], auditEvents: [] }),
+    reviewComments: slice({ kind: "boardreadyops.claimed-review-comments-snapshot", comments: [] }),
+    reviewWorkflow: slice({ kind: "boardreadyops.claimed-review-workflow-snapshot", approvals: [] }),
+    findingCollaboration: slice({ kind: "boardreadyops.claimed-finding-collaboration-snapshot", decisions: [] }),
+    artifactMetadata: slice({ kind: "boardreadyops.claimed-artifact-metadata-snapshot", artifacts: [metadata] }),
   } as Input["slices"];
   return { input: { slices, verifiedObjects: [{ object, bytes }] } as Input, bytes, object, metadata };
 }
@@ -69,7 +80,10 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
 
   it("permits a legitimate metadata-only snapshot with no artifacts", () => {
     const { input } = fixture();
-    input.slices.artifactMetadata = slice({ artifacts: [] });
+    input.slices.artifactMetadata = slice({
+      ...JSON.parse(input.slices.artifactMetadata.bytes.toString("utf8")),
+      artifacts: [],
+    });
     input.verifiedObjects = [];
     const result = prepareClaimedArchiveEntries(input);
     expect(result.entries).toHaveLength(7);
@@ -103,6 +117,26 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
         slices: { ...input.slices, reviewAudit: missing },
       }),
     ).toThrow(ExportArchivePreflightError);
+  });
+
+  it("rejects a swapped or wrongly versioned metadata slice with a valid digest and exportId", () => {
+    const { input } = fixture();
+    const swapped = { ...input.slices, reviewComments: input.slices.reviewAudit };
+    expect(() => prepareClaimedArchiveEntries({ ...input, slices: swapped })).toThrow(ExportArchivePreflightError);
+    const original = JSON.parse(input.slices.reviewWorkflow.bytes.toString("utf8")) as Record<string, unknown>;
+    for (const header of [
+      { ...original, kind: "boardreadyops.claimed-review-comments-snapshot" },
+      { ...original, kind: null },
+      { ...original, formatVersion: 2 },
+      { ...original, formatVersion: null },
+    ]) {
+      expect(() =>
+        prepareClaimedArchiveEntries({
+          ...input,
+          slices: { ...input.slices, reviewWorkflow: slice(header) },
+        }),
+      ).toThrow(ExportArchivePreflightError);
+    }
   });
 
   it("rejects missing, additional and duplicate physical objects", () => {
