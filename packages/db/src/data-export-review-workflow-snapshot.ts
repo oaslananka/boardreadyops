@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ExportRecordClaim } from "./data-export-record-snapshot.js";
+import { isValidExportTimestamp } from "./data-export-timestamp.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
 export class ExportReviewWorkflowSnapshotUnavailableError extends Error {
@@ -23,10 +24,7 @@ const id = (v: unknown): v is string => typeof v === "string" && v.length > 0 &&
 const nullableId = (v: unknown): v is string | null => v === null || id(v);
 const bounded = (v: unknown, n: number): v is string => typeof v === "string" && Buffer.byteLength(v, "utf8") <= n;
 const optionalText = (v: unknown, n: number): v is string | null => v === null || bounded(v, n);
-const time = (v: unknown): v is string =>
-  typeof v === "string" &&
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/u.test(v) &&
-  Number.isFinite(Date.parse(v));
+const time = isValidExportTimestamp;
 const optionalTime = (v: unknown): v is string | null => v === null || time(v);
 const digest = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{64}$/u.test(v);
 

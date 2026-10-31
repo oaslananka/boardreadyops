@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ExportRecordClaim } from "./data-export-record-snapshot.js";
+import { isValidExportTimestamp } from "./data-export-timestamp.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
 /** Incomplete claim-scoped metadata, not publication or download authorization. */
@@ -23,10 +24,7 @@ const fail = (): never => {
 const validId = (v: unknown): v is string => typeof v === "string" && v.length > 0 && v.length <= 256 && v.trim() === v;
 const validText = (v: unknown, max: number): v is string =>
   typeof v === "string" && Buffer.byteLength(v, "utf8") <= max;
-const validTime = (v: unknown): v is string =>
-  typeof v === "string" &&
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/u.test(v) &&
-  Number.isFinite(Date.parse(v));
+const validTime = isValidExportTimestamp;
 const validOptionalTime = (v: unknown): v is string | null => v === null || validTime(v);
 const validDigest = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{64}$/u.test(v);
 

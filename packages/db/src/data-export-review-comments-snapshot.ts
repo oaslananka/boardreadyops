@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ExportRecordClaim } from "./data-export-record-snapshot.js";
+import { isValidExportTimestamp } from "./data-export-timestamp.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
 /** An incomplete internal preparation slice, not publication or download authorization. */
@@ -25,10 +26,7 @@ const validId = (v: unknown): v is string => typeof v === "string" && v.length >
 const validOptionalId = (v: unknown): v is string | null => v === null || validId(v);
 const validOptionalEvidence = (v: unknown): v is string | null =>
   v === null || (typeof v === "string" && Buffer.byteLength(v, "utf8") <= maxEvidenceBytes);
-const validTimestamp = (v: unknown): v is string =>
-  typeof v === "string" &&
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/u.test(v) &&
-  Number.isFinite(Date.parse(v));
+const validTimestamp = isValidExportTimestamp;
 
 interface CommentRow {
   id: unknown;
