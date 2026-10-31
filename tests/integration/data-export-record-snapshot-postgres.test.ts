@@ -8,6 +8,14 @@ import {
   prepareClaimedRunFindingSnapshot,
 } from "../../packages/db/src/data-export-record-snapshot.js";
 import { prepareClaimedReviewAuditSnapshot } from "../../packages/db/src/data-export-review-audit-snapshot.js";
+import {
+  ExportReviewCommentsSnapshotUnavailableError,
+  prepareClaimedReviewCommentsSnapshot,
+} from "../../packages/db/src/data-export-review-comments-snapshot.js";
+import {
+  ExportReviewWorkflowSnapshotUnavailableError,
+  prepareClaimedReviewWorkflowSnapshot,
+} from "../../packages/db/src/data-export-review-workflow-snapshot.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -83,7 +91,7 @@ afterAll(async () => {
 });
 
 describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
-  it("prepares three partial scopes within one read-only snapshot without publishing an export", async () => {
+  it("prepares six partial scopes within one read-only snapshot without publishing an export", async () => {
     const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
     const prepared = await prepareClaimedConsistentMetadataSlices(executor(), claim);
     expect(prepared).not.toBeNull();
@@ -92,6 +100,13 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
     const reviewAudit = JSON.parse(prepared?.reviewAudit.bytes.toString("utf8") ?? "{}");
     expect(reviewAudit.reviews).toEqual([]);
     expect(reviewAudit.revisions).toEqual([]);
+    expect(JSON.parse(prepared?.reviewComments.bytes.toString("utf8") ?? "{}").comments).toEqual([]);
+    const workflow = JSON.parse(prepared?.reviewWorkflow.bytes.toString("utf8") ?? "{}");
+    expect(workflow.approvals).toEqual([]);
+    expect(workflow.checklistItems).toEqual([]);
+    const finding = JSON.parse(prepared?.findingCollaboration.bytes.toString("utf8") ?? "{}");
+    expect(finding.decisions).toEqual([]);
+    expect(finding.assignments).toEqual([]);
     expect(reviewAudit.auditEvents).toEqual([]);
     expect(repositories.repositories).toEqual([expect.objectContaining({ repositoryId: repository[0] })]);
     expect(records.runs).toEqual([expect.objectContaining({ repositoryId: repository[0] })]);
@@ -108,6 +123,366 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
       download_url: null,
       completed_at: null,
     });
+  });
+
+  it("includes only authorized review comments and preserves all source fields", async () => {
+    const rollback = "comment-export-validation-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const reviewIds = [randomUUID(), randomUUID(), randomUUID()];
+        for (let i = 0; i < 3; i++) {
+          await tx.query(
+            `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+          VALUES($1,$2,'Synthetic review','completed','approved',$3)`,
+            [reviewIds[i], repository[i], runId[i]],
+          );
+        }
+        const parentId = randomUUID();
+        const childId = randomUUID();
+        await tx.query(
+          `INSERT INTO review_comments(id,repository_id,review_id,author_id,content)
+        VALUES($1,$2,$3,'actor','Parent comment')`,
+          [parentId, repository[0], reviewIds[0]],
+        );
+        await tx.query(
+          `INSERT INTO review_comments(id,repository_id,review_id,parent_id,author_id,content,
+        finding_fingerprint,evidence_anchor,created_at,updated_at)
+        VALUES($1,$2,$3,$4,'actor','Child comment','fp-synthetic','evidence-synthetic',
+          '2026-10-01T01:02:03Z'::timestamptz,'2026-10-02T01:02:03Z'::timestamptz)`,
+          [childId, repository[0], reviewIds[0], parentId],
+        );
+        const alien = [randomUUID(), randomUUID()];
+        for (let i = 1; i < 3; i++) {
+          await tx.query(
+            `INSERT INTO review_comments(id,repository_id,review_id,author_id,content)
+          VALUES($1,$2,$3,'actor','OUT_OF_SCOPE')`,
+            [alien[i - 1], repository[i], reviewIds[i]],
+          );
+        }
+        const output = await prepareClaimedReviewCommentsSnapshot(tx, claim);
+        const data = JSON.parse(output?.bytes.toString("utf8") ?? "{}");
+        expect(data.comments.map((v: { id: string }) => v.id).sort()).toEqual([parentId, childId].sort());
+        expect(data.comments).toContainEqual(
+          expect.objectContaining({
+            id: childId,
+            parentId,
+            findingFingerprint: "fp-synthetic",
+            evidenceAnchor: "evidence-synthetic",
+            createdAt: expect.any(String),
+            updatedAt: expect.any(String),
+          }),
+        );
+        const child = data.comments.find((v: { id: string }) => v.id === childId);
+        expect(new Date(child.createdAt).toISOString()).toBe("2026-10-01T01:02:03.000Z");
+        expect(new Date(child.updatedAt).toISOString()).toBe("2026-10-02T01:02:03.000Z");
+        for (const forbidden of [...alien, "OUT_OF_SCOPE"])
+          expect(output?.bytes.toString("utf8")).not.toContain(forbidden);
+        expect(await prepareClaimedReviewCommentsSnapshot(tx, { ...claim, token: "invalid" })).toBeNull();
+        const joined = await prepareClaimedConsistentMetadataSlices(executor(), claim);
+        expect(joined?.reviewComments.sha256).toMatch(/^[0-9a-f]{64}$/u);
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("fails closed on a mismatched repository in an otherwise authorized review", async () => {
+    const rollback = "comment-mismatch-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const reviewId = randomUUID();
+        await tx.query(
+          `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+        VALUES($1,$2,'Synthetic review','completed','approved',$3)`,
+          [reviewId, repository[0], runId[0]],
+        );
+        await tx.query(
+          `INSERT INTO review_comments(id,repository_id,review_id,author_id,content)
+        VALUES($1,$2,$3,'actor','mismatched repository')`,
+          [randomUUID(), repository[1], reviewId],
+        );
+        await expect(prepareClaimedReviewCommentsSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewCommentsSnapshotUnavailableError,
+        );
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("preserves valid empty optional evidence in PostgreSQL without weakening overflow checks", async () => {
+    const rollback = "comment-empty-evidence-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const [reviewId, commentId] = [randomUUID(), randomUUID()];
+        await tx.query(
+          `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+        VALUES($1,$2,'Synthetic review','completed','approved',$3)`,
+          [reviewId, repository[0], runId[0]],
+        );
+        await tx.query(
+          `INSERT INTO review_comments(id,repository_id,review_id,author_id,content,
+        finding_fingerprint,evidence_anchor) VALUES($1,$2,$3,'actor','valid empty','', '')`,
+          [commentId, repository[0], reviewId],
+        );
+        const snap = await prepareClaimedReviewCommentsSnapshot(tx, claim);
+        const decoded = JSON.parse(snap?.bytes.toString("utf8") ?? "{}");
+        expect(decoded.comments).toContainEqual(
+          expect.objectContaining({ id: commentId, findingFingerprint: "", evidenceAnchor: "" }),
+        );
+        await tx.query(`UPDATE review_comments SET evidence_anchor=repeat('x',2049) WHERE id=$1`, [commentId]);
+        await expect(prepareClaimedReviewCommentsSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewCommentsSnapshotUnavailableError,
+        );
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("rejects a comment whose parent belongs to a different review in the same authorized repository", async () => {
+    const rollback = "cross-review-parent-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const [firstReview, secondReview, parent, child] = Array.from({ length: 4 }, () => randomUUID());
+        for (const id of [firstReview, secondReview]) {
+          await tx.query(
+            `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+          VALUES($1,$2,'Synthetic review','completed','approved',$3)`,
+            [id, repository[0], runId[0]],
+          );
+        }
+        await tx.query(
+          `INSERT INTO review_comments(id,repository_id,review_id,author_id,content)
+        VALUES($1,$2,$3,'actor','parent')`,
+          [parent, repository[0], firstReview],
+        );
+        await tx.query(
+          `INSERT INTO review_comments(id,repository_id,review_id,parent_id,author_id,content)
+        VALUES($1,$2,$3,$4,'actor','cross-review child')`,
+          [child, repository[0], secondReview, parent],
+        );
+        await expect(prepareClaimedReviewCommentsSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewCommentsSnapshotUnavailableError,
+        );
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("rejects cyclic review comment parent links in PostgreSQL", async () => {
+    const rollback = "parent-cycle-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const [reviewId, first, second] = Array.from({ length: 3 }, () => randomUUID());
+        await tx.query(
+          `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+        VALUES($1,$2,'Synthetic review','completed','approved',$3)`,
+          [reviewId, repository[0], runId[0]],
+        );
+        for (const id of [first, second]) {
+          await tx.query(
+            `INSERT INTO review_comments(id,repository_id,review_id,author_id,content)
+          VALUES($1,$2,$3,'actor','cycle')`,
+            [id, repository[0], reviewId],
+          );
+        }
+        await tx.query(`UPDATE review_comments SET parent_id=$2 WHERE id=$1`, [first, second]);
+        await tx.query(`UPDATE review_comments SET parent_id=$2 WHERE id=$1`, [second, first]);
+        await expect(prepareClaimedReviewCommentsSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewCommentsSnapshotUnavailableError,
+        );
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("rejects 101 scoped comments rather than returning a partial export", async () => {
+    const rollback = "comment-count-overflow-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const reviewId = randomUUID();
+        await tx.query(
+          `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+        VALUES($1,$2,'Synthetic review','completed','approved',$3)`,
+          [reviewId, repository[0], runId[0]],
+        );
+        await tx.query(
+          `INSERT INTO review_comments(id,repository_id,review_id,author_id,content)
+        SELECT $1 || '-' || number::text, $2, $3, 'actor', 'bounded comment'
+        FROM generate_series(1,101) AS number`,
+          [randomUUID(), repository[0], reviewId],
+        );
+        await expect(prepareClaimedReviewCommentsSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewCommentsSnapshotUnavailableError,
+        );
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("rejects a PostgreSQL JSON aggregate over 256 KiB without returning truncated data", async () => {
+    const rollback = "comment-bytes-overflow-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const reviewId = randomUUID();
+        await tx.query(
+          `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+        VALUES($1,$2,'Synthetic review','completed','approved',$3)`,
+          [reviewId, repository[0], runId[0]],
+        );
+        await tx.query(
+          `INSERT INTO review_comments(id,repository_id,review_id,author_id,content)
+        SELECT $1 || '-' || number::text, $2, $3, 'actor', repeat('x',60000)
+        FROM generate_series(1,5) AS number`,
+          [randomUUID(), repository[0], reviewId],
+        );
+        await expect(prepareClaimedReviewCommentsSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewCommentsSnapshotUnavailableError,
+        );
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("returns no comments when the original installation becomes suspended", async () => {
+    const rollback = "comment-suspension-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        await tx.query(`UPDATE installations SET suspended_at=NOW() WHERE id=$1`, [installation[0]]);
+        expect(await prepareClaimedReviewCommentsSnapshot(tx, claim)).toBeNull();
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("includes only claim-scoped approvals and checklist entries with revision provenance", async () => {
+    const rollback = "workflow-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const reviews = Array.from({ length: 3 }, () => randomUUID());
+        const revisions = Array.from({ length: 3 }, () => randomUUID());
+        const approvals = Array.from({ length: 3 }, () => randomUUID());
+        const checklist = Array.from({ length: 3 }, () => randomUUID());
+        for (let i = 0; i < 3; i++) {
+          await tx.query(
+            `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+          VALUES($1,$2,'Synthetic','completed','approved',$3)`,
+            [reviews[i], repository[i], runId[i]],
+          );
+          await tx.query(
+            `INSERT INTO review_revisions(id,review_id,sequence,head_run_id,head_commit_sha,evidence_digest)
+          VALUES($1,$2,1,$3,$4,$5)`,
+            [revisions[i], reviews[i], runId[i], "a".repeat(40), "b".repeat(64)],
+          );
+          await tx.query(
+            `INSERT INTO review_approvals(id,repository_id,review_id,revision_id,evidence_digest,
+          approver_id,status,reason,is_break_glass) VALUES($1,$2,$3,$4,$5,'reviewer','approved','Synthetic approval',false)`,
+            [approvals[i], repository[i], reviews[i], revisions[i], "b".repeat(64)],
+          );
+          await tx.query(
+            `INSERT INTO review_checklist_items(id,repository_id,review_id,title,completed,completed_by,completed_at)
+          VALUES($1,$2,$3,'Synthetic checklist',true,'reviewer',NOW())`,
+            [checklist[i], repository[i], reviews[i]],
+          );
+        }
+        const result = await prepareClaimedReviewWorkflowSnapshot(tx, claim);
+        const json = JSON.parse(result?.bytes.toString("utf8") ?? "{}");
+        expect(json.approvals).toEqual([
+          expect.objectContaining({
+            id: approvals[0],
+            repositoryId: repository[0],
+            reviewId: reviews[0],
+            revisionId: revisions[0],
+            reason: "Synthetic approval",
+            evidenceDigest: "b".repeat(64),
+            isBreakGlass: false,
+          }),
+        ]);
+        expect(json.checklistItems).toEqual([
+          expect.objectContaining({
+            id: checklist[0],
+            reviewId: reviews[0],
+            completed: true,
+            completedBy: "reviewer",
+            completedAt: expect.any(String),
+          }),
+        ]);
+        for (const value of [...approvals.slice(1), ...checklist.slice(1)])
+          expect(result?.bytes.toString("utf8")).not.toContain(value);
+        expect(await prepareClaimedReviewWorkflowSnapshot(tx, { ...claim, token: "invalid" })).toBeNull();
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("fails closed on mismatched approval repository or forged revision", async () => {
+    const rollback = "invalid-approval-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const reviewId = randomUUID();
+        await tx.query(
+          `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+        VALUES($1,$2,'Synthetic','completed','approved',$3)`,
+          [reviewId, repository[0], runId[0]],
+        );
+        const badApproval = randomUUID();
+        await tx.query(
+          `INSERT INTO review_approvals(id,repository_id,review_id,revision_id,evidence_digest,
+        approver_id,status) VALUES($1,$2,$3,$4,$5,'reviewer','approved')`,
+          [badApproval, repository[1], reviewId, randomUUID(), "b".repeat(64)],
+        );
+        await expect(prepareClaimedReviewWorkflowSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewWorkflowSnapshotUnavailableError,
+        );
+        await tx.query(`UPDATE review_approvals SET repository_id=$2 WHERE id=$1`, [badApproval, repository[0]]);
+        await expect(prepareClaimedReviewWorkflowSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewWorkflowSnapshotUnavailableError,
+        );
+        const revisionId = randomUUID();
+        await tx.query(
+          `INSERT INTO review_revisions(id,review_id,sequence,base_run_id,head_run_id,
+          head_commit_sha,evidence_digest) VALUES($1,$2,1,$3,$4,$5,$6)`,
+          [revisionId, reviewId, runId[1], runId[0], "a".repeat(40), "b".repeat(64)],
+        );
+        await tx.query(`UPDATE review_approvals SET revision_id=$2 WHERE id=$1`, [badApproval, revisionId]);
+        await expect(prepareClaimedReviewWorkflowSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewWorkflowSnapshotUnavailableError,
+        );
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
+  });
+
+  it("fails closed on checklist repository mismatch", async () => {
+    const rollback = "invalid-checklist-rollback";
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const reviewId = randomUUID();
+        await tx.query(
+          `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+        VALUES($1,$2,'Synthetic','completed','approved',$3)`,
+          [reviewId, repository[0], runId[0]],
+        );
+        await tx.query(
+          `INSERT INTO review_checklist_items(id,repository_id,review_id,title)
+        VALUES($1,$2,$3,'Synthetic')`,
+          [randomUUID(), repository[1], reviewId],
+        );
+        await expect(prepareClaimedReviewWorkflowSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewWorkflowSnapshotUnavailableError,
+        );
+        throw new Error(rollback);
+      }),
+    ).rejects.toThrow(rollback);
   });
 
   it("isolates repository review and audit evidence under the original export claim", async () => {
