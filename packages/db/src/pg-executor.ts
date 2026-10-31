@@ -14,7 +14,7 @@ export type PgQueryExecutor = SqlQueryExecutor & {
   /** Pins every statement in one logical write to a single PG client. */
   withTransaction<T>(
     work: (transaction: SqlQueryExecutor) => Promise<T>,
-    options?: { statementTimeoutMs?: number },
+    options?: { statementTimeoutMs?: number; consistentRead?: true },
   ): Promise<T>;
 };
 
@@ -31,11 +31,15 @@ export function createPgQueryExecutor(options: PgLifecycleExecutorOptions): PgQu
     },
     async withTransaction<T>(
       work: (transaction: SqlQueryExecutor) => Promise<T>,
-      options?: { statementTimeoutMs?: number },
+      options?: { statementTimeoutMs?: number; consistentRead?: true },
     ): Promise<T> {
       const client = await pool.connect();
       try {
-        await client.query("BEGIN");
+        // Opt-in snapshot for bounded multi-query exports; preserve ordinary write transactions.
+        // Set isolation before statement_timeout's SELECT set_config (and before the first read).
+        await client.query(
+          options?.consistentRead === true ? "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY" : "BEGIN",
+        );
         if (options?.statementTimeoutMs !== undefined) {
           if (
             !Number.isInteger(options.statementTimeoutMs) ||
