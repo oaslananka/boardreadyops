@@ -263,6 +263,7 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
         repositoryId: "repo_1",
         ...(key === "reviewAudit" ? {} : { reviewId: "review_1" }),
         ...(field === "approvals" ? { revisionId: "revision_1" } : {}),
+        ...(field === "comments" ? { parentId: null } : {}),
       };
       const updated = slice({ ...original, [field]: [child] });
       const audit =
@@ -405,6 +406,7 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
         repositoryId: "repo_1",
         reviewId: "review_1",
         ...(field === "approvals" ? { revisionId: "revision_1" } : {}),
+        ...(field === "comments" ? { parentId: null } : {}),
       };
       expect(
         () =>
@@ -415,6 +417,58 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
         `${key}.${field}`,
       ).not.toThrow();
     }
+  });
+
+  it("rejects orphaned and cross-review comment parent links even within a permitted repository", () => {
+    const { input } = fixture();
+    const audit = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
+    input.slices.reviewAudit = slice({
+      ...audit,
+      reviews: [
+        { id: "review_1", repositoryId: "repo_1" },
+        { id: "review_2", repositoryId: "repo_1" },
+      ],
+    });
+    const original = JSON.parse(input.slices.reviewComments.bytes.toString("utf8")) as Record<string, unknown>;
+    const parent = { id: "comment_1", repositoryId: "repo_1", reviewId: "review_1", parentId: null };
+    const child = { id: "comment_2", repositoryId: "repo_1", reviewId: "review_2", parentId: "comment_1" };
+    for (const comments of [
+      [child],
+      [parent, child],
+      [{ ...parent, parentId: "comment_1" }],
+      [parent, { ...parent }],
+      [
+        { ...parent, parentId: "comment_2" },
+        { ...child, reviewId: "review_1" },
+      ],
+    ]) {
+      expect(() =>
+        prepareClaimedArchiveEntries({
+          ...input,
+          slices: { ...input.slices, reviewComments: slice({ ...original, comments }) },
+        }),
+      ).toThrow(ExportArchivePreflightError);
+    }
+  });
+
+  it("accepts properly nested comments for the same review and repository", () => {
+    const { input } = fixture();
+    const audit = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
+    input.slices.reviewAudit = slice({
+      ...audit,
+      reviews: [{ id: "review_1", repositoryId: "repo_1" }],
+    });
+    const original = JSON.parse(input.slices.reviewComments.bytes.toString("utf8")) as Record<string, unknown>;
+    const comments = [
+      { id: "comment_1", repositoryId: "repo_1", reviewId: "review_1", parentId: null },
+      { id: "comment_2", repositoryId: "repo_1", reviewId: "review_1", parentId: "comment_1" },
+    ];
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: { ...input.slices, reviewComments: slice({ ...original, comments }) },
+      }),
+    ).not.toThrow();
   });
 
   it("rejects an approval targeting a missing or another review's revision", () => {

@@ -271,6 +271,40 @@ export function prepareClaimedArchiveEntries(input: {
     }
   }
 
+  // Parent pointers must stay inside the same bounded review/comment
+  // collection; a valid repository does not authorize a cross-review thread.
+  const comments = decoded<{
+    comments: Array<{ id?: unknown; reviewId?: unknown; repositoryId?: unknown; parentId?: unknown }>;
+  }>(entryBytes[3]?.bytes).comments;
+  const byCommentId = new Map<string, (typeof comments)[number]>();
+  for (const comment of comments) {
+    if (
+      !validReviewLink(comment?.id) ||
+      byCommentId.has(comment.id) ||
+      (comment.parentId !== null && !validReviewLink(comment.parentId))
+    ) {
+      throw new ExportArchivePreflightError();
+    }
+    byCommentId.set(comment.id, comment);
+  }
+  for (const comment of comments) {
+    const visited = new Set([comment.id as string]);
+    let cursor = comment;
+    while (cursor.parentId !== null) {
+      const parent = byCommentId.get(cursor.parentId as string);
+      if (
+        !parent ||
+        parent.reviewId !== comment.reviewId ||
+        parent.repositoryId !== comment.repositoryId ||
+        visited.has(cursor.parentId as string)
+      ) {
+        throw new ExportArchivePreflightError();
+      }
+      visited.add(cursor.parentId as string);
+      cursor = parent;
+    }
+  }
+
   const verified = new Map<string, VerifiedArchiveObject>();
   for (const candidate of input.verifiedObjects) {
     if (!candidate || !safeEntryId(candidate.object?.artifactId) || verified.has(candidate.object.artifactId)) {
