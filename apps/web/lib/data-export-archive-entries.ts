@@ -143,10 +143,12 @@ export function prepareClaimedArchiveEntries(input: {
     verified.set(candidate.object.artifactId, candidate);
   }
 
+  const includedArtifactIds = new Set<string>();
   for (const artifact of artifacts.artifacts) {
-    if (!safeEntryId(artifact?.id) || !safeEntryId(artifact.runId)) {
+    if (!safeEntryId(artifact?.id) || !safeEntryId(artifact.runId) || includedArtifactIds.has(artifact.id)) {
       throw new ExportArchivePreflightError();
     }
+    includedArtifactIds.add(artifact.id);
     const candidate = verified.get(artifact.id);
     const repository = runs.get(artifact.runId);
     if (

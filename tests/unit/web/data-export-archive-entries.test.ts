@@ -119,6 +119,22 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
     }
   });
 
+  it("rejects duplicate artifact metadata that hides an unused verified object", () => {
+    const { input, metadata } = fixture();
+    const extra = {
+      ...input.verifiedObjects[0],
+      object: { ...input.verifiedObjects[0].object, artifactId: "artifact_2" },
+    };
+    const duplicateMetadata = slice({ artifacts: [metadata, metadata] });
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: { ...input.slices, artifactMetadata: duplicateMetadata },
+        verifiedObjects: [...input.verifiedObjects, extra],
+      }),
+    ).toThrow(ExportArchivePreflightError);
+  });
+
   it("fails closed when path, SHA-256, length, run or repository cannot be reconciled", () => {
     const { input } = fixture();
     const original = input.verifiedObjects[0];
