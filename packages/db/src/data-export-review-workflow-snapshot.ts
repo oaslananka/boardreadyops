@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isValidExportSha256 } from "./data-export-hex-digest.js";
 import type { ExportRecordClaim } from "./data-export-record-snapshot.js";
 import { isValidExportTimestamp } from "./data-export-timestamp.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
@@ -26,7 +27,7 @@ const bounded = (v: unknown, n: number): v is string => typeof v === "string" &&
 const optionalText = (v: unknown, n: number): v is string | null => v === null || bounded(v, n);
 const time = isValidExportTimestamp;
 const optionalTime = (v: unknown): v is string | null => v === null || time(v);
-const digest = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{64}$/u.test(v);
+const digest = isValidExportSha256;
 
 interface Approval {
   id: unknown;
