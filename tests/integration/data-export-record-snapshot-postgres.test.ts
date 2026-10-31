@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prepareClaimedConsistentMetadataSlices } from "../../packages/db/src/data-export-consistent-snapshot.js";
+import { lookupClaimedExportObject } from "../../packages/db/src/data-export-object-authorization.js";
 import { DataExportPreparationStore } from "../../packages/db/src/data-export-preparation-store.js";
 import {
   ExportRecordSnapshotUnavailableError,
@@ -130,6 +131,62 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
       await prepareClaimedRunFindingSnapshot(executor(), { ...input, installationId: installation[1] }),
     ).toBeNull();
     expect(await prepareClaimedRunFindingSnapshot(executor(), { ...input, tenantId: "different-tenant" })).toBeNull();
+  });
+
+  it("authorizes only unexpired, installation-bound physical objects without a deletion fence", async () => {
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    const artifactIds: [string, string, string] = [randomUUID(), randomUUID(), randomUUID()];
+    const digest = "a".repeat(64);
+    const artifactPaths = artifactIds.map((id) => `synthetic/${id}.bin`);
+    for (const [index, id] of artifactIds.entries()) {
+      await executor().query(
+        `INSERT INTO artifacts(id,run_id,kind,name,storage_path,sha256,bytes,role,retention_until)
+         VALUES($1,$2,'archive','example.bin',$3,$4,22,'primary',NOW()+interval '3 days')`,
+        [id, runId[index], artifactPaths[index], digest],
+      );
+    }
+    try {
+      const active = await lookupClaimedExportObject(executor(), claim, artifactIds[0]);
+      expect(active).toMatchObject({
+        artifactId: artifactIds[0],
+        runId: runId[0],
+        repositoryId: repository[0],
+        storagePath: artifactPaths[0],
+      });
+      expect(await lookupClaimedExportObject(executor(), claim, artifactIds[1])).toBeNull();
+      expect(await lookupClaimedExportObject(executor(), claim, artifactIds[2])).toBeNull();
+      expect(
+        await lookupClaimedExportObject(executor(), { ...claim, token: "stolen-claim" }, artifactIds[0]),
+      ).toBeNull();
+      expect(
+        await lookupClaimedExportObject(executor(), { ...claim, installationId: installation[1] }, artifactIds[0]),
+      ).toBeNull();
+
+      await executor().query("UPDATE artifacts SET retention_until=NULL WHERE id=$1", [artifactIds[0]]);
+      expect(await lookupClaimedExportObject(executor(), claim, artifactIds[0])).toBeNull();
+      await executor().query(
+        "UPDATE artifacts SET uploaded_at=NOW()-interval '2 days',retention_until=NOW()-interval '1 day' WHERE id=$1",
+        [artifactIds[0]],
+      );
+      expect(await lookupClaimedExportObject(executor(), claim, artifactIds[0])).toBeNull();
+      await executor().query("UPDATE artifacts SET retention_until=NOW()+interval '3 days' WHERE id=$1", [
+        artifactIds[0],
+      ]);
+      expect(await lookupClaimedExportObject(executor(), claim, artifactIds[0])).not.toBeNull();
+
+      await executor().query(
+        `INSERT INTO artifact_deletion_jobs(artifact_id,installation_id,repository_id,release_run_id,storage_driver,
+          storage_path,deletion_reason,artifact_kind,artifact_role,artifact_sha256,artifact_bytes)
+         VALUES($1,$2,$3,$4,'local',$5,'retention_expired','archive','primary',$6,22)`,
+        [artifactIds[0], installation[0], repository[0], runId[0], artifactPaths[0], digest],
+      );
+      expect(await lookupClaimedExportObject(executor(), claim, artifactIds[0])).toBeNull();
+      await executor().query("DELETE FROM artifact_deletion_jobs WHERE artifact_id=$1", [artifactIds[0]]);
+      expect(await lookupClaimedExportObject(executor(), claim, artifactIds[0])).not.toBeNull();
+    } finally {
+      await executor().query("DELETE FROM artifact_deletion_jobs WHERE artifact_id=ANY($1::text[])", [artifactIds]);
+      await executor().query("DELETE FROM artifacts WHERE id=ANY($1::text[])", [artifactIds]);
+    }
   });
 
   it("denies disabled repository, suspended installation, and expired original lease", async () => {
