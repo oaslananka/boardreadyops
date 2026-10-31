@@ -31,6 +31,17 @@ type ReviewRow = {
   status: string;
   decision: string;
 };
+type RevisionRow = {
+  id: string;
+  review_id: string;
+  sequence: number;
+  base_run_id: string | null;
+  head_run_id: string;
+  base_commit_sha: string | null;
+  head_commit_sha: string;
+  evidence_digest: string;
+};
+
 type AuditRow = {
   id: string;
   repository_id: string;
@@ -45,7 +56,7 @@ type AuditRow = {
  * One claim-scoped SQL statement, usable inside the existing consistent-read
  * transaction. Deliberately restricts audit evidence to records explicitly
  * linked to an authorized repository; installation-only audit events, metadata
- * payloads, review comments/revisions and other data classes remain excluded.
+ * payloads, review comments and other data classes remain excluded.
  * This MUST NOT be described as a full customer export.
  */
 export async function prepareClaimedReviewAuditSnapshot(
@@ -84,6 +95,20 @@ export async function prepareClaimedReviewAuditSnapshot(
        FROM reviews AS review JOIN permitted_repositories AS permitted ON permitted.id=review.repository_id
        ORDER BY review.id LIMIT 101
      ),
+     revision_rows AS (
+       SELECT revision.id, revision.review_id, revision.sequence,
+              revision.base_run_id, revision.head_run_id,
+              revision.base_commit_sha, revision.head_commit_sha, revision.evidence_digest
+       FROM review_revisions AS revision
+       JOIN reviews AS review ON review.id=revision.review_id
+       JOIN permitted_repositories AS permitted ON permitted.id=review.repository_id
+       JOIN release_runs AS head_run ON head_run.id=revision.head_run_id
+         AND head_run.repository_id=permitted.id
+       WHERE (revision.base_run_id IS NULL OR EXISTS (
+         SELECT 1 FROM release_runs AS base_run WHERE base_run.id=revision.base_run_id
+           AND base_run.repository_id=permitted.id))
+       ORDER BY revision.id LIMIT 101
+     ),
      audit_rows AS (
        SELECT audit.id, audit.repository_id, audit.release_run_id,
               audit.event_type, audit.actor_type, audit.subject_type, audit.subject_id
@@ -94,15 +119,16 @@ export async function prepareClaimedReviewAuditSnapshot(
      )
      SELECT
        (SELECT COALESCE(jsonb_agg(to_jsonb(review_rows) ORDER BY review_rows.id),'[]'::jsonb) FROM review_rows) AS reviews,
+       (SELECT COALESCE(jsonb_agg(to_jsonb(revision_rows) ORDER BY revision_rows.id),'[]'::jsonb) FROM revision_rows) AS revisions,
        (SELECT COALESCE(jsonb_agg(to_jsonb(audit_rows) ORDER BY audit_rows.id),'[]'::jsonb) FROM audit_rows) AS audit_events
      FROM allowed LIMIT 1`,
     [claim.exportId, claim.tenantId, claim.installationId, claim.workerId, claim.token],
-  )) as { rows?: Array<{ reviews: unknown; audit_events: unknown }> };
+  )) as { rows?: Array<{ reviews: unknown; revisions: unknown; audit_events: unknown }> };
   const row = result.rows?.[0];
   if (!row) return null;
-  if (!Array.isArray(row.reviews) || !Array.isArray(row.audit_events))
+  if (!Array.isArray(row.reviews) || !Array.isArray(row.revisions) || !Array.isArray(row.audit_events))
     throw new ExportReviewAuditSnapshotUnavailableError();
-  if (row.reviews.length > maxRows || row.audit_events.length > maxRows)
+  if (row.reviews.length > maxRows || row.revisions.length > maxRows || row.audit_events.length > maxRows)
     throw new ExportReviewAuditSnapshotUnavailableError();
   const reviews = row.reviews.map((r: ReviewRow | null) => {
     if (
@@ -118,6 +144,28 @@ export async function prepareClaimedReviewAuditSnapshot(
       title: r.title,
       status: r.status,
       decision: r.decision,
+    };
+  });
+  const revisions = row.revisions.map((revision: RevisionRow | null) => {
+    if (
+      !revision ||
+      ![revision.id, revision.review_id, revision.head_run_id, revision.head_commit_sha].every(validId) ||
+      !Number.isSafeInteger(revision.sequence) ||
+      revision.sequence < 1 ||
+      !validOptionalId(revision.base_run_id) ||
+      !validOptionalId(revision.base_commit_sha) ||
+      !/^[a-f0-9]{64}$/u.test(revision.evidence_digest)
+    )
+      throw new ExportReviewAuditSnapshotUnavailableError();
+    return {
+      id: revision.id,
+      reviewId: revision.review_id,
+      sequence: revision.sequence,
+      baseRunId: revision.base_run_id,
+      headRunId: revision.head_run_id,
+      baseCommitSha: revision.base_commit_sha,
+      headCommitSha: revision.head_commit_sha,
+      evidenceDigest: revision.evidence_digest,
     };
   });
   const auditEvents = row.audit_events.map((a: AuditRow | null) => {
@@ -142,18 +190,18 @@ export async function prepareClaimedReviewAuditSnapshot(
     JSON.stringify({
       formatVersion: 1,
       kind: "boardreadyops.claimed-review-audit-snapshot",
-      coverage: "authorized-repository-reviews-and-repository-linked-audit-descriptors-only",
+      coverage: "authorized-repository-reviews-revisions-and-repository-linked-audit-descriptors-only",
       exportId: claim.exportId,
       exclusions: [
         "audit-metadata",
         "installation-only-audit",
         "review-comments",
-        "review-revisions",
         "artifacts",
         "source-code",
         "backups-and-platform-logs",
       ],
       reviews,
+      revisions,
       auditEvents,
     }),
     "utf8",
