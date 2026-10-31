@@ -16,6 +16,16 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./data-export-object-authorization": {
+      "types": "./src/data-export-object-authorization.ts",
+      "import": "./src/data-export-object-authorization.ts",
+      "default": "./src/data-export-object-authorization.ts"
+    },
+    "./data-export-record-snapshot": {
+      "types": "./src/data-export-record-snapshot.ts",
+      "import": "./src/data-export-record-snapshot.ts",
+      "default": "./src/data-export-record-snapshot.ts"
+    },
     "./lifecycle-store": {
       "types": "./src/lifecycle-store.ts",
       "import": "./src/lifecycle-store.ts",
