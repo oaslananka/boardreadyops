@@ -140,6 +140,41 @@ describe("claimed consistent repository, record, review and artifact metadata pr
     expect(artifactMissing.query).toHaveBeenCalledTimes(4);
   });
 
+  it("keeps artifact metadata only when its run is part of the exact same record snapshot", async () => {
+    const artifact = {
+      id: "artifact-1",
+      run_id: "run-1",
+      kind: "manufacturing",
+      name: "board.zip",
+      role: "package",
+      sha256: "c".repeat(64),
+      bytes: 512,
+      content_type: "application/zip",
+    };
+    const allowed = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [{ artifacts: [artifact] }] },
+    ]);
+    const prepared = await prepareClaimedConsistentMetadataSlices(allowed.db, claim);
+    expect(JSON.parse(prepared?.artifactMetadata.bytes.toString("utf8") ?? "{}").artifacts).toEqual([
+      expect.objectContaining({ id: artifact.id, runId: "run-1" }),
+    ]);
+
+    const orphaned = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [{ artifacts: [{ ...artifact, run_id: "foreign-run" }] }] },
+    ]);
+    await expect(prepareClaimedConsistentMetadataSlices(orphaned.db, claim)).rejects.toThrow(
+      ExportArtifactSnapshotUnavailableError,
+    );
+    expect(orphaned.withTransaction).toHaveBeenCalledTimes(1);
+    expect(orphaned.query).toHaveBeenCalledTimes(4);
+  });
+
   it("rejects excessive artifacts instead of returning a truncated shared snapshot", async () => {
     const overflow = fixture([
       { rows: [inventory] },

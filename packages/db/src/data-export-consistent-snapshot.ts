@@ -1,4 +1,7 @@
-import { prepareClaimedArtifactMetadataSnapshot } from "./data-export-artifact-snapshot.js";
+import {
+  ExportArtifactSnapshotUnavailableError,
+  prepareClaimedArtifactMetadataSnapshot,
+} from "./data-export-artifact-snapshot.js";
 import { DataExportInventoryStore } from "./data-export-inventory.js";
 import { type PreparedExportManifest, prepareClaimedExportManifest } from "./data-export-manifest.js";
 import {
@@ -37,6 +40,20 @@ export async function prepareClaimedConsistentMetadataSlices(
       if (!reviewAudit) return null;
       const artifactMetadata = await prepareClaimedArtifactMetadataSnapshot(transaction, claim);
       if (!artifactMetadata) return null;
+
+      // A metadata slice must not refer to a run missing from this same bounded
+      // database snapshot. Do not return an internally incomplete package.
+      const includedRunIds = new Set(
+        (JSON.parse(records.bytes.toString("utf8")) as { runs: Array<{ id: string }> }).runs.map((run) => run.id),
+      );
+      const artifactRows = (
+        JSON.parse(artifactMetadata.bytes.toString("utf8")) as {
+          artifacts: Array<{ runId: string }>;
+        }
+      ).artifacts;
+      if (artifactRows.some((artifact) => !includedRunIds.has(artifact.runId))) {
+        throw new ExportArtifactSnapshotUnavailableError();
+      }
       return { repositories, records, reviewAudit, artifactMetadata };
     },
     { consistentRead: true, statementTimeoutMs: 5_000 },
