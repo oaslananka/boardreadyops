@@ -90,6 +90,9 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
     const repositories = JSON.parse(prepared?.repositories.bytes.toString("utf8") ?? "{}");
     const records = JSON.parse(prepared?.records.bytes.toString("utf8") ?? "{}");
     const reviewAudit = JSON.parse(prepared?.reviewAudit.bytes.toString("utf8") ?? "{}");
+    const artifactMetadata = JSON.parse(prepared?.artifactMetadata.bytes.toString("utf8") ?? "{}");
+    expect(artifactMetadata.artifacts).toEqual([]);
+    expect(artifactMetadata.exclusions).toContain("artifact-contents");
     expect(reviewAudit.reviews).toEqual([]);
     expect(reviewAudit.revisions).toEqual([]);
     expect(reviewAudit.auditEvents).toEqual([]);

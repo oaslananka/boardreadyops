@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ExportArtifactSnapshotUnavailableError } from "../../../packages/db/src/data-export-artifact-snapshot.js";
 import { prepareClaimedConsistentMetadataSlices } from "../../../packages/db/src/data-export-consistent-snapshot.js";
 import { ExportRecordSnapshotUnavailableError } from "../../../packages/db/src/data-export-record-snapshot.js";
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
@@ -43,6 +44,8 @@ const records = {
   ],
 };
 
+const artifacts = { artifacts: [] };
+
 const reviewAudit = {
   revisions: [
     {
@@ -79,7 +82,14 @@ const reviewAudit = {
   ],
 };
 
-function fixture(replies: readonly unknown[] = [{ rows: [inventory] }, { rows: [records] }, { rows: [reviewAudit] }]) {
+function fixture(
+  replies: readonly unknown[] = [
+    { rows: [inventory] },
+    { rows: [records] },
+    { rows: [reviewAudit] },
+    { rows: [artifacts] },
+  ],
+) {
   const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => replies[query.mock.calls.length - 1]);
   const withTransaction = vi.fn(async (work: (tx: { query: typeof query }) => Promise<unknown>, options: unknown) => {
     expect(options).toEqual({ consistentRead: true, statementTimeoutMs: 5000 });
@@ -88,12 +98,12 @@ function fixture(replies: readonly unknown[] = [{ rows: [inventory] }, { rows: [
   return { db: { withTransaction } as unknown as Pick<PgQueryExecutor, "withTransaction">, query, withTransaction };
 }
 
-describe("claimed consistent repository and record preparation", () => {
-  it("queries three scoped slices in the same readonly transaction without completing an export", async () => {
+describe("claimed consistent repository, record, review and artifact metadata preparation", () => {
+  it("queries four scoped slices in the same readonly transaction without completing an export", async () => {
     const { db, query, withTransaction } = fixture();
     const result = await prepareClaimedConsistentMetadataSlices(db, claim);
     expect(withTransaction).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledTimes(3);
+    expect(query).toHaveBeenCalledTimes(4);
     for (const [, params] of query.mock.calls) expect(params).toEqual(Object.values(claim));
     const repositories = JSON.parse(result?.repositories.bytes.toString("utf8") ?? "{}");
     const records = JSON.parse(result?.records.bytes.toString("utf8") ?? "{}");
@@ -104,6 +114,9 @@ describe("claimed consistent repository and record preparation", () => {
     expect(reviewData.reviews).toEqual([expect.objectContaining({ id: "review-1", repositoryId: "repo-1" })]);
     expect(reviewData.revisions).toEqual([expect.objectContaining({ id: "revision-1", reviewId: "review-1" })]);
     expect(reviewData.auditEvents).toEqual([expect.objectContaining({ id: "audit-1", repositoryId: "repo-1" })]);
+    const artifactData = JSON.parse(result?.artifactMetadata.bytes.toString("utf8") ?? "{}");
+    expect(artifactData.artifacts).toEqual([]);
+    expect(artifactData.exclusions).toContain("artifact-contents");
     expect(JSON.stringify(result)).not.toContain("storage_path");
   });
 
@@ -117,6 +130,27 @@ describe("claimed consistent repository and record preparation", () => {
     const auditMissing = fixture([{ rows: [inventory] }, { rows: [records] }, { rows: [] }]);
     await expect(prepareClaimedConsistentMetadataSlices(auditMissing.db, claim)).resolves.toBeNull();
     expect(auditMissing.query).toHaveBeenCalledTimes(3);
+    const artifactMissing = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [] },
+    ]);
+    await expect(prepareClaimedConsistentMetadataSlices(artifactMissing.db, claim)).resolves.toBeNull();
+    expect(artifactMissing.query).toHaveBeenCalledTimes(4);
+  });
+
+  it("rejects excessive artifacts instead of returning a truncated shared snapshot", async () => {
+    const overflow = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [{ artifacts: Array.from({ length: 101 }, (_, index) => ({ id: `artifact-${index}` })) }] },
+    ]);
+    await expect(prepareClaimedConsistentMetadataSlices(overflow.db, claim)).rejects.toThrow(
+      ExportArtifactSnapshotUnavailableError,
+    );
+    expect(overflow.query).toHaveBeenCalledTimes(4);
   });
 
   it("rejects overflow rather than returning an incomplete record package", async () => {
