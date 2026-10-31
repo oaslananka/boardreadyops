@@ -10,6 +10,7 @@ import { Button } from "../ui/button.js";
 import { checkboxClassName } from "../ui/field.js";
 import { Input } from "../ui/input.js";
 import { NativeSelect } from "../ui/native-select.js";
+import { ExportRequestReceipt } from "./export-request-receipt.js";
 
 type DataScope = "organization" | "repository" | "user";
 
@@ -74,14 +75,7 @@ export function ExportRequestForm({
             </Button>
           </div>
           {issued ? (
-            <AlertRoot variant="info">
-              <AlertTitle>Export request {customerStatusLabel(issued.status)}</AlertTitle>
-              <AlertDescription>
-                Reference <code className="font-mono">{issued.exportId}</code>. No downloadable archive is created
-                automatically. This is a recorded request, not a completed export; an authorized operator must prepare
-                and arrange delivery before a file becomes available.
-              </AlertDescription>
-            </AlertRoot>
+            <ExportRequestReceipt key={issued.exportId} issued={issued} installationId={installationId} />
           ) : null}
         </>
       )}
