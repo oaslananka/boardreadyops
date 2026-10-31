@@ -95,6 +95,20 @@ export function prepareClaimedArchiveEntries(input: {
     path,
     bytes: checkedMetadata(content),
   }));
+  // The seven slices carry an exportId independently. A valid digest alone
+  // must never permit content from two different export reservations to be
+  // spliced into one archive, even when repository/run IDs happen to match.
+  const claimedExportIds = entryBytes.map((entry) => decoded<{ exportId?: unknown }>(entry.bytes)?.exportId);
+  const exportId = claimedExportIds[0];
+  if (
+    typeof exportId !== "string" ||
+    exportId.length === 0 ||
+    exportId.length > 256 ||
+    exportId.trim() !== exportId ||
+    claimedExportIds.some((id) => id !== exportId)
+  ) {
+    throw new ExportArchivePreflightError();
+  }
   const inventory = decoded<{ repositories: Array<{ repositoryId: string }> }>(entryBytes[0]?.bytes);
   const records = decoded<{ runs: Array<{ id: string; repositoryId: string }> }>(entryBytes[1]?.bytes);
   const artifacts = decoded<{

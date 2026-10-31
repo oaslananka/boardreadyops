@@ -8,7 +8,9 @@ import {
 type Input = Parameters<typeof prepareClaimedArchiveEntries>[0];
 const hash = (bytes: Buffer): string => createHash("sha256").update(bytes).digest("hex");
 const slice = (data: unknown) => {
-  const bytes = Buffer.from(JSON.stringify(data));
+  const bytes = Buffer.from(
+    JSON.stringify(data && typeof data === "object" && !Array.isArray(data) ? { exportId: "export-1", ...data } : data),
+  );
   return { bytes, byteLength: bytes.length, sha256: hash(bytes), contentType: "application/json" as const };
 };
 
@@ -72,6 +74,35 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
     const result = prepareClaimedArchiveEntries(input);
     expect(result.entries).toHaveLength(7);
     expect(result.entries.every((entry) => entry.path.startsWith("metadata/"))).toBe(true);
+  });
+
+  it("rejects a mixed-export metadata set even when every slice has a valid digest", () => {
+    const { input } = fixture();
+    for (const key of [
+      "repositories",
+      "records",
+      "reviewAudit",
+      "reviewComments",
+      "reviewWorkflow",
+      "findingCollaboration",
+      "artifactMetadata",
+    ] as const) {
+      const changed = JSON.parse(input.slices[key].bytes.toString("utf8")) as Record<string, unknown>;
+      const wrong = slice({ ...changed, exportId: "another-export" });
+      expect(() =>
+        prepareClaimedArchiveEntries({
+          ...input,
+          slices: { ...input.slices, [key]: wrong },
+        }),
+      ).toThrow(ExportArchivePreflightError);
+    }
+    const missing = slice({ ...JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")), exportId: null });
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: { ...input.slices, reviewAudit: missing },
+      }),
+    ).toThrow(ExportArchivePreflightError);
   });
 
   it("rejects missing, additional and duplicate physical objects", () => {

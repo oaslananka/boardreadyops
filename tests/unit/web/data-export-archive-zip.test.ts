@@ -7,7 +7,11 @@ import { sanitizeAndExtractArchive } from "../../../packages/cloud-core/src/arch
 type ZipInput = Parameters<typeof prepareClaimedArchiveZip>[0];
 const sha256 = (value: Buffer): string => createHash("sha256").update(value).digest("hex");
 const slice = (value: unknown) => {
-  const bytes = Buffer.from(JSON.stringify(value));
+  const bytes = Buffer.from(
+    JSON.stringify(
+      value && typeof value === "object" && !Array.isArray(value) ? { exportId: "export-1", ...value } : value,
+    ),
+  );
   return { bytes, byteLength: bytes.length, sha256: sha256(bytes), contentType: "application/json" as const };
 };
 function fixture() {
@@ -50,6 +54,7 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
     const files = new Map(result.files.map(({ path, data }) => [path, data]));
     expect(files.get("objects/artifact_1.bin")).toEqual(bytes);
     expect(JSON.parse(files.get("metadata/repositories.json")?.toString("utf8") ?? "{}")).toEqual({
+      exportId: "export-1",
       repositories: [{ repositoryId: "repo_1" }],
     });
     expect([...files.keys()].filter((name) => name.startsWith("metadata/"))).toHaveLength(7);
