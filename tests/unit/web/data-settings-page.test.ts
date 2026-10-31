@@ -66,12 +66,21 @@ describe("Data & Retention settings administration", () => {
       /\s+/gu,
       " ",
     );
+    const receipt = (await readFile("apps/web/components/settings/export-request-receipt.tsx", "utf8")).replace(
+      /\s+/gu,
+      " ",
+    );
     const service = await readFile("apps/web/lib/data-settings-admin.ts", "utf8");
 
     expect(page).toContain("An export request does not create a downloadable pack automatically.");
     expect(page).toContain("Submitting an erasure request does not delete records.");
-    expect(forms).toContain("No downloadable archive is created automatically.");
-    expect(forms).toContain('<AlertRoot variant="info">');
+    expect(forms).toContain("ExportRequestReceipt");
+    expect(receipt).toContain("An export request does not create a customer");
+    expect(receipt).toContain("archive automatically.");
+    expect(receipt).toContain('<AlertRoot variant="info">');
+    expect(receipt).toContain("not your full customer data archive");
+    expect(receipt).toContain("Download metadata preview");
+    expect(receipt).toContain("Revoke metadata preview");
     expect(forms).not.toContain("href={`/api/v1/data-exports/");
     expect(forms).toContain("A non-preview request is only recorded for an authorized operator workflow.");
     expect(forms).toContain("Preview records the requested scope; it does not list matching records.");
