@@ -187,6 +187,20 @@ facility, **not** the customer's full archive of source, review, findings,
 artifacts or evidence. Audited operator recovery, cleanup, complete archive
 delivery, and separately reviewed legal-hold-safe erasure remain unavailable.
 
+A separate **operator-only, lease-bound read-only record snapshot** can prepare
+a narrowly scoped in-memory JSON slice of release-run summaries and finding
+messages from the same active GitHub App installation and selected active
+repository. The original preparation worker/token and unexpired lease are
+revalidated in one database statement; disabled repositories, suspended
+installations, unbound/other-scope requests and stale claims are denied.
+More than 100 runs, more than 100 findings, or 256 KiB of serialized JSON
+rejects the entire attempt instead of silently exporting a partial list.
+The output explicitly excludes artifacts, audit events, review content, source,
+backups and platform logs. It is never persisted as an archive, exposed through
+an HTTP download, automatically dispatched or used to mark an export completed.
+A later full-archive implementation must authorize and assemble all relevant
+data classes with separately audited retention and delivery behavior.
+
 
 Installations are the top-level tenant boundary. Repository, run, artifact, runner,
 replay, reconciliation, transition, and deletion records are validated against
