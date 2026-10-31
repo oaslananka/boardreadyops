@@ -25,9 +25,7 @@ const fail = (): never => {
 const validId = (v: unknown): v is string => typeof v === "string" && v.length > 0 && v.length <= 256 && v.trim() === v;
 const validText = (v: unknown, max: number): v is string =>
   typeof v === "string" && Buffer.byteLength(v, "utf8") <= max;
-const validTime = isValidExportTimestamp;
-const validOptionalTime = (v: unknown): v is string | null => v === null || validTime(v);
-const validDigest = isValidExportSha256;
+const validOptionalTime = (v: unknown): v is string | null => v === null || isValidExportTimestamp(v);
 
 type DecisionRow = {
   id: unknown;
@@ -150,8 +148,8 @@ export async function prepareClaimedFindingCollaborationSnapshot(
       !["accepted_risk", "false_positive", "mitigated", "fix_required", "deferred"].includes(d.disposition as string) ||
       !validText(d.reason, 4096) ||
       !validOptionalTime(d.expires_at) ||
-      !validDigest(d.evidence_digest) ||
-      !validTime(d.created_at)
+      !isValidExportSha256(d.evidence_digest) ||
+      !isValidExportTimestamp(d.created_at)
     )
       fail();
     return {
@@ -176,7 +174,7 @@ export async function prepareClaimedFindingCollaborationSnapshot(
       ![a.id, a.repository_id, a.review_repository_id, a.review_id, a.assignee, a.assigned_by].every(validId) ||
       a.repository_id !== a.review_repository_id ||
       !validText(a.finding_fingerprint, 2048) ||
-      !validTime(a.created_at)
+      !isValidExportTimestamp(a.created_at)
     )
       fail();
     return {

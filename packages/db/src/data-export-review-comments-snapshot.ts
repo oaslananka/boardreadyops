@@ -26,7 +26,6 @@ const validId = (v: unknown): v is string => typeof v === "string" && v.length >
 const validOptionalId = (v: unknown): v is string | null => v === null || validId(v);
 const validOptionalEvidence = (v: unknown): v is string | null =>
   v === null || (typeof v === "string" && Buffer.byteLength(v, "utf8") <= maxEvidenceBytes);
-const validTimestamp = isValidExportTimestamp;
 
 interface CommentRow {
   id: unknown;
@@ -151,8 +150,8 @@ export async function prepareClaimedReviewCommentsSnapshot(
       Buffer.byteLength(c.content, "utf8") > maxCommentBytes ||
       !validOptionalEvidence(c.finding_fingerprint) ||
       !validOptionalEvidence(c.evidence_anchor) ||
-      !validTimestamp(c.created_at) ||
-      !validTimestamp(c.updated_at)
+      !isValidExportTimestamp(c.created_at) ||
+      !isValidExportTimestamp(c.updated_at)
     ) {
       throw new ExportReviewCommentsSnapshotUnavailableError();
     }

@@ -25,9 +25,7 @@ const id = (v: unknown): v is string => typeof v === "string" && v.length > 0 &&
 const nullableId = (v: unknown): v is string | null => v === null || id(v);
 const bounded = (v: unknown, n: number): v is string => typeof v === "string" && Buffer.byteLength(v, "utf8") <= n;
 const optionalText = (v: unknown, n: number): v is string | null => v === null || bounded(v, n);
-const time = isValidExportTimestamp;
-const optionalTime = (v: unknown): v is string | null => v === null || time(v);
-const digest = isValidExportSha256;
+const optionalTime = (v: unknown): v is string | null => v === null || isValidExportTimestamp(v);
 
 interface Approval {
   id: unknown;
@@ -151,15 +149,15 @@ export async function prepareClaimedReviewWorkflowSnapshot(
       ![a.id, a.repository_id, a.parent_repository_id, a.review_id, a.revision_id, a.approver_id].every(id) ||
       a.repository_id !== a.parent_repository_id ||
       a.valid_revision !== true ||
-      !digest(a.evidence_digest) ||
+      !isValidExportSha256(a.evidence_digest) ||
       !["approved", "changes_requested", "invalidated", "dismissed"].includes(a.status as string) ||
       !optionalText(a.reason, 4096) ||
       typeof a.is_break_glass !== "boolean" ||
       !optionalTime(a.invalidated_at) ||
       !nullableId(a.invalidated_by) ||
       !optionalText(a.invalidation_reason, 4096) ||
-      !time(a.created_at) ||
-      !time(a.updated_at)
+      !isValidExportTimestamp(a.created_at) ||
+      !isValidExportTimestamp(a.updated_at)
     )
       fail();
     return {
@@ -189,7 +187,7 @@ export async function prepareClaimedReviewWorkflowSnapshot(
       typeof item.completed !== "boolean" ||
       !nullableId(item.completed_by) ||
       !optionalTime(item.completed_at) ||
-      !time(item.created_at)
+      !isValidExportTimestamp(item.created_at)
     )
       fail();
     return {
