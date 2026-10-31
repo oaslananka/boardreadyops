@@ -99,7 +99,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ expo
   if (!viewer.session)
     return Response.json({ ok: false, error: "authentication required" }, { status: 401, headers: noStore });
   const installationId = url.searchParams.get("installationId");
-  if (!installationId || installationId.trim() !== installationId)
+  if (!installationId?.trim() || installationId.trim() !== installationId)
     return Response.json({ ok: false, error: "installationId is required" }, { status: 400, headers: noStore });
   const { exportId } = await context.params;
   if (!/^[0-9a-f-]{36}$/u.test(exportId))

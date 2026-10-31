@@ -323,7 +323,8 @@ export class DataExportPreparationStore {
       ],
     );
     const expiry = rows(result)[0]?.manifest_preview_expires_at;
-    return expiry instanceof Date ? expiry.toISOString() : typeof expiry === "string" ? expiry : null;
+    if (expiry instanceof Date) return expiry.toISOString();
+    return typeof expiry === "string" ? expiry : null;
   }
 
   /** Only the currently authorized installation may read an unexpired metadata preview. */
