@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { prepareClaimedConsistentMetadataSlices } from "@boardreadyops/db/data-export-consistent-snapshot";
 import type { ClaimedExportObject } from "@boardreadyops/db/data-export-object-authorization";
+import type { prepareClaimedConsistentMetadataSlices } from "../../../packages/db/src/data-export-consistent-snapshot.js";
 
 type ClaimedSlices = NonNullable<Awaited<ReturnType<typeof prepareClaimedConsistentMetadataSlices>>>;
 
@@ -44,7 +44,7 @@ const safeEntryId = (value: unknown): value is string =>
   });
 const digest = (bytes: Buffer): string => createHash("sha256").update(bytes).digest("hex");
 
-function checkedMetadata(value: { bytes: Buffer; byteLength: number; sha256: string }): Buffer {
+function checkedMetadata(value: { bytes: Buffer; byteLength: number; sha256: string; contentType: string }): Buffer {
   if (
     !value ||
     !Buffer.isBuffer(value.bytes) ||
@@ -59,7 +59,8 @@ function checkedMetadata(value: { bytes: Buffer; byteLength: number; sha256: str
   return value.bytes;
 }
 
-function decoded<T>(bytes: Buffer): T {
+function decoded<T>(bytes: Buffer | undefined): T {
+  if (!Buffer.isBuffer(bytes)) throw new ExportArchivePreflightError();
   try {
     return JSON.parse(bytes.toString("utf8")) as T;
   } catch {
@@ -90,12 +91,15 @@ export function prepareClaimedArchiveEntries(input: {
     ["metadata/artifacts.json", input.slices.artifactMetadata],
   ] as const;
 
-  const entryBytes = metadata.map(([path, content]) => ({ path, bytes: checkedMetadata(content) }));
-  const inventory = decoded<{ repositories: Array<{ repositoryId: string }> }>(entryBytes[0].bytes);
-  const records = decoded<{ runs: Array<{ id: string; repositoryId: string }> }>(entryBytes[1].bytes);
+  const entryBytes: Array<{ path: string; bytes: Buffer }> = metadata.map(([path, content]) => ({
+    path,
+    bytes: checkedMetadata(content),
+  }));
+  const inventory = decoded<{ repositories: Array<{ repositoryId: string }> }>(entryBytes[0]?.bytes);
+  const records = decoded<{ runs: Array<{ id: string; repositoryId: string }> }>(entryBytes[1]?.bytes);
   const artifacts = decoded<{
     artifacts: Array<{ id: string; runId: string; sha256: string; byteLength: number }>;
-  }>(entryBytes[6].bytes);
+  }>(entryBytes[6]?.bytes);
   if (
     !Array.isArray(inventory?.repositories) ||
     !Array.isArray(records?.runs) ||
