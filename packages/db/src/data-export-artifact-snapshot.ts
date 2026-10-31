@@ -28,6 +28,7 @@ type ArtifactRow = {
 const validText = (value: unknown, maxLength = 256): value is string =>
   typeof value === "string" &&
   value.length > 0 &&
+  value.length <= maxLength &&
   Buffer.byteLength(value, "utf8") <= maxLength &&
   value.trim() === value;
 

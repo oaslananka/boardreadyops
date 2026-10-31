@@ -79,6 +79,10 @@ describe("claimed artifact metadata is not a deliverable export", () => {
       ExportArtifactSnapshotUnavailableError,
     );
     expect(query).not.toHaveBeenCalled();
+    await expect(
+      prepareClaimedArtifactMetadataSnapshot(db, { ...claim, token: "x".repeat(1_000_000) }),
+    ).rejects.toThrow(ExportArtifactSnapshotUnavailableError);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("includes exactly 100 valid artifacts without silently truncating", async () => {
