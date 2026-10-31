@@ -265,35 +265,23 @@ export async function requestExportForViewer(
 ): Promise<ActionResult<{ exportId: string; status: string }>> {
   const selected = await authorizedTenant(session, input.installationId, dependencies);
   if (!selected) return fail("You do not have access to that installation.");
+  if (input.scope === "user")
+    return fail("User-scoped exports are unavailable until the original requester identity can be verified.");
   const scopeId = input.scope === "organization" ? undefined : input.scopeId?.trim();
   if (input.scope !== "organization" && !scopeId) return fail("Repository and user exports require a scope id.");
   const opened = await dependencies.openStore();
   if (!opened) return fail("This deployment has no database configured.");
   try {
-    if (input.scope !== "user") {
-      const exportId = await opened.store.createBoundPendingExport({
-        tenantId: selected.accountLogin,
-        installationId: selected.id,
-        requestedBy: session.login,
-        scope: input.scope,
-        scopeId: scopeId ?? null,
-      });
-      if (!exportId) return fail("The selected installation or repository is no longer available.");
-      return ok(
-        { exportId, status: "pending" },
-        "Export request recorded; creating a downloadable pack requires operator processing.",
-      );
-    }
-    // Legacy user-scope intake remains pending; user-scope package
-    // preparation is not currently implemented.
-    const record = await opened.store.createExport({
+    const exportId = await opened.store.createBoundPendingExport({
       tenantId: selected.accountLogin,
+      installationId: selected.id,
       requestedBy: session.login,
       scope: input.scope,
       scopeId: scopeId ?? null,
     });
+    if (!exportId) return fail("The selected installation or repository is no longer available.");
     return ok(
-      { exportId: record.id, status: record.status },
+      { exportId, status: "pending" },
       "Export request recorded; creating a downloadable pack requires operator processing.",
     );
   } finally {

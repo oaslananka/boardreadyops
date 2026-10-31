@@ -56,7 +56,9 @@ describe("exact-installation export status authorization", () => {
     expect(sql).toContain("data_exports.installation_id = installations.id");
     expect(sql).toContain("repositories.installation_id = installations.id");
     expect(sql).toContain("repositories.disabled_at IS NULL");
-    expect(sql).toContain("data_exports.installation_id IS NULL AND data_exports.scope = 'user'");
+    expect(sql).not.toContain("data_exports.installation_id IS NULL AND data_exports.scope = 'user'");
+    expect(sql).not.toContain("data_exports.*");
+    expect(sql).not.toContain("data_exports.download_url");
     expect(sql).toContain("data_exports.scope = 'organization' AND data_exports.scope_id IS NULL");
   });
 
@@ -66,9 +68,10 @@ describe("exact-installation export status authorization", () => {
     expect(query).toHaveBeenCalledOnce();
   });
 
-  it("returns legacy user-scope metadata without claiming download availability", async () => {
-    const { store } = mockStore([{ ...row, scope: "user", scope_id: "operator", installation_id: null }]);
+  it("returns metadata without loading or exposing a stored signed download URL", async () => {
+    const { store, query } = mockStore([{ ...row, download_url: "https://example.invalid/secret-capability" }]);
     const result = await store.getExport("organization-a", "export-1", "inst-a");
-    expect(result).toMatchObject({ scope: "user", status: "pending", downloadUrl: null });
+    expect(result).toMatchObject({ scope: "repository", status: "pending", downloadUrl: null });
+    expect(query.mock.calls[0]?.[0]).not.toContain("data_exports.download_url");
   });
 });

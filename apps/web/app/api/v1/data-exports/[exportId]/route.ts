@@ -82,7 +82,23 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
         { ok: false, error: "not found" },
         { status: 404, headers: { "cache-control": "private, no-store" } },
       );
-    return Response.json({ ok: true, export: exp }, { status: 200, headers: { "cache-control": "private, no-store" } });
+    // Status metadata is not a delivery capability; never serialize a stored raw URL.
+    return Response.json(
+      {
+        ok: true,
+        export: {
+          id: exp.id,
+          tenantId: exp.tenantId,
+          requestedBy: exp.requestedBy,
+          status: exp.status,
+          scope: exp.scope,
+          scopeId: exp.scopeId,
+          expiresAt: exp.expiresAt,
+          createdAt: exp.createdAt,
+        },
+      },
+      { status: 200, headers: { "cache-control": "private, no-store" } },
+    );
   } finally {
     await executor.close();
   }

@@ -385,8 +385,8 @@ export class DataLifecycleStore {
    * Exact live installation authorization for export status reads.
    * The tenant account login alone is insufficient: installations may be
    * replaced or multiple same-account installations may coexist.
-   * Historical user-scope rows remain visible as metadata only, but unbound
-   * organization/repository rows cannot be attributed to an installation.
+   * Historical unbound user-scope rows require independent original-account
+   * recovery; installation authorization alone must never reveal them.
    */
   async getExport(tenantId: string, exportId: string, installationId: string): Promise<DataExport | null> {
     if (
@@ -399,7 +399,9 @@ export class DataLifecycleStore {
     )
       return null;
     const r = (await this.db.query(
-      `SELECT data_exports.*
+      `SELECT data_exports.id, data_exports.tenant_id, data_exports.requested_by,
+              data_exports.status, data_exports.scope, data_exports.scope_id,
+              data_exports.expires_at, data_exports.created_at
          FROM data_exports
          JOIN installations ON installations.id = $3
           AND installations.suspended_at IS NULL
@@ -416,7 +418,6 @@ export class DataLifecycleStore {
                    AND repositories.disabled_at IS NULL
               ))
             ))
-            OR (data_exports.installation_id IS NULL AND data_exports.scope = 'user')
           )
         LIMIT 1`,
       [exportId, tenantId, installationId],
@@ -430,7 +431,7 @@ export class DataLifecycleStore {
       status: String(row.status) as DataExport["status"],
       scope: String(row.scope),
       scopeId: (row.scope_id as string | null) ?? null,
-      downloadUrl: (row.download_url as string | null) ?? null,
+      downloadUrl: null, // Generic status reads must never convey a delivery capability.
       expiresAt: row.expires_at ? new Date(row.expires_at as string).toISOString() : null,
       createdAt: new Date(row.created_at as string).toISOString(),
     };
