@@ -89,7 +89,9 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
 
   it("produces an extractable ZIP for a legitimate highly compressible managed artifact", () => {
     const { input } = fixture();
-    const bytes = Buffer.alloc(2 * 1024 * 1024, 0);
+    // Just above the 1 MiB sanitizer ratio threshold, without a large
+    // equality diff competing with the cloud coverage worker pool.
+    const bytes = Buffer.alloc(1024 * 1024 + 1, 0);
     const sha = sha256(bytes);
     const object = input.verifiedObjects[0].object;
     input.verifiedObjects = [{ object: { ...object, sha256: sha, byteLength: bytes.length }, bytes }];
@@ -99,9 +101,11 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
     });
     const result = prepareClaimedArchiveZip(input);
     const extracted = sanitizeAndExtractArchive(result.bytes);
-    expect(extracted.files.find((file) => file.path === "objects/artifact_1.bin")?.data).toEqual(bytes);
+    const extractedObject = extracted.files.find((file) => file.path === "objects/artifact_1.bin")?.data;
+    expect(extractedObject?.length).toBe(bytes.length);
+    expect(sha256(extractedObject ?? Buffer.alloc(0))).toBe(sha);
     expect(result.files).toBe(8);
-  });
+  }, 30_000);
 
   it("can assemble a metadata-only ZIP without inventing artifact content", () => {
     const { input } = fixture();
