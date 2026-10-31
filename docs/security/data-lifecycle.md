@@ -168,7 +168,24 @@ the same live lease. The export **remains running**, not completed; no
 customer download URL, delivery capability, auto worker or data deletion is
 created. Staged or expired claims are not automatically released or reclaimed;
 manual audited recovery and explicit deliverability/expiration validation
-are prerequisites for any future customer-facing export feature.
+are prerequisites for any future complete customer data export.
+
+A **metadata-only preview** can be explicitly published by the current internal
+preparation worker while its original lease remains valid; it is not dispatched
+automatically. This opens a single 15-minute availability window for the
+bounded, SHA-256-verified repository metadata manifest already stored in
+PostgreSQL. An authorized signed-in installation viewer may retrieve it via
+GET /api/v1/data-exports/:exportId?installationId=:id&download=metadata-manifest.
+Every read rechecks the persisted live installation, repository enablement,
+expiry, revocation and content integrity; responses have private/no-store,
+no-sniff and attachment headers. The original human requester may revoke
+access with a same-origin DELETE on the export status URL. Expiry and
+revocation do not automatically delete retained preparation bytes, and do not
+authorize a fresh worker claim. The export remains running and has no
+completed_at or general download_url. This is a partial metadata-preview
+facility, **not** the customer's full archive of source, review, findings,
+artifacts or evidence. Audited operator recovery, cleanup, complete archive
+delivery, and separately reviewed legal-hold-safe erasure remain unavailable.
 
 
 Installations are the top-level tenant boundary. Repository, run, artifact, runner,

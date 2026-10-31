@@ -31,6 +31,21 @@ function validWorker(value: string): boolean {
   return canonical(value) && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(value);
 }
 
+function checkedManifestBytes(row: Record<string, unknown>): PreparedExportManifest {
+  const bytes = row.prepared_manifest_bytes;
+  const sha256 = row.prepared_manifest_sha256;
+  if (
+    !Buffer.isBuffer(bytes) ||
+    bytes.length === 0 ||
+    bytes.length > 65536 ||
+    typeof sha256 !== "string" ||
+    !/^[a-f0-9]{64}$/u.test(sha256) ||
+    createHash("sha256").update(bytes).digest("hex") !== sha256
+  )
+    throw new Error("Persisted export manifest failed integrity verification");
+  return { bytes, sha256, byteLength: bytes.length, contentType: "application/json" };
+}
+
 function rows(result: unknown): Record<string, unknown>[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) return [];
   const value = (result as { rows?: unknown }).rows;
@@ -266,18 +281,110 @@ export class DataExportPreparationStore {
     );
     const row = rows(result)[0];
     if (!row) return null;
-    const bytes = row.prepared_manifest_bytes;
-    const sha256 = row.prepared_manifest_sha256;
-    if (
-      !Buffer.isBuffer(bytes) ||
-      bytes.length === 0 ||
-      bytes.length > 65536 ||
-      typeof sha256 !== "string" ||
-      !/^[a-f0-9]{64}$/u.test(sha256) ||
-      createHash("sha256").update(bytes).digest("hex") !== sha256
-    )
-      throw new Error("Persisted export manifest failed integrity verification");
-    return { bytes, sha256, byteLength: bytes.length, contentType: "application/json" };
+    return checkedManifestBytes(row);
+  }
+
+  /** Enable a 15-minute authenticated metadata preview under the original valid worker lease. */
+  async publishStagedManifestPreview(input: {
+    exportId: string;
+    tenantId: string;
+    installationId: string;
+    workerId: string;
+    token: string;
+  }): Promise<string | null> {
+    const preview = await this.readStagedManifest(input);
+    if (!preview) return null;
+    const result = await this.db.query(
+      `UPDATE data_exports
+       SET manifest_preview_expires_at = NOW() + interval '15 minutes'
+       WHERE id=$1 AND lower(tenant_id)=lower($2) AND installation_id=$3
+         AND status='running' AND preparation_worker=$4 AND preparation_token=$5
+         AND preparation_lease_until > NOW()
+         AND prepared_manifest_sha256=$6 AND octet_length(prepared_manifest_bytes)=$7
+         AND manifest_preview_expires_at IS NULL AND manifest_preview_revoked_at IS NULL
+         AND EXISTS (SELECT 1 FROM installations
+              WHERE installations.id=data_exports.installation_id
+                AND installations.suspended_at IS NULL
+                AND lower(installations.account_login)=lower(data_exports.tenant_id)
+                AND ( (data_exports.scope='organization' AND data_exports.scope_id IS NULL)
+                      OR (data_exports.scope='repository' AND EXISTS (
+                        SELECT 1 FROM repositories WHERE repositories.id=data_exports.scope_id
+                          AND repositories.installation_id=installations.id
+                          AND repositories.disabled_at IS NULL)) ) )
+       RETURNING manifest_preview_expires_at`,
+      [
+        input.exportId,
+        input.tenantId,
+        input.installationId,
+        input.workerId,
+        input.token,
+        preview.sha256,
+        preview.byteLength,
+      ],
+    );
+    const expiry = rows(result)[0]?.manifest_preview_expires_at;
+    return expiry instanceof Date ? expiry.toISOString() : typeof expiry === "string" ? expiry : null;
+  }
+
+  /** Only the currently authorized installation may read an unexpired metadata preview. */
+  async readPublishedManifestPreview(input: {
+    exportId: string;
+    tenantId: string;
+    installationId: string;
+  }): Promise<PreparedExportManifest | null> {
+    if (![input.exportId, input.tenantId, input.installationId].every((v) => canonical(v)))
+      throw new ExportPreparationInputError();
+    const result = await this.db.query(
+      `SELECT data_exports.prepared_manifest_bytes,
+              data_exports.prepared_manifest_sha256
+       FROM data_exports
+       JOIN installations ON installations.id=data_exports.installation_id
+       WHERE data_exports.id=$1 AND lower(data_exports.tenant_id)=lower($2)
+         AND data_exports.installation_id=$3 AND data_exports.status='running'
+         AND data_exports.manifest_preview_expires_at > NOW()
+         AND data_exports.manifest_preview_revoked_at IS NULL
+         AND installations.suspended_at IS NULL
+         AND lower(installations.account_login)=lower(data_exports.tenant_id)
+         AND ((data_exports.scope='organization' AND data_exports.scope_id IS NULL)
+           OR (data_exports.scope='repository' AND EXISTS (
+             SELECT 1 FROM repositories WHERE repositories.id=data_exports.scope_id
+               AND repositories.installation_id=installations.id
+               AND repositories.disabled_at IS NULL))) LIMIT 1`,
+      [input.exportId, input.tenantId, input.installationId],
+    );
+    const row = rows(result)[0];
+    return row ? checkedManifestBytes(row) : null;
+  }
+
+  /** Durable, one-way revocation after the original preparation lease expires too. */
+  async revokePublishedManifestPreview(input: {
+    exportId: string;
+    tenantId: string;
+    installationId: string;
+    actorLogin: string;
+  }): Promise<boolean> {
+    if (![input.exportId, input.tenantId, input.installationId, input.actorLogin].every((v) => canonical(v)))
+      throw new ExportPreparationInputError();
+    const result = await this.db.query(
+      `UPDATE data_exports
+       SET manifest_preview_revoked_at=NOW()
+       WHERE id=$1 AND lower(tenant_id)=lower($2) AND installation_id=$3
+         AND lower(requested_by)=lower($4)
+         AND status='running' AND manifest_preview_expires_at IS NOT NULL
+         AND manifest_preview_revoked_at IS NULL
+         AND EXISTS (SELECT 1 FROM installations
+           WHERE installations.id=data_exports.installation_id
+             AND installations.suspended_at IS NULL
+             AND lower(installations.account_login)=lower(data_exports.tenant_id)
+             AND ((data_exports.scope='organization' AND data_exports.scope_id IS NULL)
+               OR (data_exports.scope='repository' AND EXISTS (
+                 SELECT 1 FROM repositories WHERE repositories.id=data_exports.scope_id
+                   AND repositories.installation_id=installations.id
+                   AND repositories.disabled_at IS NULL))))
+       RETURNING id`,
+      [input.exportId, input.tenantId, input.installationId, input.actorLogin],
+    );
+    return rows(result).length === 1;
   }
 
   /**
