@@ -374,6 +374,76 @@ describeDatabase("installation-bound read-only export preparation claims (Postgr
     });
   });
 
+  it("publishes only short, revocable metadata preview to its current installation", async () => {
+    const id = await store().createBoundPendingExport({
+      tenantId: tenant,
+      installationId: installations[1],
+      requestedBy: "operator",
+      scope: "repository",
+      scopeId: repositories[1],
+    });
+    expect(id).toBeTruthy();
+    if (!id) throw new Error("expected bound export");
+    exported.push(id);
+    const claim = await store().claimNext({ installationId: installations[1], workerId: "preview-worker" });
+    expect(claim?.exportId).toBe(id);
+    if (!claim) throw new Error("expected preview reservation");
+    const lease = {
+      exportId: id,
+      tenantId: tenant,
+      installationId: installations[1],
+      workerId: claim.workerId,
+      token: claim.token,
+    };
+    const viewer = { exportId: id, tenantId: tenant, installationId: installations[1], actorLogin: "operator" };
+    expect(await otherStore().readPublishedManifestPreview(viewer)).toBeNull();
+    const stage = await store().stageClaimedManifest(lease);
+    expect(stage?.sha256).toMatch(/^[a-f0-9]{64}$/u);
+    const expiry = await store().publishStagedManifestPreview(lease);
+    expect(expiry).toBeTruthy();
+    expect(Date.parse(expiry ?? "")).toBeGreaterThan(Date.now());
+    expect(await store().publishStagedManifestPreview(lease)).toBeNull();
+    const preview = await otherStore().readPublishedManifestPreview(viewer);
+    expect(preview?.sha256).toBe(stage?.sha256);
+    expect(JSON.parse(preview?.bytes.toString("utf8") ?? "{}")).toMatchObject({
+      kind: "boardreadyops.repository-metadata-export",
+      exportId: id,
+      tenantId: tenant,
+    });
+    expect(await store().readPublishedManifestPreview({ ...viewer, installationId: installations[0] })).toBeNull();
+    expect(await store().readPublishedManifestPreview({ ...viewer, tenantId: outsider })).toBeNull();
+    expect(await store().readPublishedManifestPreview({ ...viewer, actorLogin: "another-user" })).toBeNull();
+    await db().query("UPDATE repositories SET disabled_at=NOW() WHERE id=$1", [repositories[1]]);
+    expect(await store().readPublishedManifestPreview(viewer)).toBeNull();
+    await db().query("UPDATE repositories SET disabled_at=NULL WHERE id=$1", [repositories[1]]);
+    await db().query("UPDATE installations SET suspended_at=NOW() WHERE id=$1", [installations[1]]);
+    expect(await store().readPublishedManifestPreview(viewer)).toBeNull();
+    await db().query("UPDATE installations SET suspended_at=NULL WHERE id=$1", [installations[1]]);
+    await db().query("UPDATE data_exports SET manifest_preview_expires_at=NOW()-interval '1 second' WHERE id=$1", [id]);
+    expect(await store().readPublishedManifestPreview(viewer)).toBeNull();
+    await db().query("UPDATE data_exports SET manifest_preview_expires_at=NOW()+interval '5 minutes' WHERE id=$1", [
+      id,
+    ]);
+    expect(await store().revokePublishedManifestPreview({ ...viewer, actorLogin: "stranger" })).toBe(false);
+    expect(
+      await store().revokePublishedManifestPreview({
+        ...viewer,
+        installationId: installations[0],
+        actorLogin: "operator",
+      }),
+    ).toBe(false);
+    expect(await store().revokePublishedManifestPreview({ ...viewer, actorLogin: "operator" })).toBe(true);
+    expect(await store().revokePublishedManifestPreview({ ...viewer, actorLogin: "operator" })).toBe(false);
+    expect(await store().readPublishedManifestPreview(viewer)).toBeNull();
+    expect(await store().publishStagedManifestPreview(lease)).toBeNull();
+    const final = await db().query("SELECT status,download_url,completed_at FROM data_exports WHERE id=$1", [id]);
+    expect((final as { rows: unknown[] }).rows[0]).toMatchObject({
+      status: "running",
+      download_url: null,
+      completed_at: null,
+    });
+  });
+
   it("refuses new reservations after suspension without erasing prior requests", async () => {
     await db().query("UPDATE installations SET suspended_at=NOW() WHERE id=$1", [installations[1]]);
     expect(
