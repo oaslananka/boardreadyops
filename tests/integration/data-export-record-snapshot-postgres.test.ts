@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { prepareClaimedConsistentMetadataSlices } from "../../packages/db/src/data-export-consistent-snapshot.js";
 import { DataExportPreparationStore } from "../../packages/db/src/data-export-preparation-store.js";
 import {
   ExportRecordSnapshotUnavailableError,
@@ -80,6 +81,29 @@ afterAll(async () => {
 });
 
 describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
+  it("prepares two partial scopes within one read-only snapshot without publishing an export", async () => {
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    const prepared = await prepareClaimedConsistentMetadataSlices(executor(), claim);
+    expect(prepared).not.toBeNull();
+    const repositories = JSON.parse(prepared?.repositories.bytes.toString("utf8") ?? "{}");
+    const records = JSON.parse(prepared?.records.bytes.toString("utf8") ?? "{}");
+    expect(repositories.repositories).toEqual([expect.objectContaining({ repositoryId: repository[0] })]);
+    expect(records.runs).toEqual([expect.objectContaining({ repositoryId: repository[0] })]);
+    expect(records.findings).toEqual([expect.objectContaining({ runId: runId[0] })]);
+    expect(await prepareClaimedConsistentMetadataSlices(executor(), { ...claim, token: "wrong-token" })).toBeNull();
+    expect(
+      await prepareClaimedConsistentMetadataSlices(executor(), { ...claim, installationId: installation[1] }),
+    ).toBeNull();
+    const current = await executor().query("SELECT status, download_url, completed_at FROM data_exports WHERE id=$1", [
+      exportId,
+    ]);
+    expect((current as { rows: unknown[] }).rows[0]).toMatchObject({
+      status: "running",
+      download_url: null,
+      completed_at: null,
+    });
+  });
+
   it("excludes other repositories and other installations sharing the same tenant", async () => {
     const input = {
       exportId,
