@@ -164,7 +164,7 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
               Hardware projects grouped by workspace, across Altium, KiCad, EasyEDA, Fusion 360, and Gerber packages.
             </p>
           </div>
-          {result.state === "ok" ? (
+          {result.state === "ok" && result.selected.role !== "viewer" ? (
             <Button asChild>
               <Link href="/projects/new">Add a project source</Link>
             </Button>
@@ -200,7 +200,13 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
             </section>
 
             {result.total === 0 ? (
-              <OptionalProjectPreview actionHref="/projects/new" actionLabel="Add your first project source" />
+              <ReviewEmptyVisualPreview
+                mode="onboarding"
+                actionHref={result.selected.role === "viewer" ? "/reviews" : "/projects/new"}
+                actionLabel={
+                  result.selected.role === "viewer" ? "Browse hardware reviews" : "Add your first project source"
+                }
+              />
             ) : null}
             <Panel
               title={result.selected.name}
@@ -262,24 +268,6 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
         )}
       </main>
     </AppShell>
-  );
-}
-
-function OptionalProjectPreview({ actionHref, actionLabel }: Readonly<{ actionHref: string; actionLabel: string }>) {
-  return (
-    <details className="overflow-hidden rounded-xl border border-border bg-card" aria-label="Example hardware review">
-      <summary className="flex min-h-14 cursor-pointer items-center justify-between gap-3 px-5 py-3 text-sm font-semibold text-foreground hover:bg-muted/35">
-        <span>
-          Explore a sample PCB and schematic <span className="font-normal text-muted-foreground">· Example only</span>
-        </span>
-        <span aria-hidden="true" className="text-primary">
-          ⌄
-        </span>
-      </summary>
-      <div className="border-t border-border p-3">
-        <ReviewEmptyVisualPreview mode="onboarding" actionHref={actionHref} actionLabel={actionLabel} />
-      </div>
-    </details>
   );
 }
 
@@ -355,6 +343,11 @@ function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-co
           </Button>
         </div>
       </section>
+      <ReviewEmptyVisualPreview
+        mode="onboarding"
+        actionHref="/dashboard"
+        actionLabel="Explore your GitHub repositories"
+      />
       <details className="rounded-xl border border-border bg-card" aria-label="Optional CAD workspace setup">
         <summary className="min-h-14 cursor-pointer px-5 py-4 text-sm font-semibold text-foreground hover:bg-muted/35">
           <span className="block">Optional: Create your first workspace</span>
@@ -369,7 +362,6 @@ function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-co
           <CreateWorkspaceForm action={createWorkspaceAction} />
         </div>
       </details>
-      <OptionalProjectPreview actionHref="/dashboard" actionLabel="Explore your GitHub repositories" />
     </>
   );
 }
