@@ -1,8 +1,16 @@
 import { createHash } from "node:crypto";
+import * as filesystem from "node:fs/promises";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import * as artifactDownloads from "../../../apps/web/lib/artifact-downloads.js";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const real = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...real, open: vi.fn(real.open) };
+});
+
 import {
   maxLocalExportObjectBytes,
   readVerifiedLocalExportObject,
@@ -19,6 +27,7 @@ async function fixture(bytes = Buffer.from("synthetic artifact data")) {
   return { root, object, bytes };
 }
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(created.splice(0).map((d) => rm(d, { recursive: true, force: true })));
 });
 
@@ -67,6 +76,35 @@ describe("bounded, read-only physical export object verification", () => {
     await expect(
       readVerifiedLocalExportObject({ ...ref, object: { ...f.object, storagePath: "artifacts/outside.bin" } }),
     ).resolves.toBeNull();
+  });
+
+  it("rejects an object removed between path resolution and opening", async () => {
+    const f = await fixture();
+    vi.spyOn(artifactDownloads, "resolveLocalArtifactFile").mockResolvedValue({
+      state: "resolved",
+      path: path.join(f.root, "artifacts", "removed-before-open.bin"),
+    });
+    await expect(
+      readVerifiedLocalExportObject({ storageDriver: "local", storageRoot: f.root, object: f.object }),
+    ).resolves.toBeNull();
+  });
+
+  it("rejects a disk read failure after opening a previously valid file", async () => {
+    const f = await fixture();
+    const fakeHandle = {
+      stat: async () => ({ isFile: () => true, size: f.bytes.length }),
+      read: async () => {
+        throw new Error("synthetic disk read failure");
+      },
+      close: vi.fn(async () => undefined),
+    };
+    vi.mocked(filesystem.open).mockResolvedValueOnce(
+      fakeHandle as unknown as Awaited<ReturnType<typeof filesystem.open>>,
+    );
+    await expect(
+      readVerifiedLocalExportObject({ storageDriver: "local", storageRoot: f.root, object: f.object }),
+    ).resolves.toBeNull();
+    expect(fakeHandle.close).toHaveBeenCalledTimes(1);
   });
 
   it("rejects unsupported storage drivers, oversized inputs and malformed hash/metadata", async () => {
