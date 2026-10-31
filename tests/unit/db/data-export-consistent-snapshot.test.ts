@@ -79,7 +79,40 @@ const reviewAudit = {
   ],
 };
 
-function fixture(replies: readonly unknown[] = [{ rows: [inventory] }, { rows: [records] }, { rows: [reviewAudit] }]) {
+const reviewComments = {
+  comments: [
+    {
+      id: "comment-1",
+      review_id: "review-1",
+      repository_id: "repo-1",
+      review_repository_id: "repo-1",
+      parent_id: null,
+      parent_valid: true,
+      author_id: "actor-1",
+      author_type: "internal",
+      content: "synthetic review comment",
+      status: "open",
+      finding_fingerprint: null,
+      evidence_anchor: null,
+      created_at: "2026-10-01T01:02:03.000Z",
+      updated_at: "2026-10-02T01:02:03.000Z",
+    },
+  ],
+};
+
+const reviewWorkflow = { approvals: [], checklist: [] };
+const findingCollaboration = { decisions: [], assignments: [] };
+
+function fixture(
+  replies: readonly unknown[] = [
+    { rows: [inventory] },
+    { rows: [records] },
+    { rows: [reviewAudit] },
+    { rows: [reviewComments] },
+    { rows: [reviewWorkflow] },
+    { rows: [findingCollaboration] },
+  ],
+) {
   const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => replies[query.mock.calls.length - 1]);
   const withTransaction = vi.fn(async (work: (tx: { query: typeof query }) => Promise<unknown>, options: unknown) => {
     expect(options).toEqual({ consistentRead: true, statementTimeoutMs: 5000 });
@@ -89,11 +122,11 @@ function fixture(replies: readonly unknown[] = [{ rows: [inventory] }, { rows: [
 }
 
 describe("claimed consistent repository and record preparation", () => {
-  it("queries three scoped slices in the same readonly transaction without completing an export", async () => {
+  it("queries six scoped slices in the same readonly transaction without completing an export", async () => {
     const { db, query, withTransaction } = fixture();
     const result = await prepareClaimedConsistentMetadataSlices(db, claim);
     expect(withTransaction).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledTimes(3);
+    expect(query).toHaveBeenCalledTimes(6);
     for (const [, params] of query.mock.calls) expect(params).toEqual(Object.values(claim));
     const repositories = JSON.parse(result?.repositories.bytes.toString("utf8") ?? "{}");
     const records = JSON.parse(result?.records.bytes.toString("utf8") ?? "{}");
@@ -104,6 +137,14 @@ describe("claimed consistent repository and record preparation", () => {
     expect(reviewData.reviews).toEqual([expect.objectContaining({ id: "review-1", repositoryId: "repo-1" })]);
     expect(reviewData.revisions).toEqual([expect.objectContaining({ id: "revision-1", reviewId: "review-1" })]);
     expect(reviewData.auditEvents).toEqual([expect.objectContaining({ id: "audit-1", repositoryId: "repo-1" })]);
+    const decodedComments = JSON.parse(result?.reviewComments.bytes.toString("utf8") ?? "{}");
+    expect(decodedComments.comments).toEqual([expect.objectContaining({ id: "comment-1", repositoryId: "repo-1" })]);
+    const decodedWorkflow = JSON.parse(result?.reviewWorkflow.bytes.toString("utf8") ?? "{}");
+    expect(decodedWorkflow.approvals).toEqual([]);
+    expect(decodedWorkflow.checklistItems).toEqual([]);
+    const findingData = JSON.parse(result?.findingCollaboration.bytes.toString("utf8") ?? "{}");
+    expect(findingData.decisions).toEqual([]);
+    expect(findingData.assignments).toEqual([]);
     expect(JSON.stringify(result)).not.toContain("storage_path");
   });
 
@@ -117,6 +158,33 @@ describe("claimed consistent repository and record preparation", () => {
     const auditMissing = fixture([{ rows: [inventory] }, { rows: [records] }, { rows: [] }]);
     await expect(prepareClaimedConsistentMetadataSlices(auditMissing.db, claim)).resolves.toBeNull();
     expect(auditMissing.query).toHaveBeenCalledTimes(3);
+    const commentsMissing = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [] },
+    ]);
+    await expect(prepareClaimedConsistentMetadataSlices(commentsMissing.db, claim)).resolves.toBeNull();
+    expect(commentsMissing.query).toHaveBeenCalledTimes(4);
+    const workflowMissing = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [reviewComments] },
+      { rows: [] },
+    ]);
+    await expect(prepareClaimedConsistentMetadataSlices(workflowMissing.db, claim)).resolves.toBeNull();
+    expect(workflowMissing.query).toHaveBeenCalledTimes(5);
+    const findingMissing = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [reviewComments] },
+      { rows: [reviewWorkflow] },
+      { rows: [] },
+    ]);
+    await expect(prepareClaimedConsistentMetadataSlices(findingMissing.db, claim)).resolves.toBeNull();
+    expect(findingMissing.query).toHaveBeenCalledTimes(6);
   });
 
   it("rejects overflow rather than returning an incomplete record package", async () => {
