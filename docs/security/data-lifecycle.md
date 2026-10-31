@@ -24,6 +24,10 @@ archive.
 The control plane stores tenant-scoped metadata in PostgreSQL. Optional managed
 report artifacts are stored by the configured artifact driver. The currently
 implemented physical deletion worker supports `ARTIFACT_STORAGE_DRIVER=local`.
+The `S3ArtifactStorage` interface remains a stub: when `AWS_S3_BUCKET` is
+configured, its upload, completion, download, and deletion operations fail
+closed instead of silently using a process-local simulated object store.
+This is not a real S3/R2 provider adapter or a customer export capability.
 Database backups, reverse-proxy logs, container logs, platform logs, and copies of
 the artifact directory are outside the application-level sweeper and must have a
 separate operator policy.
