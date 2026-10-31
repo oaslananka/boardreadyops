@@ -183,6 +183,36 @@ export function prepareClaimedArchiveEntries(input: {
     }
     findingIds.add(finding.id);
   }
+  // Review, audit, comment and collaboration snapshots may have independent
+  // valid digests yet contain records scoped to another repository. Validate
+  // their repository boundaries even for metadata-only archives.
+  const scopedSlices = [
+    { source: entryBytes[2]?.bytes, fields: ["reviews", "auditEvents"], arrays: ["revisions"] },
+    { source: entryBytes[3]?.bytes, fields: ["comments"], arrays: [] },
+    { source: entryBytes[4]?.bytes, fields: ["approvals", "checklistItems"], arrays: [] },
+    { source: entryBytes[5]?.bytes, fields: ["decisions", "assignments"], arrays: [] },
+  ] as const;
+  for (const slice of scopedSlices) {
+    const document = decoded<Record<string, unknown>>(slice.source);
+    for (const field of [...slice.fields, ...slice.arrays]) {
+      const records = document?.[field];
+      if (!Array.isArray(records) || records.length > 100) {
+        throw new ExportArchivePreflightError();
+      }
+      if (slice.fields.some((scopedField) => scopedField === field)) {
+        for (const record of records) {
+          const repositoryId =
+            record && typeof record === "object" && !Array.isArray(record)
+              ? (record as { repositoryId?: unknown }).repositoryId
+              : null;
+          if (!safeEntryId(repositoryId) || !permittedRepositories.has(repositoryId)) {
+            throw new ExportArchivePreflightError();
+          }
+        }
+      }
+    }
+  }
+
   const verified = new Map<string, VerifiedArchiveObject>();
   for (const candidate of input.verifiedObjects) {
     if (!candidate || !safeEntryId(candidate.object?.artifactId) || verified.has(candidate.object.artifactId)) {

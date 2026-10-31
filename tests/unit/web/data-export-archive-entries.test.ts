@@ -44,10 +44,23 @@ function fixture() {
       runs: [{ id: "run_1", repositoryId: "repo_1" }],
       findings: [],
     }),
-    reviewAudit: slice({ kind: "boardreadyops.claimed-review-audit-snapshot", reviews: [], auditEvents: [] }),
+    reviewAudit: slice({
+      kind: "boardreadyops.claimed-review-audit-snapshot",
+      reviews: [],
+      revisions: [],
+      auditEvents: [],
+    }),
     reviewComments: slice({ kind: "boardreadyops.claimed-review-comments-snapshot", comments: [] }),
-    reviewWorkflow: slice({ kind: "boardreadyops.claimed-review-workflow-snapshot", approvals: [] }),
-    findingCollaboration: slice({ kind: "boardreadyops.claimed-finding-collaboration-snapshot", decisions: [] }),
+    reviewWorkflow: slice({
+      kind: "boardreadyops.claimed-review-workflow-snapshot",
+      approvals: [],
+      checklistItems: [],
+    }),
+    findingCollaboration: slice({
+      kind: "boardreadyops.claimed-finding-collaboration-snapshot",
+      decisions: [],
+      assignments: [],
+    }),
     artifactMetadata: slice({ kind: "boardreadyops.claimed-artifact-metadata-snapshot", artifacts: [metadata] }),
   } as Input["slices"];
   return { input: { slices, verifiedObjects: [{ object, bytes }] } as Input, bytes, object, metadata };
@@ -228,6 +241,77 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
       },
     };
     expect(() => prepareClaimedArchiveEntries(metadataOnly)).toThrow(ExportArchivePreflightError);
+  });
+
+  it("accepts scoped review and collaboration records in the same repository", () => {
+    const { input } = fixture();
+    const arrays = [
+      ["reviewAudit", "reviews"],
+      ["reviewAudit", "auditEvents"],
+      ["reviewComments", "comments"],
+      ["reviewWorkflow", "approvals"],
+      ["reviewWorkflow", "checklistItems"],
+      ["findingCollaboration", "decisions"],
+      ["findingCollaboration", "assignments"],
+    ] as const;
+    for (const [key, field] of arrays) {
+      const original = JSON.parse(input.slices[key].bytes.toString("utf8")) as Record<string, unknown>;
+      const updated = slice({ ...original, [field]: [{ id: "record_1", repositoryId: "repo_1" }] });
+      expect(
+        () =>
+          prepareClaimedArchiveEntries({
+            ...input,
+            slices: { ...input.slices, [key]: updated },
+          }),
+        `${key}.${field}`,
+      ).not.toThrow();
+    }
+  });
+
+  it("rejects absent, oversized or malformed scoped record collections", () => {
+    const { input } = fixture();
+    const original = JSON.parse(input.slices.reviewComments.bytes.toString("utf8")) as Record<string, unknown>;
+    for (const comments of [null, {}, "invalid", Array(101).fill({ id: "record_1", repositoryId: "repo_1" }), [null]]) {
+      expect(() =>
+        prepareClaimedArchiveEntries({
+          ...input,
+          slices: { ...input.slices, reviewComments: slice({ ...original, comments }) },
+        }),
+      ).toThrow(ExportArchivePreflightError);
+    }
+    const missing = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
+    delete missing.revisions;
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: { ...input.slices, reviewAudit: slice(missing) },
+      }),
+    ).toThrow(ExportArchivePreflightError);
+  });
+
+  it("rejects foreign-repository records in every review and collaboration slice", () => {
+    const { input } = fixture();
+    const cases = [
+      ["reviewAudit", "reviews"],
+      ["reviewAudit", "auditEvents"],
+      ["reviewComments", "comments"],
+      ["reviewWorkflow", "approvals"],
+      ["reviewWorkflow", "checklistItems"],
+      ["findingCollaboration", "decisions"],
+      ["findingCollaboration", "assignments"],
+    ] as const;
+    for (const [key, field] of cases) {
+      const original = JSON.parse(input.slices[key].bytes.toString("utf8")) as Record<string, unknown>;
+      const changed = slice({ ...original, [field]: [{ id: "record_1", repositoryId: "foreign-repo" }] });
+      expect(
+        () =>
+          prepareClaimedArchiveEntries({
+            ...input,
+            slices: { ...input.slices, [key]: changed },
+          }),
+        `${key}.${field}`,
+      ).toThrow(ExportArchivePreflightError);
+    }
   });
 
   it("rejects artifacts attached to out-of-scope runs or repositories", () => {

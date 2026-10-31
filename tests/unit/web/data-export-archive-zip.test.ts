@@ -36,10 +36,23 @@ function fixture() {
       runs: [{ id: "run_1", repositoryId: "repo_1" }],
       findings: [],
     }),
-    reviewAudit: slice({ kind: "boardreadyops.claimed-review-audit-snapshot", reviews: [], auditEvents: [] }),
+    reviewAudit: slice({
+      kind: "boardreadyops.claimed-review-audit-snapshot",
+      reviews: [],
+      revisions: [],
+      auditEvents: [],
+    }),
     reviewComments: slice({ kind: "boardreadyops.claimed-review-comments-snapshot", comments: [] }),
-    reviewWorkflow: slice({ kind: "boardreadyops.claimed-review-workflow-snapshot", approvals: [] }),
-    findingCollaboration: slice({ kind: "boardreadyops.claimed-finding-collaboration-snapshot", decisions: [] }),
+    reviewWorkflow: slice({
+      kind: "boardreadyops.claimed-review-workflow-snapshot",
+      approvals: [],
+      checklistItems: [],
+    }),
+    findingCollaboration: slice({
+      kind: "boardreadyops.claimed-finding-collaboration-snapshot",
+      decisions: [],
+      assignments: [],
+    }),
     artifactMetadata: slice({
       kind: "boardreadyops.claimed-artifact-metadata-snapshot",
       artifacts: [
