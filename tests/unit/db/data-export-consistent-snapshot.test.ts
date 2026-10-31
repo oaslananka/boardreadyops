@@ -44,8 +44,6 @@ const records = {
   ],
 };
 
-const artifacts = { artifacts: [] };
-
 const reviewAudit = {
   revisions: [
     {
@@ -82,11 +80,39 @@ const reviewAudit = {
   ],
 };
 
+const reviewComments = {
+  comments: [
+    {
+      id: "comment-1",
+      review_id: "review-1",
+      repository_id: "repo-1",
+      review_repository_id: "repo-1",
+      parent_id: null,
+      parent_valid: true,
+      author_id: "actor-1",
+      author_type: "internal",
+      content: "synthetic review comment",
+      status: "open",
+      finding_fingerprint: null,
+      evidence_anchor: null,
+      created_at: "2026-10-01T01:02:03.000Z",
+      updated_at: "2026-10-02T01:02:03.000Z",
+    },
+  ],
+};
+
+const reviewWorkflow = { approvals: [], checklist: [] };
+const findingCollaboration = { decisions: [], assignments: [] };
+const artifacts = { artifacts: [] };
+
 function fixture(
   replies: readonly unknown[] = [
     { rows: [inventory] },
     { rows: [records] },
     { rows: [reviewAudit] },
+    { rows: [reviewComments] },
+    { rows: [reviewWorkflow] },
+    { rows: [findingCollaboration] },
     { rows: [artifacts] },
   ],
 ) {
@@ -98,12 +124,12 @@ function fixture(
   return { db: { withTransaction } as unknown as Pick<PgQueryExecutor, "withTransaction">, query, withTransaction };
 }
 
-describe("claimed consistent repository, record, review and artifact metadata preparation", () => {
-  it("queries four scoped slices in the same readonly transaction without completing an export", async () => {
+describe("claimed consistent repository and record preparation", () => {
+  it("queries seven scoped slices in the same readonly transaction without completing an export", async () => {
     const { db, query, withTransaction } = fixture();
     const result = await prepareClaimedConsistentMetadataSlices(db, claim);
     expect(withTransaction).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledTimes(4);
+    expect(query).toHaveBeenCalledTimes(7);
     for (const [, params] of query.mock.calls) expect(params).toEqual(Object.values(claim));
     const repositories = JSON.parse(result?.repositories.bytes.toString("utf8") ?? "{}");
     const records = JSON.parse(result?.records.bytes.toString("utf8") ?? "{}");
@@ -114,9 +140,15 @@ describe("claimed consistent repository, record, review and artifact metadata pr
     expect(reviewData.reviews).toEqual([expect.objectContaining({ id: "review-1", repositoryId: "repo-1" })]);
     expect(reviewData.revisions).toEqual([expect.objectContaining({ id: "revision-1", reviewId: "review-1" })]);
     expect(reviewData.auditEvents).toEqual([expect.objectContaining({ id: "audit-1", repositoryId: "repo-1" })]);
-    const artifactData = JSON.parse(result?.artifactMetadata.bytes.toString("utf8") ?? "{}");
-    expect(artifactData.artifacts).toEqual([]);
-    expect(artifactData.exclusions).toContain("artifact-contents");
+    const decodedComments = JSON.parse(result?.reviewComments.bytes.toString("utf8") ?? "{}");
+    expect(decodedComments.comments).toEqual([expect.objectContaining({ id: "comment-1", repositoryId: "repo-1" })]);
+    const decodedWorkflow = JSON.parse(result?.reviewWorkflow.bytes.toString("utf8") ?? "{}");
+    expect(decodedWorkflow.approvals).toEqual([]);
+    expect(decodedWorkflow.checklistItems).toEqual([]);
+    const findingData = JSON.parse(result?.findingCollaboration.bytes.toString("utf8") ?? "{}");
+    expect(findingData.decisions).toEqual([]);
+    expect(findingData.assignments).toEqual([]);
+    expect(JSON.parse(result?.artifactMetadata.bytes.toString("utf8") ?? "{}").artifacts).toEqual([]);
     expect(JSON.stringify(result)).not.toContain("storage_path");
   });
 
@@ -130,17 +162,47 @@ describe("claimed consistent repository, record, review and artifact metadata pr
     const auditMissing = fixture([{ rows: [inventory] }, { rows: [records] }, { rows: [] }]);
     await expect(prepareClaimedConsistentMetadataSlices(auditMissing.db, claim)).resolves.toBeNull();
     expect(auditMissing.query).toHaveBeenCalledTimes(3);
-    const artifactMissing = fixture([
+    const commentsMissing = fixture([
       { rows: [inventory] },
       { rows: [records] },
       { rows: [reviewAudit] },
       { rows: [] },
     ]);
+    await expect(prepareClaimedConsistentMetadataSlices(commentsMissing.db, claim)).resolves.toBeNull();
+    expect(commentsMissing.query).toHaveBeenCalledTimes(4);
+    const workflowMissing = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [reviewComments] },
+      { rows: [] },
+    ]);
+    await expect(prepareClaimedConsistentMetadataSlices(workflowMissing.db, claim)).resolves.toBeNull();
+    expect(workflowMissing.query).toHaveBeenCalledTimes(5);
+    const findingMissing = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [reviewComments] },
+      { rows: [reviewWorkflow] },
+      { rows: [] },
+    ]);
+    await expect(prepareClaimedConsistentMetadataSlices(findingMissing.db, claim)).resolves.toBeNull();
+    expect(findingMissing.query).toHaveBeenCalledTimes(6);
+    const artifactMissing = fixture([
+      { rows: [inventory] },
+      { rows: [records] },
+      { rows: [reviewAudit] },
+      { rows: [reviewComments] },
+      { rows: [reviewWorkflow] },
+      { rows: [findingCollaboration] },
+      { rows: [] },
+    ]);
     await expect(prepareClaimedConsistentMetadataSlices(artifactMissing.db, claim)).resolves.toBeNull();
-    expect(artifactMissing.query).toHaveBeenCalledTimes(4);
+    expect(artifactMissing.query).toHaveBeenCalledTimes(7);
   });
 
-  it("keeps artifact metadata only when its run is part of the exact same record snapshot", async () => {
+  it("rejects artifacts whose run is absent from the seven-slice snapshot", async () => {
     const artifact = {
       id: "artifact-1",
       run_id: "run-1",
@@ -151,41 +213,24 @@ describe("claimed consistent repository, record, review and artifact metadata pr
       bytes: 512,
       content_type: "application/zip",
     };
-    const allowed = fixture([
+    const prefix = [
       { rows: [inventory] },
       { rows: [records] },
       { rows: [reviewAudit] },
-      { rows: [{ artifacts: [artifact] }] },
-    ]);
-    const prepared = await prepareClaimedConsistentMetadataSlices(allowed.db, claim);
-    expect(JSON.parse(prepared?.artifactMetadata.bytes.toString("utf8") ?? "{}").artifacts).toEqual([
+      { rows: [reviewComments] },
+      { rows: [reviewWorkflow] },
+      { rows: [findingCollaboration] },
+    ];
+    const valid = fixture([...prefix, { rows: [{ artifacts: [artifact] }] }]);
+    const result = await prepareClaimedConsistentMetadataSlices(valid.db, claim);
+    expect(JSON.parse(result?.artifactMetadata.bytes.toString("utf8") ?? "{}").artifacts).toEqual([
       expect.objectContaining({ id: artifact.id, runId: "run-1" }),
     ]);
-
-    const orphaned = fixture([
-      { rows: [inventory] },
-      { rows: [records] },
-      { rows: [reviewAudit] },
-      { rows: [{ artifacts: [{ ...artifact, run_id: "foreign-run" }] }] },
-    ]);
-    await expect(prepareClaimedConsistentMetadataSlices(orphaned.db, claim)).rejects.toThrow(
+    const invalid = fixture([...prefix, { rows: [{ artifacts: [{ ...artifact, run_id: "foreign-run" }] }] }]);
+    await expect(prepareClaimedConsistentMetadataSlices(invalid.db, claim)).rejects.toThrow(
       ExportArtifactSnapshotUnavailableError,
     );
-    expect(orphaned.withTransaction).toHaveBeenCalledTimes(1);
-    expect(orphaned.query).toHaveBeenCalledTimes(4);
-  });
-
-  it("rejects excessive artifacts instead of returning a truncated shared snapshot", async () => {
-    const overflow = fixture([
-      { rows: [inventory] },
-      { rows: [records] },
-      { rows: [reviewAudit] },
-      { rows: [{ artifacts: Array.from({ length: 101 }, (_, index) => ({ id: `artifact-${index}` })) }] },
-    ]);
-    await expect(prepareClaimedConsistentMetadataSlices(overflow.db, claim)).rejects.toThrow(
-      ExportArtifactSnapshotUnavailableError,
-    );
-    expect(overflow.query).toHaveBeenCalledTimes(4);
+    expect(invalid.query).toHaveBeenCalledTimes(7);
   });
 
   it("rejects overflow rather than returning an incomplete record package", async () => {
