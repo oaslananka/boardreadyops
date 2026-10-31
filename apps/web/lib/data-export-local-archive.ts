@@ -25,6 +25,58 @@ function sameObject(first: ClaimedExportObject, second: ClaimedExportObject): bo
   );
 }
 
+type ClaimedMetadataSlices = NonNullable<Awaited<ReturnType<typeof prepareClaimedConsistentMetadataSlices>>>;
+
+function isValidArtifactRow(value: unknown): value is { id: string; byteLength: number } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value as { id?: unknown; byteLength?: unknown };
+  return (
+    typeof row.id === "string" &&
+    row.id.length > 0 &&
+    row.id.length <= 128 &&
+    typeof row.byteLength === "number" &&
+    Number.isSafeInteger(row.byteLength) &&
+    row.byteLength >= 0
+  );
+}
+
+/** Validate reservation and byte budget before opening physical artifacts. */
+function boundedClaimedArtifactIds(slices: ClaimedMetadataSlices, exportId: string): string[] {
+  try {
+    const decoded = JSON.parse(slices.artifactMetadata.bytes.toString("utf8")) as {
+      exportId?: unknown;
+      artifacts?: unknown;
+    };
+    const inventory = JSON.parse(slices.repositories.bytes.toString("utf8")) as { exportId?: unknown };
+    if (
+      decoded?.exportId !== exportId ||
+      inventory?.exportId !== exportId ||
+      !Array.isArray(decoded.artifacts) ||
+      decoded.artifacts.length > maxArtifacts
+    ) {
+      throw new ExportArchivePreflightError();
+    }
+    const artifactIds: string[] = [];
+    const seen = new Set<string>();
+    let size = Object.values(slices).reduce((sum, slice) => sum + slice.bytes.length, 0);
+    for (const item of decoded.artifacts) {
+      if (!isValidArtifactRow(item) || seen.has(item.id)) {
+        throw new ExportArchivePreflightError();
+      }
+      seen.add(item.id);
+      artifactIds.push(item.id);
+      size += item.byteLength;
+      if (!Number.isSafeInteger(size) || size > maxArchiveSourceBytes) {
+        throw new ExportArchivePreflightError();
+      }
+    }
+    return artifactIds;
+  } catch (error) {
+    if (error instanceof ExportArchivePreflightError) throw error;
+    throw new ExportArchivePreflightError();
+  }
+}
+
 /**
  * Internal read-only coordinator for a bounded local-storage ZIP.
  *
@@ -47,48 +99,7 @@ export async function prepareClaimedLocalArchiveZip(input: {
   const slices = await prepareClaimedConsistentMetadataSlices(input.db, input.claim);
   if (!slices) return null;
 
-  let artifactIds: string[];
-  try {
-    const decoded = JSON.parse(slices.artifactMetadata.bytes.toString("utf8")) as {
-      exportId?: unknown;
-      artifacts?: Array<{ id?: unknown; byteLength?: unknown }>;
-    };
-    const inventory = JSON.parse(slices.repositories.bytes.toString("utf8")) as { exportId?: unknown };
-    if (
-      decoded?.exportId !== input.claim.exportId ||
-      inventory?.exportId !== input.claim.exportId ||
-      !Array.isArray(decoded.artifacts) ||
-      decoded.artifacts.length > maxArtifacts
-    ) {
-      throw new ExportArchivePreflightError();
-    }
-    let size = Object.values(slices).reduce((sum, slice) => sum + slice.bytes.length, 0);
-    artifactIds = [];
-    const seen = new Set<string>();
-    for (const item of decoded.artifacts) {
-      if (
-        !item ||
-        typeof item.id !== "string" ||
-        item.id.length === 0 ||
-        item.id.length > 128 ||
-        seen.has(item.id) ||
-        typeof item.byteLength !== "number" ||
-        !Number.isSafeInteger(item.byteLength) ||
-        item.byteLength < 0
-      ) {
-        throw new ExportArchivePreflightError();
-      }
-      seen.add(item.id);
-      artifactIds.push(item.id);
-      size += item.byteLength;
-      if (!Number.isSafeInteger(size) || size > maxArchiveSourceBytes) {
-        throw new ExportArchivePreflightError();
-      }
-    }
-  } catch (error) {
-    if (error instanceof ExportArchivePreflightError) throw error;
-    throw new ExportArchivePreflightError();
-  }
+  const artifactIds = boundedClaimedArtifactIds(slices, input.claim.exportId);
 
   const verifiedObjects: VerifiedArchiveObject[] = [];
   for (const artifactId of artifactIds) {

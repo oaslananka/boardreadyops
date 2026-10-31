@@ -94,9 +94,12 @@ export async function prepareClaimedArtifactMetadataSnapshot(
   }
 
   const seenIds = new Set<string>();
-  const artifacts = data.artifacts.map((row: ArtifactRow) => {
+  const artifacts = data.artifacts.map((candidate: unknown) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      throw new ExportArtifactSnapshotUnavailableError();
+    }
+    const row = candidate as ArtifactRow;
     if (
-      !row ||
       !validText(row.id) ||
       !validText(row.run_id) ||
       !validText(row.kind) ||

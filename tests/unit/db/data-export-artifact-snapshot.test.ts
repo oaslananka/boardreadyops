@@ -130,6 +130,11 @@ describe("claimed artifact metadata is not a deliverable export", () => {
 
   it("rejects malformed, unbounded or duplicate artifact metadata without truncating", async () => {
     const invalidRows = [
+      [null],
+      [false],
+      [17],
+      ["not-an-artifact"],
+      [[]],
       [{ ...artifact, sha256: "not-a-digest" }],
       [{ ...artifact, sha256: "A".repeat(64) }],
       [{ ...artifact, sha256: "g".repeat(64) }],
