@@ -42,6 +42,7 @@ describe("BillingStore atomic Marketplace processing", () => {
     expect(sql).toContain("scope IN ('organization', 'user')");
     expect(sql).toContain("scope = $16::text");
     expect(sql).toContain("lower(tenant_id) = lower((SELECT tenant_id FROM resolved_erasure_tenant))");
+    expect(sql).toContain("$16::text = 'organization'");
     expect(sql).toContain(
       "($16::text = 'user' AND lower(scope_id) = lower((SELECT tenant_id FROM resolved_erasure_tenant)))",
     );

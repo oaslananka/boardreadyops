@@ -42,6 +42,8 @@ describe("data lifecycle administration", () => {
     expect(holdSql).toContain("($2='user' AND lower(scope_id)=lower($3))");
     expect(erasureSql).toContain("scope_id=$5");
     expect(holdSql).toContain("scope_id=$3");
+    expect(erasureSql).toContain("$4='organization'");
+    expect(holdSql).toContain("$2='organization'");
   });
 
   it("releases only the selected tenant hold without requeuing blocked erasure requests", async () => {
@@ -291,10 +293,13 @@ describe("data lifecycle administration", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects malformed erasure and hold scopes before querying, including missing scoped identifiers", async () => {
+  it("rejects malformed export, erasure and hold scopes before querying", async () => {
     const query = vi.fn();
     const store = new DataLifecycleStore({ query });
     for (const scope of ["unknown", "", "organization ", "repository "]) {
+      await expect(store.createExport({ tenantId: "acme", requestedBy: "alice", scope })).rejects.toThrow(
+        "Invalid lifecycle scope",
+      );
       await expect(store.createErasure({ tenantId: "acme", requestedBy: "alice", scope })).rejects.toThrow(
         "Invalid lifecycle scope",
       );
@@ -305,6 +310,9 @@ describe("data lifecycle administration", () => {
     for (const scope of ["repository", "user"]) {
       for (const scopeId of [null, undefined, "", " ", " padded ", "\trepo"]) {
         const scoped = scopeId === undefined ? {} : { scopeId };
+        await expect(store.createExport({ tenantId: "acme", requestedBy: "alice", scope, ...scoped })).rejects.toThrow(
+          "require a canonical scope id",
+        );
         await expect(store.createErasure({ tenantId: "acme", requestedBy: "alice", scope, ...scoped })).rejects.toThrow(
           "require a canonical scope id",
         );
@@ -322,6 +330,9 @@ describe("data lifecycle administration", () => {
     }
     for (const scopeId of ["", "repository-1", " "]) {
       await expect(
+        store.createExport({ tenantId: "acme", requestedBy: "alice", scope: "organization", scopeId }),
+      ).rejects.toThrow("must not have a scope id");
+      await expect(
         store.createErasure({ tenantId: "acme", requestedBy: "alice", scope: "organization", scopeId }),
       ).rejects.toThrow("must not have a scope id");
       await expect(store.hasActiveHold("acme", "organization", scopeId)).rejects.toThrow("must not have a scope id");
@@ -334,11 +345,11 @@ describe("data lifecycle administration", () => {
     const store = new DataLifecycleStore({ query });
     await expect(store.hasActiveHold("acme", "repository", "repo-1")).resolves.toBe(true);
     await expect(store.hasActiveHold("acme", "organization")).resolves.toBe(true);
-    expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining("scope='organization' OR (scope=$2"), [
-      "acme",
-      "repository",
-      "repo-1",
-    ]);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("scope='organization' OR $2='organization' OR (scope=$2"),
+      ["acme", "repository", "repo-1"],
+    );
     expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("lower(tenant_id)=lower($1)"), [
       "acme",
       "organization",

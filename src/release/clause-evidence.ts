@@ -175,3 +175,55 @@ export function exportPassportAuditClausesJson(
   };
   return `${canonicalizeJson(report)}\n`;
 }
+
+/**
+ * Human-readable, offline rendering of the same validated non-normative JSON
+ * projection. Do not imply that recorded fields satisfy any audit obligation.
+ */
+export function exportPassportAuditClausesMarkdown(
+  passport: ReleasePassport,
+  mappings: readonly AuditClauseMapping[],
+): string {
+  const report = JSON.parse(exportPassportAuditClausesJson(passport, mappings)) as AuditClauseExport;
+  // The release ID comes from an untrusted local file: never let it add markup,
+  // HTML or rows to a reviewer-facing Markdown report.
+  const escapeCell = (value: string): string =>
+    value
+      .replace(/\s+/gu, " ")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replace(/([\\`*_{}[\]()#+.!|~-])/gu, String.raw`\$1`);
+  const fields = (values: readonly string[]): string => (values.length > 0 ? values.map(escapeCell).join(", ") : "—");
+
+  const lines = [
+    "# Release Passport clause records (self-reported)",
+    "",
+    "> These are recorded-field presence checks, not independently verified evidence, compliance, certification, or audit success.",
+    "> Standard and clause identities and field requirements are supplied by the reviewer; confirm the applicable edition and obligations independently.",
+    "",
+    `Release: ${escapeCell(report.release.id)}`,
+    "",
+    `Passport digest (self-consistency only): ${report.release.passportDigest}`,
+    "",
+    `Source commit claim (unverified): ${report.release.sourceCommitClaim ?? "not recorded"}`,
+    "",
+    "| Standard | Reviewer clause | Recorded passport fields | Missing passport fields | Record coverage |",
+    "| --- | --- | --- | --- | --- |",
+  ];
+  for (const clause of report.clauses) {
+    lines.push(
+      "| " +
+        [
+          escapeCell(clause.standard),
+          escapeCell(clause.clause),
+          fields(clause.recordedEvidence),
+          fields(clause.missingEvidence),
+          clause.recordCoverage,
+        ].join(" | ") +
+        " |",
+    );
+  }
+  lines.push("", "Record coverage describes passport fields only; it does not evaluate any normative clause.", "");
+  return lines.join("\n");
+}

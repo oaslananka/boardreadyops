@@ -65,6 +65,7 @@ import { runRetentionMaintenanceCleanup } from "./lib/retention-maintenance-work
 import { createRunnerClient } from "./lib/runner-client.js";
 import { runnerModeSummary, runnerWorkflowDispatchClient } from "./lib/runner-mode.js";
 import { sendSentryEvent } from "./lib/sentry-worker-client.js";
+import { processStripeEntitlementPass } from "./lib/stripe-entitlement-worker.js";
 import { type AffectedBoardsResult, affectedPartKeys, composeSupplyAnnouncement } from "./lib/supply-announcement.js";
 
 // Opt-in only: sends nothing unless SENTRY_DSN is set. See lib/sentry-worker-client.ts.
@@ -115,6 +116,13 @@ const installationConcurrency = integerEnvironment("BOARDREADYOPS_WORKER_INSTALL
 const repositoryConcurrency = integerEnvironment("BOARDREADYOPS_WORKER_REPOSITORY_CONCURRENCY", 2, 1, 32);
 const pollMilliseconds = integerEnvironment("BOARDREADYOPS_WORKER_POLL_MS", 1000, 100, 60_000);
 const outboxPollMilliseconds = integerEnvironment("BOARDREADYOPS_OUTBOX_POLL_MS", 500, 100, 60_000);
+const stripeReconciliationPollMilliseconds = integerEnvironment(
+  "BOARDREADYOPS_STRIPE_RECONCILIATION_POLL_MS",
+  5_000,
+  1_000,
+  60_000,
+);
+const stripeReconciliationBatchSize = integerEnvironment("BOARDREADYOPS_STRIPE_RECONCILIATION_BATCH_SIZE", 10, 1, 25);
 const artifactDeletionPollMilliseconds = integerEnvironment(
   "BOARDREADYOPS_ARTIFACT_DELETION_POLL_MS",
   1_000,
@@ -1115,6 +1123,21 @@ async function runArtifactDeletionLoop(): Promise<void> {
   }
 }
 
+async function runStripeReconciliationLoop(): Promise<void> {
+  while (!shuttingDown) {
+    try {
+      const summary = await processStripeEntitlementPass(executor, { limit: stripeReconciliationBatchSize });
+      if (Object.values(summary).some((count) => count > 0)) {
+        // Aggregate only: never log customer identifiers or Stripe event payloads.
+        log(summary.failed > 0 || summary.dead_letter > 0 ? "warn" : "info", "worker.stripe_reconciliation", summary);
+      }
+    } catch (error) {
+      log("warn", "worker.stripe_reconciliation_failed", { errorClass: errorClass(error) });
+    }
+    await sleep(stripeReconciliationPollMilliseconds);
+  }
+}
+
 async function runLifecycleReconciliationLoop(): Promise<void> {
   while (!shuttingDown) {
     const claimed = await claimLifecycleReconciliationItems();
@@ -1207,6 +1230,7 @@ try {
     runLifecycleLoop(),
     runOutboxLoop(),
     runArtifactDeletionLoop(),
+    runStripeReconciliationLoop(),
     runLifecycleReconciliationLoop(),
     runGitHubReconciliationLoop(),
     runMaintenanceLoop(),

@@ -10,6 +10,7 @@ import { Button } from "../ui/button.js";
 import { checkboxClassName } from "../ui/field.js";
 import { Input } from "../ui/input.js";
 import { NativeSelect } from "../ui/native-select.js";
+import { ExportRequestReceipt } from "./export-request-receipt.js";
 
 type DataScope = "organization" | "repository" | "user";
 
@@ -19,9 +20,17 @@ type ScopeFieldsProps = {
   scopeId?: string;
   onScopeChange?: (scope: DataScope) => void;
   onScopeIdChange?: (scopeId: string) => void;
+  allowUser?: boolean;
 };
 
-function ScopeFields({ idPrefix, scope, scopeId, onScopeChange, onScopeIdChange }: Readonly<ScopeFieldsProps>) {
+function ScopeFields({
+  idPrefix,
+  scope,
+  scopeId,
+  onScopeChange,
+  onScopeIdChange,
+  allowUser = true,
+}: Readonly<ScopeFieldsProps>) {
   return (
     <>
       <div className="flex flex-col gap-1.5">
@@ -36,7 +45,9 @@ function ScopeFields({ idPrefix, scope, scopeId, onScopeChange, onScopeIdChange 
         >
           <option value="organization">Whole organization</option>
           <option value="repository">One repository</option>
-          <option value="user">One user</option>
+          <option value="user" disabled={!allowUser}>
+            One user{allowUser ? "" : " (unavailable for export)"}
+          </option>
         </NativeSelect>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -67,26 +78,14 @@ export function ExportRequestForm({
       {({ pending }) => (
         <>
           <input type="hidden" name="installationId" value={installationId} />
-          <ScopeFields idPrefix={idPrefix} />
+          <ScopeFields idPrefix={idPrefix} allowUser={false} />
           <div>
             <Button type="submit" disabled={pending}>
               {pending ? "Requesting…" : "Request export"}
             </Button>
           </div>
           {issued ? (
-            <AlertRoot variant="success">
-              <AlertTitle>Export {customerStatusLabel(issued.status)}</AlertTitle>
-              <AlertDescription>
-                Reference <code className="font-mono">{issued.exportId}</code>. Download it from{" "}
-                <a
-                  className="text-primary underline underline-offset-2"
-                  href={`/api/v1/data-exports/${issued.exportId}`}
-                >
-                  the export endpoint
-                </a>{" "}
-                once it finishes; the link is signed and time-limited.
-              </AlertDescription>
-            </AlertRoot>
+            <ExportRequestReceipt key={issued.exportId} issued={issued} installationId={installationId} />
           ) : null}
         </>
       )}
@@ -148,10 +147,10 @@ export function ErasureRequestForm({
             />
             <span>
               <label className="block" htmlFor={`${idPrefix}-dry-run`}>
-                Preview what would be deleted
+                Record a dry-run request
               </label>
               <span id={`${idPrefix}-dry-run-hint`} className="block text-meta text-muted-foreground">
-                Records the request and reports the scope without removing anything.
+                Preview records the requested scope; it does not list matching records. Nothing is deleted.
               </span>
             </span>
           </div>
@@ -208,8 +207,8 @@ export function ErasureRequestForm({
               </AlertTitle>
               <AlertDescription>
                 {outcome.dryRun
-                  ? "Nothing was deleted. Uncheck the preview box to run it for real."
-                  : "Processing happens asynchronously and cannot be undone."}
+                  ? "This is a request preview only; no records were deleted or enumerated."
+                  : "A non-preview request is only recorded for an authorized operator workflow. No records have been deleted by this submission."}
               </AlertDescription>
             </AlertRoot>
           ) : null}

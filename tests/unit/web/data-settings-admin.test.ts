@@ -49,6 +49,7 @@ function deps(selected = business) {
     })),
     releaseLegalHold: vi.fn().mockResolvedValue(true),
     createExport: vi.fn().mockImplementation(async (input) => ({ id: "export-1", status: "pending", ...input })),
+    createBoundPendingExport: vi.fn().mockResolvedValue("export-1"),
     createErasure: vi.fn().mockImplementation(async (input) => ({
       id: "erase-1",
       status: "pending",
@@ -221,20 +222,30 @@ describe("data settings admin", () => {
       { installationId: "inst-a", scope: "organization" },
       dependencies,
     );
-    expect(exported.status).toBe("ok");
-    expect(store.createExport).toHaveBeenCalledWith({
+    expect(exported).toMatchObject({
+      status: "ok",
+      data: { exportId: "export-1", status: "pending" },
+      message: "Export request recorded; creating a downloadable pack requires operator processing.",
+    });
+    expect(store.createBoundPendingExport).toHaveBeenCalledWith({
       tenantId: "acme",
+      installationId: "inst-a",
       requestedBy: "octocat",
       scope: "organization",
       scopeId: null,
     });
+    expect(store.createExport).not.toHaveBeenCalled();
 
     const erased = await requestErasureForViewer(
       session,
       { installationId: "inst-a", scope: "organization", confirm: "acme", dryRun: true },
       dependencies,
     );
-    expect(erased.status).toBe("ok");
+    expect(erased).toMatchObject({
+      status: "ok",
+      data: { erasureId: "erase-1", dryRun: true },
+      message: "Preview recorded. No records were deleted or enumerated; review the requested scope.",
+    });
     expect(store.createErasure).toHaveBeenCalledWith({
       tenantId: "acme",
       requestedBy: "octocat",
@@ -242,6 +253,54 @@ describe("data settings admin", () => {
       scopeId: null,
       dryRun: true,
     });
+  });
+
+  it("rejects vanished installation or repository exports without falling back to unbound intake", async () => {
+    const { store, dependencies } = deps();
+    vi.mocked(store.createBoundPendingExport).mockResolvedValueOnce(null);
+    const result = await requestExportForViewer(
+      session,
+      { installationId: "inst-a", scope: "repository", scopeId: "repo-a" },
+      dependencies,
+    );
+    expect(result).toMatchObject({ status: "error" });
+    expect(store.createBoundPendingExport).toHaveBeenCalledWith({
+      tenantId: "acme",
+      installationId: "inst-a",
+      requestedBy: "octocat",
+      scope: "repository",
+      scopeId: "repo-a",
+    });
+    expect(store.createExport).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on unverified user-scope export intake before opening storage", async () => {
+    const { store, dependencies } = deps();
+    const result = await requestExportForViewer(
+      session,
+      { installationId: "inst-a", scope: "user", scopeId: "octocat" },
+      dependencies,
+    );
+    expect(result).toMatchObject({ status: "error" });
+    expect(store.createExport).not.toHaveBeenCalled();
+    expect(store.createBoundPendingExport).not.toHaveBeenCalled();
+    expect(dependencies.openStore).not.toHaveBeenCalled();
+  });
+
+  it("does not claim an accepted non-preview erasure request deleted data", async () => {
+    const { store, dependencies } = deps();
+    const result = await requestErasureForViewer(
+      session,
+      { installationId: "inst-a", scope: "organization", confirm: "acme", dryRun: false },
+      dependencies,
+    );
+    expect(result).toMatchObject({
+      status: "ok",
+      data: { erasureId: "erase-1", status: "pending", dryRun: false },
+      message:
+        "Erasure request recorded; no records have been deleted. Completion requires an authorized operator workflow.",
+    });
+    expect(store.createErasure).toHaveBeenCalledOnce();
   });
 
   it("refuses an organization erasure confirmed with the viewer login instead of the tenant", async () => {

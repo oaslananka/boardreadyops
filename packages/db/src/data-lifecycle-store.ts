@@ -360,6 +360,7 @@ export class DataLifecycleStore {
     scope: string;
     scopeId?: string | null;
   }): Promise<DataExport> {
+    validateLifecycleScope(input.scope, input.scopeId);
     const id = randomUUID();
     const r = (await this.db.query(
       `INSERT INTO data_exports (id, tenant_id, requested_by, status, scope, scope_id, created_at) VALUES ($1,$2,$3,'pending',$4,$5,NOW()) RETURNING *`,
@@ -380,11 +381,47 @@ export class DataLifecycleStore {
     };
   }
 
-  async getExport(tenantId: string, exportId: string): Promise<DataExport | null> {
-    const r = (await this.db.query(`SELECT * FROM data_exports WHERE id=$1 AND tenant_id=$2 LIMIT 1`, [
-      exportId,
-      tenantId,
-    ])) as { rows?: Array<Record<string, unknown>> };
+  /**
+   * Exact live installation authorization for export status reads.
+   * The tenant account login alone is insufficient: installations may be
+   * replaced or multiple same-account installations may coexist.
+   * Historical unbound user-scope rows require independent original-account
+   * recovery; installation authorization alone must never reveal them.
+   */
+  async getExport(tenantId: string, exportId: string, installationId: string): Promise<DataExport | null> {
+    if (
+      !tenantId ||
+      !exportId ||
+      !installationId ||
+      tenantId !== tenantId.trim() ||
+      exportId !== exportId.trim() ||
+      installationId !== installationId.trim()
+    )
+      return null;
+    const r = (await this.db.query(
+      `SELECT data_exports.id, data_exports.tenant_id, data_exports.requested_by,
+              data_exports.status, data_exports.scope, data_exports.scope_id,
+              data_exports.expires_at, data_exports.created_at
+         FROM data_exports
+         JOIN installations ON installations.id = $3
+          AND installations.suspended_at IS NULL
+          AND lower(installations.account_login) = lower($2)
+        WHERE data_exports.id = $1
+          AND lower(data_exports.tenant_id) = lower(installations.account_login)
+          AND (
+            (data_exports.installation_id = installations.id AND (
+              (data_exports.scope = 'organization' AND data_exports.scope_id IS NULL)
+              OR (data_exports.scope = 'repository' AND EXISTS (
+                SELECT 1 FROM repositories
+                 WHERE repositories.id = data_exports.scope_id
+                   AND repositories.installation_id = installations.id
+                   AND repositories.disabled_at IS NULL
+              ))
+            ))
+          )
+        LIMIT 1`,
+      [exportId, tenantId, installationId],
+    )) as { rows?: Array<Record<string, unknown>> };
     const row = r.rows?.[0];
     if (!row) return null;
     return {
@@ -394,7 +431,7 @@ export class DataLifecycleStore {
       status: String(row.status) as DataExport["status"],
       scope: String(row.scope),
       scopeId: (row.scope_id as string | null) ?? null,
-      downloadUrl: (row.download_url as string | null) ?? null,
+      downloadUrl: null, // Generic status reads must never convey a delivery capability.
       expiresAt: row.expires_at ? new Date(row.expires_at as string).toISOString() : null,
       createdAt: new Date(row.created_at as string).toISOString(),
     };
@@ -421,6 +458,7 @@ export class DataLifecycleStore {
             AND active=TRUE
             AND (
               scope='organization'
+              OR $4='organization'
               OR (scope=$4 AND (scope_id=$5 OR ($4='user' AND lower(scope_id)=lower($5)) OR scope_id IS NULL))
             )
           LIMIT 1
@@ -506,7 +544,7 @@ export class DataLifecycleStore {
   async hasActiveHold(tenantId: string, scope: string, scopeId?: string | null): Promise<boolean> {
     validateLifecycleScope(scope, scopeId);
     const r = (await this.db.query(
-      `SELECT 1 FROM legal_holds WHERE lower(tenant_id)=lower($1) AND active=TRUE AND (scope='organization' OR (scope=$2 AND (scope_id=$3 OR ($2='user' AND lower(scope_id)=lower($3)) OR scope_id IS NULL))) LIMIT 1`,
+      `SELECT 1 FROM legal_holds WHERE lower(tenant_id)=lower($1) AND active=TRUE AND (scope='organization' OR $2='organization' OR (scope=$2 AND (scope_id=$3 OR ($2='user' AND lower(scope_id)=lower($3)) OR scope_id IS NULL))) LIMIT 1`,
       [tenantId, scope, scopeId ?? null],
     )) as { rows?: unknown[] };
     return (r.rows?.length ?? 0) > 0;

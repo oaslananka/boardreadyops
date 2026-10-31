@@ -60,6 +60,40 @@ describe("Data & Retention settings administration", () => {
     expect(page).toContain("non-local managed-object deletion");
   });
 
+  it("does not promise completed exports or destructive erasure from intake alone", async () => {
+    const page = await readFile("apps/web/app/settings/data/page.tsx", "utf8");
+    const forms = (await readFile("apps/web/components/settings/data-lifecycle-forms.tsx", "utf8")).replace(
+      /\s+/gu,
+      " ",
+    );
+    const receipt = (await readFile("apps/web/components/settings/export-request-receipt.tsx", "utf8")).replace(
+      /\s+/gu,
+      " ",
+    );
+    const service = await readFile("apps/web/lib/data-settings-admin.ts", "utf8");
+
+    expect(page).toContain("An export request does not create a downloadable pack automatically.");
+    expect(page).toContain("Submitting an erasure request does not delete records.");
+    expect(forms).toContain("ExportRequestReceipt");
+    expect(receipt).toContain("An export request does not create a customer");
+    expect(receipt).toContain("archive automatically.");
+    expect(receipt).toContain('<AlertRoot variant="info">');
+    expect(receipt).toContain("not your full customer data archive");
+    expect(receipt).toContain("Download metadata preview");
+    expect(receipt).toContain("Revoke metadata preview");
+    expect(forms).not.toContain("href={`/api/v1/data-exports/");
+    expect(forms).toContain("A non-preview request is only recorded for an authorized operator workflow.");
+    expect(forms).toContain("Preview records the requested scope; it does not list matching records.");
+    expect(service).toContain("Export request recorded; creating a downloadable pack requires operator processing.");
+    expect(service).toContain("Erasure request recorded; no records have been deleted.");
+
+    expect(page).not.toContain("Removes records for a scope.");
+    expect(forms).not.toContain("Download it from");
+    expect(forms).not.toContain("Uncheck the preview box to run it for real.");
+    expect(forms).not.toContain("Processing happens asynchronously and cannot be undone.");
+    expect(service).not.toContain("Erasure requested. It is processed asynchronously and cannot be undone.");
+  });
+
   it("wires server actions for save/create/release and revalidates the page", async () => {
     const actions = await readFile("apps/web/app/settings/data/actions.ts", "utf8");
     expect(actions).toContain("saveRetentionPolicyAction");

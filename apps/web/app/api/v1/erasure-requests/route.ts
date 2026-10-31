@@ -1,70 +1,37 @@
 import { DataLifecycleStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
-import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
+import { prepareLifecyclePost } from "../../../../lib/data-lifecycle-post-request.js";
+import { lifecycleScopeRefinement } from "../../../../lib/data-lifecycle-scope-refinement.js";
 
 export const runtime = "nodejs";
 
 const erasureSchema = z
   .object({
+    installationId: z
+      .string()
+      .min(1)
+      .max(128)
+      .refine((id) => id === id.trim(), "Canonical installation id required."),
     scope: z.enum(["organization", "repository", "user"]),
     scopeId: z.string().optional(),
     dryRun: z.boolean().optional().default(false),
   })
-  .superRefine((data, ctx) => {
-    if (data.scope === "organization") {
-      if (data.scopeId !== undefined) {
-        ctx.addIssue({ code: "custom", path: ["scopeId"], message: "Organization erasure must not have a scope id." });
-      }
-    } else if (!data.scopeId?.trim() || data.scopeId !== data.scopeId.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["scopeId"],
-        message: "Repository and user erasures require a canonical scope id.",
-      });
-    }
-  });
+  .superRefine(lifecycleScopeRefinement("erasure"));
 
 export async function POST(request: Request): Promise<Response> {
-  const viewer = await viewerAuthorization();
-  if (!viewer.session)
-    return Response.json(
-      { ok: false, error: "authentication required" },
-      { status: 401, headers: { "cache-control": "private, no-store" } },
-    );
-  let body: unknown = {};
-  try {
-    const text = await request.text();
-    if (text) body = JSON.parse(text) as unknown;
-  } catch {
-    return Response.json(
-      { ok: false, error: "Invalid JSON" },
-      { status: 400, headers: { "cache-control": "private, no-store" } },
-    );
-  }
-  const parsed = erasureSchema.safeParse(body);
-  if (!parsed.success)
-    return Response.json(
-      { ok: false, error: "Invalid payload", issues: parsed.error.issues },
-      { status: 400, headers: { "cache-control": "private, no-store" } },
-    );
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres")
-    return Response.json(
-      { ok: false, error: "Database not configured" },
-      { status: 503, headers: { "cache-control": "private, no-store" } },
-    );
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const prepared = await prepareLifecyclePost(request, erasureSchema);
+  if (!prepared.ok) return prepared.response;
+  const executor = createPgQueryExecutor({ connectionString: prepared.databaseUrl });
   try {
     const store = new DataLifecycleStore(executor);
-    const tenantId = viewer.session.login;
+    const tenantId = prepared.tenantId;
     const erasure = await store.createErasure({
       tenantId,
-      requestedBy: viewer.session.login,
-      scope: parsed.data.scope,
-      scopeId: parsed.data.scopeId ?? null,
-      dryRun: parsed.data.dryRun,
+      requestedBy: prepared.actorLogin,
+      scope: prepared.data.scope,
+      scopeId: prepared.data.scopeId ?? null,
+      dryRun: prepared.data.dryRun,
     });
     if (erasure.status === "blocked_by_hold") {
       return Response.json(

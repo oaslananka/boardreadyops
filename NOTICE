@@ -213,7 +213,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `import-in-the-middle@3.3.3`
   - Description: Intercept imports in Node.js
   - Homepage: https://github.com/nodejs/import-in-the-middle#readme
-- `legacy-javascript@0.0.3`
+- `legacy-javascript@0.0.4`
   - Description: Identify legacy polyfills and code transforms
   - Homepage: https://github.com/GoogleChrome/lighthouse#readme
 - `lighthouse@13.5.0`
@@ -289,19 +289,21 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 ## BlueOak-1.0.0
 
-- `glob@13.0.6`
+- `@isaacs/nonrecursive-glob-match@1.0.1`
+  - Description: a single-path-portion glob matcher not subject to recursive backtracking ReDoS
+- `glob@14.0.2`
   - Description: the most correct and second fastest glob implementation in JavaScript
   - Homepage: https://github.com/isaacs/node-glob#readme
 - `lru-cache@11.5.2`
   - Description: A cache object that deletes the least-recently-used items.
   - Homepage: https://github.com/isaacs/node-lru-cache#readme
-- `minimatch@10.2.5`
+- `minimatch@11.0.1`
   - Description: a glob matcher in javascript
   - Homepage: https://github.com/isaacs/minimatch#readme
 - `minipass@7.1.3`
   - Description: minimal implementation of a PassThrough stream
   - Homepage: https://github.com/isaacs/minipass#readme
-- `path-scurry@2.0.2`
+- `path-scurry@3.0.0`
   - Description: walk paths fast and efficiently
   - Homepage: https://github.com/isaacs/path-scurry#readme
 
@@ -800,7 +802,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/formatjs/formatjs#readme
 - `@gerrit0/mini-shiki@3.23.0`
   - Homepage: https://github.com/Gerrit0/mini-shiki#readme
-- `@hono/node-server@2.1.3`
+- `@hono/node-server@2.1.5`
   - Description: Node.js Adapter for Hono
   - Homepage: https://github.com/honojs/node-server
 - `@html-validate/stylish@6.0.0`

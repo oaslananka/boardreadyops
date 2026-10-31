@@ -98,8 +98,8 @@ describe("ci-risk-profile", () => {
   it("keeps billing/database PRs off KiCad PPA while exercising PostgreSQL integration", () => {
     for (const file of [
       "packages/db/src/billing-store.ts",
-      "packages/db/migrations/0096_stripe_reconciliation_claims.sql",
-      "packages/db/migrations/0095_pending_stripe_customer_events_index.sql",
+      "packages/db/migrations/0107_stripe_reconciliation_claims.sql",
+      "packages/db/migrations/0106_pending_stripe_customer_events_index.sql",
       "packages/cloud-core/src/stripe-service.ts",
       "apps/web/lib/stripe-entitlement-worker.ts",
       "apps/web/app/api/v1/billing/webhook/route.ts",

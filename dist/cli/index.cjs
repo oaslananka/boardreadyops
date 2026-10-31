@@ -80820,6 +80820,39 @@ function exportPassportAuditClausesJson(passport, mappings2) {
   return `${canonicalizeJson(report)}
 `;
 }
+function exportPassportAuditClausesMarkdown(passport, mappings2) {
+  const report = JSON.parse(exportPassportAuditClausesJson(passport, mappings2));
+  const escapeCell = (value) => value.replace(/\s+/gu, " ").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replace(/([\\`*_{}[\]()#+.!|~-])/gu, String.raw`\$1`);
+  const fields = (values) => values.length > 0 ? values.map(escapeCell).join(", ") : "\u2014";
+  const lines = [
+    "# Release Passport clause records (self-reported)",
+    "",
+    "> These are recorded-field presence checks, not independently verified evidence, compliance, certification, or audit success.",
+    "> Standard and clause identities and field requirements are supplied by the reviewer; confirm the applicable edition and obligations independently.",
+    "",
+    `Release: ${escapeCell(report.release.id)}`,
+    "",
+    `Passport digest (self-consistency only): ${report.release.passportDigest}`,
+    "",
+    `Source commit claim (unverified): ${report.release.sourceCommitClaim ?? "not recorded"}`,
+    "",
+    "| Standard | Reviewer clause | Recorded passport fields | Missing passport fields | Record coverage |",
+    "| --- | --- | --- | --- | --- |"
+  ];
+  for (const clause of report.clauses) {
+    lines.push(
+      "| " + [
+        escapeCell(clause.standard),
+        escapeCell(clause.clause),
+        fields(clause.recordedEvidence),
+        fields(clause.missingEvidence),
+        clause.recordCoverage
+      ].join(" | ") + " |"
+    );
+  }
+  lines.push("", "Record coverage describes passport fields only; it does not evaluate any normative clause.", "");
+  return lines.join("\n");
+}
 
 // src/core/diff/fabrication.ts
 function diffFabrication(previous, current, previousFindings, currentFindings, options = {}) {
@@ -81416,7 +81449,10 @@ async function releaseAuditClausesCommand(passportFile, options, streams) {
     if (typeof passport !== "object" || passport === null || Array.isArray(passport) || !Array.isArray(mappings2) || !mappings2.every((item2) => typeof item2 === "object" && item2 !== null && !Array.isArray(item2))) {
       throw new Error("Audit clause inputs must be a passport object and an array of mapping objects.");
     }
-    const output3 = exportPassportAuditClausesJson(passport, mappings2);
+    if (options.format !== void 0 && options.format !== "json" && options.format !== "markdown") {
+      throw new Error("Unsupported audit clause export format.");
+    }
+    const output3 = options.format === "markdown" ? exportPassportAuditClausesMarkdown(passport, mappings2) : exportPassportAuditClausesJson(passport, mappings2);
     streams.stdout.write(output3);
     return 0;
   } catch {
@@ -83863,13 +83899,28 @@ function leaseContext(input3) {
 async function boundedResponseText(response) {
   const declaredLength = response.headers.get("content-length");
   if (declaredLength && /^\d+$/u.test(declaredLength) && Number(declaredLength) > responseBodyLimitBytes) {
+    await response.body?.cancel().catch(() => void 0);
     throw new Error("runner control-plane response exceeded the maximum permitted size");
   }
-  const body = await response.text();
-  if (Buffer.byteLength(body, "utf8") > responseBodyLimitBytes) {
-    throw new Error("runner control-plane response exceeded the maximum permitted size");
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > responseBodyLimitBytes) {
+        await reader.cancel().catch(() => void 0);
+        throw new Error("runner control-plane response exceeded the maximum permitted size");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return body;
+  return new TextDecoder().decode(Buffer.concat(chunks, totalBytes));
 }
 function positiveInteger4(value, name) {
   if (!Number.isSafeInteger(value) || value <= 0) {
@@ -87410,7 +87461,7 @@ function registerAllCommands(program2, streams) {
   ).option("--output <path>", "write the release diff JSON to a file").option("--html <path>", "write an HTML release diff dashboard to a file").action(async (previous, pathInput, options) => {
     process.exitCode = await releaseDiffCommand(previous, pathInput, options, streams);
   });
-  release.command("audit-clauses").description("export self-reported Release Passport fields by reviewer-supplied clause, not compliance").argument("<passport>", "Release Passport JSON file").requiredOption("--mappings <path>", "reviewer-provided clause mapping JSON array").action(async (passportPath, options) => {
+  release.command("audit-clauses").description("export self-reported Release Passport fields by reviewer-supplied clause, not compliance").argument("<passport>", "Release Passport JSON file").requiredOption("--mappings <path>", "reviewer-provided clause mapping JSON array").option("--format <format>", "output format: json or markdown", "json").action(async (passportPath, options) => {
     process.exitCode = await releaseAuditClausesCommand(passportPath, options, streams);
   });
   release.command("sign").argument("[bundle]", "release evidence bundle directory").option("--key <path>", "Ed25519 private key PEM used to sign the manifest").action(async (bundleInput, options) => {

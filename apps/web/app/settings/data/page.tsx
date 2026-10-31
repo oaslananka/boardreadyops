@@ -344,16 +344,26 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
           <Panel
             title="Export your data"
             id="data-export"
-            description={`Requests a signed pack of records under ${admin.selected.accountLogin}.`}
+            description={`Records an export request for ${admin.selected.accountLogin}.`}
           >
+            <p className="mb-3 text-sm text-muted-foreground">
+              An export request does not create a downloadable pack automatically. An authorized operator must prepare
+              and deliver an export using a separate workflow. After recording the request, you can refresh its status
+              and optionally download or revoke the 15-minute metadata-only preview if an operator publishes it. This
+              preview is not a complete customer data archive.
+            </p>
             <ExportRequestForm installationId={admin.selected.id} action={requestExportAction} />
           </Panel>
           <Panel
             title="Erasure request"
             id="erasure-request"
-            description="Removes records for a scope. An active legal hold blocks it."
+            description="Records a scoped erasure request. An active legal hold blocks it."
             tone="critical"
           >
+            <p className="mb-3 text-sm text-muted-foreground">
+              Submitting an erasure request does not delete records. Completion requires a separate authorized operator
+              workflow and must respect active legal holds.
+            </p>
             <ErasureRequestForm
               installationId={admin.selected.id}
               action={requestErasureAction}

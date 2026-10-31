@@ -168,6 +168,119 @@ describe("repository setup operator routes", () => {
     );
   });
 
+  it("emits one scoped setup PR metric only after newly created and persisted setup", async () => {
+    const emitted = vi.fn();
+    const deps = dependencies();
+    deps.emitTelemetry = emitted;
+    deps.mutationService = vi.fn(() => ({
+      execute: vi.fn(async () => ({
+        outcome: "created" as const,
+        branchName: "boardreadyops/setup",
+        commitSha: "commit-123",
+        pullRequestNumber: 15,
+        pullRequestUrl: "https://github.test/octo/board/pull/15",
+      })),
+    }));
+
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "create_pr", requestId: "metric-created" }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+    expect(response.status).toBe(201);
+    expect(emitted).toHaveBeenCalledExactlyOnceWith({
+      event: "setup_pr_opened",
+      installationId: 123,
+      repositoryId: 456,
+      latencyMs: expect.any(Number),
+    });
+    expect(emitted.mock.calls[0]?.[0].latencyMs).toBeGreaterThanOrEqual(0);
+    expect(JSON.stringify(emitted.mock.calls)).not.toContain("boardreadyops/setup");
+    expect(JSON.stringify(emitted.mock.calls)).not.toContain("github.test");
+  });
+
+  it("does not emit setup PR metrics on replay, failed persistence, or failed mutation", async () => {
+    const metric = vi.fn();
+    const cases = [
+      {
+        outcome: "replayed" as const,
+        store: store(),
+        successStatus: 200,
+      },
+      {
+        outcome: "created" as const,
+        store: store({
+          applyRevision: vi.fn(async () => {
+            throw new Error("failed to persist");
+          }),
+        }),
+        successStatus: 502,
+      },
+    ];
+    for (const [index, testCase] of cases.entries()) {
+      const deps = dependencies(testCase.store);
+      deps.emitTelemetry = metric;
+      deps.mutationService = vi.fn(() => ({
+        execute: vi.fn(async () => ({
+          outcome: testCase.outcome,
+          branchName: "boardreadyops/setup",
+          commitSha: "commit-123",
+          pullRequestNumber: 15,
+          pullRequestUrl: "https://github.test/octo/board/pull/15",
+        })),
+      }));
+      const response = await handleRepositorySetupPost(
+        request("POST", { action: "create_pr", requestId: `metric-replay-${index}` }),
+        installationId,
+        repositoryId,
+        deps,
+      );
+      expect(response.status).toBe(testCase.successStatus);
+    }
+    const deps = dependencies();
+    deps.emitTelemetry = metric;
+    deps.mutationService = vi.fn(() => ({
+      execute: vi.fn(async () => {
+        throw new Error("provider failure");
+      }),
+    }));
+    expect(
+      (
+        await handleRepositorySetupPost(
+          request("POST", { action: "create_pr", requestId: "metric-failure" }),
+          installationId,
+          repositoryId,
+          deps,
+        )
+      ).status,
+    ).toBe(502);
+    expect(metric).not.toHaveBeenCalled();
+  });
+
+  it("does not fail successful setup when the optional metric sink throws", async () => {
+    const deps = dependencies();
+    deps.emitTelemetry = () => {
+      throw new Error("telemetry is unavailable");
+    };
+    deps.mutationService = vi.fn(() => ({
+      execute: vi.fn(async () => ({
+        outcome: "created" as const,
+        branchName: "boardreadyops/setup",
+        commitSha: "commit-123",
+        pullRequestNumber: 15,
+        pullRequestUrl: "https://github.test/octo/board/pull/15",
+      })),
+    }));
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "create_pr", requestId: "metric-sink-failed" }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+    expect(response.status).toBe(201);
+  });
+
   it("selects a versioned preset idempotently", async () => {
     const setupStore = store();
     const response = await handleRepositorySetupPost(

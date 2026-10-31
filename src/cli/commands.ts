@@ -179,7 +179,8 @@ export function registerAllCommands(
     .description("export self-reported Release Passport fields by reviewer-supplied clause, not compliance")
     .argument("<passport>", "Release Passport JSON file")
     .requiredOption("--mappings <path>", "reviewer-provided clause mapping JSON array")
-    .action(async (passportPath: string, options: { mappings: string }) => {
+    .option("--format <format>", "output format: json or markdown", "json")
+    .action(async (passportPath: string, options: { mappings: string; format: "json" | "markdown" }) => {
       process.exitCode = await releaseAuditClausesCommand(passportPath, options, streams);
     });
   release

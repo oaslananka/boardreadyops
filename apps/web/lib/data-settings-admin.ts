@@ -1,4 +1,5 @@
 import {
+  type DataExportPreparationStore,
   type DataLifecycleStore,
   type LegalHold,
   LegalHoldAdmissionConflictError,
@@ -43,7 +44,8 @@ type DataSettingsStore = Pick<
   | "releaseLegalHold"
   | "createExport"
   | "createErasure"
->;
+> &
+  Pick<DataExportPreparationStore, "createBoundPendingExport">;
 
 type OpenedStore = { readonly store: DataSettingsStore; readonly close: () => Promise<void> };
 
@@ -58,12 +60,20 @@ export type DataSettingsAdminDependencies = {
 async function openDefaultStore(): Promise<OpenedStore | undefined> {
   const connectionString = process.env.DATABASE_URL?.trim();
   if (!connectionString) return undefined;
-  const [{ DataLifecycleStore }, { createPgQueryExecutor }] = await Promise.all([
+  const [{ DataExportPreparationStore, DataLifecycleStore }, { createPgQueryExecutor }] = await Promise.all([
     import("@boardreadyops/db"),
     import("@boardreadyops/db/pg-executor"),
   ]);
   const executor = createPgQueryExecutor({ connectionString, max: 1 });
-  return { store: new DataLifecycleStore(executor), close: () => executor.close() };
+  const store = new DataLifecycleStore(executor);
+  const exportStore = new DataExportPreparationStore(executor);
+  return {
+    store: Object.assign(store, {
+      createBoundPendingExport: (input: Parameters<DataExportPreparationStore["createBoundPendingExport"]>[0]) =>
+        exportStore.createBoundPendingExport(input),
+    }),
+    close: () => executor.close(),
+  };
 }
 
 const defaultDependencies: DataSettingsAdminDependencies = {
@@ -255,20 +265,24 @@ export async function requestExportForViewer(
 ): Promise<ActionResult<{ exportId: string; status: string }>> {
   const selected = await authorizedTenant(session, input.installationId, dependencies);
   if (!selected) return fail("You do not have access to that installation.");
+  if (input.scope === "user")
+    return fail("User-scoped exports are unavailable until the original requester identity can be verified.");
   const scopeId = input.scope === "organization" ? undefined : input.scopeId?.trim();
   if (input.scope !== "organization" && !scopeId) return fail("Repository and user exports require a scope id.");
   const opened = await dependencies.openStore();
   if (!opened) return fail("This deployment has no database configured.");
   try {
-    const record = await opened.store.createExport({
+    const exportId = await opened.store.createBoundPendingExport({
       tenantId: selected.accountLogin,
+      installationId: selected.id,
       requestedBy: session.login,
       scope: input.scope,
       scopeId: scopeId ?? null,
     });
+    if (!exportId) return fail("The selected installation or repository is no longer available.");
     return ok(
-      { exportId: record.id, status: record.status },
-      "Export requested. It is generated asynchronously and the download link is time-limited.",
+      { exportId, status: "pending" },
+      "Export request recorded; creating a downloadable pack requires operator processing.",
     );
   } finally {
     await opened.close();
@@ -310,8 +324,8 @@ export async function requestErasureForViewer(
     return ok(
       { erasureId: record.id, status: record.status, dryRun: record.dryRun },
       record.dryRun
-        ? "Preview recorded. Nothing was deleted — review the scope before running it for real."
-        : "Erasure requested. It is processed asynchronously and cannot be undone.",
+        ? "Preview recorded. No records were deleted or enumerated; review the requested scope."
+        : "Erasure request recorded; no records have been deleted. Completion requires an authorized operator workflow.",
     );
   } finally {
     await opened.close();

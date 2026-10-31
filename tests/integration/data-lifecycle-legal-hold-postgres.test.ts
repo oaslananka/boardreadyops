@@ -86,6 +86,75 @@ describeDatabase("legal-hold release must not authorize erasure (PostgreSQL)", (
     ]);
   });
 
+  it("blocks organization-wide erasure when a repository or user hold protects any tenant data", async () => {
+    const store = new DataLifecycleStore(requireExecutor());
+    const tenant = `broad-hold-${randomUUID()}`;
+    const otherTenant = `broad-other-${randomUUID()}`;
+    tenants.push(tenant, otherTenant);
+
+    const repositoryHold = await store.createLegalHold({
+      tenantId: tenant,
+      createdBy: "audit-review",
+      reason: "Preserve retained PCB review evidence",
+      scope: "repository",
+      scopeId: "retained-board",
+    });
+    expect(repositoryHold.active).toBe(true);
+    await expect(store.hasActiveHold(tenant, "organization")).resolves.toBe(true);
+
+    const broad = await store.createErasure({
+      tenantId: tenant,
+      requestedBy: "operator",
+      scope: "organization",
+    });
+    const preview = await store.createErasure({
+      tenantId: tenant,
+      requestedBy: "operator",
+      scope: "organization",
+      dryRun: true,
+    });
+    const unrelatedRepo = await store.createErasure({
+      tenantId: tenant,
+      requestedBy: "operator",
+      scope: "repository",
+      scopeId: "unrelated-board",
+    });
+    const otherOrganization = await store.createErasure({
+      tenantId: otherTenant,
+      requestedBy: "operator",
+      scope: "organization",
+    });
+    expect([broad.status, preview.status, unrelatedRepo.status, otherOrganization.status]).toEqual([
+      "blocked_by_hold",
+      "blocked_by_hold",
+      "pending",
+      "pending",
+    ]);
+
+    await expect(store.releaseLegalHold(tenant, repositoryHold.id, "audit-review")).resolves.toBe(true);
+    const userHold = await store.createLegalHold({
+      tenantId: tenant,
+      createdBy: "audit-review",
+      reason: "Preserve retained user evidence records",
+      scope: "user",
+      scopeId: "MemberA",
+    });
+    await expect(store.hasActiveHold(tenant, "organization")).resolves.toBe(true);
+    const broadWithUserHold = await store.createErasure({
+      tenantId: tenant,
+      requestedBy: "operator",
+      scope: "organization",
+    });
+    expect(broadWithUserHold.status).toBe("blocked_by_hold");
+    await expect(store.releaseLegalHold(tenant, userHold.id, "audit-review")).resolves.toBe(true);
+    await expect(store.hasActiveHold(tenant, "organization")).resolves.toBe(false);
+    expect(await erasureStatuses([broad.id, preview.id, broadWithUserHold.id])).toEqual([
+      "blocked_by_hold",
+      "blocked_by_hold",
+      "blocked_by_hold",
+    ]);
+  });
+
   it("keeps a blocked real and dry-run erasure blocked after the final overlapping hold is released", async () => {
     const store = new DataLifecycleStore(requireExecutor());
     const tenantA = `legal-hold-a-${randomUUID()}`;

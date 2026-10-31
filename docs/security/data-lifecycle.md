@@ -121,9 +121,86 @@ Both uninstall requests use the persisted installation `account_login` and `acco
 
 This is an intake contract, not automatic purge. Export request intake is automatic and is intentionally not blocked by legal hold; export pack materialization/download expiry still use the existing export operator/executor workflow. The 30-day period applies to destructive erasure, which remains legal-hold aware. BoardReadyOps does not yet automatically purge every relational data class, delete non-local managed objects, or expire backup/platform copies when the deletion deadline arrives.
 
+**An organization-wide erasure request overlaps every active legal hold within
+its tenant**, including repository- and user-scoped holds. The request is recorded
+as `blocked_by_hold` even if no organization-scoped hold exists. This applies to
+manual intake, GitHub App uninstall, and GitHub Marketplace cancellation.
+A narrower
+repository or user erasure request still checks organization holds and holds
+matching that narrower scope; another tenant's holds cannot block it. These are
+intake-time safeguards, not a completed erasure executor. Any future executor
+must independently recheck overlapping holds before destructive work.
+
 **Legal-hold release is not erasure resumption.** Releasing a hold deactivates only that hold and records who released it. Requests already marked `blocked_by_hold` remain blocked; release does not automatically requeue them, change their deadlines, or initiate deletion. A supported requeue operation is not implemented. Before one can be introduced, it must require an explicit, audited, tenant-authorized action against a selected request, atomically recheck scope and all overlapping active holds, and retain export and reinstall-cancellation evidence. Operators must not treat release as authorization to purge.
 
 ### Tenant scope and auditability
+
+The direct lifecycle endpoints `POST /api/v1/data-exports` and
+`POST /api/v1/erasure-requests` require an internal `installationId` in the
+JSON body. `GET /api/v1/data-exports/:exportId` requires the same identifier in
+its query string and returns metadata, not a signed archive. For each request the
+server resolves that GitHub App installation against the current authenticated
+viewer's active authorized installations; an absent identifier returns 400 and
+a foreign or disabled installation returns 403 without writing a request.
+The status read also checks the persisted live installation and the exact
+repository scope in SQL: a different installation with the same tenant login,
+a suspended installation, or a disabled repository cannot read that request.
+Historical unbound organization/repository requests are not assigned an
+installation by guessing; legacy unbound user-scoped status remains available
+for compatibility but creates no preparable/downloadable package.
+The persisted tenant is the resolved installation's account login, not the
+human operator's personal GitHub login. Direct organization/repository export
+intake is additionally bound to that persisted installation and checks current
+repository ownership and enablement in SQL. The resulting pending record can
+enter the existing claim-based read-only preparation flow; this does **not**
+automatically generate, complete, or deliver a downloadable archive. Legacy
+user-scoped export intake remains pending but is not supported by the bounded
+repository-metadata manifest preparer. Uninstall export intake for suspended
+installations is also separate and must not reactivate access.
+These are intake and status endpoints, not export materialization or deletion
+executors.
+
+An **operator-only, unexposed preparation stage** can now persist a verified,
+allowlisted, repository-metadata manifest of at most 64 KiB in the existing
+PostgreSQL export row while a valid installation-bound preparation lease is
+held. It verifies the stored SHA-256 by reading the persisted bytes back under
+the same live lease. The export **remains running**, not completed; no
+customer download URL, delivery capability, auto worker or data deletion is
+created. Staged or expired claims are not automatically released or reclaimed;
+manual audited recovery and explicit deliverability/expiration validation
+are prerequisites for any future complete customer data export.
+
+A **metadata-only preview** can be explicitly published by the current internal
+preparation worker while its original lease remains valid; it is not dispatched
+automatically. This opens a single 15-minute availability window for the
+bounded, SHA-256-verified repository metadata manifest already stored in
+PostgreSQL. Only the signed-in user who originally requested the export, with continuing installation access, may retrieve it via
+GET /api/v1/data-exports/:exportId?installationId=:id&download=metadata-manifest.
+Every read rechecks the persisted live installation, repository enablement,
+expiry, revocation and content integrity; responses have private/no-store,
+no-sniff and attachment headers. The original human requester may revoke
+access with a same-origin DELETE on the export status URL. Expiry and
+revocation do not automatically delete retained preparation bytes, and do not
+authorize a fresh worker claim. The export remains running and has no
+completed_at or general download_url. This is a partial metadata-preview
+facility, **not** the customer's full archive of source, review, findings,
+artifacts or evidence. Audited operator recovery, cleanup, complete archive
+delivery, and separately reviewed legal-hold-safe erasure remain unavailable.
+
+A separate **operator-only, lease-bound read-only record snapshot** can prepare
+a narrowly scoped in-memory JSON slice of release-run summaries and finding
+messages from the same active GitHub App installation and selected active
+repository. The original preparation worker/token and unexpired lease are
+revalidated in one database statement; disabled repositories, suspended
+installations, unbound/other-scope requests and stale claims are denied.
+More than 100 runs, more than 100 findings, or 256 KiB of serialized JSON
+rejects the entire attempt instead of silently exporting a partial list.
+The output explicitly excludes artifacts, audit events, review content, source,
+backups and platform logs. It is never persisted as an archive, exposed through
+an HTTP download, automatically dispatched or used to mark an export completed.
+A later full-archive implementation must authorize and assemble all relevant
+data classes with separately audited retention and delivery behavior.
+
 
 Installations are the top-level tenant boundary. Repository, run, artifact, runner,
 replay, reconciliation, transition, and deletion records are validated against

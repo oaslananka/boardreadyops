@@ -32,6 +32,18 @@ jobs:
     timeout-minutes: 30
     environment: production
     steps:
+      # Fail unsafe input combinations before secrets, Tailscale or SSH setup.
+      - name: Validate deployment mode
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          PRE_QUIESCED_WORKER: ${{ inputs.pre_quiesced_worker }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" = "true" ] && [ "$PRE_QUIESCED_WORKER" = "true" ]; then
+            printf '%s\n' 'cloud-deploy preflight: pre_quiesced_worker=true requires dry_run=false' >&2
+            exit 78
+          fi
+
       - name: Install Doppler CLI
         uses: dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73 # v4.0.1
 
