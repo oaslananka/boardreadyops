@@ -107,6 +107,47 @@ describe("bounded, read-only physical export object verification", () => {
     expect(fakeHandle.close).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects an unexpected EOF even if the previous size was correct", async () => {
+    const f = await fixture();
+    const fakeHandle = {
+      stat: vi.fn(async () => ({ isFile: () => true, size: f.bytes.length })),
+      read: vi.fn(async () => ({ bytesRead: 0 })),
+      close: vi.fn(async () => undefined),
+    };
+    vi.mocked(filesystem.open).mockResolvedValueOnce(
+      fakeHandle as unknown as Awaited<ReturnType<typeof filesystem.open>>,
+    );
+    await expect(
+      readVerifiedLocalExportObject({ storageDriver: "local", storageRoot: f.root, object: f.object }),
+    ).resolves.toBeNull();
+    expect(fakeHandle.read).toHaveBeenCalledTimes(1);
+    expect(fakeHandle.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an object whose metadata changes during the verified read", async () => {
+    const f = await fixture();
+    const unchanged = { isFile: () => true, size: f.bytes.length, dev: 1, ino: 1, mtimeMs: 10, ctimeMs: 10 };
+    const fakeHandle = {
+      stat: vi
+        .fn()
+        .mockResolvedValueOnce(unchanged)
+        .mockResolvedValueOnce({ ...unchanged, mtimeMs: 11 }),
+      read: vi.fn(async (target: Buffer, offset: number, length: number, position: number) => {
+        const copied = f.bytes.copy(target, offset, position, position + length);
+        return { bytesRead: copied, buffer: target };
+      }),
+      close: vi.fn(async () => undefined),
+    };
+    vi.mocked(filesystem.open).mockResolvedValueOnce(
+      fakeHandle as unknown as Awaited<ReturnType<typeof filesystem.open>>,
+    );
+    await expect(
+      readVerifiedLocalExportObject({ storageDriver: "local", storageRoot: f.root, object: f.object }),
+    ).resolves.toBeNull();
+    expect(fakeHandle.stat).toHaveBeenCalledTimes(2);
+    expect(fakeHandle.close).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects unsupported storage drivers, oversized inputs and malformed hash/metadata", async () => {
     const f = await fixture();
     const ref = { storageDriver: "local", storageRoot: f.root, object: f.object };
