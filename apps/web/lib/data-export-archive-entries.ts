@@ -221,24 +221,48 @@ export function prepareClaimedArchiveEntries(input: {
   }>(entryBytes[2]?.bytes);
   const validReviewLink = (value: unknown): value is string =>
     typeof value === "string" && value.length > 0 && value.length <= 256 && value.trim() === value;
-  const reviewIds = new Set<string>();
-  for (const review of audit.reviews) {
-    if (!validReviewLink(review?.id) || reviewIds.has(review.id)) {
+  const reviewRepositories = new Map<string, string>();
+  for (const review of audit.reviews as Array<{ id?: unknown; repositoryId?: unknown }>) {
+    if (!validReviewLink(review?.id) || !safeEntryId(review.repositoryId) || reviewRepositories.has(review.id)) {
       throw new ExportArchivePreflightError();
     }
-    reviewIds.add(review.id);
+    reviewRepositories.set(review.id, review.repositoryId);
   }
   const revisionIds = new Set<string>();
   for (const revision of audit.revisions) {
     if (
       !validReviewLink(revision?.id) ||
       !validReviewLink(revision.reviewId) ||
-      !reviewIds.has(revision.reviewId) ||
+      !reviewRepositories.has(revision.reviewId) ||
       revisionIds.has(revision.id)
     ) {
       throw new ExportArchivePreflightError();
     }
     revisionIds.add(revision.id);
+  }
+
+  // Every child may be individually repository-scoped but still reference
+  // another review. Require the parent review to be present in this exact
+  // bounded snapshot, with the identical repository.
+  const childSlices = [
+    { bytes: entryBytes[3]?.bytes, fields: ["comments"] },
+    { bytes: entryBytes[4]?.bytes, fields: ["approvals", "checklistItems"] },
+    { bytes: entryBytes[5]?.bytes, fields: ["decisions", "assignments"] },
+  ] as const;
+  for (const childSlice of childSlices) {
+    const document = decoded<Record<string, unknown>>(childSlice.bytes);
+    for (const field of childSlice.fields) {
+      const children = document[field] as Array<{ reviewId?: unknown; repositoryId?: unknown }>;
+      for (const child of children) {
+        if (
+          !child ||
+          !validReviewLink(child.reviewId) ||
+          reviewRepositories.get(child.reviewId) !== child.repositoryId
+        ) {
+          throw new ExportArchivePreflightError();
+        }
+      }
+    }
   }
 
   const verified = new Map<string, VerifiedArchiveObject>();
