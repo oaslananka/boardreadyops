@@ -1,4 +1,8 @@
 import {
+  ExportArtifactSnapshotUnavailableError,
+  prepareClaimedArtifactMetadataSnapshot,
+} from "./data-export-artifact-snapshot.js";
+import {
   type ClaimedFindingCollaborationSnapshot,
   prepareClaimedFindingCollaborationSnapshot,
 } from "./data-export-finding-collaboration-snapshot.js";
@@ -24,7 +28,7 @@ import {
 import type { PgQueryExecutor } from "./pg-executor.js";
 
 /**
- * Six incomplete, read-only slices are generated from the SAME PostgreSQL
+ * Seven incomplete, read-only slices are generated from the SAME PostgreSQL
  * repeatable-read snapshot and the original unexpired installation-bound claim.
  * No writes, artifact content, delivery capability or completed status.
  * Reauthorization is still required at any future publication/retrieval edge.
@@ -39,6 +43,7 @@ export async function prepareClaimedConsistentMetadataSlices(
   reviewComments: ClaimedReviewCommentsSnapshot;
   reviewWorkflow: ClaimedReviewWorkflowSnapshot;
   findingCollaboration: ClaimedFindingCollaborationSnapshot;
+  artifactMetadata: ClaimedRecordSnapshot;
 } | null> {
   return await db.withTransaction(
     async (transaction) => {
@@ -54,7 +59,28 @@ export async function prepareClaimedConsistentMetadataSlices(
       if (!reviewWorkflow) return null;
       const findingCollaboration = await prepareClaimedFindingCollaborationSnapshot(transaction, claim);
       if (!findingCollaboration) return null;
-      return { repositories, records, reviewAudit, reviewComments, reviewWorkflow, findingCollaboration };
+      const artifactMetadata = await prepareClaimedArtifactMetadataSnapshot(transaction, claim);
+      if (!artifactMetadata) return null;
+      const includedRunIds = new Set(
+        (JSON.parse(records.bytes.toString("utf8")) as { runs: Array<{ id: string }> }).runs.map((run) => run.id),
+      );
+      const artifactRows = (
+        JSON.parse(artifactMetadata.bytes.toString("utf8")) as {
+          artifacts: Array<{ runId: string }>;
+        }
+      ).artifacts;
+      if (artifactRows.some((artifact) => !includedRunIds.has(artifact.runId))) {
+        throw new ExportArtifactSnapshotUnavailableError();
+      }
+      return {
+        repositories,
+        records,
+        reviewAudit,
+        reviewComments,
+        reviewWorkflow,
+        findingCollaboration,
+        artifactMetadata,
+      };
     },
     { consistentRead: true, statementTimeoutMs: 5_000 },
   );

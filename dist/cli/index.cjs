@@ -80219,9 +80219,9 @@ function createZipBuffer(entries, date9 = /* @__PURE__ */ new Date()) {
   for (const entry of entries) {
     const nameBytes = Buffer.from(entry.name, "utf8");
     const checksum = crc32(entry.data);
-    const deflated = (0, import_node_zlib.deflateRawSync)(entry.data, { level: 6 });
-    const useDeflate = deflated.length < entry.data.length;
-    const compressedData = useDeflate ? deflated : entry.data;
+    const deflated = entry.store === true ? null : (0, import_node_zlib.deflateRawSync)(entry.data, { level: 6 });
+    const useDeflate = deflated !== null && deflated.length < entry.data.length;
+    const compressedData = useDeflate && deflated ? deflated : entry.data;
     const method = useDeflate ? 8 : 0;
     const localHeader = Buffer.allocUnsafe(30 + nameBytes.length);
     localHeader.writeUInt32LE(67324752, 0);

@@ -98,6 +98,9 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
     const repositories = JSON.parse(prepared?.repositories.bytes.toString("utf8") ?? "{}");
     const records = JSON.parse(prepared?.records.bytes.toString("utf8") ?? "{}");
     const reviewAudit = JSON.parse(prepared?.reviewAudit.bytes.toString("utf8") ?? "{}");
+    const artifactMetadata = JSON.parse(prepared?.artifactMetadata.bytes.toString("utf8") ?? "{}");
+    expect(artifactMetadata.artifacts).toEqual([]);
+    expect(artifactMetadata.exclusions).toContain("artifact-contents");
     expect(reviewAudit.reviews).toEqual([]);
     expect(reviewAudit.revisions).toEqual([]);
     expect(JSON.parse(prepared?.reviewComments.bytes.toString("utf8") ?? "{}").comments).toEqual([]);
@@ -593,6 +596,18 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
         repositoryId: repository[0],
         storagePath: artifactPaths[0],
       });
+      const combined = await prepareClaimedConsistentMetadataSlices(executor(), claim);
+      expect(combined).not.toBeNull();
+      const artifactMetadata = JSON.parse(combined?.artifactMetadata.bytes.toString("utf8") ?? "{}");
+      const runMetadata = JSON.parse(combined?.records.bytes.toString("utf8") ?? "{}");
+      expect(artifactMetadata.artifacts).toEqual([
+        expect.objectContaining({ id: artifactIds[0], runId: runId[0], byteLength: 22 }),
+      ]);
+      expect(runMetadata.runs).toEqual([expect.objectContaining({ id: runId[0] })]);
+      for (const excluded of [...artifactIds.slice(1), ...artifactPaths, "storagePath", "storage_path"]) {
+        expect(combined?.artifactMetadata.bytes.toString("utf8")).not.toContain(excluded);
+      }
+      expect(await prepareClaimedConsistentMetadataSlices(executor(), { ...claim, token: "invalid" })).toBeNull();
       expect(await lookupClaimedExportObject(executor(), claim, artifactIds[1])).toBeNull();
       expect(await lookupClaimedExportObject(executor(), claim, artifactIds[2])).toBeNull();
       expect(

@@ -166,23 +166,37 @@ describe("S3ArtifactStorage", () => {
     await expect(storage.deleteObject({ tenantId: "tenant-a", key: "a" })).resolves.toBe("deleted");
   });
 
-  it("also delegates to the local driver when AWS_S3_BUCKET/AWS_REGION are set (no live AWS call)", async () => {
+  it("fails closed for every operation when a real S3 bucket is configured", async () => {
     process.env.AWS_S3_BUCKET = "boardreadyops-artifacts";
     process.env.AWS_REGION = "us-east-1";
     const storage = new S3ArtifactStorage();
-    const bytes = Buffer.byteLength("y");
     const sha256 = sha256Of("y");
-    const cap = await storage.beginUpload({
+    const input = {
       tenantId: "tenant-a",
       repositoryId: "repo-1",
       key: "b",
       contentType: "text/plain",
-      bytes,
+      bytes: 1,
       sha256,
-    });
+    };
+    await expect(storage.beginUpload(input)).rejects.toThrow("S3 artifact storage is not implemented");
     await expect(
-      storage.completeUpload({ tenantId: "tenant-a", key: "b", uploadId: cap.uploadId, sha256, bytes }),
-    ).resolves.toMatchObject({ sha256 });
+      storage.completeUpload({ tenantId: input.tenantId, key: input.key, uploadId: "test", sha256, bytes: 1 }),
+    ).rejects.toThrow("S3 artifact storage is not implemented");
+    await expect(storage.openDownload({ tenantId: input.tenantId, key: input.key })).rejects.toThrow(
+      "S3 artifact storage is not implemented",
+    );
+    await expect(storage.deleteObject({ tenantId: input.tenantId, key: input.key })).rejects.toThrow(
+      "S3 artifact storage is not implemented",
+    );
+  });
+
+  it("fails closed with a bucket even if AWS_REGION is missing", async () => {
+    process.env.AWS_S3_BUCKET = "boardreadyops-artifacts";
+    delete process.env.AWS_REGION;
+    await expect(new S3ArtifactStorage().openDownload({ tenantId: "t", key: "test" })).rejects.toThrow(
+      "S3 artifact storage is not implemented",
+    );
   });
 });
 

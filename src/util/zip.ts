@@ -3,6 +3,8 @@ import { deflateRawSync } from "node:zlib";
 interface ZipEntry {
   name: string;
   data: Buffer;
+  /** Opt out of DEFLATE for preverified opaque payloads; defaults unchanged. */
+  store?: boolean;
 }
 
 interface ZipCentralEntry {
@@ -61,9 +63,9 @@ export function createZipBuffer(entries: ZipEntry[], date = new Date()): Buffer 
     const nameBytes = Buffer.from(entry.name, "utf8");
     const checksum = crc32(entry.data);
     // Use deflate; fall back to stored if deflated is larger
-    const deflated = deflateRawSync(entry.data, { level: 6 });
-    const useDeflate = deflated.length < entry.data.length;
-    const compressedData = useDeflate ? deflated : entry.data;
+    const deflated = entry.store === true ? null : deflateRawSync(entry.data, { level: 6 });
+    const useDeflate = deflated !== null && deflated.length < entry.data.length;
+    const compressedData = useDeflate && deflated ? deflated : entry.data;
     const method = useDeflate ? 8 : 0;
 
     const localHeader = Buffer.allocUnsafe(30 + nameBytes.length);
