@@ -259,24 +259,6 @@ function RecordedHardwareWork({ groups }: Readonly<{ groups: RepositoryGroup[] }
   );
 }
 
-function ExpandableExamplePreview() {
-  return (
-    <details className="overflow-hidden rounded-xl border border-border bg-card">
-      <summary className="flex min-h-14 cursor-pointer items-center justify-between gap-3 px-5 py-3 text-sm font-semibold text-foreground hover:bg-muted/35">
-        <span>
-          Explore a sample PCB and schematic <span className="font-normal text-muted-foreground">· Example only</span>
-        </span>
-        <span aria-hidden="true" className="text-primary">
-          ⌄
-        </span>
-      </summary>
-      <div className="border-t border-border p-3">
-        <ReviewEmptyVisualPreview mode="onboarding" />
-      </div>
-    </details>
-  );
-}
-
 function SetupInProgressBanner({ summary }: Readonly<{ summary: DashboardRepositorySummary }>) {
   return (
     <output className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-info/40 bg-info-surface px-5 py-4">
@@ -441,7 +423,9 @@ function DashboardBody({
     <div className="flex flex-col gap-5">
       <AttentionBanner summary={summary} groups={groups} />
       <RecordedHardwareWork groups={groups} />
-      {summary.repositoriesWithoutRuns > summary.repositories / 2 ? <ExpandableExamplePreview /> : null}
+      {summary.repositoriesWithoutRuns > summary.repositories / 2 ? (
+        <ReviewEmptyVisualPreview mode="onboarding" />
+      ) : null}
       {summary.repositoriesWithOpenFindings === 0 &&
       summary.repositoriesWithoutRuns === 0 &&
       summary.supplyAlerts === 0 ? (

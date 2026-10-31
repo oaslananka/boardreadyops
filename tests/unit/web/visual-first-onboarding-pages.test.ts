@@ -70,10 +70,13 @@ describe("first-use visual-first routes", () => {
     expect(html.indexOf("Your next hardware review starts with the board")).toBeGreaterThan(0);
     expect(html.indexOf("Continue with GitHub repositories")).toBeLessThan(html.indexOf("Create your first workspace"));
     expect(html.indexOf("Continue with GitHub repositories")).toBeLessThan(
-      html.indexOf("Explore a sample PCB and schematic"),
+      html.indexOf('aria-label="Example PCB and schematic design views"'),
+    );
+    expect(html.indexOf('aria-label="Example PCB and schematic design views"')).toBeLessThan(
+      html.indexOf('aria-label="Optional CAD workspace setup"'),
     );
     expect(html).toContain('aria-label="Optional CAD workspace setup"');
-    expect(html).toContain('aria-label="Example hardware review"');
+    expect(html).not.toContain('aria-label="Example hardware review"');
     expect(html).toContain("Open hardware reviews");
     expect(html).toContain('href="/dashboard"');
     expect(html).toContain('href="/runs"');
@@ -102,7 +105,9 @@ describe("first-use visual-first routes", () => {
     expect(html.indexOf("Your next hardware review starts with the board")).toBeLessThan(
       html.indexOf("No projects in this workspace yet"),
     );
-    expect(html).toContain('href="/projects/new"');
+    expect(html).not.toContain('aria-label="Example hardware review"');
+    expect(html).toContain('href="/reviews"');
+    expect(html).not.toContain('href="/projects/new"');
   });
 
   it("does not mistake a non-owner's zero impact counts for an empty project workspace", async () => {
@@ -139,6 +144,9 @@ describe("first-use visual-first routes", () => {
     expect(html.indexOf("Your next hardware review starts with the board")).toBeLessThan(
       html.indexOf("Engineering status"),
     );
+    expect(html).not.toContain('aria-label="Example hardware review"');
+    expect(html).toContain('href="/demo/royalblue54l-pcb.webp"');
+    expect(html).toContain('href="/demo/royalblue54l-schematic.webp"');
   });
 
   it("does not render an example above established repository data with existing runs", async () => {

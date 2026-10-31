@@ -218,9 +218,10 @@ describe("dashboard operational hierarchy", () => {
     });
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).toContain("Browse all 37 connected repositories");
-    expect(markup).toContain("Explore a sample PCB and schematic");
+    expect(markup).toContain('aria-label="Example PCB and schematic design views"');
+    expect(markup).not.toContain('aria-label="Example hardware review"');
     expect(markup.indexOf("Pick up your hardware work")).toBeLessThan(
-      markup.indexOf("Explore a sample PCB and schematic"),
+      markup.indexOf('aria-label="Example PCB and schematic design views"'),
     );
     expect(markup.indexOf("Pick up your hardware work")).toBeLessThan(
       markup.indexOf("Browse all 37 connected repositories"),
