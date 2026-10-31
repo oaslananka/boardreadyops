@@ -111,6 +111,8 @@ describe("claimed, bounded review and audit descriptor snapshot", () => {
     for (const row of [
       { reviews: null, audit_events: [] },
       { reviews: [], audit_events: null },
+      { reviews: [null], audit_events: [] },
+      { reviews: [], audit_events: [null] },
       { reviews: [{ ...review, id: "" }], audit_events: [] },
       { reviews: [{ ...review, title: null }], audit_events: [] },
       { reviews: [], audit_events: [{ ...audit, repository_id: "" }] },

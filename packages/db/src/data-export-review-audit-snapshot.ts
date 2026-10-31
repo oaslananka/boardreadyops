@@ -104,7 +104,7 @@ export async function prepareClaimedReviewAuditSnapshot(
     throw new ExportReviewAuditSnapshotUnavailableError();
   if (row.reviews.length > maxRows || row.audit_events.length > maxRows)
     throw new ExportReviewAuditSnapshotUnavailableError();
-  const reviews = row.reviews.map((r: ReviewRow) => {
+  const reviews = row.reviews.map((r: ReviewRow | null) => {
     if (
       !r ||
       ![r.id, r.repository_id, r.head_run_id, r.status, r.decision].every(validId) ||
@@ -120,7 +120,7 @@ export async function prepareClaimedReviewAuditSnapshot(
       decision: r.decision,
     };
   });
-  const auditEvents = row.audit_events.map((a: AuditRow) => {
+  const auditEvents = row.audit_events.map((a: AuditRow | null) => {
     if (
       !a ||
       ![a.id, a.repository_id, a.event_type, a.actor_type, a.subject_type].every(validId) ||
