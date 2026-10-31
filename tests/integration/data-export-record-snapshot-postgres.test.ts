@@ -91,6 +91,7 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
     const records = JSON.parse(prepared?.records.bytes.toString("utf8") ?? "{}");
     const reviewAudit = JSON.parse(prepared?.reviewAudit.bytes.toString("utf8") ?? "{}");
     expect(reviewAudit.reviews).toEqual([]);
+    expect(reviewAudit.revisions).toEqual([]);
     expect(reviewAudit.auditEvents).toEqual([]);
     expect(repositories.repositories).toEqual([expect.objectContaining({ repositoryId: repository[0] })]);
     expect(records.runs).toEqual([expect.objectContaining({ repositoryId: repository[0] })]);
@@ -116,11 +117,17 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
       executor().withTransaction(async (tx) => {
         const reviewIds = [randomUUID(), randomUUID(), randomUUID()];
         const auditIds = [randomUUID(), randomUUID(), randomUUID()];
+        const revisionIds = [randomUUID(), randomUUID(), randomUUID()];
         for (const [i, reviewId] of reviewIds.entries()) {
           await tx.query(
             `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
             VALUES($1,$2,$3,'completed','approved',$4)`,
             [reviewId, repository[i], `sensitive-review-${i}`, runId[i]],
+          );
+          await tx.query(
+            `INSERT INTO review_revisions(id,review_id,sequence,head_run_id,head_commit_sha,evidence_digest)
+              VALUES($1,$2,1,$3,$4,$5)`,
+            [revisionIds[i], reviewId, runId[i], "a".repeat(40), "b".repeat(64)],
           );
           await tx.query(
             `INSERT INTO audit_events(id,installation_id,event_type,actor_type,subject_type,subject_id,repository_id,release_run_id,metadata)
@@ -139,12 +146,17 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
         expect(result).not.toBeNull();
         const data = JSON.parse(result?.bytes.toString("utf8") ?? "{}");
         expect(data.reviews).toEqual([expect.objectContaining({ id: reviewIds[0], repositoryId: repository[0] })]);
+        expect(data.revisions).toEqual([
+          expect.objectContaining({ id: revisionIds[0], reviewId: reviewIds[0], headRunId: runId[0] }),
+        ]);
         expect(data.auditEvents).toEqual([expect.objectContaining({ id: auditIds[0], repositoryId: repository[0] })]);
         for (const privatePart of [
           reviewIds[1],
           reviewIds[2],
           auditIds[1],
           auditIds[2],
+          revisionIds[1],
+          revisionIds[2],
           "audit-secret-0",
           "audit-secret-1",
           "audit-secret-2",

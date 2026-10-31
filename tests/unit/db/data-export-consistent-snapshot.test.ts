@@ -44,6 +44,18 @@ const records = {
 };
 
 const reviewAudit = {
+  revisions: [
+    {
+      id: "revision-1",
+      review_id: "review-1",
+      sequence: 1,
+      base_run_id: null,
+      head_run_id: "run-1",
+      base_commit_sha: null,
+      head_commit_sha: "a".repeat(40),
+      evidence_digest: "b".repeat(64),
+    },
+  ],
   reviews: [
     {
       id: "review-1",
@@ -90,6 +102,7 @@ describe("claimed consistent repository and record preparation", () => {
     expect(records.findings).toEqual([expect.objectContaining({ id: "finding-1", runId: "run-1" })]);
     const reviewData = JSON.parse(result?.reviewAudit.bytes.toString("utf8") ?? "{}");
     expect(reviewData.reviews).toEqual([expect.objectContaining({ id: "review-1", repositoryId: "repo-1" })]);
+    expect(reviewData.revisions).toEqual([expect.objectContaining({ id: "revision-1", reviewId: "review-1" })]);
     expect(reviewData.auditEvents).toEqual([expect.objectContaining({ id: "audit-1", repositoryId: "repo-1" })]);
     expect(JSON.stringify(result)).not.toContain("storage_path");
   });
