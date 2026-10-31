@@ -20,9 +20,17 @@ type ScopeFieldsProps = {
   scopeId?: string;
   onScopeChange?: (scope: DataScope) => void;
   onScopeIdChange?: (scopeId: string) => void;
+  allowUser?: boolean;
 };
 
-function ScopeFields({ idPrefix, scope, scopeId, onScopeChange, onScopeIdChange }: Readonly<ScopeFieldsProps>) {
+function ScopeFields({
+  idPrefix,
+  scope,
+  scopeId,
+  onScopeChange,
+  onScopeIdChange,
+  allowUser = true,
+}: Readonly<ScopeFieldsProps>) {
   return (
     <>
       <div className="flex flex-col gap-1.5">
@@ -37,7 +45,9 @@ function ScopeFields({ idPrefix, scope, scopeId, onScopeChange, onScopeIdChange 
         >
           <option value="organization">Whole organization</option>
           <option value="repository">One repository</option>
-          <option value="user">One user</option>
+          <option value="user" disabled={!allowUser}>
+            One user{allowUser ? "" : " (unavailable for export)"}
+          </option>
         </NativeSelect>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -68,7 +78,7 @@ export function ExportRequestForm({
       {({ pending }) => (
         <>
           <input type="hidden" name="installationId" value={installationId} />
-          <ScopeFields idPrefix={idPrefix} />
+          <ScopeFields idPrefix={idPrefix} allowUser={false} />
           <div>
             <Button type="submit" disabled={pending}>
               {pending ? "Requesting…" : "Request export"}

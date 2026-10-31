@@ -160,17 +160,19 @@ describeDatabase("installation-bound read-only export preparation claims (Postgr
     );
     expect(await status.getExport(tenant, old, installations[0])).toBeNull();
 
-    // Legacy unbound user-scope status remains visible without claiming package delivery.
+    // Historical unbound user rows are preserved for independent recovery, never installation status.
     const user = randomUUID();
     exported.push(user);
     await db().query(
-      "INSERT INTO data_exports(id,tenant_id,requested_by,status,scope,scope_id) VALUES ($1,$2,'operator','pending','user','operator')",
-      [user, tenant],
+      "INSERT INTO data_exports(id,tenant_id,requested_by,status,scope,scope_id,download_url) VALUES ($1,$2,'operator','pending','user','operator',$3)",
+      [user, tenant, "https://example.invalid/signed-export"],
     );
-    expect(await status.getExport(tenant, user, installations[0])).toMatchObject({
+    expect(await status.getExport(tenant, user, installations[0])).toBeNull();
+    expect(await status.getExport(tenant, user, installations[1])).toBeNull();
+    const preserved = await db().query("SELECT id, download_url FROM data_exports WHERE id=$1", [user]);
+    expect((preserved as { rows: Array<{ id: string; download_url: string }> }).rows[0]).toEqual({
       id: user,
-      status: "pending",
-      scope: "user",
+      download_url: "https://example.invalid/signed-export",
     });
     // Do not leave an extra pending export for the following claim-order test.
     await db().query("DELETE FROM data_exports WHERE id=ANY($1::text[])", [[id, old, user]]);

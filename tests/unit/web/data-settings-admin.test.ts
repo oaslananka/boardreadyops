@@ -274,21 +274,17 @@ describe("data settings admin", () => {
     expect(store.createExport).not.toHaveBeenCalled();
   });
 
-  it("preserves legacy user-scope intake without suggesting a downloadable package exists", async () => {
+  it("fails closed on unverified user-scope export intake before opening storage", async () => {
     const { store, dependencies } = deps();
     const result = await requestExportForViewer(
       session,
       { installationId: "inst-a", scope: "user", scopeId: "octocat" },
       dependencies,
     );
-    expect(result).toMatchObject({ status: "ok", data: { exportId: "export-1", status: "pending" } });
-    expect(store.createExport).toHaveBeenCalledWith({
-      tenantId: "acme",
-      requestedBy: "octocat",
-      scope: "user",
-      scopeId: "octocat",
-    });
+    expect(result).toMatchObject({ status: "error" });
+    expect(store.createExport).not.toHaveBeenCalled();
     expect(store.createBoundPendingExport).not.toHaveBeenCalled();
+    expect(dependencies.openStore).not.toHaveBeenCalled();
   });
 
   it("does not claim an accepted non-preview erasure request deleted data", async () => {

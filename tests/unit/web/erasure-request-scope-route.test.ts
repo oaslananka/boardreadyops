@@ -134,34 +134,13 @@ describe("shared lifecycle request transport boundary", () => {
     expect(close).toHaveBeenCalledTimes(2);
   });
 
-  it("preserves user-scoped request intake without claiming that a preparable package exists", async () => {
+  it("rejects unverified user-scope export intake without creating database records", async () => {
     persistence.mockReturnValue({ mode: "postgres", databaseUrl: "postgres://invalid.test/mock" });
-    const query = vi.fn().mockResolvedValue({
-      rows: [
-        {
-          id: "legacy-user",
-          tenant_id: "organization-a",
-          requested_by: "acme",
-          status: "pending",
-          scope: "user",
-          scope_id: "acme",
-          created_at: new Date("2026-10-30T00:00:00Z"),
-        },
-      ],
-    });
-    const close = vi.fn().mockResolvedValue(undefined);
-    createPgQueryExecutor.mockReturnValue({ query, close });
     const response = await postExport(request({ scope: "user", scopeId: "acme" }));
-    expect(response.status).toBe(201);
-    expect(await response.json()).toMatchObject({ ok: true, exportId: "legacy-user", status: "pending" });
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO data_exports"), [
-      expect.any(String),
-      "organization-a",
-      "acme",
-      "user",
-      "acme",
-    ]);
-    expect(close).toHaveBeenCalledOnce();
+    expect(response.status).toBe(422);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toMatchObject({ ok: false });
+    expect(createPgQueryExecutor).not.toHaveBeenCalled();
   });
 
   it("fails closed when persisted installation or repository authorization disappears after session resolution", async () => {
@@ -398,6 +377,7 @@ describe("tenant-authorized lifecycle routes", () => {
           status: "pending",
           scope: "organization",
           scope_id: null,
+          download_url: "https://example.invalid/secret-capability",
           created_at: new Date("2026-10-30T00:00:00.000Z"),
         },
       ],
@@ -408,6 +388,7 @@ describe("tenant-authorized lifecycle routes", () => {
       context,
     );
     expect(response.status).toBe(200);
+    expect((await response.json()).export).not.toHaveProperty("downloadUrl");
     expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM data_exports"), [
       "ex-1",
       "organization-a",
@@ -418,6 +399,7 @@ describe("tenant-authorized lifecycle routes", () => {
     expect(sql).toContain("data_exports.installation_id = installations.id");
     expect(sql).toContain("repositories.installation_id = installations.id");
     expect(sql).toContain("repositories.disabled_at IS NULL");
-    expect(sql).toContain("data_exports.installation_id IS NULL AND data_exports.scope = 'user'");
+    expect(sql).not.toContain("data_exports.installation_id IS NULL AND data_exports.scope = 'user'");
+    expect(sql).not.toContain("data_exports.download_url");
   });
 });
