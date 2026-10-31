@@ -289,6 +289,49 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
     ).toThrow(ExportArchivePreflightError);
   });
 
+  it("rejects orphaned, duplicate, or wrongly attached review revisions", () => {
+    const { input } = fixture();
+    const review = { id: "review_1", repositoryId: "repo_1", headRunId: "run_1" };
+    const revision = { id: "revision_1", reviewId: "review_missing", headRunId: "run_1" };
+    const base = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
+    const cases = [
+      { ...base, reviews: [review], revisions: [revision] },
+      {
+        ...base,
+        reviews: [review],
+        revisions: [
+          { ...revision, reviewId: review.id },
+          { ...revision, reviewId: review.id },
+        ],
+      },
+      { ...base, reviews: [review], revisions: [{ ...revision, reviewId: 123 }] },
+    ];
+    for (const changed of cases) {
+      expect(() =>
+        prepareClaimedArchiveEntries({
+          ...input,
+          slices: { ...input.slices, reviewAudit: slice(changed) },
+        }),
+      ).toThrow(ExportArchivePreflightError);
+    }
+  });
+
+  it("accepts revisions linked to the same in-scope review snapshot", () => {
+    const { input } = fixture();
+    const base = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
+    const changed = {
+      ...base,
+      reviews: [{ id: "review_1", repositoryId: "repo_1", headRunId: "run_1" }],
+      revisions: [{ id: "revision_1", reviewId: "review_1", headRunId: "run_1" }],
+    };
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: { ...input.slices, reviewAudit: slice(changed) },
+      }),
+    ).not.toThrow();
+  });
+
   it("rejects foreign-repository records in every review and collaboration slice", () => {
     const { input } = fixture();
     const cases = [

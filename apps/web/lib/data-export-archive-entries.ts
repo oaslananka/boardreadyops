@@ -213,6 +213,34 @@ export function prepareClaimedArchiveEntries(input: {
     }
   }
 
+  // Revisions do not carry their own repositoryId; scope them through a
+  // review from this SAME bounded, claim-scoped metadata snapshot.
+  const audit = decoded<{
+    reviews: Array<{ id?: unknown }>;
+    revisions: Array<{ id?: unknown; reviewId?: unknown }>;
+  }>(entryBytes[2]?.bytes);
+  const validReviewLink = (value: unknown): value is string =>
+    typeof value === "string" && value.length > 0 && value.length <= 256 && value.trim() === value;
+  const reviewIds = new Set<string>();
+  for (const review of audit.reviews) {
+    if (!validReviewLink(review?.id) || reviewIds.has(review.id)) {
+      throw new ExportArchivePreflightError();
+    }
+    reviewIds.add(review.id);
+  }
+  const revisionIds = new Set<string>();
+  for (const revision of audit.revisions) {
+    if (
+      !validReviewLink(revision?.id) ||
+      !validReviewLink(revision.reviewId) ||
+      !reviewIds.has(revision.reviewId) ||
+      revisionIds.has(revision.id)
+    ) {
+      throw new ExportArchivePreflightError();
+    }
+    revisionIds.add(revision.id);
+  }
+
   const verified = new Map<string, VerifiedArchiveObject>();
   for (const candidate of input.verifiedObjects) {
     if (!candidate || !safeEntryId(candidate.object?.artifactId) || verified.has(candidate.object.artifactId)) {
