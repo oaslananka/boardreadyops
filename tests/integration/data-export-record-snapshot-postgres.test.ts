@@ -7,6 +7,7 @@ import {
   ExportRecordSnapshotUnavailableError,
   prepareClaimedRunFindingSnapshot,
 } from "../../packages/db/src/data-export-record-snapshot.js";
+import { prepareClaimedReviewAuditSnapshot } from "../../packages/db/src/data-export-review-audit-snapshot.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -82,12 +83,15 @@ afterAll(async () => {
 });
 
 describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
-  it("prepares two partial scopes within one read-only snapshot without publishing an export", async () => {
+  it("prepares three partial scopes within one read-only snapshot without publishing an export", async () => {
     const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
     const prepared = await prepareClaimedConsistentMetadataSlices(executor(), claim);
     expect(prepared).not.toBeNull();
     const repositories = JSON.parse(prepared?.repositories.bytes.toString("utf8") ?? "{}");
     const records = JSON.parse(prepared?.records.bytes.toString("utf8") ?? "{}");
+    const reviewAudit = JSON.parse(prepared?.reviewAudit.bytes.toString("utf8") ?? "{}");
+    expect(reviewAudit.reviews).toEqual([]);
+    expect(reviewAudit.auditEvents).toEqual([]);
     expect(repositories.repositories).toEqual([expect.objectContaining({ repositoryId: repository[0] })]);
     expect(records.runs).toEqual([expect.objectContaining({ repositoryId: repository[0] })]);
     expect(records.findings).toEqual([expect.objectContaining({ runId: runId[0] })]);
@@ -103,6 +107,55 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
       download_url: null,
       completed_at: null,
     });
+  });
+
+  it("isolates repository review and audit evidence under the original export claim", async () => {
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    const rollbackMarker = "review-audit-evidence-rollback";
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const reviewIds = [randomUUID(), randomUUID(), randomUUID()];
+        const auditIds = [randomUUID(), randomUUID(), randomUUID()];
+        for (const [i, reviewId] of reviewIds.entries()) {
+          await tx.query(
+            `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+            VALUES($1,$2,$3,'completed','approved',$4)`,
+            [reviewId, repository[i], `sensitive-review-${i}`, runId[i]],
+          );
+          await tx.query(
+            `INSERT INTO audit_events(id,installation_id,event_type,actor_type,subject_type,subject_id,repository_id,release_run_id,metadata)
+            VALUES($1,$2,'review.approved','system','review',$3,$4,$5,$6::jsonb)`,
+            [
+              auditIds[i],
+              installation[i === 2 ? 1 : 0],
+              reviewId,
+              repository[i],
+              runId[i],
+              JSON.stringify({ notForExport: `audit-secret-${i}` }),
+            ],
+          );
+        }
+        const result = await prepareClaimedReviewAuditSnapshot(tx, claim);
+        expect(result).not.toBeNull();
+        const data = JSON.parse(result?.bytes.toString("utf8") ?? "{}");
+        expect(data.reviews).toEqual([expect.objectContaining({ id: reviewIds[0], repositoryId: repository[0] })]);
+        expect(data.auditEvents).toEqual([expect.objectContaining({ id: auditIds[0], repositoryId: repository[0] })]);
+        for (const privatePart of [
+          reviewIds[1],
+          reviewIds[2],
+          auditIds[1],
+          auditIds[2],
+          "audit-secret-0",
+          "audit-secret-1",
+          "audit-secret-2",
+        ]) {
+          expect(result?.bytes.toString("utf8")).not.toContain(privatePart);
+        }
+        expect(await prepareClaimedReviewAuditSnapshot(tx, { ...claim, token: "wrong" })).toBeNull();
+        expect(await prepareClaimedReviewAuditSnapshot(tx, { ...claim, installationId: installation[1] })).toBeNull();
+        throw new Error(rollbackMarker);
+      }),
+    ).rejects.toThrow(rollbackMarker);
   });
 
   it("excludes other repositories and other installations sharing the same tenant", async () => {

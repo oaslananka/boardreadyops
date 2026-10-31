@@ -43,7 +43,31 @@ const records = {
   ],
 };
 
-function fixture(replies: readonly unknown[] = [{ rows: [inventory] }, { rows: [records] }]) {
+const reviewAudit = {
+  reviews: [
+    {
+      id: "review-1",
+      repository_id: "repo-1",
+      head_run_id: "run-1",
+      title: "Review",
+      status: "completed",
+      decision: "approved",
+    },
+  ],
+  audit_events: [
+    {
+      id: "audit-1",
+      repository_id: "repo-1",
+      release_run_id: "run-1",
+      event_type: "review.approved",
+      actor_type: "system",
+      subject_type: "review",
+      subject_id: "review-1",
+    },
+  ],
+};
+
+function fixture(replies: readonly unknown[] = [{ rows: [inventory] }, { rows: [records] }, { rows: [reviewAudit] }]) {
   const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => replies[query.mock.calls.length - 1]);
   const withTransaction = vi.fn(async (work: (tx: { query: typeof query }) => Promise<unknown>, options: unknown) => {
     expect(options).toEqual({ consistentRead: true, statementTimeoutMs: 5000 });
@@ -53,17 +77,20 @@ function fixture(replies: readonly unknown[] = [{ rows: [inventory] }, { rows: [
 }
 
 describe("claimed consistent repository and record preparation", () => {
-  it("queries both scoped slices in the same readonly transaction without completing an export", async () => {
+  it("queries three scoped slices in the same readonly transaction without completing an export", async () => {
     const { db, query, withTransaction } = fixture();
     const result = await prepareClaimedConsistentMetadataSlices(db, claim);
     expect(withTransaction).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalledTimes(3);
     for (const [, params] of query.mock.calls) expect(params).toEqual(Object.values(claim));
     const repositories = JSON.parse(result?.repositories.bytes.toString("utf8") ?? "{}");
     const records = JSON.parse(result?.records.bytes.toString("utf8") ?? "{}");
     expect(repositories.repositories).toEqual([expect.objectContaining({ repositoryId: "repo-1" })]);
     expect(records.runs).toEqual([expect.objectContaining({ id: "run-1", repositoryId: "repo-1" })]);
     expect(records.findings).toEqual([expect.objectContaining({ id: "finding-1", runId: "run-1" })]);
+    const reviewData = JSON.parse(result?.reviewAudit.bytes.toString("utf8") ?? "{}");
+    expect(reviewData.reviews).toEqual([expect.objectContaining({ id: "review-1", repositoryId: "repo-1" })]);
+    expect(reviewData.auditEvents).toEqual([expect.objectContaining({ id: "audit-1", repositoryId: "repo-1" })]);
     expect(JSON.stringify(result)).not.toContain("storage_path");
   });
 
@@ -74,6 +101,9 @@ describe("claimed consistent repository and record preparation", () => {
     const recordsMissing = fixture([{ rows: [inventory] }, { rows: [] }]);
     await expect(prepareClaimedConsistentMetadataSlices(recordsMissing.db, claim)).resolves.toBeNull();
     expect(recordsMissing.query).toHaveBeenCalledTimes(2);
+    const auditMissing = fixture([{ rows: [inventory] }, { rows: [records] }, { rows: [] }]);
+    await expect(prepareClaimedConsistentMetadataSlices(auditMissing.db, claim)).resolves.toBeNull();
+    expect(auditMissing.query).toHaveBeenCalledTimes(3);
   });
 
   it("rejects overflow rather than returning an incomplete record package", async () => {
