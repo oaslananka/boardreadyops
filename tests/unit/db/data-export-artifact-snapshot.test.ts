@@ -94,11 +94,31 @@ describe("claimed artifact metadata is not a deliverable export", () => {
     const inflated = Array.from({ length: 100 }, (_, index) => ({
       ...artifact,
       id: `artifact-${index}`,
-      name: "\\\\".repeat(1024),
-      kind: "\\\\".repeat(256),
-      role: "\\\\".repeat(256),
-      content_type: "\\\\".repeat(256),
+      name: "\\".repeat(1024),
+      kind: "\\".repeat(256),
+      role: "\\".repeat(256),
+      content_type: "\\".repeat(256),
     }));
+    for (const row of inflated) {
+      expect(Buffer.byteLength(row.name, "utf8")).toBe(1024);
+      expect(Buffer.byteLength(row.kind, "utf8")).toBe(256);
+      expect(Buffer.byteLength(row.role, "utf8")).toBe(256);
+      expect(Buffer.byteLength(row.content_type, "utf8")).toBe(256);
+    }
+    const encodedMetadata = JSON.stringify(
+      inflated.map((row) => ({
+        name: row.name,
+        kind: row.kind,
+        role: row.role,
+        contentType: row.content_type,
+      })),
+    );
+    expect(Buffer.byteLength(encodedMetadata, "utf8")).toBeGreaterThan(256 * 1024);
+    const oneArtifact = await prepareClaimedArtifactMetadataSnapshot(
+      withArtifacts([{ artifacts: inflated.slice(0, 1) }]).db,
+      claim,
+    );
+    expect(oneArtifact).not.toBeNull();
     await expect(
       prepareClaimedArtifactMetadataSnapshot(withArtifacts([{ artifacts: inflated }]).db, claim),
     ).rejects.toThrow(ExportArtifactSnapshotUnavailableError);
