@@ -261,7 +261,7 @@ export default function HomePage() {
         Skip to main content
       </a>
 
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/95 px-6 py-4 backdrop-blur">
+      <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-y-2 border-b border-border bg-background/95 px-6 py-4 backdrop-blur">
         <Link
           href="/"
           className="flex items-center gap-2 text-sm font-bold text-foreground"
@@ -297,6 +297,26 @@ export default function HomePage() {
           <Suspense fallback={null}>
             <LandingNavActions />
           </Suspense>
+        </nav>
+        <nav
+          aria-label="Mobile navigation"
+          className="order-last flex w-full items-center justify-between gap-2 text-sm lg:hidden [&>a]:flex [&>a]:min-h-11 [&>a]:items-center"
+        >
+          <a href="#product" className="text-muted-foreground hover:text-foreground">
+            Product
+          </a>
+          <a
+            href="https://docs.boardreadyops.com/security/assurance-case/"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Trust
+          </a>
+          <a href="https://docs.boardreadyops.com" className="text-muted-foreground hover:text-foreground">
+            Docs
+          </a>
+          <Link href="/setup" className="font-medium text-primary hover:underline">
+            Setup
+          </Link>
         </nav>
       </header>
 
