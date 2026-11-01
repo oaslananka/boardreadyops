@@ -54,10 +54,11 @@ describe("release run notifications", () => {
     expect(event?.headline).not.toContain("0 blocking");
   });
 
-  it("announces a passing board as ready", () => {
+  it("announces passing readiness without implying manufacturing authorization", () => {
     const event = runOutcomeEvent(input({ decision: "pass", findings: [] }));
     expect(event?.type).toBe("release.ready");
-    expect(event?.headline).toContain("ready to fabricate");
+    expect(event?.headline).toContain("readiness checks passed");
+    expect(event?.details.join(" ")).toContain("Manufacturing delivery requires separate");
   });
 
   it("keys the message on the run, so a replayed result is the same news", () => {

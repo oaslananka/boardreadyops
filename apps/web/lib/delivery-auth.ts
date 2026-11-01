@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { type DeliveryRecord, isHttpsDeliveryArchiveUrl, type SqlQueryExecutor } from "@boardreadyops/db";
+import { signedRunnerPassSql } from "@boardreadyops/db/runner-result-trust";
 
 export interface DeliveryAuthResult {
   ok: boolean;
@@ -33,6 +34,7 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
               join release_runs on release_runs.id = revisions.validation_run_id
                 and release_runs.status = 'completed'
                 and release_runs.decision = 'pass'
+                and ${signedRunnerPassSql("release_runs")}
                 and release_runs.completed_at is not null
               join artifacts on artifacts.id = revisions.validation_artifact_id
                 and artifacts.run_id = release_runs.id

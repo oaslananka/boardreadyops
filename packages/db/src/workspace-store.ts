@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
+import { signedRunnerPassSql } from "./runner-result-trust.js";
 
 /** Only HTTPS, credential-free external archive locations may be exposed to guest recipients. */
 export function isHttpsDeliveryArchiveUrl(value: string): boolean {
@@ -705,6 +706,7 @@ export class WorkspaceStore {
            on release_runs.repository_id = repositories.id
           and release_runs.status = 'completed'
           and release_runs.decision = 'pass'
+          and ${signedRunnerPassSql("release_runs")}
           and release_runs.completed_at is not null
          join artifacts
            on artifacts.run_id = release_runs.id
@@ -789,6 +791,7 @@ export class WorkspaceStore {
           and release_runs.id = $4
           and release_runs.status = 'completed'
           and release_runs.decision = 'pass'
+          and ${signedRunnerPassSql("release_runs")}
           and release_runs.completed_at is not null
          join artifacts
            on artifacts.run_id = release_runs.id
@@ -823,6 +826,7 @@ export class WorkspaceStore {
            on release_runs.id = revisions.validation_run_id
           and release_runs.status = 'completed'
           and release_runs.decision = 'pass'
+          and ${signedRunnerPassSql("release_runs")}
           and release_runs.completed_at is not null
          join artifacts
            on artifacts.id = revisions.validation_artifact_id
@@ -945,6 +949,7 @@ export class WorkspaceStore {
        join release_runs as run on run.id = share.run_id
          and run.repository_id = repository.id
          and run.status = 'completed' and run.decision = 'pass'
+         and ${signedRunnerPassSql("run")}
          and run.completed_at is not null and run.commit_sha = revision.commit_sha
        join artifacts as artifact on artifact.id = share.artifact_id
          and artifact.run_id = run.id and artifact.role = 'manufacturing'
@@ -1083,6 +1088,7 @@ export class WorkspaceStore {
             join release_runs on release_runs.id = revisions.validation_run_id
               and release_runs.status = 'completed'
               and release_runs.decision = 'pass'
+          and ${signedRunnerPassSql("release_runs")}
               and release_runs.completed_at is not null
             join artifacts on artifacts.id = revisions.validation_artifact_id
               and artifacts.run_id = release_runs.id

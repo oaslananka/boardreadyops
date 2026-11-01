@@ -1,4 +1,5 @@
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
+import { signedRunnerPassSql } from "./runner-result-trust.js";
 
 /**
  * Explicit human permission to SHARE an existing manufacturing artifact.
@@ -26,6 +27,7 @@ export async function authorizeManufacturingShare(
     "join release_runs as run on run.id = revision.validation_run_id",
     "and run.repository_id = repository.id and run.status = 'completed'",
     "and run.decision = 'pass' and run.completed_at is not null",
+    `and ${signedRunnerPassSql("run")}`,
     "join artifacts as artifact on artifact.id = revision.validation_artifact_id",
     "and artifact.run_id = run.id and artifact.role = 'manufacturing'",
     "and artifact.kind = 'archive' and artifact.bytes > 0 and artifact.sha256 ~ '^[0-9a-f]{64}$'",
@@ -74,6 +76,7 @@ export async function authorizedManufacturingRevisionIds(
       "and run.repository_id = repository.id",
       "and run.id = revision.validation_run_id and run.status = 'completed'",
       "and run.decision = 'pass' and run.completed_at is not null",
+      `and ${signedRunnerPassSql("run")}`,
       "join artifacts as artifact on artifact.id = share.artifact_id",
       "and artifact.id = revision.validation_artifact_id and artifact.run_id = run.id",
       "and artifact.kind = 'archive' and artifact.role = 'manufacturing'",
@@ -105,6 +108,7 @@ export async function revisionHasManufacturingShareAuthorization(
       "and run.repository_id = repository.id",
       "and run.id = revision.validation_run_id and run.status = 'completed'",
       "and run.decision = 'pass' and run.completed_at is not null",
+      `and ${signedRunnerPassSql("run")}`,
       "join artifacts as artifact on artifact.id = share.artifact_id",
       "and artifact.id = revision.validation_artifact_id and artifact.run_id = run.id",
       "and artifact.kind = 'archive' and artifact.role = 'manufacturing'",

@@ -69,6 +69,26 @@ beforeAll(async () => {
      values ($1, $2, $3, 'refs/heads/main', 'pull_request', 'completed', 'pass', now())`,
     [theirsRunId, theirsRepository, "f".repeat(40)],
   );
+  // One accepted Pass remains green; the other four Pass previews must not.
+  const signedRun = runIds.at(-1);
+  if (!signedRun) throw new Error("Missing fixture run");
+  const attemptId = "9e100000-0000-4000-8000-000000000035";
+  const digest = "d".repeat(64);
+  await database().query(
+    `insert into release_run_attempts (id, run_id, attempt_number, status, completed_at, result_digest)
+     values ($1, $2, 1, 'completed', now(), $3)`,
+    [attemptId, signedRun, digest],
+  );
+  await database().query(
+    `update release_runs set execution_attempt_id = $2, execution_attempt_started_at = now(), terminal_result_digest = $3 where id = $1`,
+    [signedRun, attemptId, digest],
+  );
+  await database().query(
+    `insert into release_run_results
+      (run_id, execution_attempt_id, contract_version, status, conclusion, decision, payload, result_digest)
+     values ($1, $2, 1, 'completed', 'success', 'pass', '{}'::jsonb, $3)`,
+    [signedRun, attemptId, digest],
+  );
 });
 
 afterAll(async () => {
@@ -85,6 +105,8 @@ describeDatabase("viewer run listing", () => {
     if (page.state !== "ok") throw new Error(`expected ok, got ${page.state}`);
 
     expect(page.runs.map((run) => run.id)).toEqual([...runIds].reverse());
+    expect(page.runs[0]?.decision).toBe("pass");
+    expect(page.runs.slice(1).every((run) => run.decision === "readiness_not_verified")).toBe(true);
     expect(page.runs.some((run) => run.id === theirsRunId)).toBe(false);
   });
 

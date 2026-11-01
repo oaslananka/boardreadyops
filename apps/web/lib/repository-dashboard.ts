@@ -1,3 +1,4 @@
+import { displayedRunnerDecisionSql } from "@boardreadyops/db/runner-result-trust";
 import { notCancelledSubscription } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
@@ -136,7 +137,7 @@ const repositorySummaryQuery = `
            release_runs.repository_id,
            release_runs.id as run_id,
            release_runs.status,
-           release_runs.decision,
+           ${displayedRunnerDecisionSql("release_runs")} as decision,
            release_runs.started_at
       from release_runs
       join visible on visible.id = release_runs.repository_id
@@ -331,7 +332,7 @@ export async function loadRepositoryDetail(
     const runsResult = await executor.query(
       `select release_runs.id,
               release_runs.status,
-              release_runs.decision,
+              ${displayedRunnerDecisionSql("release_runs")} as decision,
               release_runs.commit_sha,
               release_runs.ref,
               release_runs.pull_request_number,
@@ -537,7 +538,7 @@ export async function loadRepositoryBoardHistory(
          left join lateral (
            select snapshot.id, snapshot.run_id, snapshot.commit_sha as snapshot_commit_sha,
                   release_runs.commit_sha as run_commit_sha, snapshot.component_count,
-                  snapshot.captured_at, release_runs.status as run_status, release_runs.decision as run_decision
+                  snapshot.captured_at, release_runs.status as run_status, ${displayedRunnerDecisionSql("release_runs")} as run_decision
              from board_bom_snapshots as snapshot
              join release_runs on release_runs.id = snapshot.run_id
                               and release_runs.repository_id = boards.repository_id

@@ -1,3 +1,4 @@
+import { displayedRunnerDecisionSql } from "@boardreadyops/db/runner-result-trust";
 import { notCancelledSubscription } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
@@ -78,7 +79,7 @@ const runListingQuery = `
          repositories.owner,
          repositories.name as repository_name,
          release_runs.status,
-         release_runs.decision,
+         ${displayedRunnerDecisionSql("release_runs")} as decision,
          release_runs.commit_sha,
          release_runs.ref,
          release_runs.pull_request_number,

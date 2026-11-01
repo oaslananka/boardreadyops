@@ -80,6 +80,41 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     );
 
     expect(await store.listValidatedRevisionCandidatesByWorkspace(`ws_other_${randomUUID()}`)).toEqual([]);
+    // Raw Pass plus an archive is a preview, not runner-verified manufacturing evidence.
+    expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    expect(
+      await store.registerValidatedRevisionFromArtifact({
+        workspaceId,
+        projectId: project.id,
+        runId,
+        artifactId,
+        revisionLabel: "Unsigned preview",
+      }),
+    ).toBeNull();
+
+    const attemptId = randomUUID();
+    const resultDigest = createHash("sha256").update("isolated accepted runner result").digest("hex");
+    await executor.query(
+      `insert into release_run_attempts (id, run_id, attempt_number, status, completed_at, result_digest)
+       values ($1, $2, 1, 'completed', now(), $3)`,
+      [attemptId, runId, resultDigest],
+    );
+    await executor.query(
+      `update release_runs set execution_attempt_id = $2, execution_attempt_started_at = now(), terminal_result_digest = $3 where id = $1`,
+      [runId, attemptId, resultDigest],
+    );
+    // An attempt pointer without the accepted versioned result is still not evidence.
+    expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    await executor.query(
+      `insert into release_run_results
+         (run_id, execution_attempt_id, contract_version, status, conclusion, decision, payload, result_digest)
+       values ($1, $2, 1, 'completed', 'success', 'pass', '{}'::jsonb, $3)`,
+      [runId, attemptId, resultDigest],
+    );
+    await executor.query("update release_runs set terminal_result_digest = $2 where id = $1", [runId, "f".repeat(64)]);
+    expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    await executor.query("update release_runs set terminal_result_digest = $2 where id = $1", [runId, resultDigest]);
+
     const candidates = await store.listValidatedRevisionCandidatesByWorkspace(workspaceId);
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({

@@ -557,7 +557,13 @@ function RunSummaryPanel({ run }: Readonly<{ run: RunDetail }>) {
     >
       <DefinitionGrid>
         <Definition label="Outcome">
-          <StatusBadge value={run.decision ?? run.conclusion ?? run.status} />
+          <StatusBadge
+            value={
+              run.investigationState === "partial_data"
+                ? "readiness_not_verified"
+                : (run.decision ?? run.conclusion ?? run.status)
+            }
+          />
         </Definition>
         <Definition label="Trigger">{humanize(run.triggerKind)}</Definition>
         <Definition label="Pull request">
