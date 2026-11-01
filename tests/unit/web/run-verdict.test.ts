@@ -23,7 +23,7 @@ describe("run verdict", () => {
     const verdict = runVerdict(run());
 
     expect(verdict.tone).toBe("success");
-    expect(verdict.headline).toBe("Ready to fabricate");
+    expect(verdict.headline).toBe("Readiness checks passed");
     expect(verdict.detail).toContain("abc1234");
   });
 
@@ -90,8 +90,8 @@ describe("run verdict", () => {
     );
 
     // A waived finding is a decision somebody already made; mentioning it would undo them.
-    expect(verdict.headline).toBe("Ready to fabricate");
-    expect(verdict.detail).toContain("Every check passed");
+    expect(verdict.headline).toBe("Readiness checks passed");
+    expect(verdict.detail).toContain("Every readiness check passed");
   });
 
   it("never overrides a recorded pass using raw severities", () => {
@@ -103,7 +103,7 @@ describe("run verdict", () => {
     );
 
     expect(verdict.tone).toBe("success");
-    expect(verdict.headline).toBe("Ready to fabricate");
+    expect(verdict.headline).toBe("Readiness checks passed");
     // Understating it would be the opposite error, so the weight is still named.
     expect(verdict.detail).toContain("1 high-severity finding is recorded");
   });

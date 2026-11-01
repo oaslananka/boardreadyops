@@ -216,8 +216,8 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("Run details and actions");
     expect(markup).toContain('class="hidden lg:block"');
     expect(markup).toContain("overflow-x-auto border-b border-border lg:overflow-visible");
-    expect(markup.indexOf("Run details and actions")).toBeLessThan(markup.indexOf("Ready to fabricate"));
-    expect(markup.indexOf("Ready to fabricate")).toBeLessThan(markup.indexOf('id="design-evidence"'));
+    expect(markup.indexOf("Run details and actions")).toBeLessThan(markup.indexOf("Readiness checks passed"));
+    expect(markup.indexOf("Readiness checks passed")).toBeLessThan(markup.indexOf('id="design-evidence"'));
     expect(await axeViolations(markup, `/runs/${run.id}/design`)).toEqual([]);
   });
 
@@ -275,10 +275,10 @@ describe("run investigation accessibility", () => {
     // The verdict is the answer somebody came for, so it comes before the evidence that
     // supports it. Asserting the order rather than mere presence is the point of this test's
     // name; the identity header above it only says which run this is.
-    expect(markup).toContain("Ready to fabricate");
-    expect(markup.indexOf("Ready to fabricate")).toBeLessThan(markup.indexOf('aria-label="Run investigation"'));
+    expect(markup).toContain("Readiness checks passed");
+    expect(markup.indexOf("Readiness checks passed")).toBeLessThan(markup.indexOf('aria-label="Run investigation"'));
     expect(markup.indexOf('aria-label="Run investigation"')).toBeLessThan(markup.indexOf("Source and runtime"));
-    expect(markup.indexOf("Ready to fabricate")).toBeLessThan(markup.indexOf("Open this run in GitHub"));
+    expect(markup.indexOf("Readiness checks passed")).toBeLessThan(markup.indexOf("Open this run in GitHub"));
 
     // The header states which run this is; the verdict states the outcome. Repeating the
     // outcome in both is what made the page read as a status dump.
@@ -294,7 +294,7 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("Readiness score unavailable");
     expect(markup).toContain("Safe (restricted execution)");
     expect(markup).toContain("Trust mode describes execution permissions, not whether fabrication checks passed.");
-    expect(markup).toContain("Ready to fabricate");
+    expect(markup).toContain("Readiness checks passed");
   });
 
   it("does not show a fabrication-ready headline when a passed run lacks a signed result", () => {
@@ -306,7 +306,7 @@ describe("run investigation accessibility", () => {
     expect(html).toContain("Readiness not verified");
     expect(html).toContain("This run has partial data");
     expect(html).toContain("Inspect missing result");
-    expect(html).not.toContain("Ready to fabricate");
+    expect(html).not.toContain("Readiness checks passed");
   });
 
   it("renders storage-neutral release lineage with explicit missing governance context", () => {

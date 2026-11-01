@@ -72,7 +72,7 @@ function buildPassDetail(commitSha: string, blockingCount: number, advisoryCount
   if (advisoryCount > 0) {
     return `Nothing is blocking. ${advisoryCount} ${plural(advisoryCount, "thing", "things")} worth a look before you order.`;
   }
-  return `Every check passed on ${shortSha(commitSha)}.`;
+  return `Every readiness check passed on ${shortSha(commitSha)}. Manufacturing packages and sharing require separate validation.`;
 }
 
 function handleSettlingRun(run: VerdictRun): RunVerdict {
@@ -127,7 +127,7 @@ function handlePassedRun(run: VerdictRun, blocking: readonly VerdictFinding[], a
   const outstanding = blocking.length + advisory;
   return {
     tone: "success",
-    headline: "Ready to fabricate",
+    headline: "Readiness checks passed",
     detail,
     action:
       outstanding > 0
@@ -135,7 +135,7 @@ function handlePassedRun(run: VerdictRun, blocking: readonly VerdictFinding[], a
             label: `Review ${outstanding} ${plural(outstanding, "finding", "findings")}`,
             href: `/runs/${run.id}/findings${blockingFindingsQuery}`,
           }
-        : { label: "See the evidence", href: `/runs/${run.id}/artifacts` },
+        : { label: "Review run evidence", href: `/runs/${run.id}/publication` },
   };
 }
 

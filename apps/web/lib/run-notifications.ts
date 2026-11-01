@@ -93,8 +93,11 @@ export function runOutcomeEvent(input: RunOutcomeInput): NotificationEvent | und
       type: "release.ready",
       installationId: input.installationId,
       repositoryFullName: input.repositoryFullName,
-      headline: "This board passed every gate and is ready to fabricate",
-      details: [whereLine(input), "Evidence was sealed; the release decision is recorded against this commit."],
+      headline: "Board readiness checks passed",
+      details: [
+        whereLine(input),
+        "The result is recorded against this commit. Manufacturing delivery requires separate validated package evidence and sharing approval.",
+      ],
       ...(url ? { url } : {}),
       dedupeKey: `run:${input.runId}:ready`,
       occurredAt: input.occurredAt,

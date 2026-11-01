@@ -66,6 +66,24 @@ beforeAll(async () => {
             ($4, $2, $5, 'refs/heads/main', 'pull_request', 'completed', 'fail', now() - interval '1 hour')`,
     [runOne, mineRepository, "a".repeat(40), runTwo, "b".repeat(40)],
   );
+  // The newer failed run carries an accepted runner result; the older Pass is unsigned.
+  const attemptId = "9e000000-0000-4000-8000-000000000023";
+  const digest = "c".repeat(64);
+  await database().query(
+    `insert into release_run_attempts (id, run_id, attempt_number, status, completed_at, result_digest)
+     values ($1, $2, 1, 'completed', now(), $3)`,
+    [attemptId, runTwo, digest],
+  );
+  await database().query(
+    `update release_runs set execution_attempt_id = $2, execution_attempt_started_at = now(), terminal_result_digest = $3 where id = $1`,
+    [runTwo, attemptId, digest],
+  );
+  await database().query(
+    `insert into release_run_results
+      (run_id, execution_attempt_id, contract_version, status, conclusion, decision, payload, result_digest)
+     values ($1, $2, 1, 'completed', 'failure', 'fail', '{}'::jsonb, $3)`,
+    [runTwo, attemptId, digest],
+  );
   await database().query(
     `insert into findings (id, run_id, rule_id, severity, message, kind)
      values ('9e000000-0000-4000-8000-000000000031', $1, 'old.rule', 'high', 'stale', 'drc'),
@@ -145,7 +163,7 @@ describeDatabase("repository dashboard", () => {
   it("loads run history for a repository the viewer can see", async () => {
     const detail = await loadRepositoryDetail(mineRepository, session([mineGithubInstallation]), environment);
 
-    expect(detail?.runs.map((run) => run.decision)).toEqual(["fail", "pass"]);
+    expect(detail?.runs.map((run) => run.decision)).toEqual(["fail", "readiness_not_verified"]);
     expect(detail?.runs[0]?.findingCount).toBe(1);
   });
 

@@ -31,6 +31,7 @@ const warningValues = new Set([
   "metadata-only",
   "missing",
   "partial_data",
+  "readiness_not_verified",
   "reconciliation",
   "stale",
   "waived",

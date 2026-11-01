@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { SqlQueryExecutor } from "@boardreadyops/db";
+import { signedRunnerPassSql } from "@boardreadyops/db/runner-result-trust";
 import {
   type ArtifactDownloadRecord,
   recordArtifactDownloadStarted,
@@ -21,6 +22,7 @@ const guestManufacturingArchiveSql = [
   "join release_runs as run on run.id = revision.validation_run_id",
   "and run.repository_id = repository.id and run.status = 'completed'",
   "and run.decision = 'pass' and run.completed_at is not null",
+  `and ${signedRunnerPassSql("run")}`,
   "join artifacts as a on a.id = revision.validation_artifact_id and a.run_id = run.id",
   "and a.role = 'manufacturing' and a.kind = 'archive'",
   "and a.bytes > 0 and a.sha256 ~ '^[0-9a-f]{64}$'",
