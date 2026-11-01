@@ -191,6 +191,40 @@ describe("Review Detail Tabs", () => {
     expect(notLinked).not.toContain('href="/runs/');
   });
 
+  it("links exact source SHAs to GitHub without fabricating review change evidence", () => {
+    const pinned = {
+      ...review,
+      repositoryName: "boardreadyops/boardreadyops-e2e-public",
+      baseCommitSha: "a".repeat(40),
+      headCommitSha: "b".repeat(40),
+      changedFiles: undefined,
+      bomChanges: undefined,
+    };
+    const html = renderToStaticMarkup(createElement(ReviewRevisionEvidence, { review: pinned }));
+    expect(html).toContain(
+      `href="https://github.com/boardreadyops/boardreadyops-e2e-public/compare/${"a".repeat(40)}...${"b".repeat(40)}"`,
+    );
+    expect(html).toContain("View source changes on GitHub");
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).not.toContain("geometry/placement changes detected");
+
+    for (const invalid of [
+      { repositoryName: "https://github.com.evil.test/owner/repo" },
+      { repositoryName: "owner/../repo" },
+      { repositoryName: "owner/." },
+      { repositoryName: "owner/.." },
+      { baseCommitSha: "0".repeat(40) },
+      { baseCommitSha: "x".repeat(40) },
+      { headCommitSha: "z".repeat(40) },
+      { headCommitSha: "b".repeat(7) },
+    ]) {
+      const output = renderToStaticMarkup(createElement(ReviewRevisionEvidence, { review: { ...pinned, ...invalid } }));
+      expect(output).not.toContain("View source changes on GitHub");
+      expect(output).not.toContain("/compare/");
+    }
+  });
+
   it("never treats an approved review as signed manufacturing authorization", () => {
     const approved = {
       ...review,
