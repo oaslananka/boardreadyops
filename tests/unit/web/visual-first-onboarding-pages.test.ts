@@ -110,6 +110,38 @@ describe("first-use visual-first routes", () => {
     expect(html).not.toContain('href="/projects/new"');
   });
 
+  it("shows a source-attributed example before the table when existing projects have no linked repository", async () => {
+    authMock.mockResolvedValue({ session: { userId: "123", login: "tester" } });
+    projectsMock.mockResolvedValue({
+      state: "ok",
+      selected: { id: "workspace-1", name: "Hardware team", role: "owner", planTier: "free" },
+      workspaces: [{ id: "workspace-1", name: "Hardware team", role: "owner", planTier: "free" }],
+      projects: [
+        {
+          id: "project-1",
+          name: "Unlinked board",
+          description: null,
+          defaultCadFormat: "kicad",
+          createdAt: "2026-10-19T00:00:00Z",
+          githubRepoFullName: null,
+        },
+      ],
+      impact: { workspace: { projects: 1, revisions: 0, deliveries: 0 }, byProject: {} },
+      total: 1,
+      page: 1,
+      totalPages: 1,
+    });
+    const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain('aria-label="Example PCB and schematic design views"');
+    expect(html).toContain("Example only");
+    expect(html).toContain("not your repository");
+    expect(html.indexOf("Your next hardware review starts with the board")).toBeLessThan(
+      html.indexOf("Unlinked board"),
+    );
+    expect(html).toContain('href="/setup"');
+    expect(html).toContain("Connect your board repository");
+  });
+
   it("does not mistake a non-owner's zero impact counts for an empty project workspace", async () => {
     authMock.mockResolvedValue({ session: { userId: "123", login: "tester" } });
     projectsMock.mockResolvedValue({

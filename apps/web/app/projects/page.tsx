@@ -146,6 +146,29 @@ function projectColumns(role: string, impact: WorkspaceProjectsImpact): readonly
   ];
 }
 
+/** Show source-attributed sample artwork only before a workspace has a linked project. */
+function ProjectOnboardingPreview({
+  projects,
+  total,
+  role,
+}: Readonly<{ projects: readonly ProjectRecord[]; total: number; role: string }>) {
+  const unlinkedPage = projects.length > 0 && projects.every((project) => !project.githubRepoFullName);
+  if (total > 0 && !unlinkedPage) return null;
+  if (role === "viewer") {
+    return <ReviewEmptyVisualPreview mode="onboarding" actionHref="/reviews" actionLabel="Browse hardware reviews" />;
+  }
+  if (total === 0) {
+    return (
+      <ReviewEmptyVisualPreview
+        mode="onboarding"
+        actionHref="/projects/new"
+        actionLabel="Add your first project source"
+      />
+    );
+  }
+  return <ReviewEmptyVisualPreview mode="onboarding" actionHref="/setup" actionLabel="Connect your board repository" />;
+}
+
 export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPageProps>) {
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
@@ -199,15 +222,7 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
               </div>
             </section>
 
-            {result.total === 0 ? (
-              <ReviewEmptyVisualPreview
-                mode="onboarding"
-                actionHref={result.selected.role === "viewer" ? "/reviews" : "/projects/new"}
-                actionLabel={
-                  result.selected.role === "viewer" ? "Browse hardware reviews" : "Add your first project source"
-                }
-              />
-            ) : null}
+            <ProjectOnboardingPreview projects={result.projects} total={result.total} role={result.selected.role} />
             <Panel
               title={result.selected.name}
               description={`You are ${customerStatusLabel(result.selected.role)} of this workspace · ${customerPlanLabel(result.selected.planTier)} plan`}
