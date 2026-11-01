@@ -2,9 +2,26 @@ import type { PolicyFieldSource } from "@boardreadyops/contracts";
 import Link from "next/link";
 import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoReview } from "../../lib/demo-data.js";
+import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { Button } from "../ui/button.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "../ui.js";
 import { ReviewCanvas } from "./review-canvas.js";
+
+/** Source-only GitHub diff navigation. Never infer structural/BOM changes from text diffs. */
+function githubReviewCompareUrl(repository: string, base: string | undefined, head: string): string | undefined {
+  const name = canonicalRepositoryName(repository);
+  if (
+    !name ||
+    name.endsWith("/.") ||
+    name.endsWith("/..") ||
+    !base ||
+    !/^[a-f0-9]{40}$/iu.test(base) ||
+    !/^[a-f0-9]{40}$/iu.test(head)
+  )
+    return undefined;
+  if (/^0+$/u.test(base) || /^0+$/u.test(head)) return undefined;
+  return `https://github.com/${name}/compare/${base.toLowerCase()}...${head.toLowerCase()}`;
+}
 
 /**
  * Whether this revision has rendered schematic/PCB snapshots behind the Changes tab.
@@ -88,6 +105,7 @@ function policyValueWithSource(value: string, source: PolicyFieldSource | null) 
  */
 export function ReviewRevisionEvidence({ review }: Readonly<{ review: DemoReview }>) {
   const baseSha = /^0+$/u.test(review.baseCommitSha) ? undefined : review.baseCommitSha;
+  const compareUrl = githubReviewCompareUrl(review.repositoryName, baseSha, review.headCommitSha);
   return (
     <Panel
       title="Revision evidence trail"
@@ -132,6 +150,16 @@ export function ReviewRevisionEvidence({ review }: Readonly<{ review: DemoReview
           </dd>
         </div>
       </dl>
+      {compareUrl ? (
+        <a
+          href={compareUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-2"
+        >
+          View source changes on GitHub
+        </a>
+      ) : null}
       <p className="mt-3 text-xs text-muted-foreground">
         These are the source commits recorded on this Review revision. A linked Run is execution evidence, not
         independent proof of a signed source-bound manufacturing package. The Review is repository-scoped: neither a Run
@@ -312,7 +340,7 @@ export function OverviewTab({
             <Button type="button" size="sm" variant="outline" onClick={onOpenChanges}>
               {hasCanvas(review)
                 ? (review.baseSnapshots?.length ?? 0) > 0
-                  ? "Compare source revisions"
+                  ? "Compare design views"
                   : "Inspect PCB & schematic"
                 : "Open Changes"}
             </Button>
