@@ -63,6 +63,12 @@ transactions and explicit terminal recovery:
 A second ordinary SQL check, process-local mutex, or session lock around unlink
 cannot on its own satisfy the disconnect and crash invariants.
 
+## Internal export-copy admission (migration 0110)
+
+An internal, installation-bound export preparation can now create a **durable, path-wide copy reservation before local object I/O**, under the same tenant-then-path PostgreSQL advisory-lock order as physical unlink. Unlink admission checks the active reservation before issuing a deletion fence, defers without spending retry budget, and also protects paths shared across installations. A queued deletion denies new export copying. A worker must release its random-token reservation **only after the read has settled**; a crash or unknown release outcome leaves a visible, unresolved reservation instead of assuming the bytes are safe to unlink. Repository/lease/retention checks still apply and cannot be bypassed by a legal hold.
+
+This is a source-level fencing mechanism for **internal, in-memory export preparation**, not a persisted or delivered customer archive. Reservation-quarantine inspection and a separately authenticated, evidence-based reconciliation path remain required for production operation. No reservation is cleared automatically by time, and old physical-deletion workers must be quiesced for a safe migration cutover.
+
 ## Staged engineering and remaining acceptance evidence
 
 The schema, store and worker changes are present in `main` and have source-level

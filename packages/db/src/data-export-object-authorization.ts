@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { ExportRecordClaim } from "./data-export-record-snapshot.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
@@ -88,4 +89,51 @@ export async function lookupClaimedExportObject(
     sha256: row.sha256,
     byteLength: row.bytes,
   };
+}
+
+/** Persist a path-wide deletion fence BEFORE filesystem reads; no HTTP delivery. */
+export async function reserveClaimedExportObjectCopy(
+  db: SqlQueryExecutor,
+  claim: ExportRecordClaim,
+  object: ClaimedExportObject,
+): Promise<string | null> {
+  if (
+    !validIdentity(object.artifactId) ||
+    typeof object.storagePath !== "string" ||
+    object.storagePath.length === 0 ||
+    object.storagePath.length > 1024 ||
+    object.storagePath.trim() !== object.storagePath
+  )
+    return null;
+  const token = randomUUID();
+  const result = (await db.query(
+    "select boardreadyops_begin_export_object_copy($1,$2,$3,$4,$5,$6,$7,$8::uuid) as outcome",
+    [
+      claim.exportId,
+      claim.tenantId,
+      claim.installationId,
+      claim.workerId,
+      claim.token,
+      object.artifactId,
+      object.storagePath,
+      token,
+    ],
+  )) as { rows?: Array<{ outcome?: string }> };
+  return result.rows?.[0]?.outcome === "reserved" ? token : null;
+}
+
+/** Call ONLY after physical read completion; uncertain settlement fails closed. */
+export async function releaseClaimedExportObjectCopy(
+  db: SqlQueryExecutor,
+  claim: ExportRecordClaim,
+  token: string,
+): Promise<void> {
+  const result = (await db.query("select boardreadyops_finish_export_object_copy($1,$2,$3::uuid) as outcome", [
+    claim.exportId,
+    claim.workerId,
+    token,
+  ])) as { rows?: Array<{ outcome?: string }> };
+  if (result.rows?.[0]?.outcome !== "released") {
+    throw new Error("Export object copy reservation could not be settled");
+  }
 }

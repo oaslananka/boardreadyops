@@ -159,6 +159,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0107_stripe_reconciliation_claims.sql",
       "0108_data_export_manifest_staging.sql",
       "0109_data_export_manifest_preview.sql",
+      "0110_artifact_export_copy_unlink_fence.sql",
     ]);
   });
 

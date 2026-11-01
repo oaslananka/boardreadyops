@@ -33,9 +33,12 @@ async function fixture() {
   return { root, bytes, row };
 }
 function dbWithRows(...rows: Array<Record<string, unknown> | null>) {
-  const query = vi.fn(async (_sql: string, _args?: readonly unknown[]) => ({
-    rows: [rows[query.mock.calls.length - 1]].filter(Boolean),
-  }));
+  let lookupIndex = 0;
+  const query = vi.fn(async (sql: string, _args?: readonly unknown[]) => {
+    if (sql.includes("boardreadyops_begin_export_object_copy")) return { rows: [{ outcome: "reserved" }] };
+    if (sql.includes("boardreadyops_finish_export_object_copy")) return { rows: [{ outcome: "released" }] };
+    return { rows: [rows[lookupIndex++]].filter(Boolean) };
+  });
   return { db: { query } as unknown as SqlQueryExecutor, query };
 }
 function input(root: string, db: SqlQueryExecutor) {
@@ -49,17 +52,19 @@ afterEach(async () => {
 describe("claimed export object post-IO authority recheck", () => {
   it("returns verified bytes only if the original scoped claim survives both DB reads", async () => {
     const f = await fixture();
-    const { db, query } = dbWithRows(f.row, f.row);
+    const { db, query } = dbWithRows(f.row, f.row, f.row);
     const value = await readClaimedVerifiedLocalExportObject(input(f.root, db));
     expect(value?.bytes).toEqual(f.bytes);
     expect(value?.object).toMatchObject({ artifactId: f.row.id, repositoryId: f.row.repository_id });
-    expect(query).toHaveBeenCalledTimes(2);
-    for (const [sql, args] of query.mock.calls) {
+    expect(query).toHaveBeenCalledTimes(5);
+    for (const [sql, args] of query.mock.calls.filter(([sql]) => sql.includes("FROM data_exports AS exports"))) {
       expect(sql).toContain("artifact.retention_until > NOW()");
       expect(sql).toContain("artifact_deletion_jobs");
       expect(sql).toContain("exports.preparation_lease_until > NOW()");
       expect(args).toEqual([...Object.values(claim), f.row.id]);
     }
+    expect(query.mock.calls.filter(([sql]) => sql.includes("boardreadyops_begin_export_object_copy"))).toHaveLength(1);
+    expect(query.mock.calls.filter(([sql]) => sql.includes("boardreadyops_finish_export_object_copy"))).toHaveLength(1);
   });
 
   it("rejects malformed claim identifiers without querying the database", async () => {
@@ -83,9 +88,9 @@ describe("claimed export object post-IO authority recheck", () => {
 
   it("rejects a claim revoked during filesystem I/O", async () => {
     const f = await fixture();
-    const { db, query } = dbWithRows(f.row, null);
+    const { db, query } = dbWithRows(f.row, f.row, null);
     await expect(readClaimedVerifiedLocalExportObject(input(f.root, db))).resolves.toBeNull();
-    expect(query).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalledTimes(5);
   });
 
   it("rejects changed scope, path, length or digest after IO", async () => {
@@ -97,10 +102,24 @@ describe("claimed export object post-IO authority recheck", () => {
       { sha256: "0".repeat(64) },
     ];
     for (const changes of differences) {
-      const { db, query } = dbWithRows(f.row, { ...f.row, ...changes });
+      const { db, query } = dbWithRows(f.row, f.row, { ...f.row, ...changes });
       await expect(readClaimedVerifiedLocalExportObject(input(f.root, db))).resolves.toBeNull();
-      expect(query).toHaveBeenCalledTimes(2);
+      expect(query).toHaveBeenCalledTimes(5);
     }
+  });
+
+  it("fails closed if the physical read ended but durable release could not be confirmed", async () => {
+    const f = await fixture();
+    const { db, query } = dbWithRows(f.row, f.row, f.row);
+    query.mockImplementation(async (sql: string) => {
+      if (sql.includes("boardreadyops_begin_export_object_copy")) return { rows: [{ outcome: "reserved" }] };
+      if (sql.includes("boardreadyops_finish_export_object_copy")) return { rows: [{ outcome: "stale" }] };
+      return { rows: [f.row] };
+    });
+    await expect(readClaimedVerifiedLocalExportObject(input(f.root, db))).rejects.toThrow(
+      "Export object copy reservation could not be settled",
+    );
+    expect(query.mock.calls.some(([sql]) => sql.includes("boardreadyops_finish_export_object_copy"))).toBe(true);
   });
 
   it("rejects unsupported storage driver and physically modified bytes", async () => {
@@ -111,9 +130,9 @@ describe("claimed export object post-IO authority recheck", () => {
     ).resolves.toBeNull();
     expect(query).toHaveBeenCalledTimes(1);
     await writeFile(path.join(f.root, f.row.storage_path), Buffer.alloc(f.bytes.length, 23));
-    const next = dbWithRows(f.row, f.row);
+    const next = dbWithRows(f.row, f.row, f.row);
     await expect(readClaimedVerifiedLocalExportObject(input(f.root, next.db))).resolves.toBeNull();
-    expect(next.query).toHaveBeenCalledTimes(1);
+    expect(next.query).toHaveBeenCalledTimes(4);
   });
 
   it("fails closed on incorrect, oversized or malformed database metadata", async () => {

@@ -94,8 +94,13 @@ async function fixture(options: { artifacts?: boolean } = {}) {
   const liveReplies: Array<{ rows: Record<string, unknown>[] }> =
     options.artifacts === false
       ? [{ rows: [inventory] }]
-      : [{ rows: [row] }, { rows: [row] }, { rows: [row] }, { rows: [inventory] }];
-  const query = vi.fn(async () => liveReplies[query.mock.calls.length - 1]);
+      : [{ rows: [row] }, { rows: [row] }, { rows: [row] }, { rows: [row] }, { rows: [inventory] }];
+  let liveIndex = 0;
+  const query = vi.fn(async (sql: string) => {
+    if (sql.includes("boardreadyops_begin_export_object_copy")) return { rows: [{ outcome: "reserved" }] };
+    if (sql.includes("boardreadyops_finish_export_object_copy")) return { rows: [{ outcome: "released" }] };
+    return liveReplies[liveIndex++];
+  });
   const db = { withTransaction, query } as unknown as Pick<PgQueryExecutor, "withTransaction" | "query">;
   const input = { db, claim, storageDriver: "local", storageRoot: root };
   return { input, root, bytes, row, inventory, txReplies, liveReplies, withTransaction, query, queryInside };
@@ -118,12 +123,16 @@ describe("internal claim-bound local archive assembly", () => {
     expect(JSON.stringify(extracted.files.map(({ path: name }) => name))).not.toContain(f.row.storage_path);
     expect(f.withTransaction).toHaveBeenCalledTimes(1);
     expect(f.queryInside).toHaveBeenCalledTimes(7);
-    expect(f.query).toHaveBeenCalledTimes(4);
+    expect(f.query).toHaveBeenCalledTimes(7);
     for (const [sql, params] of f.query.mock.calls) {
       if (sql.includes("FROM data_exports AS exports")) {
         expect(sql).toContain("artifact_deletion_jobs");
         expect(sql).toContain("retention_until > NOW()");
         expect(params).toEqual([...Object.values(claim), "artifact-1"]);
+      } else if (sql.includes("boardreadyops_begin_export_object_copy")) {
+        expect(params).toEqual([...Object.values(claim), "artifact-1", f.row.storage_path, expect.any(String)]);
+      } else if (sql.includes("boardreadyops_finish_export_object_copy")) {
+        expect(params).toEqual([claim.exportId, claim.workerId, expect.any(String)]);
       } else {
         expect(sql).toContain("preparation_lease_until > NOW()");
       }
@@ -143,28 +152,28 @@ describe("internal claim-bound local archive assembly", () => {
     await expect(prepareClaimedLocalArchiveZip(f.input)).resolves.toBeNull();
     expect(f.query).toHaveBeenCalledTimes(1);
     const next = await fixture();
-    next.liveReplies[1] = { rows: [] };
+    next.liveReplies[2] = { rows: [] };
     await expect(prepareClaimedLocalArchiveZip(next.input)).resolves.toBeNull();
-    expect(next.query).toHaveBeenCalledTimes(2);
+    expect(next.query).toHaveBeenCalledTimes(5);
   });
 
   it("rejects revocation after an object was verified but before final ZIP assembly", async () => {
     const f = await fixture();
-    f.liveReplies[2] = { rows: [] };
+    f.liveReplies[3] = { rows: [] };
     await expect(prepareClaimedLocalArchiveZip(f.input)).resolves.toBeNull();
-    expect(f.query).toHaveBeenCalledTimes(3);
+    expect(f.query).toHaveBeenCalledTimes(6);
     const later = await fixture();
-    later.liveReplies[3] = { rows: [] };
+    later.liveReplies[4] = { rows: [] };
     await expect(prepareClaimedLocalArchiveZip(later.input)).resolves.toBeNull();
-    expect(later.query).toHaveBeenCalledTimes(4);
+    expect(later.query).toHaveBeenCalledTimes(7);
   });
 
   it("rejects changed repository or storage path on the final object recheck", async () => {
     const f = await fixture();
-    f.liveReplies[2] = { rows: [{ ...f.row, repository_id: "foreign-repo" }] };
+    f.liveReplies[3] = { rows: [{ ...f.row, repository_id: "foreign-repo" }] };
     await expect(prepareClaimedLocalArchiveZip(f.input)).resolves.toBeNull();
     const next = await fixture();
-    next.liveReplies[2] = { rows: [{ ...next.row, storage_path: "other/file" }] };
+    next.liveReplies[3] = { rows: [{ ...next.row, storage_path: "other/file" }] };
     await expect(prepareClaimedLocalArchiveZip(next.input)).resolves.toBeNull();
   });
 
@@ -194,12 +203,13 @@ describe("internal claim-bound local archive assembly", () => {
         { artifacts: [existing, { ...existing, id: otherRow.id, sha256: otherRow.sha256, bytes: otherRow.bytes }] },
       ],
     };
-    f.liveReplies.splice(2, 0, { rows: [otherRow] }, { rows: [otherRow] });
+    f.liveReplies.splice(3, 0, { rows: [otherRow] }, { rows: [otherRow] }, { rows: [otherRow] });
+    f.liveReplies.splice(7, 0, { rows: [otherRow] });
     // Both objects were independently checked after their own IO, but the
     // first is now revoked before the final all-object authorization fence.
-    f.liveReplies[4] = { rows: [] };
+    f.liveReplies[6] = { rows: [] };
     await expect(prepareClaimedLocalArchiveZip(f.input)).resolves.toBeNull();
-    expect(f.query).toHaveBeenCalledTimes(5);
+    expect(f.query).toHaveBeenCalledTimes(11);
   });
 
   it("rejects over-budget object metadata before any physical IO", async () => {
@@ -212,7 +222,7 @@ describe("internal claim-bound local archive assembly", () => {
 
   it("rejects a changed repository inventory on the final lease recheck", async () => {
     const f = await fixture();
-    f.liveReplies[3] = {
+    f.liveReplies[4] = {
       rows: [
         {
           ...f.inventory,
@@ -221,7 +231,7 @@ describe("internal claim-bound local archive assembly", () => {
       ],
     };
     await expect(prepareClaimedLocalArchiveZip(f.input)).resolves.toBeNull();
-    expect(f.query).toHaveBeenCalledTimes(4);
+    expect(f.query).toHaveBeenCalledTimes(7);
   });
 
   it("rejects snapshot-integrity mismatches before any physical object lookup", async () => {
