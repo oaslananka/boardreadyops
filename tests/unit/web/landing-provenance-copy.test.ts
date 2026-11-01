@@ -77,6 +77,38 @@ describe("public manufacturing evidence claims (#445 / #771)", () => {
     expect(source).not.toContain("These links are source fixtures, not");
   });
 
+  it("grounds WARN, policy and change-impact demonstrations in existing reports (#445)", () => {
+    const prototype = JSON.parse(
+      readFileSync(new URL("../../../examples/scenarios/prototype-ready/report.json", import.meta.url), "utf8"),
+    ) as { summary: { total: number; high: number; medium: number; failed: boolean }; readiness: { status: string } };
+    const failing = JSON.parse(
+      readFileSync(new URL("../../../examples/scenarios/failing-pr/report.json", import.meta.url), "utf8"),
+    ) as { findings: Array<{ ruleId: string; severity: string }> };
+    const expected = JSON.parse(
+      readFileSync(new URL("../../../examples/golden-demo/expected-findings.json", import.meta.url), "utf8"),
+    ) as { broken: string[]; fixed: string[] };
+
+    expect(prototype.summary).toMatchObject({ total: 1, high: 0, medium: 1, failed: false });
+    expect(prototype.readiness.status).toBe("at-risk");
+    expect(failing.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ruleId: "bom.eol-detection", severity: "high" }),
+        expect.objectContaining({ ruleId: "bom.missing-mpn", severity: "high" }),
+      ]),
+    );
+    expect(expected.fixed).toEqual([]);
+    expect(expected.broken).toEqual(
+      expect.arrayContaining(["design.board-outline", "design.unique-references", "bom.missing-mpn", "bom.compliance"]),
+    );
+    expect(source).toContain("WARN · reproducible source report");
+    expect(source).toContain("not a hosted GitHub App WARN Check Run");
+    expect(source).toContain("Before → after · policy and component evidence");
+    expect(source).toContain("not one recorded customer revision history");
+    expect(source).toContain("examples/scenarios/prototype-ready/report.json");
+    expect(source).toContain("examples/scenarios/failing-pr/report.json");
+    expect(source).toContain("examples/golden-demo/expected-findings.json");
+  });
+
   it("keeps reproducible source fixtures and setup paths discoverable", () => {
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/fixed");
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/broken");
