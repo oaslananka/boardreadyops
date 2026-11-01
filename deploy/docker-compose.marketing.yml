@@ -1,0 +1,26 @@
+# Optional, independent marketing deployment. It does not join the SaaS project,
+# load the SaaS .env, expose a customer API, or create database/worker services.
+# Supply a previously built and reviewed immutable runtime image SHA tag.
+name: boardreadyops-marketing
+
+services:
+  marketing:
+    image: boardreadyops-web-runtime:${BOARDREADYOPS_MARKETING_IMAGE_TAG:?set reviewed immutable runtime image tag}
+    restart: unless-stopped
+    environment:
+      BOARDREADYOPS_SITE_SURFACE: marketing
+      BOARDREADYOPS_MARKETING_APP_ORIGIN: ${BOARDREADYOPS_MARKETING_APP_ORIGIN:-https://boardreadyops.com}
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "127.0.0.1:${BOARDREADYOPS_MARKETING_PORT:-3002}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 4
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

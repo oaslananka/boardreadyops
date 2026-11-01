@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { applicationHref, isMarketingSurface } from "../lib/marketing-surface.js";
 import { viewerAuthorization } from "../lib/viewer-authorization.js";
 import { buttonVariants } from "./ui/button.js";
 import { ViewerControls } from "./viewer-controls.js";
@@ -22,6 +23,17 @@ const primaryClass = `${buttonVariants({ variant: "default", size: "lg" })} gap-
 const secondaryClass = buttonVariants({ variant: "secondary", size: "lg" });
 
 export async function LandingNavActions() {
+  // An independently deployed public-only site has no customer session.
+  if (isMarketingSurface()) {
+    return (
+      <>
+        <ViewerControls login={undefined} />
+        <a className={navCtaClass} href={installUrl}>
+          Install on GitHub
+        </a>
+      </>
+    );
+  }
   const session = (await viewerAuthorization()).session;
 
   if (!session) {
@@ -48,6 +60,18 @@ export async function LandingNavActions() {
 }
 
 export async function LandingHeroActions() {
+  if (isMarketingSurface()) {
+    return (
+      <>
+        <a className={primaryClass} href={installUrl}>
+          Install on GitHub
+        </a>
+        <a className={secondaryClass} href={applicationHref("/setup")}>
+          Preview repository setup
+        </a>
+      </>
+    );
+  }
   const session = (await viewerAuthorization()).session;
 
   if (!session) {

@@ -6,6 +6,7 @@ import { installUrl, LandingHeroActions, LandingNavActions } from "../components
 import { PublicStructuredData } from "../components/public-structured-data.js";
 import { ThemeToggle } from "../components/theme-toggle.js";
 import { buttonVariants } from "../components/ui/button.js";
+import { applicationHref } from "../lib/marketing-surface.js";
 
 export const metadata: Metadata = {
   title: { absolute: "BoardReadyOps — Know what stands between your board and production." },
@@ -755,7 +756,7 @@ export default function HomePage() {
               <a href="https://docs.boardreadyops.com" className="text-primary hover:underline">
                 Read the documentation
               </a>
-              <a href="/openapi.json" className="text-primary hover:underline">
+              <a href={applicationHref("/openapi.json")} className="text-primary hover:underline">
                 OpenAPI
               </a>
               <a href="/llms.txt" className="text-primary hover:underline">
@@ -781,9 +782,9 @@ export default function HomePage() {
                 <span>Install on GitHub</span>
                 <span aria-hidden="true">↗</span>
               </a>
-              <Link className={buttonVariants({ variant: "secondary", size: "lg" })} href="/setup">
+              <a className={buttonVariants({ variant: "secondary", size: "lg" })} href={applicationHref("/setup")}>
                 Review setup first
-              </Link>
+              </a>
             </div>
           </div>
         </section>
