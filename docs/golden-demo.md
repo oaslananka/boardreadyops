@@ -9,10 +9,13 @@ The public source fixtures are part of this repository. Inspect
 and [the corrected board](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed).
 They demonstrate **expected fail** and **expected pass** outcomes without needing credentials or a hosted service.
 
-The former external PR demos are not currently available, so no live Check Run or sticky
-PR comment is promised by these links. To evaluate the GitHub Action and uploaded workflow
-artifacts, install the reviewed workflow in a repository you control and run it against a
-test commit. This corpus tests the local deterministic engine directly.
+The old external demo repos are unavailable, but real public pull requests now run the
+same synthetic fixtures in the existing [boardreadyops-e2e-public](https://github.com/boardreadyops/boardreadyops-e2e-public)
+target repository. Inspect the [passing PR #4](https://github.com/boardreadyops/boardreadyops-e2e-public/pull/4)
+or [blocked PR #5](https://github.com/boardreadyops/boardreadyops-e2e-public/pull/5) for
+the actual BoardReadyOps App Check Runs, sticky PR reports and GitHub Actions artifacts.
+Those public runs demonstrate the software; they do **not** attest a customer manufacturing
+export or prove the synthetic board is fit for commercial fabrication.
 
 ## Run it in two commands
 

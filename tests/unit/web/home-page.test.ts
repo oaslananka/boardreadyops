@@ -94,6 +94,23 @@ describe("HomePage", () => {
     expect(installLinks.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("links verified public PASS/BLOCK pull requests to their actual Actions and cloud checks", () => {
+    const text = collectText(HomePage());
+    const links = collectLinks(HomePage());
+    for (const number of [4, 5]) {
+      expect(links).toContain(`https://github.com/boardreadyops/boardreadyops-e2e-public/pull/${number}`);
+    }
+    for (const id of [41347951847, 41347954172]) {
+      expect(links).toContain(`https://github.com/boardreadyops/boardreadyops-e2e-public/actions/runs/${id}`);
+    }
+    expect(links).toContain("https://boardreadyops.com/runs/6d1bab08-527a-47fa-99c4-f778f02714a8");
+    expect(links).toContain("https://boardreadyops.com/runs/889f9d24-0425-4f63-8eb5-1446cc93a9ef");
+    expect(text).toContain("Verified pull request demos");
+    expect(text).toContain("Actual GitHub App: pass");
+    expect(text).toContain("Actual GitHub App: block");
+    expect(text).toContain("demonstrations, not customer manufacturing attestations");
+  });
+
   it("links the secondary CTA to the setup preview", () => {
     const links = collectLinks(HomePage());
     expect(links).toContain("/setup");

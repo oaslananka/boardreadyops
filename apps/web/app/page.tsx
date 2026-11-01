@@ -25,21 +25,27 @@ const proofItems = [
   "Reviewable findings, output inventories and checksums",
 ] as const;
 
-/** Reproducible, repository-owned source fixtures; no external demo PR is implied. */
+/** Real public PRs on synthetic fixtures, verified against exact GitHub App and Actions runs. */
 const liveDemos = [
   {
     verdict: "pass" as const,
     title: "A board ready to release",
-    href: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed",
-    baseline: "Fixed fixture: no blocking findings",
-    body: "Inspect the corrected source files and BOM, then run the local review to verify the clean result.",
+    prHref: "https://github.com/boardreadyops/boardreadyops-e2e-public/pull/4",
+    actionsHref: "https://github.com/boardreadyops/boardreadyops-e2e-public/actions/runs/41347951847",
+    checkHref: "https://boardreadyops.com/runs/6d1bab08-527a-47fa-99c4-f778f02714a8",
+    sourceHref: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed",
+    baseline: "Actual GitHub App: pass · 0 findings",
+    body: "Open a real public pull request showing a green hardware Check Run, its exact-commit GitHub Actions workflow, and a downloadable review report.",
   },
   {
     verdict: "fail" as const,
     title: "A board with release blockers",
-    href: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/broken",
-    baseline: "Broken fixture: five findings",
-    body: "Inspect the open outline, repeated reference, and BOM risk in a synthetic board. Reproduce the blocked outcome locally.",
+    prHref: "https://github.com/boardreadyops/boardreadyops-e2e-public/pull/5",
+    actionsHref: "https://github.com/boardreadyops/boardreadyops-e2e-public/actions/runs/41347954172",
+    checkHref: "https://boardreadyops.com/runs/889f9d24-0425-4f63-8eb5-1446cc93a9ef",
+    sourceHref: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/broken",
+    baseline: "Actual GitHub App: block · 4 high, 1 medium",
+    body: "See a real blocked PR with an open board outline, duplicate reference, missing MPN and compliance findings, plus the workflow report.",
   },
 ] as const;
 
@@ -443,19 +449,20 @@ export default function HomePage() {
         <section className="border-b border-border py-16" id="live-demos" aria-labelledby="live-demos-heading">
           <div className="mx-auto max-w-6xl px-6">
             <div className="flex max-w-2xl flex-col gap-2">
-              <p className="text-sm font-medium text-primary">Reproducible source demos</p>
+              <p className="text-sm font-medium text-primary">Verified pull request demos</p>
               <h2 id="live-demos-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
-                Inspect real fixtures before connecting a repository.
+                See a real GitHub PR pass or block a hardware release.
               </h2>
               <p className="text-sm text-muted-foreground">
-                Two checked-in synthetic board states show what passes and what blocks a release. Open the source,
-                inspect the actual files, then run the reproducible checks locally. These links are source fixtures, not
-                live GitHub pull-request checks.
+                Both examples use public, synthetic KiCad boards. Their GitHub App Check Runs and target-repository
+                Actions are real: one passes without findings; the other blocks on four high-severity hardware/BOM
+                issues and shows one supply-risk warning. Review the exact PR, its checks and downloadable Actions
+                reports; these are demonstrations, not customer manufacturing attestations.
               </p>
             </div>
             <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
               {liveDemos.map((demo) => (
-                <li key={demo.href} className="flex flex-col rounded-md border border-border bg-card p-5">
+                <li key={demo.prHref} className="flex flex-col rounded-md border border-border bg-card p-5">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span
                       className={`size-2 rounded-full ${demo.verdict === "pass" ? "bg-success" : "bg-danger"}`}
@@ -463,25 +470,50 @@ export default function HomePage() {
                     />
                     <span>{demo.baseline}</span>
                     <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-foreground">
-                      Expected result: {demo.verdict === "pass" ? "pass" : "block"}
+                      Verified result: {demo.verdict === "pass" ? "pass" : "block"}
                     </span>
                   </div>
                   <strong className="mt-3 text-base text-foreground">{demo.title}</strong>
                   <p className="mt-2 flex-1 text-sm text-muted-foreground">{demo.body}</p>
-                  <a
-                    href={demo.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex items-center gap-1.5 self-start text-sm text-primary underline underline-offset-2"
-                  >
-                    <span>Inspect source fixture</span>
-                    <span aria-hidden="true">↗</span>
-                  </a>
+                  <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                    <a
+                      href={demo.prHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-primary underline underline-offset-2"
+                    >
+                      View real pull request
+                    </a>
+                    <a
+                      href={demo.actionsHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      Actions and report
+                    </a>
+                    <a
+                      href={demo.checkHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      App Check Run
+                    </a>
+                    <a
+                      href={demo.sourceHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-muted-foreground underline underline-offset-2"
+                    >
+                      Inspect source fixture
+                    </a>
+                  </div>
                 </li>
               ))}
             </ul>
             <p className="mt-4 text-xs text-muted-foreground">
-              Synthetic hardware is included in the repository. Run{" "}
+              The underlying fixtures remain reproducible offline. Run{" "}
               <code className="rounded-sm bg-muted px-1.5 py-0.5">boardreadyops run examples/golden-demo/broken</code>{" "}
               or <code className="rounded-sm bg-muted px-1.5 py-0.5">boardreadyops run examples/golden-demo/fixed</code>{" "}
               — no KiCad installation needed.
