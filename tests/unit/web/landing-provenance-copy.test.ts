@@ -72,7 +72,8 @@ describe("public manufacturing evidence claims (#445 / #771)", () => {
     expect(source).toContain("boardreadyops-e2e-public/actions/runs/41347645773");
     expect(source).toContain("/runs/9ab5ab15-0db0-4b22-b923-ac434da4ebee");
     expect(source).toContain("/runs/74c7f60f-0779-4f48-bfe0-2fc07360565b");
-    expect(source).toContain("not customer");
+    expect(source).toContain("reproducible demonstrations, not");
+    expect(source).toContain("customer manufacturing evidence or a fabrication approval");
     expect(source).not.toContain("These links are source fixtures, not");
   });
 
