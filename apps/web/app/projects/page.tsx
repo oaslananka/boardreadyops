@@ -199,12 +199,19 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
               </div>
             </section>
 
-            {result.total === 0 ? (
+            {result.total === 0 ||
+            (result.projects.length > 0 && result.projects.every((project) => !project.githubRepoFullName)) ? (
               <ReviewEmptyVisualPreview
                 mode="onboarding"
-                actionHref={result.selected.role === "viewer" ? "/reviews" : "/projects/new"}
+                actionHref={
+                  result.selected.role === "viewer" ? "/reviews" : result.total === 0 ? "/projects/new" : "/setup"
+                }
                 actionLabel={
-                  result.selected.role === "viewer" ? "Browse hardware reviews" : "Add your first project source"
+                  result.selected.role === "viewer"
+                    ? "Browse hardware reviews"
+                    : result.total === 0
+                      ? "Add your first project source"
+                      : "Connect your board repository"
                 }
               />
             ) : null}
