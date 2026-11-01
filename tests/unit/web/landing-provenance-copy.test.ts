@@ -65,6 +65,17 @@ describe("public manufacturing evidence claims (#445 / #771)", () => {
     expect(source).not.toContain("Annotations appear inline on changed layout or schematic files");
   });
 
+  it("links public PASS and BLOCK PRs to actual App verdicts and Actions runs (#445)", () => {
+    expect(source).toContain("boardreadyops/boardreadyops-e2e-public/pull/4");
+    expect(source).toContain("boardreadyops/boardreadyops-e2e-public/pull/5");
+    expect(source).toContain("boardreadyops-e2e-public/actions/runs/41347650029");
+    expect(source).toContain("boardreadyops-e2e-public/actions/runs/41347645773");
+    expect(source).toContain("/runs/9ab5ab15-0db0-4b22-b923-ac434da4ebee");
+    expect(source).toContain("/runs/74c7f60f-0779-4f48-bfe0-2fc07360565b");
+    expect(source).toContain("not customer");
+    expect(source).not.toContain("These links are source fixtures, not");
+  });
+
   it("keeps reproducible source fixtures and setup paths discoverable", () => {
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/fixed");
     expect(source).toContain("boardreadyops/tree/main/examples/golden-demo/broken");
