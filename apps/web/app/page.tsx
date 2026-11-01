@@ -25,21 +25,27 @@ const proofItems = [
   "Reviewable findings, output inventories and checksums",
 ] as const;
 
-/** Reproducible, repository-owned source fixtures; no external demo PR is implied. */
+/** Public, SHA-verified synthetic PR demos; links point to actual GitHub App and Actions results. */
 const liveDemos = [
   {
     verdict: "pass" as const,
     title: "A board ready to release",
-    href: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed",
-    baseline: "Fixed fixture: no blocking findings",
-    body: "Inspect the corrected source files and BOM, then run the local review to verify the clean result.",
+    href: "https://github.com/boardreadyops/boardreadyops-e2e-public/pull/4",
+    checkHref: "https://boardreadyops.com/runs/9ab5ab15-0db0-4b22-b923-ac434da4ebee",
+    actionsHref: "https://github.com/boardreadyops/boardreadyops-e2e-public/actions/runs/41347650029",
+    sourceHref: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed",
+    baseline: "Verified GitHub App: pass, zero findings",
+    body: "See a real GitHub App release-readiness success on a public PR, with the corresponding Actions run and downloadable reports.",
   },
   {
     verdict: "fail" as const,
     title: "A board with release blockers",
-    href: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/broken",
-    baseline: "Broken fixture: five findings",
-    body: "Inspect the open outline, repeated reference, and BOM risk in a synthetic board. Reproduce the blocked outcome locally.",
+    href: "https://github.com/boardreadyops/boardreadyops-e2e-public/pull/5",
+    checkHref: "https://boardreadyops.com/runs/74c7f60f-0779-4f48-bfe0-2fc07360565b",
+    actionsHref: "https://github.com/boardreadyops/boardreadyops-e2e-public/actions/runs/41347645773",
+    sourceHref: "https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/broken",
+    baseline: "Verified GitHub App: block, six high and two medium findings",
+    body: "See real Check Run blockers for a synthetic board outline, duplicate references, and BOM compliance risks, with workflow evidence.",
   },
 ] as const;
 
@@ -443,14 +449,14 @@ export default function HomePage() {
         <section className="border-b border-border py-16" id="live-demos" aria-labelledby="live-demos-heading">
           <div className="mx-auto max-w-6xl px-6">
             <div className="flex max-w-2xl flex-col gap-2">
-              <p className="text-sm font-medium text-primary">Reproducible source demos</p>
+              <p className="text-sm font-medium text-primary">Live GitHub pull request demos</p>
               <h2 id="live-demos-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
-                Inspect real fixtures before connecting a repository.
+                See a real passing check and a real blocked release.
               </h2>
               <p className="text-sm text-muted-foreground">
-                Two checked-in synthetic board states show what passes and what blocks a release. Open the source,
-                inspect the actual files, then run the reproducible checks locally. These links are source fixtures, not
-                live GitHub pull-request checks.
+                Two public pull requests show the actual BoardReadyOps GitHub App verdicts, Actions execution and
+                downloadable reports on synthetic KiCad and BOM data. These are reproducible demonstrations, not
+                customer manufacturing evidence or a fabrication approval.
               </p>
             </div>
             <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -463,20 +469,45 @@ export default function HomePage() {
                     />
                     <span>{demo.baseline}</span>
                     <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-foreground">
-                      Expected result: {demo.verdict === "pass" ? "pass" : "block"}
+                      GitHub App: {demo.verdict === "pass" ? "PASS" : "BLOCK"}
                     </span>
                   </div>
                   <strong className="mt-3 text-base text-foreground">{demo.title}</strong>
                   <p className="mt-2 flex-1 text-sm text-muted-foreground">{demo.body}</p>
-                  <a
-                    href={demo.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex items-center gap-1.5 self-start text-sm text-primary underline underline-offset-2"
-                  >
-                    <span>Inspect source fixture</span>
-                    <span aria-hidden="true">↗</span>
-                  </a>
+                  <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                    <a
+                      href={demo.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      Open {demo.verdict === "pass" ? "PASS" : "BLOCK"} pull request
+                    </a>
+                    <a
+                      href={demo.checkHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      App verdict
+                    </a>
+                    <a
+                      href={demo.actionsHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      Actions and reports
+                    </a>
+                    <a
+                      href={demo.sourceHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      Source fixture
+                    </a>
+                  </div>
                 </li>
               ))}
             </ul>

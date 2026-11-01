@@ -9,10 +9,31 @@ The public source fixtures are part of this repository. Inspect
 and [the corrected board](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed).
 They demonstrate **expected fail** and **expected pass** outcomes without needing credentials or a hosted service.
 
-The former external PR demos are not currently available, so no live Check Run or sticky
-PR comment is promised by these links. To evaluate the GitHub Action and uploaded workflow
-artifacts, install the reviewed workflow in a repository you control and run it against a
-test commit. This corpus tests the local deterministic engine directly.
+## Verified public GitHub pull requests
+
+The original standalone demo repositories were retired. Two **public, synthetic**
+pull requests now live in the existing
+[boardreadyops/boardreadyops-e2e-public](https://github.com/boardreadyops/boardreadyops-e2e-public)
+test repository. They use a pinned BoardReadyOps Action and the real BoardReadyOps GitHub App
+for an end-to-end verdict, without private customer board data:
+
+- [PASS PR #4](https://github.com/boardreadyops/boardreadyops-e2e-public/pull/4):
+  [GitHub App check PASS, zero findings](https://boardreadyops.com/runs/9ab5ab15-0db0-4b22-b923-ac434da4ebee);
+  [Actions and downloadable report](https://github.com/boardreadyops/boardreadyops-e2e-public/actions/runs/41347650029).
+  Verified head: `6e5e4e563eed238b5a2c0b9582f8a86a431a8c27`.
+- [BLOCK PR #5](https://github.com/boardreadyops/boardreadyops-e2e-public/pull/5):
+  [GitHub App check BLOCK](https://boardreadyops.com/runs/74c7f60f-0779-4f48-bfe0-2fc07360565b);
+  [Actions and downloadable report](https://github.com/boardreadyops/boardreadyops-e2e-public/actions/runs/41347645773).
+  Verified head: `dbb4105762b64fca53ac51dbfd752ea8baaa6e36`.
+  The hosted App reports six high and two medium records because some source
+  findings appear twice; the underlying golden fixture reproduces **five distinct
+  finding types** (four high and one medium).
+
+The PRs are deliberately **left open and unmerged** for inspection. Their source,
+PR comments, native App Check Runs, workflow logs and Actions artifacts are
+independently inspectable. These are illustrative test boards, **not** independently
+attested source-to-fabrication evidence, real customer manufacturing acceptance,
+or proof of a delivered production board.
 
 ## Run it in two commands
 
