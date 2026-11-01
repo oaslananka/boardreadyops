@@ -10,6 +10,7 @@ import { type PcbFootprintSummary, pcbFootprintSummarySchema } from "@boardready
 import { ReviewStore, storeRunPcbFootprintSummary } from "@boardreadyops/db";
 import { z } from "zod";
 import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
+import { resolveReviewEffectivePolicy } from "../../../../lib/review-readiness.js";
 import { decodeRunListingCursor, loadViewerRuns, normalizedRunListingLimit } from "../../../../lib/run-listing.js";
 import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
@@ -234,6 +235,30 @@ async function syncReviewForRun(
 ): Promise<string | undefined> {
   if (!payload.pullRequestNumber && !payload.evidenceDigest) return undefined;
   const reviewStore = new ReviewStore(executor);
+  // Derive tenant from the already-authorized repository within the same run-ingestion transaction.
+  const ownerResult = (await executor.query(
+    `SELECT installations.account_login AS tenant
+     FROM repositories JOIN installations ON installations.id = repositories.installation_id
+     WHERE repositories.id = $1 AND repositories.disabled_at IS NULL
+       AND installations.suspended_at IS NULL`,
+    [repositoryId],
+  )) as { rows?: Array<{ tenant: string }> };
+  const tenantId = ownerResult.rows?.[0]?.tenant;
+  if (!tenantId) throw new Error("Review policy owner is unavailable");
+  const resolvedPolicy = await resolveReviewEffectivePolicy({ executor, repositoryId, tenantId });
+  const policyAtIngestion = resolvedPolicy
+    ? {
+        id: resolvedPolicy.id,
+        name: resolvedPolicy.name,
+        sourceLayer: resolvedPolicy.sourceLayer,
+        requiredChecklist: resolvedPolicy.requiredChecklist,
+        requiredRoles: resolvedPolicy.requiredRoles,
+        ...(resolvedPolicy.severityGate ? { severityGate: resolvedPolicy.severityGate } : {}),
+        requireEvidencePack: resolvedPolicy.requireEvidencePack,
+        requireExternalReview: resolvedPolicy.requireExternalReview,
+        provenance: resolvedPolicy.provenance,
+      }
+    : null;
   const evidenceDigest = payload.evidenceDigest ?? "0".repeat(64);
   const title = payload.title ?? `Review for PR #${payload.pullRequestNumber ?? payload.commitSha.slice(0, 7)}`;
   const reviewResult = await reviewStore.upsertReviewForRun({
@@ -245,6 +270,7 @@ async function syncReviewForRun(
     ...(payload.baseRunId !== undefined ? { baseRunId: payload.baseRunId } : {}),
     ...(payload.baseCommitSha !== undefined ? { baseCommitSha: payload.baseCommitSha } : {}),
     evidenceDigest,
+    policyAtIngestion,
     createdBy: actorId,
   });
 

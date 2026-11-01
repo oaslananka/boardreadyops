@@ -71,6 +71,7 @@ describe("authorized, commit-bound client PCB summary ingestion", () => {
     });
     mockQuery.mockImplementation(async (sql: string, params: unknown[] = []) => {
       const norm = sql.toLowerCase().replace(/\s+/g, " ");
+      if (norm.includes("select installations.account_login as tenant")) return { rows: [{ tenant: "owner-test" }] };
       if (norm.includes("from repositories")) return { rows: [{ github_installation_id: 4242 }] };
       if (norm.includes("insert into run_pcb_footprint_summaries")) return { rows: [{ run_id: params[0] }] };
       if (norm.includes("insert into reviews"))
@@ -127,6 +128,81 @@ describe("authorized, commit-bound client PCB summary ingestion", () => {
     const response = await post(body);
     expect(response.status).toBe(400);
     expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("records server-resolved organization/repository policy provenance, not caller-submitted policy", async () => {
+    const base = mockQuery.getMockImplementation();
+    const timestamp = "2026-11-01T17:00:00.000Z";
+    mockQuery.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      if (sql.toLowerCase().includes("from review_policies")) {
+        expect(params[0]).toBe("owner-test");
+        const scope = params[1];
+        if (scope === "organization") {
+          return {
+            rows: [
+              {
+                id: "88000000-0000-4000-8000-000000000001",
+                tenantId: "owner-test",
+                scope,
+                scopeId: null,
+                name: "Org baseline",
+                description: null,
+                requiredChecklist: ["release-review"],
+                requiredRoles: ["hardware-lead"],
+                severityGate: "high",
+                requireEvidencePack: true,
+                requireExternalReview: false,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+            ],
+          };
+        }
+        if (scope === "repository") {
+          return {
+            rows: [
+              {
+                id: "88000000-0000-4000-8000-000000000002",
+                tenantId: "owner-test",
+                scope,
+                scopeId: "repo-1",
+                name: "Repo override",
+                description: null,
+                requiredChecklist: ["fab-checklist"],
+                requiredRoles: [],
+                severityGate: null,
+                requireEvidencePack: false,
+                requireExternalReview: true,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+            ],
+          };
+        }
+      }
+      return await base?.(sql, params);
+    });
+    const response = await post({ ...payload, policySnapshot: { name: "FORGED", severityGate: "error" } });
+    // The API rejects the unknown policySnapshot field only if its schema is strict;
+    // regardless, it must never use a client's effective-policy claim.
+    expect(response.status).toBe(201);
+    const insertion = mockQuery.mock.calls.find(([sql]) => String(sql).includes("insert into review_revisions"));
+    expect(insertion).toBeDefined();
+    if (!insertion) throw new Error("Missing Review revision insertion");
+    const record = JSON.parse((insertion[1] as unknown[])[9] as string);
+    expect(record.recordedAt).toEqual(expect.any(String));
+    expect(record.policy).toMatchObject({
+      name: "Org baseline",
+      requiredChecklist: ["fab-checklist"],
+      requiredRoles: ["hardware-lead"],
+      sourceLayer: "repository",
+      severityGate: "high",
+      provenance: {
+        requiredChecklist: { layer: "repository", policyName: "Repo override" },
+        requiredRoles: { layer: "organization", policyName: "Org baseline" },
+      },
+    });
+    expect(JSON.stringify(record)).not.toContain("FORGED");
   });
 
   it("preserves older client compatibility when no summary is submitted", async () => {

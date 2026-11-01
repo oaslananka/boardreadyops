@@ -52,6 +52,26 @@ export const effectivePolicyProvenanceSchema = z.object({
 });
 export type EffectivePolicyProvenance = z.infer<typeof effectivePolicyProvenanceSchema>;
 
+export const recordedReviewPolicySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(128),
+  sourceLayer: policySourceLayerSchema,
+  requiredChecklist: z.array(z.string().min(1).max(128)).max(20),
+  requiredRoles: z.array(z.string().min(1).max(64)).max(10),
+  severityGate: policySeverityGateSchema.optional(),
+  requireEvidencePack: z.boolean(),
+  requireExternalReview: z.boolean(),
+  provenance: effectivePolicyProvenanceSchema,
+});
+export type RecordedReviewPolicy = z.infer<typeof recordedReviewPolicySchema>;
+
+/** Captured at accepted cloud run ingestion; not a signed local-execution verdict. */
+export const reviewPolicyRecordSchema = z.object({
+  recordedAt: z.string().datetime(),
+  policy: recordedReviewPolicySchema.nullable(),
+});
+export type ReviewPolicyRecordSnapshot = z.infer<typeof reviewPolicyRecordSchema>;
+
 export const effectivePolicySchema = z.object({
   policy: reviewPolicySchema,
   sourceLayer: policySourceLayerSchema,

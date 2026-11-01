@@ -1,4 +1,4 @@
-import type { SnapshotArtifact } from "@boardreadyops/contracts";
+import { reviewPolicyRecordSchema, type SnapshotArtifact } from "@boardreadyops/contracts";
 import { loadRunPcbFootprintSummary } from "@boardreadyops/db";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
@@ -69,6 +69,7 @@ interface StoredDbRevisionRow {
   base_commit_sha: string | null;
   head_commit_sha: string;
   evidence_digest: string;
+  policy_snapshot?: unknown;
 }
 
 interface StoredDbFindingRow {
@@ -482,7 +483,7 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
     }
 
     const revResult = await executor.query(
-      `SELECT id, sequence, base_run_id, head_run_id, base_commit_sha, head_commit_sha, evidence_digest
+      `SELECT id, sequence, base_run_id, head_run_id, base_commit_sha, head_commit_sha, evidence_digest, policy_snapshot
        FROM review_revisions
        WHERE id = $1 AND review_id = $2
        LIMIT 1`,
@@ -494,6 +495,9 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       return null;
     }
 
+    const savedPolicyResult = reviewPolicyRecordSchema.safeParse(revision.policy_snapshot);
+    const recordedPolicy = savedPolicyResult.success ? savedPolicyResult.data : null;
+    // Historical revisions lacking a snapshot must not be silently relabelled as recorded evidence.
     const [findings, evidenceItems, governance, headSnapshots, baseSnapshots, effectivePolicy, pcbFootprintSummary] =
       await Promise.all([
         loadReconstructedFindings(executor, reviewId, revision.head_run_id),
@@ -507,7 +511,7 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
           revision.base_run_id,
           revision.head_run_id,
         ),
-        session
+        session && !recordedPolicy
           ? resolveReviewEffectivePolicy({ executor, repositoryId: row.repository_id, tenantId: row.account_login })
           : Promise.resolve(null),
         loadRunPcbFootprintSummary(
@@ -550,19 +554,23 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       ...(pcbFootprintSummary ? { pcbFootprintSummary } : {}),
       headSnapshots: headSnapshots.length > 0 ? headSnapshots : undefined,
       baseSnapshots: baseSnapshots.length > 0 ? baseSnapshots : undefined,
-      effectivePolicy: effectivePolicy
-        ? {
-            id: effectivePolicy.id,
-            name: effectivePolicy.name,
-            sourceLayer: effectivePolicy.sourceLayer,
-            requiredChecklist: effectivePolicy.requiredChecklist,
-            requiredRoles: effectivePolicy.requiredRoles,
-            severityGate: effectivePolicy.severityGate,
-            requireEvidencePack: effectivePolicy.requireEvidencePack,
-            requireExternalReview: effectivePolicy.requireExternalReview,
-            provenance: effectivePolicy.provenance,
-          }
-        : undefined,
+      ...(session && recordedPolicy ? { policyRecordedAt: recordedPolicy.recordedAt } : {}),
+      effectivePolicy:
+        session && recordedPolicy
+          ? (recordedPolicy.policy ?? undefined)
+          : effectivePolicy
+            ? {
+                id: effectivePolicy.id,
+                name: effectivePolicy.name,
+                sourceLayer: effectivePolicy.sourceLayer,
+                requiredChecklist: effectivePolicy.requiredChecklist,
+                requiredRoles: effectivePolicy.requiredRoles,
+                severityGate: effectivePolicy.severityGate,
+                requireEvidencePack: effectivePolicy.requireEvidencePack,
+                requireExternalReview: effectivePolicy.requireExternalReview,
+                provenance: effectivePolicy.provenance,
+              }
+            : undefined,
     };
   } finally {
     await executor.close();

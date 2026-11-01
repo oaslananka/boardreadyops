@@ -160,6 +160,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0108_data_export_manifest_staging.sql",
       "0109_data_export_manifest_preview.sql",
       "0110_artifact_export_copy_unlink_fence.sql",
+      "0111_review_policy_run_ingestion_snapshot.sql",
     ]);
   });
 

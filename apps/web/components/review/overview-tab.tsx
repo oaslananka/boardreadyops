@@ -284,8 +284,16 @@ export function OverviewTab({
 
       {review.effectivePolicy ? (
         <Panel
-          title="Current configured policy (not a run snapshot)"
-          description="The policy below is resolved from the current organization and repository settings. It is not historical evidence of the policy used for this review revision; a run-bound policy snapshot is not recorded. Sources identify the layer for each displayed field."
+          title={
+            review.policyRecordedAt
+              ? "Policy recorded at run ingestion"
+              : "Current configured policy (not a run snapshot)"
+          }
+          description={
+            review.policyRecordedAt
+              ? `Captured on ${review.policyRecordedAt} when this run was accepted by the cloud. This records configured policy and field provenance, not proof that the runner enforced it during local execution or signed release evidence.`
+              : "The policy below is resolved from the current organization and repository settings. It is not historical evidence of the policy used for this review revision; a run-bound policy snapshot is not recorded. Sources identify the layer for each displayed field."
+          }
           tone="inset"
         >
           <DefinitionGrid>
@@ -328,6 +336,16 @@ export function OverviewTab({
               )}
             </Definition>
           </DefinitionGrid>
+        </Panel>
+      ) : null}
+
+      {review.policyRecordedAt && !review.effectivePolicy ? (
+        <Panel
+          title="No policy recorded at run ingestion"
+          description={`No organization/repository policy was configured when this run was accepted on ${review.policyRecordedAt}. This is not proof of the runner's local policy or a release approval.`}
+          tone="inset"
+        >
+          <p className="text-sm">No policy was configured at this ingestion boundary.</p>
         </Panel>
       ) : null}
 

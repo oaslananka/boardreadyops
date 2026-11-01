@@ -11,6 +11,7 @@ import {
   ReviewPolicyStore,
   ReviewStore,
 } from "@boardreadyops/db";
+import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 
 function toContractPolicy(record: ReviewPolicyRecord): ReviewPolicy {
@@ -27,7 +28,7 @@ export type ResolvedReviewEffectivePolicy = ReviewPolicy & {
 };
 
 export async function resolveReviewEffectivePolicy(input: {
-  executor: PgQueryExecutor;
+  executor: SqlQueryExecutor;
   repositoryId: string;
   tenantId: string;
 }): Promise<ResolvedReviewEffectivePolicy | null> {
