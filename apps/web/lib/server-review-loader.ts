@@ -1,7 +1,13 @@
-import { reviewPolicyRecordSchema, type SnapshotArtifact } from "@boardreadyops/contracts";
+import {
+  effectivePolicyProvenanceSchema,
+  policySeverityGateSchema,
+  policySourceLayerSchema,
+  type SnapshotArtifact,
+} from "@boardreadyops/contracts";
 import { loadRunPcbFootprintSummary } from "@boardreadyops/db";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { z } from "zod";
 import { type CloudPersistenceConfiguration, resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
 import {
   type DemoApproval,
@@ -17,6 +23,24 @@ import { reviewFixturesEnabled } from "./review-listing.js";
 import { resolveReviewEffectivePolicy } from "./review-readiness.js";
 import { cancelledSubscriptionProbe } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
+
+/** Private cloud presentation schema: not a CLI/Action contract or local execution attestation. */
+const reviewPolicyRecordSchema = z.object({
+  recordedAt: z.string().datetime(),
+  policy: z
+    .object({
+      id: z.string().uuid(),
+      name: z.string().min(1).max(128),
+      sourceLayer: policySourceLayerSchema,
+      requiredChecklist: z.array(z.string().min(1).max(128)).max(20),
+      requiredRoles: z.array(z.string().min(1).max(64)).max(10),
+      severityGate: policySeverityGateSchema.optional(),
+      requireEvidencePack: z.boolean(),
+      requireExternalReview: z.boolean(),
+      provenance: effectivePolicyProvenanceSchema,
+    })
+    .nullable(),
+});
 
 function mapCanonicalSeverity(raw: string): DemoFinding["severity"] {
   const lower = raw.toLowerCase();

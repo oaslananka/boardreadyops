@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type {
-  RecordedReviewPolicy,
+  EffectivePolicyProvenance,
+  PolicySeverityGate,
+  PolicySourceLayer,
   Review,
   ReviewDecision,
   ReviewRevision,
@@ -47,6 +49,19 @@ export type StoredFindingRow = {
   kind: string | null;
   fingerprint: string | null;
   waived_at: string | Date | null;
+};
+
+/** Cloud-ingestion configuration record, not part of the public runner/CLI wire contract. */
+export type RecordedReviewPolicy = {
+  id: string;
+  name: string;
+  sourceLayer: PolicySourceLayer;
+  requiredChecklist: string[];
+  requiredRoles: string[];
+  severityGate?: PolicySeverityGate | undefined;
+  requireEvidencePack: boolean;
+  requireExternalReview: boolean;
+  provenance: EffectivePolicyProvenance;
 };
 
 export interface UpsertReviewInput {
