@@ -4,8 +4,8 @@ import nextConfig from "../../../apps/web/next.config.mjs";
 import { proxy, config as proxyConfig, wantsMarkdown } from "../../../apps/web/proxy.js";
 
 describe("public discovery Next.js routing", () => {
-  it("runs the request-aware proxy only for the public homepage", () => {
-    expect(proxyConfig).toEqual({ matcher: ["/"] });
+  it("runs a shared proxy so the optional marketing-only runtime can deny application routes", () => {
+    expect(proxyConfig).toEqual({ matcher: ["/:path*"] });
   });
 
   it("honors Markdown Accept quality instead of substring matching", () => {

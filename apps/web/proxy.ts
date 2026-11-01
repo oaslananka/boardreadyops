@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { isMarketingSurface, marketingRouteAllowed } from "./lib/marketing-surface.js";
 
 export const HOMEPAGE_LINK_HEADER =
   '<https://boardreadyops.com/>; rel="canonical", </llms.txt>; rel="describedby"' as const;
@@ -30,6 +31,18 @@ function appendHeaderToken(headers: Headers, name: string, token: string): void 
 }
 
 export function proxy(request: NextRequest) {
+  const mode = process.env.BOARDREADYOPS_SITE_SURFACE;
+  if (mode && mode !== "app" && mode !== "marketing") {
+    return new NextResponse(null, { status: 503 });
+  }
+  const path = request.nextUrl.pathname;
+  if (isMarketingSurface() && !marketingRouteAllowed(path, request.method)) {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  // The request-aware Markdown rewrite and discovery headers belong only to
+  // the homepage. Other application routes retain their existing behavior.
+  if (path !== "/") return NextResponse.next();
   const safeReadMethod = request.method === "GET" || request.method === "HEAD";
   const response =
     safeReadMethod && wantsMarkdown(request.headers.get("accept"))
@@ -42,5 +55,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/"],
+  matcher: ["/:path*"],
 };
