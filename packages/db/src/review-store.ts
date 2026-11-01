@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import type { Review, ReviewDecision, ReviewRevision, ReviewStatus } from "@boardreadyops/contracts";
+import type {
+  EffectivePolicyProvenance,
+  PolicySeverityGate,
+  PolicySourceLayer,
+  Review,
+  ReviewDecision,
+  ReviewRevision,
+  ReviewStatus,
+} from "@boardreadyops/contracts";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
 export type StoredReviewRow = {
@@ -27,6 +35,7 @@ export type StoredReviewRevisionRow = {
   base_commit_sha: string | null;
   head_commit_sha: string;
   evidence_digest: string;
+  policy_snapshot?: unknown;
   created_at: string | Date;
 };
 
@@ -42,6 +51,19 @@ export type StoredFindingRow = {
   waived_at: string | Date | null;
 };
 
+/** Cloud-ingestion configuration record, not part of the public runner/CLI wire contract. */
+export type RecordedReviewPolicy = {
+  id: string;
+  name: string;
+  sourceLayer: PolicySourceLayer;
+  requiredChecklist: string[];
+  requiredRoles: string[];
+  severityGate?: PolicySeverityGate | undefined;
+  requireEvidencePack: boolean;
+  requireExternalReview: boolean;
+  provenance: EffectivePolicyProvenance;
+};
+
 export interface UpsertReviewInput {
   repositoryId: string;
   pullRequestNumber?: number;
@@ -51,6 +73,8 @@ export interface UpsertReviewInput {
   baseRunId?: string;
   baseCommitSha?: string;
   evidenceDigest: string;
+  /** Only pass server-resolved policy, never a client-supplied snapshot. */
+  policyAtIngestion?: RecordedReviewPolicy | null;
   createdBy?: string;
 }
 
@@ -169,8 +193,8 @@ export class ReviewStore {
 
     await this.db.query(
       `insert into review_revisions (
-        id, review_id, sequence, base_run_id, head_run_id, base_commit_sha, head_commit_sha, evidence_digest, created_at
-      ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        id, review_id, sequence, base_run_id, head_run_id, base_commit_sha, head_commit_sha, evidence_digest, created_at, policy_snapshot
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`,
       [
         revisionId,
         reviewId,
@@ -181,6 +205,9 @@ export class ReviewStore {
         input.headCommitSha,
         input.evidenceDigest,
         now,
+        input.policyAtIngestion === undefined
+          ? null
+          : JSON.stringify({ recordedAt: now, policy: input.policyAtIngestion }),
       ],
     );
 

@@ -114,6 +114,8 @@ export interface DemoReview {
   pcbFootprintSummary?: PcbFootprintSummary | undefined;
   /** Effective cloud governance policy plus field-level inheritance provenance. */
   effectivePolicy?: DemoEffectivePolicy | undefined;
+  /** Trusted snapshot timestamp from accepted run ingestion, not local execution time. */
+  policyRecordedAt?: string | undefined;
 }
 
 type DemoChangedFile = {

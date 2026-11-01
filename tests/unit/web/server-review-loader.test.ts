@@ -237,6 +237,86 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
     });
   });
 
+  it("uses a validated policy captured at run ingestion, never the current mutable policy", async () => {
+    vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
+      mode: "postgres",
+      databaseUrl: "postgresql://postgres:postgres@localhost:5432/boardreadyops",
+    });
+    const snapshotAt = "2026-11-01T17:00:00.000Z";
+    mockLoaderQuery.mockImplementation(async (sql: string) => {
+      const norm = sql.toLowerCase().replace(/\s+/g, " ");
+      if (norm.includes("from reviews join repositories")) {
+        return {
+          rows: [
+            {
+              id: reviewId,
+              repository_id: "r1",
+              pull_request_number: 3,
+              title: "Review",
+              status: "active",
+              decision: "pending",
+              base_run_id: null,
+              head_run_id: "run1",
+              current_revision_id: "rev1",
+              created_by: "owner",
+              created_at: now,
+              updated_at: now,
+              completed_at: null,
+              owner: "alice",
+              name: "pcb",
+              private: false,
+              disabled_at: null,
+              suspended_at: null,
+              github_installation_id: 47001,
+              account_login: "alice",
+            },
+          ],
+        };
+      }
+      if (norm.includes("from review_revisions"))
+        return {
+          rows: [
+            {
+              id: "rev1",
+              sequence: 1,
+              base_run_id: null,
+              head_run_id: "run1",
+              base_commit_sha: null,
+              head_commit_sha: "1".repeat(40),
+              evidence_digest: "a".repeat(64),
+              policy_snapshot: {
+                recordedAt: snapshotAt,
+                policy: {
+                  id: "88000000-0000-4000-8000-000000000009",
+                  name: "Original policy",
+                  sourceLayer: "organization",
+                  requiredChecklist: ["release-review"],
+                  requiredRoles: [],
+                  severityGate: "high",
+                  requireEvidencePack: false,
+                  requireExternalReview: false,
+                  provenance: {
+                    requiredChecklist: { layer: "organization", policyId: "p1", policyName: "Original policy" },
+                    requiredRoles: null,
+                    severityGate: null,
+                    requireEvidencePack: null,
+                    requireExternalReview: null,
+                  },
+                },
+              },
+            },
+          ],
+        };
+      if (norm.includes("from review_policies")) throw new Error("historical snapshot must not reread current policy");
+      return { rows: [] };
+    });
+    const review = await loadServerReview(reviewId, authorizedSession);
+    expect(review?.policyRecordedAt).toBe(snapshotAt);
+    expect(review?.effectivePolicy?.name).toBe("Original policy");
+    expect(review?.effectivePolicy?.requiredChecklist).toEqual(["release-review"]);
+    expect(mockLoaderQuery.mock.calls.some(([sql]) => String(sql).includes("review_policies"))).toBe(false);
+  });
+
   it("populates headSnapshots from run_snapshots recorded for the revision's head run", async () => {
     vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
       mode: "postgres",

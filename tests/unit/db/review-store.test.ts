@@ -69,6 +69,7 @@ class InMemoryMockDb implements SqlQueryExecutor {
         head_commit_sha: params[6] as string,
         evidence_digest: params[7] as string,
         created_at: params[8] as string,
+        policy_snapshot: params[9] ? JSON.parse(params[9] as string) : null,
       };
       this.revisions.push(row);
       return { rows: [row] };
@@ -164,6 +165,23 @@ describe("ReviewStore", () => {
     expect(revisions).toHaveLength(2);
     expect(revisions[0]?.sequence).toBe(1);
     expect(revisions[1]?.sequence).toBe(2);
+  });
+
+  it("stores an explicit absence-of-policy record only when run ingestion supplied one", async () => {
+    const db = new InMemoryMockDb();
+    const store = new ReviewStore(db);
+    const captured = await store.upsertReviewForRun({
+      repositoryId: "repo-1",
+      title: "Run with no policy",
+      headRunId: "run-1",
+      headCommitSha: "a".repeat(40),
+      evidenceDigest: "b".repeat(64),
+      policyAtIngestion: null,
+    });
+    expect(captured.revision.sequence).toBe(1);
+    const revision = db.revisions[0] as StoredReviewRevisionRow & { policy_snapshot?: unknown };
+    expect(revision.policy_snapshot).toBeDefined();
+    expect(revision.policy_snapshot).toMatchObject({ policy: null });
   });
 
   it("enforces tenant isolation across repositories", async () => {

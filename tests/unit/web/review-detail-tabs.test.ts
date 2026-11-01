@@ -301,6 +301,22 @@ describe("Review Detail Tabs", () => {
     expect(overview).toContain("Organization · Org baseline");
     expect(overview).toContain("fab-checklist");
     expect(overview).toContain("hardware-lead");
+
+    const recorded = renderToStaticMarkup(
+      createElement(OverviewTab, {
+        review: { ...policyReview, policyRecordedAt: "2026-11-01T17:00:00.000Z" },
+      }),
+    );
+    expect(recorded).toContain("Policy recorded at run ingestion");
+    expect(recorded).toContain("not proof that the runner enforced it");
+    expect(recorded).not.toContain("Current configured policy (not a run snapshot)");
+
+    const noPolicy = renderToStaticMarkup(
+      createElement(OverviewTab, {
+        review: { ...review, policyRecordedAt: "2026-11-01T17:00:00.000Z" },
+      }),
+    );
+    expect(noPolicy).toContain("No policy recorded at run ingestion");
   });
 
   it("renders ChangesTab with schematic, layout, and BOM diffs", () => {

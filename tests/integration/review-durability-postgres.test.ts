@@ -5,6 +5,7 @@ import { loadServerReview } from "../../apps/web/lib/server-review-loader.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { ReviewApprovalStore } from "../../packages/db/src/review-approval-store.js";
 import { ReviewCommentStore } from "../../packages/db/src/review-comment-store.js";
+import { ReviewStore } from "../../packages/db/src/review-store.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
 const connectionString = getPostgresTestConnectionString();
@@ -119,6 +120,62 @@ describeDatabase("Review Durability & Atomic Approval Persistence (PostgreSQL)",
     await database().query(`DELETE FROM repositories WHERE id = $1`, [repositoryId]);
     await database().query(`DELETE FROM installations WHERE id = $1`, [installationId]);
     await executor.close();
+  });
+
+  it("retains distinct run-ingestion policy snapshots across later Review revisions", async () => {
+    const store = new ReviewStore(database());
+    const captured = {
+      id: "88000000-0000-4000-8000-000000000088",
+      name: "Release gate at ingest",
+      sourceLayer: "organization" as const,
+      requiredChecklist: ["design-review"],
+      requiredRoles: ["hardware-lead"],
+      severityGate: "high" as const,
+      requireEvidencePack: true,
+      requireExternalReview: false,
+      provenance: {
+        requiredChecklist: { layer: "organization" as const, policyId: "p1", policyName: "Release gate at ingest" },
+        requiredRoles: null,
+        severityGate: null,
+        requireEvidencePack: null,
+        requireExternalReview: null,
+      },
+    };
+    const first = await store.upsertReviewForRun({
+      repositoryId,
+      pullRequestNumber: 880,
+      title: "Captured run policy",
+      headRunId: runId,
+      headCommitSha: "1".repeat(40),
+      evidenceDigest,
+      policyAtIngestion: captured,
+    });
+    try {
+      const firstSnapshot = (await database().query("SELECT policy_snapshot FROM review_revisions WHERE id=$1", [
+        first.revision.id,
+      ])) as { rows?: Array<{ policy_snapshot: { recordedAt: string; policy: typeof captured } }> };
+      expect(firstSnapshot.rows?.[0]?.policy_snapshot.policy).toEqual(captured);
+      expect(firstSnapshot.rows?.[0]?.policy_snapshot.recordedAt).toMatch(/^2026-/u);
+      const second = await store.upsertReviewForRun({
+        repositoryId,
+        pullRequestNumber: 880,
+        title: "Captured run policy",
+        headRunId: runId,
+        headCommitSha: "2".repeat(40),
+        evidenceDigest: "b".repeat(64),
+        policyAtIngestion: null,
+      });
+      const snapshots = (await database().query(
+        "SELECT id, policy_snapshot FROM review_revisions WHERE review_id=$1 ORDER BY sequence",
+        [first.review.id],
+      )) as { rows?: Array<{ id: string; policy_snapshot: { recordedAt: string; policy: typeof captured | null } }> };
+      expect(snapshots.rows).toHaveLength(2);
+      expect(snapshots.rows?.[0]?.policy_snapshot.policy).toEqual(captured);
+      expect(snapshots.rows?.[1]?.id).toBe(second.revision.id);
+      expect(snapshots.rows?.[1]?.policy_snapshot.policy).toBeNull();
+    } finally {
+      await database().query("DELETE FROM reviews WHERE id=$1", [first.review.id]);
+    }
   });
 
   it("persists approval and transitions review decision atomically in a single statement", async () => {
