@@ -9,6 +9,30 @@ The public source fixtures are part of this repository. Inspect
 and [the corrected board](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo/fixed).
 They demonstrate **expected fail** and **expected pass** outcomes without needing credentials or a hosted service.
 
+## WARN, policy and changed-component walkthroughs
+
+The live public GitHub App demonstrations cover **PASS** and **BLOCK**. The
+additional **WARN** example is a reproducible checked-in **CLI report**, not a
+hosted App WARN Check Run:
+
+- [Prototype-ready scenario report](https://github.com/oaslananka/boardreadyops/blob/main/examples/scenarios/prototype-ready/report.json):
+  one medium `manufacturing.fab-notes` finding, no high-severity blocker;
+  `readiness.status=at-risk` and `summary.failed=false` under the configured
+  `fail-on: high` threshold. [Inspect source and config](https://github.com/oaslananka/boardreadyops/tree/main/examples/scenarios/prototype-ready).
+- [Blocked lifecycle/policy scenario report](https://github.com/oaslananka/boardreadyops/blob/main/examples/scenarios/failing-pr/report.json):
+  high findings include `bom.eol-detection` (NRND component), `bom.missing-mpn`
+  and `bom.compliance`; non-blocking supply-risk findings also appear.
+  [Inspect config](https://github.com/oaslananka/boardreadyops/blob/main/examples/scenarios/failing-pr/boardreadyops.yml).
+- [Golden broken vs fixed rule inventory](https://github.com/oaslananka/boardreadyops/blob/main/examples/golden-demo/expected-findings.json):
+  the paired fixtures change the open board outline, duplicate reference,
+  missing MPN and non-compliant BOM row. The fixed fixture has zero findings.
+  This is a reproducible before/after *fixture comparison*, not an authenticated
+  customer revision history.
+
+All three examples are synthetic. They illustrate evidence and policy behavior;
+they do not claim customer manufacturing attestation, an independent
+source-to-Gerber proof, or a third native GitHub App WARN verdict.
+
 ## Verified public GitHub pull requests
 
 The original standalone demo repositories were retired. Two **public, synthetic**

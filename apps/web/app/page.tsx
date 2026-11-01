@@ -512,6 +512,80 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
+            <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <article className="rounded-md border border-border bg-card p-5" aria-labelledby="warn-demo-heading">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="size-2 rounded-full bg-warning" aria-hidden="true" />
+                  <span>WARN · reproducible source report</span>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-foreground">Non-blocking</span>
+                </div>
+                <h3 id="warn-demo-heading" className="mt-3 text-base font-bold text-foreground">
+                  A prototype with one manufacturing advisory
+                </h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  The synthetic prototype-ready run reports one medium fabrication-notes finding, with zero
+                  high-severity blockers. Its recorded readiness is at-risk, but the configured high-severity release
+                  threshold does not block this example.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                  <a
+                    href="https://github.com/oaslananka/boardreadyops/blob/main/examples/scenarios/prototype-ready/report.json"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline underline-offset-2"
+                  >
+                    Inspect WARN report
+                  </a>
+                  <a
+                    href="https://github.com/oaslananka/boardreadyops/tree/main/examples/scenarios/prototype-ready"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline underline-offset-2"
+                  >
+                    Reproduce source
+                  </a>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  This is a checked-in CLI scenario report, not a hosted GitHub App WARN Check Run.
+                </p>
+              </article>
+              <article className="rounded-md border border-border bg-card p-5" aria-labelledby="change-demo-heading">
+                <div className="text-xs text-muted-foreground">Before → after · policy and component evidence</div>
+                <h3 id="change-demo-heading" className="mt-3 text-base font-bold text-foreground">
+                  See what actually changes the release decision
+                </h3>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                  <li>PCB: close the open Edge.Cuts outline and resolve duplicate R1 references.</li>
+                  <li>BOM: supply the missing MPN and replace the non-compliant part.</li>
+                  <li>
+                    Policy: the separate failing-pr scenario blocks NRND lifecycle and missing MPN at the high
+                    threshold.
+                  </li>
+                  <li>Evidence: compare the broken and fixed source fixtures with the recorded findings.</li>
+                </ul>
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                  <a
+                    href="https://github.com/oaslananka/boardreadyops/blob/main/examples/golden-demo/expected-findings.json"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline underline-offset-2"
+                  >
+                    Before/after findings
+                  </a>
+                  <a
+                    href="https://github.com/oaslananka/boardreadyops/blob/main/examples/scenarios/failing-pr/report.json"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline underline-offset-2"
+                  >
+                    Lifecycle and policy report
+                  </a>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  These are separate synthetic examples; they are not one recorded customer revision history.
+                </p>
+              </article>
+            </div>
             <p className="mt-4 text-xs text-muted-foreground">
               Synthetic hardware is included in the repository. Run{" "}
               <code className="rounded-sm bg-muted px-1.5 py-0.5">boardreadyops run examples/golden-demo/broken</code>{" "}
