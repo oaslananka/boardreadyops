@@ -259,6 +259,11 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("No validated revisions to share yet");
     expect(markup).toContain('href="/runs"');
     expect(markup).toContain("Inspect runs");
+    expect(markup).toContain("A passing readiness run or runner-generated draft archive cannot be shared directly.");
+    expect(markup).toContain("independently verified source evidence");
+    expect(markup).not.toContain(
+      "Run BoardReadyOps on a connected GitHub project until it completes with a passing manufacturing archive",
+    );
     // The form would be a control that cannot succeed, so it is absent rather than disabled.
     expect(markup).not.toContain("Create guest link");
   });
@@ -320,8 +325,8 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("Review your boards");
     expect(markup).toContain("Prepare a manufacturing delivery");
     expect(markup).toContain("A Review is not a");
-    expect(markup).toContain("validated manufacturing archive from a passing run");
-    expect(markup).toContain("Creating a workspace alone does not approve");
+    expect(markup).toContain("independently validated manufacturing archive");
+    expect(markup).toContain("Creating a workspace or running readiness checks does not approve fabrication");
     expect(markup).toContain('href="/reviews"');
     expect(markup).toContain('href="/runs"');
     expect(markup).toContain('href="/projects"');

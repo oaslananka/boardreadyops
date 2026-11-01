@@ -222,8 +222,9 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                     }
                   >
                     <p>
-                      Start with a passing run that produced a manufacturing archive. Register its validated evidence
-                      here before sharing.
+                      A passing readiness run is not a shareable manufacturing package. Runners may upload draft
+                      archives, but sharing requires separately verified source-to-export evidence and a validated
+                      package revision.
                     </p>
                   </EmptyState>
                 }
@@ -233,7 +234,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
             {result.selected.role !== "viewer" && result.revisionCandidates.length > 0 ? (
               <Panel
                 title="Register validated revision"
-                description="Turn persisted manufacturing evidence from a passing BoardReadyOps run into a shareable revision."
+                description="Register an independently validated manufacturing archive from a verified passing run."
               >
                 <ValidatedRevisionRegisterForm
                   workspaceId={result.selected.id}
@@ -323,9 +324,9 @@ function CreatePanel({
     return (
       <Panel id="share-package" title="Share a package">
         <Alert tone="info" title="No validated revisions to share yet">
-          Run BoardReadyOps on a connected GitHub project until it completes with a passing manufacturing archive, then
-          register that artifact as a revision above. Guest links are not issued for revision records without live
-          validation evidence.
+          A passing readiness run or runner-generated draft archive cannot be shared directly. A manufacturing export
+          needs independently verified source evidence and a validated package revision before an owner or admin can
+          authorize a guest link. Existing runs remain available to inspect; they do not grant delivery eligibility.
           <div className="mt-3">
             <Button asChild variant="outline">
               <Link href="/runs">Inspect runs</Link>
@@ -401,11 +402,12 @@ function DeliveriesUnavailable({ state }: Readonly<{ state: "signed-out" | "not-
       </Panel>
       <Panel
         title="Prepare a manufacturing delivery"
-        description="Delivery links require a CAD workspace project revision and a validated manufacturing archive from a passing run."
+        description="Guest links require a verified passing run, an independently validated manufacturing archive and owner/admin sharing authorization."
       >
         <p className="text-sm text-muted-foreground">
-          Creating a workspace alone does not approve a design or issue a guest link. Register eligible evidence before
-          sharing a package with a manufacturing partner.
+          Creating a workspace or running readiness checks does not approve fabrication or issue a guest link. The
+          standard runner's draft archive is not delivery-eligible; separately verified source-to-export evidence and
+          explicit owner/admin permission are required.
         </p>
         <Button asChild className="mt-4">
           <Link href="/projects">Set up a CAD workspace</Link>
