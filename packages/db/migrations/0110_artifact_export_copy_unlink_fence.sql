@@ -2,7 +2,7 @@
 -- Unresolved reservations are quarantine state: NEVER expire or clear on a timer.
 -- This does not authorize customer delivery, restart expired export claims, or
 -- bypass legal holds. Deployment still requires all old unlink workers quiesced.
-create table if not exists public.artifact_export_copy_reservations (
+create table if not exists artifact_export_copy_reservations (
   token uuid primary key,
   export_id text not null,
   artifact_id text not null,
