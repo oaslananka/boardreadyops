@@ -70,13 +70,11 @@ Inheritance is field-aware:
 - `requireEvidencePack` and `requireExternalReview` are monotonic requirements: a repository may turn an inherited requirement on, but cannot turn an organization requirement off by setting `false`; and
 - every effective field records the policy id, policy name, and layer that supplied it.
 
-The review Overview shows this field-level provenance under **Effective Policy & Inheritance**. This makes repository-specific exceptions visible without pretending the whole effective policy came from one layer. The same resolver feeds review-readiness enforcement, so the displayed provenance and the approval gate use the same effective-policy calculation.
-
-This provenance describes the policy that is effective **now** for the review.
+The review Overview shows field-level provenance for the effective organization/repository policy. New Reviews accepted through `POST /api/v1/runs` record the server-resolved policy (or explicit no-policy state) with the revision during run ingestion and display **Policy recorded at run ingestion**. Historical Reviews without a stored snapshot continue to display **Current configured policy (not a run snapshot)**. The review-readiness and approval gates still resolve **current** policy independently; viewing the ingestion snapshot does not change enforcement.
 
 Policy mutations are separately recorded in the tenant-scoped, append-only `review_policy_audit_events` history. Create, update, and delete mutations write their audit event in the same PostgreSQL statement as the policy change, including the authenticated GitHub actor plus before/after policy snapshots where applicable. The history remains available after a policy is deleted and can be read for an owned policy through `GET /api/v1/policies/:id/audit`.
 
-Historical **per-run effective-policy snapshots** are still separate work. The mutation audit proves how governance configuration changed over time; it does not by itself prove which effective policy a past release run evaluated. Do not treat the current-policy view as immutable historical run evidence until run-scoped policy snapshots are persisted.
+Migration 0111 retains the effective policy and per-field source at cloud run ingestion for new Review revisions. The revision records the run, commit and evidence digest separately. Older revisions are **not backfilled**, and direct `POST /api/v1/reviews` creation does not create an ingestion snapshot. This is an application-level historical record of cloud configuration when the run was accepted, **not** a cryptographically signed local runner policy decision, proof of policy evaluation during PCB analysis, or a completed customer evidence export. Policy mutation audits record separate configuration changes.
 
 
 ### Hosted policy usage: organization, repository, and enterprise review teams
@@ -133,21 +131,21 @@ before relying on organization-wide uniformity.
 **Review and audit.** Use `GET /api/v1/policies` to view your tenant's policies;
 `PATCH /api/v1/policies/:id` to update an owned policy; and
 `GET /api/v1/policies/:id/audit` to inspect its append-only mutation history,
-including after deletion. The review Overview displays **current**
-field-level provenance (organization versus repository) under **Effective
-Policy & Inheritance**. The review-readiness decision uses the same resolver
-for its checklist, reviewer-role, and severity inputs. The audit trail records
-*policy mutations*, not the exact effective policy that a historical run used.
+including after deletion. The Review Overview displays **captured field-level provenance** for new
+run-ingested revisions and an explicitly labelled **current policy** for legacy
+revisions without a capture. The review-readiness decision still uses the
+current resolver for its checklist, reviewer-role and severity inputs. The
+mutation audit records policy changes separately from ingestion snapshots.
 Approval and release authority remain separate from policy configuration.
 
 **Team and enterprise boundary.** The policy contract and creation endpoint
 reserve a `team` scope, and the resolver defines an `exception` layer, but
 the hosted review loader currently resolves **only organization and repository
 policies**. Creating a team policy does not make it effective in hosted review
-readiness. Until per-run immutable policy snapshots and the remaining #45
-acceptance are delivered, an exported run/evidence bundle must not be presented
-as reproducing its historical effective policy merely from today's Overview
-or the mutation log.
+readiness. The ingestion-time snapshot is not a signed runner policy verdict and is not
+yet embedded in completed customer evidence bundles. Until the remaining #45
+cross-repository and bundle acceptance is verified, those exports must not be
+presented as proving the exact policy executed by a historical hardware run.
 
 
 ## Opt-in source-bound manufacturing export policy (#771)
