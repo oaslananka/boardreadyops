@@ -1,4 +1,6 @@
+import { Window } from "happy-dom";
 import { isValidElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import HomePage, { metadata as homeMetadata } from "../../../apps/web/app/page.js";
 import { PUBLIC_STRUCTURED_DATA } from "../../../apps/web/components/public-structured-data.js";
@@ -115,6 +117,26 @@ describe("HomePage", () => {
     const links = collectLinks(HomePage());
     expect(links).toContain("https://docs.boardreadyops.com");
     expect(links).toContain("https://docs.boardreadyops.com/security/assurance-case/");
+  });
+
+  it("keeps trust, documentation and setup discoverable in mobile primary navigation", () => {
+    const window = new Window({ url: "https://boardreadyops.com/" });
+    try {
+      window.document.write(renderToStaticMarkup(HomePage()));
+      const nav = window.document.querySelector('nav[aria-label="Mobile navigation"]');
+      expect(nav).not.toBeNull();
+      expect(nav?.className).toContain("lg:hidden");
+      const links = [...(nav?.querySelectorAll("a") ?? [])];
+      expect(links.map((link) => [link.textContent?.trim(), link.getAttribute("href")])).toEqual([
+        ["Product", "#product"],
+        ["Trust", "https://docs.boardreadyops.com/security/assurance-case/"],
+        ["Docs", "https://docs.boardreadyops.com"],
+        ["Setup", "/setup"],
+      ]);
+      expect(window.document.querySelectorAll('nav[aria-label="Global navigation"]')).toHaveLength(1);
+    } finally {
+      void window.close();
+    }
   });
 
   it("no longer ships a separate landing.css and uses the shared design tokens instead", async () => {
