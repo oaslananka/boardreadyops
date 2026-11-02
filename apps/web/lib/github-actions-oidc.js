@@ -108,7 +108,7 @@ export function resetGitHubActionsOidcJwksCache() {
   cachedJwksExpiresAt = 0;
 }
 
-export async function verifyGitHubActionsOidcToken(
+export async function verifyGitHubActionsOidcTokenClaims(
   token,
   {
     runId,
@@ -125,12 +125,12 @@ export async function verifyGitHubActionsOidcToken(
   },
 ) {
   if (typeof token !== "string" || token.length < 100 || token.length > 20_000 || typeof fetchImpl !== "function") {
-    return false;
+    return undefined;
   }
 
   const segments = token.split(".");
   if (segments.length !== 3 || segments.some((segment) => segment.length === 0)) {
-    return false;
+    return undefined;
   }
 
   const [encodedHeader, encodedPayload, encodedSignature] = segments;
@@ -150,7 +150,7 @@ export async function verifyGitHubActionsOidcToken(
       Math.floor(now() / 1000),
     )
   ) {
-    return false;
+    return undefined;
   }
 
   try {
@@ -166,17 +166,37 @@ export async function verifyGitHubActionsOidcToken(
     );
 
     if (matchingKeys.length !== 1) {
-      return false;
+      return undefined;
     }
 
     const publicKey = createPublicKey({ key: matchingKeys[0], format: "jwk" });
-    return verify(
+    const signatureValid = verify(
       "RSA-SHA256",
       Buffer.from(`${encodedHeader}.${encodedPayload}`),
       publicKey,
       Buffer.from(encodedSignature, "base64url"),
     );
+    if (!signatureValid) return undefined;
+
+    // These fields are now backed by GitHub's verified signature, not request headers.
+    const workflowSha = stringClaim(payload, "sha");
+    const workflowRunId = stringClaim(payload, "run_id");
+    if (!workflowSha || !/^[0-9a-f]{40}$/u.test(workflowSha) || !workflowRunId) return undefined;
+    return {
+      workflowSha,
+      workflowRunId,
+      repository: stringClaim(payload, "repository"),
+      repositoryId: stringClaim(payload, "repository_id"),
+      workflowRef: stringClaim(payload, "workflow_ref"),
+      ref: stringClaim(payload, "ref"),
+      event: stringClaim(payload, "event_name"),
+      runnerEnvironment: stringClaim(payload, "runner_environment"),
+    };
   } catch {
-    return false;
+    return undefined;
   }
+}
+
+export async function verifyGitHubActionsOidcToken(token, options) {
+  return (await verifyGitHubActionsOidcTokenClaims(token, options)) !== undefined;
 }

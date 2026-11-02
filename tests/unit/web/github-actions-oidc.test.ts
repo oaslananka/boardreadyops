@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   resetGitHubActionsOidcJwksCache,
   verifyGitHubActionsOidcToken,
+  verifyGitHubActionsOidcTokenClaims,
 } from "../../../apps/web/lib/github-actions-oidc.js";
 
 const runId = "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d";
@@ -121,6 +122,43 @@ describe("GitHub Actions OIDC verification", () => {
         now: () => nowMs,
       }),
     ).resolves.toBe(false);
+  });
+
+  it("returns the signed workflow SHA separately from the reviewed target SHA", async () => {
+    const targetSha = "a".repeat(40);
+    const workflowSha = "b".repeat(40);
+    const audience = `boardreadyops-cloud:${runId}:${executionAttemptId}:${targetSha}:standard:none`;
+    const claims = await verifyGitHubActionsOidcTokenClaims(token({ aud: audience, sha: workflowSha }), {
+      runId,
+      executionAttemptId,
+      audience,
+      repositoryId,
+      githubRunId: "29121986402",
+      fetchImpl: jwksFetch(),
+      now: () => nowMs,
+    });
+    expect(claims).toEqual({
+      workflowSha,
+      workflowRunId: "29121986402",
+      repository,
+      repositoryId,
+      workflowRef,
+      ref: "refs/heads/main",
+      event: "workflow_dispatch",
+      runnerEnvironment: "github-hosted",
+    });
+  });
+
+  it("does not return claims for an invalid signature", async () => {
+    const valid = token();
+    const [header, payload] = valid.split(".");
+    const claims = await verifyGitHubActionsOidcTokenClaims(`${header}.${payload}.invalid`, {
+      runId,
+      executionAttemptId,
+      fetchImpl: jwksFetch(),
+      now: () => nowMs,
+    });
+    expect(claims).toBeUndefined();
   });
 
   it("rejects a valid token from a different GitHub Actions workflow run", async () => {

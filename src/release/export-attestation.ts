@@ -20,7 +20,10 @@ const oidcIssuer = "https://token.actions.githubusercontent.com";
 export interface TrustedExportExpectation {
   repository: string;
   repositoryId: string;
+  /** Immutable source commit whose KiCad files were exported. */
   reviewedSha: string;
+  /** Immutable SHA of the target-repository workflow definition that signed the export. */
+  signerSha?: string;
   sourceRef: string;
   workflowPath: string;
   event: string;
@@ -190,6 +193,7 @@ function validExpectation(e: TrustedExportExpectation): boolean {
     repoPattern.test(e.repository) &&
     /^\d+$/u.test(e.repositoryId) &&
     shaPattern.test(e.reviewedSha) &&
+    (e.signerSha === undefined || shaPattern.test(e.signerSha)) &&
     // Only a protected-branch workflow_dispatch is a supported export signer.
     // A signed push/tag/PR run cannot fulfill the target-repository contract.
     /^refs\/heads\/[^\r\n]+$/u.test(e.sourceRef) &&
@@ -228,10 +232,11 @@ function matchesVerifiedResult(value: unknown, e: TrustedExportExpectation, inve
     cert.sourceRepositoryURI !== `https://github.com/${e.repository}` ||
     cert.sourceRepositoryIdentifier !== e.repositoryId ||
     cert.sourceRepositoryDigest !== e.reviewedSha ||
+    cert.githubWorkflowSHA !== (e.signerSha ?? e.reviewedSha) ||
     cert.sourceRepositoryRef !== e.sourceRef ||
     cert.runInvocationURI !== runUri ||
     cert.buildSignerURI !== workflowUri ||
-    cert.buildSignerDigest !== e.reviewedSha ||
+    cert.buildSignerDigest !== (e.signerSha ?? e.reviewedSha) ||
     cert.runnerEnvironment !== "github-hosted" ||
     cert.buildTrigger !== e.event ||
     signerSAN !== workflowUri ||
@@ -281,7 +286,7 @@ export async function verifyReviewedExportAttestation(
     "--source-digest",
     e.reviewedSha,
     "--signer-digest",
-    e.reviewedSha,
+    e.signerSha ?? e.reviewedSha,
     "--source-ref",
     e.sourceRef,
     "--cert-oidc-issuer",

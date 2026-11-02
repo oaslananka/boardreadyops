@@ -220,3 +220,36 @@ This does not automatically change release pack, production deployment,
 dashboard trust badges or customer GA acceptance. See
 [policy-engine](policy-engine.md) for the exact CLI invocation and the
 separate #154 two-private-installation requirement.
+
+## Separate the reviewed source commit from the signing workflow commit
+
+A workflow_dispatch run can check out a reviewed source commit that differs
+from the commit containing the target repository's workflow definition.
+GitHub's signed OIDC sha claim identifies the workflow ref commit (the
+signer), while the export manifest and its source fingerprint must identify
+the exact reviewed checkout. These values are not interchangeable.
+
+The verifier therefore accepts:
+- reviewedSha: the independently authorized target commit whose KiCad source
+  and generated outputs are hashed;
+- signerSha: the workflow definition commit, obtained only from the
+  cryptographically verified GitHub OIDC sha claim for the exact persisted
+  repository/workflow/ref/run/attempt.
+
+The CLI local policy path remains backward-compatible: when no separate
+signerSha is provided, it continues to expect the signer and source commit
+to be the same. An API integration must never accept signerSha from an
+unsigned request field or manifest. It must call
+verifyGitHubActionsOidcTokenClaims after loading the independent run
+expectations, then pass that verifier-returned workflowSha as signerSha.
+
+The composite export Action now verifies that Git HEAD equals the supplied
+reviewed-source-sha; it deliberately does not require this source SHA to
+equal GitHub's workflow-ref GITHUB_SHA. The signer SHA remains independently
+checked against the Sigstore certificate's githubWorkflowSHA and
+buildSignerDigest, while sourceRepositoryDigest must equal reviewedSha.
+
+This change fixes the two-SHA identity contract only. It does not itself
+persist a tenant delivery, grant sharing authorization, or enable a source-bound
+manufacturing revision. The signed export ingestion and tenant lifecycle remain
+separate acceptance work.

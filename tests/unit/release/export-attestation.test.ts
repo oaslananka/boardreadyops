@@ -109,6 +109,7 @@ function verifiedResult(f: Fixture, overrides: Record<string, unknown> = {}) {
     sourceRepositoryRef: "refs/heads/review",
     runInvocationURI: "https://github.com/customer/fabrication/actions/runs/12345/attempts/2",
     buildSignerDigest: sha,
+    githubWorkflowSHA: sha,
     buildSignerURI:
       "https://github.com/customer/fabrication/.github/workflows/boardreadyops-export.yml@refs/heads/review",
     runnerEnvironment: "github-hosted",
@@ -217,6 +218,34 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
         "json",
       ]),
     );
+  });
+
+  it("binds the reviewed source SHA separately from the immutable signer workflow SHA", async () => {
+    const f = await fixture();
+    const signerSha = "b".repeat(40);
+    succeed(verifiedResult(f, { cert: { buildSignerDigest: signerSha, githubWorkflowSHA: signerSha } }));
+    const result = await verify(f, { ...expectation, signerSha });
+    expect(result.status).toBe("eligible");
+    const [, args] = mockedRun.mock.calls[0] ?? [];
+    expect(args).toContain("--source-digest");
+    expect(args).toContain(sha);
+    expect(args).toContain("--signer-digest");
+    expect(args).toContain(signerSha);
+  });
+
+  it("rejects a signer SHA that differs from the verified workflow certificate", async () => {
+    const f = await fixture();
+    const signerSha = "b".repeat(40);
+    succeed(verifiedResult(f));
+    const result = await verify(f, { ...expectation, signerSha });
+    expect(result.status).toBe("rejected");
+  });
+
+  it("rejects an invalid signer SHA before invoking GitHub CLI", async () => {
+    const f = await fixture();
+    succeed(verifiedResult(f));
+    expect((await verify(f, { ...expectation, signerSha: "not-a-commit" })).status).toBe("rejected");
+    expect(mockedRun).not.toHaveBeenCalled();
   });
 
   it.each([
