@@ -144,6 +144,73 @@ describe("Review Detail Tabs", () => {
     expect(withoutImages).not.toContain('aria-label="Published design preview"');
   });
 
+  it("compares only uniquely paired published image hashes without claiming a hardware diff", () => {
+    const view = (name: string, sha256: string) => ({
+      id: name,
+      name,
+      kind: "pcb_layer" as const,
+      format: "svg" as const,
+      sheetOrLayer: "F.Cu",
+      width: 800,
+      height: 600,
+      sha256,
+      anchors: [],
+    });
+    const pairedReview = {
+      ...review,
+      changedFiles: undefined,
+      baseSnapshots: [
+        view("native-r1", "a".repeat(64)),
+        view("native-r2", "c".repeat(64)),
+        view("duplicate", "d".repeat(64)),
+        view("duplicate", "d".repeat(64)),
+      ],
+      headSnapshots: [
+        view("native-r1", "b".repeat(64)),
+        view("native-r2", "c".repeat(64)),
+        view("duplicate", "e".repeat(64)),
+        view("unpaired", "f".repeat(64)),
+      ],
+    };
+    const html = renderToStaticMarkup(createElement(OverviewTab, { review: pairedReview }));
+    expect(html).toContain('aria-label="Published image comparison"');
+    expect(html).toContain("1 different, 1 matching");
+    expect(html).toContain("2 paired view(s)");
+    expect(html).toContain("native-r1");
+    expect(html).toContain("native-r2");
+    expect(html).not.toContain("unpaired · F.Cu");
+    expect(html).not.toContain("duplicate · F.Cu");
+    expect(html).toContain("Different image bytes do not prove");
+    expect(html).toContain("Hardware surface diff details are not available");
+  });
+
+  it("does not invent an image comparison without an unambiguous base or a valid digest", () => {
+    const view = {
+      id: "native-schematic",
+      name: "native-schematic",
+      kind: "schematic" as const,
+      format: "svg" as const,
+      sheetOrLayer: "root",
+      width: 800,
+      height: 600,
+      sha256: "z".repeat(64),
+      anchors: [],
+    };
+    const invalid = renderToStaticMarkup(
+      createElement(OverviewTab, {
+        review: { ...review, changedFiles: undefined, headSnapshots: [view], baseSnapshots: [view] },
+      }),
+    );
+    expect(invalid).not.toContain('aria-label="Published image comparison"');
+    const missing = renderToStaticMarkup(
+      createElement(OverviewTab, {
+        review: { ...review, changedFiles: undefined, headSnapshots: [view], baseSnapshots: undefined },
+      }),
+    );
+    expect(missing).not.toContain('aria-label="Published image comparison"');
+    expect(missing).toContain("Hardware surface diff details are not available");
+  });
+
   it("renders ReviewView with accessible tablist and workspace semantics", () => {
     const view = renderToStaticMarkup(createElement(ReviewView, { initialReview: review }));
     expect(view).toContain('aria-label="Review workspace"');
