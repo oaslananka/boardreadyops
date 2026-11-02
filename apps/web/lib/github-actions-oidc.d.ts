@@ -4,6 +4,7 @@ export type GitHubActionsOidcVerificationOptions = {
   readonly audience?: string;
   readonly repository?: string;
   readonly repositoryId?: string;
+  readonly githubRunId?: string;
   readonly workflowRef?: string;
   readonly ref?: string;
   readonly sha?: string;

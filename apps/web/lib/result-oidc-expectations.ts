@@ -13,6 +13,7 @@ export type ResultOidcExpectations = {
   executionAttemptId?: string;
   repository: string;
   repositoryId: string;
+  githubRunId: string;
   targetSha: string;
   workflowRef: string;
   ref: string;
@@ -71,6 +72,7 @@ export async function resultOidcExpectations(
             repositories.name,
             repositories.github_repo_id,
             repositories.default_branch,
+            release_run_attempts.github_workflow_dispatch_id,
             release_runs.commit_sha,
             release_runs.trust_mode,
             release_runs.safe_mode_reasons
@@ -91,10 +93,21 @@ export async function resultOidcExpectations(
   const owner = stringCell(row, "owner");
   const name = stringCell(row, "name");
   const repositoryId = stringCell(row, "github_repo_id");
+  const githubRunId = stringCell(row, "github_workflow_dispatch_id");
   const defaultBranch = stringCell(row, "default_branch");
   const sha = stringCell(row, "commit_sha");
   const trust = trustSnapshot(row);
-  if (!owner || !name || !repositoryId || !defaultBranch || !sha || !exactCommitShaPattern.test(sha) || !trust) {
+  if (
+    !owner ||
+    !name ||
+    !repositoryId ||
+    !githubRunId ||
+    !/^[1-9]\d{0,19}$/u.test(githubRunId) ||
+    !defaultBranch ||
+    !sha ||
+    !exactCommitShaPattern.test(sha) ||
+    !trust
+  ) {
     return undefined;
   }
 
@@ -111,6 +124,7 @@ export async function resultOidcExpectations(
     ...(executionAttemptId === undefined ? {} : { executionAttemptId }),
     repository,
     repositoryId,
+    githubRunId,
     targetSha: sha,
     workflowRef,
     ref,
