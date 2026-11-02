@@ -1366,6 +1366,8 @@ export function ArtifactsView({
 }: Readonly<{ run: RunDetail; searchParameters: SearchParameterMap }>) {
   const current = stringSearchParameters(searchParameters);
   const normalizedArtifactSort = filtersFromSearchParameters(searchParameters).artifactSort ?? "newest";
+  const hasArtifactFilters = Boolean(current.artifactSearch || current.artifactRole || current.artifactKind);
+  const hasNoStoredArtifacts = !hasArtifactFilters && run.artifactsPage.total === 0 && run.artifacts.length === 0;
   const hasUnavailableSignedDownload = run.artifacts.some((artifact) => !artifact.downloadUrl);
   const artifactLifecycleTotal =
     run.artifactLifecycle.deleted +
@@ -1459,10 +1461,24 @@ export function ArtifactsView({
         </div>
       ) : null}
       <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
-        {run.artifactsPage.total} matching artifact{run.artifactsPage.total === 1 ? "" : "s"}
+        {hasNoStoredArtifacts
+          ? "0 stored artifacts"
+          : `${run.artifactsPage.total} matching artifact${run.artifactsPage.total === 1 ? "" : "s"}`}
       </p>
       <div className="mt-3">
-        <ArtifactTable artifacts={run.artifacts} />
+        {hasNoStoredArtifacts ? (
+          <EmptyState title="No stored artifacts for this run">
+            <p>
+              A passing readiness check does not automatically produce a manufacturing package. This run has no recorded
+              artifact uploads; inspect execution attempts to see what was produced.
+            </p>
+            <Link className="text-sm text-primary underline underline-offset-2" href={`/runs/${run.id}/attempts`}>
+              Inspect execution attempts
+            </Link>
+          </EmptyState>
+        ) : (
+          <ArtifactTable artifacts={run.artifacts} />
+        )}
       </div>
       <div className="mt-4">
         <Pagination
