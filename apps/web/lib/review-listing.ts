@@ -1,5 +1,6 @@
 import { CloudRuntimeConfigurationError, resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
 import type { DemoReview } from "./demo-data.js";
+import { resolvedReviewTitle } from "./review-generated-title.js";
 import { notCancelledSubscription } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
@@ -70,6 +71,7 @@ const reviewListingQuery = `
          repositories.name as repository_name,
          reviews.pull_request_number,
          reviews.title,
+         current_revision.head_commit_sha as current_head_commit_sha,
          reviews.status,
          reviews.decision,
          reviews.created_by,
@@ -77,6 +79,9 @@ const reviewListingQuery = `
     from reviews
     join repositories on repositories.id = reviews.repository_id
     join installations on installations.id = repositories.installation_id
+    left join review_revisions as current_revision
+      on current_revision.id = reviews.current_revision_id
+     and current_revision.review_id = reviews.id
    where installations.github_installation_id = any($1::bigint[])
      and repositories.disabled_at is null
      and installations.suspended_at is null
@@ -114,7 +119,7 @@ export async function loadViewerReviews(
           repositoryId,
           repositoryName: `${text(row, "owner") ?? ""}/${text(row, "repository_name") ?? ""}`,
           pullRequestNumber: typeof pullRequestNumber === "number" ? pullRequestNumber : undefined,
-          title: text(row, "title") ?? "Untitled review",
+          title: resolvedReviewTitle(text(row, "title") ?? "Untitled review", text(row, "current_head_commit_sha")),
           status: text(row, "status") ?? "unknown",
           decision: text(row, "decision") ?? "pending",
           createdBy: text(row, "created_by") ?? "unknown",

@@ -19,6 +19,7 @@ import {
   getDemoReview,
 } from "./demo-data.js";
 import { buildDemoSnapshots } from "./demo-snapshots.js";
+import { resolvedReviewTitle } from "./review-generated-title.js";
 import { reviewFixturesEnabled } from "./review-listing.js";
 import { resolveReviewEffectivePolicy } from "./review-readiness.js";
 import { cancelledSubscriptionProbe } from "./tenant-scope.js";
@@ -555,13 +556,7 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       repositoryId: row.repository_id,
       repositoryName: `${row.owner}/${row.name}`,
       pullRequestNumber: row.pull_request_number ?? 0,
-      // Older published reviews retain their first generated SHA label in storage.
-      // Resolve only automatic labels against the verified current revision on read;
-      // never overwrite a human-entered title or mutate the persisted review.
-      title:
-        /^Review for [0-9a-f]{8}$/u.test(row.title) && /^[0-9a-f]{40}$/u.test(revision.head_commit_sha)
-          ? `Review for ${revision.head_commit_sha.slice(0, 8)}`
-          : row.title,
+      title: resolvedReviewTitle(row.title, revision.head_commit_sha),
       status: row.status,
       decision: row.decision,
       currentRevisionId: revision.id,
