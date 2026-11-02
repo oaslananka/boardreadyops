@@ -4,6 +4,7 @@ const store = vi.hoisted(() => ({
   workspaceRoleFor: vi.fn(),
   registerValidatedRevisionFromArtifact: vi.fn(),
   workspaceIdForRevision: vi.fn(),
+  getWorkspaceById: vi.fn(),
   revisionHasValidatedManufacturingEvidence: vi.fn(),
   createDeliveryLink: vi.fn(),
 }));
@@ -72,6 +73,7 @@ beforeEach(() => {
     createdAt: "2026-10-02T03:00:00.000Z",
   });
   store.workspaceIdForRevision.mockResolvedValue("ws-1");
+  store.getWorkspaceById.mockResolvedValue({ id: "ws-1", planTier: "team" });
   store.revisionHasValidatedManufacturingEvidence.mockResolvedValue(true);
   store.createDeliveryLink.mockResolvedValue({
     delivery: {
@@ -188,6 +190,34 @@ describe("validated delivery revision actions", () => {
       const result = await createDeliveryLinkAction(idle, values);
       expect(result).toMatchObject({ status: "error" });
     }
+    expect(store.createDeliveryLink).not.toHaveBeenCalled();
+  });
+
+  it.each(["community", "free", "unknown"] as const)(
+    "does not mint a guest delivery link for a %s workspace",
+    async (planTier) => {
+      store.getWorkspaceById.mockResolvedValue({ id: "ws-1", planTier });
+      const result = await createDeliveryLinkAction(idle, delivery());
+      expect(result).toMatchObject({ status: "error" });
+      expect(JSON.stringify(result)).toContain("Team");
+      expect(store.createDeliveryLink).not.toHaveBeenCalled();
+      expect(store.revisionHasValidatedManufacturingEvidence).not.toHaveBeenCalled();
+    },
+  );
+
+  it("denies guest links to a viewer before disclosing workspace plan details", async () => {
+    store.workspaceRoleFor.mockResolvedValue("viewer");
+    const result = await createDeliveryLinkAction(idle, delivery());
+    expect(result).toMatchObject({ status: "error" });
+    expect(store.getWorkspaceById).not.toHaveBeenCalled();
+    expect(store.createDeliveryLink).not.toHaveBeenCalled();
+  });
+
+  it("does not disclose a missing workspace during guest-link creation", async () => {
+    store.getWorkspaceById.mockResolvedValue(null);
+    const result = await createDeliveryLinkAction(idle, delivery());
+    expect(result).toMatchObject({ status: "error" });
+    expect(JSON.stringify(result)).toContain("Revision not found");
     expect(store.createDeliveryLink).not.toHaveBeenCalled();
   });
 

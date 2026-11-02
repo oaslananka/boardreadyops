@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { fail, ok } from "../../lib/action-result.js";
 import { defineAction } from "../../lib/server-action.js";
+import { assertWorkspaceEntitlement } from "../../lib/workspace-entitlements.js";
 import { openWorkspaceStore } from "../../lib/workspace-store-access.js";
 
 /**
@@ -165,8 +166,15 @@ export const createDeliveryLinkAction = defineAction(createSchema, async (input,
     const role = workspaceId
       ? await store.workspaceRoleFor(workspaceId, { githubUserId: session.userId, login: session.login })
       : null;
-    if (!role) return fail("Revision not found.");
+    if (!workspaceId || !role) return fail("Revision not found.");
     if (role === "viewer") return fail("Viewers cannot create delivery links.");
+
+    // Membership and revision scope are checked before inspecting the workspace plan.
+    const workspace = await store.getWorkspaceById(workspaceId);
+    if (!workspace) return fail("Revision not found.");
+    const entitlement = assertWorkspaceEntitlement(workspace.planTier, "canCreateDeliveryLink");
+    if (!entitlement.allowed) return fail(entitlement.error ?? "Delivery links are unavailable for this workspace.");
+
     if (!(await store.revisionHasValidatedManufacturingEvidence(input.revisionId))) {
       return fail("This revision is not backed by validated manufacturing evidence.");
     }
