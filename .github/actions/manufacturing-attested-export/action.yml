@@ -4,7 +4,7 @@ description: >-
   Produces unsigned subjects only; caller must attest in its own repository.
 inputs:
   reviewed-source-sha:
-    description: Authenticated target-repository Git SHA (must equal github.sha)
+    description: Authenticated target-repository source commit SHA checked out in this workflow run
     required: true
   project:
     description: Exact reviewed .kicad_pro project path
@@ -44,7 +44,6 @@ runs:
         [[ "${BOARDREADYOPS_RUNNER_ENVIRONMENT}" == "github-hosted" ]]
         [[ "${RUNNER_OS}" == "Linux" ]]
         [[ "${BOARDREADYOPS_REVIEWED_SHA}" =~ ^[0-9a-f]{40}$ ]]
-        [[ "${BOARDREADYOPS_REVIEWED_SHA}" == "${GITHUB_SHA}" ]]
         [[ "${GITHUB_REF}" == refs/heads/* ]]
         [[ -n "${BOARDREADYOPS_PROJECT}" ]]
         [[ "${BOARDREADYOPS_PROJECT}" == *.kicad_pro ]]
@@ -53,7 +52,7 @@ runs:
         # It has no access to source outside that exact checkout.
         cd "${GITHUB_WORKSPACE}"
         [[ "$(git rev-parse --show-toplevel)" == "${GITHUB_WORKSPACE}" ]]
-        [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
+        [[ "$(git rev-parse HEAD)" == "${BOARDREADYOPS_REVIEWED_SHA}" ]]
         [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
         [[ "$(kicad-cli version)" == 10.0.* ]]
 
@@ -70,7 +69,7 @@ runs:
           --project "${BOARDREADYOPS_PROJECT}" \
           --recipe "${BOARDREADYOPS_ACTION_DIR}/manufacturing-recipe.json" \
           --output build/boardreadyops-attested \
-          --reviewed-source-sha "${GITHUB_SHA}"
+          --reviewed-source-sha "${BOARDREADYOPS_REVIEWED_SHA}"
 
         # Sign only a complete, source-linked fabrication and assembly set.
         # A missing schematic or failed KiCad BOM/CPL export must fail closed.
@@ -98,7 +97,7 @@ runs:
         checksum_file="$(mktemp "${RUNNER_TEMP}/boardreadyops-subjects-XXXXXXXX.txt")"
         node "${cli}" export-checksums "${GITHUB_WORKSPACE}" \
           --manifest build/boardreadyops-attested/manifest.json \
-          --reviewed-source-sha "${GITHUB_SHA}" > "${checksum_file}"
+          --reviewed-source-sha "${BOARDREADYOPS_REVIEWED_SHA}" > "${checksum_file}"
         [[ -s "${checksum_file}" ]]
         {
           echo "subject-checksums=${checksum_file}"

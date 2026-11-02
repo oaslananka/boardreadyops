@@ -78132,7 +78132,7 @@ async function prepareExportAttestationChecksums(options) {
   return (await prepareInventory(options.root, options.manifestPath, options.reviewedSha)).checksums;
 }
 function validExpectation(e) {
-  return repoPattern.test(e.repository) && /^\d+$/u.test(e.repositoryId) && shaPattern.test(e.reviewedSha) && // Only a protected-branch workflow_dispatch is a supported export signer.
+  return repoPattern.test(e.repository) && /^\d+$/u.test(e.repositoryId) && shaPattern.test(e.reviewedSha) && (e.signerSha === void 0 || shaPattern.test(e.signerSha)) && // Only a protected-branch workflow_dispatch is a supported export signer.
   // A signed push/tag/PR run cannot fulfill the target-repository contract.
   /^refs\/heads\/[^\r\n]+$/u.test(e.sourceRef) && /^\.github\/workflows\/[a-zA-Z0-9_.-]+\.ya?ml$/u.test(e.workflowPath) && e.event === "workflow_dispatch" && /^[1-9]\d*$/u.test(e.runId) && Number.isSafeInteger(e.runAttempt) && e.runAttempt > 0;
 }
@@ -78153,7 +78153,7 @@ function matchesVerifiedResult(value, e, inventory) {
   const san = cert?.subjectAlternativeName;
   const signerSAN = typeof san === "string" ? san : recordAt(cert, "subjectAlternativeName")?.value;
   const runUri = `https://github.com/${e.repository}/actions/runs/${e.runId}/attempts/${e.runAttempt}`;
-  if (cert?.issuer !== oidcIssuer || cert.sourceRepositoryURI !== `https://github.com/${e.repository}` || cert.sourceRepositoryIdentifier !== e.repositoryId || cert.sourceRepositoryDigest !== e.reviewedSha || cert.sourceRepositoryRef !== e.sourceRef || cert.runInvocationURI !== runUri || cert.buildSignerURI !== workflowUri || cert.buildSignerDigest !== e.reviewedSha || cert.runnerEnvironment !== "github-hosted" || cert.buildTrigger !== e.event || signerSAN !== workflowUri || statement?.predicateType !== slsaPredicate || !Array.isArray(subjects) || subjects.length !== inventory.names.size)
+  if (cert?.issuer !== oidcIssuer || cert.sourceRepositoryURI !== `https://github.com/${e.repository}` || cert.sourceRepositoryIdentifier !== e.repositoryId || cert.sourceRepositoryDigest !== e.reviewedSha || cert.githubWorkflowSHA !== (e.signerSha ?? e.reviewedSha) || cert.sourceRepositoryRef !== e.sourceRef || cert.runInvocationURI !== runUri || cert.buildSignerURI !== workflowUri || cert.buildSignerDigest !== (e.signerSha ?? e.reviewedSha) || cert.runnerEnvironment !== "github-hosted" || cert.buildTrigger !== e.event || signerSAN !== workflowUri || statement?.predicateType !== slsaPredicate || !Array.isArray(subjects) || subjects.length !== inventory.names.size)
     return false;
   const remaining = new Map(inventory.names);
   for (const subject of subjects) {
@@ -78185,7 +78185,7 @@ async function verifyReviewedExportAttestation(options) {
     "--source-digest",
     e.reviewedSha,
     "--signer-digest",
-    e.reviewedSha,
+    e.signerSha ?? e.reviewedSha,
     "--source-ref",
     e.sourceRef,
     "--cert-oidc-issuer",
