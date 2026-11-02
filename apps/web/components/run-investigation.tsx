@@ -1229,6 +1229,8 @@ function FindingRow({
 }>) {
   const sourceUrl = githubFindingSourceUrl(repository ?? "", commitSha ?? "", finding.path);
   const domain = findingDomainFromRule(finding.ruleId);
+  const kicadNotExecuted =
+    finding.ruleId === "drc.kicad-cli-unavailable" || finding.ruleId === "erc.kicad-cli-unavailable";
   return (
     <li className="rounded-md border border-border bg-card p-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -1288,17 +1290,26 @@ function FindingRow({
         </div>
       </dl>
       <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-sm">
-        <p className="font-semibold text-foreground">How to resolve</p>
+        <p className="font-semibold text-foreground">{kicadNotExecuted ? "Restore the check" : "How to resolve"}</p>
         <p className="mt-1 text-foreground">{findingGuidance(finding.ruleId, finding.message)}</p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Suggested from the rule ID, not a verified repair. Check the original diagnostic before editing.
-        </p>
-        <p className="mt-1">
-          <small>
-            Commit the correction, then verify readiness against the new commit. Re-running this unchanged SHA only
-            repeats the existing check; it does not prove a source fix.
-          </small>
-        </p>
+        {kicadNotExecuted ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            This is missing execution evidence, not a diagnosed design defect. Check runner setup and logs, then rerun
+            the same commit after KiCad is available. No CAD edit or new source commit is implied.
+          </p>
+        ) : (
+          <>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Suggested from the rule ID, not a verified repair. Check the original diagnostic before editing.
+            </p>
+            <p className="mt-1">
+              <small>
+                Commit the correction, then verify readiness against the new commit. Re-running this unchanged SHA only
+                repeats the existing check; it does not prove a source fix.
+              </small>
+            </p>
+          </>
+        )}
       </div>
     </li>
   );

@@ -481,6 +481,26 @@ describe("run investigation accessibility", () => {
     expect(markup).not.toContain("Rerun required to verify");
   });
 
+  it("does not tell users to edit or commit CAD source when KiCad CLI was unavailable", () => {
+    const run = sampleRun();
+    run.findings = ["drc.kicad-cli-unavailable", "erc.kicad-cli-unavailable"].map((ruleId) => ({
+      id: ruleId,
+      ruleId,
+      severity: "info" as const,
+      message: "kicad-cli not available, skipped check.",
+      path: ".",
+      kind: "electrical",
+      waivedAt: undefined,
+    }));
+    const markup = renderToStaticMarkup(createElement(FindingsView, { run, searchParameters: {} }));
+    expect(markup.match(/Restore the check/gu)).toHaveLength(2);
+    expect(markup.match(/missing execution evidence/gu)).toHaveLength(2);
+    expect(markup).toContain("require-kicad: true");
+    expect(markup).toContain("same source commit");
+    expect(markup).not.toContain("Commit the correction");
+    expect(markup).not.toContain("correct the relevant board geometry");
+  });
+
   it("renders a board-revision correction for changelog diagnostics when no PCB revision exists", () => {
     const run = sampleRun();
     run.findings = [

@@ -46,6 +46,19 @@ describe("finding remediation guidance", () => {
     expect(findingGuidance(ruleId)).toContain(phrase);
   });
 
+  it.each(["drc.kicad-cli-unavailable", "erc.kicad-cli-unavailable"])(
+    "treats %s as a missing runner dependency, not a CAD defect",
+    (ruleId) => {
+      const guidance = findingGuidance(ruleId);
+      expect(findingDomainFromRule(ruleId)).toBe("electrical");
+      expect(guidance).toContain("kicad-cli was unavailable");
+      expect(guidance).toContain("PATH");
+      expect(guidance).toContain("require-kicad: true");
+      expect(guidance).toContain("same source commit");
+      expect(guidance).not.toContain("correct the relevant");
+    },
+  );
+
   it("uses the rule's actual missing-revision diagnostic instead of suggesting a changelog-only fix", () => {
     const advice = findingGuidance(
       "release.changelog-present",
