@@ -177,6 +177,23 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("Live");
   });
 
+  it("labels the guest-link list rather than displaying only the workspace name as a heading", async () => {
+    const namedWorkspace = { ...workspace, name: "test" };
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [namedWorkspace],
+      selected: namedWorkspace,
+      revisionCandidates: [],
+      revisions: [],
+      deliveries: [],
+    });
+
+    const markup = await render();
+    expect(markup).toContain(">Guest links</");
+    expect(markup).toContain("Shared from workspace test");
+    expect(markup).toContain("No guest links yet");
+  });
+
   it("does not show an unexpired delivery as Live after sharing authorization is revoked", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",

@@ -263,7 +263,10 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
               </Panel>
             ) : null}
 
-            <Panel title={result.selected.name} description="Newest first. An expired link stops working on its own.">
+            <Panel
+              title="Guest links"
+              description={`Shared from workspace ${result.selected.name}. Newest first; expired links stop working automatically.`}
+            >
               <DataTable
                 caption={`Guest delivery links in ${result.selected.name}`}
                 columns={deliveryColumns(result.selected.role !== "viewer", result.authorizedRevisionIds ?? [])}
