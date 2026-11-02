@@ -121,8 +121,6 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(job?.permissions).toMatchObject({
       contents: "read",
       "id-token": "write",
-      attestations: "write",
-      "artifact-metadata": "write",
     });
     const steps = job?.steps ?? [];
     const guard = steps.find((step) => String(step.name ?? "").startsWith("Require protected main"));
@@ -134,7 +132,19 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect((exportStep?.with as { project?: string } | undefined)?.project).toBe(
       "tests/fixtures/projects/safe-basic/safe-basic.kicad_pro",
     );
-    expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/attest@"))).toBe(true);
+    expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/attest@"))).toBe(false);
+    const install = steps.find((step) =>
+      String(step.name ?? "").startsWith("Install pinned GitHub attestation library"),
+    );
+    expect(install?.run).toContain("@actions/attest@3.2.0");
+    const sign = steps.find((step) => String(step.id ?? "") === "internal");
+    expect(sign?.run).toContain("sigstore:'github'");
+    expect(sign?.run).toContain("skipWrite:true");
+    expect(sign?.run).toContain("rfc3161Timestamps");
+    expect(steps.filter((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"))).toHaveLength(2);
+    expect(steps.some((step) => JSON.stringify(step).includes("test-fixture-sigstore-bundle"))).toBe(true);
+    expect(raw).not.toContain("attestations: write");
+    expect(raw).not.toContain("artifact-metadata: write");
     expect(raw).toContain("TEST FIXTURE ONLY");
     expect(raw).not.toContain("pull_request:");
   });
