@@ -39,9 +39,11 @@ function token(
       workflow_ref: workflowRef,
       ref: "refs/heads/main",
       sha: "a".repeat(40),
+      workflow_sha: "a".repeat(40),
       event_name: "workflow_dispatch",
       runner_environment: "github-hosted",
       run_id: "29121986402",
+      run_attempt: "2",
       iat: nowSeconds - 10,
       nbf: nowSeconds - 10,
       exp: nowSeconds + 300,
@@ -96,7 +98,7 @@ describe("GitHub Actions OIDC verification", () => {
     // workflow_dispatch runs on the default branch, while the checkout target
     // may be a different commit. GitHub's JWT sha is the dispatch ref SHA.
     await expect(
-      verifyGitHubActionsOidcToken(token({ aud: audience, sha: workflowSha }), {
+      verifyGitHubActionsOidcToken(token({ aud: audience, sha: targetSha, workflow_sha: workflowSha }), {
         runId,
         executionAttemptId,
         audience,
@@ -128,18 +130,22 @@ describe("GitHub Actions OIDC verification", () => {
     const targetSha = "a".repeat(40);
     const workflowSha = "b".repeat(40);
     const audience = `boardreadyops-cloud:${runId}:${executionAttemptId}:${targetSha}:standard:none`;
-    const claims = await verifyGitHubActionsOidcTokenClaims(token({ aud: audience, sha: workflowSha }), {
-      runId,
-      executionAttemptId,
-      audience,
-      repositoryId,
-      githubRunId: "29121986402",
-      fetchImpl: jwksFetch(),
-      now: () => nowMs,
-    });
+    const claims = await verifyGitHubActionsOidcTokenClaims(
+      token({ aud: audience, sha: targetSha, workflow_sha: workflowSha }),
+      {
+        runId,
+        executionAttemptId,
+        audience,
+        repositoryId,
+        githubRunId: "29121986402",
+        fetchImpl: jwksFetch(),
+        now: () => nowMs,
+      },
+    );
     expect(claims).toEqual({
       workflowSha,
       workflowRunId: "29121986402",
+      runAttempt: 2,
       repository,
       repositoryId,
       workflowRef,

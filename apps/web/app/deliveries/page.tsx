@@ -74,7 +74,12 @@ function revisionColumns(): readonly DataColumn<WorkspaceRevisionRecord>[] {
       cell: (revision) =>
         revision.validationRunId && revision.validationArtifactId ? (
           <span className="flex flex-col gap-0.5">
-            <StatusBadge value="neutral" label="Run-backed" />
+            <StatusBadge
+              value={revision.sourceBinding === "source-bound-verified" ? "success" : "warning"}
+              label={
+                revision.sourceBinding === "source-bound-verified" ? "Source-bound verified" : "Not delivery-eligible"
+              }
+            />
             <span className="font-mono text-meta text-muted-foreground">{revision.bundleSha256.slice(0, 12)}…</span>
           </span>
         ) : (
@@ -235,7 +240,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
             {result.selected.role !== "viewer" && result.revisionCandidates.length > 0 ? (
               <Panel
                 title="Register run-backed revision"
-                description="Register the stored manufacturing archive from an accepted passing runner result. Source-to-export attestation is separate."
+                description="Register a stored manufacturing archive from an accepted passing runner result. The source-to-export status is shown per package; legacy/manual packages remain usable without being promoted to source-bound verified."
               >
                 <ValidatedRevisionRegisterForm
                   workspaceId={result.selected.id}
@@ -246,16 +251,14 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
             ) : null}
 
             {(result.selected.role === "owner" || result.selected.role === "admin") &&
-            result.revisions.some((revision) => revision.validationRunId && revision.validationArtifactId) ? (
+            result.revisions.some((revision) => revision.sourceBinding === "source-bound-verified") ? (
               <Panel
                 title="Explicit permission to share"
-                description="Readiness checks are not manufacturing approval. An owner/admin must separately permit
+                description="Readiness checks and source attestation are not manufacturing approval. An owner/admin must separately permit
                   guest sharing for one exact source commit and archive checksum."
               >
                 <ManufacturingShareAuthorizationForm
-                  revisions={result.revisions.filter(
-                    (revision) => revision.validationRunId && revision.validationArtifactId,
-                  )}
+                  revisions={result.revisions.filter((revision) => revision.sourceBinding === "source-bound-verified")}
                   authorizedRevisionIds={result.authorizedRevisionIds ?? []}
                   approveAction={authorizeManufacturingShareAction}
                   revokeAction={revokeManufacturingShareAction}
@@ -280,8 +283,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                       hasWorkspaceEntitlement(result.selected.planTier, "canCreateDeliveryLink") &&
                       result.revisions.some(
                         (revision) =>
-                          revision.validationRunId &&
-                          revision.validationArtifactId &&
+                          revision.sourceBinding === "source-bound-verified" &&
                           (result.authorizedRevisionIds ?? []).includes(revision.id),
                       ) ? (
                         <Button asChild variant="outline">
@@ -291,7 +293,8 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                     }
                   >
                     <p>
-                      Links you issue appear here until they expire. Only eligible run-backed revisions can be shared.
+                      Links you issue appear here until they expire. Only source-bound verified revisions with explicit
+                      owner/admin approval can be shared.
                     </p>
                   </EmptyState>
                 }
@@ -327,6 +330,7 @@ function CreatePanel({
 }>) {
   const validatedRevisions = result.revisions.filter(
     (revision) =>
+      revision.sourceBinding === "source-bound-verified" &&
       revision.validationRunId !== undefined &&
       revision.validationArtifactId !== undefined &&
       (result.authorizedRevisionIds ?? []).includes(revision.id),

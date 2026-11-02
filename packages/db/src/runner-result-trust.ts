@@ -14,7 +14,7 @@ export function acceptedRunnerResultSql(alias: "run" | "release_runs"): string {
 }
 
 /** Manufacturing authorizations require an accepted, successful runner result. */
-export function signedRunnerPassSql(alias: "run" | "release_runs"): string {
+export function signedRunnerPassSql(alias: "run" | "release_runs" | "evidence_run"): string {
   return `exists (
     select 1 from release_run_results as accepted
     join release_run_attempts as attempt

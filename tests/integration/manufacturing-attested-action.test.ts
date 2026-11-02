@@ -113,6 +113,53 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"))).toBe(true);
   });
 
+  it("connects optional source-bound manufacturing export to the exact readiness run without changing normal runner permissions", async () => {
+    const raw = await fs.readFile(".github/workflows/readiness-runner.yml", "utf8");
+    const workflow = load(raw) as TargetSpec;
+    const job = workflow.jobs.readiness;
+    expect(job?.permissions).toMatchObject({
+      actions: "read",
+      checks: "read",
+      contents: "read",
+      "id-token": "write",
+    });
+    expect(job?.permissions).not.toHaveProperty("attestations");
+    expect(job?.permissions).not.toHaveProperty("artifact-metadata");
+    const steps = job?.steps ?? [];
+    const exportIndex = steps.findIndex((step) => step.id === "manufacturing-export");
+    const signIndex = steps.findIndex((step) => step.id === "manufacturing-attestation");
+    const importIndex = steps.findIndex((step) => step.id === "manufacturing-export-import");
+    const resultIndex = steps.findIndex((step) =>
+      String(step.name ?? "").startsWith("Publish OIDC-authenticated cloud result"),
+    );
+    expect(exportIndex).toBeGreaterThan(-1);
+    expect(signIndex).toBeGreaterThan(exportIndex);
+    expect(importIndex).toBeGreaterThan(signIndex);
+    expect(resultIndex).toBeGreaterThan(importIndex);
+    expect(steps[exportIndex]?.if).toContain("vars.BOARDREADYOPS_PROJECT");
+    expect(steps[exportIndex]?.uses).toBe(
+      "oaslananka/boardreadyops/.github/actions/manufacturing-attested-export@bbdfd58631d5c8daca1179a10f74b45533903b58",
+    );
+    expect(steps[exportIndex]?.with).toMatchObject({
+      "reviewed-source-sha": "$" + "{{ inputs.head_sha }}",
+      project: "$" + "{{ vars.BOARDREADYOPS_PROJECT }}",
+    });
+    expect(String(steps[signIndex]?.run)).toContain("attestProvenance");
+    expect(String(steps[signIndex]?.run)).toContain("skipWrite: true");
+    expect(String((steps[importIndex]?.with as { script?: string } | undefined)?.script)).toContain(
+      "core.getIDToken(audience)",
+    );
+    expect(String((steps[importIndex]?.with as { script?: string } | undefined)?.script)).toContain(
+      "/manufacturing-export",
+    );
+    const importerScript = String((steps[importIndex]?.with as { script?: string } | undefined)?.script);
+    expect(importerScript).toContain("boardreadyops-manufacturing-export:");
+    expect(importerScript).not.toContain("boardreadyops-cloud:");
+    for (const index of [exportIndex, signIndex, importIndex]) {
+      expect(steps[index]?.["continue-on-error"]).toBe(true);
+    }
+  });
+
   it("keeps real GitHub OIDC signing confined to a manually dispatched protected test fixture", async () => {
     const raw = await fs.readFile(".github/workflows/attested-fixture-validation.yml", "utf8");
     const wf = load(raw) as TargetSpec;
