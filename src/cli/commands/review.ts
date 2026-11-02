@@ -206,6 +206,9 @@ export async function reviewPublishCommand(
     cwd: root,
     path: root,
     ...(options.config ? { config: options.config } : {}),
+    // --project is a disclosure boundary for Review snapshots. A workspace
+    // may contain other boards that must not be included in this upload.
+    ...(options.project ? { project: options.project } : {}),
     rules: options.rule ?? [],
     skips: options.skip ?? [],
     executionPolicy: options.executionPolicy ?? "safe",
