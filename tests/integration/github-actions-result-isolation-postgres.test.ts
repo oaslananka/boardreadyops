@@ -44,6 +44,7 @@ const fixtures = {
     commitSha: "a".repeat(40),
     workflowSha: "d".repeat(40),
     checkRunId: 9_100_003,
+    githubWorkflowRunId: "910000004",
     pullRequestNumber: 17,
     trustMode: "safe" as const,
     safeModeReasons: ["private-repository"] as const,
@@ -61,6 +62,7 @@ const fixtures = {
     commitSha: "b".repeat(40),
     workflowSha: "e".repeat(40),
     checkRunId: 9_200_003,
+    githubWorkflowRunId: "920000004",
     pullRequestNumber: null,
     trustMode: "standard" as const,
     safeModeReasons: [] as const,
@@ -100,7 +102,7 @@ function token(fixture: Fixture, overrides: Readonly<Record<string, unknown>> = 
       sha: fixture.workflowSha,
       event_name: "workflow_dispatch",
       runner_environment: "github-hosted",
-      run_id: String(fixture.checkRunId),
+      run_id: fixture.githubWorkflowRunId,
       iat: issuedAt,
       nbf: issuedAt,
       exp: issuedAt + 300,
@@ -316,7 +318,7 @@ beforeAll(async () => {
          dispatched_at, started_at, github_workflow_dispatch_id
        ) values ($1, $2, 1, 'in_progress', $3::timestamptz, $3::timestamptz,
                  $3::timestamptz, $3::timestamptz, $4)`,
-      [fixture.attemptId, fixture.runId, "2026-08-02T04:29:00.000Z", `workflow-${fixture.owner}`],
+      [fixture.attemptId, fixture.runId, "2026-08-02T04:29:00.000Z", fixture.githubWorkflowRunId],
     );
     if ("previousAttemptId" in fixture) {
       // The A run now points at attempt #2, while #1 is a genuinely persisted,

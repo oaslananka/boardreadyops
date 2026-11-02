@@ -18,6 +18,7 @@ describe("result OIDC repository binding", () => {
           owner: "octo-org",
           name: "hardware-board",
           github_repo_id: "98765",
+          github_workflow_dispatch_id: "29121986402",
           default_branch: "trunk",
           commit_sha: "a".repeat(40),
           trust_mode: "safe",
@@ -31,6 +32,7 @@ describe("result OIDC repository binding", () => {
       executionAttemptId,
       repository: "octo-org/hardware-board",
       repositoryId: "98765",
+      githubRunId: "29121986402",
       targetSha: "a".repeat(40),
       workflowRef: "octo-org/hardware-board/.github/workflows/readiness-runner.yml@refs/heads/trunk",
       ref: "refs/heads/trunk",
@@ -54,6 +56,7 @@ describe("result OIDC repository binding", () => {
       owner: "octo-org",
       name: "hardware-board",
       github_repo_id: "98765",
+      github_workflow_dispatch_id: "29121986402",
       default_branch: "trunk",
       commit_sha: "a".repeat(40),
     };
@@ -78,6 +81,23 @@ describe("result OIDC repository binding", () => {
     }
   });
 
+  it("fails closed when the persisted GitHub workflow run ID is missing or malformed", async () => {
+    const baseRow = {
+      owner: "octo-org",
+      name: "hardware-board",
+      github_repo_id: "98765",
+      default_branch: "trunk",
+      commit_sha: "a".repeat(40),
+      trust_mode: "standard",
+      safe_mode_reasons: [],
+    };
+    for (const githubRunId of [undefined, "", "workflow-owner", "0", "-1", "123 456"]) {
+      const row = { ...baseRow, ...(githubRunId === undefined ? {} : { github_workflow_dispatch_id: githubRunId }) };
+      const query = vi.fn(async () => ({ rows: [row] }));
+      await expect(resultOidcExpectations({ query }, runId, executionAttemptId)).resolves.toBeUndefined();
+    }
+  });
+
   it("fails closed when the persisted commit SHA is not exact", async () => {
     const query = vi.fn(async () => ({
       rows: [
@@ -85,6 +105,7 @@ describe("result OIDC repository binding", () => {
           owner: "octo-org",
           name: "hardware-board",
           github_repo_id: "98765",
+          github_workflow_dispatch_id: "29121986402",
           default_branch: "trunk",
           commit_sha: "main",
           trust_mode: "standard",

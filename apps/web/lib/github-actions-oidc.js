@@ -70,6 +70,7 @@ function claimsAreTrusted(payload, expectations, nowSeconds) {
     stringClaim(payload, "repository") === expectations.repository &&
     (expectations.repositoryId === undefined || stringClaim(payload, "repository_id") === expectations.repositoryId) &&
     stringClaim(payload, "workflow_ref") === expectations.workflowRef &&
+    (expectations.githubRunId === undefined || stringClaim(payload, "run_id") === expectations.githubRunId) &&
     stringClaim(payload, "ref") === expectations.ref &&
     (expectations.sha === undefined || stringClaim(payload, "sha") === expectations.sha) &&
     stringClaim(payload, "event_name") === "workflow_dispatch" &&
@@ -115,6 +116,7 @@ export async function verifyGitHubActionsOidcToken(
     audience,
     repository = defaultRepository,
     repositoryId,
+    githubRunId,
     workflowRef = defaultWorkflowRef,
     ref = "refs/heads/main",
     sha,
@@ -144,7 +146,7 @@ export async function verifyGitHubActionsOidcToken(
     header.kid.length === 0 ||
     !claimsAreTrusted(
       payload,
-      { runId, executionAttemptId, audience, repository, repositoryId, workflowRef, ref, sha },
+      { runId, executionAttemptId, audience, repository, repositoryId, githubRunId, workflowRef, ref, sha },
       Math.floor(now() / 1000),
     )
   ) {

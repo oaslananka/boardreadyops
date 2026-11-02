@@ -74,6 +74,7 @@ describe("GitHub Actions OIDC verification", () => {
         runId,
         executionAttemptId,
         repositoryId,
+        githubRunId: "29121986402",
         sha: "a".repeat(40),
         fetchImpl,
         now: () => nowMs,
@@ -99,6 +100,7 @@ describe("GitHub Actions OIDC verification", () => {
         executionAttemptId,
         audience,
         repositoryId,
+        githubRunId: "29121986402",
         targetSha,
         fetchImpl,
         now: () => nowMs,
@@ -113,11 +115,28 @@ describe("GitHub Actions OIDC verification", () => {
         executionAttemptId,
         audience,
         repositoryId,
+        githubRunId: "29121986402",
         targetSha,
         fetchImpl,
         now: () => nowMs,
       }),
     ).resolves.toBe(false);
+  });
+
+  it("rejects a valid token from a different GitHub Actions workflow run", async () => {
+    const fetchImpl = jwksFetch();
+    await expect(
+      verifyGitHubActionsOidcToken(token({ run_id: "29121986403" }), {
+        runId,
+        executionAttemptId,
+        repositoryId,
+        githubRunId: "29121986402",
+        sha: "a".repeat(40),
+        fetchImpl,
+        now: () => nowMs,
+      }),
+    ).resolves.toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("accepts an explicit setup-probe audience while retaining repository claim binding", async () => {
