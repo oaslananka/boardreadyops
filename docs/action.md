@@ -57,24 +57,8 @@ floating `v1` alias moves with stable releases.
 | `log-file-max-bytes` | `` | Rotate the log file after this many bytes. Empty uses the default. |
 | `log-file-retention` | `` | Number of rotated log files to keep. Empty uses the default. |
 | `cloud-upload` | `` | Upload findings and evidence pack to BoardReadyOps Cloud. One of metadata, snapshots, source. Empty disables. |
-| `native-visuals` | `false` | Explicitly consent to publishing source-derived KiCad native SVG artwork when `cloud-upload: snapshots` and a scoped `BOARDREADYOPS_TOKEN` are configured. Never enabled by default or in `safe-mode`. |
+| `native-visuals` | `false` | Explicit consent to publish source-derived native PCB/schematic SVGs. Only applies with cloud-upload: snapshots and a runs:write token. Disabled by default. Never uploads images in safe-mode. |
 | `cloud-server` | `https://app.boardreadyops.com` | BoardReadyOps Cloud instance URL. |
-
-### Native visual publication (explicit opt-in)
-
-The Action normally sends **findings only**, even when cloud upload is configured.
-To publish source-derived KiCad PCB/schematic artwork to a private Review,
-set **both** `cloud-upload: snapshots` and `native-visuals: "true"` and provide
-an explicitly authorized, repository-scoped `BOARDREADYOPS_TOKEN` with `runs:write`.
-Use an exact `project` input to limit which board is shared, and install a
-compatible `kicad-cli` on the runner. Native SVG publishing is disabled in
-`safe-mode`, with `cloud-upload: metadata`, without a token, or if no native
-KiCad output was produced. Other projects' raw CAD source files are never uploaded.
-
-The GitHub App's separate OIDC readiness-result callback only reports findings.
-It does **not** grant artwork publishing privileges or substitute for the
-token-backed Review API. Do not enable this input for customer designs without
-their informed consent. A published SVG is not a DRC/ERC or manufacturing pass.
 
 ## Outputs
 
@@ -98,6 +82,22 @@ their informed consent. A published SVG is not a DRC/ERC or manufacturing pass.
 When `comment-pr` is enabled, the sticky pull request comment summarizes the current findings. With `comment-format: review`, BoardReadyOps also attempts an exact-base hardware-impact comparison: the exact pull request base SHA is compared with the exact analyzed head SHA using a BoardReadyOps JSON artifact from the same workflow identity. There is no latest-run or same-branch fallback. If exact-base evidence is unavailable, the comment says so and the current-run decision remains valid. The default `report` format keeps its existing fabrication-diff behavior when a prior report artifact can be discovered.
 
 Exact-base artifact discovery uses the job-scoped repository `GITHUB_TOKEN` and needs `actions: read`. The historical/current detailed report artifacts remain in the target repository; only the bounded structured impact summary is eligible for hosted result publication.
+
+### Native visual publication (explicit opt-in)
+
+The Action normally sends **findings only**, even when cloud upload is configured.
+To publish source-derived KiCad PCB/schematic artwork to a private Review,
+set **both** `cloud-upload: snapshots` and `native-visuals: "true"` and provide
+an explicitly authorized, repository-scoped `BOARDREADYOPS_TOKEN` with `runs:write`.
+Use an exact `project` input to limit which board is shared, and install a
+compatible `kicad-cli` on the runner. Native SVG publishing is disabled in
+`safe-mode`, with `cloud-upload: metadata`, without a token, or if no native
+KiCad output was produced. Other projects' raw CAD source files are never uploaded.
+
+The GitHub App's separate OIDC readiness-result callback only reports findings.
+It does **not** grant artwork publishing privileges or substitute for the
+token-backed Review API. Do not enable this input for customer designs without
+their informed consent. A published SVG is not a DRC/ERC or manufacturing pass.
 
 ## Notifiers
 
