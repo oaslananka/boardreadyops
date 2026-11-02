@@ -67,7 +67,7 @@ export const registerValidatedRevisionAction = defineAction(registerRevisionSche
     revalidatePath("/deliveries");
     return ok(
       { revisionId: revision.id },
-      `Revision ${revision.revisionLabel} registered from validated manufacturing evidence.`,
+      `Revision ${revision.revisionLabel} registered from accepted runner evidence; source-to-export attestation is separate.`,
     );
   } finally {
     await executor.close();

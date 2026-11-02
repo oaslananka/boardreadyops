@@ -279,11 +279,11 @@ describe("DeliveriesListPage", () => {
     });
 
     const markup = await render();
-    expect(markup).toContain("No validated revisions to share yet");
+    expect(markup).toContain("No run-backed revisions to share yet");
     expect(markup).toContain('href="/runs"');
     expect(markup).toContain("Inspect runs");
     expect(markup).toContain("A passing readiness run or runner-generated draft archive cannot be shared directly.");
-    expect(markup).toContain("independently verified source evidence");
+    expect(markup).toContain("an accepted runner result with a stored manufacturing archive");
     expect(markup).not.toContain(
       "Run BoardReadyOps on a connected GitHub project until it completes with a passing manufacturing archive",
     );
@@ -316,6 +316,35 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain('href="#share-package"');
     expect(markup).toContain('id="share-package"');
     expect(markup).toContain("Create a guest link");
+  });
+
+  it("does not imply independent source attestation from runner-backed archive metadata", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [],
+      revisions: [
+        {
+          id: "rev_runner",
+          projectName: "Gateway board",
+          revisionLabel: "rev C",
+          sourceKind: "github_commit",
+          bundleSha256: "b".repeat(64),
+          validationRunId: "run_accepted",
+          validationArtifactId: "archive_persisted",
+        },
+      ],
+      authorizedRevisionIds: [],
+      deliveries: [],
+    });
+
+    const markup = await render();
+    expect(markup).toContain("Run-backed");
+    expect(markup).toContain("do not independently attest source-to-export provenance");
+    expect(markup).not.toContain(">Validated</");
+    expect(markup).not.toContain("independently validated manufacturing archive");
+    expect(markup).toContain("Explicit permission to share");
   });
 
   it("explains the Community plan limit instead of showing a guest link form that the server rejects", async () => {
@@ -406,7 +435,7 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("Review your boards");
     expect(markup).toContain("Prepare a manufacturing delivery");
     expect(markup).toContain("A Review is not a");
-    expect(markup).toContain("independently validated manufacturing archive");
+    expect(markup).toContain("accepted passing runner result");
     expect(markup).toContain("Creating a workspace or running readiness checks does not approve fabrication");
     expect(markup).toContain('href="/reviews"');
     expect(markup).toContain('href="/runs"');

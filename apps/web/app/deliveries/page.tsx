@@ -74,7 +74,7 @@ function revisionColumns(): readonly DataColumn<WorkspaceRevisionRecord>[] {
       cell: (revision) =>
         revision.validationRunId && revision.validationArtifactId ? (
           <span className="flex flex-col gap-0.5">
-            <StatusBadge value="success" label="Validated" />
+            <StatusBadge value="neutral" label="Run-backed" />
             <span className="font-mono text-meta text-muted-foreground">{revision.bundleSha256.slice(0, 12)}…</span>
           </span>
         ) : (
@@ -206,7 +206,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
 
             <Panel
               title="Package revisions"
-              description="Revisions keep their ingestion provenance. Only evidence-backed revisions can be shared."
+              description="An accepted runner result and stored archive do not independently attest source-to-export provenance or approve fabrication."
             >
               <DataTable
                 caption={`Package revisions in ${result.selected.name}`}
@@ -224,8 +224,8 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                   >
                     <p>
                       A passing readiness run is not a shareable manufacturing package. Runners may upload draft
-                      archives, but sharing requires separately verified source-to-export evidence and a validated
-                      package revision.
+                      archives, but sharing requires an accepted runner result with a stored manufacturing archive and a
+                      validated package revision.
                     </p>
                   </EmptyState>
                 }
@@ -234,8 +234,8 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
 
             {result.selected.role !== "viewer" && result.revisionCandidates.length > 0 ? (
               <Panel
-                title="Register validated revision"
-                description="Register an independently validated manufacturing archive from a verified passing run."
+                title="Register run-backed revision"
+                description="Register the stored manufacturing archive from an accepted passing runner result. Source-to-export attestation is separate."
               >
                 <ValidatedRevisionRegisterForm
                   workspaceId={result.selected.id}
@@ -290,7 +290,9 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                       ) : null
                     }
                   >
-                    <p>Links you issue appear here until they expire. Only validated revisions can be shared.</p>
+                    <p>
+                      Links you issue appear here until they expire. Only eligible run-backed revisions can be shared.
+                    </p>
                   </EmptyState>
                 }
               />
@@ -344,10 +346,10 @@ function CreatePanel({
   if (validatedRevisions.length === 0) {
     return (
       <Panel id="share-package" title="Share a package">
-        <Alert tone="info" title="No validated revisions to share yet">
+        <Alert tone="info" title="No run-backed revisions to share yet">
           A passing readiness run or runner-generated draft archive cannot be shared directly. A manufacturing export
-          needs independently verified source evidence and a validated package revision before an owner or admin can
-          authorize a guest link. Existing runs remain available to inspect; they do not grant delivery eligibility.
+          needs an accepted runner result and a stored archive before an owner or admin can authorize a guest link.
+          Existing runs remain available to inspect; they do not grant delivery eligibility.
           <div className="mt-3">
             <Button asChild variant="outline">
               <Link href="/runs">Inspect runs</Link>
@@ -362,7 +364,7 @@ function CreatePanel({
     <Panel
       id="share-package"
       title="Share a package"
-      description="Only validated revisions are selectable. The guest link is shown once and only its hash is stored."
+      description="Only authorized run-backed revisions can be selected. Source-to-export attestation is separate; the link is shown once."
     >
       <DeliveryCreateForm
         revisions={validatedRevisions.map((revision) => ({
@@ -423,12 +425,12 @@ function DeliveriesUnavailable({ state }: Readonly<{ state: "signed-out" | "not-
       </Panel>
       <Panel
         title="Prepare a manufacturing delivery"
-        description="Guest links require a verified passing run, an independently validated manufacturing archive and owner/admin sharing authorization."
+        description="Guest links require an accepted passing runner result, a stored manufacturing archive and owner/admin sharing authorization."
       >
         <p className="text-sm text-muted-foreground">
           Creating a workspace or running readiness checks does not approve fabrication or issue a guest link. The
-          standard runner's draft archive is not delivery-eligible; separately verified source-to-export evidence and
-          explicit owner/admin permission are required.
+          standard runner's draft archive is not delivery-eligible; an accepted runner result with a stored
+          manufacturing archive and explicit owner/admin permission are required.
         </p>
         <Button asChild className="mt-4">
           <Link href="/projects">Set up a CAD workspace</Link>
