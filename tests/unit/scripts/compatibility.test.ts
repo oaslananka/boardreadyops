@@ -498,9 +498,9 @@ describe("compatibility matrix", () => {
     expect(toolchain.node.preferred.split(".")[0]).toBe(config.node.recommended);
     expect(binaryWorkflow.env?.NODE_VERSION).toBe(toolchain.node.preferred);
     expect(containerWorkflow.env?.NODE_VERSION).toBe(config.node.tested?.[config.node.recommended]);
-    expect(containerWorkflow.env?.KICAD_PPA_SERIES).toBe(config.kicad.recommended);
+    expect(containerWorkflow.env?.KICAD_PPA_SERIES).toBeUndefined();
     expect(dockerfile).toContain(`ARG NODE_VERSION=${config.node.tested?.[config.node.recommended]}`);
-    expect(dockerfile).toContain(`ARG KICAD_PPA_SERIES=${config.kicad.recommended}`);
+    expect(dockerfile).toContain("dnf -y install --setopt=install_weak_deps=False kicad");
     expect(readme).toContain("Node.js 24 LTS only");
     expect(readme).toMatch(/Node\.js 26\s+Current is tracked but not supported/);
     expect(readme).toContain("CI-tested on KiCad 10.0");

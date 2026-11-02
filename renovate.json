@@ -23,15 +23,15 @@
     },
     {
       "customType": "regex",
-      "description": "Track the Ubuntu container action image by version and immutable digest without tag@digest syntax.",
+      "description": "Track the Fedora container action image by version and immutable digest without tag@digest syntax.",
       "managerFilePatterns": ["/^apps\\/container\\/Dockerfile$/"],
       "matchStrings": [
-        "# renovate: datasource=docker depName=ubuntu currentValue=(?<currentValue>\\d{2}\\.\\d{2})\\nFROM ubuntu@(?<currentDigest>sha256:[a-f0-9]{64})"
+        "# renovate: datasource=docker depName=fedora currentValue=(?<currentValue>\\d+)\\nFROM fedora@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],
-      "depNameTemplate": "ubuntu",
+      "depNameTemplate": "fedora",
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker",
-      "autoReplaceStringTemplate": "# renovate: datasource=docker depName=ubuntu currentValue={{{newValue}}}\nFROM ubuntu@{{{newDigest}}}"
+      "autoReplaceStringTemplate": "# renovate: datasource=docker depName=fedora currentValue={{{newValue}}}\nFROM fedora@{{{newDigest}}}"
     }
   ],
   "schedule": ["after 5am and before 8am every weekday"],
@@ -144,13 +144,13 @@
       "addLabels": ["supply-chain", "manual-review"]
     },
     {
-      "description": "Prevent duplicate native Dockerfile updates for the digest-only Ubuntu container action image.",
+      "description": "Prevent duplicate native Dockerfile updates for the digest-only Fedora container action image.",
       "matchManagers": ["dockerfile"],
       "matchFileNames": ["apps/container/Dockerfile"],
       "enabled": false
     },
     {
-      "description": "Manually review the Ubuntu container action image custom digest updates.",
+      "description": "Manually review the Fedora container action image custom digest updates.",
       "matchManagers": ["custom.regex"],
       "matchFileNames": ["apps/container/Dockerfile"],
       "automerge": false,
