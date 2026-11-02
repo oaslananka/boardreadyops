@@ -42,19 +42,19 @@ describe("container action release surfaces", () => {
     expect(entrypoint).not.toContain(`INPUT_PROJECT=\${2-}`);
   });
 
-  it("builds a GitHub-compatible Ubuntu image with an unprivileged account", async () => {
+  it("builds a GitHub-compatible Fedora image with an unprivileged account", async () => {
     const dockerfile = await readFile("apps/container/Dockerfile", "utf8");
 
-    expect(dockerfile).toContain("# renovate: datasource=docker depName=ubuntu currentValue=26.04");
-    expect(dockerfile).toMatch(/^FROM ubuntu@sha256:[a-f0-9]{64}$/mu);
+    expect(dockerfile).toContain("# renovate: datasource=docker depName=fedora currentValue=45");
+    expect(dockerfile).toMatch(/^FROM fedora@sha256:[a-f0-9]{64}$/mu);
     expect(dockerfile).not.toMatch(/^FROM [^\n]+:[^\s]+@sha256:/mu);
     expect(dockerfile).toContain("ARG NODE_VERSION=24.22.1");
+    expect(dockerfile).not.toContain("ARG KICAD_PPA_SERIES");
+    expect(dockerfile).toContain("dnf -y install --setopt=install_weak_deps=False kicad");
     expect(dockerfile).toContain("ARG BOARDREADYOPS_VERSION");
     expect(dockerfile).not.toContain("ARG BOARDREADYOPS_VERSION=latest");
     expect(dockerfile).toContain("BOARDREADYOPS_VERSION must be an exact semantic version");
     expect(dockerfile).not.toContain("ARG PNPM_VERSION");
-    expect(dockerfile).toContain("ARG KICAD_PPA_SERIES=10.0");
-    expect(dockerfile).toContain(`ppa:kicad/kicad-\${KICAD_PPA_SERIES}-releases`);
     expect(dockerfile).toContain("NPM_CONFIG_UPDATE_NOTIFIER=false npm install");
     expect(dockerfile).toContain("--global --ignore-scripts --no-audit --no-fund");
     expect(dockerfile).toContain(`"boardreadyops@\${BOARDREADYOPS_VERSION}"`);
@@ -76,7 +76,7 @@ describe("container action release surfaces", () => {
     ]);
 
     expect(dockerfile).toContain("/usr/share/doc/boardreadyops/LICENSE-KICAD");
-    expect(dockerfile).toContain("/usr/share/common-licenses/GPL-3");
+    expect(dockerfile).toContain("/usr/share/licenses/kicad/LICENSE");
     expect(docs).toContain("Container image redistributes KiCad under GPL terms.");
   });
 
@@ -114,8 +114,15 @@ describe("container action release surfaces", () => {
     expect(workflow.jobs?.smoke?.strategy?.matrix?.include).toEqual([
       {
         "kicad-version": "10.0",
-        "kicad-ppa-series": "10.0",
         "node-version": "24.22.1",
+        runner: "ubuntu-24.04",
+        arch: "amd64",
+      },
+      {
+        "kicad-version": "10.0",
+        "node-version": "24.22.1",
+        runner: "ubuntu-24.04-arm",
+        arch: "arm64",
       },
     ]);
   });

@@ -265,7 +265,7 @@ describe("dependency and security automation configuration", () => {
       currentValue: "44.97.6",
       currentDigest: "sha256:128e8d6d6cb07beccc009a2cfbdbe741e2c620a9f70a2b8fb72614ca33dbe5ac",
     });
-    const ubuntuManager = (
+    const fedoraManager = (
       renovate.customManagers as Array<{
         description?: string;
         managerFilePatterns?: string[];
@@ -275,28 +275,25 @@ describe("dependency and security automation configuration", () => {
     ).find(
       ({ description }) =>
         description ===
-        "Track the Ubuntu container action image by version and immutable digest without tag@digest syntax.",
+        "Track the Fedora container action image by version and immutable digest without tag@digest syntax.",
     );
-    expect(ubuntuManager?.managerFilePatterns).toEqual(["/^apps\\/container\\/Dockerfile$/"]);
+    expect(fedoraManager?.managerFilePatterns).toEqual(["/^apps\\/container\\/Dockerfile$/"]);
     const actionDockerfilePin = await repositoryFile("apps/container/Dockerfile");
-    const ubuntuMatch = new RegExp(ubuntuManager?.matchStrings?.[0] ?? "(?!)", "u").exec(actionDockerfilePin);
-    expect(ubuntuMatch?.groups).toMatchObject({
-      currentValue: "26.04",
-      currentDigest: "sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944",
+    const fedoraMatch = new RegExp(fedoraManager?.matchStrings?.[0] ?? "(?!)", "u").exec(actionDockerfilePin);
+    expect(fedoraMatch?.groups).toMatchObject({
+      currentValue: "45",
+      currentDigest: "sha256:aacbc26b38361ba0cb3d10f268da40b61b36aed6ed6fe5831a35871636bedb06",
     });
-    expect(ubuntuManager?.autoReplaceStringTemplate).toBe(
-      "# renovate: datasource=docker depName=ubuntu currentValue={{{newValue}}}\nFROM ubuntu@{{{newDigest}}}",
+    expect(fedoraManager?.autoReplaceStringTemplate).toBe(
+      "# renovate: datasource=docker depName=fedora currentValue={{{newValue}}}\nFROM fedora@{{{newDigest}}}",
     );
     expect(
       (
-        ubuntuManager?.autoReplaceStringTemplate
-          ?.replace("{{{newValue}}}", "26.04")
+        fedoraManager?.autoReplaceStringTemplate
+          ?.replace("{{{newValue}}}", "45")
           .replace("{{{newDigest}}}", `sha256:${"a".repeat(64)}`) ?? ""
       ).split("\n"),
-    ).toEqual([
-      "# renovate: datasource=docker depName=ubuntu currentValue=26.04",
-      `FROM ubuntu@sha256:${"a".repeat(64)}`,
-    ]);
+    ).toEqual(["# renovate: datasource=docker depName=fedora currentValue=45", `FROM fedora@sha256:${"a".repeat(64)}`]);
     expect(packageJson.scripts?.["deps:install-renovate"]).toBeUndefined();
     expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe("node scripts/renovate-post-upgrade.mjs");
     expect(renovateWorkflow.jobs?.validate).toBeDefined();
@@ -309,13 +306,13 @@ describe("dependency and security automation configuration", () => {
     const rules = (renovate.packageRules ?? []) as RenovateRule[];
     const byDescription = (description: string) => rules.find((rule) => rule.description === description);
     expect(
-      byDescription("Prevent duplicate native Dockerfile updates for the digest-only Ubuntu container action image."),
+      byDescription("Prevent duplicate native Dockerfile updates for the digest-only Fedora container action image."),
     ).toMatchObject({
       matchManagers: ["dockerfile"],
       matchFileNames: ["apps/container/Dockerfile"],
       enabled: false,
     });
-    expect(byDescription("Manually review the Ubuntu container action image custom digest updates.")).toMatchObject({
+    expect(byDescription("Manually review the Fedora container action image custom digest updates.")).toMatchObject({
       matchManagers: ["custom.regex"],
       matchFileNames: ["apps/container/Dockerfile"],
       automerge: false,

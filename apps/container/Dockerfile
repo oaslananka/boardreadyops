@@ -1,36 +1,29 @@
-# Renovate uses the explicit 26.04 version and immutable digest below; do not combine tag@digest here.
-# renovate: datasource=docker depName=ubuntu currentValue=26.04
-FROM ubuntu@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
+# Renovate tracks Fedora 45 by version + immutable multiarch digest; no tag@digest syntax.
+# renovate: datasource=docker depName=fedora currentValue=45
+FROM fedora@sha256:aacbc26b38361ba0cb3d10f268da40b61b36aed6ed6fe5831a35871636bedb06
+
+RUN dnf -y upgrade --refresh \
+    && dnf -y install --setopt=install_weak_deps=False kicad \
+    && dnf clean all \
+    && kicad-cli version
 
 ARG NODE_VERSION=24.22.1
 ARG BOARDREADYOPS_VERSION
-ARG KICAD_PPA_SERIES=10.0
 
 LABEL org.opencontainers.image.source="https://github.com/oaslananka/boardreadyops"
 LABEL org.opencontainers.image.description="BoardReadyOps with KiCad CLI preinstalled."
 
 RUN set -eux; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
-      ca-certificates \
-      curl \
-      gnupg \
-      software-properties-common \
-      xz-utils; \
-    add-apt-repository --yes "ppa:kicad/kicad-${KICAD_PPA_SERIES}-releases"; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends kicad; \
-    rm -f /usr/bin/pebble; \
-    rm -rf /var/lib/apt/lists/*; \
-    case "$(dpkg --print-architecture)" in \
-      amd64) node_arch="x64" ;; \
-      arm64) node_arch="arm64" ;; \
+    case "$(rpm --eval '%{_arch}')" in \
+      x86_64) node_arch="x64" ;; \
+      aarch64) node_arch="arm64" ;; \
       *) echo "Unsupported Node architecture." >&2; exit 1 ;; \
     esac; \
+    cd /tmp; \
     archive="node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
     curl --proto '=https' --proto-redir '=https' -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/${archive}"; \
     curl --proto '=https' --proto-redir '=https' -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
-    grep " ${archive}\$" SHASUMS256.txt | sha256sum -c -; \
+    grep " ${archive}$" SHASUMS256.txt | sha256sum -c -; \
     tar -xJf "${archive}" --directory /usr/local --strip-components 1; \
     rm "${archive}" SHASUMS256.txt; \
     node --version; \
@@ -50,7 +43,7 @@ RUN set -eux; \
     boardreadyops --version; \
     kicad-cli version; \
     mkdir -p /usr/share/doc/boardreadyops; \
-    cp /usr/share/common-licenses/GPL-3 /usr/share/doc/boardreadyops/LICENSE-KICAD; \
+    cp /usr/share/licenses/kicad/LICENSE /usr/share/doc/boardreadyops/LICENSE-KICAD; \
     useradd --create-home --shell /bin/bash --uid 10001 boardreadyops
 
 COPY action-entrypoint.sh /usr/local/bin/boardreadyops-action
