@@ -74011,7 +74011,7 @@ var footprintMismatchRule = rule(
       (row) => finding(context5, {
         ruleId: "bom.footprint-mismatch",
         severity: configuredSeverity(context5, "bom.footprint-mismatch", "medium"),
-        message: `${row.reference} BOM footprint ${row.footprint} does not match PCB footprint ${pcbFootprints.get(row.reference)?.footprint}.`,
+        message: pcbFootprints.get(row.reference)?.footprint ? `${row.reference} BOM footprint ${row.footprint} does not match PCB footprint ${pcbFootprints.get(row.reference)?.footprint}.` : `${row.reference} BOM footprint ${row.footprint} cannot be compared: the PCB footprint assignment is missing.`,
         path: row.sourcePath,
         kind: "bom",
         line: row.line,
