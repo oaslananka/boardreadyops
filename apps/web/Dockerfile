@@ -26,9 +26,29 @@ FROM node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d20
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG VERSION=dev
+# renovate: datasource=github-releases depName=cli/cli
+ARG GH_VERSION=2.103.3
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl curl \
   && rm -rf /var/lib/apt/lists/*
+
+# The existing source-export verifier delegates Sigstore cryptographic verification
+# to GitHub CLI. Pin the official immutable release archive by architecture digest
+# so production verification uses the same reviewed verifier as local acceptance.
+RUN set -eux; \
+    case "$(dpkg --print-architecture)" in \
+      amd64) gh_arch="amd64"; gh_sha256="4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d" ;; \
+      arm64) gh_arch="arm64"; gh_sha256="ee32df2323c8847f5fac6cb6b4b69ca75828e9329a8f22f677021f7b3306ce63" ;; \
+      *) echo "Unsupported GitHub CLI architecture." >&2; exit 1 ;; \
+    esac; \
+    archive="gh_""$GH_VERSION""_linux_""$gh_arch"".tar.gz"; \
+    curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSLo "/tmp/$archive" "https://github.com/cli/cli/releases/download/v$GH_VERSION/$archive"; \
+    printf '%s  %s\n' "$gh_sha256" "/tmp/$archive" | sha256sum --check --strict; \
+    mkdir -p /tmp/gh-cli; \
+    tar -xzf "/tmp/$archive" -C /tmp/gh-cli; \
+    install -o root -g root -m 0755 "/tmp/gh-cli/gh_$GH_VERSION""_linux_""$gh_arch"/bin/gh /usr/local/bin/gh; \
+    gh --version | grep -F "gh version $GH_VERSION"; \
+    rm -rf /tmp/gh-cli "/tmp/$archive"
 
 LABEL org.opencontainers.image.title="BoardReadyOps Cloud" \
       org.opencontainers.image.description="Self-hosted BoardReadyOps cloud control plane" \
