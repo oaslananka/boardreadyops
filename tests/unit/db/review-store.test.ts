@@ -184,6 +184,42 @@ describe("ReviewStore", () => {
     expect(revision.policy_snapshot).toMatchObject({ policy: null });
   });
 
+  it("updates generated commit-based titles but preserves custom review titles", async () => {
+    const db = new InMemoryMockDb();
+    const store = new ReviewStore(db);
+    const first = await store.upsertReviewForRun({
+      repositoryId: "repo-1",
+      pullRequestNumber: 10,
+      title: "Review for 6aa49e71",
+      headRunId: "run-before",
+      headCommitSha: "6aa49e71".padEnd(40, "0"),
+      evidenceDigest: "a".repeat(64),
+    });
+    const second = await store.upsertReviewForRun({
+      repositoryId: "repo-1",
+      pullRequestNumber: 10,
+      title: "Review for 8714bbeb",
+      headRunId: "run-after",
+      headCommitSha: "8714bbeb".padEnd(40, "0"),
+      evidenceDigest: "b".repeat(64),
+    });
+    expect(second.review.id).toBe(first.review.id);
+    expect(second.review.title).toBe("Review for 8714bbeb");
+
+    const saved = db.reviews[0];
+    if (!saved) throw new Error("Missing review");
+    saved.title = "Power Board Review";
+    const third = await store.upsertReviewForRun({
+      repositoryId: "repo-1",
+      pullRequestNumber: 10,
+      title: "Review for ffffffff",
+      headRunId: "run-third",
+      headCommitSha: "f".repeat(40),
+      evidenceDigest: "c".repeat(64),
+    });
+    expect(third.review.title).toBe("Power Board Review");
+  });
+
   it("enforces tenant isolation across repositories", async () => {
     const db = new InMemoryMockDb();
     const store = new ReviewStore(db);
