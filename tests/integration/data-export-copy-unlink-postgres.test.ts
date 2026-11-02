@@ -84,6 +84,7 @@ async function finish(f: Awaited<ReturnType<typeof fixture>>, token: string) {
   ]);
 }
 
+// Make the fixture unambiguously due before the JavaScript-millisecond claim clock.
 async function deletionJob(f: Awaited<ReturnType<typeof fixture>>, path = f.sharedPath) {
   const jobId = randomUUID();
   await executor().query(
@@ -91,7 +92,7 @@ async function deletionJob(f: Awaited<ReturnType<typeof fixture>>, path = f.shar
       id,artifact_id,installation_id,repository_id,release_run_id,
       storage_driver,storage_path,deletion_reason,artifact_kind,artifact_role,
       artifact_sha256,artifact_bytes,available_at,created_at
-    ) VALUES ($1,$2,$3,$4,$5,'local',$6,'result_replaced','manufacturing','package',$7,17,NOW(),NOW())`,
+    ) VALUES ($1,$2,$3,$4,$5,'local',$6,'result_replaced','manufacturing','package',$7,17,NOW()-INTERVAL '1 second',NOW())`,
     [jobId, randomUUID(), f.installationId, f.repositoryId, f.runId, path, "b".repeat(64)],
   );
   return jobId;
