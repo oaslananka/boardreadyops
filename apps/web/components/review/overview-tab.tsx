@@ -1,4 +1,4 @@
-import type { PolicyFieldSource } from "@boardreadyops/contracts";
+import type { PolicyFieldSource, SnapshotArtifact } from "@boardreadyops/contracts";
 import Link from "next/link";
 import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoReview } from "../../lib/demo-data.js";
@@ -44,6 +44,38 @@ function canvasSummary(review: DemoReview): string {
   return (review.baseSnapshots?.length ?? 0) > 0
     ? `${sheets}, with the base revision available for side-by-side and overlay comparison.`
     : `${sheets} you can pan, zoom, and open findings on.`;
+}
+
+/** Stored rendering digests compare published image bytes, not hardware geometry. */
+function publishedImageDigestPairs(review: DemoReview): Array<{ label: string; identical: boolean }> {
+  if (!review.baseSnapshots?.length || !review.headSnapshots?.length) return [];
+  const identity = (snapshot: { name: string; kind: string; sheetOrLayer: string }) =>
+    JSON.stringify([snapshot.name, snapshot.kind, snapshot.sheetOrLayer]);
+  const base = new Map<string, SnapshotArtifact[]>();
+  const headCounts = new Map<string, number>();
+  for (const snapshot of review.baseSnapshots) {
+    const id = identity(snapshot);
+    base.set(id, [...(base.get(id) ?? []), snapshot]);
+  }
+  for (const snapshot of review.headSnapshots) {
+    const id = identity(snapshot);
+    headCounts.set(id, (headCounts.get(id) ?? 0) + 1);
+  }
+  const validDigest = (sha: string) => /^[a-f0-9]{64}$/iu.test(sha);
+  return review.headSnapshots.flatMap((snapshot) => {
+    const id = identity(snapshot);
+    const matching = base.get(id);
+    // Ambiguous or missing views must not be presented as an actual design change.
+    if (headCounts.get(id) !== 1 || matching?.length !== 1) return [];
+    const prior = matching[0];
+    if (!prior || !validDigest(prior.sha256) || !validDigest(snapshot.sha256)) return [];
+    return [
+      {
+        label: `${snapshot.name} · ${snapshot.sheetOrLayer}`,
+        identical: prior.sha256.toLowerCase() === snapshot.sha256.toLowerCase(),
+      },
+    ];
+  });
 }
 
 type ReadinessTone = "danger" | "success" | "warning";
@@ -208,10 +240,39 @@ export function OverviewTab({
 
   let changedFilesContent: React.ReactNode;
   if (review.changedFiles === undefined) {
+    const publishedPairs = publishedImageDigestPairs(review);
+    const differing = publishedPairs.filter((pair) => !pair.identical).length;
     changedFilesContent = (
-      <p className="text-sm text-muted-foreground">
-        Hardware surface diff details are not available for this persisted review.
-      </p>
+      <div className="space-y-3">
+        {publishedPairs.length > 0 ? (
+          <section
+            className="rounded-md border border-border/70 bg-muted/20 p-3"
+            aria-label="Published image comparison"
+          >
+            <p className="text-sm font-medium">
+              Published artwork: {differing} different, {publishedPairs.length - differing} matching
+              <span className="text-muted-foreground"> · {publishedPairs.length} paired view(s)</span>
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {publishedPairs.map((pair) => (
+                <li key={pair.label} className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="min-w-0 break-all text-foreground">{pair.label}</span>
+                  <span className="text-muted-foreground">
+                    {pair.identical ? "Same image digest" : "Different image digest"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Compares stored SHA-256 values of matching published images only. Different image bytes do not prove
+              component, electrical, BOM, or manufacturing changes; unpaired views are not classified.
+            </p>
+          </section>
+        ) : null}
+        <p className="text-sm text-muted-foreground">
+          Hardware surface diff details are not available for this persisted review.
+        </p>
+      </div>
     );
   } else if (review.changedFiles.length === 0) {
     changedFilesContent = (
