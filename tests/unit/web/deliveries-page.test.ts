@@ -21,6 +21,12 @@ vi.mock("../../../apps/web/components/deliveries/manufacturing-share-authorizati
   ManufacturingShareAuthorizationForm: () => null,
 }));
 
+// The server-page tests only need to know whether the action is offered. The
+// separately tested client form uses useActionState and cannot render via static SSR.
+vi.mock("../../../apps/web/components/deliveries/delivery-create-form.js", () => ({
+  DeliveryCreateForm: () => createElement("span", null, "Create guest link"),
+}));
+
 const loadWorkspaceDeliveries = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/web/lib/delivery-listing.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -294,6 +300,64 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain('id="share-package"');
     expect(markup).toContain("Create a guest link");
   });
+
+  it("explains the Community plan limit instead of showing a guest link form that the server rejects", async () => {
+    const communityWorkspace = { ...workspace, planTier: "community" as const };
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [communityWorkspace],
+      selected: communityWorkspace,
+      revisionCandidates: [],
+      revisions: [
+        {
+          id: "rev_a",
+          projectName: "Gateway board",
+          revisionLabel: "rev C",
+          validationRunId: "run_a",
+          validationArtifactId: "artifact_a",
+          sourceKind: "github_commit",
+          bundleSha256: "a".repeat(64),
+        },
+      ],
+      deliveries: [],
+      authorizedRevisionIds: ["rev_a"],
+    });
+
+    const markup = await render();
+    expect(markup).toContain("Guest links require Team or higher");
+    expect(markup).toContain("No guest links yet");
+    expect(markup).not.toContain("Create guest link");
+  });
+
+  it.each(["team", "business", "pilot"] as const)(
+    "still offers the validated guest link form on the %s plan",
+    async (planTier) => {
+      const paidWorkspace = { ...workspace, planTier };
+      loadWorkspaceDeliveries.mockResolvedValue({
+        state: "ok",
+        workspaces: [paidWorkspace],
+        selected: paidWorkspace,
+        revisionCandidates: [],
+        revisions: [
+          {
+            id: "rev_a",
+            projectName: "Gateway board",
+            revisionLabel: "rev C",
+            validationRunId: "run_a",
+            validationArtifactId: "artifact_a",
+            sourceKind: "github_commit",
+            bundleSha256: "a".repeat(64),
+          },
+        ],
+        deliveries: [],
+        authorizedRevisionIds: ["rev_a"],
+      });
+
+      const markup = await render();
+      expect(markup).toContain("Create guest link");
+      expect(markup).not.toContain("Guest links require Team or higher");
+    },
+  );
 
   it("offers no create form to a viewer, who is refused server-side anyway", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({

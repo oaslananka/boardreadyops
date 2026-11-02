@@ -1,3 +1,4 @@
+import { hasWorkspaceEntitlement } from "@boardreadyops/cloud-core";
 import type { WorkspaceDeliveryRecord, WorkspaceRevisionRecord } from "@boardreadyops/db";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -273,7 +274,13 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                     title="No guest links yet"
                     action={
                       result.selected.role !== "viewer" &&
-                      result.revisions.some((revision) => revision.validationRunId && revision.validationArtifactId) ? (
+                      hasWorkspaceEntitlement(result.selected.planTier, "canCreateDeliveryLink") &&
+                      result.revisions.some(
+                        (revision) =>
+                          revision.validationRunId &&
+                          revision.validationArtifactId &&
+                          (result.authorizedRevisionIds ?? []).includes(revision.id),
+                      ) ? (
                         <Button asChild variant="outline">
                           <a href="#share-package">Create a guest link</a>
                         </Button>
@@ -319,6 +326,17 @@ function CreatePanel({
       revision.validationArtifactId !== undefined &&
       (result.authorizedRevisionIds ?? []).includes(revision.id),
   );
+
+  if (!hasWorkspaceEntitlement(result.selected.planTier, "canCreateDeliveryLink")) {
+    return (
+      <Panel id="share-package" title="Share a package">
+        <Alert tone="info" title="Guest links require Team or higher">
+          Your workspace can still inspect revisions and existing deliveries, but its current plan does not include
+          creating new guest links.
+        </Alert>
+      </Panel>
+    );
+  }
 
   if (validatedRevisions.length === 0) {
     return (
