@@ -45,7 +45,7 @@ export function ValidatedRevisionRegisterForm({
 
           <div className="flex min-w-0 flex-col gap-1.5">
             <label className="text-meta font-medium text-foreground" htmlFor={candidateId}>
-              Validated manufacturing package
+              Run-backed manufacturing archive
             </label>
             <NativeSelect id={candidateId} name="candidate" required>
               {candidates.map((candidate) => (
@@ -55,7 +55,8 @@ export function ValidatedRevisionRegisterForm({
               ))}
             </NativeSelect>
             <p className="text-meta text-muted-foreground">
-              Candidates come only from completed passing BoardReadyOps runs with a persisted manufacturing archive.
+              Candidates require an accepted passing runner result and a stored archive. Independent source-to-export
+              attestation is not established by this list.
             </p>
             {fieldError(state, "candidate") ? (
               <p className="text-meta text-danger">{fieldError(state, "candidate")}</p>
