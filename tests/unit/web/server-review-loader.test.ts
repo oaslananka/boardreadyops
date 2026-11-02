@@ -508,6 +508,7 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
     const review = await loadServerReview(reviewId, authorizedSession);
     expect(review?.baseSnapshots).toHaveLength(1);
     expect(review?.baseSnapshots?.[0]).toMatchObject({ id: "snap_sch_board_base" });
+    expect(review?.baseRunId).toBe("run-hw-104-base");
   });
 
   it("fails closed (returns null) for unauthorized viewer on private repository", async () => {

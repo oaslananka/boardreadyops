@@ -349,8 +349,8 @@ async function loadBaseSnapshots(
   baseCommitSha: string | null,
   baseRunId: string | null,
   headRunId: string,
-): Promise<SnapshotArtifact[]> {
-  if (!baseCommitSha) return [];
+): Promise<{ runId?: string; snapshots: SnapshotArtifact[] }> {
+  if (!baseCommitSha) return { snapshots: [] };
 
   const runResult = await executor.query(
     `SELECT base.id FROM release_runs AS base
@@ -364,9 +364,10 @@ async function loadBaseSnapshots(
   );
   const runRows = (runResult as { rows?: { id: string }[] }).rows ?? [];
   const selectedBaseRunId = runRows[0]?.id;
-  if (!selectedBaseRunId) return [];
+  if (!selectedBaseRunId) return { snapshots: [] };
 
-  return loadHeadSnapshots(executor, selectedBaseRunId);
+  const snapshots = await loadHeadSnapshots(executor, selectedBaseRunId);
+  return snapshots.length > 0 ? { runId: selectedBaseRunId, snapshots } : { snapshots: [] };
 }
 
 async function loadReviewGovernanceData(
@@ -522,7 +523,7 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
     const savedPolicyResult = reviewPolicyRecordSchema.safeParse(revision.policy_snapshot);
     const recordedPolicy = savedPolicyResult.success ? savedPolicyResult.data : null;
     // Historical revisions lacking a snapshot must not be silently relabelled as recorded evidence.
-    const [findings, evidenceItems, governance, headSnapshots, baseSnapshots, effectivePolicy, pcbFootprintSummary] =
+    const [findings, evidenceItems, governance, headSnapshots, baseEvidence, effectivePolicy, pcbFootprintSummary] =
       await Promise.all([
         loadReconstructedFindings(executor, reviewId, revision.head_run_id),
         loadEvidenceArtifacts(executor, revision.head_run_id),
@@ -560,7 +561,9 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       currentRevisionId: revision.id,
       currentRevisionSequence: revision.sequence,
       headRunId: revision.head_run_id,
-      ...(revision.base_run_id ? { baseRunId: revision.base_run_id } : {}),
+      ...((revision.base_run_id ?? baseEvidence.runId)
+        ? { baseRunId: revision.base_run_id ?? baseEvidence.runId }
+        : {}),
       baseCommitSha: baseCommit,
       headCommitSha: revision.head_commit_sha,
       evidenceDigest: revision.evidence_digest,
@@ -577,7 +580,7 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       comments: governance.comments,
       ...(pcbFootprintSummary ? { pcbFootprintSummary } : {}),
       headSnapshots: headSnapshots.length > 0 ? headSnapshots : undefined,
-      baseSnapshots: baseSnapshots.length > 0 ? baseSnapshots : undefined,
+      baseSnapshots: baseEvidence.snapshots.length > 0 ? baseEvidence.snapshots : undefined,
       ...(session && recordedPolicy ? { policyRecordedAt: recordedPolicy.recordedAt } : {}),
       effectivePolicy:
         session && recordedPolicy
