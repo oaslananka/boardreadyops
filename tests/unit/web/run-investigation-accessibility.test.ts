@@ -230,6 +230,24 @@ describe("run investigation accessibility", () => {
     expect(html).not.toContain("sm:flex-row sm:items-start sm:justify-between");
   });
 
+  it("distinguishes an unfiltered empty run from filters that matched no artifacts", () => {
+    const run = sampleRun();
+    run.artifacts = [];
+    run.artifactsPage = { page: 1, pageSize: 25, total: 0, totalPages: 1 };
+
+    const empty = renderToStaticMarkup(createElement(ArtifactsView, { run, searchParameters: {} }));
+    expect(empty).toContain("No stored artifacts for this run");
+    expect(empty).toContain("A passing readiness check does not automatically produce a manufacturing package");
+    expect(empty).not.toContain("No matching artifacts");
+
+    const filtered = renderToStaticMarkup(
+      createElement(ArtifactsView, { run, searchParameters: { artifactRole: "manufacturing" } }),
+    );
+    expect(filtered).toContain("No matching artifacts");
+    expect(filtered).toContain("No current artifact metadata matches these filters");
+    expect(filtered).not.toContain("No stored artifacts for this run");
+  });
+
   it("links GitHub Actions logs and repository-owned artifacts from the authoritative workflow run", () => {
     const run = sampleRun();
     run.attempts = [
