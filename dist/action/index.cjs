@@ -67227,7 +67227,7 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 var import_promises26 = __toESM(require("node:fs/promises"), 1);
-var import_node_path54 = __toESM(require("node:path"), 1);
+var import_node_path55 = __toESM(require("node:path"), 1);
 
 // node_modules/@actions/core/lib/command.js
 var os = __toESM(require("os"), 1);
@@ -103710,7 +103710,7 @@ function sarifPositiveInteger(value) {
 var import_node_child_process2 = require("node:child_process");
 var import_node_crypto9 = require("node:crypto");
 var import_promises19 = __toESM(require("node:fs/promises"), 1);
-var import_node_path50 = __toESM(require("node:path"), 1);
+var import_node_path51 = __toESM(require("node:path"), 1);
 
 // packages/cloud-core/src/archive-sanitizer.ts
 var DEFAULT_MAX_COMPRESSED_SIZE = 50 * 1024 * 1024;
@@ -124959,6 +124959,54 @@ async function generateSnapshots(options) {
   return rendered.flat().slice(0, 64);
 }
 
+// src/util/git-resolver.ts
+var import_node_fs4 = require("node:fs");
+var import_node_path50 = require("node:path");
+function defaultIsRegularFile(filePath) {
+  try {
+    return (0, import_node_fs4.statSync)(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+function resolveGitExecutable(options = {}) {
+  const env = options.env ?? process.env;
+  const platform2 = options.platform ?? process.platform;
+  const checkFile = options.isRegularFile ?? defaultIsRegularFile;
+  const override = env.BOARDREADYOPS_GIT_PATH;
+  if (override !== void 0 && override.trim() !== "") {
+    const trimmed = override.trim();
+    if (!(0, import_node_path50.isAbsolute)(trimmed)) {
+      throw new Error(`BOARDREADYOPS_GIT_PATH must be an absolute path, got: "${trimmed}"`);
+    }
+    if (!checkFile(trimmed)) {
+      throw new Error(`BOARDREADYOPS_GIT_PATH does not point to an existing regular file: "${trimmed}"`);
+    }
+    return trimmed;
+  }
+  const candidates = [];
+  if (platform2 === "win32") {
+    candidates.push(
+      String.raw`C:\Program Files\Git\cmd\git.exe`,
+      String.raw`C:\Program Files\Git\bin\git.exe`,
+      String.raw`C:\Program Files (x86)\Git\cmd\git.exe`,
+      String.raw`C:\Program Files (x86)\Git\bin\git.exe`
+    );
+  } else if (platform2 === "darwin") {
+    candidates.push("/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git");
+  } else {
+    candidates.push("/usr/bin/git", "/usr/local/bin/git");
+  }
+  for (const candidate of candidates) {
+    if (checkFile(candidate)) {
+      return candidate;
+    }
+  }
+  throw new Error(
+    "Safe git executable not found in standard system locations. Set the BOARDREADYOPS_GIT_PATH environment variable to the absolute path of your git binary."
+  );
+}
+
 // src/action/cloud-publish.ts
 async function nativeEvidenceForAction(result, inputs, workspace, logger7) {
   if (inputs.cloudUpload !== "snapshots" || inputs.nativeVisuals !== true) return void 0;
@@ -124968,22 +125016,22 @@ async function nativeEvidenceForAction(result, inputs, workspace, logger7) {
   }
   try {
     const realWorkspace = await import_promises19.default.realpath(workspace);
-    const scanRoot = await import_promises19.default.realpath(import_node_path50.default.resolve(workspace, inputs.path ?? "."));
+    const scanRoot = await import_promises19.default.realpath(import_node_path51.default.resolve(workspace, inputs.path ?? "."));
     if (!isInside(realWorkspace, scanRoot)) throw new Error("Scan directory must stay in the checked-out workspace");
-    const sourceSha = (0, import_node_child_process2.execFileSync)("git", ["-C", realWorkspace, "rev-parse", "HEAD"], {
+    const sourceSha = (0, import_node_child_process2.execFileSync)(resolveGitExecutable(), ["-C", realWorkspace, "rev-parse", "HEAD"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
     if (!/^[0-9a-f]{40}$/u.test(sourceSha)) throw new Error("Exact source commit is unavailable");
     const files = async (key) => {
       const items = result.projects.flatMap((project) => project[key]);
-      const accepted = [];
-      for (const file3 of items) {
-        const absolute = await import_promises19.default.realpath(import_node_path50.default.resolve(scanRoot, file3));
-        if (!isInside(scanRoot, absolute)) throw new Error("Source file escapes selected scan directory");
-        accepted.push(absolute);
-      }
-      return accepted;
+      return await Promise.all(
+        items.map(async (file3) => {
+          const absolute = await import_promises19.default.realpath(import_node_path51.default.resolve(scanRoot, file3));
+          if (!isInside(scanRoot, absolute)) throw new Error("Source file escapes selected scan directory");
+          return absolute;
+        })
+      );
     };
     const [schematicFiles, pcbFiles] = await Promise.all([files("schematicFiles"), files("boardFiles")]);
     if (!schematicFiles.length && !pcbFiles.length) return void 0;
@@ -129397,7 +129445,7 @@ function bomRiskSection(risk) {
 // src/action/previous-result.ts
 var import_promises23 = __toESM(require("node:fs/promises"), 1);
 var import_node_os6 = __toESM(require("node:os"), 1);
-var import_node_path51 = __toESM(require("node:path"), 1);
+var import_node_path52 = __toESM(require("node:path"), 1);
 
 // node_modules/@actions/artifact/lib/internal/shared/config.js
 var import_os4 = __toESM(require("os"), 1);
@@ -160584,7 +160632,7 @@ var Batch = class {
 };
 
 // node_modules/@azure/storage-blob/dist/esm/utils/utils.js
-var import_node_fs4 = __toESM(require("node:fs"), 1);
+var import_node_fs5 = __toESM(require("node:fs"), 1);
 var import_node_util3 = __toESM(require("node:util"), 1);
 async function streamToBuffer(stream4, buffer2, offset, end, encoding) {
   let pos = 0;
@@ -160623,7 +160671,7 @@ async function streamToBuffer(stream4, buffer2, offset, end, encoding) {
 }
 async function readStreamToLocalFile(rs, file3) {
   return new Promise((resolve2, reject) => {
-    const ws = import_node_fs4.default.createWriteStream(file3);
+    const ws = import_node_fs5.default.createWriteStream(file3);
     rs.on("error", (err) => {
       reject(err);
     });
@@ -160634,8 +160682,8 @@ async function readStreamToLocalFile(rs, file3) {
     rs.pipe(ws);
   });
 }
-var fsStat = import_node_util3.default.promisify(import_node_fs4.default.stat);
-var fsCreateReadStream = import_node_fs4.default.createReadStream;
+var fsStat = import_node_util3.default.promisify(import_node_fs5.default.stat);
+var fsCreateReadStream = import_node_fs5.default.createReadStream;
 
 // node_modules/@azure/storage-blob/dist/esm/Clients.js
 var BlobClient = class _BlobClient extends StorageClient2 {
@@ -164590,7 +164638,7 @@ async function loadExactBaseRunResult(input3) {
     );
     if (!artifact) continue;
     sawNamedArtifact = true;
-    const directory = await import_promises23.default.mkdtemp(import_node_path51.default.join(import_node_os6.default.tmpdir(), "boardreadyops-exact-base-"));
+    const directory = await import_promises23.default.mkdtemp(import_node_path52.default.join(import_node_os6.default.tmpdir(), "boardreadyops-exact-base-"));
     try {
       const downloaded = await client2.downloadArtifact(artifact.id, { path: directory, findBy });
       const parsed = await findComparisonRunResultArtifact(downloaded.downloadPath ?? directory);
@@ -164622,7 +164670,7 @@ async function loadPreviousRunResult(token, owner, repo, artifactName2, pull) {
       if (!artifact) {
         continue;
       }
-      const directory = await import_promises23.default.mkdtemp(import_node_path51.default.join(import_node_os6.default.tmpdir(), "boardreadyops-previous-"));
+      const directory = await import_promises23.default.mkdtemp(import_node_path52.default.join(import_node_os6.default.tmpdir(), "boardreadyops-previous-"));
       try {
         const downloaded = await client2.downloadArtifact(artifact.id, { path: directory, findBy }).catch(() => void 0);
         const previous = await findRunResultArtifact(downloaded?.downloadPath ?? directory);
@@ -164724,7 +164772,7 @@ function isRecord(value) {
 }
 async function artifactFiles(root) {
   const entries = await import_promises23.default.readdir(root, { recursive: true, withFileTypes: true }).catch(() => []);
-  return entries.filter((entry) => entry.isFile()).map((entry) => import_node_path51.default.join(entry.parentPath, entry.name)).sort(compareText);
+  return entries.filter((entry) => entry.isFile()).map((entry) => import_node_path52.default.join(entry.parentPath, entry.name)).sort(compareText);
 }
 function compareText(left, right) {
   if (left < right) return -1;
@@ -164800,7 +164848,7 @@ function reviewReports(artifactName2) {
 
 // src/action/hardware-impact.ts
 var import_promises24 = require("node:fs/promises");
-var import_node_path52 = __toESM(require("node:path"), 1);
+var import_node_path53 = __toESM(require("node:path"), 1);
 
 // src/core/diff/run.ts
 function diffRuns(previous, current, options = {}) {
@@ -165161,7 +165209,7 @@ async function hostedPullRequestBinding(token, owner, repo) {
 }
 async function checkoutSha(workspace) {
   const gitDirectory = await resolveGitDirectory(workspace);
-  const head = (await (0, import_promises24.readFile)(import_node_path52.default.join(gitDirectory, "HEAD"), "utf8")).trim();
+  const head = (await (0, import_promises24.readFile)(import_node_path53.default.join(gitDirectory, "HEAD"), "utf8")).trim();
   if (fullLowercaseSha2.test(head)) return head;
   const match = /^ref: (refs\/[^\r\n]+)$/u.exec(head);
   const ref = match?.[1];
@@ -165169,9 +165217,9 @@ async function checkoutSha(workspace) {
     throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
   }
   const commonDirectory = await resolveCommonGitDirectory(gitDirectory);
-  const looseSha = await readOptionalText(import_node_path52.default.join(commonDirectory, ...ref.split("/")));
+  const looseSha = await readOptionalText(import_node_path53.default.join(commonDirectory, ...ref.split("/")));
   if (looseSha && fullLowercaseSha2.test(looseSha.trim())) return looseSha.trim();
-  const packedRefs = await readOptionalText(import_node_path52.default.join(commonDirectory, "packed-refs"));
+  const packedRefs = await readOptionalText(import_node_path53.default.join(commonDirectory, "packed-refs"));
   const packedSha = packedRefs ? packedRefSha(packedRefs, ref) : void 0;
   if (packedSha) return packedSha;
   throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
@@ -165187,18 +165235,18 @@ function packedRefSha(packedRefs, ref) {
   return void 0;
 }
 async function resolveGitDirectory(workspace) {
-  const dotGit = import_node_path52.default.join(workspace, ".git");
+  const dotGit = import_node_path53.default.join(workspace, ".git");
   const metadata2 = await (0, import_promises24.stat)(dotGit);
   if (metadata2.isDirectory()) return dotGit;
   if (!metadata2.isFile()) throw new Error("workspace .git metadata is unavailable");
   const marker2 = (await (0, import_promises24.readFile)(dotGit, "utf8")).trim();
   const match = /^gitdir: (.+)$/u.exec(marker2);
   if (!match?.[1]) throw new Error("workspace .git metadata is invalid");
-  return import_node_path52.default.resolve(import_node_path52.default.dirname(dotGit), match[1]);
+  return import_node_path53.default.resolve(import_node_path53.default.dirname(dotGit), match[1]);
 }
 async function resolveCommonGitDirectory(gitDirectory) {
-  const commonMarker = await readOptionalText(import_node_path52.default.join(gitDirectory, "commondir"));
-  return commonMarker ? import_node_path52.default.resolve(gitDirectory, commonMarker.trim()) : gitDirectory;
+  const commonMarker = await readOptionalText(import_node_path53.default.join(gitDirectory, "commondir"));
+  return commonMarker ? import_node_path53.default.resolve(gitDirectory, commonMarker.trim()) : gitDirectory;
 }
 async function readOptionalText(file3) {
   try {
@@ -165219,9 +165267,9 @@ function numericRunId(value) {
 }
 
 // src/action/inputs.ts
-var import_node_path53 = __toESM(require("node:path"), 1);
+var import_node_path54 = __toESM(require("node:path"), 1);
 function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? process.cwd()) {
-  const root = import_node_path53.default.resolve(workspace);
+  const root = import_node_path54.default.resolve(workspace);
   const gate = empty(getInput("gate"));
   return {
     cwd: root,
@@ -165361,7 +165409,7 @@ function optionalNonNegativeInteger(value, name) {
   return Number.parseInt(trimmed, 10);
 }
 function workspacePath(workspace, value) {
-  const resolved = import_node_path53.default.resolve(workspace, value);
+  const resolved = import_node_path54.default.resolve(workspace, value);
   if (!isInside(workspace, resolved)) {
     throw new Error(`Input path must stay inside GITHUB_WORKSPACE: ${value}`);
   }
@@ -165538,7 +165586,7 @@ async function ensureRunnerFile(file3) {
   if (!file3) {
     return;
   }
-  await import_promises26.default.mkdir(import_node_path54.default.dirname(file3), { recursive: true });
+  await import_promises26.default.mkdir(import_node_path55.default.dirname(file3), { recursive: true });
   await import_promises26.default.appendFile(file3, "", "utf8");
 }
 function githubRunUrl() {

@@ -8,6 +8,7 @@ import { mapFindingsForCloud } from "../core/cloud-findings.js";
 import type { Logger } from "../core/logger.js";
 import type { RunResult } from "../core/result.js";
 import { generateSnapshots } from "../kicad/snapshots.js";
+import { resolveGitExecutable } from "../util/git-resolver.js";
 import { isInside } from "../util/path.js";
 import type { ActionInputs } from "./inputs.js";
 
@@ -38,7 +39,7 @@ async function nativeEvidenceForAction(
     const realWorkspace = await fs.realpath(workspace);
     const scanRoot = await fs.realpath(path.resolve(workspace, inputs.path ?? "."));
     if (!isInside(realWorkspace, scanRoot)) throw new Error("Scan directory must stay in the checked-out workspace");
-    const sourceSha = execFileSync("git", ["-C", realWorkspace, "rev-parse", "HEAD"], {
+    const sourceSha = execFileSync(resolveGitExecutable(), ["-C", realWorkspace, "rev-parse", "HEAD"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
@@ -46,13 +47,13 @@ async function nativeEvidenceForAction(
 
     const files = async (key: "schematicFiles" | "boardFiles"): Promise<string[]> => {
       const items = result.projects.flatMap((project) => project[key]);
-      const accepted: string[] = [];
-      for (const file of items) {
-        const absolute = await fs.realpath(path.resolve(scanRoot, file));
-        if (!isInside(scanRoot, absolute)) throw new Error("Source file escapes selected scan directory");
-        accepted.push(absolute);
-      }
-      return accepted;
+      return await Promise.all(
+        items.map(async (file) => {
+          const absolute = await fs.realpath(path.resolve(scanRoot, file));
+          if (!isInside(scanRoot, absolute)) throw new Error("Source file escapes selected scan directory");
+          return absolute;
+        }),
+      );
     };
     const [schematicFiles, pcbFiles] = await Promise.all([files("schematicFiles"), files("boardFiles")]);
     if (!schematicFiles.length && !pcbFiles.length) return undefined;
