@@ -31,6 +31,12 @@ boardreadyops schema review-publish > review-publish-result.schema.json
 
 Successful JSON stdout is one schema-versioned document containing the BoardReadyOps tool name/version, `success`, `dryRun`, the full `evidenceDigest`, the resolved same-origin `reviewUrl` for live publishes, and `runId` when the service supplies one. Dry runs omit `reviewUrl` and `runId`. Human diagnostics and failures are written to stderr; failed JSON-mode publishes leave stdout empty. Validate consumers against `schemas/review-publish-result.schema.json` or `boardreadyops schema review-publish`.
 
+When publishing from a multi-project workspace, use `--project <path>` to restrict analysis, findings, and generated Review snapshots to that specific KiCad project. A `projects:` entry in `boardreadyops.yml` sets project-local rules; it does **not** limit discovery. Review the selected project before opting in to source-derived native visuals:
+
+```bash
+boardreadyops review publish . --project hardware/mainboard/mainboard.kicad_pro --native-visuals
+```
+
 **Native PCB and schematic visuals require explicit opt-in.** Use boardreadyops review publish . --native-visuals only when your organization permits detailed source-derived design geometry to be stored by the configured BoardReadyOps server. The option changes the effective upload mode to snapshots when it would otherwise be metadata; the exported SVG can reveal copper routing, component arrangement, net labels, and schematics even though raw KiCad source files are not uploaded. Without the flag, Review publishing retains the existing lightweight summary snapshots and does **not** upload native design artwork. This option neither certifies manufacturing readiness nor links plotted geometry independently to the reviewed commit.
 
 **Optional PCB footprint-count publishing requires a separate explicit opt-in.** With two exact Git revisions and a tracked KiCad PCB, use:

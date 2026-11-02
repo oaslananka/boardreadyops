@@ -270,6 +270,41 @@ describe("CLI review publish command", () => {
     ).toBe(true);
   });
 
+  it("scopes published snapshots to --project instead of disclosing unrelated workspace designs", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "bro-multiproject-review-"));
+    const selected = path.join(root, "selected");
+    const unrelated = path.join(root, "unrelated");
+    fs.cpSync(fixtureRoot, selected, { recursive: true });
+    fs.cpSync(fixtureRoot, unrelated, { recursive: true });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(successResponse({ ok: true, runId: "run-scoped", reviewUrl: "/reviews/scoped" }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const stdout = createMockStream();
+      const stderr = createMockStream();
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({
+          project: "selected/safe-basic.kicad_pro",
+          upload: "snapshots",
+        }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code, stderr.output).toBe(0);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const body = JSON.parse(String(request.body)) as { snapshots: { kind: string; name: string }[] };
+      // The selected project has one schematic and two PCB layers. Without
+      // --project propagation this incorrectly includes both KiCad projects.
+      expect(body.snapshots.filter((item) => item.kind === "schematic")).toHaveLength(1);
+      expect(body.snapshots.filter((item) => item.kind === "pcb_layer")).toHaveLength(2);
+      expect(body.snapshots).toHaveLength(3);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("never enables source-derived design artwork without an explicit opt-in", async () => {
     const stdout = createMockStream();
     const stderr = createMockStream();
