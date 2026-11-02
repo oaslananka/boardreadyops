@@ -29,13 +29,13 @@ ARG VERSION=dev
 # renovate: datasource=github-releases depName=cli/cli
 ARG GH_VERSION=2.103.3
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl curl \
-  && rm -rf /var/lib/apt/lists/*
-
 # The existing source-export verifier delegates Sigstore cryptographic verification
 # to GitHub CLI. Pin the official immutable release archive by architecture digest
 # so production verification uses the same reviewed verifier as local acceptance.
 RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl openssl; \
+    rm -rf /var/lib/apt/lists/*; \
     case "$(dpkg --print-architecture)" in \
       amd64) gh_arch="amd64"; gh_sha256="4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d" ;; \
       arm64) gh_arch="arm64"; gh_sha256="ee32df2323c8847f5fac6cb6b4b69ca75828e9329a8f22f677021f7b3306ce63" ;; \

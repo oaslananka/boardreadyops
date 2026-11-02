@@ -12,7 +12,7 @@ describe("web Docker dependency layer", () => {
     expect(dockerfile).toContain("ee32df2323c8847f5fac6cb6b4b69ca75828e9329a8f22f677021f7b3306ce63");
     expect(dockerfile).toContain("sha256sum --check --strict");
     expect(dockerfile).toContain('gh --version | grep -F "gh version $GH_VERSION"');
-    expect(dockerfile).toContain("ca-certificates openssl curl");
+    expect(dockerfile).toContain("ca-certificates curl openssl");
   });
 
   it("copies every pnpm patch before installing dependencies", async () => {
