@@ -59,7 +59,7 @@ export const defaultReadinessWorkflowTemplate = [
   "      checks: read\n",
   "      contents: read\n",
   "      id-token: write\n",
-  "    runs-on: ubuntu-latest\n",
+  "    runs-on: ubuntu-24.04\n",
   "    timeout-minutes: 30\n",
   "    steps:\n",
   "      - name: Validate dispatch binding\n",
