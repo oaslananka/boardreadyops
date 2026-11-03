@@ -154,8 +154,10 @@ describe("production MCP request adapter is not publicly mounted", () => {
     expect(body).not.toContain("secret-owner");
     expect(body).not.toContain("private-repo-id");
     expect(checkCurrentPermission).toHaveBeenCalledTimes(2);
-    expect(openDb).toHaveBeenCalledTimes(3);
-    expect(close).toHaveBeenCalledTimes(3);
+    // Tool results revalidate the durable OAuth grant after the DB read.
+    expect(query.mock.calls.filter(([sql]) => sql.includes("remote_mcp_oauth_grants"))).toHaveLength(3);
+    expect(openDb).toHaveBeenCalledTimes(4);
+    expect(close).toHaveBeenCalledTimes(4);
 
     checkCurrentPermission.mockResolvedValue(false);
     const denied = await handler(
@@ -170,8 +172,8 @@ describe("production MCP request adapter is not publicly mounted", () => {
     const revoked = await handler(mcpRequest("tools/list", token));
     expect(revoked.status).toBe(401);
     expect(revoked.headers.get("www-authenticate")).toContain("oauth-protected-resource/mcp");
-    expect(openDb).toHaveBeenCalledTimes(6);
-    expect(close).toHaveBeenCalledTimes(6);
+    expect(openDb).toHaveBeenCalledTimes(7);
+    expect(close).toHaveBeenCalledTimes(7);
   });
 
   it("rejects malicious public key sets and untrusted request origins before any database lookup", async () => {

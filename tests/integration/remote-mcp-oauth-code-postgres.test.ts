@@ -992,8 +992,9 @@ describePg("remote MCP OAuth single-use flow on isolated PostgreSQL", () => {
     expect(await revokeRemoteMcpGrant(executor(), required(grantId), githubUserId)).toBe(true);
     const revoked = await handler(request("tools/list"));
     expect(revoked.status).toBe(401);
-    expect(query.mock.calls.filter(([sql]) => sql.includes("remote_mcp_oauth_grants"))).toHaveLength(4);
-    expect(close).toHaveBeenCalledTimes(6);
+    // A successful tool read performs one more durable grant check before returning facts.
+    expect(query.mock.calls.filter(([sql]) => sql.includes("remote_mcp_oauth_grants"))).toHaveLength(5);
+    expect(close).toHaveBeenCalledTimes(7);
   });
 
   it("allows a GitHub user to revoke only their own live grant through the browser, invalidating subsequent MCP requests", async () => {
