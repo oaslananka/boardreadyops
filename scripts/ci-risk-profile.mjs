@@ -112,6 +112,8 @@ const PACKAGE_PATTERNS = [
 ];
 const PATH_PATTERNS = [
   /path/i,
+  // Signed export archive names are persisted across OS-native storage paths.
+  /^apps\/web\/lib\/signed-manufacturing-export-import\.ts$/,
   /^src\/(core|kicad|cli|release|vendor)\//,
   /^tests\/integration\/cross-platform-paths\.test\.ts$/,
 ];

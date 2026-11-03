@@ -95,6 +95,14 @@ describe("ci-risk-profile", () => {
     }
   });
 
+  it("runs the native path matrix for signed export storage key changes", () => {
+    const profile = classifyChangedFiles(["apps/web/lib/signed-manufacturing-export-import.ts"], {
+      eventName: "pull_request",
+    });
+    expect(profile.needs_unit_matrix).toBe(true);
+    expect(profile.needs_cross_platform).toBe(true);
+  });
+
   it("keeps billing/database PRs off KiCad PPA while exercising PostgreSQL integration", () => {
     for (const file of [
       "packages/db/src/billing-store.ts",
