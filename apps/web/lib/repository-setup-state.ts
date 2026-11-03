@@ -23,7 +23,7 @@ function explicitProblem(value: string | undefined): boolean {
 }
 
 /** Revision zero is the repository-dashboard sentinel, not a persisted setup revision. */
-export function hasPersistedSetupRevision(revision: number | undefined): revision is number {
+function hasPersistedSetupRevision(revision: number | undefined): revision is number {
   return revision !== undefined && Number.isSafeInteger(revision) && revision > 0;
 }
 

@@ -4,7 +4,7 @@ import type { RepositorySetupPreset } from "@boardreadyops/cloud-core/repository
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { customerStatusLabel } from "../lib/customer-nomenclature.js";
-import { deriveRepositorySetupState, hasPersistedSetupRevision } from "../lib/repository-setup-state.js";
+import { deriveRepositorySetupState } from "../lib/repository-setup-state.js";
 import { Alert, Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
 import { YamlSyntaxHighlighter } from "./yaml-syntax-highlighter.js";
 
@@ -219,7 +219,7 @@ export function RepositorySetupInteractive({
     const result = await requestSetupPr(repositoryId, activePreset.id);
     setPrResult(result);
     const setupRevision = result.setupRevision;
-    if (result.ok && hasPersistedSetupRevision(setupRevision)) {
+    if (result.ok && setupRevision !== undefined && Number.isSafeInteger(setupRevision) && setupRevision > 0) {
       setSetupOverrides((current) => ({
         ...current,
         [repositoryId]: {
@@ -454,7 +454,7 @@ function setupReadinessView({
   blockedReason,
   result,
 }: Omit<SetupReadinessProps, "onValidate">): SetupReadinessView {
-  const noRevision = !hasPersistedSetupRevision(repository?.setupRevision);
+  const noRevision = deriveRepositorySetupState(repository ?? {}).id === "unconfigured";
   const status = effectiveProbeStatus(result, repository?.setupProbeStatus);
   const probeInProgress = status === "pending" || status === "dispatched";
   const workflowRunId = result?.workflowRunId ?? repository?.setupProbeWorkflowRunId;
@@ -690,7 +690,7 @@ function SetupProgressDetails({
   return (
     <DefinitionGrid>
       <Definition label="Setup revision">
-        {!hasPersistedSetupRevision(repository.setupRevision) ? "Not created" : `#${repository.setupRevision}`}
+        {stateId === "unconfigured" ? "Not created" : `#${repository.setupRevision}`}
       </Definition>
       <Definition label="Persisted policy">{repository.setupPreset?.replaceAll("-", " ") ?? "Not recorded"}</Definition>
       <Definition label="Workflow">
