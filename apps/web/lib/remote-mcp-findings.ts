@@ -5,6 +5,7 @@ import {
   type CheckLiveRepositoryPermission,
   loadAuthorizedRemoteReviewSnapshot,
   type RemoteMcpPrincipal,
+  sameAuthorizedRemoteReviewSnapshot,
 } from "./remote-mcp-access.js";
 
 const pageSize = 30;
@@ -128,15 +129,7 @@ export async function loadAuthorizedRemoteFindings(
   // page is read. Recheck the authoritative scope immediately before returning
   // source-bound facts; never return the previously authorized stale snapshot.
   const current = await loadAuthorizedRemoteReviewSnapshot(db, principal, reviewId, checkCurrentPermission);
-  if (
-    !current ||
-    current.headRunId !== snapshot.headRunId ||
-    current.facts.headCommitSha !== snapshot.facts.headCommitSha ||
-    current.facts.evidenceDigest !== snapshot.facts.evidenceDigest ||
-    current.facts.status !== snapshot.facts.status ||
-    current.facts.decision !== snapshot.facts.decision
-  )
-    return null;
+  if (!sameAuthorizedRemoteReviewSnapshot(snapshot, current)) return null;
   return {
     schemaVersion: 1,
     availability: "available",
