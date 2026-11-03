@@ -44,6 +44,25 @@ interface RemoteMcpReadDependencies {
   checkCurrentPermission: CheckLiveRepositoryPermission;
 }
 
+/** A single fail-closed, bounded read path for all hosted Review MCP tools. */
+async function readAuthorizedRemoteMcpTool<T extends Record<string, unknown>>(
+  dependencies: RemoteMcpReadDependencies,
+  read: (db: Awaited<ReturnType<RemoteMcpReadDependencies["openDb"]>>) => Promise<T | null>,
+) {
+  let db: Awaited<ReturnType<RemoteMcpReadDependencies["openDb"]>> | undefined;
+  try {
+    db = await dependencies.openDb();
+    const facts = await read(db);
+    if (!facts) return { isError: true, content: [{ type: "text" as const, text: "Review unavailable" }] };
+    return { content: [{ type: "text" as const, text: JSON.stringify(facts) }], structuredContent: facts };
+  } catch {
+    // Never leak repository IDs, CAD paths, database failures, tokens, or external provider details.
+    return { isError: true, content: [{ type: "text" as const, text: "Review unavailable" }] };
+  } finally {
+    await db?.close().catch(() => undefined);
+  }
+}
+
 /** Reject mismatched routes and untrusted browser origins BEFORE any grant lookup.
  * Never trust Host/Forwarded headers to construct the canonical MCP resource.
  */
@@ -84,25 +103,10 @@ export async function handleAuthorizedRemoteMcpHttp(
             inputSchema: z.object({ reviewId: z.string().uuid() }).strict(),
             annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
           },
-          async ({ reviewId }) => {
-            let db: Awaited<ReturnType<RemoteMcpReadDependencies["openDb"]>> | undefined;
-            try {
-              db = await dependencies.openDb();
-              const facts = await loadAuthorizedRemoteReview(
-                db,
-                principal,
-                reviewId,
-                dependencies.checkCurrentPermission,
-              );
-              if (!facts) return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
-              return { content: [{ type: "text", text: JSON.stringify(facts) }], structuredContent: facts };
-            } catch {
-              // Do not disclose repository IDs, CAD paths, database errors or external service details.
-              return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
-            } finally {
-              await db?.close().catch(() => undefined);
-            }
-          },
+          ({ reviewId }) =>
+            readAuthorizedRemoteMcpTool(dependencies, (db) =>
+              loadAuthorizedRemoteReview(db, principal, reviewId, dependencies.checkCurrentPermission),
+            ),
         );
       }
       if (principal.scopes.includes("review:read")) {
@@ -119,25 +123,10 @@ export async function handleAuthorizedRemoteMcpHttp(
               .strict(),
             annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
           },
-          async ({ reviewId, cursor }) => {
-            let db: Awaited<ReturnType<RemoteMcpReadDependencies["openDb"]>> | undefined;
-            try {
-              db = await dependencies.openDb();
-              const data = await loadAuthorizedRemoteFindings(
-                db,
-                principal,
-                reviewId,
-                cursor,
-                dependencies.checkCurrentPermission,
-              );
-              if (!data) return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
-              return { content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data };
-            } catch {
-              return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
-            } finally {
-              await db?.close().catch(() => undefined);
-            }
-          },
+          ({ reviewId, cursor }) =>
+            readAuthorizedRemoteMcpTool(dependencies, (db) =>
+              loadAuthorizedRemoteFindings(db, principal, reviewId, cursor, dependencies.checkCurrentPermission),
+            ),
         );
       }
       if (principal.scopes.includes("review:read")) {
@@ -149,24 +138,10 @@ export async function handleAuthorizedRemoteMcpHttp(
             inputSchema: z.object({ reviewId: z.string().uuid() }).strict(),
             annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
           },
-          async ({ reviewId }) => {
-            let db: Awaited<ReturnType<RemoteMcpReadDependencies["openDb"]>> | undefined;
-            try {
-              db = await dependencies.openDb();
-              const facts = await loadAuthorizedRemoteFootprintSummary(
-                db,
-                principal,
-                reviewId,
-                dependencies.checkCurrentPermission,
-              );
-              if (!facts) return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
-              return { content: [{ type: "text", text: JSON.stringify(facts) }], structuredContent: facts };
-            } catch {
-              return { isError: true, content: [{ type: "text", text: "Review unavailable" }] };
-            } finally {
-              await db?.close().catch(() => undefined);
-            }
-          },
+          ({ reviewId }) =>
+            readAuthorizedRemoteMcpTool(dependencies, (db) =>
+              loadAuthorizedRemoteFootprintSummary(db, principal, reviewId, dependencies.checkCurrentPermission),
+            ),
         );
       }
       if (principal.scopes.includes("review:read")) {
