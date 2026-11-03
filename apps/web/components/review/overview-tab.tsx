@@ -2,6 +2,7 @@ import type { PolicyFieldSource, SnapshotArtifact } from "@boardreadyops/contrac
 import Link from "next/link";
 import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoReview } from "../../lib/demo-data.js";
+import { displayReviewAuthor } from "../../lib/review-author-display.js";
 import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { Button } from "../ui/button.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "../ui.js";
@@ -432,7 +433,7 @@ export function OverviewTab({
       <Panel title="Review Details & Metadata" tone="inset">
         <DefinitionGrid>
           <Definition label="Repository">{review.repositoryName}</Definition>
-          <Definition label="Author">{review.createdBy}</Definition>
+          <Definition label="Author">{displayReviewAuthor(review.createdBy)}</Definition>
           <Definition label="Base Commit">
             <code>{/^0+$/u.test(review.baseCommitSha) ? "Not recorded" : review.baseCommitSha}</code>
           </Definition>

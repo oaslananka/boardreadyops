@@ -90,6 +90,20 @@ describe("Review Detail Tabs", () => {
     expect(html).toContain("min-h-11 shrink-0 items-center");
   });
 
+  it("hides recorded member UUIDs in Review details while preserving human author labels", () => {
+    const recordedId = "620f1df3-f731-497b-9a8c-c5425f762c7d";
+    const privateAuthor = renderToStaticMarkup(
+      createElement(OverviewTab, { review: { ...review, createdBy: recordedId } }),
+    );
+    expect(privateAuthor).toContain("Recorded member");
+    expect(privateAuthor).not.toContain(recordedId);
+
+    const namedAuthor = renderToStaticMarkup(
+      createElement(OverviewTab, { review: { ...review, createdBy: "github-reviewer" } }),
+    );
+    expect(namedAuthor).toContain("github-reviewer");
+  });
+
   it("labels a manual Review without inventing a PR number or base commit", () => {
     const manual = { ...review, pullRequestNumber: 0, baseCommitSha: "0".repeat(40) };
     const header = renderToStaticMarkup(
