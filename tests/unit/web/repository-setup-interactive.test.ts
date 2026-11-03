@@ -110,6 +110,26 @@ describe("repository setup readiness controls", () => {
     expect(container.textContent).toContain("Open the setup pull request first");
   });
 
+  it("never claims setup verified without its observed Git commit", async () => {
+    const repository = {
+      ...readyForProbe,
+      setupWorkflowStatus: "ready",
+      setupConfigStatus: "ready",
+      setupRevision: 2,
+      setupObservedSha: undefined,
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [repository] }),
+      );
+    });
+    expect(container.textContent).toContain("Setup needs attention");
+    expect(container.textContent).toContain("verified Git commit");
+    expect(container.textContent).toContain("Not verified");
+    expect(container.textContent).not.toContain("Repository setup verified");
+    expect(button(container, "Validate readiness").disabled).toBe(false);
+  });
+
   it("shows replayed probe state and the GitHub Actions run", async () => {
     vi.stubGlobal(
       "fetch",
@@ -223,7 +243,7 @@ describe("repository setup readiness controls", () => {
       ...readyForProbe,
       setupWorkflowStatus: "ready",
       setupConfigStatus: "ready",
-      setupObservedSha: "abcdef1234567890",
+      setupObservedSha: "abcdef1234567890abcdef1234567890abcdef12",
     };
     await act(async () => {
       root.render(
@@ -246,7 +266,12 @@ describe("repository setup readiness controls", () => {
   });
 
   it("preserves an explicit reviewed update path for verified setup", async () => {
-    const verified = { ...readyForProbe, setupWorkflowStatus: "ready", setupConfigStatus: "ready" };
+    const verified = {
+      ...readyForProbe,
+      setupWorkflowStatus: "ready",
+      setupConfigStatus: "ready",
+      setupObservedSha: "a".repeat(40),
+    };
     const fetchMock = vi.fn(async () =>
       jsonResponse({
         ok: true,
