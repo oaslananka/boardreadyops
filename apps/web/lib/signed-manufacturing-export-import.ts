@@ -125,6 +125,12 @@ async function fileDigest(filePath: string): Promise<string> {
   return hash.digest("hex");
 }
 
+// Windows tar emits CRLF listing separators. Normalize only the line terminator;
+// embedded carriage returns must remain visible to the entry-name guard.
+export function tarListingLines(output: string): string[] {
+  return output.split(/\r?\n/u).filter(Boolean);
+}
+
 export function tarEntryExpandedBytes(detail: string): number | undefined {
   const gnu = /^[-d][rwxStTs-]{9}\s+\S+\s+(\d+)\s/u.exec(detail);
   const bsd = /^[-d][rwxStTs-]{9}\s+\d+\s+\S+\s+\S+\s+(\d+)\s/u.exec(detail);
@@ -167,8 +173,8 @@ async function inspectTar(archive: string): Promise<boolean> {
       execFileAsync("tar", ["-tzf", archive], { maxBuffer: 2 * 1024 * 1024, timeout: 15_000 }),
       execFileAsync("tar", ["-tvzf", archive], { maxBuffer: 2 * 1024 * 1024, timeout: 15_000 }),
     ]);
-    const entries = names.stdout.split("\n").filter(Boolean);
-    const details = verbose.stdout.split("\n").filter(Boolean);
+    const entries = tarListingLines(names.stdout);
+    const details = tarListingLines(verbose.stdout);
     if (entries.length < 2 || entries.length > maximumArchiveEntries || entries.length !== details.length) return false;
     return safeArchiveHeaders(details) && safeArchiveNames(entries, details);
   } catch {

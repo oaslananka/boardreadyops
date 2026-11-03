@@ -8,6 +8,7 @@ import {
   handleSignedManufacturingExportImport,
   type SignedExportImportDependencies,
   tarEntryExpandedBytes,
+  tarListingLines,
 } from "../../../apps/web/lib/signed-manufacturing-export-import.js";
 
 const runId = "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d";
@@ -143,6 +144,14 @@ async function filesBelow(root: string): Promise<string[]> {
 }
 
 describe("portable tar metadata parsing", () => {
+  it("accepts CRLF listing terminators but preserves embedded unsafe carriage returns", () => {
+    expect(tarListingLines("build/\r\nbuild/boardreadyops-attested/manifest.json\r\nbundle.sigstore.json\r\n")).toEqual(
+      ["build/", "build/boardreadyops-attested/manifest.json", "bundle.sigstore.json"],
+    );
+    expect(tarListingLines("build/unsafe\rname\n")).toEqual(["build/unsafe\rname"]);
+    expect(tarListingLines("build/unsafe\r\r\n")).toEqual(["build/unsafe\r"]);
+  });
+
   it("reads expanded sizes from GNU tar and BSD tar verbose listings", () => {
     expect(tarEntryExpandedBytes("-rw-r--r-- 0/0 19 2026-11-03 00:00 build/manifest.json")).toBe(19);
     expect(
