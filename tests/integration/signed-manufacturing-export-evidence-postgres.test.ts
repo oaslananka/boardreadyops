@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
+import { startLostPostgresReplyProxy } from "../helpers/lost-postgres-reply-proxy.js";
 
 const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
@@ -142,9 +143,41 @@ describeDatabase("signed manufacturing export evidence (PostgreSQL)", () => {
       nextParameters[3] = nextArtifactId;
       nextParameters[4] = `${runId}/${nextAttemptId}/${nextArtifactId}.tar.gz`;
       nextParameters[10] = nextGithubRunId;
-      expect(
-        ((await executor.query(call, nextParameters)) as { rows: Array<{ outcome: string }> }).rows[0]?.outcome,
-      ).toBe("accepted");
+      // The same proven loopback proxy used for runner uploads drops the actual
+      // PostgreSQL wire response only after ReadyForQuery confirms completion.
+      // A rejected pg Promise must not be mistaken for a rolled-back write.
+      if (!connectionString) throw new Error("disposable PostgreSQL is required");
+      const proxy = await startLostPostgresReplyProxy(
+        connectionString,
+        "boardreadyops_record_signed_manufacturing_export",
+      );
+      const interruptedExecutor = createPgQueryExecutor({ connectionString: proxy.connectionString, max: 1 });
+      try {
+        await expect(interruptedExecutor.query(call, nextParameters)).rejects.toThrow();
+        expect(proxy.droppedReply()).toBe(true);
+      } finally {
+        await interruptedExecutor.close();
+        await proxy.close();
+      }
+      const persisted = await executor.query(
+        "select evidence.artifact_id, evidence.repository_id, evidence.installation_id, " +
+          "evidence.github_run_id, evidence.source_sha, artifact.storage_path, artifact.sha256 " +
+          "from signed_manufacturing_export_evidence as evidence " +
+          "join artifacts as artifact on artifact.id = evidence.artifact_id " +
+          "where evidence.run_id = $1 and evidence.execution_attempt_id = $2",
+        [runId, nextAttemptId],
+      );
+      expect((persisted as { rows: Array<Record<string, unknown>> }).rows[0]).toMatchObject({
+        artifact_id: nextArtifactId,
+        repository_id: repositoryId,
+        installation_id: installationId,
+        github_run_id: nextGithubRunId,
+        source_sha: sourceSha,
+        storage_path: nextParameters[4],
+        sha256: archiveSha,
+      });
+      const replayAfterLostReply = await executor.query(call, nextParameters);
+      expect((replayAfterLostReply as { rows: Array<{ outcome: string }> }).rows[0]?.outcome).toBe("replayed");
 
       await expect(
         executor.query("update signed_manufacturing_export_evidence set signer_sha = $2 where run_id = $1", [
