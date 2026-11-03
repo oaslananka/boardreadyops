@@ -44,7 +44,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,7 +58,7 @@ services:
     environment:
       ARTIFACT_STORAGE_ROOT: /data/artifacts
       BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
-      DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL required}
       REDIS_URL: redis://redis:6379
     expose:
       - "3000"
@@ -84,7 +84,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL required}
       BOARDREADYOPS_WORKER_HEALTH_PORT: 3001
       # The deletion worker must resolve the same files that web uploads.
       ARTIFACT_STORAGE_ROOT: /data/artifacts
@@ -113,10 +113,8 @@ services:
     logging: *boardreadyops-log-policy
     image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-boardreadyops}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-boardreadyops}
+    env_file:
+      - .env
     volumes:
       - boardreadyops_postgres:/var/lib/postgresql/data
     healthcheck:
