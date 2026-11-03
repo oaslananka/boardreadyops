@@ -1,0 +1,11 @@
+[Unit]
+Description=BoardReadyOps Coolify production PostgreSQL and artifact backup
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/boardreadyops/coolify-backup.env
+ExecStart=/usr/bin/bash %h/.local/libexec/boardreadyops-coolify-backup.sh
+TimeoutStartSec=15min
+UMask=0077
+NoNewPrivileges=true
