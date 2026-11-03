@@ -46885,6 +46885,7 @@ function parsedComponents(model, file3) {
       manufacturer: propertyValue(symbol3, "Manufacturer") ?? propertyValue(symbol3, "Mfr"),
       mpn: propertyValue(symbol3, "MPN") ?? propertyValue(symbol3, "Manufacturer Part Number"),
       dnp: boolValue(propertyValue(symbol3, "DNP") ?? propertyValue(symbol3, "Dopopulate")),
+      ...listChildValue(symbol3, "in_bom") === "no" ? { inBom: false } : {},
       raw: variant ? { Variant: variant } : void 0,
       sourcePath: file3,
       sourceKind: "schematic"
@@ -46981,7 +46982,7 @@ async function loadBomContext(context) {
   for (const project of context.projects) {
     for (const schematic of project.schematicFiles) {
       const parsed = await parseSchematic(import_node_path8.default.resolve(context.root, schematic));
-      schematicRows.push(...parsed.components);
+      schematicRows.push(...parsed.components.filter((component) => component.inBom !== false));
     }
     for (const board of project.boardFiles) {
       const parsed = await parsePcb(import_node_path8.default.resolve(context.root, board));
