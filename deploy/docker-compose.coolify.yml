@@ -38,7 +38,7 @@ services:
     logging: *boardreadyops-log-policy
     image: boardreadyops-web-runtime:${SOURCE_COMMIT:?Coolify selected Git revision is required}
     build:
-      context: ..
+      context: .
       dockerfile: apps/web/Dockerfile
       args:
         BUILD_DATE: ${BOARDREADYOPS_BUILD_DATE:-unknown}
