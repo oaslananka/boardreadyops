@@ -18,7 +18,9 @@ export async function loadBomContext(context: RuleContext): Promise<{
   for (const project of context.projects) {
     for (const schematic of project.schematicFiles) {
       const parsed = await parseSchematic(path.resolve(context.root, schematic));
-      schematicRows.push(...parsed.components);
+      // Honor KiCad's source (in_bom no) exclusion for BOM rules only.
+      // Keep the symbol available to non-BOM schematic analysis.
+      schematicRows.push(...parsed.components.filter((component) => component.inBom !== false));
     }
     for (const board of project.boardFiles) {
       const parsed = await parsePcb(path.resolve(context.root, board));

@@ -76,6 +76,7 @@ function parsedComponents(model: ReturnType<typeof parseKicadDocument>, file: st
       manufacturer: propertyValue(symbol, "Manufacturer") ?? propertyValue(symbol, "Mfr"),
       mpn: propertyValue(symbol, "MPN") ?? propertyValue(symbol, "Manufacturer Part Number"),
       dnp: boolValue(propertyValue(symbol, "DNP") ?? propertyValue(symbol, "Dopopulate")),
+      ...(listChildValue(symbol, "in_bom") === "no" ? { inBom: false } : {}),
       raw: variant ? { Variant: variant } : undefined,
       sourcePath: file,
       sourceKind: "schematic",
