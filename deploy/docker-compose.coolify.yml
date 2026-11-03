@@ -16,13 +16,18 @@ services:
     image: cloudflare/cloudflared:2026.8.2
     restart: unless-stopped
     command: ["tunnel", "--no-autoupdate", "--config", "/etc/cloudflared/config.yml", "run"]
+    # Mirror bind sources in environment to retain required-variable checks:
+    # Coolify rejects required-value syntax in a volume source itself.
+    environment:
+      BOARDREADYOPS_TUNNEL_CONFIG_HOST_FILE: ${BOARDREADYOPS_TUNNEL_CONFIG_HOST_FILE:?}
+      BOARDREADYOPS_TUNNEL_CREDENTIALS_HOST_FILE: ${BOARDREADYOPS_TUNNEL_CREDENTIALS_HOST_FILE:?}
     volumes:
       - type: bind
-        source: ${BOARDREADYOPS_TUNNEL_CONFIG_HOST_FILE:?tunnel config required}
+        source: ${BOARDREADYOPS_TUNNEL_CONFIG_HOST_FILE}
         target: /etc/cloudflared/config.yml
         read_only: true
       - type: bind
-        source: ${BOARDREADYOPS_TUNNEL_CREDENTIALS_HOST_FILE:?tunnel credentials required}
+        source: ${BOARDREADYOPS_TUNNEL_CREDENTIALS_HOST_FILE}
         target: /etc/cloudflared/credentials.json
         read_only: true
     depends_on:
@@ -58,6 +63,10 @@ services:
     environment:
       ARTIFACT_STORAGE_ROOT: /data/artifacts
       BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
+      BOARDREADYOPS_RELEASE_POLICY_HOST_FILE: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE:?}
+      BOARDREADYOPS_ARTIFACT_VOLUME: ${BOARDREADYOPS_ARTIFACT_VOLUME:?}
+      BOARDREADYOPS_POSTGRES_VOLUME: ${BOARDREADYOPS_POSTGRES_VOLUME:?}
+      BOARDREADYOPS_REDIS_VOLUME: ${BOARDREADYOPS_REDIS_VOLUME:?}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL required}
       REDIS_URL: redis://redis:6379
     expose:
@@ -65,7 +74,7 @@ services:
     volumes:
       - boardreadyops_artifacts:/data/artifacts
       - type: bind
-        source: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE:?release policy required}
+        source: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE}
         target: /run/policies/repositories
         read_only: true
     depends_on:
@@ -89,10 +98,11 @@ services:
       # The deletion worker must resolve the same files that web uploads.
       ARTIFACT_STORAGE_ROOT: /data/artifacts
       BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
+      BOARDREADYOPS_RELEASE_POLICY_HOST_FILE: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE:?}
     volumes:
       - boardreadyops_artifacts:/data/artifacts
       - type: bind
-        source: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE:?release policy required}
+        source: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE}
         target: /run/policies/repositories
         read_only: true
     expose:
@@ -140,10 +150,10 @@ services:
 volumes:
   boardreadyops_artifacts:
     external: true
-    name: ${BOARDREADYOPS_ARTIFACT_VOLUME:?existing artifact volume required}
+    name: ${BOARDREADYOPS_ARTIFACT_VOLUME}
   boardreadyops_postgres:
     external: true
-    name: ${BOARDREADYOPS_POSTGRES_VOLUME:?existing PostgreSQL volume required}
+    name: ${BOARDREADYOPS_POSTGRES_VOLUME}
   boardreadyops_redis:
     external: true
-    name: ${BOARDREADYOPS_REDIS_VOLUME:?existing Redis volume required}
+    name: ${BOARDREADYOPS_REDIS_VOLUME}
