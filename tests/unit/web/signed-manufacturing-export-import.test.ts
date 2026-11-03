@@ -255,6 +255,46 @@ describe("signed manufacturing export import boundary", () => {
     }
   });
 
+  it("retains complete archive bytes when the metadata commit acknowledgement is ambiguous", async () => {
+    for (const caseName of ["before-write", "committed-ack-lost"] as const) {
+      const deps = dependencies();
+      const archive = await archiveFixture();
+      const sha256 = createHash("sha256").update(archive).digest("hex");
+      const recorded = new Map<string, string>();
+      deps.query.mockImplementationOnce(async (...args: unknown[]) => {
+        const parameters = args[1] as unknown[];
+        if (caseName === "committed-ack-lost") {
+          // Model the database accepting the write before its transport reply disappears.
+          recorded.set(String(parameters[4]), String(parameters[5]));
+        }
+        throw new Error("database acknowledgement unavailable");
+      });
+
+      const response = await handleSignedManufacturingExportImport(request(archive), { runId, attemptId }, deps);
+      expect(response.status).toBe(503);
+      expect(deps.query).toHaveBeenCalledOnce();
+      expect(deps.verifyArchive).toHaveBeenCalledOnce();
+      expect(deps.closeQueryExecutor).toHaveBeenCalledOnce();
+
+      const root = deps.environment.ARTIFACT_STORAGE_ROOT ?? "";
+      const storedFiles = await filesBelow(root);
+      expect(storedFiles).toHaveLength(1);
+      const storedFile = storedFiles[0];
+      if (!storedFile) throw new Error("ambiguous write must retain its physical archive");
+      const storedBytes = await fs.readFile(storedFile);
+      expect(storedBytes).toEqual(Buffer.from(archive));
+      expect(createHash("sha256").update(storedBytes).digest("hex")).toBe(sha256);
+
+      const archiveName = path.relative(root, storedFile).split(path.sep).join("/");
+      if (caseName === "committed-ack-lost") {
+        expect(recorded.get(archiveName)).toBe(sha256);
+      } else {
+        expect(recorded.size).toBe(0);
+      }
+      // A failed response cannot distinguish these states; neither is safe to unlink.
+    }
+  });
+
   it("rejects missing OIDC authentication and invalid route IDs before storage access", async () => {
     const deps = dependencies();
     const missingToken = new Request("https://boardreadyops.test/upload", {
