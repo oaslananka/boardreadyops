@@ -74,6 +74,14 @@ const ruleSteps: Readonly<Record<string, string>> = {
 };
 
 export function findingGuidance(ruleId: string, message?: string): string {
+  // Older persisted findings may still describe virtual KiCad symbols as
+  // missing MPNs. The correct action is to exclude them from the purchase BOM.
+  if (
+    ruleId === "bom.missing-mpn" &&
+    (message?.startsWith("KiCad virtual symbol #") || /^#[A-Za-z0-9_+-]+ is missing an MPN\.$/u.test(message ?? ""))
+  ) {
+    return "Use KiCad's Exclude from BOM attribute for this virtual schematic symbol, regenerate the BOM, and rerun the sourcing checks. Do not assign a manufacturer part number to a nonphysical power or graphical symbol.";
+  }
   // The actual rule emits this diagnostic when the BOARD revision is missing.
   // A changelog edit cannot repair it; source-authoritative board metadata must change first.
   if (ruleId === "release.changelog-present" && message?.includes("no board revision is set")) {

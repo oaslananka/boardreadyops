@@ -28,7 +28,9 @@ export const missingMpnRule = rule(
         finding(context, {
           ruleId: "bom.missing-mpn",
           severity: configuredSeverity(context, "bom.missing-mpn", "high"),
-          message: `${row.reference} is missing an MPN.`,
+          message: row.reference.startsWith("#")
+            ? `KiCad virtual symbol ${row.reference} was included in the exported BOM. Exclude it from the exported BOM.`
+            : `${row.reference} is missing an MPN.`,
           path: row.sourcePath,
           kind: row.sourceKind === "bom" ? "bom" : "schematic",
           line: row.line,

@@ -74,6 +74,19 @@ describe("finding remediation guidance", () => {
     );
   });
 
+  it("tells a user to exclude virtual KiCad # references from BOM instead of sourcing an impossible MPN", () => {
+    for (const message of [
+      "#PWR010 is missing an MPN.",
+      "#FLG01 is missing an MPN.",
+      "KiCad virtual symbol #PWR010 was included in the exported BOM. Exclude it from the exported BOM.",
+    ]) {
+      const guidance = findingGuidance("bom.missing-mpn", message);
+      expect(guidance).toContain("Exclude from BOM");
+      expect(guidance).not.toContain("Supply a verifiable manufacturer part number");
+    }
+    expect(findingGuidance("bom.missing-mpn", "R1 is missing an MPN.")).toContain("manufacturer part number");
+  });
+
   it("never tells a release documentation error to edit a CAD design file", () => {
     const message = findingGuidance("release.changelog-present");
     expect(message).not.toContain("CAD");

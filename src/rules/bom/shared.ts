@@ -18,9 +18,12 @@ export async function loadBomContext(context: RuleContext): Promise<{
   for (const project of context.projects) {
     for (const schematic of project.schematicFiles) {
       const parsed = await parseSchematic(path.resolve(context.root, schematic));
-      // Honor KiCad's source (in_bom no) exclusion for BOM rules only.
-      // Keep the symbol available to non-BOM schematic analysis.
-      schematicRows.push(...parsed.components.filter((component) => component.inBom !== false));
+      // KiCad's virtual # references (power/graphical symbols) never denote
+      // purchasable BOM parts, even when an older schematic omits (in_bom no).
+      // Keep the symbols available to non-BOM schematic analysis.
+      schematicRows.push(
+        ...parsed.components.filter((component) => component.inBom !== false && !component.reference.startsWith("#")),
+      );
     }
     for (const board of project.boardFiles) {
       const parsed = await parsePcb(path.resolve(context.root, board));
