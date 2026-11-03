@@ -101,6 +101,30 @@ describe("hosted read-only MCP finding pages", () => {
     expect(reviewReads).toBe(2);
   });
 
+  it("rejects findings from a superseded Review revision with identical source and digest", async () => {
+    const db = store();
+    let reads = 0;
+    db.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("from reviews")) {
+        return {
+          rows: [
+            {
+              ...review,
+              current_revision_id: reads++ === 0 ? "revision-now" : "revision-next",
+            },
+          ],
+        };
+      }
+      if (sql.includes("from review_revisions")) return { rows: [revision] };
+      if (sql.includes("from findings")) return { rows: [row(1)] };
+      throw new Error("Unexpected query");
+    });
+    expect(
+      await loadAuthorizedRemoteFindings(db, principal, reviewId, undefined, vi.fn().mockResolvedValue(true)),
+    ).toBeNull();
+    expect(reads).toBe(2);
+  });
+
   it("fails closed when the live GitHub permission check becomes unavailable after a read", async () => {
     const db = store();
     const access = vi.fn().mockResolvedValueOnce(true).mockRejectedValueOnce(new Error("GitHub unavailable"));

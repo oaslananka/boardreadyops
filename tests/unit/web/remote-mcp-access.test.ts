@@ -226,6 +226,29 @@ describe("remote MCP live repository gate", () => {
     expect(reads).toBe(2);
   });
 
+  it("rejects a superseded Review revision even when the source commit and digest are unchanged", async () => {
+    const store = db();
+    let reads = 0;
+    store.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("from reviews")) {
+        return {
+          rows: [
+            {
+              ...ownerReview,
+              current_revision_id: reads++ === 0 ? "revision-1" : "revision-2",
+            },
+          ],
+        };
+      }
+      if (sql.includes("from review_revisions")) {
+        return { rows: [{ head_commit_sha: sha40, evidence_digest: sha64 }] };
+      }
+      throw new Error("Unexpected query");
+    });
+    expect(await loadAuthorizedRemoteReview(store, authorized, reviewId, vi.fn().mockResolvedValue(true))).toBeNull();
+    expect(reads).toBe(2);
+  });
+
   it("fails closed when the live permission provider becomes unavailable after reading", async () => {
     const store = db();
     const checkLive = vi.fn().mockResolvedValueOnce(true).mockRejectedValueOnce(new Error("GitHub unavailable"));

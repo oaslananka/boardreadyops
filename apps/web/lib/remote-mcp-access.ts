@@ -275,14 +275,6 @@ export async function loadAuthorizedRemoteReview(
   // Authorization and the current Review head can change during the revision
   // lookup. Revalidate both before returning any source-bound facts.
   const current = await loadAuthorizedRemoteReviewSnapshot(db, principal, reviewId, checkCurrentPermission);
-  if (
-    !current ||
-    current.headRunId !== authorized.headRunId ||
-    current.facts.headCommitSha !== authorized.facts.headCommitSha ||
-    current.facts.evidenceDigest !== authorized.facts.evidenceDigest ||
-    current.facts.status !== authorized.facts.status ||
-    current.facts.decision !== authorized.facts.decision
-  )
-    return null;
+  if (!sameAuthorizedRemoteReviewSnapshot(authorized, current)) return null;
   return authorized.facts;
 }
