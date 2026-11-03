@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily bounded BoardReadyOps production backup
+
+[Timer]
+OnCalendar=*-*-* 02:40:00
+Persistent=true
+RandomizedDelaySec=5min
+Unit=boardreadyops-coolify-backup.service
+
+[Install]
+WantedBy=timers.target

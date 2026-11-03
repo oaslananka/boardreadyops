@@ -45,3 +45,57 @@ Copy the Compose file into a disposable directory, provide only dummy nonproduct
     docker compose --env-file .env -f docker-compose.coolify.yml config --quiet
 
 This does not deploy or run migrations. A successful parse is not evidence of working production OAuth, ingress or artifact recovery.
+
+
+## Ongoing production recovery backups
+
+Coolify Storage Backups only lists eligible managed application mounts. The existing
+PostgreSQL and artifact data use named external Compose volumes and must not be
+replaced or copied as a live PostgreSQL filesystem snapshot. Do not create a storage
+backup schedule for the release-policy mount; it does not protect the database.
+Coolify's database-aware scheduler also does not manage a PostgreSQL service that is
+part of this application Compose. Use the host-side, engine-aware maintenance script
+below instead. No staging environment, additional always-on container, or new paid
+provider is required.
+
+The deployment operator supplies an existing private directory with 0700 permissions
+and a private config file at $HOME/.config/boardreadyops/coolify-backup.env. Populate
+these names from the **verified live** Coolify Compose project and Docker mounts:
+
+    BOARDREADYOPS_COMPOSE_PROJECT=<current Coolify Compose project identity>
+    BOARDREADYOPS_POSTGRES_VOLUME=<existing production PostgreSQL volume name>
+    BOARDREADYOPS_ARTIFACT_VOLUME=<existing production artifact volume name>
+    BOARDREADYOPS_BACKUP_DIR=<absolute private backup directory, mode 0700>
+    BOARDREADYOPS_BACKUP_KEEP=7
+
+Install deploy/maintenance/coolify-production-backup.sh at
+$HOME/.local/libexec/boardreadyops-coolify-backup.sh (mode 0700), and install
+boardreadyops-coolify-backup.service and boardreadyops-coolify-backup.timer in
+$HOME/.config/systemd/user/. The timer runs daily at 02:40 in the host's local
+timezone, with up to five minutes of jitter; its 15-minute service timeout
+prevents overlapping/unbounded work. Enable it only after an operator confirms
+systemd user timers work without an interactive shell and runs:
+
+    systemctl --user daemon-reload
+    systemctl --user start boardreadyops-coolify-backup.service
+    systemctl --user enable --now boardreadyops-coolify-backup.timer
+    systemctl --user list-timers --all
+    journalctl --user -u boardreadyops-coolify-backup.service -n 30 --no-pager
+
+Run the script with --preflight first to validate the runtime without writing
+a backup. Each successful run creates a custom-format pg_dump, a gzip-compressed
+artifact archive and a SHA-256 manifest, all with owner-only permissions.
+It refuses absent/ambiguous or unhealthy containers, unexpected data volume
+names, inaccessible Docker, unsafe backup permissions, or low disk space.
+Archive size is capped to 1 GiB per file, each capture is time-bounded,
+and only files created by this exact scheduled job are eligible for seven-copy
+rotation. Existing pre-deployment and operator backups are never rotated by
+this script. PostgreSQL dump catalog and tar readability are verified after
+capture; periodically perform a **full restore into a disposable isolated
+database** and compare table counts and representative data before trusting
+the schedule. A dump listing alone is not a restore test.
+
+Local backups on the same VPS cannot survive host or disk loss. Keep a separately
+protected, periodically verified off-server copy when an approved destination
+is available. Do not enable unbounded uploads, new paid storage, or secret
+transfers merely because a backup schedule is enabled.
