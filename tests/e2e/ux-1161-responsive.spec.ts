@@ -26,6 +26,17 @@ for (const width of [320, 390, 1440]) {
       await preview.getByRole("button", { name: /Inspect findings on the board/ }).click();
       await expect(page.getByRole("tab", { name: /Changes/ })).toHaveAttribute("aria-selected", "true");
       await expect(page.getByRole("region", { name: "Hardware design inspection workspace" })).toBeVisible();
+      if (width < 640) {
+        const modes = page.locator('fieldset[aria-label="Revision comparison modes"]');
+        await expect(modes).toBeVisible();
+        for (const label of ["Overlay", "Split", "Visual Diff", "Head Only", "Base Only"]) {
+          const button = modes.getByRole("button", { name: label, exact: true });
+          const bounds = await button.boundingBox();
+          expect(bounds, label).not.toBeNull();
+          expect(bounds?.x ?? -1, label).toBeGreaterThanOrEqual(0);
+          expect((bounds?.x ?? width) + (bounds?.width ?? width), label).toBeLessThanOrEqual(width + 1);
+        }
+      }
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth),
       ).toBe(false);

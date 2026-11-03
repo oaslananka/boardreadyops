@@ -63,6 +63,34 @@ describe("revision comparison mode accessibility", () => {
     }
   });
 
+  it("keeps every revision mode discoverable without horizontal scrolling on narrow screens", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    try {
+      await act(async () => {
+        root.render(createElement(ReviewCanvas, { headSnapshots: [head], baseSnapshots: [base] }));
+      });
+      const group = container.querySelector<HTMLElement>('fieldset[aria-label="Revision comparison modes"]');
+      expect(group).not.toBeNull();
+      expect(group?.className).toContain("grid-cols-2");
+      expect(group?.className).toContain("sm:flex");
+      expect(group?.className).not.toContain("overflow-x-auto");
+      expect([...(group?.querySelectorAll("button") ?? [])].map((button) => button.textContent?.trim())).toEqual([
+        "Overlay",
+        "Split",
+        "Visual Diff",
+        "Head Only",
+        "Base Only",
+      ]);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+    }
+  });
+
   it("keeps the only available head view selected when comparison is unavailable", async () => {
     const container = document.createElement("div");
     document.body.append(container);
