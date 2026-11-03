@@ -53,12 +53,13 @@ for historical verified snapshots and outstanding follow-ups.
 ## Runtime Support
 
 BoardReadyOps supports **Node.js 24 LTS only**. Earlier Node major versions
-are no longer supported or CI-tested. Node.js 26 Current is tracked but not supported
-in engines.node or CI until it reaches LTS and dependency validation is added.
+are no longer supported or CI-tested. Node.js 26 has entered upstream LTS,
+but remains **unvalidated and unsupported** in engines.node and CI until the
+dependency and cross-platform validation is completed.
 
-KiCad CLI compatibility is CI-tested on KiCad 10.0, with 10.0.6 as the latest
-verified patch. KiCad 9.0 remains the minimum supported line but is upstream EOL
-and no longer CI-tested. The machine-readable policy and generated support table
+KiCad CLI compatibility is CI-tested on KiCad 10.0, with 10.0.8 as the latest
+verified patch (native CLI netlist and PCB DRC smoke on 2026-11-03). KiCad 9.0
+remains the minimum supported line but is upstream EOL and no longer CI-tested. The machine-readable policy and generated support table
 live in [docs/support-matrix.md](docs/support-matrix.md).
 
 ### Install Via Script

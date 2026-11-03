@@ -22,6 +22,8 @@ type CompatibilityConfig = {
     recommended: string;
     supported: string[];
     current: string[];
+    ltsPending?: string[];
+    upstreamLatest?: Record<string, string>;
     tested?: Record<string, string>;
     policy?: Record<string, string>;
   };
@@ -77,14 +79,16 @@ describe("compatibility matrix", () => {
 
     expect(config.node.minimumVersion).toBe("24.0.0");
     expect(config.node.supported).toEqual(["24"]);
-    expect(config.node.current).toEqual(["26"]);
+    expect(config.node.current).toEqual([]);
+    expect(config.node.ltsPending).toEqual(["26"]);
+    expect(config.node.upstreamLatest).toEqual({ "24": "24.22.2", "26": "26.13.0" });
     expect(config.node.tested).toEqual({
       "24": "24.22.1",
     });
     const verifiedNodeSource = config.source_checked as typeof config.source_checked & {
       node: { checkedAt: string };
     };
-    expect(verifiedNodeSource.node.checkedAt).toBe("2026-10-27");
+    expect(verifiedNodeSource.node.checkedAt).toBe("2026-11-03");
     expect(toolchain.node.preferred).toBe("24.22.1");
     expect(toolchain.node.engines).toBe("^24.0.0");
     expect(toolchain.node.supportedMajors).toEqual([24]);
@@ -98,13 +102,13 @@ describe("compatibility matrix", () => {
     expect(supportMatrix).toBe(renderSupportMatrix(config));
     expect(supportMatrix).toContain("| KiCad | 9.0 | Minimum supported, upstream EOL, not CI-tested |");
     expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line |");
-    expect(supportMatrix).toContain("Latest verified patch: **10.0.7**");
-    expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line | 10.0.7 |");
+    expect(supportMatrix).toContain("Latest verified patch: **10.0.8**");
+    expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line | 10.0.8 |");
     expect(supportMatrix).not.toContain("| KiCad | 9.1 | Supported |");
     expect(supportMatrix).not.toContain("| KiCad | 10.1 | Supported |");
     expect(supportMatrix).not.toContain("| Node.js | 22 |");
     expect(supportMatrix).toContain("| Node.js | 24 | Minimum supported and recommended LTS runtime |");
-    expect(supportMatrix).toContain("| Node.js | 26 | Current, not supported |");
+    expect(supportMatrix).toContain("| Node.js | 26 | LTS, validation pending (not supported) |  | 26.13.0 |");
     expect(supportMatrix).toContain("| CycloneDX JSON | 1.7 | Pinned HBOM contract |");
     expect(config.cyclonedx.schemaUrl).toBe("https://cyclonedx.org/schema/bom-1.7.schema.json");
     expect(config.cyclonedx.hbomSchema).toBe("schemas/hbom.schema.json");
@@ -213,6 +217,37 @@ describe("compatibility matrix", () => {
     expect(buildDriftReport(drift)).toContain("KiCad 11.0");
     expect(buildDriftReport(drift)).toContain("Node.js 24.19.0");
     expect(buildDriftReport(drift)).not.toContain("Node.js 26.2.0");
+  });
+
+  it("acknowledges reviewed upstream patches without claiming untested Node support", async () => {
+    const config = yaml.load(await readFile("docs/compatibility.yaml", "utf8")) as CompatibilityConfig;
+    const cycloneDxSchema = {
+      $id: "https://cyclonedx.org/schema/bom-1.7.schema.json",
+    };
+    const baseline = findCompatibilityDrift(config, {
+      kicadReleases: ["10.0.8", "10.0.7"],
+      nodeReleases: [
+        { version: "v24.22.2", lts: "Krypton" },
+        { version: "v26.13.0", lts: "Lithium" },
+      ],
+      cycloneDxSchema,
+    });
+    expect(baseline).toEqual({ kicad: [], node: [], cyclonedx: [] });
+    const next = findCompatibilityDrift(config, {
+      kicadReleases: ["10.0.9"],
+      nodeReleases: [
+        { version: "v24.22.3", lts: "Krypton" },
+        { version: "v26.13.1", lts: "Lithium" },
+      ],
+      cycloneDxSchema,
+    });
+    expect(next.kicad).toEqual([{ series: "10.0", latest: "10.0.9", tested: "10.0.8", reason: "new-verified-patch" }]);
+    expect(next.node).toEqual([
+      { major: "24", latest: "24.22.3", tested: "24.22.1", reviewed: "24.22.2", reason: "new-release" },
+      { major: "26", latest: "26.13.1", tested: "26.13.0", reason: "new-pending-lts" },
+    ]);
+    expect(buildDriftReport(next)).toContain("newer than reviewed 24.22.2");
+    expect(buildDriftReport(next)).toContain("unsupported major 26");
   });
 
   it("flags Node current lines when they become LTS before support policy changes", () => {
@@ -473,11 +508,13 @@ describe("compatibility matrix", () => {
     expect(kicadInstall?.if).toContain("matrix.postgres-version == '17'");
     expect(config.kicad.tested).toEqual(["10.0"]);
     expect(config.kicad.eol).toEqual(["9.0"]);
-    expect(config.source_checked.date).toBe("2026-10-12");
-    expect(config.source_checked.kicad.release).toBe("https://www.kicad.org/blog/2026/10/KiCad-10.0.7-Release/");
-    expect(config.kicad.latestVerified).toBe("10.0.7");
+    expect(config.source_checked.date).toBe("2026-11-03");
+    expect(config.source_checked.kicad.release).toBe("https://www.kicad.org/blog/2026/10/KiCad-10.0.8-Release/");
+    expect(config.kicad.latestVerified).toBe("10.0.8");
     expect(config.node.supported).toEqual(["24"]);
-    expect(config.node.current).toEqual(["26"]);
+    expect(config.node.current).toEqual([]);
+    expect(config.node.ltsPending).toEqual(["26"]);
+    expect(config.node.upstreamLatest).toEqual({ "24": "24.22.2", "26": "26.13.0" });
     expect(crossPlatform?.strategy?.matrix?.os).toEqual(["ubuntu-24.04", "macos-latest", "windows-2025-vs2026"]);
     expect(lintRuns).toContain("pnpm run compatibility:check");
   });
@@ -502,9 +539,9 @@ describe("compatibility matrix", () => {
     expect(dockerfile).toContain(`ARG NODE_VERSION=${config.node.tested?.[config.node.recommended]}`);
     expect(dockerfile).toContain("dnf -y install --setopt=install_weak_deps=False kicad");
     expect(readme).toContain("Node.js 24 LTS only");
-    expect(readme).toMatch(/Node\.js 26\s+Current is tracked but not supported/);
+    expect(readme).toMatch(/Node\.js 26 has entered upstream LTS,\s+but remains/);
     expect(readme).toContain("CI-tested on KiCad 10.0");
-    expect(readme).toMatch(/10\.0\.6 as the latest\s+verified patch/);
+    expect(readme).toMatch(/10\.0\.8 as the latest\s+verified patch/);
     expect(readme).not.toContain("KiCad 9.0 and 10.0");
     expect(readme).toContain("docs/support-matrix.md");
   });
