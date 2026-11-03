@@ -10,6 +10,7 @@ import {
   type RemoteMcpPrincipal,
   type RemoteMcpTokenVerifier,
 } from "./remote-mcp-access.js";
+import { loadAuthorizedRemoteEvidence } from "./remote-mcp-evidence.js";
 import { loadAuthorizedRemoteFindings, remoteFindingCursorFormat } from "./remote-mcp-findings.js";
 import { loadAuthorizedRemoteFootprintSummary } from "./remote-mcp-footprint.js";
 import { remoteMcpMetadataUrl, remoteMcpOrigin, remoteMcpResource } from "./remote-mcp-foundation.js";
@@ -141,6 +142,21 @@ export async function handleAuthorizedRemoteMcpHttp(
           ({ reviewId }) =>
             readAuthorizedRemoteMcpTool(dependencies, (db) =>
               loadAuthorizedRemoteFootprintSummary(db, principal, reviewId, dependencies.checkCurrentPermission),
+            ),
+        );
+      }
+      if (principal.scopes.includes("evidence:read")) {
+        server.registerTool(
+          "boardreadyops_evidence_get",
+          {
+            description:
+              "Get recorded metadata and a trusted in-app Review link for a current authorized evidence revision. No raw CAD or verified fabrication verdict.",
+            inputSchema: z.object({ evidenceId: z.string().uuid() }).strict(),
+            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+          },
+          ({ evidenceId }) =>
+            readAuthorizedRemoteMcpTool(dependencies, (db) =>
+              loadAuthorizedRemoteEvidence(db, principal, evidenceId, dependencies.checkCurrentPermission),
             ),
         );
       }
