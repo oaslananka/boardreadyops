@@ -1,8 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   handleSignedManufacturingExportImport,
@@ -21,19 +21,42 @@ afterEach(async () => {
   for (const root of roots.splice(0)) await fs.rm(root, { recursive: true, force: true });
 });
 
+function tarEntry(name: string, body: Buffer, type: "0" | "2" | "5" = "0", linkName = ""): Buffer {
+  const header = Buffer.alloc(512);
+  const put = (value: string, offset: number, length: number) => header.write(value, offset, length, "utf8");
+  const octal = (value: number, length: number) => value.toString(8).padStart(length - 1, "0") + "\0";
+  put(name, 0, 100);
+  put(octal(type === "5" ? 0o755 : 0o644, 8), 100, 8);
+  put(octal(0, 8), 108, 8);
+  put(octal(0, 8), 116, 8);
+  put(octal(body.length, 12), 124, 12);
+  put(octal(1_700_000_000, 12), 136, 12);
+  header.fill(0x20, 148, 156);
+  put(type, 156, 1);
+  put(linkName, 157, 100);
+  put("ustar\0", 257, 6);
+  put("00", 263, 2);
+  put("boardreadyops", 265, 32);
+  put("boardreadyops", 297, 32);
+  const checksum = header.reduce((sum, byte) => sum + byte, 0);
+  put(checksum.toString(8).padStart(6, "0") + "\0 ", 148, 8);
+  const paddedBody =
+    body.length === 0 ? Buffer.alloc(0) : Buffer.concat([body, Buffer.alloc((512 - (body.length % 512)) % 512)]);
+  return Buffer.concat([header, paddedBody]);
+}
+
 async function archiveFixture(symlink = false): Promise<Uint8Array> {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "brops-import-fixture-"));
-  roots.push(root);
-  const exportRoot = path.join(root, "build/boardreadyops-attested");
-  await fs.mkdir(exportRoot, { recursive: true });
-  await fs.writeFile(path.join(exportRoot, "manifest.json"), JSON.stringify({ fixture: true }));
-  await fs.writeFile(path.join(root, "bundle.sigstore.json"), JSON.stringify({ signed: true }));
+  const entries = [
+    tarEntry("build/", Buffer.alloc(0), "5"),
+    tarEntry("build/boardreadyops-attested/", Buffer.alloc(0), "5"),
+    tarEntry("build/boardreadyops-attested/manifest.json", Buffer.from(JSON.stringify({ fixture: true }))),
+    tarEntry("bundle.sigstore.json", Buffer.from(JSON.stringify({ signed: true }))),
+  ];
   if (symlink) {
-    await fs.symlink(path.join(root, "bundle.sigstore.json"), path.join(exportRoot, "linked.json"));
+    entries.push(tarEntry("build/boardreadyops-attested/linked.json", Buffer.alloc(0), "2", "../bundle.sigstore.json"));
   }
-  const archivePath = path.join(root, "upload.tar.gz");
-  execFileSync("tar", ["-czf", archivePath, "-C", root, "build/", "bundle.sigstore.json"]);
-  return new Uint8Array(await fs.readFile(archivePath));
+  const tar = Buffer.concat([...entries, Buffer.alloc(1024)]);
+  return new Uint8Array(gzipSync(tar));
 }
 
 function expectedRun() {
