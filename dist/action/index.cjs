@@ -73825,7 +73825,9 @@ async function loadBomContext(context5) {
   for (const project of context5.projects) {
     for (const schematic of project.schematicFiles) {
       const parsed = await parseSchematic(import_node_path7.default.resolve(context5.root, schematic));
-      schematicRows.push(...parsed.components.filter((component) => component.inBom !== false));
+      schematicRows.push(
+        ...parsed.components.filter((component) => component.inBom !== false && !component.reference.startsWith("#"))
+      );
     }
     for (const board of project.boardFiles) {
       const parsed = await parsePcb(import_node_path7.default.resolve(context5.root, board));
@@ -74241,7 +74243,7 @@ var missingMpnRule = rule(
       (row) => finding(context5, {
         ruleId: "bom.missing-mpn",
         severity: configuredSeverity(context5, "bom.missing-mpn", "high"),
-        message: `${row.reference} is missing an MPN.`,
+        message: row.reference.startsWith("#") ? `KiCad virtual symbol ${row.reference} was included in the exported BOM. Exclude it from the exported BOM.` : `${row.reference} is missing an MPN.`,
         path: row.sourcePath,
         kind: row.sourceKind === "bom" ? "bom" : "schematic",
         line: row.line,
