@@ -1,0 +1,151 @@
+# Git-sourced production-only Coolify stack. No second environment or duplicate data.
+# Never deploy while the previous stack still mounts these external volumes.
+# Configure secret values and verified host bind paths in the deployment control plane.
+# Bound per-container JSON logs independently of the host Docker daemon defaults.
+# Applies only when containers are recreated during an explicitly authorized deploy.
+x-boardreadyops-log-policy: &boardreadyops-log-policy
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  cloudflared:
+    logging: *boardreadyops-log-policy
+    user: "0:0"
+    image: cloudflare/cloudflared:2026.8.2
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "--config", "/etc/cloudflared/config.yml", "run"]
+    volumes:
+      - type: bind
+        source: ${BOARDREADYOPS_TUNNEL_CONFIG_HOST_FILE:?tunnel config required}
+        target: /etc/cloudflared/config.yml
+        read_only: true
+      - type: bind
+        source: ${BOARDREADYOPS_TUNNEL_CREDENTIALS_HOST_FILE:?tunnel credentials required}
+        target: /etc/cloudflared/credentials.json
+        read_only: true
+    depends_on:
+      web:
+        condition: service_healthy
+
+  migrate:
+    logging: *boardreadyops-log-policy
+    image: boardreadyops-web-runtime:${SOURCE_COMMIT:?Coolify selected Git revision is required}
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        BUILD_DATE: ${BOARDREADYOPS_BUILD_DATE:-unknown}
+        VCS_REF: ${SOURCE_COMMIT:?Coolify selected Git revision is required}
+        VERSION: ${BOARDREADYOPS_VERSION:-dev}
+    restart: "no"
+    command: ["node", "migrate.mjs"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    logging: *boardreadyops-log-policy
+    image: boardreadyops-web-runtime:${SOURCE_COMMIT:?Coolify selected Git revision is required}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ARTIFACT_STORAGE_ROOT: /data/artifacts
+      BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
+      DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
+      REDIS_URL: redis://redis:6379
+    expose:
+      - "3000"
+    volumes:
+      - boardreadyops_artifacts:/data/artifacts
+      - type: bind
+        source: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE:?release policy required}
+        target: /run/policies/repositories
+        read_only: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    logging: *boardreadyops-log-policy
+    image: boardreadyops-web-runtime:${SOURCE_COMMIT:?Coolify selected Git revision is required}
+    restart: unless-stopped
+    command: ["node", "worker.mjs"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
+      BOARDREADYOPS_WORKER_HEALTH_PORT: 3001
+      # The deletion worker must resolve the same files that web uploads.
+      ARTIFACT_STORAGE_ROOT: /data/artifacts
+      BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
+    volumes:
+      - boardreadyops_artifacts:/data/artifacts
+      - type: bind
+        source: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE:?release policy required}
+        target: /run/policies/repositories
+        read_only: true
+    expose:
+      - "3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+
+  postgres:
+    logging: *boardreadyops-log-policy
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-boardreadyops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-boardreadyops}
+    volumes:
+      - boardreadyops_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    logging: *boardreadyops-log-policy
+    image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+    restart: unless-stopped
+    volumes:
+      - boardreadyops_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  boardreadyops_artifacts:
+    external: true
+    name: ${BOARDREADYOPS_ARTIFACT_VOLUME:?existing artifact volume required}
+  boardreadyops_postgres:
+    external: true
+    name: ${BOARDREADYOPS_POSTGRES_VOLUME:?existing PostgreSQL volume required}
+  boardreadyops_redis:
+    external: true
+    name: ${BOARDREADYOPS_REDIS_VOLUME:?existing Redis volume required}
