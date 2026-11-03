@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadAuthorizedRemoteFindings } from "../../apps/web/lib/remote-mcp-findings.js";
+import { loadAuthorizedRemoteFootprintSummary } from "../../apps/web/lib/remote-mcp-footprint.js";
+import { storeRunPcbFootprintSummary } from "../../packages/db/src/pcb-footprint-summary-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -27,6 +29,7 @@ describePg("live-authorized MCP finding pagination against PostgreSQL", () => {
       "0001_cloud_schema.sql",
       "0048_review_domain_spine.sql",
       "0056_marketplace_subscription_state.sql",
+      "0094_run_pcb_footprint_summaries.sql",
       "0101_hosted_review_findings_pagination_index.sql",
     ]) {
       const source = await readFile(new URL(`../../packages/db/migrations/${file}`, import.meta.url), "utf8");
@@ -153,6 +156,44 @@ describePg("live-authorized MCP finding pagination against PostgreSQL", () => {
     expect(
       await loadAuthorizedRemoteFindings(executor(), principal, reviewId, undefined, vi.fn().mockResolvedValue(true)),
     ).not.toBeNull();
+  });
+
+  it("serves a persisted source-bound PCB count summary only for the current authorized Review", async () => {
+    const baseSha = "c".repeat(40);
+    const headSha = "a".repeat(40);
+    const summary = {
+      schemaVersion: 1 as const,
+      scope: "pcb-footprints-only" as const,
+      provenance: "local-git-commits" as const,
+      disclosure: "counts-and-digests-only" as const,
+      baseCommitSha: baseSha,
+      headCommitSha: headSha,
+      baseBlobSha: "d".repeat(40),
+      headBlobSha: "e".repeat(40),
+      baseSourceSha256: "f".repeat(64),
+      headSourceSha256: "0".repeat(64),
+      changes: {
+        added: 1,
+        removed: 0,
+        modified: 0,
+        byField: { reference: 0, libraryId: 0, layer: 0, positionMm: 0, rotationDeg: 0 },
+      },
+      riskAssessment: "not-evaluated" as const,
+    };
+    await executor().query("update review_revisions set base_commit_sha = $1 where id = $2", [baseSha, revisionId]);
+    try {
+      await storeRunPcbFootprintSummary(executor(), repositoryId, runId, summary);
+      const grant = vi.fn().mockResolvedValue(true);
+      const resolved = await loadAuthorizedRemoteFootprintSummary(executor(), principal, reviewId, grant);
+      expect(resolved).toEqual({ availability: "client-reported", summary });
+      expect(grant).toHaveBeenCalledTimes(2);
+      expect(
+        await loadAuthorizedRemoteFootprintSummary(executor(), principal, reviewId, vi.fn().mockResolvedValue(false)),
+      ).toBeNull();
+    } finally {
+      await executor().query("delete from run_pcb_footprint_summaries where run_id = $1", [runId]);
+      await executor().query("update review_revisions set base_commit_sha = null where id = $1", [revisionId]);
+    }
   });
 
   it("denies a revoked user before querying the finding table", async () => {
