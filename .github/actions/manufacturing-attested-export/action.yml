@@ -46,13 +46,34 @@ runs:
         [[ "${BOARDREADYOPS_REVIEWED_SHA}" =~ ^[0-9a-f]{40}$ ]]
         [[ "${GITHUB_REF}" == refs/heads/* ]]
         [[ -n "${BOARDREADYOPS_PROJECT}" ]]
-        [[ "${BOARDREADYOPS_PROJECT}" == *.kicad_pro ]]
 
         # This Action is SHA-pinned in the *calling* target-repository workflow.
         # It has no access to source outside that exact checkout.
         cd "${GITHUB_WORKSPACE}"
         [[ "$(git rev-parse --show-toplevel)" == "${GITHUB_WORKSPACE}" ]]
         [[ "$(git rev-parse HEAD)" == "${BOARDREADYOPS_REVIEWED_SHA}" ]]
+
+        # Accept one project directory or an exact .kicad_pro file without guessing.
+        project="${BOARDREADYOPS_PROJECT}"
+        if [[ -d "$project" ]]; then
+          mapfile -d '' -t project_files < <(find "$project" -maxdepth 1 -type f -name '*.kicad_pro' -print0 | sort -z)
+          project_count="${#project_files[@]}"
+          if [[ "$project_count" -ne 1 ]]; then
+            echo "::error::BOARDREADYOPS_PROJECT directory must contain exactly one .kicad_pro file."
+            exit 1
+          fi
+          project="${project_files[0]}"
+        fi
+        [[ "$project" == *.kicad_pro && -f "$project" ]]
+        case "$project" in
+          /*) ;;
+          *) project="$GITHUB_WORKSPACE/$project" ;;
+        esac
+        canonical_project="$(realpath "$project")"
+        case "$canonical_project" in
+          "$GITHUB_WORKSPACE"/*) project="$canonical_project" ;;
+          *) echo "::error::BOARDREADYOPS_PROJECT must remain inside the checked-out repository."; exit 1 ;;
+        esac
         [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
         [[ "$(kicad-cli version)" == 10.0.* ]]
 
@@ -66,7 +87,7 @@ runs:
         cli="${BOARDREADYOPS_ACTION_DIR}/../../../dist/cli/index.cjs"
         [[ -f "${cli}" ]]
         node "${cli}" generate "${GITHUB_WORKSPACE}" \
-          --project "${BOARDREADYOPS_PROJECT}" \
+          --project "$project" \
           --recipe "${BOARDREADYOPS_ACTION_DIR}/manufacturing-recipe.json" \
           --output build/boardreadyops-attested \
           --reviewed-source-sha "${BOARDREADYOPS_REVIEWED_SHA}"

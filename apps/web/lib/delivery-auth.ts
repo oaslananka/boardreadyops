@@ -36,14 +36,34 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
                 and release_runs.decision = 'pass'
                 and ${signedRunnerPassSql("release_runs")}
                 and release_runs.completed_at is not null
+              join projects on projects.id = revisions.project_id
+              join repositories on repositories.id = release_runs.repository_id
+                and lower(repositories.owner || '/' || repositories.name) =
+                    lower(projects.github_repo_full_name)
+              join release_run_attempts as attempt on attempt.id = release_runs.execution_attempt_id
+                and attempt.run_id = release_runs.id
+                and attempt.status = 'completed'
+                and attempt.github_workflow_dispatch_id is not null
               join artifacts on artifacts.id = revisions.validation_artifact_id
                 and artifacts.run_id = release_runs.id
                 and artifacts.role = 'manufacturing'
                 and artifacts.kind = 'archive'
                 and artifacts.bytes > 0
                 and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+                and artifacts.execution_attempt_id = release_runs.execution_attempt_id
+              join signed_manufacturing_export_evidence as evidence on evidence.artifact_id = artifacts.id
+                and evidence.run_id = release_runs.id
+                and evidence.execution_attempt_id = release_runs.execution_attempt_id
+                and evidence.repository_id = repositories.id
+                and evidence.installation_id = repositories.installation_id
+                and evidence.github_repository_id = repositories.github_repo_id
+                and evidence.github_run_id = attempt.github_workflow_dispatch_id
+                and evidence.run_attempt = 1
+                and evidence.source_sha = release_runs.commit_sha
+                and evidence.source_ref = release_runs.ref
               join manufacturing_share_authorizations as share
                 on share.revision_id = revisions.id
+                and share.workspace_id = projects.workspace_id
                 and share.revoked_at is null
                 and share.run_id = release_runs.id
                 and share.artifact_id = artifacts.id

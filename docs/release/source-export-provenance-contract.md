@@ -253,3 +253,28 @@ This change fixes the two-SHA identity contract only. It does not itself
 persist a tenant delivery, grant sharing authorization, or enable a source-bound
 manufacturing revision. The signed export ingestion and tenant lifecycle remain
 separate acceptance work.
+
+## Hosted tenant import (implementation phase)
+
+The opt-in target-repository readiness workflow can now run the pinned
+manufacturing export action when the repository's non-secret
+`BOARDREADYOPS_PROJECT` variable selects one project directory or
+`.kicad_pro` file. The target job signs the manifest and every Gerber, drill,
+BOM and CPL subject using a GitHub-internal Sigstore bundle, then sends one
+self-contained archive with a short-lived GitHub OIDC token to the current
+BoardReadyOps run/attempt import route.
+
+The cloud derives run, execution attempt, repository, installation, target
+source SHA, signer workflow path/ref and dispatched GitHub run ID from
+PostgreSQL and the verified token. It verifies the bundle with `gh`, checks
+the complete archive inventory and every subject digest, and persists the
+archive with a separate immutable, tenant-scoped evidence row. BoardReadyOps
+attempt numbering is not conflated with GitHub OIDC `run_attempt`; same-run
+GitHub re-runs remain fail-closed and require a new control-plane dispatch.
+
+A revision candidate is labelled `source-bound-verified` only if its exact
+artifact, current execution attempt and source SHA match that persisted proof.
+Legacy/manual archives remain `not-established` and inspectable, but are not
+eligible for new revisions, share authorizations or guest delivery until a
+fresh signed source-bound export is imported. The importer never creates a
+revision, guest link or manufacturing approval by itself.

@@ -306,6 +306,7 @@ describe("DeliveriesListPage", () => {
           bundleSha256: "a".repeat(64),
           validationRunId: "run_good",
           validationArtifactId: "artifact_good",
+          sourceBinding: "source-bound-verified",
         },
       ],
       deliveries: [],
@@ -340,11 +341,11 @@ describe("DeliveriesListPage", () => {
     });
 
     const markup = await render();
-    expect(markup).toContain("Run-backed");
+    expect(markup).toContain("Not delivery-eligible");
     expect(markup).toContain("do not independently attest source-to-export provenance");
     expect(markup).not.toContain(">Validated</");
     expect(markup).not.toContain("independently validated manufacturing archive");
-    expect(markup).toContain("Explicit permission to share");
+    expect(markup).not.toContain("Explicit permission to share");
   });
 
   it("explains the Community plan limit instead of showing a guest link form that the server rejects", async () => {
@@ -363,6 +364,7 @@ describe("DeliveriesListPage", () => {
           validationArtifactId: "artifact_a",
           sourceKind: "github_commit",
           bundleSha256: "a".repeat(64),
+          sourceBinding: "source-bound-verified",
         },
       ],
       deliveries: [],
@@ -393,6 +395,7 @@ describe("DeliveriesListPage", () => {
             validationArtifactId: "artifact_a",
             sourceKind: "github_commit",
             bundleSha256: "a".repeat(64),
+            sourceBinding: "source-bound-verified",
           },
         ],
         deliveries: [],

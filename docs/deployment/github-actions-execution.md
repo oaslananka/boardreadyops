@@ -122,6 +122,47 @@ Repositories containing multiple KiCad fixtures or projects can set the non-secr
 
 Do not configure a central dispatch repository. The control plane always dispatches the workflow in the repository associated with the release run and uses that repository's persisted default branch.
 
+## Optional source-bound manufacturing export import
+
+When a target repository sets the non-secret `BOARDREADYOPS_PROJECT` variable
+to one project directory or exact `.kicad_pro` path, the readiness workflow
+also runs the SHA-pinned manufacturing export action against the exact
+reviewed checkout. With the variable unset, the ordinary readiness workflow
+does not attempt a manufacturing export.
+
+The target repository signs the export manifest and every generated Gerber,
+drill, BOM and CPL file using its own GitHub OIDC identity and GitHub-internal
+Sigstore bundle. It then posts the self-contained archive to:
+
+```text
+POST /api/v1/runs/{runId}/attempts/{executionAttemptId}/manufacturing-export
+Authorization: Bearer <GitHub Actions OIDC token>
+Content-Type: application/gzip
+```
+
+The cloud resolves the active repository, installation, target SHA, workflow
+path, GitHub workflow run ID and execution-attempt mapping from PostgreSQL.
+It obtains the signer workflow SHA and GitHub run attempt only from the
+cryptographically verified OIDC claims. The reviewed source SHA and signer
+workflow SHA are separate values; neither is trusted from the uploaded
+manifest. The server verifies the self-contained manifest, exact exported file
+inventory, every subject digest and the Sigstore bundle with the pinned
+GitHub CLI before persisting the archive and immutable tenant/run/attempt
+evidence row.
+
+The import is idempotent per BoardReadyOps execution attempt. Replayed,
+stale, wrong-tenant, wrong-run, wrong-attempt and incomplete archives fail
+closed. This import does not create a revision, grant guest access, approve
+fabrication, or bypass the explicit workspace owner/admin share authorization.
+Deliveries surfaces distinguish source-bound verified exports from legacy or
+manual run-backed archives whose source-to-export link is not established.
+Legacy/manual archives remain inspectable, but cannot receive new share grants
+or guest links until a fresh signed source-bound export is imported.
+
+The existing readiness result callback remains independent: an optional
+manufacturing-export failure does not replace the normal readiness result,
+and it cannot promote an unverified package.
+
 The callback endpoint is:
 
 ```text

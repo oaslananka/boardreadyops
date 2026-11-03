@@ -5,8 +5,10 @@ import { verifyDeliveryToken } from "../../../apps/web/lib/delivery-auth.js";
 
 class MockDeliveryDb implements SqlQueryExecutor {
   deliveries: Record<string, unknown>[] = [];
+  statements: string[] = [];
 
   async query(sql: string, params: readonly unknown[] = []): Promise<{ rows: unknown[] }> {
+    this.statements.push(sql);
     const s = sql.toLowerCase();
     if (s.includes("from deliveries") && s.includes("access_token_hash = $1")) {
       const hash = params[0] as string;
@@ -39,6 +41,12 @@ describe("verifyDeliveryToken", () => {
     expect(result.status).toBe(200);
     expect(result.delivery?.id).toBe("del_valid");
     expect(result.delivery?.recipientNotes).toBe("Review package for JLCPCB");
+    const sql = String(db.statements[0]).toLowerCase();
+    expect(sql).toContain("join projects on projects.id = revisions.project_id");
+    expect(sql).toContain("lower(repositories.owner || '/' || repositories.name)");
+    expect(sql).toContain("lower(projects.github_repo_full_name)");
+    expect(sql).toContain("share.workspace_id = projects.workspace_id");
+    expect(sql).toContain("join signed_manufacturing_export_evidence");
   });
 
   it("accepts a valid first-party delivery without any legacy external archive URL", async () => {

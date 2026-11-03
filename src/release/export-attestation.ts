@@ -37,6 +37,8 @@ export interface ExportAttestationOptions {
   expected: TrustedExportExpectation;
   /** Optional already-downloaded Sigstore bundle for independently verified offline evidence. */
   bundlePath?: string | undefined;
+  /** Verify a signed, self-contained export archive without a Git checkout of the source repository. */
+  sourceCheckout?: boolean | undefined;
 }
 
 export interface ExportAttestationResult {
@@ -188,6 +190,113 @@ export async function prepareExportAttestationChecksums(options: {
   return (await prepareInventory(options.root, options.manifestPath, options.reviewedSha)).checksums;
 }
 
+async function prepareAttestedArchiveInventory(
+  root: string,
+  manifestPath: string,
+  reviewedSha: string,
+): Promise<SubjectInventory> {
+  const absoluteRoot = await fs.realpath(root);
+  const absoluteManifest = path.resolve(absoluteRoot, manifestPath);
+  const relativeManifest = path.relative(absoluteRoot, absoluteManifest).split(path.sep).join("/");
+  if (!allowedSubjectName(relativeManifest) || path.basename(absoluteManifest) !== "manifest.json") {
+    throw new Error("Attested export requires a canonical in-root manifest.json.");
+  }
+  await assertCanonicalSubjectPath(absoluteManifest);
+  const raw = await fs.readFile(absoluteManifest, "utf8");
+  const manifest = JSON.parse(raw) as {
+    kind?: string;
+    schemaVersion?: number;
+    tool?: { name?: string; version?: string };
+    git?: { sha?: string; dirty?: boolean };
+    sourceSnapshot?: string;
+    sourceFingerprint?: string;
+    steps?: Array<{ kind?: string; status?: string; files?: number }>;
+    artifacts?: Array<{ path: string; sha256: string; bytes: number; kind?: string }>;
+  };
+  if (
+    manifest.kind !== "boardreadyops.export-provenance" ||
+    manifest.schemaVersion !== 1 ||
+    manifest.tool?.name !== "boardreadyops" ||
+    manifest.git?.sha !== reviewedSha ||
+    manifest.git.dirty !== false ||
+    manifest.sourceSnapshot !== "stable" ||
+    !digestPattern.test(manifest.sourceFingerprint ?? "") ||
+    !["gerbers", "drill", "bom", "positions"].every((kind) =>
+      manifest.steps?.some((step) => step.kind === kind && step.status === "generated" && (step.files ?? 0) > 0),
+    )
+  ) {
+    throw new Error("Signed export manifest is not a complete, clean reviewed-source export.");
+  }
+  const requiredKinds = ["gerber", "drill", "bom", "cpl"];
+  const names = new Map<string, string>();
+  names.set(relativeManifest, await fileSha256(absoluteManifest));
+  if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length < requiredKinds.length) {
+    throw new Error("Signed export has no complete manufacturing subject inventory.");
+  }
+  const manifestDir = path.dirname(absoluteManifest);
+  const actualFiles = new Set<string>([absoluteManifest]);
+  const pending = [manifestDir];
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    if (!directory) continue;
+    await assertCanonicalSubjectPath(directory);
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isSymbolicLink()) throw new Error("Signed export contains a symlink.");
+      if (entry.isDirectory()) {
+        pending.push(absolute);
+        continue;
+      }
+      if (!entry.isFile()) throw new Error("Signed export contains a non-regular file.");
+      actualFiles.add(absolute);
+    }
+  }
+  const declaredFiles = new Set<string>([absoluteManifest]);
+  const kinds = new Set<string>();
+  for (const item of manifest.artifacts) {
+    if (
+      !item ||
+      typeof item.path !== "string" ||
+      !allowedSubjectName(item.path) ||
+      !digestPattern.test(item.sha256) ||
+      !Number.isSafeInteger(item.bytes) ||
+      item.bytes <= 0 ||
+      typeof item.kind !== "string"
+    ) {
+      throw new Error("Signed export contains an invalid subject declaration.");
+    }
+    if (kinds.has(`${item.kind}\0${item.path}`))
+      throw new Error("Signed export contains duplicate subject declarations.");
+    kinds.add(`${item.kind}\0${item.path}`);
+    const absolute = path.resolve(manifestDir, item.path);
+    if (!allowedSubjectName(path.relative(absoluteRoot, absolute).split(path.sep).join("/"))) {
+      throw new Error("Signed export subject escaped the archive root.");
+    }
+    await assertCanonicalSubjectPath(absolute);
+    const stat = await fs.stat(absolute);
+    if (!stat.isFile() || stat.size !== item.bytes) throw new Error("Signed export subject size mismatch.");
+    const actual = await fileSha256(absolute);
+    if (actual !== item.sha256) throw new Error("Signed export subject digest mismatch.");
+    const relative = path.relative(absoluteRoot, absolute).split(path.sep).join("/");
+    if (names.has(relative)) throw new Error("Signed export contains duplicate subject paths.");
+    names.set(relative, actual);
+    declaredFiles.add(absolute);
+  }
+  if (!requiredKinds.every((kind) => manifest.artifacts?.some((item) => item.kind === kind) === true)) {
+    throw new Error("Signed export is missing Gerber, drill, BOM or CPL subjects.");
+  }
+  if (actualFiles.size !== declaredFiles.size || [...actualFiles].some((file) => !declaredFiles.has(file))) {
+    throw new Error("Signed export archive contains undeclared or missing files.");
+  }
+  if (names.size > 1024) throw new Error("GitHub attestations support at most 1024 subjects.");
+  const checksums = `${[...names]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, hash]) => `${hash}  ${name}`)
+    .join("\n")}\n`;
+  return { names, checksums, manifestPath: absoluteManifest };
+}
+
 function validExpectation(e: TrustedExportExpectation): boolean {
   return (
     repoPattern.test(e.repository) &&
@@ -270,7 +379,10 @@ export async function verifyReviewedExportAttestation(
   if (!validExpectation(e)) return rejected("Invalid independently trusted source/run expectation.");
   let inventory: SubjectInventory;
   try {
-    inventory = await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
+    inventory =
+      options.sourceCheckout === false
+        ? await prepareAttestedArchiveInventory(options.root, options.manifestPath, e.reviewedSha)
+        : await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
   } catch {
     return rejected("Export source, manifest or output inventory failed closed.");
   }
@@ -326,7 +438,10 @@ export async function verifyReviewedExportAttestation(
   // Recheck the source and complete output set before returning an eligible
   // result; no stale pre-verification hash may bless a changed checkout.
   try {
-    const afterVerification = await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
+    const afterVerification =
+      options.sourceCheckout === false
+        ? await prepareAttestedArchiveInventory(options.root, options.manifestPath, e.reviewedSha)
+        : await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
     if (
       afterVerification.manifestPath !== inventory.manifestPath ||
       afterVerification.checksums !== inventory.checksums

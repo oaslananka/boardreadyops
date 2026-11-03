@@ -70,6 +70,10 @@ describe("token-bound first-party manufacturing download", () => {
     expect(sql).toContain("revision.commit_sha = run.commit_sha");
     expect(sql).toContain("manufacturing_share_authorizations");
     expect(sql).toContain("share.revoked_at is null");
+    expect(sql).toContain("join signed_manufacturing_export_evidence");
+    expect(sql).toContain("evidence.execution_attempt_id = run.execution_attempt_id");
+    expect(sql).toContain("evidence.github_run_id = attempt.github_workflow_dispatch_id");
+    expect(sql).toContain("evidence.source_sha = run.commit_sha");
   });
 
   it("rejects expired, revoked and unbound tokens without reading any file", async () => {

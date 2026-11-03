@@ -184,6 +184,121 @@ jobs:
           upload-artifacts: "true"
           comment-pr: "false"
 
+      # Optional source-bound manufacturing evidence. The readiness run remains
+      # usable without this project setting; no delivery or share is authorized here.
+      - name: Export manufacturing artifacts from the exact reviewed source
+        id: manufacturing-export
+        if: always() && steps.validate.outcome == 'success' && steps.kicad.outcome == 'success' && vars.BOARDREADYOPS_PROJECT != ''
+        continue-on-error: true
+        uses: oaslananka/boardreadyops/.github/actions/manufacturing-attested-export@bbdfd58631d5c8daca1179a10f74b45533903b58
+        with:
+          reviewed-source-sha: ${{ inputs.head_sha }}
+          project: ${{ vars.BOARDREADYOPS_PROJECT }}
+
+      - name: Install pinned GitHub attestation library
+        id: manufacturing-attestation-install
+        if: steps.manufacturing-export.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        # zizmor: ignore[adhoc-packages] @actions/attest is exactly pinned for private-repository GitHub-internal Sigstore bundles; scripts are disabled.
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/attest-tools" --no-audit --no-fund --ignore-scripts --save-exact @actions/attest@3.2.0
+
+      - name: Sign manufacturing export with GitHub-internal Sigstore
+        id: manufacturing-attestation
+        if: steps.manufacturing-export.outcome == 'success' && steps.manufacturing-attestation-install.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env:
+          SUBJECTS: ${{ steps.manufacturing-export.outputs.subject-checksums }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          cat > "$RUNNER_TEMP/attest-tools/sign-export.mjs" <<'JSCODE'
+          import fs from 'node:fs';
+          import { attestProvenance } from '@actions/attest';
+          const pattern = /^([a-f0-9]{64})  (.+)$/u;
+          const lines = fs.readFileSync(process.env.SUBJECTS, 'utf8').trimEnd().split('\n');
+          const names = new Set();
+          const subjects = lines.map((line) => {
+            const match = pattern.exec(line);
+            const name = match?.[2];
+            if (
+              !match ||
+              !name ||
+              names.has(name) ||
+              name.startsWith('/') ||
+              name.includes('\\') ||
+              /[\r\n\0]/u.test(name) ||
+              name.split('/').some((part) => !part || part === '.' || part === '..')
+            ) {
+              throw new Error('Unsafe manufacturing subject checksum list');
+            }
+            names.add(match[2]);
+            return { name: match[2], digest: { sha256: match[1] } };
+          });
+          if (subjects.length < 5 || !subjects.some((subject) => subject.name.endsWith('/manifest.json'))) {
+            throw new Error('Incomplete manufacturing subject inventory');
+          }
+          const result = await attestProvenance({
+            subjects,
+            token: process.env.GH_TOKEN,
+            sigstore: 'github',
+            skipWrite: true,
+          });
+          if (result.attestationID || result.tlogID) throw new Error('Unexpected remote attestation persistence');
+          const bundlePath = process.env.RUNNER_TEMP + '/bundle.sigstore.json';
+          fs.writeFileSync(bundlePath, JSON.stringify(result.bundle), { mode: 0o600 });
+          const bundle = JSON.parse(fs.readFileSync(bundlePath, 'utf8'));
+          if ((bundle?.verificationMaterial?.tlogEntries ?? []).length !== 0) {
+            throw new Error('Unexpected public transparency log entry');
+          }
+          if ((bundle?.verificationMaterial?.timestampVerificationData?.rfc3161Timestamps ?? []).length === 0) {
+            throw new Error('Missing signed internal timestamp');
+          }
+          JSCODE
+          node "$RUNNER_TEMP/attest-tools/sign-export.mjs"
+          tar -cf "$RUNNER_TEMP/boardreadyops-manufacturing-export.tar" \
+            -C "$GITHUB_WORKSPACE" build/boardreadyops-attested
+          tar -rf "$RUNNER_TEMP/boardreadyops-manufacturing-export.tar" -C "$RUNNER_TEMP" bundle.sigstore.json
+          gzip -f "$RUNNER_TEMP/boardreadyops-manufacturing-export.tar"
+
+      - name: Import verified manufacturing evidence into this run
+        id: manufacturing-export-import
+        if: steps.manufacturing-attestation.outcome == 'success'
+        continue-on-error: true
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+          EXECUTION_ATTEMPT_ID: ${{ inputs.execution_attempt_id }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          CLOUD_ORIGIN: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}
+          TRUST_MODE: ${{ inputs.safe_mode == 'true' && 'safe' || 'standard' }}
+          SAFE_MODE_REASONS: ${{ inputs.safe_mode_reasons }}
+        with:
+          script: |
+            const fs = require("node:fs");
+            const audience = `boardreadyops-manufacturing-export:${process.env.RUN_ID}:${process.env.EXECUTION_ATTEMPT_ID}:${process.env.HEAD_SHA}`;
+            const token = await core.getIDToken(audience);
+            const origin = process.env.CLOUD_ORIGIN;
+            if (!origin || !origin.startsWith("https://")) throw new Error("BoardReadyOps cloud origin is not configured");
+            const url = new URL(
+              `/api/v1/runs/${encodeURIComponent(process.env.RUN_ID)}/attempts/${encodeURIComponent(process.env.EXECUTION_ATTEMPT_ID)}/manufacturing-export`,
+              origin,
+            );
+            const archive = fs.readFileSync(process.env.RUNNER_TEMP + "/boardreadyops-manufacturing-export.tar.gz");
+            const response = await fetch(url, {
+              method: "POST",
+              headers: { authorization: `Bearer ${token}`, "content-type": "application/gzip" },
+              body: archive,
+            });
+            if (!response.ok) throw new Error("Signed manufacturing evidence import returned HTTP " + response.status);
+            const result = await response.json();
+            if (!result.ok || typeof result.artifactId !== "string") throw new Error("Signed manufacturing evidence import returned an invalid response");
+            core.info("Source-bound manufacturing evidence imported and independently verified.");
+
       - name: Publish OIDC-authenticated cloud result
         if: always() && steps.validate.outcome == 'success'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0

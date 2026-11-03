@@ -100,6 +100,44 @@ async function fixture(): Promise<Fixture> {
   return { root, manifestPath, subjectHashes };
 }
 
+async function signedArchiveFixture(): Promise<Fixture> {
+  const f = await fixture();
+  const manifestFile = path.join(f.root, f.manifestPath);
+  const manifest = JSON.parse(await fs.readFile(manifestFile, "utf8")) as {
+    steps: Array<{ kind: string; status: string; files: number }>;
+    artifacts: Array<{ path: string; sha256: string; bytes: number; kind: string }>;
+  };
+  const assembly = path.join(f.root, "build/reviewed/assembly");
+  await fs.mkdir(assembly, { recursive: true });
+  for (const [name, kind, step] of [
+    ["bom.csv", "bom", "bom"],
+    ["positions.csv", "cpl", "positions"],
+  ] as const) {
+    const bytes = Buffer.from(`${name},fixture\n`);
+    await fs.writeFile(path.join(assembly, name), bytes);
+    manifest.artifacts.push({
+      path: `assembly/${name}`,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      bytes: bytes.byteLength,
+      kind,
+    });
+    manifest.steps.push({ kind: step, status: "generated", files: 1 });
+  }
+  const manifestBytes = JSON.stringify(manifest);
+  await fs.writeFile(manifestFile, manifestBytes);
+  f.subjectHashes.clear();
+  f.subjectHashes.set(f.manifestPath, createHash("sha256").update(manifestBytes).digest("hex"));
+  for (const artifact of manifest.artifacts) {
+    f.subjectHashes.set(
+      `build/reviewed/${artifact.path}`,
+      createHash("sha256")
+        .update(await fs.readFile(path.join(f.root, "build/reviewed", artifact.path)))
+        .digest("hex"),
+    );
+  }
+  return f;
+}
+
 function verifiedResult(f: Fixture, overrides: Record<string, unknown> = {}) {
   const cert = {
     issuer: "https://token.actions.githubusercontent.com",
@@ -258,6 +296,56 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
     const f = await fixture();
     succeed(verifiedResult(f));
     expect((await verify(f, { ...expectation, ...change })).status).toBe("rejected");
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
+
+  it("verifies a self-contained signed archive without requiring the customer Git checkout", async () => {
+    const f = await signedArchiveFixture();
+    succeed(verifiedResult(f));
+    const result = await verifyReviewedExportAttestation({
+      root: f.root,
+      manifestPath: f.manifestPath,
+      expected: expectation,
+      sourceCheckout: false,
+      bundlePath: path.join(f.root, "bundle.sigstore.json"),
+    });
+    expect(result.status).toBe("eligible");
+    expect(result.subjects).toBe(5);
+    const [, args] = mockedRun.mock.calls[0] ?? [];
+    expect(args).toContain("--bundle");
+  });
+
+  it("rejects undeclared files in a self-contained signed archive", async () => {
+    const f = await signedArchiveFixture();
+    await fs.writeFile(path.join(f.root, "build/reviewed/assembly/extra.csv"), "unattested bytes");
+    succeed(verifiedResult(f));
+    const result = await verifyReviewedExportAttestation({
+      root: f.root,
+      manifestPath: f.manifestPath,
+      expected: expectation,
+      sourceCheckout: false,
+    });
+    expect(result.status).toBe("rejected");
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing manufacturing output kind in a self-contained archive", async () => {
+    const f = await signedArchiveFixture();
+    const manifestFile = path.join(f.root, f.manifestPath);
+    const manifest = JSON.parse(await fs.readFile(manifestFile, "utf8")) as {
+      artifacts: Array<{ path: string; sha256: string; bytes: number; kind: string }>;
+    };
+    manifest.artifacts = manifest.artifacts.filter((entry) => entry.kind !== "cpl");
+    await fs.rm(path.join(f.root, "build/reviewed/assembly/positions.csv"));
+    await fs.writeFile(manifestFile, JSON.stringify(manifest));
+    succeed(verifiedResult(f));
+    const result = await verifyReviewedExportAttestation({
+      root: f.root,
+      manifestPath: f.manifestPath,
+      expected: expectation,
+      sourceCheckout: false,
+    });
+    expect(result.status).toBe("rejected");
     expect(mockedRun).not.toHaveBeenCalled();
   });
 

@@ -27,7 +27,12 @@ function stringClaim(payload, name) {
 
 function integerClaim(payload, name) {
   const value = payload[name];
-  return Number.isSafeInteger(value) ? value : undefined;
+  if (Number.isSafeInteger(value)) return value;
+  if (typeof value === "string" && /^[1-9][0-9]{0,8}$/u.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }
 
 function audienceMatches(audience, expected) {
@@ -71,6 +76,7 @@ function claimsAreTrusted(payload, expectations, nowSeconds) {
     (expectations.repositoryId === undefined || stringClaim(payload, "repository_id") === expectations.repositoryId) &&
     stringClaim(payload, "workflow_ref") === expectations.workflowRef &&
     (expectations.githubRunId === undefined || stringClaim(payload, "run_id") === expectations.githubRunId) &&
+    (expectations.runAttempt === undefined || integerClaim(payload, "run_attempt") === expectations.runAttempt) &&
     stringClaim(payload, "ref") === expectations.ref &&
     (expectations.sha === undefined || stringClaim(payload, "sha") === expectations.sha) &&
     stringClaim(payload, "event_name") === "workflow_dispatch" &&
@@ -117,6 +123,7 @@ export async function verifyGitHubActionsOidcTokenClaims(
     repository = defaultRepository,
     repositoryId,
     githubRunId,
+    runAttempt,
     workflowRef = defaultWorkflowRef,
     ref = "refs/heads/main",
     sha,
@@ -146,7 +153,7 @@ export async function verifyGitHubActionsOidcTokenClaims(
     header.kid.length === 0 ||
     !claimsAreTrusted(
       payload,
-      { runId, executionAttemptId, audience, repository, repositoryId, githubRunId, workflowRef, ref, sha },
+      { runId, executionAttemptId, audience, repository, repositoryId, githubRunId, runAttempt, workflowRef, ref, sha },
       Math.floor(now() / 1000),
     )
   ) {
@@ -179,12 +186,13 @@ export async function verifyGitHubActionsOidcTokenClaims(
     if (!signatureValid) return undefined;
 
     // These fields are now backed by GitHub's verified signature, not request headers.
-    const workflowSha = stringClaim(payload, "sha");
+    const workflowSha = stringClaim(payload, "workflow_sha");
     const workflowRunId = stringClaim(payload, "run_id");
     if (!workflowSha || !/^[0-9a-f]{40}$/u.test(workflowSha) || !workflowRunId) return undefined;
     return {
       workflowSha,
       workflowRunId,
+      runAttempt: integerClaim(payload, "run_attempt"),
       repository: stringClaim(payload, "repository"),
       repositoryId: stringClaim(payload, "repository_id"),
       workflowRef: stringClaim(payload, "workflow_ref"),

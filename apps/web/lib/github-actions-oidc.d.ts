@@ -5,6 +5,7 @@ export type GitHubActionsOidcVerificationOptions = {
   readonly repository?: string;
   readonly repositoryId?: string;
   readonly githubRunId?: string;
+  readonly runAttempt?: number;
   readonly workflowRef?: string;
   readonly ref?: string;
   readonly sha?: string;
@@ -21,6 +22,7 @@ export function verifyGitHubActionsOidcToken(
 export type VerifiedGitHubActionsOidcClaims = {
   readonly workflowSha: string;
   readonly workflowRunId: string;
+  readonly runAttempt: number | undefined;
   readonly repository: string | undefined;
   readonly repositoryId: string | undefined;
   readonly workflowRef: string | undefined;
