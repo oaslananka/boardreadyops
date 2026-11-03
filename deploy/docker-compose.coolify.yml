@@ -64,6 +64,9 @@ services:
       ARTIFACT_STORAGE_ROOT: /data/artifacts
       BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
       BOARDREADYOPS_RELEASE_POLICY_HOST_FILE: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE:?}
+      BOARDREADYOPS_ARTIFACT_VOLUME: ${BOARDREADYOPS_ARTIFACT_VOLUME:?}
+      BOARDREADYOPS_POSTGRES_VOLUME: ${BOARDREADYOPS_POSTGRES_VOLUME:?}
+      BOARDREADYOPS_REDIS_VOLUME: ${BOARDREADYOPS_REDIS_VOLUME:?}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL required}
       REDIS_URL: redis://redis:6379
     expose:
@@ -147,10 +150,10 @@ services:
 volumes:
   boardreadyops_artifacts:
     external: true
-    name: ${BOARDREADYOPS_ARTIFACT_VOLUME:?existing artifact volume required}
+    name: ${BOARDREADYOPS_ARTIFACT_VOLUME}
   boardreadyops_postgres:
     external: true
-    name: ${BOARDREADYOPS_POSTGRES_VOLUME:?existing PostgreSQL volume required}
+    name: ${BOARDREADYOPS_POSTGRES_VOLUME}
   boardreadyops_redis:
     external: true
-    name: ${BOARDREADYOPS_REDIS_VOLUME:?existing Redis volume required}
+    name: ${BOARDREADYOPS_REDIS_VOLUME}
