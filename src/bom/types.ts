@@ -10,6 +10,8 @@ export interface BomRow {
   lifecycle?: string | undefined;
   compliance?: string | undefined;
   dnp?: boolean | undefined;
+  /** Schematic-origin KiCad BOM inclusion flag; false for (in_bom no) symbols. */
+  inBom?: boolean | undefined;
   sourcePath: string;
   sourceKind: "bom" | "schematic";
   line?: number | undefined;

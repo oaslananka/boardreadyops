@@ -9,6 +9,34 @@ describe("bom.missing-mpn", () => {
     expect(findings[0]?.details).toMatchObject({ reference: "R1" });
   });
 
+  it("does not request MPNs for schematic symbols excluded from BOM exports", async () => {
+    const dir = await writeFixture({
+      "board.kicad_pro": "{}",
+      "board.kicad_sch":
+        '(kicad_sch (symbol (lib_id "power:GND") (in_bom no) (on_board no) (property "Reference" "#PWR01")) (symbol (lib_id "Mechanical:Fiducial") (in_bom no) (property "Reference" "FID1")) (symbol (lib_id "Device:R") (in_bom yes) (property "Reference" "R1")) (symbol (lib_id "Device:C") (property "Reference" "C1")) (symbol (lib_id "Device:U") (in_bom yes) (property "Reference" "U1") (property "MPN" "ABC123")) (symbol (lib_id "Device:R") (property "Reference" "R2") (property "DNP" "true")))',
+      "board.kicad_pcb": '(kicad_pcb (title_block (rev "v1.0")))',
+    });
+    const result = await runPipeline({ path: dir, rules: ["bom.missing-mpn"], failOn: "never" });
+    const findings = expectRule(result, "bom.missing-mpn", 2);
+    expect(findings.map((item) => item.details?.reference).sort()).toEqual(["C1", "R1"]);
+  });
+
+  it("continues to honor explicit BOM input even for a schematic-excluded reference", async () => {
+    const dir = await writeFixture({
+      "board.kicad_pro": "{}",
+      "board.kicad_sch": '(kicad_sch (symbol (in_bom no) (property "Reference" "#PWR01")))',
+      "board.kicad_pcb": '(kicad_pcb (title_block (rev "v1.0")))',
+      "manual.csv": "Reference,MPN\n#PWR01,\n",
+    });
+    const result = await runPipeline({
+      path: dir,
+      bom: "manual.csv",
+      rules: ["bom.missing-mpn"],
+      failOn: "never",
+    });
+    expect(expectRule(result, "bom.missing-mpn", 1)[0]?.details).toMatchObject({ reference: "#PWR01" });
+  });
+
   it("uses explicit BOM options and schematic fallback rows", async () => {
     const explicitBom = await writeFixture({
       "board.kicad_pro": "{}",
