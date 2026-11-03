@@ -86,6 +86,30 @@ describe("repository setup readiness controls", () => {
     expect(container.textContent).toContain("Open the setup pull request first");
   });
 
+  it("does not allow validation or advertise a verified setup for revision zero", async () => {
+    const repository = {
+      ...readyForProbe,
+      setupRevision: 0,
+      setupWorkflowStatus: "ready",
+      setupConfigStatus: "ready",
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [repository],
+        }),
+      );
+    });
+    expect(container.textContent).toContain("Setup not started");
+    expect(container.textContent).toContain("No persisted setup revision exists");
+    expect(container.textContent).toContain("Not created");
+    expect(container.textContent).not.toContain("Setup revision#0");
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+    expect(container.textContent).toContain("Open the setup pull request first");
+  });
+
   it("shows replayed probe state and the GitHub Actions run", async () => {
     vi.stubGlobal(
       "fetch",

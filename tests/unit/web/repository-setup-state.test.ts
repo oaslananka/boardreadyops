@@ -10,6 +10,23 @@ describe("repository setup onboarding state", () => {
     });
   });
 
+  it("does not invent a persisted setup for the control-plane zero sentinel", () => {
+    for (const revision of [0, -1]) {
+      expect(
+        deriveRepositorySetupState({
+          setupRevision: revision,
+          setupWorkflowStatus: "ready",
+          setupConfigStatus: "ready",
+          setupObservedSha: "abcdef1234567890",
+        }),
+      ).toMatchObject({
+        id: "unconfigured",
+        label: "Setup not started",
+        currentStep: 1,
+      });
+    }
+  });
+
   it("moves to validation pending once a setup revision exists", () => {
     expect(
       deriveRepositorySetupState({

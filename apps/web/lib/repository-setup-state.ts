@@ -22,6 +22,11 @@ function explicitProblem(value: string | undefined): boolean {
   return value !== undefined && value !== "unknown" && value !== "ready";
 }
 
+/** Revision zero is the repository-dashboard sentinel, not a persisted setup revision. */
+function hasPersistedSetupRevision(revision: number | undefined): revision is number {
+  return revision !== undefined && Number.isSafeInteger(revision) && revision > 0;
+}
+
 /**
  * Turns persisted setup facts into the repository onboarding state shown in the setup UI.
  *
@@ -29,7 +34,7 @@ function explicitProblem(value: string | undefined): boolean {
  * a second maintainer, or a different browser therefore sees the same answer.
  */
 export function deriveRepositorySetupState(input: RepositorySetupStateInput): RepositorySetupState {
-  if (input.setupRevision === undefined) {
+  if (!hasPersistedSetupRevision(input.setupRevision)) {
     return {
       id: "unconfigured",
       label: "Setup not started",

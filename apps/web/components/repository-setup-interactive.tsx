@@ -219,7 +219,7 @@ export function RepositorySetupInteractive({
     const result = await requestSetupPr(repositoryId, activePreset.id);
     setPrResult(result);
     const setupRevision = result.setupRevision;
-    if (result.ok && setupRevision !== undefined) {
+    if (result.ok && setupRevision !== undefined && Number.isSafeInteger(setupRevision) && setupRevision > 0) {
       setSetupOverrides((current) => ({
         ...current,
         [repositoryId]: {
@@ -454,7 +454,7 @@ function setupReadinessView({
   blockedReason,
   result,
 }: Omit<SetupReadinessProps, "onValidate">): SetupReadinessView {
-  const noRevision = repository?.setupRevision === undefined;
+  const noRevision = deriveRepositorySetupState(repository ?? {}).id === "unconfigured";
   const status = effectiveProbeStatus(result, repository?.setupProbeStatus);
   const probeInProgress = status === "pending" || status === "dispatched";
   const workflowRunId = result?.workflowRunId ?? repository?.setupProbeWorkflowRunId;
@@ -690,7 +690,7 @@ function SetupProgressDetails({
   return (
     <DefinitionGrid>
       <Definition label="Setup revision">
-        {repository.setupRevision === undefined ? "Not created" : `#${repository.setupRevision}`}
+        {stateId === "unconfigured" ? "Not created" : `#${repository.setupRevision}`}
       </Definition>
       <Definition label="Persisted policy">{repository.setupPreset?.replaceAll("-", " ") ?? "Not recorded"}</Definition>
       <Definition label="Workflow">
