@@ -21,6 +21,39 @@ describe("bom.missing-mpn", () => {
     expect(findings.map((item) => item.details?.reference).sort()).toEqual(["C1", "R1"]);
   });
 
+  it("never treats KiCad virtual # references as purchasable schematic parts when exclusion flags are absent", async () => {
+    const dir = await writeFixture({
+      "board.kicad_pro": "{}",
+      "board.kicad_sch":
+        '(kicad_sch (symbol (lib_id "power:VCC") (property "Reference" "#PWR010")) (symbol (lib_id "power:PWR_FLAG") (in_bom yes) (property "Reference" "#FLG01")) (symbol (lib_id "Graphic:OSHW") (property "Reference" "#SYM01")) (symbol (lib_id "Device:R") (property "Reference" "R1")))',
+      "board.kicad_pcb": '(kicad_pcb (title_block (rev "v1.0")))',
+    });
+    const result = await runPipeline({ path: dir, rules: ["bom.missing-mpn"], failOn: "never" });
+    const findings = expectRule(result, "bom.missing-mpn", 1);
+    expect(findings.map((item) => item.details?.reference)).toEqual(["R1"]);
+  });
+
+  it("reports virtual references explicitly present in an external BOM as export errors, not missing purchasable MPNs", async () => {
+    const dir = await writeFixture({
+      "board.kicad_pro": "{}",
+      "board.kicad_sch": "(kicad_sch)",
+      "board.kicad_pcb": '(kicad_pcb (title_block (rev "v1.0")))',
+      "manual.csv": "Reference,MPN\n#PWR010,\nR1,\n",
+    });
+    const result = await runPipeline({
+      path: dir,
+      bom: "manual.csv",
+      rules: ["bom.missing-mpn"],
+      failOn: "never",
+    });
+    const findings = expectRule(result, "bom.missing-mpn", 2);
+    const power = findings.find((item) => item.details?.reference === "#PWR010");
+    const resistor = findings.find((item) => item.details?.reference === "R1");
+    expect(power?.message).toContain("Exclude it from the exported BOM");
+    expect(power?.message).not.toContain("missing an MPN");
+    expect(resistor?.message).toBe("R1 is missing an MPN.");
+  });
+
   it("continues to honor explicit BOM input even for a schematic-excluded reference", async () => {
     const dir = await writeFixture({
       "board.kicad_pro": "{}",
