@@ -954,3 +954,17 @@ release-switch change is required.
 discovery endpoints stay disabled until independent real OAuth permission,
 client interoperability and security acceptance. Source readiness is not
 ChatGPT or Claude connector availability.
+
+
+## OAuth grant revocation during a Review read (#1248)
+
+The production verified-grant MCP ingress checks the signed, audience-bound
+OAuth access token and durable grant record at request entry **and again before
+returning the authorized Review tool result**. This also covers a grant revoked,
+client deactivated, grant epoch invalidated, token expired or durable grant
+storage unavailable while the read is in progress. The final check uses the
+original token and verifies that the GitHub user, grant ID and scopes have not
+changed. Denial returns the same generic unavailable result and does not expose
+previously read Review metadata. Independent live GitHub repository permission
+checks remain in force. This is a source-level control; it does not enable the
+remote MCP production endpoints or claim completed ChatGPT/Claude acceptance.

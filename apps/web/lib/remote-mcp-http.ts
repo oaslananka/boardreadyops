@@ -43,6 +43,8 @@ function rejectInvalidMcpPostHeaders(request: Request): Response | null {
 interface RemoteMcpReadDependencies {
   openDb(): Promise<Pick<PgQueryExecutor, "query" | "close">>;
   checkCurrentPermission: CheckLiveRepositoryPermission;
+  /** Verified-grant production ingress injects a fresh durable OAuth check before publishing read results. */
+  revalidateCurrentGrant?(): Promise<boolean>;
 }
 
 /** A single fail-closed, bounded read path for all hosted Review MCP tools. */
@@ -54,7 +56,9 @@ async function readAuthorizedRemoteMcpTool<T extends Record<string, unknown>>(
   try {
     db = await dependencies.openDb();
     const facts = await read(db);
-    if (!facts) return { isError: true, content: [{ type: "text" as const, text: "Review unavailable" }] };
+    if (!facts || (dependencies.revalidateCurrentGrant && !(await dependencies.revalidateCurrentGrant()))) {
+      return { isError: true, content: [{ type: "text" as const, text: "Review unavailable" }] };
+    }
     return { content: [{ type: "text" as const, text: JSON.stringify(facts) }], structuredContent: facts };
   } catch {
     // Never leak repository IDs, CAD paths, database failures, tokens, or external provider details.
@@ -215,5 +219,20 @@ export async function handleRemoteMcpWithVerifiedGrant(
       },
     });
   }
-  return handleAuthorizedRemoteMcpHttp(request, principal, config);
+  return handleAuthorizedRemoteMcpHttp(request, principal, {
+    openDb: config.openDb,
+    checkCurrentPermission: config.checkCurrentPermission,
+    // Revalidate the original signed token against the durable grant record
+    // after asynchronous Review reads. A grant revoked mid-request must not
+    // authorize the already-loaded facts; fail closed on verifier errors/outage.
+    revalidateCurrentGrant: async () => {
+      const refreshed = await authenticateRemoteMcpRequest(request, config.issuer, config.verifier);
+      return (
+        refreshed !== null &&
+        refreshed.githubUserId === principal.githubUserId &&
+        refreshed.grantId === principal.grantId &&
+        refreshed.scopes.join(" ") === principal.scopes.join(" ")
+      );
+    },
+  });
 }
