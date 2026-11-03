@@ -125,12 +125,21 @@ async function fileDigest(filePath: string): Promise<string> {
   return hash.digest("hex");
 }
 
+export function tarEntryExpandedBytes(detail: string): number | undefined {
+  const gnu = /^[-d][rwxStTs-]{9}\s+\S+\s+(\d+)\s/u.exec(detail);
+  const bsd = /^[-d][rwxStTs-]{9}\s+\d+\s+\S+\s+\S+\s+(\d+)\s/u.exec(detail);
+  const match = gnu ?? bsd;
+  if (!match) return undefined;
+  const size = Number(match[1]);
+  return Number.isSafeInteger(size) && size >= 0 ? size : undefined;
+}
+
 function safeArchiveHeaders(details: string[]): boolean {
   let expandedBytes = 0;
   for (const detail of details) {
-    const match = /^[-d][rwxStTs-]{9}\s+\S+\s+(\d+)\s/u.exec(detail);
-    if (!match) return false;
-    expandedBytes += Number(match[1]);
+    const size = tarEntryExpandedBytes(detail);
+    if (size === undefined) return false;
+    expandedBytes += size;
     if (!Number.isSafeInteger(expandedBytes) || expandedBytes > 512 * 1024 * 1024) return false;
   }
   return true;
