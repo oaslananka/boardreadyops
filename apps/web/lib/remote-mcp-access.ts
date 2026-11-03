@@ -145,7 +145,7 @@ type AuthorizedReviewRow = {
   github_installation_id: string | number;
 };
 
-type AuthorizedRevisionRow = { head_commit_sha: string; evidence_digest: string };
+type AuthorizedRevisionRow = { head_commit_sha: string; base_commit_sha: string | null; evidence_digest: string };
 
 function validGitHubId(input: string | number): number | null {
   const value = Number(input);
@@ -164,7 +164,13 @@ export async function loadAuthorizedRemoteReviewSnapshot(
   principal: RemoteMcpPrincipal,
   reviewId: string,
   checkCurrentPermission: CheckLiveRepositoryPermission,
-): Promise<{ facts: ReturnType<typeof remoteReviewFacts>; headRunId: string } | null> {
+): Promise<{
+  facts: ReturnType<typeof remoteReviewFacts>;
+  headRunId: string;
+  repositoryId: string;
+  revisionId: string;
+  baseCommitSha: string | null;
+} | null> {
   if (!principal.scopes.includes("review:read") || !/^[a-f0-9-]{36}$/iu.test(reviewId)) return null;
   const result = await db.query(
     `select reviews.id, reviews.repository_id, reviews.head_run_id, reviews.current_revision_id,
@@ -210,7 +216,7 @@ export async function loadAuthorizedRemoteReviewSnapshot(
   if (!permitted) return null;
 
   const revision = await db.query(
-    `select review_revisions.head_commit_sha, review_revisions.evidence_digest
+    `select review_revisions.head_commit_sha, review_revisions.base_commit_sha, review_revisions.evidence_digest
        from review_revisions
        join release_runs as revision_head_run
          on revision_head_run.id = review_revisions.head_run_id
@@ -226,6 +232,9 @@ export async function loadAuthorizedRemoteReviewSnapshot(
   if (!current) return null;
   return {
     headRunId: row.head_run_id,
+    repositoryId: row.repository_id,
+    revisionId: row.current_revision_id,
+    baseCommitSha: current.base_commit_sha ?? null,
     facts: remoteReviewFacts({
       status: row.status as Parameters<typeof remoteReviewFacts>[0]["status"],
       decision: row.decision as Parameters<typeof remoteReviewFacts>[0]["decision"],

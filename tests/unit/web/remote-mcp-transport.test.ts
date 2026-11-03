@@ -382,6 +382,140 @@ describe("MCP v2 stateless web request boundary", () => {
     expect(openDb).not.toHaveBeenCalled();
   });
 
+  it("advertises the source-minimized footprint tool only with Review scope", async () => {
+    const dependencies = { openDb: vi.fn(), checkCurrentPermission: vi.fn() };
+    const authorized = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/list"),
+      { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] },
+      dependencies,
+    );
+    expect(await authorized.text()).toContain("boardreadyops_review_footprint_summary");
+    const evidenceOnly = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/list"),
+      { githubUserId: ghUser, grantId: jti, scopes: ["evidence:read"] },
+      dependencies,
+    );
+    expect(await evidenceOnly.text()).not.toContain("boardreadyops_review_footprint_summary");
+    expect(dependencies.openDb).not.toHaveBeenCalled();
+  });
+
+  it("serves the current consented PCB summary through the actual remote MCP tool and closes its database", async () => {
+    const summary = {
+      schemaVersion: 1,
+      scope: "pcb-footprints-only",
+      provenance: "local-git-commits",
+      disclosure: "counts-and-digests-only",
+      baseCommitSha: "a".repeat(40),
+      headCommitSha: "b".repeat(40),
+      baseBlobSha: "c".repeat(40),
+      headBlobSha: "d".repeat(40),
+      baseSourceSha256: "e".repeat(64),
+      headSourceSha256: "f".repeat(64),
+      changes: {
+        added: 2,
+        removed: 1,
+        modified: 0,
+        byField: { reference: 0, libraryId: 0, layer: 0, positionMm: 0, rotationDeg: 0 },
+      },
+      riskAssessment: "not-evaluated",
+    } as const;
+    const { createHash } = await import("node:crypto");
+    const sha = createHash("sha256").update(JSON.stringify(summary)).digest("hex");
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("from reviews"))
+        return {
+          rows: [
+            {
+              id: reviewId,
+              repository_id: "private-repo",
+              head_run_id: "head-run",
+              current_revision_id: "current-revision",
+              status: "active",
+              decision: "pending",
+              owner: "PRIVATE-OWNER",
+              name: "PRIVATE-REPO",
+              github_repo_id: "456",
+              github_installation_id: "789",
+            },
+          ],
+        };
+      if (sql.includes("from review_revisions"))
+        return {
+          rows: [
+            {
+              head_commit_sha: summary.headCommitSha,
+              base_commit_sha: summary.baseCommitSha,
+              evidence_digest: "9".repeat(64),
+            },
+          ],
+        };
+      if (sql.includes("from run_pcb_footprint_summaries")) return { rows: [{ summary, summary_sha256: sha }] };
+      throw new Error("Unexpected query");
+    });
+    const close = vi.fn().mockResolvedValue(undefined);
+    const grant = vi.fn().mockResolvedValue(true);
+    const openDb = vi.fn().mockResolvedValue({ query, close });
+    const actual = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/call", { name: "boardreadyops_review_footprint_summary", arguments: { reviewId } }),
+      { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] },
+      { openDb, checkCurrentPermission: grant },
+    );
+    const body = await actual.text();
+    expect(actual.status, body).toBe(200);
+    expect(body).toContain("client-reported");
+    expect(body).toContain("pcb-footprints-only");
+    expect(body).not.toContain("PRIVATE-OWNER");
+    expect(body).not.toContain("PRIVATE-REPO");
+    expect(body).not.toContain("private-repo");
+    expect(grant).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("does not present missing stored PCB summaries as a successful no-change analysis", async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("from reviews"))
+        return {
+          rows: [
+            {
+              id: reviewId,
+              repository_id: "private-repo",
+              head_run_id: "head-run",
+              current_revision_id: "rev-1",
+              status: "active",
+              decision: "pending",
+              owner: "owner",
+              name: "repo",
+              github_repo_id: "456",
+              github_installation_id: "789",
+            },
+          ],
+        };
+      if (sql.includes("from review_revisions"))
+        return {
+          rows: [
+            {
+              head_commit_sha: "b".repeat(40),
+              base_commit_sha: "a".repeat(40),
+              evidence_digest: "9".repeat(64),
+            },
+          ],
+        };
+      if (sql.includes("from run_pcb_footprint_summaries")) return { rows: [] };
+      throw new Error("Unexpected query");
+    });
+    const response = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/call", { name: "boardreadyops_review_footprint_summary", arguments: { reviewId } }),
+      { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] },
+      { openDb: vi.fn().mockResolvedValue({ query, close }), checkCurrentPermission: vi.fn().mockResolvedValue(true) },
+    );
+    const body = await response.text();
+    expect(body).toContain("unavailable");
+    expect(body).toContain("not-evaluated");
+    expect(body).not.toContain("client-reported");
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it("exposes the portable MCP Apps Review resource only after the user-bound OAuth grant", async () => {
     const openDb = vi.fn();
     const config = { openDb, checkCurrentPermission: vi.fn() };
