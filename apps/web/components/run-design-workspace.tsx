@@ -8,6 +8,49 @@ import { ReviewCanvas } from "./review/review-canvas.js";
 
 type RunFinding = RunDetail["findings"][number];
 
+/** Use the same source-grounded finding details in the mobile row and desktop inspector. */
+function FindingEvidence({
+  finding,
+  sourceUrl,
+  sourceLabel,
+  recordedAnchor,
+}: Readonly<{
+  finding: RunFinding;
+  sourceUrl: string | undefined;
+  sourceLabel: string;
+  recordedAnchor: boolean;
+}>) {
+  return (
+    <div className="space-y-3 text-sm">
+      <div>
+        <span className="text-xs text-muted-foreground">Rule</span>
+        <p className="mt-1 break-words font-medium text-foreground">{finding.ruleId}</p>
+      </div>
+      <div>
+        <span className="text-xs text-muted-foreground">Source at evaluated commit</span>
+        <p className="mt-1 break-all text-foreground">
+          {sourceUrl ? (
+            <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+              {finding.path} ↗
+            </a>
+          ) : (
+            sourceLabel
+          )}
+        </p>
+      </div>
+      <div>
+        <span className="text-xs text-muted-foreground">How to investigate</span>
+        <p className="mt-1 text-foreground">{findingGuidance(finding.ruleId, finding.message)}</p>
+      </div>
+      <p className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+        {recordedAnchor
+          ? "This finding has a recorded image anchor. Confirm the design location against the native source."
+          : "No verified image coordinate is linked to this finding. Use the source and diagnostic instead."}
+      </p>
+    </div>
+  );
+}
+
 /**
  * A run is evidence, not an approved Review. Only a recorded snapshot anchor with
  * the same persisted finding fingerprint may select a visual location; rule text and
@@ -83,6 +126,19 @@ export function RunDesignWorkspace({
                     <span className="mt-1 block text-xs text-muted-foreground">Waived · remains recorded</span>
                   ) : null}
                 </button>
+                {selectedId === finding.id && selected ? (
+                  <section
+                    aria-label="Selected finding details"
+                    className="mt-2 rounded-md border border-primary/40 bg-primary/5 p-3 xl:hidden"
+                  >
+                    <FindingEvidence
+                      finding={selected}
+                      sourceUrl={sourceUrl}
+                      sourceLabel={sourceLabel}
+                      recordedAnchor={recordedAnchor}
+                    />
+                  </section>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -112,35 +168,19 @@ export function RunDesignWorkspace({
         </p>
       </div>
 
-      <aside className="order-3 min-w-0 rounded-lg border border-border bg-card p-3" aria-label="Selected run finding">
+      <aside
+        className="order-3 hidden min-w-0 rounded-lg border border-border bg-card p-3 xl:block"
+        aria-label="Selected run finding"
+      >
         <h3 className="text-sm font-semibold text-foreground">Finding inspector</h3>
         {selected ? (
-          <div className="mt-3 space-y-3 text-sm">
-            <div>
-              <span className="text-xs text-muted-foreground">Rule</span>
-              <p className="mt-1 break-words font-medium text-foreground">{selected.ruleId}</p>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">Source at evaluated commit</span>
-              <p className="mt-1 break-all text-foreground">
-                {sourceUrl ? (
-                  <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                    {selected.path} ↗
-                  </a>
-                ) : (
-                  sourceLabel
-                )}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">How to investigate</span>
-              <p className="mt-1 text-foreground">{findingGuidance(selected.ruleId, selected.message)}</p>
-            </div>
-            <p className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
-              {recordedAnchor
-                ? "This finding has a recorded image anchor. Confirm the design location against the native source."
-                : "No verified image coordinate is linked to this finding. Use the source and diagnostic instead."}
-            </p>
+          <div className="mt-3">
+            <FindingEvidence
+              finding={selected}
+              sourceUrl={sourceUrl}
+              sourceLabel={sourceLabel}
+              recordedAnchor={recordedAnchor}
+            />
           </div>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">Select a finding to inspect its source and guidance.</p>
