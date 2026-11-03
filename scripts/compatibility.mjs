@@ -53,14 +53,14 @@ export function renderSupportMatrix(input) {
     "",
     `Minimum supported Node.js: **${config.node.minimumVersion}**. Recommended Node.js major: **${config.node.recommended}**.`,
     "",
-    "| Runtime | Version | Status | Tested latest | Policy |",
-    "| --- | --- | --- | --- | --- |",
+    "| Runtime | Version | Status | Tested latest | Latest upstream | Policy |",
+    "| --- | --- | --- | --- | --- | --- |",
   );
 
   for (const version of config.node.supported) {
     const status = nodeSupportStatus(config, version);
     lines.push(
-      `| Node.js | ${version} | ${status} | ${config.node.tested[version] ?? ""} | ${markdownCell(
+      `| Node.js | ${version} | ${status} | ${config.node.tested[version] ?? ""} | ${config.node.upstreamLatest[version] ?? ""} | ${markdownCell(
         config.node.policy[version] ?? "",
       )} |`,
     );
@@ -68,7 +68,13 @@ export function renderSupportMatrix(input) {
 
   for (const version of config.node.current) {
     lines.push(
-      `| Node.js | ${version} | Current, not supported |  | ${markdownCell(config.node.policy[version] ?? "")} |`,
+      `| Node.js | ${version} | Current, not supported |  | ${config.node.upstreamLatest[version] ?? ""} | ${markdownCell(config.node.policy[version] ?? "")} |`,
+    );
+  }
+
+  for (const version of config.node.ltsPending) {
+    lines.push(
+      `| Node.js | ${version} | LTS, validation pending (not supported) |  | ${config.node.upstreamLatest[version] ?? ""} | ${markdownCell(config.node.policy[version] ?? "")} |`,
     );
   }
 
@@ -313,12 +319,25 @@ function findNodeDrift(config, releases) {
   const minimum = Number(config.node.minimum);
   const supported = new Set(config.node.supported);
   const documentedCurrent = new Set(config.node.current);
+  const ltsPending = new Set(config.node.ltsPending);
   const latestByMajor = latestNodeReleasesByMajor(releases, minimum);
 
   const drift = [];
   for (const [major, entry] of [...latestByMajor.entries()].sort(([left], [right]) => Number(left) - Number(right))) {
     const latest = entry.version;
     if (!supported.has(major)) {
+      if (ltsPending.has(major) && entry.lts) {
+        const documented = stableReleaseName(config.node.upstreamLatest[major]);
+        if (!documented || compareVersion(latest, documented) > 0) {
+          drift.push({
+            major,
+            latest: latest.normalized,
+            tested: documented?.normalized ?? null,
+            reason: "new-pending-lts",
+          });
+        }
+        continue;
+      }
       const reason = unsupportedNodeReason(documentedCurrent.has(major), entry.lts);
       if (reason) {
         drift.push({ major, latest: latest.normalized, tested: null, reason });
@@ -331,11 +350,19 @@ function findNodeDrift(config, releases) {
       continue;
     }
     const testedVersion = stableReleaseName(tested);
-    if (!testedVersion || compareVersion(latest, testedVersion) <= 0) {
+    const documented = stableReleaseName(config.node.upstreamLatest[major]) ?? testedVersion;
+    if (!testedVersion || !documented || compareVersion(latest, documented) <= 0) {
       continue;
     }
-    const reason = latest.minor > testedVersion.minor ? "new-minor" : "new-release";
-    drift.push({ major, latest: latest.normalized, tested: testedVersion.normalized, reason });
+    const reason = latest.minor > documented.minor ? "new-minor" : "new-release";
+    const reviewed = config.node.upstreamLatest[major];
+    drift.push({
+      major,
+      latest: latest.normalized,
+      tested: testedVersion.normalized,
+      ...(reviewed ? { reviewed } : {}),
+      reason,
+    });
   }
   return drift;
 }
@@ -391,10 +418,15 @@ function nodeDriftMessage(entry) {
   if (entry.reason === "current-promoted-lts") {
     return `Node.js ${entry.latest} moved to LTS but is still documented only under node.current.`;
   }
+  if (entry.reason === "new-pending-lts") {
+    return `Node.js ${entry.latest} is newer than reviewed upstream LTS ${entry.tested ?? "unknown"} for unsupported major ${entry.major}.`;
+  }
   if (entry.reason === "untested-supported") {
     return `Node.js ${entry.major} is supported but has no tested latest version recorded.`;
   }
-  return `Node.js ${entry.latest} is newer than recorded ${entry.tested} for supported major ${entry.major}.`;
+  const baseline = entry.reviewed ?? entry.tested;
+  const testedNote = entry.reviewed ? ` (last CI-tested: ${entry.tested})` : "";
+  return `Node.js ${entry.latest} is newer than reviewed ${baseline} for supported major ${entry.major}${testedNote}.`;
 }
 
 function kicadDriftMessage(entry) {
@@ -427,6 +459,8 @@ function normalizeCompatibilityConfig(input) {
       recommended: stringValue(node.recommended, "node.recommended"),
       supported: stringArray(node.supported, "node.supported"),
       current: stringArray(node.current, "node.current"),
+      ltsPending: stringArray(node.ltsPending ?? [], "node.ltsPending"),
+      upstreamLatest: stringRecord(node.upstreamLatest ?? {}, "node.upstreamLatest"),
       tested: stringRecord(node.tested ?? {}, "node.tested"),
       policy: stringRecord(node.policy ?? {}, "node.policy"),
     },

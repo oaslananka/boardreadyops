@@ -1,12 +1,12 @@
 source_checked:
-  date: "2026-10-12"
+  date: "2026-11-03"
   node:
     releases: "https://nodejs.org/en/about/previous-releases"
     schedule: "https://github.com/nodejs/Release#release-schedule"
     index: "https://nodejs.org/dist/index.json"
-    checkedAt: "2026-10-27"
+    checkedAt: "2026-11-03"
   kicad:
-    release: "https://www.kicad.org/blog/2026/10/KiCad-10.0.7-Release/"
+    release: "https://www.kicad.org/blog/2026/10/KiCad-10.0.8-Release/"
     linux_packages: "https://www.kicad.org/download/linux-distros/"
     tags: "https://gitlab.com/kicad/code/kicad/-/tags"
   cyclonedx:
@@ -18,7 +18,7 @@ source_checked:
 kicad:
   minimum: "9.0"
   recommended: "10.0"
-  latestVerified: "10.0.7"
+  latestVerified: "10.0.8"
   eol:
     - "9.0"
   tested:
@@ -31,12 +31,16 @@ node:
   minimumVersion: "24.0.0"
   recommended: "24"
   supported: ["24"]
-  current: ["26"]
+  current: []
+  ltsPending: ["26"]
+  upstreamLatest:
+    "24": "24.22.2"
+    "26": "26.13.0"
   tested:
     "24": "24.22.1"
   policy:
     "24": "Maintenance LTS and recommended runtime. Used by default CI jobs, binary builds, GitHub Action runtime, and KiCad 10.0 integration jobs."
-    "26": "Current release line. Tracked by drift guard but not in package engines or CI until it reaches LTS and dependency/tooling validation is added."
+    "26": "Upstream LTS since October 2026; not supported until dependency/toolchain and cross-platform CI validation. Keep Node 24 as the only supported major."
 cyclonedx:
   specVersion: "1.7"
   schemaUrl: "https://cyclonedx.org/schema/bom-1.7.schema.json"
