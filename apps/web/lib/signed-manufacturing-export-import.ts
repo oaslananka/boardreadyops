@@ -347,7 +347,7 @@ async function persistVerifiedArchive(
 ): Promise<Response> {
   const artifactId = dependencies.id();
   if (!uuid(artifactId)) return jsonError("signed export metadata service is unavailable", 503);
-  const archiveName = path.join(params.runId, params.attemptId, `${artifactId}.tar.gz`);
+  const archiveName = path.posix.join(params.runId, params.attemptId, `${artifactId}.tar.gz`);
   const storageRoot = dependencies.environment.ARTIFACT_STORAGE_ROOT;
   if (!storageRoot) return jsonError("manufacturing artifact storage is not configured", 503);
   const finalPath = safeLocalArtifactPath(storageRoot, archiveName);
