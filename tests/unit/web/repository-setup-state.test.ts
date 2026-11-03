@@ -50,6 +50,20 @@ describe("repository setup onboarding state", () => {
     expect(state.description).toContain("workflow missing");
   });
 
+  it("refuses a verified badge when the current setup lacks a recorded commit", () => {
+    for (const sha of [undefined, "", "not-a-commit", "a".repeat(39)]) {
+      const result = deriveRepositorySetupState({
+        setupRevision: 5,
+        setupWorkflowStatus: "ready",
+        setupConfigStatus: "ready",
+        ...(sha === undefined ? {} : { setupObservedSha: sha }),
+      });
+      expect(result).toMatchObject({ id: "attention", label: "Setup needs attention", currentStep: 4 });
+      expect(result.description).toContain("verified Git commit");
+      expect(result.description).toContain("Validate readiness");
+    }
+  });
+
   it("becomes ready only when both persisted readiness dimensions are ready", () => {
     const state = deriveRepositorySetupState({
       setupRevision: 4,

@@ -45,7 +45,19 @@ export function deriveRepositorySetupState(input: RepositorySetupStateInput): Re
   }
 
   if (input.setupWorkflowStatus === "ready" && input.setupConfigStatus === "ready") {
-    const commit = input.setupObservedSha ? ` at commit ${input.setupObservedSha.slice(0, 8)}` : "";
+    // Workflow/config statuses alone are not source evidence. A missing commit
+    // may be permitted by storage but cannot justify a verified setup label.
+    const observedSha = input.setupObservedSha ?? "";
+    if (!/^[0-9a-f]{40}$/u.test(observedSha)) {
+      return {
+        id: "attention",
+        label: "Setup needs attention",
+        description:
+          "The workflow and configuration report ready, but no verified Git commit was recorded. Validate readiness again to capture the source commit before trusting this setup.",
+        currentStep: 4,
+      };
+    }
+    const commit = ` at commit ${observedSha.slice(0, 8)}`;
     return {
       id: "ready",
       label: "Repository setup verified",
