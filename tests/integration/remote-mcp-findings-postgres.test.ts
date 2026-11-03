@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { loadAuthorizedRemoteEvidence } from "../../apps/web/lib/remote-mcp-evidence.js";
 import { loadAuthorizedRemoteFindings } from "../../apps/web/lib/remote-mcp-findings.js";
 import { loadAuthorizedRemoteFootprintSummary } from "../../apps/web/lib/remote-mcp-footprint.js";
 import { storeRunPcbFootprintSummary } from "../../packages/db/src/pcb-footprint-summary-store.js";
@@ -194,6 +195,32 @@ describePg("live-authorized MCP finding pagination against PostgreSQL", () => {
       await executor().query("delete from run_pcb_footprint_summaries where run_id = $1", [runId]);
       await executor().query("update review_revisions set base_commit_sha = null where id = $1", [revisionId]);
     }
+  });
+
+  it("reads only the current persisted evidence revision and rejects unauthorized or nonexistent IDs", async () => {
+    const scope = { githubUserId: userId, grantId: "evidence-grant", scopes: ["evidence:read"] };
+    const granted = vi.fn().mockResolvedValue(true);
+    const entry = await loadAuthorizedRemoteEvidence(executor(), scope, revisionId, granted);
+    expect(entry).toEqual({
+      schemaVersion: 1,
+      availability: "recorded",
+      source: "hosted-review-revision",
+      evidenceId: revisionId,
+      headCommitSha: "a".repeat(40),
+      evidenceDigest: "b".repeat(64),
+      inAppUrl: `https://boardreadyops.com/reviews/${reviewId}`,
+      verification: "recorded-metadata-only",
+      productionApproval: "not-evaluated",
+    });
+    expect(granted).toHaveBeenCalledTimes(2);
+    const denied = await loadAuthorizedRemoteEvidence(executor(), scope, revisionId, vi.fn().mockResolvedValue(false));
+    expect(denied).toBeNull();
+    const missingAccess = vi.fn();
+    expect(await loadAuthorizedRemoteEvidence(executor(), scope, randomUUID(), missingAccess)).toBeNull();
+    expect(missingAccess).not.toHaveBeenCalled();
+    expect(
+      await loadAuthorizedRemoteEvidence(executor(), { ...scope, scopes: ["review:read"] }, revisionId, granted),
+    ).toBeNull();
   });
 
   it("denies a revoked user before querying the finding table", async () => {

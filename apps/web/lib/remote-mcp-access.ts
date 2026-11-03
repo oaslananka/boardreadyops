@@ -164,6 +164,7 @@ export async function loadAuthorizedRemoteReviewSnapshot(
   principal: RemoteMcpPrincipal,
   reviewId: string,
   checkCurrentPermission: CheckLiveRepositoryPermission,
+  requiredScope: "review:read" | "evidence:read" = "review:read",
 ): Promise<{
   facts: ReturnType<typeof remoteReviewFacts>;
   headRunId: string;
@@ -171,7 +172,7 @@ export async function loadAuthorizedRemoteReviewSnapshot(
   revisionId: string;
   baseCommitSha: string | null;
 } | null> {
-  if (!principal.scopes.includes("review:read") || !/^[a-f0-9-]{36}$/iu.test(reviewId)) return null;
+  if (!principal.scopes.includes(requiredScope) || !/^[a-f0-9-]{36}$/iu.test(reviewId)) return null;
   const result = await db.query(
     `select reviews.id, reviews.repository_id, reviews.head_run_id, reviews.current_revision_id,
             reviews.status, reviews.decision, repositories.owner, repositories.name,
@@ -242,6 +243,24 @@ export async function loadAuthorizedRemoteReviewSnapshot(
       evidenceDigest: current.evidence_digest,
     }),
   };
+}
+
+/** Compare every authority/revision field on both sides of an asynchronous evidence read. */
+export function sameAuthorizedRemoteReviewSnapshot(
+  before: NonNullable<Awaited<ReturnType<typeof loadAuthorizedRemoteReviewSnapshot>>>,
+  current: Awaited<ReturnType<typeof loadAuthorizedRemoteReviewSnapshot>>,
+): boolean {
+  return (
+    current !== null &&
+    current.repositoryId === before.repositoryId &&
+    current.revisionId === before.revisionId &&
+    current.headRunId === before.headRunId &&
+    current.baseCommitSha === before.baseCommitSha &&
+    current.facts.headCommitSha === before.facts.headCommitSha &&
+    current.facts.evidenceDigest === before.facts.evidenceDigest &&
+    current.facts.status === before.facts.status &&
+    current.facts.decision === before.facts.decision
+  );
 }
 
 /** Public MCP review reads expose only the allowlisted facts, never DB IDs. */

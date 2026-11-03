@@ -59,8 +59,8 @@ It is not a cloud-hosted MCP endpoint.
 | --- | --- | --- | --- |
 | `boardreadyops_review_get` | `reviewId` | Allowlisted Review status, decision and current head/evidence digests; no release approval | Guarded in source; not deployed |
 | `boardreadyops_review_findings` | `reviewId`, `cursor?` | At most 30 current-run rule IDs, severity, kind and optional fingerprint, with opaque page cursor; no messages, paths or CAD | Guarded in source; not deployed |
-| `boardreadyops_review_footprint_summary` | `reviewId` | Consented source-bound digest/count facts, or `unavailable` | Planned |
-| `boardreadyops_evidence_get` | `evidenceId` | Metadata/hash and authorized in-app link, not raw design bytes | Planned |
+| `boardreadyops_review_footprint_summary` | `reviewId` | Previously consented client-reported digest/count facts, or `unavailable` | Guarded in source; not enabled |
+| `boardreadyops_evidence_get` | `evidenceId` | Current persisted Review revision digest/source SHA and authorized in-app Review link; no artifact bytes | Guarded in source; not enabled |
 
 Tool schemas must be drawn from the existing versioned contracts before implementation.
 Do not reuse local stdio filesystem inputs as remote MCP tool inputs.
@@ -927,3 +927,30 @@ Staging requires separate explicit authorization, disposable test data,
 independent database/volumes/keys and memory limits on the existing VPS.
 Do not set staging flags or change release switches on production services.
 Real cross-client acceptance and production release remain blocked.
+
+
+## 2026-11-03 — guarded remote read tool completion (#1248)
+
+PR #1380 adds current-Review-only, previously consented, **client-reported**
+PCB footprint counts and digests through `boardreadyops_review_footprint_summary`.
+A separate bounded `boardreadyops_evidence_get` accepts only a persisted
+`review_revisions.id` UUID, never a path, URL, or arbitrary artifact selector.
+It returns the *recorded* Review evidence digest, current head/base source SHA
+(when present), and the fixed, login-required `/reviews/:id` in-app route.
+The result says `verification: recorded-metadata-only`; it does **not**
+independently recompute evidence bytes, disclose CAD geometry, assert
+manufacturing approval, or create a sharing capability.
+
+`evidence_get` requires an independent `evidence:read` OAuth scope;
+`review:read` alone is not sufficient. On each request, the current
+user/repository GitHub authority and current Review identity are checked
+before and after the metadata lookup. Historical/superseded revisions,
+revoked access, changed head/digest or missing records fail closed with the
+same generic unavailable result; missing data is never treated as verified.
+No new table, stored bytes, external service, recurring workload or
+release-switch change is required.
+
+**Release remains on HOLD:** the publicly deployed remote MCP and OAuth
+discovery endpoints stay disabled until independent real OAuth permission,
+client interoperability and security acceptance. Source readiness is not
+ChatGPT or Claude connector availability.

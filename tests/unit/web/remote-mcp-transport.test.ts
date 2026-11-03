@@ -550,6 +550,107 @@ describe("MCP v2 stateless web request boundary", () => {
     expect(openDb).not.toHaveBeenCalled();
   });
 
+  it("advertises evidence_get only for evidence:read grants, without opening storage", async () => {
+    const openDb = vi.fn();
+    const config = { openDb, checkCurrentPermission: vi.fn() };
+    const evidenceOnly = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/list"),
+      { githubUserId: ghUser, grantId: jti, scopes: ["evidence:read"] },
+      config,
+    );
+    const evidenceCatalog = await evidenceOnly.text();
+    expect(evidenceCatalog).toContain("boardreadyops_evidence_get");
+    expect(evidenceCatalog).not.toContain("boardreadyops_review_get");
+    expect(evidenceCatalog).not.toContain("boardreadyops_review_findings");
+    const reviewOnly = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/list"),
+      { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] },
+      config,
+    );
+    expect(await reviewOnly.text()).not.toContain("boardreadyops_evidence_get");
+    expect(openDb).not.toHaveBeenCalled();
+  });
+
+  it("returns only the persisted current revision digest and trusted Review link via actual MCP tools/call", async () => {
+    const evidenceId = "c68e521d-fc45-4dfa-942d-776e9fe76838";
+    const digest = "9".repeat(64);
+    const query = vi.fn(async (sql: string, args?: unknown[]) => {
+      if (sql.includes("from review_revisions as requested_revision")) {
+        expect(args).toEqual([evidenceId]);
+        return { rows: [{ review_id: reviewId }] };
+      }
+      if (sql.includes("from reviews"))
+        return {
+          rows: [
+            {
+              id: reviewId,
+              repository_id: "PRIVATE_INTERNAL_REPO",
+              head_run_id: "current-head-run",
+              current_revision_id: evidenceId,
+              status: "active",
+              decision: "pending",
+              owner: "PRIVATE_OWNER",
+              name: "PRIVATE_REPO",
+              github_repo_id: "456",
+              github_installation_id: "789",
+            },
+          ],
+        };
+      if (sql.includes("from review_revisions"))
+        return {
+          rows: [
+            {
+              head_commit_sha: "a".repeat(40),
+              base_commit_sha: null,
+              evidence_digest: digest,
+            },
+          ],
+        };
+      throw new Error("Unexpected query");
+    });
+    const close = vi.fn().mockResolvedValue(undefined);
+    const checkCurrentPermission = vi.fn().mockResolvedValue(true);
+    const response = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/call", { name: "boardreadyops_evidence_get", arguments: { evidenceId } }),
+      { githubUserId: ghUser, grantId: jti, scopes: ["evidence:read"] },
+      { openDb: vi.fn().mockResolvedValue({ query, close }), checkCurrentPermission },
+    );
+    const text = await response.text();
+    expect(response.status, text).toBe(200);
+    expect(text).toContain(evidenceId);
+    expect(text).toContain(digest);
+    expect(text).toContain(`https://boardreadyops.com/reviews/${reviewId}`);
+    expect(text).toContain("recorded-metadata-only");
+    expect(text).not.toContain("PRIVATE_OWNER");
+    expect(text).not.toContain("PRIVATE_REPO");
+    expect(text).not.toContain("PRIVATE_INTERNAL_REPO");
+    expect(text).not.toContain("current-head-run");
+    expect(checkCurrentPermission).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("rejects malformed evidence selectors and grants with insufficient scope before any DB open", async () => {
+    const openDb = vi.fn();
+    const config = { openDb, checkCurrentPermission: vi.fn() };
+    const principal = { githubUserId: ghUser, grantId: jti, scopes: ["evidence:read"] };
+    const badSelector = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/call", { name: "boardreadyops_evidence_get", arguments: { evidenceId: "../../secret" } }),
+      principal,
+      config,
+    );
+    expect(await badSelector.text()).not.toContain("recorded-metadata-only");
+    const wrongScope = await handleAuthorizedRemoteMcpHttp(
+      mcpRequest("tools/call", {
+        name: "boardreadyops_evidence_get",
+        arguments: { evidenceId: "c68e521d-fc45-4dfa-942d-776e9fe76838" },
+      }),
+      { ...principal, scopes: ["review:read"] },
+      config,
+    );
+    expect(await wrongScope.text()).not.toContain("recorded-metadata-only");
+    expect(openDb).not.toHaveBeenCalled();
+  });
+
   it("does not advertise or invoke Review tools for evidence-only OAuth grants", async () => {
     const openDb = vi.fn();
     const principal = { githubUserId: ghUser, grantId: jti, scopes: ["evidence:read"] };

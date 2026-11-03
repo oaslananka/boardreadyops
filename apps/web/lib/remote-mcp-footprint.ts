@@ -4,6 +4,7 @@ import {
   type CheckLiveRepositoryPermission,
   loadAuthorizedRemoteReviewSnapshot,
   type RemoteMcpPrincipal,
+  sameAuthorizedRemoteReviewSnapshot,
 } from "./remote-mcp-access.js";
 import { remoteFootprintFacts } from "./remote-mcp-foundation.js";
 
@@ -29,17 +30,6 @@ export async function loadAuthorizedRemoteFootprintSummary(
     before.facts.headCommitSha,
   );
   const current = await loadAuthorizedRemoteReviewSnapshot(db, principal, reviewId, checkCurrentPermission);
-  if (
-    !current ||
-    current.repositoryId !== before.repositoryId ||
-    current.revisionId !== before.revisionId ||
-    current.headRunId !== before.headRunId ||
-    current.baseCommitSha !== before.baseCommitSha ||
-    current.facts.headCommitSha !== before.facts.headCommitSha ||
-    current.facts.evidenceDigest !== before.facts.evidenceDigest ||
-    current.facts.status !== before.facts.status ||
-    current.facts.decision !== before.facts.decision
-  )
-    return null;
+  if (!sameAuthorizedRemoteReviewSnapshot(before, current)) return null;
   return remoteFootprintFacts(summary);
 }
