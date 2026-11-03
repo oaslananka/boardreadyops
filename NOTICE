@@ -879,7 +879,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@modelcontextprotocol/ext-apps@2.0.3`
   - Description: MCP Apps SDK — Enable MCP servers to display interactive user interfaces in conversational clients.
   - Homepage: https://github.com/modelcontextprotocol/ext-apps
-- `@modelcontextprotocol/sdk@1.32.0`, `@modelcontextprotocol/sdk@1.32.1`
+- `@modelcontextprotocol/sdk@1.32.0`, `@modelcontextprotocol/sdk@1.32.2`
   - Description: Model Context Protocol implementation for TypeScript
   - Homepage: https://modelcontextprotocol.io
 - `@next/env@16.4.1`
