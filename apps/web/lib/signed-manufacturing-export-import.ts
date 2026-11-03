@@ -49,7 +49,7 @@ export type SignedExportImportDependencies = {
   id(): string;
 };
 
-export function signedManufacturingExportAudience(
+function signedManufacturingExportAudience(
   expected: Pick<ResultOidcExpectations, "runId" | "executionAttemptId" | "targetSha">,
 ): string {
   if (!expected.executionAttemptId) throw new Error("signed manufacturing export requires an execution attempt");
@@ -173,7 +173,7 @@ function configuredQueryExecutor(
   return createPgQueryExecutor({ connectionString, max: Number(environment.DATABASE_POOL_MAX ?? 5) });
 }
 
-export function createSignedExportImportDependencies(
+function createSignedExportImportDependencies(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): SignedExportImportDependencies {
   return {

@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
  */
 
 const migrationsDir = join(process.cwd(), "packages/db/migrations");
-const createTablePattern = /create\s+table\s+(?:if\s+not\s+exists\s+)?"?([a-z_][a-z0-9_]*)"?/giu;
+const createTablePattern = /create\s+table\s+(?:if\s+not\s+exists\s+)?(?:[a-z_][a-z0-9_]*\.)?"?([a-z_][a-z0-9_]*)"?/giu;
 
 describe("migration table ownership", () => {
   it("never lets two migrations create the same table", async () => {
