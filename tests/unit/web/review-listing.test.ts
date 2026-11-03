@@ -1,7 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
 import { loadViewerReviews, reviewFixturesEnabled } from "../../../apps/web/lib/review-listing.js";
 import type { UserSession } from "../../../apps/web/lib/user-session.js";
+
+const listingQuery = vi.hoisted(() => vi.fn());
+const listingClose = vi.hoisted(() => vi.fn());
+
+vi.mock("@boardreadyops/db/pg-executor", () => ({
+  createPgQueryExecutor: () => ({ query: listingQuery, close: listingClose }),
+}));
 
 const session = { login: "octocat", installationIds: [42] } as unknown as UserSession;
 
@@ -50,5 +57,46 @@ describe("loadViewerReviews", () => {
     const noInstallations = { login: "octocat", installationIds: [] } as unknown as UserSession;
     await expect(loadViewerReviews(noInstallations, {}, withDatabase)).resolves.toEqual({ state: "signed-out" });
     await expect(loadViewerReviews(undefined, {}, withDatabase)).resolves.toEqual({ state: "signed-out" });
+  });
+});
+
+describe("loadViewerReviews current-revision-generated titles", () => {
+  beforeEach(() => {
+    listingQuery.mockReset();
+    listingClose.mockReset();
+  });
+
+  it.each([
+    ["Review for 6aa49e71", "8714bbeb".padEnd(40, "0"), "Review for 8714bbeb"],
+    ["Custom hardware design review", "8714bbeb".padEnd(40, "0"), "Custom hardware design review"],
+    ["Review for 6aa49e71", null, "Review for 6aa49e71"],
+    ["Review for 6aa49e71", "malformed", "Review for 6aa49e71"],
+  ])("renders stored title %s and current SHA %s as %s", async (storedTitle, headSha, expectedTitle) => {
+    listingQuery.mockResolvedValue({
+      rows: [
+        {
+          id: "review_1",
+          repository_id: "repo_1",
+          owner: "acme",
+          repository_name: "pcb",
+          pull_request_number: 10,
+          title: storedTitle,
+          current_head_commit_sha: headSha,
+          status: "active",
+          decision: "pending",
+          created_by: "alice",
+          updated_at: "2026-11-02T12:00:00Z",
+        },
+      ],
+    });
+
+    const result = await loadViewerReviews(session, {}, withDatabase);
+    expect(result).toMatchObject({ state: "ok", reviews: [{ title: expectedTitle }] });
+    expect(listingQuery).toHaveBeenCalledTimes(1);
+    const [sql, params] = listingQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("current_revision.review_id = reviews.id");
+    expect(sql).toContain("current_revision.head_commit_sha as current_head_commit_sha");
+    expect(params).toEqual([[42], 50]);
+    expect(listingClose).toHaveBeenCalledOnce();
   });
 });

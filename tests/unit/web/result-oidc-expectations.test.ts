@@ -18,7 +18,13 @@ describe("result OIDC repository binding", () => {
           owner: "octo-org",
           name: "hardware-board",
           github_repo_id: "98765",
+          github_workflow_dispatch_id: "29121986402",
           default_branch: "trunk",
+          repository_record_id: "repo-db-123",
+          installation_id: "install-db-123",
+          attempt_number: 2,
+          run_status: "running",
+          attempt_status: "in_progress",
           commit_sha: "a".repeat(40),
           trust_mode: "safe",
           safe_mode_reasons: ["private-repository"],
@@ -29,8 +35,13 @@ describe("result OIDC repository binding", () => {
     await expect(resultOidcExpectations({ query }, runId, executionAttemptId)).resolves.toEqual({
       runId,
       executionAttemptId,
+      repositoryRecordId: "repo-db-123",
+      installationId: "install-db-123",
+      attemptNumber: 2,
+      workflowPath: ".github/workflows/readiness-runner.yml",
       repository: "octo-org/hardware-board",
       repositoryId: "98765",
+      githubRunId: "29121986402",
       targetSha: "a".repeat(40),
       workflowRef: "octo-org/hardware-board/.github/workflows/readiness-runner.yml@refs/heads/trunk",
       ref: "refs/heads/trunk",
@@ -48,13 +59,48 @@ describe("result OIDC repository binding", () => {
     expect(query.mock.calls[0]?.[0]).toContain("release_runs.safe_mode_reasons");
   });
 
+  it("preserves completed callback replay while requiring an active attempt for manufacturing import", async () => {
+    const completedRow = {
+      owner: "octo-org",
+      name: "hardware-board",
+      github_repo_id: "98765",
+      github_workflow_dispatch_id: "29121986402",
+      default_branch: "trunk",
+      repository_record_id: "repo-db-123",
+      installation_id: "install-db-123",
+      attempt_number: 2,
+      run_status: "completed",
+      attempt_status: "completed",
+      commit_sha: "a".repeat(40),
+      trust_mode: "standard",
+      safe_mode_reasons: [],
+    };
+    const query = vi.fn(async () => ({ rows: [completedRow] }));
+
+    await expect(resultOidcExpectations({ query }, runId, executionAttemptId)).resolves.toMatchObject({
+      runId,
+      githubRunId: "29121986402",
+      targetSha: "a".repeat(40),
+    });
+    await expect(
+      resultOidcExpectations({ query }, runId, executionAttemptId, { requireActiveAttempt: true }),
+    ).resolves.toBeUndefined();
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
   it("accepts only canonical trust snapshots", async () => {
     const query = vi.fn();
     const baseRow = {
       owner: "octo-org",
       name: "hardware-board",
       github_repo_id: "98765",
+      github_workflow_dispatch_id: "29121986402",
       default_branch: "trunk",
+      repository_record_id: "repo-db-123",
+      installation_id: "install-db-123",
+      attempt_number: 2,
+      run_status: "running",
+      attempt_status: "in_progress",
       commit_sha: "a".repeat(40),
     };
 
@@ -72,8 +118,36 @@ describe("result OIDC repository binding", () => {
       { trust_mode: "safe", safe_mode_reasons: ["unknown"] },
       { trust_mode: "safe", safe_mode_reasons: ["private-repository", "private-repository"] },
       { trust_mode: "safe", safe_mode_reasons: ["private-repository", "draft-pull-request"] },
+      { run_status: "completed" },
+      { attempt_status: "failed" },
+      { attempt_number: 0 },
     ]) {
       query.mockResolvedValueOnce({ rows: [{ ...baseRow, ...trust }] });
+      const activeOnly = "run_status" in trust || "attempt_status" in trust;
+      await expect(
+        resultOidcExpectations(
+          { query },
+          runId,
+          executionAttemptId,
+          activeOnly ? { requireActiveAttempt: true } : undefined,
+        ),
+      ).resolves.toBeUndefined();
+    }
+  });
+
+  it("fails closed when the persisted GitHub workflow run ID is missing or malformed", async () => {
+    const baseRow = {
+      owner: "octo-org",
+      name: "hardware-board",
+      github_repo_id: "98765",
+      default_branch: "trunk",
+      commit_sha: "a".repeat(40),
+      trust_mode: "standard",
+      safe_mode_reasons: [],
+    };
+    for (const githubRunId of [undefined, "", "workflow-owner", "0", "-1", "123 456"]) {
+      const row = { ...baseRow, ...(githubRunId === undefined ? {} : { github_workflow_dispatch_id: githubRunId }) };
+      const query = vi.fn(async () => ({ rows: [row] }));
       await expect(resultOidcExpectations({ query }, runId, executionAttemptId)).resolves.toBeUndefined();
     }
   });
@@ -85,6 +159,7 @@ describe("result OIDC repository binding", () => {
           owner: "octo-org",
           name: "hardware-board",
           github_repo_id: "98765",
+          github_workflow_dispatch_id: "29121986402",
           default_branch: "trunk",
           commit_sha: "main",
           trust_mode: "standard",

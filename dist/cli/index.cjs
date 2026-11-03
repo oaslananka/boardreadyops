@@ -47168,7 +47168,7 @@ var footprintMismatchRule = rule(
       (row) => finding(context, {
         ruleId: "bom.footprint-mismatch",
         severity: configuredSeverity(context, "bom.footprint-mismatch", "medium"),
-        message: `${row.reference} BOM footprint ${row.footprint} does not match PCB footprint ${pcbFootprints.get(row.reference)?.footprint}.`,
+        message: pcbFootprints.get(row.reference)?.footprint ? `${row.reference} BOM footprint ${row.footprint} does not match PCB footprint ${pcbFootprints.get(row.reference)?.footprint}.` : `${row.reference} BOM footprint ${row.footprint} cannot be compared: the PCB footprint assignment is missing.`,
         path: row.sourcePath,
         kind: "bom",
         line: row.line,
@@ -78131,8 +78131,82 @@ async function prepareExportAttestationChecksums(options) {
   if (!shaPattern.test(options.reviewedSha)) throw new Error("Expected full lowercase reviewed commit SHA.");
   return (await prepareInventory(options.root, options.manifestPath, options.reviewedSha)).checksums;
 }
+async function prepareAttestedArchiveInventory(root, manifestPath, reviewedSha) {
+  const absoluteRoot = await import_promises19.default.realpath(root);
+  const absoluteManifest = import_node_path56.default.resolve(absoluteRoot, manifestPath);
+  const relativeManifest = import_node_path56.default.relative(absoluteRoot, absoluteManifest).split(import_node_path56.default.sep).join("/");
+  if (!allowedSubjectName(relativeManifest) || import_node_path56.default.basename(absoluteManifest) !== "manifest.json") {
+    throw new Error("Attested export requires a canonical in-root manifest.json.");
+  }
+  await assertCanonicalSubjectPath(absoluteManifest);
+  const raw = await import_promises19.default.readFile(absoluteManifest, "utf8");
+  const manifest = JSON.parse(raw);
+  if (manifest.kind !== "boardreadyops.export-provenance" || manifest.schemaVersion !== 1 || manifest.tool?.name !== "boardreadyops" || manifest.git?.sha !== reviewedSha || manifest.git.dirty !== false || manifest.sourceSnapshot !== "stable" || !digestPattern.test(manifest.sourceFingerprint ?? "") || !["gerbers", "drill", "bom", "positions"].every(
+    (kind) => manifest.steps?.some((step) => step.kind === kind && step.status === "generated" && (step.files ?? 0) > 0)
+  )) {
+    throw new Error("Signed export manifest is not a complete, clean reviewed-source export.");
+  }
+  const requiredKinds = ["gerber", "drill", "bom", "cpl"];
+  const names = /* @__PURE__ */ new Map();
+  names.set(relativeManifest, await fileSha256(absoluteManifest));
+  if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length < requiredKinds.length) {
+    throw new Error("Signed export has no complete manufacturing subject inventory.");
+  }
+  const manifestDir = import_node_path56.default.dirname(absoluteManifest);
+  const actualFiles = /* @__PURE__ */ new Set([absoluteManifest]);
+  const pending = [manifestDir];
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    if (!directory) continue;
+    await assertCanonicalSubjectPath(directory);
+    const entries = await import_promises19.default.readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      const absolute = import_node_path56.default.join(directory, entry.name);
+      if (entry.isSymbolicLink()) throw new Error("Signed export contains a symlink.");
+      if (entry.isDirectory()) {
+        pending.push(absolute);
+        continue;
+      }
+      if (!entry.isFile()) throw new Error("Signed export contains a non-regular file.");
+      actualFiles.add(absolute);
+    }
+  }
+  const declaredFiles = /* @__PURE__ */ new Set([absoluteManifest]);
+  const kinds = /* @__PURE__ */ new Set();
+  for (const item2 of manifest.artifacts) {
+    if (!item2 || typeof item2.path !== "string" || !allowedSubjectName(item2.path) || !digestPattern.test(item2.sha256) || !Number.isSafeInteger(item2.bytes) || item2.bytes <= 0 || typeof item2.kind !== "string") {
+      throw new Error("Signed export contains an invalid subject declaration.");
+    }
+    if (kinds.has(`${item2.kind}\0${item2.path}`))
+      throw new Error("Signed export contains duplicate subject declarations.");
+    kinds.add(`${item2.kind}\0${item2.path}`);
+    const absolute = import_node_path56.default.resolve(manifestDir, item2.path);
+    if (!allowedSubjectName(import_node_path56.default.relative(absoluteRoot, absolute).split(import_node_path56.default.sep).join("/"))) {
+      throw new Error("Signed export subject escaped the archive root.");
+    }
+    await assertCanonicalSubjectPath(absolute);
+    const stat5 = await import_promises19.default.stat(absolute);
+    if (!stat5.isFile() || stat5.size !== item2.bytes) throw new Error("Signed export subject size mismatch.");
+    const actual = await fileSha256(absolute);
+    if (actual !== item2.sha256) throw new Error("Signed export subject digest mismatch.");
+    const relative = import_node_path56.default.relative(absoluteRoot, absolute).split(import_node_path56.default.sep).join("/");
+    if (names.has(relative)) throw new Error("Signed export contains duplicate subject paths.");
+    names.set(relative, actual);
+    declaredFiles.add(absolute);
+  }
+  if (!requiredKinds.every((kind) => manifest.artifacts?.some((item2) => item2.kind === kind) === true)) {
+    throw new Error("Signed export is missing Gerber, drill, BOM or CPL subjects.");
+  }
+  if (actualFiles.size !== declaredFiles.size || [...actualFiles].some((file3) => !declaredFiles.has(file3))) {
+    throw new Error("Signed export archive contains undeclared or missing files.");
+  }
+  if (names.size > 1024) throw new Error("GitHub attestations support at most 1024 subjects.");
+  const checksums = `${[...names].sort(([a], [b]) => a.localeCompare(b)).map(([name, hash3]) => `${hash3}  ${name}`).join("\n")}
+`;
+  return { names, checksums, manifestPath: absoluteManifest };
+}
 function validExpectation(e) {
-  return repoPattern.test(e.repository) && /^\d+$/u.test(e.repositoryId) && shaPattern.test(e.reviewedSha) && // Only a protected-branch workflow_dispatch is a supported export signer.
+  return repoPattern.test(e.repository) && /^\d+$/u.test(e.repositoryId) && shaPattern.test(e.reviewedSha) && (e.signerSha === void 0 || shaPattern.test(e.signerSha)) && // Only a protected-branch workflow_dispatch is a supported export signer.
   // A signed push/tag/PR run cannot fulfill the target-repository contract.
   /^refs\/heads\/[^\r\n]+$/u.test(e.sourceRef) && /^\.github\/workflows\/[a-zA-Z0-9_.-]+\.ya?ml$/u.test(e.workflowPath) && e.event === "workflow_dispatch" && /^[1-9]\d*$/u.test(e.runId) && Number.isSafeInteger(e.runAttempt) && e.runAttempt > 0;
 }
@@ -78153,7 +78227,7 @@ function matchesVerifiedResult(value, e, inventory) {
   const san = cert?.subjectAlternativeName;
   const signerSAN = typeof san === "string" ? san : recordAt(cert, "subjectAlternativeName")?.value;
   const runUri = `https://github.com/${e.repository}/actions/runs/${e.runId}/attempts/${e.runAttempt}`;
-  if (cert?.issuer !== oidcIssuer || cert.sourceRepositoryURI !== `https://github.com/${e.repository}` || cert.sourceRepositoryIdentifier !== e.repositoryId || cert.sourceRepositoryDigest !== e.reviewedSha || cert.sourceRepositoryRef !== e.sourceRef || cert.runInvocationURI !== runUri || cert.buildSignerURI !== workflowUri || cert.buildSignerDigest !== e.reviewedSha || cert.runnerEnvironment !== "github-hosted" || cert.buildTrigger !== e.event || signerSAN !== workflowUri || statement?.predicateType !== slsaPredicate || !Array.isArray(subjects) || subjects.length !== inventory.names.size)
+  if (cert?.issuer !== oidcIssuer || cert.sourceRepositoryURI !== `https://github.com/${e.repository}` || cert.sourceRepositoryIdentifier !== e.repositoryId || cert.sourceRepositoryDigest !== e.reviewedSha || cert.githubWorkflowSHA !== (e.signerSha ?? e.reviewedSha) || cert.sourceRepositoryRef !== e.sourceRef || cert.runInvocationURI !== runUri || cert.buildSignerURI !== workflowUri || cert.buildSignerDigest !== (e.signerSha ?? e.reviewedSha) || cert.runnerEnvironment !== "github-hosted" || cert.buildTrigger !== e.event || signerSAN !== workflowUri || statement?.predicateType !== slsaPredicate || !Array.isArray(subjects) || subjects.length !== inventory.names.size)
     return false;
   const remaining = new Map(inventory.names);
   for (const subject of subjects) {
@@ -78170,7 +78244,7 @@ async function verifyReviewedExportAttestation(options) {
   if (!validExpectation(e)) return rejected("Invalid independently trusted source/run expectation.");
   let inventory;
   try {
-    inventory = await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
+    inventory = options.sourceCheckout === false ? await prepareAttestedArchiveInventory(options.root, options.manifestPath, e.reviewedSha) : await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
   } catch {
     return rejected("Export source, manifest or output inventory failed closed.");
   }
@@ -78185,7 +78259,7 @@ async function verifyReviewedExportAttestation(options) {
     "--source-digest",
     e.reviewedSha,
     "--signer-digest",
-    e.reviewedSha,
+    e.signerSha ?? e.reviewedSha,
     "--source-ref",
     e.sourceRef,
     "--cert-oidc-issuer",
@@ -78221,7 +78295,7 @@ async function verifyReviewedExportAttestation(options) {
     );
   }
   try {
-    const afterVerification = await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
+    const afterVerification = options.sourceCheckout === false ? await prepareAttestedArchiveInventory(options.root, options.manifestPath, e.reviewedSha) : await prepareInventory(options.root, options.manifestPath, e.reviewedSha);
     if (afterVerification.manifestPath !== inventory.manifestPath || afterVerification.checksums !== inventory.checksums) {
       return rejected("Export source or subject inventory changed during attestation verification.");
     }

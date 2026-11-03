@@ -11,8 +11,13 @@ type ResultSafeModeReason = "draft-pull-request" | "fork-pull-request" | "privat
 export type ResultOidcExpectations = {
   runId: string;
   executionAttemptId?: string;
+  repositoryRecordId: string;
+  installationId: string;
+  attemptNumber: number;
+  workflowPath: string;
   repository: string;
   repositoryId: string;
+  githubRunId: string;
   targetSha: string;
   workflowRef: string;
   ref: string;
@@ -62,6 +67,7 @@ export async function resultOidcExpectations(
   executor: SqlQueryExecutor,
   runId: string,
   executionAttemptId: string | undefined,
+  options: { requireActiveAttempt?: boolean } = {},
 ): Promise<ResultOidcExpectations | undefined> {
   const workflow = configuredGitHubActionsWorkflow();
   if (!workflow) return undefined;
@@ -71,6 +77,12 @@ export async function resultOidcExpectations(
             repositories.name,
             repositories.github_repo_id,
             repositories.default_branch,
+            repositories.id as repository_record_id,
+            repositories.installation_id,
+            release_run_attempts.attempt_number,
+            release_run_attempts.github_workflow_dispatch_id,
+            release_runs.status as run_status,
+            release_run_attempts.status as attempt_status,
             release_runs.commit_sha,
             release_runs.trust_mode,
             release_runs.safe_mode_reasons
@@ -91,10 +103,33 @@ export async function resultOidcExpectations(
   const owner = stringCell(row, "owner");
   const name = stringCell(row, "name");
   const repositoryId = stringCell(row, "github_repo_id");
+  const githubRunId = stringCell(row, "github_workflow_dispatch_id");
   const defaultBranch = stringCell(row, "default_branch");
+  const repositoryRecordId = stringCell(row, "repository_record_id");
+  const installationId = stringCell(row, "installation_id");
+  const attemptNumber = typeof row.attempt_number === "number" ? row.attempt_number : Number(row.attempt_number);
+  const runStatus = stringCell(row, "run_status");
+  const attemptStatus = stringCell(row, "attempt_status");
   const sha = stringCell(row, "commit_sha");
   const trust = trustSnapshot(row);
-  if (!owner || !name || !repositoryId || !defaultBranch || !sha || !exactCommitShaPattern.test(sha) || !trust) {
+  if (
+    !owner ||
+    !name ||
+    !repositoryId ||
+    !githubRunId ||
+    !/^[1-9]\d{0,19}$/u.test(githubRunId) ||
+    !defaultBranch ||
+    !repositoryRecordId ||
+    !installationId ||
+    !Number.isSafeInteger(attemptNumber) ||
+    attemptNumber < 1 ||
+    (options.requireActiveAttempt === true &&
+      (!["dispatched", "running"].includes(runStatus ?? "") ||
+        !["dispatched", "in_progress", "uploading_artifacts", "reporting"].includes(attemptStatus ?? ""))) ||
+    !sha ||
+    !exactCommitShaPattern.test(sha) ||
+    !trust
+  ) {
     return undefined;
   }
 
@@ -109,8 +144,13 @@ export async function resultOidcExpectations(
   return {
     runId,
     ...(executionAttemptId === undefined ? {} : { executionAttemptId }),
+    repositoryRecordId,
+    installationId,
+    attemptNumber,
+    workflowPath: `.github/workflows/${workflow}`,
     repository,
     repositoryId,
+    githubRunId,
     targetSha: sha,
     workflowRef,
     ref,

@@ -78,6 +78,16 @@ export interface RevisionRecord {
   normalizedSummary: Record<string, unknown>;
   validationRunId?: string | undefined;
   validationArtifactId?: string | undefined;
+  sourceBinding?: "source-bound-verified" | "not-established" | undefined;
+  sourceEvidence?:
+    | {
+        signerSha: string;
+        workflowPath: string;
+        sourceRef: string;
+        subjectCount: number;
+        verifiedAt: string;
+      }
+    | undefined;
   createdAt: string;
 }
 
@@ -91,6 +101,16 @@ export interface ValidatedRevisionCandidate {
   artifactId: string;
   artifactName: string;
   bundleSha256: string;
+  sourceBinding: "source-bound-verified" | "not-established";
+  sourceEvidence?:
+    | {
+        signerSha: string;
+        workflowPath: string;
+        sourceRef: string;
+        subjectCount: number;
+        verifiedAt: string;
+      }
+    | undefined;
 }
 
 /** A revision with the project it belongs to, for surfaces that list across a workspace. */
@@ -166,6 +186,7 @@ type RevisionRow = {
   normalized_summary: Record<string, unknown> | string;
   validation_run_id: string | null;
   validation_artifact_id: string | null;
+  source_binding_verified?: boolean;
   created_at: string | Date;
 };
 
@@ -218,6 +239,49 @@ function mapProject(row: ProjectRow): ProjectRecord {
   };
 }
 
+function sourceBindingVerifiedExpression(revisionAlias: string): string {
+  return `exists (
+    select 1
+      from release_runs as evidence_run
+      join repositories as evidence_repository
+        on evidence_repository.id = evidence_run.repository_id
+      join projects as evidence_project
+        on evidence_project.id = ${revisionAlias}.project_id
+       and lower(evidence_repository.owner || '/' || evidence_repository.name) =
+           lower(evidence_project.github_repo_full_name)
+      join release_run_attempts as evidence_attempt
+        on evidence_attempt.id = evidence_run.execution_attempt_id
+       and evidence_attempt.run_id = evidence_run.id
+       and evidence_attempt.status = 'completed'
+       and evidence_attempt.github_workflow_dispatch_id is not null
+      join artifacts as evidence_artifact
+        on evidence_artifact.id = ${revisionAlias}.validation_artifact_id
+       and evidence_artifact.run_id = evidence_run.id
+       and evidence_artifact.execution_attempt_id = evidence_run.execution_attempt_id
+       and evidence_artifact.role = 'manufacturing'
+       and evidence_artifact.kind = 'archive'
+       and evidence_artifact.bytes > 0
+      join signed_manufacturing_export_evidence as source_proof
+        on source_proof.artifact_id = evidence_artifact.id
+       and source_proof.run_id = evidence_run.id
+       and source_proof.execution_attempt_id = evidence_run.execution_attempt_id
+       and source_proof.repository_id = evidence_repository.id
+       and source_proof.installation_id = evidence_repository.installation_id
+       and source_proof.github_repository_id = evidence_repository.github_repo_id
+       and source_proof.github_run_id = evidence_attempt.github_workflow_dispatch_id
+       and source_proof.run_attempt = 1
+       and source_proof.source_sha = evidence_run.commit_sha
+       and source_proof.source_ref = evidence_run.ref
+     where evidence_run.id = ${revisionAlias}.validation_run_id
+       and evidence_run.status = 'completed'
+       and evidence_run.decision = 'pass'
+       and ${signedRunnerPassSql("evidence_run")}
+       and evidence_run.completed_at is not null
+       and ${revisionAlias}.commit_sha = evidence_run.commit_sha
+       and ${revisionAlias}.bundle_sha256 = evidence_artifact.sha256
+  )`;
+}
+
 function mapRevision(row: RevisionRow): RevisionRecord {
   const summary =
     typeof row.normalized_summary === "string" ? JSON.parse(row.normalized_summary) : (row.normalized_summary ?? {});
@@ -231,6 +295,12 @@ function mapRevision(row: RevisionRow): RevisionRecord {
     normalizedSummary: summary,
     ...(typeof row.validation_run_id === "string" ? { validationRunId: row.validation_run_id } : {}),
     ...(typeof row.validation_artifact_id === "string" ? { validationArtifactId: row.validation_artifact_id } : {}),
+    ...(typeof row.validation_run_id === "string" && typeof row.validation_artifact_id === "string"
+      ? {
+          sourceBinding:
+            row.source_binding_verified === true ? ("source-bound-verified" as const) : ("not-established" as const),
+        }
+      : {}),
     createdAt: new Date(row.created_at).toISOString(),
   };
 }
@@ -651,7 +721,8 @@ export class WorkspaceStore {
   async getRevisionById(id: string): Promise<RevisionRecord | null> {
     const result = (await this.executor.query(
       `select id, project_id, revision_label, source_kind, commit_sha, bundle_sha256, normalized_summary,
-              validation_run_id, validation_artifact_id, created_at
+              validation_run_id, validation_artifact_id, created_at,
+              ${sourceBindingVerifiedExpression("revisions")} as source_binding_verified
        from revisions
        where id = $1`,
       [id],
@@ -667,7 +738,8 @@ export class WorkspaceStore {
       `select revisions.id, revisions.project_id, revisions.revision_label, revisions.source_kind,
               revisions.commit_sha, revisions.bundle_sha256, revisions.normalized_summary,
               revisions.validation_run_id, revisions.validation_artifact_id,
-              revisions.created_at, projects.name as project_name
+              revisions.created_at, projects.name as project_name,
+              ${sourceBindingVerifiedExpression("revisions")} as source_binding_verified
          from revisions
          join projects on projects.id = revisions.project_id
         where projects.workspace_id = $1
@@ -698,7 +770,12 @@ export class WorkspaceStore {
               release_runs.completed_at,
               artifacts.id as artifact_id,
               artifacts.name as artifact_name,
-              artifacts.sha256 as bundle_sha256
+              artifacts.sha256 as bundle_sha256,
+              evidence.signer_sha,
+              evidence.workflow_path,
+              evidence.source_ref,
+              evidence.subject_count,
+              evidence.verified_at
          from projects
          join repositories
            on lower(repositories.owner || '/' || repositories.name) = lower(projects.github_repo_full_name)
@@ -708,12 +785,29 @@ export class WorkspaceStore {
           and release_runs.decision = 'pass'
           and ${signedRunnerPassSql("release_runs")}
           and release_runs.completed_at is not null
+         join release_run_attempts as attempt
+           on attempt.id = release_runs.execution_attempt_id
+          and attempt.run_id = release_runs.id
+          and attempt.status = 'completed'
+          and attempt.github_workflow_dispatch_id is not null
          join artifacts
            on artifacts.run_id = release_runs.id
+          and artifacts.execution_attempt_id = release_runs.execution_attempt_id
           and artifacts.role = 'manufacturing'
           and artifacts.kind = 'archive'
           and artifacts.bytes > 0
           and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+         join signed_manufacturing_export_evidence as evidence
+           on evidence.artifact_id = artifacts.id
+          and evidence.run_id = release_runs.id
+          and evidence.execution_attempt_id = release_runs.execution_attempt_id
+          and evidence.repository_id = repositories.id
+          and evidence.installation_id = repositories.installation_id
+          and evidence.github_repository_id = repositories.github_repo_id
+          and evidence.github_run_id = attempt.github_workflow_dispatch_id
+          and evidence.run_attempt = 1
+          and evidence.source_sha = release_runs.commit_sha
+          and evidence.source_ref = release_runs.ref
         where projects.workspace_id = $1
           and projects.github_repo_full_name is not null
           and not exists (
@@ -732,6 +826,11 @@ export class WorkspaceStore {
         artifact_id: string;
         artifact_name: string;
         bundle_sha256: string;
+        signer_sha: string;
+        workflow_path: string;
+        source_ref: string;
+        subject_count: number;
+        verified_at: string | Date;
       }[];
     };
 
@@ -744,6 +843,14 @@ export class WorkspaceStore {
       artifactId: row.artifact_id,
       artifactName: row.artifact_name,
       bundleSha256: row.bundle_sha256,
+      sourceBinding: "source-bound-verified" as const,
+      sourceEvidence: {
+        signerSha: row.signer_sha,
+        workflowPath: row.workflow_path,
+        sourceRef: row.source_ref,
+        subjectCount: row.subject_count,
+        verifiedAt: new Date(row.verified_at).toISOString(),
+      },
     }));
   }
 
@@ -778,7 +885,15 @@ export class WorkspaceStore {
                   'status', 'validated',
                   'runId', release_runs.id,
                   'artifactId', artifacts.id,
-                  'artifactName', artifacts.name
+                  'artifactName', artifacts.name,
+                  'sourceBinding', 'source-bound-verified',
+                  'sourceEvidence', jsonb_build_object(
+                    'signerSha', evidence.signer_sha,
+                    'workflowPath', evidence.workflow_path,
+                    'sourceRef', evidence.source_ref,
+                    'subjectCount', evidence.subject_count,
+                    'verifiedAt', evidence.verified_at
+                  )
                 )
               ),
               release_runs.id,
@@ -793,13 +908,30 @@ export class WorkspaceStore {
           and release_runs.decision = 'pass'
           and ${signedRunnerPassSql("release_runs")}
           and release_runs.completed_at is not null
+         join release_run_attempts as attempt
+           on attempt.id = release_runs.execution_attempt_id
+          and attempt.run_id = release_runs.id
+          and attempt.status = 'completed'
+          and attempt.github_workflow_dispatch_id is not null
          join artifacts
            on artifacts.run_id = release_runs.id
+          and artifacts.execution_attempt_id = release_runs.execution_attempt_id
           and artifacts.id = $5
           and artifacts.role = 'manufacturing'
           and artifacts.kind = 'archive'
           and artifacts.bytes > 0
           and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+         join signed_manufacturing_export_evidence as evidence
+           on evidence.artifact_id = artifacts.id
+          and evidence.run_id = release_runs.id
+          and evidence.execution_attempt_id = release_runs.execution_attempt_id
+          and evidence.repository_id = repositories.id
+          and evidence.installation_id = repositories.installation_id
+          and evidence.github_repository_id = repositories.github_repo_id
+          and evidence.github_run_id = attempt.github_workflow_dispatch_id
+          and evidence.run_attempt = 1
+          and evidence.source_sha = release_runs.commit_sha
+          and evidence.source_ref = release_runs.ref
         where projects.workspace_id = $2
           and projects.id = $3
           and projects.github_repo_full_name is not null
@@ -807,7 +939,7 @@ export class WorkspaceStore {
             select 1 from revisions where revisions.validation_artifact_id = artifacts.id
           )
        returning id, project_id, revision_label, source_kind, commit_sha, bundle_sha256, normalized_summary,
-                 validation_run_id, validation_artifact_id, created_at`,
+                 validation_run_id, validation_artifact_id, created_at, true as source_binding_verified`,
       [id, input.workspaceId, input.projectId, input.runId, input.artifactId, input.revisionLabel],
     )) as { rows?: RevisionRow[] };
 
@@ -828,12 +960,35 @@ export class WorkspaceStore {
           and release_runs.decision = 'pass'
           and ${signedRunnerPassSql("release_runs")}
           and release_runs.completed_at is not null
+         join projects
+           on projects.id = revisions.project_id
+         join repositories
+           on repositories.id = release_runs.repository_id
+          and lower(repositories.owner || '/' || repositories.name) =
+              lower(projects.github_repo_full_name)
+         join release_run_attempts as attempt
+           on attempt.id = release_runs.execution_attempt_id
+          and attempt.run_id = release_runs.id
+          and attempt.status = 'completed'
+          and attempt.github_workflow_dispatch_id is not null
          join artifacts
            on artifacts.id = revisions.validation_artifact_id
           and artifacts.run_id = release_runs.id
+          and artifacts.execution_attempt_id = release_runs.execution_attempt_id
           and artifacts.role = 'manufacturing'
           and artifacts.kind = 'archive'
           and artifacts.bytes > 0
+         join signed_manufacturing_export_evidence as evidence
+           on evidence.artifact_id = artifacts.id
+          and evidence.run_id = release_runs.id
+          and evidence.execution_attempt_id = release_runs.execution_attempt_id
+          and evidence.repository_id = repositories.id
+          and evidence.installation_id = repositories.installation_id
+          and evidence.github_repository_id = repositories.github_repo_id
+          and evidence.github_run_id = attempt.github_workflow_dispatch_id
+          and evidence.run_attempt = 1
+          and evidence.source_sha = release_runs.commit_sha
+          and evidence.source_ref = release_runs.ref
         where revisions.id = $1
           and revisions.bundle_sha256 = artifacts.sha256
           and revisions.commit_sha = release_runs.commit_sha
@@ -951,10 +1106,20 @@ export class WorkspaceStore {
          and run.status = 'completed' and run.decision = 'pass'
          and ${signedRunnerPassSql("run")}
          and run.completed_at is not null and run.commit_sha = revision.commit_sha
+       join release_run_attempts as attempt on attempt.id = run.execution_attempt_id
+         and attempt.run_id = run.id and attempt.status = 'completed'
+         and attempt.github_workflow_dispatch_id is not null
        join artifacts as artifact on artifact.id = share.artifact_id
-         and artifact.run_id = run.id and artifact.role = 'manufacturing'
+         and artifact.run_id = run.id and artifact.execution_attempt_id = run.execution_attempt_id
+         and artifact.role = 'manufacturing'
          and artifact.kind = 'archive' and artifact.bytes > 0
          and artifact.sha256 = revision.bundle_sha256
+       join signed_manufacturing_export_evidence as evidence on evidence.artifact_id = artifact.id
+         and evidence.run_id = run.id and evidence.execution_attempt_id = run.execution_attempt_id
+         and evidence.repository_id = repository.id and evidence.installation_id = repository.installation_id
+         and evidence.github_repository_id = repository.github_repo_id
+         and evidence.github_run_id = attempt.github_workflow_dispatch_id and evidence.run_attempt = 1
+         and evidence.source_sha = run.commit_sha and evidence.source_ref = run.ref
        where revision.id = $2
        returning id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes, created_at`,
       [id, input.revisionId, accessTokenHash, expiresAt, input.signedArchiveUrl ?? null, input.recipientNotes ?? null],

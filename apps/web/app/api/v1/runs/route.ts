@@ -313,7 +313,11 @@ export async function POST(request: Request): Promise<Response> {
 
       const runId = randomUUID();
       const now = new Date().toISOString();
-      const decision = payload.decision ?? (payload.findings.some((f) => f.severity === "error") ? "fail" : "pass");
+      // Review uploads use the same blocking severities as the Review UI: high and error.
+      // Never record a passing run for a source revision with unresolved blockers.
+      const hasBlockers = payload.findings.some((f) => f.severity === "error" || f.severity === "high");
+      let decision = payload.decision ?? "pass";
+      if (hasBlockers && decision === "pass") decision = "fail";
 
       await insertRunEntities(transaction, runId, repositoryId, idempotencyKey, payload, now, decision);
       const reviewUrl = await syncReviewForRun(transaction, repositoryId, runId, payload, auth.actorId);

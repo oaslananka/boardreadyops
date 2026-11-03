@@ -220,3 +220,61 @@ This does not automatically change release pack, production deployment,
 dashboard trust badges or customer GA acceptance. See
 [policy-engine](policy-engine.md) for the exact CLI invocation and the
 separate #154 two-private-installation requirement.
+
+## Separate the reviewed source commit from the signing workflow commit
+
+A workflow_dispatch run can check out a reviewed source commit that differs
+from the commit containing the target repository's workflow definition.
+GitHub's signed OIDC sha claim identifies the workflow ref commit (the
+signer), while the export manifest and its source fingerprint must identify
+the exact reviewed checkout. These values are not interchangeable.
+
+The verifier therefore accepts:
+- reviewedSha: the independently authorized target commit whose KiCad source
+  and generated outputs are hashed;
+- signerSha: the workflow definition commit, obtained only from the
+  cryptographically verified GitHub OIDC sha claim for the exact persisted
+  repository/workflow/ref/run/attempt.
+
+The CLI local policy path remains backward-compatible: when no separate
+signerSha is provided, it continues to expect the signer and source commit
+to be the same. An API integration must never accept signerSha from an
+unsigned request field or manifest. It must call
+verifyGitHubActionsOidcTokenClaims after loading the independent run
+expectations, then pass that verifier-returned workflowSha as signerSha.
+
+The composite export Action now verifies that Git HEAD equals the supplied
+reviewed-source-sha; it deliberately does not require this source SHA to
+equal GitHub's workflow-ref GITHUB_SHA. The signer SHA remains independently
+checked against the Sigstore certificate's githubWorkflowSHA and
+buildSignerDigest, while sourceRepositoryDigest must equal reviewedSha.
+
+This change fixes the two-SHA identity contract only. It does not itself
+persist a tenant delivery, grant sharing authorization, or enable a source-bound
+manufacturing revision. The signed export ingestion and tenant lifecycle remain
+separate acceptance work.
+
+## Hosted tenant import (implementation phase)
+
+The opt-in target-repository readiness workflow can now run the pinned
+manufacturing export action when the repository's non-secret
+`BOARDREADYOPS_PROJECT` variable selects one project directory or
+`.kicad_pro` file. The target job signs the manifest and every Gerber, drill,
+BOM and CPL subject using a GitHub-internal Sigstore bundle, then sends one
+self-contained archive with a short-lived GitHub OIDC token to the current
+BoardReadyOps run/attempt import route.
+
+The cloud derives run, execution attempt, repository, installation, target
+source SHA, signer workflow path/ref and dispatched GitHub run ID from
+PostgreSQL and the verified token. It verifies the bundle with `gh`, checks
+the complete archive inventory and every subject digest, and persists the
+archive with a separate immutable, tenant-scoped evidence row. BoardReadyOps
+attempt numbering is not conflated with GitHub OIDC `run_attempt`; same-run
+GitHub re-runs remain fail-closed and require a new control-plane dispatch.
+
+A revision candidate is labelled `source-bound-verified` only if its exact
+artifact, current execution attempt and source SHA match that persisted proof.
+Legacy/manual archives remain `not-established` and inspectable, but are not
+eligible for new revisions, share authorizations or guest delivery until a
+fresh signed source-bound export is imported. The importer never creates a
+revision, guest link or manufacturing approval by itself.

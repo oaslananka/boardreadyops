@@ -230,6 +230,24 @@ describe("run investigation accessibility", () => {
     expect(html).not.toContain("sm:flex-row sm:items-start sm:justify-between");
   });
 
+  it("distinguishes an unfiltered empty run from filters that matched no artifacts", () => {
+    const run = sampleRun();
+    run.artifacts = [];
+    run.artifactsPage = { page: 1, pageSize: 25, total: 0, totalPages: 1 };
+
+    const empty = renderToStaticMarkup(createElement(ArtifactsView, { run, searchParameters: {} }));
+    expect(empty).toContain("No stored artifacts for this run");
+    expect(empty).toContain("A passing readiness check does not automatically produce a manufacturing package");
+    expect(empty).not.toContain("No matching artifacts");
+
+    const filtered = renderToStaticMarkup(
+      createElement(ArtifactsView, { run, searchParameters: { artifactRole: "manufacturing" } }),
+    );
+    expect(filtered).toContain("No matching artifacts");
+    expect(filtered).toContain("No current artifact metadata matches these filters");
+    expect(filtered).not.toContain("No stored artifacts for this run");
+  });
+
   it("links GitHub Actions logs and repository-owned artifacts from the authoritative workflow run", () => {
     const run = sampleRun();
     run.attempts = [
@@ -479,6 +497,26 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("Request exception");
     expect(markup).not.toContain("Update the source design file");
     expect(markup).not.toContain("Rerun required to verify");
+  });
+
+  it("does not tell users to edit or commit CAD source when KiCad CLI was unavailable", () => {
+    const run = sampleRun();
+    run.findings = ["drc.kicad-cli-unavailable", "erc.kicad-cli-unavailable"].map((ruleId) => ({
+      id: ruleId,
+      ruleId,
+      severity: "info" as const,
+      message: "kicad-cli not available, skipped check.",
+      path: ".",
+      kind: "electrical",
+      waivedAt: undefined,
+    }));
+    const markup = renderToStaticMarkup(createElement(FindingsView, { run, searchParameters: {} }));
+    expect(markup.match(/Restore the check/gu)).toHaveLength(2);
+    expect(markup.match(/missing execution evidence/gu)).toHaveLength(2);
+    expect(markup).toContain("require-kicad: true");
+    expect(markup).toContain("same source commit");
+    expect(markup).not.toContain("Commit the correction");
+    expect(markup).not.toContain("correct the relevant board geometry");
   });
 
   it("renders a board-revision correction for changelog diagnostics when no PCB revision exists", () => {

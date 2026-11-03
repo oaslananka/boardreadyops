@@ -53,6 +53,7 @@ describe("action gate detection", () => {
     vi.stubEnv("INPUT_LOG-FILE", "logs/boardreadyops.jsonl");
     vi.stubEnv("INPUT_LOG-FILE-MAX-BYTES", "8192");
     vi.stubEnv("INPUT_LOG-FILE-RETENTION", "2");
+    vi.stubEnv("INPUT_NATIVE-VISUALS", "true");
 
     expect(readActionInputs(workspace)).toMatchObject({
       path: path.join(workspace, "hardware"),
@@ -84,6 +85,7 @@ describe("action gate detection", () => {
       logFile: path.join(workspace, "logs/boardreadyops.jsonl"),
       logFileMaxBytes: 8192,
       logFileRetention: 2,
+      nativeVisuals: true,
     });
   });
 
@@ -100,6 +102,10 @@ describe("action gate detection", () => {
     vi.unstubAllEnvs();
     vi.stubEnv("INPUT_REQUIRE-KICAD", "sometimes");
     expect(() => readActionInputs(path.resolve("."))).toThrow("Input require-kicad must be true or false.");
+
+    vi.unstubAllEnvs();
+    vi.stubEnv("INPUT_NATIVE-VISUALS", "sometimes");
+    expect(() => readActionInputs(path.resolve("."))).toThrow("Input native-visuals must be true or false.");
 
     vi.unstubAllEnvs();
     vi.stubEnv("INPUT_LOG-LEVEL", "trace");
@@ -135,6 +141,10 @@ describe("action gate detection", () => {
     expect(() => readActionInputs(path.resolve("."))).toThrow(
       "Input cloud-upload must be metadata, snapshots, or source.",
     );
+  });
+
+  it("does not consent to native source artwork by default", () => {
+    expect(readActionInputs(path.resolve(".")).nativeVisuals).toBe(false);
   });
 
   it("parses valid cloud-upload input", () => {

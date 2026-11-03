@@ -508,7 +508,77 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
     const review = await loadServerReview(reviewId, authorizedSession);
     expect(review?.baseSnapshots).toHaveLength(1);
     expect(review?.baseSnapshots?.[0]).toMatchObject({ id: "snap_sch_board_base" });
+    expect(review?.baseRunId).toBe("run-hw-104-base");
   });
+
+  it.each([
+    ["Review for 6aa49e71", "8714bbeb".padEnd(40, "0"), "Review for 8714bbeb"],
+    ["Power Board Production Review", "8714bbeb".padEnd(40, "0"), "Power Board Production Review"],
+    ["Review for 6aa49e71", "not-a-valid-head-sha", "Review for 6aa49e71"],
+  ])(
+    "renders historical title %s with head %s as %s without mutating the database",
+    async (storedTitle, headSha, expectedTitle) => {
+      vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
+        mode: "postgres",
+        databaseUrl: "postgresql://postgres:postgres@localhost:5432/boardreadyops",
+      });
+
+      mockLoaderQuery.mockImplementation(async (sql: string) => {
+        const norm = sql.toLowerCase().replace(/\s+/g, " ");
+        if (norm.includes("from reviews join repositories")) {
+          return {
+            rows: [
+              {
+                id: reviewId,
+                repository_id: "repo-hw-prod",
+                pull_request_number: 10,
+                title: storedTitle,
+                status: "active",
+                decision: "pending",
+                base_run_id: null,
+                head_run_id: "run-head",
+                current_revision_id: "rev-current",
+                created_by: "system",
+                created_at: now,
+                updated_at: now,
+                completed_at: null,
+                owner: "acme-hardware",
+                name: "synthetic-pcb",
+                private: false,
+                disabled_at: null,
+                suspended_at: null,
+                github_installation_id: 47001,
+                account_login: "acme-hardware",
+              },
+            ],
+          };
+        }
+        if (norm.includes("from review_revisions where id = $1 and review_id = $2")) {
+          return {
+            rows: [
+              {
+                id: "rev-current",
+                sequence: 2,
+                base_run_id: null,
+                head_run_id: "run-head",
+                base_commit_sha: null,
+                head_commit_sha: headSha,
+                evidence_digest: "e".repeat(64),
+              },
+            ],
+          };
+        }
+        return { rows: [] };
+      });
+
+      const review = await loadServerReview(reviewId, null);
+      expect(review?.title).toBe(expectedTitle);
+      expect(review?.headCommitSha).toBe(headSha);
+      expect(mockLoaderQuery.mock.calls.some(([sql]) => /^\s*(?:update|insert|delete)\b/iu.test(String(sql)))).toBe(
+        false,
+      );
+    },
+  );
 
   it("fails closed (returns null) for unauthorized viewer on private repository", async () => {
     vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({

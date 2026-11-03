@@ -83,6 +83,12 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     // Raw Pass plus an archive is a preview, not runner-verified manufacturing evidence.
     expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
     expect(
+      await authorizeManufacturingShare(executor, "rev_without_source_proof", {
+        githubUserId: 4711,
+        login: "fixture-owner",
+      }),
+    ).toBe(false);
+    expect(
       await store.registerValidatedRevisionFromArtifact({
         workspaceId,
         projectId: project.id,
@@ -95,9 +101,10 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     const attemptId = randomUUID();
     const resultDigest = createHash("sha256").update("isolated accepted runner result").digest("hex");
     await executor.query(
-      `insert into release_run_attempts (id, run_id, attempt_number, status, completed_at, result_digest)
-       values ($1, $2, 1, 'completed', now(), $3)`,
-      [attemptId, runId, resultDigest],
+      `insert into release_run_attempts (
+         id, run_id, attempt_number, status, completed_at, result_digest, github_workflow_dispatch_id
+       ) values ($1, $2, 1, 'completed', now(), $3, $4)`,
+      [attemptId, runId, resultDigest, String(repoNumber)],
     );
     await executor.query(
       `update release_runs set execution_attempt_id = $2, execution_attempt_started_at = now(), terminal_result_digest = $3 where id = $1`,
@@ -114,6 +121,28 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     await executor.query("update release_runs set terminal_result_digest = $2 where id = $1", [runId, "f".repeat(64)]);
     expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
     await executor.query("update release_runs set terminal_result_digest = $2 where id = $1", [runId, resultDigest]);
+    await executor.query("update artifacts set execution_attempt_id = $2 where id = $1", [artifactId, attemptId]);
+    await executor.query(
+      `insert into signed_manufacturing_export_evidence (
+         run_id, execution_attempt_id, repository_id, installation_id, artifact_id,
+         github_repository_id, github_run_id, run_attempt, source_sha, signer_sha,
+         source_ref, workflow_path, manifest_sha256, bundle_sha256, subject_count, verified_at
+       ) values ($1, $2, $3, $4, $5, $6, $7, 1, $8, $9, 'refs/heads/main',
+                 '.github/workflows/readiness-runner.yml', $10, $11, 29, now())`,
+      [
+        runId,
+        attemptId,
+        repositoryId,
+        installationId,
+        artifactId,
+        repoNumber,
+        String(repoNumber),
+        commitSha,
+        "c".repeat(40),
+        createHash("sha256").update("verified source manifest fixture").digest("hex"),
+        createHash("sha256").update("verified sigstore bundle fixture").digest("hex"),
+      ],
+    );
 
     const candidates = await store.listValidatedRevisionCandidatesByWorkspace(workspaceId);
     expect(candidates).toHaveLength(1);
@@ -123,6 +152,13 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
       artifactId,
       commitSha,
       bundleSha256: archiveSha256,
+      sourceBinding: "source-bound-verified",
+      sourceEvidence: {
+        signerSha: "c".repeat(40),
+        workflowPath: ".github/workflows/readiness-runner.yml",
+        sourceRef: "refs/heads/main",
+        subjectCount: 29,
+      },
     });
 
     expect(
@@ -151,6 +187,9 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     });
     expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
     expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(true);
+    expect(await store.listRevisionsByWorkspace(workspaceId)).toMatchObject([
+      expect.objectContaining({ id: revision?.id, sourceBinding: "source-bound-verified" }),
+    ]);
 
     // Technical readiness alone cannot grant guest access, even when SQL is called directly.
     await expect(
@@ -179,7 +218,7 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     ).toBe(false);
     expect(await authorizedManufacturingRevisionIds(executor, workspaceId)).toContain(revision?.id);
 
-    // This checks database/token linkage, not source attestation or a signed fabrication approval.
+    // Immutable source proof is necessary but not a fabrication approval; owner share remains separate.
     const { delivery, rawToken } = await store.createDeliveryLink({
       revisionId: revision?.id ?? "",
       expiresAt: new Date(Date.now() + 60_000),

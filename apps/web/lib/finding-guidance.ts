@@ -29,6 +29,10 @@ export function findingDomainFromRule(ruleId: string): FindingDomain {
 }
 
 const ruleSteps: Readonly<Record<string, string>> = {
+  "drc.kicad-cli-unavailable":
+    "DRC was not executed because kicad-cli was unavailable in the runner. Install a supported KiCad CLI, make it available on PATH, and enable require-kicad: true in the readiness workflow. Rerun DRC on this same source commit; this diagnostic does not verify a PCB defect.",
+  "erc.kicad-cli-unavailable":
+    "ERC was not executed because kicad-cli was unavailable in the runner. Install a supported KiCad CLI, make it available on PATH, and enable require-kicad: true in the readiness workflow. Rerun ERC on this same source commit; this diagnostic does not verify a schematic defect.",
   "erc.footprint_filter":
     "In the schematic symbol properties, compare Footprint Filters with the assigned footprint. Select a compatible footprint or correct the filters, then run KiCad ERC.",
   "erc.four_way_junction":

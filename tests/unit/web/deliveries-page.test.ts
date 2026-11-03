@@ -21,6 +21,12 @@ vi.mock("../../../apps/web/components/deliveries/manufacturing-share-authorizati
   ManufacturingShareAuthorizationForm: () => null,
 }));
 
+// The server-page tests only need to know whether the action is offered. The
+// separately tested client form uses useActionState and cannot render via static SSR.
+vi.mock("../../../apps/web/components/deliveries/delivery-create-form.js", () => ({
+  DeliveryCreateForm: () => createElement("span", null, "Create guest link"),
+}));
+
 const loadWorkspaceDeliveries = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/web/lib/delivery-listing.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -171,6 +177,23 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("Live");
   });
 
+  it("labels the guest-link list rather than displaying only the workspace name as a heading", async () => {
+    const namedWorkspace = { ...workspace, name: "test" };
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [namedWorkspace],
+      selected: namedWorkspace,
+      revisionCandidates: [],
+      revisions: [],
+      deliveries: [],
+    });
+
+    const markup = await render();
+    expect(markup).toContain(">Guest links</");
+    expect(markup).toContain("Shared from workspace test");
+    expect(markup).toContain("No guest links yet");
+  });
+
   it("does not show an unexpired delivery as Live after sharing authorization is revoked", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
@@ -256,11 +279,11 @@ describe("DeliveriesListPage", () => {
     });
 
     const markup = await render();
-    expect(markup).toContain("No validated revisions to share yet");
+    expect(markup).toContain("No run-backed revisions to share yet");
     expect(markup).toContain('href="/runs"');
     expect(markup).toContain("Inspect runs");
     expect(markup).toContain("A passing readiness run or runner-generated draft archive cannot be shared directly.");
-    expect(markup).toContain("independently verified source evidence");
+    expect(markup).toContain("an accepted runner result with a stored manufacturing archive");
     expect(markup).not.toContain(
       "Run BoardReadyOps on a connected GitHub project until it completes with a passing manufacturing archive",
     );
@@ -283,6 +306,7 @@ describe("DeliveriesListPage", () => {
           bundleSha256: "a".repeat(64),
           validationRunId: "run_good",
           validationArtifactId: "artifact_good",
+          sourceBinding: "source-bound-verified",
         },
       ],
       deliveries: [],
@@ -294,6 +318,95 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain('id="share-package"');
     expect(markup).toContain("Create a guest link");
   });
+
+  it("does not imply independent source attestation from runner-backed archive metadata", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [],
+      revisions: [
+        {
+          id: "rev_runner",
+          projectName: "Gateway board",
+          revisionLabel: "rev C",
+          sourceKind: "github_commit",
+          bundleSha256: "b".repeat(64),
+          validationRunId: "run_accepted",
+          validationArtifactId: "archive_persisted",
+        },
+      ],
+      authorizedRevisionIds: [],
+      deliveries: [],
+    });
+
+    const markup = await render();
+    expect(markup).toContain("Not delivery-eligible");
+    expect(markup).toContain("do not independently attest source-to-export provenance");
+    expect(markup).not.toContain(">Validated</");
+    expect(markup).not.toContain("independently validated manufacturing archive");
+    expect(markup).not.toContain("Explicit permission to share");
+  });
+
+  it("explains the Community plan limit instead of showing a guest link form that the server rejects", async () => {
+    const communityWorkspace = { ...workspace, planTier: "community" as const };
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [communityWorkspace],
+      selected: communityWorkspace,
+      revisionCandidates: [],
+      revisions: [
+        {
+          id: "rev_a",
+          projectName: "Gateway board",
+          revisionLabel: "rev C",
+          validationRunId: "run_a",
+          validationArtifactId: "artifact_a",
+          sourceKind: "github_commit",
+          bundleSha256: "a".repeat(64),
+          sourceBinding: "source-bound-verified",
+        },
+      ],
+      deliveries: [],
+      authorizedRevisionIds: ["rev_a"],
+    });
+
+    const markup = await render();
+    expect(markup).toContain("Guest links require Team or higher");
+    expect(markup).toContain("No guest links yet");
+    expect(markup).not.toContain("Create guest link");
+  });
+
+  it.each(["team", "business", "pilot"] as const)(
+    "still offers the validated guest link form on the %s plan",
+    async (planTier) => {
+      const paidWorkspace = { ...workspace, planTier };
+      loadWorkspaceDeliveries.mockResolvedValue({
+        state: "ok",
+        workspaces: [paidWorkspace],
+        selected: paidWorkspace,
+        revisionCandidates: [],
+        revisions: [
+          {
+            id: "rev_a",
+            projectName: "Gateway board",
+            revisionLabel: "rev C",
+            validationRunId: "run_a",
+            validationArtifactId: "artifact_a",
+            sourceKind: "github_commit",
+            bundleSha256: "a".repeat(64),
+            sourceBinding: "source-bound-verified",
+          },
+        ],
+        deliveries: [],
+        authorizedRevisionIds: ["rev_a"],
+      });
+
+      const markup = await render();
+      expect(markup).toContain("Create guest link");
+      expect(markup).not.toContain("Guest links require Team or higher");
+    },
+  );
 
   it("offers no create form to a viewer, who is refused server-side anyway", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
@@ -325,7 +438,7 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("Review your boards");
     expect(markup).toContain("Prepare a manufacturing delivery");
     expect(markup).toContain("A Review is not a");
-    expect(markup).toContain("independently validated manufacturing archive");
+    expect(markup).toContain("accepted passing runner result");
     expect(markup).toContain("Creating a workspace or running readiness checks does not approve fabrication");
     expect(markup).toContain('href="/reviews"');
     expect(markup).toContain('href="/runs"');

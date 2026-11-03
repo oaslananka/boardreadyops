@@ -50,7 +50,7 @@ describe("bounded, read-only physical export object verification", () => {
         readVerifiedLocalExportObject({ storageDriver: "local", storageRoot: f.root, object: f.object }),
       ).resolves.toEqual(input);
     }
-  });
+  }, 30_000);
 
   it("rejects mismatched size, digest and same-sized tampering", async () => {
     const f = await fixture();

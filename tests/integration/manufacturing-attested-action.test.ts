@@ -113,6 +113,53 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"))).toBe(true);
   });
 
+  it("connects optional source-bound manufacturing export to the exact readiness run without changing normal runner permissions", async () => {
+    const raw = await fs.readFile(".github/workflows/readiness-runner.yml", "utf8");
+    const workflow = load(raw) as TargetSpec;
+    const job = workflow.jobs.readiness;
+    expect(job?.permissions).toMatchObject({
+      actions: "read",
+      checks: "read",
+      contents: "read",
+      "id-token": "write",
+    });
+    expect(job?.permissions).not.toHaveProperty("attestations");
+    expect(job?.permissions).not.toHaveProperty("artifact-metadata");
+    const steps = job?.steps ?? [];
+    const exportIndex = steps.findIndex((step) => step.id === "manufacturing-export");
+    const signIndex = steps.findIndex((step) => step.id === "manufacturing-attestation");
+    const importIndex = steps.findIndex((step) => step.id === "manufacturing-export-import");
+    const resultIndex = steps.findIndex((step) =>
+      String(step.name ?? "").startsWith("Publish OIDC-authenticated cloud result"),
+    );
+    expect(exportIndex).toBeGreaterThan(-1);
+    expect(signIndex).toBeGreaterThan(exportIndex);
+    expect(importIndex).toBeGreaterThan(signIndex);
+    expect(resultIndex).toBeGreaterThan(importIndex);
+    expect(steps[exportIndex]?.if).toContain("vars.BOARDREADYOPS_PROJECT");
+    expect(steps[exportIndex]?.uses).toBe(
+      "oaslananka/boardreadyops/.github/actions/manufacturing-attested-export@bbdfd58631d5c8daca1179a10f74b45533903b58",
+    );
+    expect(steps[exportIndex]?.with).toMatchObject({
+      "reviewed-source-sha": "$" + "{{ inputs.head_sha }}",
+      project: "$" + "{{ vars.BOARDREADYOPS_PROJECT }}",
+    });
+    expect(String(steps[signIndex]?.run)).toContain("attestProvenance");
+    expect(String(steps[signIndex]?.run)).toContain("skipWrite: true");
+    expect(String((steps[importIndex]?.with as { script?: string } | undefined)?.script)).toContain(
+      "core.getIDToken(audience)",
+    );
+    expect(String((steps[importIndex]?.with as { script?: string } | undefined)?.script)).toContain(
+      "/manufacturing-export",
+    );
+    const importerScript = String((steps[importIndex]?.with as { script?: string } | undefined)?.script);
+    expect(importerScript).toContain("boardreadyops-manufacturing-export:");
+    expect(importerScript).not.toContain("boardreadyops-cloud:");
+    for (const index of [exportIndex, signIndex, importIndex]) {
+      expect(steps[index]?.["continue-on-error"]).toBe(true);
+    }
+  });
+
   it("keeps real GitHub OIDC signing confined to a manually dispatched protected test fixture", async () => {
     const raw = await fs.readFile(".github/workflows/attested-fixture-validation.yml", "utf8");
     const wf = load(raw) as TargetSpec;
@@ -121,8 +168,6 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(job?.permissions).toMatchObject({
       contents: "read",
       "id-token": "write",
-      attestations: "write",
-      "artifact-metadata": "write",
     });
     const steps = job?.steps ?? [];
     const guard = steps.find((step) => String(step.name ?? "").startsWith("Require protected main"));
@@ -134,7 +179,19 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect((exportStep?.with as { project?: string } | undefined)?.project).toBe(
       "tests/fixtures/projects/safe-basic/safe-basic.kicad_pro",
     );
-    expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/attest@"))).toBe(true);
+    expect(steps.some((step) => String(step.uses ?? "").startsWith("actions/attest@"))).toBe(false);
+    const install = steps.find((step) =>
+      String(step.name ?? "").startsWith("Install pinned GitHub attestation library"),
+    );
+    expect(install?.run).toContain("@actions/attest@3.2.0");
+    const sign = steps.find((step) => String(step.id ?? "") === "internal");
+    expect(sign?.run).toContain("sigstore:'github'");
+    expect(sign?.run).toContain("skipWrite:true");
+    expect(sign?.run).toContain("rfc3161Timestamps");
+    expect(steps.filter((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"))).toHaveLength(2);
+    expect(steps.some((step) => JSON.stringify(step).includes("test-fixture-sigstore-bundle"))).toBe(true);
+    expect(raw).not.toContain("attestations: write");
+    expect(raw).not.toContain("artifact-metadata: write");
     expect(raw).toContain("TEST FIXTURE ONLY");
     expect(raw).not.toContain("pull_request:");
   });
@@ -230,6 +287,24 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(subjects.has("build/boardreadyops-attested/gerbers/safe-basic-F_Cu.gtl")).toBe(true);
     expect(subjects.has("build/boardreadyops-attested/assembly/bom.csv")).toBe(true);
     expect(subjects.has("build/boardreadyops-attested/assembly/positions.csv")).toBe(true);
+  });
+
+  it("binds generated bytes to the checked-out reviewed source SHA even when the signer workflow SHA differs", async () => {
+    const f = await fixture();
+    const signerWorkflowSha = "b".repeat(40);
+    const result = await runExport(f, { GITHUB_SHA: signerWorkflowSha });
+    expect(result.status, result.stderr).toBe(0);
+    const outputs = new Map(
+      (await fs.readFile(f.output, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => line.split("=", 2) as [string, string]),
+    );
+    const manifest = JSON.parse(await fs.readFile(path.join(f.root, outputs.get("manifest") ?? ""), "utf8")) as {
+      git?: { sha?: string };
+    };
+    expect(manifest.git?.sha).toBe(f.sha);
+    expect(manifest.git?.sha).not.toBe(signerWorkflowSha);
   });
 
   it("refuses an archive when the reviewed source has no BOM schematic", async () => {

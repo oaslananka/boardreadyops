@@ -136,7 +136,8 @@ export class ReviewStore {
       const rows = ((existingPr as { rows?: StoredReviewRow[] }).rows ?? []) as StoredReviewRow[];
       if (rows.length > 0 && rows[0]) {
         reviewId = rows[0].id;
-        title = rows[0].title;
+        // Only refresh auto-generated source-hash labels, never a human-entered title.
+        title = /^Review for [0-9a-f]{8}$/u.test(rows[0].title) ? input.title : rows[0].title;
       } else {
         reviewId = randomUUID();
       }

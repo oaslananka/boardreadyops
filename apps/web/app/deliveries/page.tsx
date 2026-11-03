@@ -1,3 +1,4 @@
+import { hasWorkspaceEntitlement } from "@boardreadyops/cloud-core";
 import type { WorkspaceDeliveryRecord, WorkspaceRevisionRecord } from "@boardreadyops/db";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -73,7 +74,12 @@ function revisionColumns(): readonly DataColumn<WorkspaceRevisionRecord>[] {
       cell: (revision) =>
         revision.validationRunId && revision.validationArtifactId ? (
           <span className="flex flex-col gap-0.5">
-            <StatusBadge value="success" label="Validated" />
+            <StatusBadge
+              value={revision.sourceBinding === "source-bound-verified" ? "success" : "warning"}
+              label={
+                revision.sourceBinding === "source-bound-verified" ? "Source-bound verified" : "Not delivery-eligible"
+              }
+            />
             <span className="font-mono text-meta text-muted-foreground">{revision.bundleSha256.slice(0, 12)}…</span>
           </span>
         ) : (
@@ -205,7 +211,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
 
             <Panel
               title="Package revisions"
-              description="Revisions keep their ingestion provenance. Only evidence-backed revisions can be shared."
+              description="An accepted runner result and stored archive do not independently attest source-to-export provenance or approve fabrication."
             >
               <DataTable
                 caption={`Package revisions in ${result.selected.name}`}
@@ -223,8 +229,8 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                   >
                     <p>
                       A passing readiness run is not a shareable manufacturing package. Runners may upload draft
-                      archives, but sharing requires separately verified source-to-export evidence and a validated
-                      package revision.
+                      archives, but sharing requires an accepted runner result with a stored manufacturing archive and a
+                      validated package revision.
                     </p>
                   </EmptyState>
                 }
@@ -233,8 +239,8 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
 
             {result.selected.role !== "viewer" && result.revisionCandidates.length > 0 ? (
               <Panel
-                title="Register validated revision"
-                description="Register an independently validated manufacturing archive from a verified passing run."
+                title="Register run-backed revision"
+                description="Register a stored manufacturing archive from an accepted passing runner result. The source-to-export status is shown per package; legacy/manual packages remain usable without being promoted to source-bound verified."
               >
                 <ValidatedRevisionRegisterForm
                   workspaceId={result.selected.id}
@@ -245,16 +251,14 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
             ) : null}
 
             {(result.selected.role === "owner" || result.selected.role === "admin") &&
-            result.revisions.some((revision) => revision.validationRunId && revision.validationArtifactId) ? (
+            result.revisions.some((revision) => revision.sourceBinding === "source-bound-verified") ? (
               <Panel
                 title="Explicit permission to share"
-                description="Readiness checks are not manufacturing approval. An owner/admin must separately permit
+                description="Readiness checks and source attestation are not manufacturing approval. An owner/admin must separately permit
                   guest sharing for one exact source commit and archive checksum."
               >
                 <ManufacturingShareAuthorizationForm
-                  revisions={result.revisions.filter(
-                    (revision) => revision.validationRunId && revision.validationArtifactId,
-                  )}
+                  revisions={result.revisions.filter((revision) => revision.sourceBinding === "source-bound-verified")}
                   authorizedRevisionIds={result.authorizedRevisionIds ?? []}
                   approveAction={authorizeManufacturingShareAction}
                   revokeAction={revokeManufacturingShareAction}
@@ -262,7 +266,10 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
               </Panel>
             ) : null}
 
-            <Panel title={result.selected.name} description="Newest first. An expired link stops working on its own.">
+            <Panel
+              title="Guest links"
+              description={`Shared from workspace ${result.selected.name}. Newest first; expired links stop working automatically.`}
+            >
               <DataTable
                 caption={`Guest delivery links in ${result.selected.name}`}
                 columns={deliveryColumns(result.selected.role !== "viewer", result.authorizedRevisionIds ?? [])}
@@ -273,14 +280,22 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                     title="No guest links yet"
                     action={
                       result.selected.role !== "viewer" &&
-                      result.revisions.some((revision) => revision.validationRunId && revision.validationArtifactId) ? (
+                      hasWorkspaceEntitlement(result.selected.planTier, "canCreateDeliveryLink") &&
+                      result.revisions.some(
+                        (revision) =>
+                          revision.sourceBinding === "source-bound-verified" &&
+                          (result.authorizedRevisionIds ?? []).includes(revision.id),
+                      ) ? (
                         <Button asChild variant="outline">
                           <a href="#share-package">Create a guest link</a>
                         </Button>
                       ) : null
                     }
                   >
-                    <p>Links you issue appear here until they expire. Only validated revisions can be shared.</p>
+                    <p>
+                      Links you issue appear here until they expire. Only source-bound verified revisions with explicit
+                      owner/admin approval can be shared.
+                    </p>
                   </EmptyState>
                 }
               />
@@ -315,18 +330,30 @@ function CreatePanel({
 }>) {
   const validatedRevisions = result.revisions.filter(
     (revision) =>
+      revision.sourceBinding === "source-bound-verified" &&
       revision.validationRunId !== undefined &&
       revision.validationArtifactId !== undefined &&
       (result.authorizedRevisionIds ?? []).includes(revision.id),
   );
 
+  if (!hasWorkspaceEntitlement(result.selected.planTier, "canCreateDeliveryLink")) {
+    return (
+      <Panel id="share-package" title="Share a package">
+        <Alert tone="info" title="Guest links require Team or higher">
+          Your workspace can still inspect revisions and existing deliveries, but its current plan does not include
+          creating new guest links.
+        </Alert>
+      </Panel>
+    );
+  }
+
   if (validatedRevisions.length === 0) {
     return (
       <Panel id="share-package" title="Share a package">
-        <Alert tone="info" title="No validated revisions to share yet">
+        <Alert tone="info" title="No run-backed revisions to share yet">
           A passing readiness run or runner-generated draft archive cannot be shared directly. A manufacturing export
-          needs independently verified source evidence and a validated package revision before an owner or admin can
-          authorize a guest link. Existing runs remain available to inspect; they do not grant delivery eligibility.
+          needs an accepted runner result and a stored archive before an owner or admin can authorize a guest link.
+          Existing runs remain available to inspect; they do not grant delivery eligibility.
           <div className="mt-3">
             <Button asChild variant="outline">
               <Link href="/runs">Inspect runs</Link>
@@ -341,7 +368,7 @@ function CreatePanel({
     <Panel
       id="share-package"
       title="Share a package"
-      description="Only validated revisions are selectable. The guest link is shown once and only its hash is stored."
+      description="Only authorized run-backed revisions can be selected. Source-to-export attestation is separate; the link is shown once."
     >
       <DeliveryCreateForm
         revisions={validatedRevisions.map((revision) => ({
@@ -402,12 +429,12 @@ function DeliveriesUnavailable({ state }: Readonly<{ state: "signed-out" | "not-
       </Panel>
       <Panel
         title="Prepare a manufacturing delivery"
-        description="Guest links require a verified passing run, an independently validated manufacturing archive and owner/admin sharing authorization."
+        description="Guest links require an accepted passing runner result, a stored manufacturing archive and owner/admin sharing authorization."
       >
         <p className="text-sm text-muted-foreground">
           Creating a workspace or running readiness checks does not approve fabrication or issue a guest link. The
-          standard runner's draft archive is not delivery-eligible; separately verified source-to-export evidence and
-          explicit owner/admin permission are required.
+          standard runner's draft archive is not delivery-eligible; an accepted runner result with a stored
+          manufacturing archive and explicit owner/admin permission are required.
         </p>
         <Button asChild className="mt-4">
           <Link href="/projects">Set up a CAD workspace</Link>

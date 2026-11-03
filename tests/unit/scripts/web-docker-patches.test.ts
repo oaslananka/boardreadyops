@@ -4,6 +4,17 @@ import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 describe("web Docker dependency layer", () => {
+  it("pins GitHub CLI and verifies the release archive before enabling Sigstore verification", async () => {
+    const dockerfile = await readFile("apps/web/Dockerfile", "utf8");
+    expect(dockerfile).toContain("ARG GH_VERSION=2.103.3");
+    expect(dockerfile).toContain(`gh_""$GH_VERSION""_linux_""$gh_arch"".tar.gz`);
+    expect(dockerfile).toContain("4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d");
+    expect(dockerfile).toContain("ee32df2323c8847f5fac6cb6b4b69ca75828e9329a8f22f677021f7b3306ce63");
+    expect(dockerfile).toContain("sha256sum --check --strict");
+    expect(dockerfile).toContain('gh --version | grep -F "gh version $GH_VERSION"');
+    expect(dockerfile).toContain("ca-certificates curl openssl");
+  });
+
   it("copies every pnpm patch before installing dependencies", async () => {
     const workspace = load(await readFile("pnpm-workspace.yaml", "utf8")) as {
       patchedDependencies?: Record<string, string>;

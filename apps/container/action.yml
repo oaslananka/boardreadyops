@@ -132,6 +132,13 @@ inputs:
     description: Upload findings and evidence pack to BoardReadyOps Cloud. One of metadata, snapshots, source. Empty disables.
     required: false
     default: ""
+  native-visuals:
+    description: >-
+      Explicit consent to publish source-derived native PCB/schematic SVGs.
+      Only applies with cloud-upload: snapshots and a runs:write token.
+      Disabled by default. Never uploads images in safe-mode.
+    required: false
+    default: "false"
   cloud-server:
     description: BoardReadyOps Cloud instance URL.
     required: false

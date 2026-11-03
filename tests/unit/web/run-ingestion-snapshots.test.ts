@@ -201,4 +201,39 @@ describe("POST /api/v1/runs persists review-canvas snapshots", () => {
     );
     expect(insertCall).toBeUndefined();
   });
+
+  it.each([
+    ["error", undefined, "fail"],
+    ["high", undefined, "fail"],
+    ["high", "pass", "fail"],
+    ["high", "error", "error"],
+    ["medium", undefined, "pass"],
+    ["low", undefined, "pass"],
+    ["info", undefined, "pass"],
+    ["medium", "fail", "fail"],
+  ] as const)(
+    "persists %s findings with requested decision %s as %s",
+    async (severity, requestedDecision, expected) => {
+      const request = new Request("https://boardreadyops.test/api/v1/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          repositoryId: "repo-1",
+          commitSha: "a".repeat(40),
+          ref: "refs/heads/main",
+          triggerKind: "manual",
+          ...(requestedDecision !== undefined ? { decision: requestedDecision } : {}),
+          findings: [{ ruleId: "drc.track_dangling", severity, message: "Synthetic hardware finding" }],
+        }),
+      });
+
+      const response = await postRun(request);
+      expect(response.status).toBe(201);
+      expect((await response.json()).decision).toBe(expected);
+      const inserted = mockQuery.mock.calls.find(([sql]) =>
+        String(sql).toLowerCase().includes("insert into release_runs"),
+      );
+      expect(inserted?.[1]?.[7]).toBe(expected);
+    },
+  );
 });

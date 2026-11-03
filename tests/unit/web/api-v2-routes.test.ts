@@ -31,6 +31,7 @@ vi.mock("../../../packages/db/src/pg-executor.js", () => ({
         return mockShareAuthorizationQuery(sql, params);
       if (sql.includes("from workspace_members")) return mockMembershipQuery(sql, params);
       if (
+        sql.trimStart().startsWith("select 1") &&
         sql.includes("from revisions") &&
         sql.includes("join release_runs") &&
         sql.includes("validation_run_id") &&
@@ -38,7 +39,7 @@ vi.mock("../../../packages/db/src/pg-executor.js", () => ({
       ) {
         return mockValidatedEvidenceQuery(sql, params);
       }
-      if (sql.includes("from revisions") && sql.includes("join projects")) {
+      if (sql.trimStart().startsWith("select projects.workspace_id")) {
         return mockRevisionWorkspaceQuery(sql, params);
       }
       if (sql.includes("from projects") && sql.includes("where id = $1")) return mockProjectQuery(sql, params);

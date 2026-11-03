@@ -15,8 +15,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      attestations: write
-      artifact-metadata: write
     steps:
       - name: Checkout protected exact source commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -53,10 +51,55 @@ jobs:
         with:
           reviewed-source-sha: ${{ github.sha }}
           project: tests/fixtures/projects/safe-basic/safe-basic.kicad_pro
-      - name: Sign test fixture export inventory with GitHub OIDC
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+      - name: Install pinned GitHub attestation library
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/attest-tools" --no-audit --no-fund --ignore-scripts --save-exact @actions/attest@3.2.0
+      - name: Sign test fixture export inventory with GitHub-internal Sigstore
+        id: internal
+        shell: bash
+        env:
+          SUBJECTS: ${{ steps.export.outputs.subject-checksums }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          cat > "$RUNNER_TEMP/attest-tools/sign.mjs" <<'JSCODE'
+          import fs from 'node:fs';
+          import {attestProvenance} from '@actions/attest';
+          const pattern=/^([a-f0-9]{64})  ([a-zA-Z0-9_.\/-]+)$/u;
+          const lines=fs.readFileSync(process.env.SUBJECTS,'utf8').trimEnd().split('\n');
+          const names=new Set();
+          const subjects=lines.map(line=>{
+            const m=pattern.exec(line);
+            if(!m || names.has(m[2]) || m[2].split('/').some(x=>x===''||x==='.'||x==='..')) throw new Error('Unsafe subject checksum list');
+            names.add(m[2]);
+            return {name:m[2],digest:{sha256:m[1]}};
+          });
+          if(subjects.length<3 || !subjects.some(x=>x.name.endsWith('/manifest.json'))) throw new Error('Incomplete export');
+          const result=await attestProvenance({
+            subjects,
+            token:process.env.GH_TOKEN,
+            sigstore:'github',
+            skipWrite:true,
+          });
+          if(result.attestationID||result.tlogID) throw new Error('Unexpected remote persistence');
+          const bundle=process.env.RUNNER_TEMP+'/boardreadyops-internal-export.sigstore.json';
+          fs.writeFileSync(bundle,JSON.stringify(result.bundle),{mode:0o600});
+          const verify=JSON.parse(fs.readFileSync(bundle,'utf8'));
+          if((verify?.verificationMaterial?.tlogEntries??[]).length!==0) throw new Error('Unexpected public transparency log entry');
+          if((verify?.verificationMaterial?.timestampVerificationData?.rfc3161Timestamps??[]).length===0) throw new Error('No signed internal timestamp');
+          console.log('GitHub-internal signed SLSA bundle created for '+subjects.length+' fixture subjects (no attestations API storage).');
+          JSCODE
+          node "$RUNNER_TEMP/attest-tools/sign.mjs"
+      - name: Retain test-only Sigstore bundle for offline verification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          subject-checksums: ${{ steps.export.outputs.subject-checksums }}
+          name: test-fixture-sigstore-bundle
+          path: ${{ runner.temp }}/boardreadyops-internal-export.sigstore.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Retain test-only export for independent byte verification
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

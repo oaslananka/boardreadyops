@@ -1229,6 +1229,8 @@ function FindingRow({
 }>) {
   const sourceUrl = githubFindingSourceUrl(repository ?? "", commitSha ?? "", finding.path);
   const domain = findingDomainFromRule(finding.ruleId);
+  const kicadNotExecuted =
+    finding.ruleId === "drc.kicad-cli-unavailable" || finding.ruleId === "erc.kicad-cli-unavailable";
   return (
     <li className="rounded-md border border-border bg-card p-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -1288,17 +1290,26 @@ function FindingRow({
         </div>
       </dl>
       <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-sm">
-        <p className="font-semibold text-foreground">How to resolve</p>
+        <p className="font-semibold text-foreground">{kicadNotExecuted ? "Restore the check" : "How to resolve"}</p>
         <p className="mt-1 text-foreground">{findingGuidance(finding.ruleId, finding.message)}</p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Suggested from the rule ID, not a verified repair. Check the original diagnostic before editing.
-        </p>
-        <p className="mt-1">
-          <small>
-            Commit the correction, then verify readiness against the new commit. Re-running this unchanged SHA only
-            repeats the existing check; it does not prove a source fix.
-          </small>
-        </p>
+        {kicadNotExecuted ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            This is missing execution evidence, not a diagnosed design defect. Check runner setup and logs, then rerun
+            the same commit after KiCad is available. No CAD edit or new source commit is implied.
+          </p>
+        ) : (
+          <>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Suggested from the rule ID, not a verified repair. Check the original diagnostic before editing.
+            </p>
+            <p className="mt-1">
+              <small>
+                Commit the correction, then verify readiness against the new commit. Re-running this unchanged SHA only
+                repeats the existing check; it does not prove a source fix.
+              </small>
+            </p>
+          </>
+        )}
       </div>
     </li>
   );
@@ -1355,6 +1366,8 @@ export function ArtifactsView({
 }: Readonly<{ run: RunDetail; searchParameters: SearchParameterMap }>) {
   const current = stringSearchParameters(searchParameters);
   const normalizedArtifactSort = filtersFromSearchParameters(searchParameters).artifactSort ?? "newest";
+  const hasArtifactFilters = Boolean(current.artifactSearch || current.artifactRole || current.artifactKind);
+  const hasNoStoredArtifacts = !hasArtifactFilters && run.artifactsPage.total === 0 && run.artifacts.length === 0;
   const hasUnavailableSignedDownload = run.artifacts.some((artifact) => !artifact.downloadUrl);
   const artifactLifecycleTotal =
     run.artifactLifecycle.deleted +
@@ -1448,10 +1461,24 @@ export function ArtifactsView({
         </div>
       ) : null}
       <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
-        {run.artifactsPage.total} matching artifact{run.artifactsPage.total === 1 ? "" : "s"}
+        {hasNoStoredArtifacts
+          ? "0 stored artifacts"
+          : `${run.artifactsPage.total} matching artifact${run.artifactsPage.total === 1 ? "" : "s"}`}
       </p>
       <div className="mt-3">
-        <ArtifactTable artifacts={run.artifacts} />
+        {hasNoStoredArtifacts ? (
+          <EmptyState title="No stored artifacts for this run">
+            <p>
+              A passing readiness check does not automatically produce a manufacturing package. This run has no recorded
+              artifact uploads; inspect execution attempts to see what was produced.
+            </p>
+            <Link className="text-sm text-primary underline underline-offset-2" href={`/runs/${run.id}/attempts`}>
+              Inspect execution attempts
+            </Link>
+          </EmptyState>
+        ) : (
+          <ArtifactTable artifacts={run.artifacts} />
+        )}
       </div>
       <div className="mt-4">
         <Pagination

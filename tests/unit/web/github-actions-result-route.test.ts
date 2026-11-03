@@ -38,6 +38,7 @@ const expectations = {
   executionAttemptId,
   repository: "octo-org/hardware-board",
   repositoryId: "98765",
+  githubRunId: "29121986402",
   targetSha: "a".repeat(40),
   workflowRef: "octo-org/hardware-board/.github/workflows/readiness-runner.yml@refs/heads/main",
   ref: "refs/heads/main",

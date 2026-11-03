@@ -4,7 +4,7 @@ description: >-
   Produces unsigned subjects only; caller must attest in its own repository.
 inputs:
   reviewed-source-sha:
-    description: Authenticated target-repository Git SHA (must equal github.sha)
+    description: Authenticated target-repository source commit SHA checked out in this workflow run
     required: true
   project:
     description: Exact reviewed .kicad_pro project path
@@ -44,16 +44,36 @@ runs:
         [[ "${BOARDREADYOPS_RUNNER_ENVIRONMENT}" == "github-hosted" ]]
         [[ "${RUNNER_OS}" == "Linux" ]]
         [[ "${BOARDREADYOPS_REVIEWED_SHA}" =~ ^[0-9a-f]{40}$ ]]
-        [[ "${BOARDREADYOPS_REVIEWED_SHA}" == "${GITHUB_SHA}" ]]
         [[ "${GITHUB_REF}" == refs/heads/* ]]
         [[ -n "${BOARDREADYOPS_PROJECT}" ]]
-        [[ "${BOARDREADYOPS_PROJECT}" == *.kicad_pro ]]
 
         # This Action is SHA-pinned in the *calling* target-repository workflow.
         # It has no access to source outside that exact checkout.
         cd "${GITHUB_WORKSPACE}"
         [[ "$(git rev-parse --show-toplevel)" == "${GITHUB_WORKSPACE}" ]]
-        [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]
+        [[ "$(git rev-parse HEAD)" == "${BOARDREADYOPS_REVIEWED_SHA}" ]]
+
+        # Accept one project directory or an exact .kicad_pro file without guessing.
+        project="${BOARDREADYOPS_PROJECT}"
+        if [[ -d "$project" ]]; then
+          mapfile -d '' -t project_files < <(find "$project" -maxdepth 1 -type f -name '*.kicad_pro' -print0 | sort -z)
+          project_count="${#project_files[@]}"
+          if [[ "$project_count" -ne 1 ]]; then
+            echo "::error::BOARDREADYOPS_PROJECT directory must contain exactly one .kicad_pro file."
+            exit 1
+          fi
+          project="${project_files[0]}"
+        fi
+        [[ "$project" == *.kicad_pro && -f "$project" ]]
+        case "$project" in
+          /*) ;;
+          *) project="$GITHUB_WORKSPACE/$project" ;;
+        esac
+        canonical_project="$(realpath "$project")"
+        case "$canonical_project" in
+          "$GITHUB_WORKSPACE"/*) project="$canonical_project" ;;
+          *) echo "::error::BOARDREADYOPS_PROJECT must remain inside the checked-out repository."; exit 1 ;;
+        esac
         [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
         [[ "$(kicad-cli version)" == 10.0.* ]]
 
@@ -67,10 +87,10 @@ runs:
         cli="${BOARDREADYOPS_ACTION_DIR}/../../../dist/cli/index.cjs"
         [[ -f "${cli}" ]]
         node "${cli}" generate "${GITHUB_WORKSPACE}" \
-          --project "${BOARDREADYOPS_PROJECT}" \
+          --project "$project" \
           --recipe "${BOARDREADYOPS_ACTION_DIR}/manufacturing-recipe.json" \
           --output build/boardreadyops-attested \
-          --reviewed-source-sha "${GITHUB_SHA}"
+          --reviewed-source-sha "${BOARDREADYOPS_REVIEWED_SHA}"
 
         # Sign only a complete, source-linked fabrication and assembly set.
         # A missing schematic or failed KiCad BOM/CPL export must fail closed.
@@ -98,7 +118,7 @@ runs:
         checksum_file="$(mktemp "${RUNNER_TEMP}/boardreadyops-subjects-XXXXXXXX.txt")"
         node "${cli}" export-checksums "${GITHUB_WORKSPACE}" \
           --manifest build/boardreadyops-attested/manifest.json \
-          --reviewed-source-sha "${GITHUB_SHA}" > "${checksum_file}"
+          --reviewed-source-sha "${BOARDREADYOPS_REVIEWED_SHA}" > "${checksum_file}"
         [[ -s "${checksum_file}" ]]
         {
           echo "subject-checksums=${checksum_file}"

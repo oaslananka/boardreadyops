@@ -25,6 +25,8 @@ export interface ActionInputs extends Partial<PipelineOptions> {
   logFileMaxBytes?: number | undefined;
   logFileRetention?: number | undefined;
   cloudUpload?: "metadata" | "snapshots" | "source" | undefined;
+  /** Consent to publish KiCad-native PCB/schematic SVG bytes with cloud-upload=snapshots. */
+  nativeVisuals?: boolean | undefined;
   cloudServer?: string | undefined;
 }
 
@@ -77,6 +79,7 @@ export function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? pro
       "log-file-retention",
     ),
     cloudUpload: cloudUploadInput(core.getInput("cloud-upload")),
+    nativeVisuals: boolInput("native-visuals", false),
     cloudServer: empty(core.getInput("cloud-server")),
   };
 }

@@ -189,7 +189,7 @@ class MockWorkspaceDb implements SqlQueryExecutor {
       return { rows: [row] };
     }
 
-    if (s.includes("from revisions") && s.includes("join projects")) {
+    if (s.includes("from revisions") && s.includes("join projects") && s.includes("where projects.workspace_id = $1")) {
       const workspaceId = params[0];
       const rows = this.revisions
         .filter((r) => this.projects.some((p) => p.id === r.project_id && p.workspace_id === workspaceId))
@@ -331,6 +331,38 @@ describe("WorkspaceStore", () => {
     expect(fetched).toEqual(rev);
   });
 
+  it("does not trust normalized summary metadata to display source-bound verification", async () => {
+    const query = vi.fn(async (_sql: string, _params: readonly unknown[] = []) => ({
+      rows: [
+        {
+          id: "rev-forged-summary",
+          project_id: "prj-1",
+          revision_label: "rev forged",
+          source_kind: "direct_upload",
+          commit_sha: "a".repeat(40),
+          bundle_sha256: "b".repeat(64),
+          normalized_summary: {
+            validation: {
+              sourceBinding: "source-bound-verified",
+              sourceEvidence: { signerSha: "c".repeat(40) },
+            },
+          },
+          validation_run_id: "run-1",
+          validation_artifact_id: "art-1",
+          source_binding_verified: false,
+          created_at: "2026-11-03T00:00:00.000Z",
+          project_name: "Gateway board",
+        },
+      ],
+    }));
+    const store = new WorkspaceStore({ query });
+    const revisions = await store.listRevisionsByWorkspace("ws-1");
+    expect(revisions[0]?.sourceBinding).toBe("not-established");
+    expect(revisions[0]?.sourceEvidence).toBeUndefined();
+    expect(String(query.mock.calls[0]?.[0])).toContain("source_binding_verified");
+    expect(String(query.mock.calls[0]?.[0])).toContain("join signed_manufacturing_export_evidence");
+  });
+
   it("derives validated revision candidates only through the trusted evidence query", async () => {
     const query = vi.fn(async (_sql: string, _params: readonly unknown[] = []) => ({
       rows: [
@@ -343,22 +375,22 @@ describe("WorkspaceStore", () => {
           artifact_id: "art-1",
           artifact_name: "gerbers.zip",
           bundle_sha256: "b".repeat(64),
+          signer_sha: "c".repeat(40),
+          workflow_path: ".github/workflows/readiness-runner.yml",
+          source_ref: "refs/heads/main",
+          subject_count: 29,
+          verified_at: "2026-11-03T00:00:00.000Z",
         },
       ],
     }));
     const store = new WorkspaceStore({ query });
 
     await expect(store.listValidatedRevisionCandidatesByWorkspace("ws-1")).resolves.toEqual([
-      {
+      expect.objectContaining({
         projectId: "prj-1",
-        projectName: "Gateway board",
-        runId: "run-1",
-        commitSha: "a".repeat(40),
-        completedAt: "2026-10-02T03:00:00.000Z",
         artifactId: "art-1",
-        artifactName: "gerbers.zip",
-        bundleSha256: "b".repeat(64),
-      },
+        sourceBinding: "source-bound-verified",
+      }),
     ]);
 
     const sql = String(query.mock.calls[0]?.[0]).toLowerCase();
@@ -366,7 +398,49 @@ describe("WorkspaceStore", () => {
     expect(sql).toContain("release_runs.decision = 'pass'");
     expect(sql).toContain("artifacts.role = 'manufacturing'");
     expect(sql).toContain("artifacts.kind = 'archive'");
+    expect(sql).toContain("join signed_manufacturing_export_evidence");
+    expect(sql).toContain("evidence.source_sha = release_runs.commit_sha");
+    expect(sql).toContain("evidence.github_run_id = attempt.github_workflow_dispatch_id");
     expect(sql).toContain("revisions.validation_artifact_id = artifacts.id");
+  });
+
+  it("labels an export source-bound only when the exact current attempt and source SHA have persisted proof", async () => {
+    const query = vi.fn(async (_sql: string, _params: readonly unknown[] = []) => ({
+      rows: [
+        {
+          project_id: "prj-1",
+          project_name: "Gateway board",
+          run_id: "run-1",
+          commit_sha: "a".repeat(40),
+          completed_at: "2026-10-02T03:00:00.000Z",
+          artifact_id: "art-1",
+          artifact_name: "signed-manufacturing-export.tar.gz",
+          bundle_sha256: "b".repeat(64),
+          signer_sha: "c".repeat(40),
+          workflow_path: ".github/workflows/readiness-runner.yml",
+          source_ref: "refs/heads/main",
+          subject_count: 29,
+          verified_at: "2026-11-03T00:00:00.000Z",
+        },
+      ],
+    }));
+    const store = new WorkspaceStore({ query });
+    await expect(store.listValidatedRevisionCandidatesByWorkspace("ws-1")).resolves.toMatchObject([
+      {
+        artifactId: "art-1",
+        sourceBinding: "source-bound-verified",
+        sourceEvidence: {
+          signerSha: "c".repeat(40),
+          workflowPath: ".github/workflows/readiness-runner.yml",
+          sourceRef: "refs/heads/main",
+          subjectCount: 29,
+          verifiedAt: "2026-11-03T00:00:00.000Z",
+        },
+      },
+    ]);
+    const sql = String(query.mock.calls[0]?.[0]).toLowerCase();
+    expect(sql).toContain("evidence.execution_attempt_id = release_runs.execution_attempt_id");
+    expect(sql).toContain("evidence.source_sha = release_runs.commit_sha");
   });
 
   it("registers a validated revision through one evidence-rechecking insert-select", async () => {
@@ -408,6 +482,8 @@ describe("WorkspaceStore", () => {
     expect(sql).toContain("release_runs.decision = 'pass'");
     expect(sql).toContain("artifacts.role = 'manufacturing'");
     expect(sql).toContain("artifacts.kind = 'archive'");
+    expect(sql).toContain("join signed_manufacturing_export_evidence");
+    expect(sql).toContain("sourcebinding");
     expect(sql).toContain("projects.workspace_id = $2");
   });
 
@@ -424,6 +500,8 @@ describe("WorkspaceStore", () => {
     const sql = String(query.mock.calls[0]?.[0]).toLowerCase();
     expect(sql).toContain("revisions.bundle_sha256 = artifacts.sha256");
     expect(sql).toContain("revisions.commit_sha = release_runs.commit_sha");
+    expect(sql).toContain("join signed_manufacturing_export_evidence as evidence");
+    expect(sql).toContain("evidence.execution_attempt_id = release_runs.execution_attempt_id");
     expect(sql).toContain("artifacts.role = 'manufacturing'");
   });
 

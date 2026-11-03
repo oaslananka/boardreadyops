@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   resetGitHubActionsOidcJwksCache,
   verifyGitHubActionsOidcToken,
+  verifyGitHubActionsOidcTokenClaims,
 } from "../../../apps/web/lib/github-actions-oidc.js";
 
 const runId = "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d";
@@ -38,9 +39,11 @@ function token(
       workflow_ref: workflowRef,
       ref: "refs/heads/main",
       sha: "a".repeat(40),
+      workflow_sha: "a".repeat(40),
       event_name: "workflow_dispatch",
       runner_environment: "github-hosted",
       run_id: "29121986402",
+      run_attempt: "2",
       iat: nowSeconds - 10,
       nbf: nowSeconds - 10,
       exp: nowSeconds + 300,
@@ -74,6 +77,7 @@ describe("GitHub Actions OIDC verification", () => {
         runId,
         executionAttemptId,
         repositoryId,
+        githubRunId: "29121986402",
         sha: "a".repeat(40),
         fetchImpl,
         now: () => nowMs,
@@ -94,11 +98,12 @@ describe("GitHub Actions OIDC verification", () => {
     // workflow_dispatch runs on the default branch, while the checkout target
     // may be a different commit. GitHub's JWT sha is the dispatch ref SHA.
     await expect(
-      verifyGitHubActionsOidcToken(token({ aud: audience, sha: workflowSha }), {
+      verifyGitHubActionsOidcToken(token({ aud: audience, sha: targetSha, workflow_sha: workflowSha }), {
         runId,
         executionAttemptId,
         audience,
         repositoryId,
+        githubRunId: "29121986402",
         targetSha,
         fetchImpl,
         now: () => nowMs,
@@ -113,11 +118,69 @@ describe("GitHub Actions OIDC verification", () => {
         executionAttemptId,
         audience,
         repositoryId,
+        githubRunId: "29121986402",
         targetSha,
         fetchImpl,
         now: () => nowMs,
       }),
     ).resolves.toBe(false);
+  });
+
+  it("returns the signed workflow SHA separately from the reviewed target SHA", async () => {
+    const targetSha = "a".repeat(40);
+    const workflowSha = "b".repeat(40);
+    const audience = `boardreadyops-cloud:${runId}:${executionAttemptId}:${targetSha}:standard:none`;
+    const claims = await verifyGitHubActionsOidcTokenClaims(
+      token({ aud: audience, sha: targetSha, workflow_sha: workflowSha }),
+      {
+        runId,
+        executionAttemptId,
+        audience,
+        repositoryId,
+        githubRunId: "29121986402",
+        fetchImpl: jwksFetch(),
+        now: () => nowMs,
+      },
+    );
+    expect(claims).toEqual({
+      workflowSha,
+      workflowRunId: "29121986402",
+      runAttempt: 2,
+      repository,
+      repositoryId,
+      workflowRef,
+      ref: "refs/heads/main",
+      event: "workflow_dispatch",
+      runnerEnvironment: "github-hosted",
+    });
+  });
+
+  it("does not return claims for an invalid signature", async () => {
+    const valid = token();
+    const [header, payload] = valid.split(".");
+    const claims = await verifyGitHubActionsOidcTokenClaims(`${header}.${payload}.invalid`, {
+      runId,
+      executionAttemptId,
+      fetchImpl: jwksFetch(),
+      now: () => nowMs,
+    });
+    expect(claims).toBeUndefined();
+  });
+
+  it("rejects a valid token from a different GitHub Actions workflow run", async () => {
+    const fetchImpl = jwksFetch();
+    await expect(
+      verifyGitHubActionsOidcToken(token({ run_id: "29121986403" }), {
+        runId,
+        executionAttemptId,
+        repositoryId,
+        githubRunId: "29121986402",
+        sha: "a".repeat(40),
+        fetchImpl,
+        now: () => nowMs,
+      }),
+    ).resolves.toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("accepts an explicit setup-probe audience while retaining repository claim binding", async () => {

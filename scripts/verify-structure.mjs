@@ -9,7 +9,9 @@ const graph = new Map(files.map((file) => [relative(file), []]));
 const violations = [];
 
 const allowedLayers = new Map([
-  ["action", new Set(["action", "core", "report", "util"])],
+  // Native SVG publication is a deliberate Action capability, using the same
+  // KiCad parser/exporter as the CLI; no general dependency exception.
+  ["action", new Set(["action", "core", "kicad", "report", "util"])],
   ["bom", new Set(["bom", "util"])],
   [
     "cli",

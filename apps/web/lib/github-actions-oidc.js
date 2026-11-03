@@ -27,7 +27,12 @@ function stringClaim(payload, name) {
 
 function integerClaim(payload, name) {
   const value = payload[name];
-  return Number.isSafeInteger(value) ? value : undefined;
+  if (Number.isSafeInteger(value)) return value;
+  if (typeof value === "string" && /^[1-9][0-9]{0,8}$/u.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }
 
 function audienceMatches(audience, expected) {
@@ -70,6 +75,8 @@ function claimsAreTrusted(payload, expectations, nowSeconds) {
     stringClaim(payload, "repository") === expectations.repository &&
     (expectations.repositoryId === undefined || stringClaim(payload, "repository_id") === expectations.repositoryId) &&
     stringClaim(payload, "workflow_ref") === expectations.workflowRef &&
+    (expectations.githubRunId === undefined || stringClaim(payload, "run_id") === expectations.githubRunId) &&
+    (expectations.runAttempt === undefined || integerClaim(payload, "run_attempt") === expectations.runAttempt) &&
     stringClaim(payload, "ref") === expectations.ref &&
     (expectations.sha === undefined || stringClaim(payload, "sha") === expectations.sha) &&
     stringClaim(payload, "event_name") === "workflow_dispatch" &&
@@ -107,7 +114,7 @@ export function resetGitHubActionsOidcJwksCache() {
   cachedJwksExpiresAt = 0;
 }
 
-export async function verifyGitHubActionsOidcToken(
+export async function verifyGitHubActionsOidcTokenClaims(
   token,
   {
     runId,
@@ -115,6 +122,8 @@ export async function verifyGitHubActionsOidcToken(
     audience,
     repository = defaultRepository,
     repositoryId,
+    githubRunId,
+    runAttempt,
     workflowRef = defaultWorkflowRef,
     ref = "refs/heads/main",
     sha,
@@ -123,12 +132,12 @@ export async function verifyGitHubActionsOidcToken(
   },
 ) {
   if (typeof token !== "string" || token.length < 100 || token.length > 20_000 || typeof fetchImpl !== "function") {
-    return false;
+    return undefined;
   }
 
   const segments = token.split(".");
   if (segments.length !== 3 || segments.some((segment) => segment.length === 0)) {
-    return false;
+    return undefined;
   }
 
   const [encodedHeader, encodedPayload, encodedSignature] = segments;
@@ -144,11 +153,11 @@ export async function verifyGitHubActionsOidcToken(
     header.kid.length === 0 ||
     !claimsAreTrusted(
       payload,
-      { runId, executionAttemptId, audience, repository, repositoryId, workflowRef, ref, sha },
+      { runId, executionAttemptId, audience, repository, repositoryId, githubRunId, runAttempt, workflowRef, ref, sha },
       Math.floor(now() / 1000),
     )
   ) {
-    return false;
+    return undefined;
   }
 
   try {
@@ -164,17 +173,38 @@ export async function verifyGitHubActionsOidcToken(
     );
 
     if (matchingKeys.length !== 1) {
-      return false;
+      return undefined;
     }
 
     const publicKey = createPublicKey({ key: matchingKeys[0], format: "jwk" });
-    return verify(
+    const signatureValid = verify(
       "RSA-SHA256",
       Buffer.from(`${encodedHeader}.${encodedPayload}`),
       publicKey,
       Buffer.from(encodedSignature, "base64url"),
     );
+    if (!signatureValid) return undefined;
+
+    // These fields are now backed by GitHub's verified signature, not request headers.
+    const workflowSha = stringClaim(payload, "workflow_sha");
+    const workflowRunId = stringClaim(payload, "run_id");
+    if (!workflowSha || !/^[0-9a-f]{40}$/u.test(workflowSha) || !workflowRunId) return undefined;
+    return {
+      workflowSha,
+      workflowRunId,
+      runAttempt: integerClaim(payload, "run_attempt"),
+      repository: stringClaim(payload, "repository"),
+      repositoryId: stringClaim(payload, "repository_id"),
+      workflowRef: stringClaim(payload, "workflow_ref"),
+      ref: stringClaim(payload, "ref"),
+      event: stringClaim(payload, "event_name"),
+      runnerEnvironment: stringClaim(payload, "runner_environment"),
+    };
   } catch {
-    return false;
+    return undefined;
   }
+}
+
+export async function verifyGitHubActionsOidcToken(token, options) {
+  return (await verifyGitHubActionsOidcTokenClaims(token, options)) !== undefined;
 }
