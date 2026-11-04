@@ -208,6 +208,90 @@ describe("dashboard operational hierarchy", () => {
     expect(markup).not.toContain("fabrication approved");
   });
 
+  it.each([
+    "queued",
+    "dispatched",
+    "running",
+    "reconciliation_required",
+    "failed",
+    "timed_out",
+    "cancelled",
+    "superseded",
+  ])("does not present a %s run without findings as a completed clean result", async (status) => {
+    vi.mocked(loadViewerRepositories).mockResolvedValueOnce([
+      {
+        accountLogin: "octocat",
+        repositories: [
+          {
+            id: "repo-pending",
+            installationId: "installation-1",
+            githubInstallationId: 123,
+            accountLogin: "octocat",
+            owner: "octocat",
+            name: "new-board",
+            private: true,
+            latestRunId: "run-pending",
+            latestRunStatus: status,
+            latestRunDecision: undefined,
+            latestRunAt: "2026-11-04T08:00:00.000Z",
+            openFindings: 0,
+            watchedBoards: 0,
+            openSupplyFindings: 0,
+          },
+        ],
+      },
+    ]);
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 1,
+      repositoriesWithOpenFindings: 0,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 0,
+      watchedBoards: 0,
+    });
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("No completed result yet; findings may be incomplete");
+    expect(markup).not.toContain("No open findings in the latest recorded run");
+    expect(markup).not.toContain("No open findings recorded in the latest runs");
+    expect(markup).toContain('href="/runs/run-pending"');
+  });
+
+  it("shows an accurate zero-finding summary only for a completed latest run", async () => {
+    vi.mocked(loadViewerRepositories).mockResolvedValueOnce([
+      {
+        accountLogin: "octocat",
+        repositories: [
+          {
+            id: "repo-completed",
+            installationId: "installation-1",
+            githubInstallationId: 123,
+            accountLogin: "octocat",
+            owner: "octocat",
+            name: "reviewed-board",
+            private: true,
+            latestRunId: "run-completed",
+            latestRunStatus: "completed",
+            latestRunDecision: "pass",
+            latestRunAt: "2026-11-04T08:00:00.000Z",
+            openFindings: 0,
+            watchedBoards: 0,
+            openSupplyFindings: 0,
+          },
+        ],
+      },
+    ]);
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 1,
+      repositoriesWithOpenFindings: 0,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 0,
+      watchedBoards: 0,
+    });
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("No open findings in the latest completed run");
+    expect(markup).toContain("No open findings recorded in the latest runs");
+    expect(markup).not.toContain("No completed result yet; findings may be incomplete");
+  });
+
   it("keeps sample art secondary and long repository tables on demand", async () => {
     vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
       repositories: 37,

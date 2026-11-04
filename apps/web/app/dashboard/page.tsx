@@ -220,6 +220,13 @@ function RecordedHardwareWork({ groups }: Readonly<{ groups: RepositoryGroup[] }
       <div className="grid gap-3 xl:grid-cols-3">
         {selected.map((repository) => {
           const hasFindings = repository.openFindings > 0;
+          const isCompleted = repository.latestRunStatus === "completed";
+          let findingsDescription = "No completed result yet; findings may be incomplete";
+          if (hasFindings) {
+            findingsDescription = `${repository.openFindings} open findings in the latest recorded run`;
+          } else if (isCompleted) {
+            findingsDescription = "No open findings in the latest completed run";
+          }
           const url = hasFindings ? `/runs/${repository.latestRunId}/findings` : `/runs/${repository.latestRunId}`;
           return (
             <article
@@ -236,11 +243,7 @@ function RecordedHardwareWork({ groups }: Readonly<{ groups: RepositoryGroup[] }
                 <h3 className="break-words text-base font-semibold text-foreground">
                   {repository.owner}/{repository.name}
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  {hasFindings
-                    ? `${repository.openFindings} open findings in the latest recorded run`
-                    : "No open findings in the latest recorded run"}
-                </p>
+                <p className="text-sm text-muted-foreground">{findingsDescription}</p>
                 <p className="text-xs text-muted-foreground">
                   {repository.latestRunAt ? `Last run ${when(repository.latestRunAt)} UTC` : "Run date unavailable"}
                 </p>
@@ -419,6 +422,10 @@ function DashboardBody({
     );
   }
 
+  const latestRunsCompleted = groups.every((group) =>
+    group.repositories.every((repository) => !repository.latestRunId || repository.latestRunStatus === "completed"),
+  );
+
   return (
     <div className="flex flex-col gap-5">
       <AttentionBanner summary={summary} groups={groups} />
@@ -428,7 +435,8 @@ function DashboardBody({
       ) : null}
       {summary.repositoriesWithOpenFindings === 0 &&
       summary.repositoriesWithoutRuns === 0 &&
-      summary.supplyAlerts === 0 ? (
+      summary.supplyAlerts === 0 &&
+      latestRunsCompleted ? (
         <section className="rounded-md border border-border bg-card p-5" aria-label="Latest checks">
           <h2 className="text-lg font-semibold text-foreground">No open findings recorded in the latest runs</h2>
           <p className="mt-1 text-sm text-muted-foreground">
