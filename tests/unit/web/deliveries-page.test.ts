@@ -109,6 +109,44 @@ describe("DeliverySignoffCard", () => {
     expect(text).not.toContain("Sealed Package");
   });
 
+  it("does not treat a passed readiness result as an engineering signature or sealed package", async () => {
+    await act(async () => {
+      root.render(
+        createElement(DeliverySignoffCard, {
+          revisionId: "rev_pass_no_signoff",
+          readinessVerdict: "pass",
+          signedArchiveUrl: "/api/v2/deliveries/test-token/archive",
+          expiresAt: "2026-12-05T01:00:00Z",
+        }),
+      );
+    });
+
+    const text = container.querySelector(".delivery-signoff-card")?.textContent;
+    expect(text).toContain("Readiness result recorded");
+    expect(text).toContain("PASS");
+    expect(text).toContain("Sign-off not recorded");
+    expect(text).not.toContain("Verified Manufacturing Package");
+    expect(text).not.toContain("Engineering Auto-Verified");
+    expect(text).not.toContain("Sealed Package");
+  });
+
+  it("does not claim that a first-party download is a ZIP regardless of its stored file format", async () => {
+    await act(async () => {
+      root.render(
+        createElement(DeliverySignoffCard, {
+          revisionId: "rev_archive",
+          signedArchiveUrl: "/api/v2/deliveries/test-token/archive",
+          expiresAt: "2026-12-05T01:00:00Z",
+        }),
+      );
+    });
+
+    const link = container.querySelector(".download-bundle-button");
+    expect(link?.getAttribute("href")).toBe("/api/v2/deliveries/test-token/archive");
+    expect(link?.textContent).toBe("Download package");
+    expect(link?.getAttribute("download")).toBeDefined();
+  });
+
   it("provides a sender-supplied package link without certifying its contents", async () => {
     await act(async () => {
       root.render(
