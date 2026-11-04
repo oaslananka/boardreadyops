@@ -232,6 +232,22 @@ function validateReviewParents(
     revisionReviewIds.set(revision.id, revision.reviewId);
   }
 
+  // An audit row can be repository-scoped while pointing at a Review from
+  // another included repository. Check subjects that are present in this
+  // bounded snapshot; historic subjects outside it may have been retained
+  // after their original Review was removed.
+  const auditEvents = decoded<{
+    auditEvents: Array<{ repositoryId?: unknown; subjectType?: unknown; subjectId?: unknown }>;
+  }>(entryBytes[2]?.bytes).auditEvents;
+  for (const event of auditEvents) {
+    if (event.subjectType === "review" && typeof event.subjectId === "string") {
+      const reviewRepository = reviewRepositories.get(event.subjectId);
+      if (reviewRepository !== undefined && reviewRepository !== event.repositoryId) {
+        throw new ExportArchivePreflightError();
+      }
+    }
+  }
+
   return { reviewRepositories, revisionReviewIds };
 }
 
