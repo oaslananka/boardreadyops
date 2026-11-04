@@ -847,8 +847,9 @@ function OneClickSetup({
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card p-4">
         <p className="text-sm text-muted-foreground">
-          Sign in and BoardReadyOps opens the pull request on a repository you pick. You can also copy the two files
-          above and commit them yourself — the result is identical.
+          Sign in to open a reviewed setup pull request for the repository you choose. You can also copy the two files
+          above and commit them yourself, but that does not register a BoardReadyOps setup revision and does not verify
+          readiness. Return here to complete the guided setup.
         </p>
         <a
           href="/api/auth/github/login"

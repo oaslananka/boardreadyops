@@ -74,6 +74,16 @@ describe("repository setup readiness controls", () => {
     expect(container.textContent).toContain("Sign in with GitHub to validate");
   });
 
+  it("does not describe manually copied setup files as a registered setup revision", async () => {
+    await act(async () => {
+      root.render(createElement(RepositorySetupInteractive, { ...baseProps, signedIn: false, repositories: [] }));
+    });
+
+    expect(container.textContent).toContain("does not register a BoardReadyOps setup revision");
+    expect(container.textContent).toContain("does not verify readiness");
+    expect(container.textContent).not.toContain("the result is identical");
+  });
+
   it("disables readiness validation until a setup revision exists", async () => {
     const repository = { ...readyForProbe, setupRevision: undefined };
     await act(async () => {
