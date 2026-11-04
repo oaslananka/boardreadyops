@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CopyButton } from "../../components/copy-button.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
+import { RunLiveRefresh } from "../../components/run-live-refresh.js";
 import { RunStateIndicators } from "../../components/run-state-indicators.js";
 import { Button } from "../../components/ui/button.js";
 import { CursorPagination, type DataColumn, DataTable } from "../../components/ui/data-table.js";
@@ -14,6 +15,7 @@ import {
   type RunListingEntry,
   type RunListingResult,
 } from "../../lib/run-listing.js";
+import { shouldLiveRefreshRunListing } from "../../lib/run-live-refresh.js";
 import { buildRunPaginationLinks } from "../../lib/run-pagination-links.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
@@ -169,6 +171,8 @@ export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>
             Every readiness run across the repositories your installations can see, newest first.
           </p>
         </header>
+
+        {shouldLiveRefreshRunListing(runs.map((run) => run.status)) ? <RunLiveRefresh enabled /> : null}
 
         <Panel
           title={listing.state === "not-configured" ? "Run history" : "Recent runs"}

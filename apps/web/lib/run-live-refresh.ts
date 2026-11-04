@@ -20,6 +20,19 @@ export type RunLiveRefreshEnvironment = {
 };
 
 const refreshableStates = new Set<RunLiveRefreshState>(["current", "reconciliation", "stale"]);
+const refreshableListingStatuses = new Set([
+  "queued",
+  "dispatching",
+  "dispatched",
+  "running",
+  "reporting",
+  "reconciliation_required",
+]);
+
+/** Only poll a run list when at least one visible run can still change state. */
+export function shouldLiveRefreshRunListing(statuses: readonly string[]): boolean {
+  return statuses.some((status) => refreshableListingStatuses.has(status));
+}
 
 export function shouldLiveRefreshRun(state: RunLiveRefreshState): boolean {
   return refreshableStates.has(state);

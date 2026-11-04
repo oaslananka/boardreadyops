@@ -3,6 +3,7 @@ import {
   type RunLiveRefreshEnvironment,
   type RunLiveRefreshEvent,
   shouldLiveRefreshRun,
+  shouldLiveRefreshRunListing,
   startRunLiveRefresh,
 } from "../../../apps/web/lib/run-live-refresh.js";
 
@@ -57,6 +58,15 @@ describe("run live refresh", () => {
     for (const state of ["completed", "dead_letter", "failed", "partial_data", "superseded", "timed_out"] as const) {
       expect(shouldLiveRefreshRun(state)).toBe(false);
     }
+  });
+
+  it("refreshes list pages only while at least one displayed run is active", () => {
+    const activeStatuses = ["queued", "dispatching", "dispatched", "running", "reporting", "reconciliation_required"];
+    for (const status of activeStatuses) {
+      expect(shouldLiveRefreshRunListing(["completed", status])).toBe(true);
+    }
+    expect(shouldLiveRefreshRunListing(["completed", "failed", "timed_out", "cancelled", "superseded"])).toBe(false);
+    expect(shouldLiveRefreshRunListing([])).toBe(false);
   });
 
   it("refreshes periodically only while the page is visible and online", () => {
