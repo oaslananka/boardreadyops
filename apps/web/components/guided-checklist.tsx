@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { cn } from "../lib/utils.js";
 import { Card, CardContent } from "./ui/card.js";
@@ -15,9 +16,9 @@ function StepMarker({ status, index }: Readonly<{ status: GuidedChecklistStep["s
     return (
       <span
         aria-hidden="true"
-        className="flex size-4 shrink-0 items-center justify-center rounded-full bg-success text-[10px] font-bold text-background"
+        className="flex size-4 shrink-0 items-center justify-center rounded-full bg-success text-background"
       >
-        ✓
+        <Check className="size-3 text-background" />
       </span>
     );
   }

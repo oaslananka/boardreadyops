@@ -37,6 +37,7 @@ function actualPathToPattern(actualPath: string): string {
     .replace(/\/rev_[a-z0-9_]+/, "/:id")
     .replace(/\/demo-1/, "/:runId")
     .replace(/\/repo-does-not-exist/, "/:repositoryId")
+    .replace(/\/board-does-not-exist/, "/:boardId")
     .replace(/\/token-does-not-exist/, "/:token")
     .replace(/\/intake\/demo$/, "/intake/:slug");
 }

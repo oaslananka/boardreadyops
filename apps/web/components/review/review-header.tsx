@@ -159,7 +159,7 @@ export function ReviewHeader({
             </Link>
           </nav>
         ) : null}
-        <div className="flex max-w-full flex-wrap items-center gap-2 sm:flex-nowrap">
+        <div className="flex max-w-full flex-wrap items-center gap-2">
           <Button size="sm" variant={isApproved ? "secondary" : "default"} onClick={() => onApprove?.()}>
             {isApproved ? "✓ Approved" : "Approve review"}
           </Button>

@@ -19,7 +19,7 @@ export function SettingsNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="rounded-md border border-border bg-card p-3 shadow-lg" aria-label="Settings navigation">
+    <nav className="rounded-md border border-border bg-card p-3 shadow-e1" aria-label="Settings navigation">
       <ul className="settings-nav-list flex flex-col gap-1" data-testid="settings-nav-list">
         {destinations.map((dest) => {
           const current = pathname === dest.href || pathname?.startsWith(`${dest.href}/`);
