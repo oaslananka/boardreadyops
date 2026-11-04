@@ -43,7 +43,8 @@ describe("authenticated bounded metadata preview download and revocation", () =>
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("content-disposition")).toContain(`boardreadyops-metadata-${exportId}.json`);
     expect(Buffer.from(await response.arrayBuffer())).toEqual(bytes);
-    expect(query).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(resolveTenant).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[0]?.[1]).toEqual([exportId, "organization-a", "inst-a", "operator"]);
     const sql = query.mock.calls[0]?.[0] as string;
     expect(sql).toContain("lower(data_exports.requested_by)=lower($4)");
@@ -70,6 +71,48 @@ describe("authenticated bounded metadata preview download and revocation", () =>
     expect((await GET(new Request(`${path}&download=zip`), context)).status).toBe(400);
     database([]);
     expect((await GET(new Request(`${path}&download=metadata-manifest`), context)).status).toBe(404);
+  });
+
+  it("does not release metadata if installation membership disappears during the manifest read", async () => {
+    const { query, close } = database([{ prepared_manifest_bytes: bytes, prepared_manifest_sha256: sha256 }]);
+    resolveTenant
+      .mockResolvedValueOnce({ selected: { id: "inst-a", accountLogin: "organization-a" } })
+      .mockResolvedValueOnce({ selected: undefined });
+    const response = await GET(new Request(`${path}&download=metadata-manifest`), context);
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(query).toHaveBeenCalledOnce();
+    expect(resolveTenant).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("does not release a preview when its tenant identity changes during database IO", async () => {
+    const { query } = database([{ prepared_manifest_bytes: bytes, prepared_manifest_sha256: sha256 }]);
+    resolveTenant
+      .mockResolvedValueOnce({ selected: { id: "inst-a", accountLogin: "organization-a" } })
+      .mockResolvedValueOnce({ selected: { id: "inst-a", accountLogin: "organization-b" } });
+    const response = await GET(new Request(`${path}&download=metadata-manifest`), context);
+    expect(response.status).toBe(404);
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("does not release bytes if the preview was revoked or its contents changed during authorization", async () => {
+    const valid = { prepared_manifest_bytes: bytes, prepared_manifest_sha256: sha256 };
+    const { query } = database([valid]);
+    query.mockResolvedValueOnce({ rows: [valid] }).mockResolvedValueOnce({ rows: [] });
+    const revoked = await GET(new Request(`${path}&download=metadata-manifest`), context);
+    expect(revoked.status).toBe(404);
+    expect(query).toHaveBeenCalledTimes(2);
+
+    const changedBytes = Buffer.from('{"kind":"different-preview"}');
+    const changedSha = createHash("sha256").update(changedBytes).digest("hex");
+    const changed = database([valid]);
+    changed.query.mockResolvedValueOnce({ rows: [valid] }).mockResolvedValueOnce({
+      rows: [{ prepared_manifest_bytes: changedBytes, prepared_manifest_sha256: changedSha }],
+    });
+    const swapped = await GET(new Request(`${path}&download=metadata-manifest`), context);
+    expect(swapped.status).toBe(404);
+    expect(changed.query).toHaveBeenCalledTimes(2);
   });
 
   it("rejects changed persisted content instead of serving an unverified manifest", async () => {
