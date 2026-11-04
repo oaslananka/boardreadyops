@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetOperatorRateLimitForTests } from "../../../apps/web/lib/operator-rate-limit.js";
 import {
+  handleRepositorySetupCreatePrForActor,
   handleRepositorySetupGet,
   handleRepositorySetupPost,
   handleRepositorySetupProbeForActor,
   type RepositorySetupRouteDependencies,
 } from "../../../apps/web/lib/repository-setup-routes.js";
+import { SetupFileConflictError } from "../../../packages/cloud-core/src/github-mutation-service.js";
 import type { RepositorySetupStore } from "../../../packages/db/src/repository-setup-store.js";
 
 const token = "operator-token-".padEnd(48, "x");
@@ -168,6 +170,85 @@ describe("repository setup operator routes", () => {
     );
   });
 
+  it("returns 409 without recording setup revision when a custom first-setup file conflicts", async () => {
+    const setupStore = store({ getContext: vi.fn(async () => ({ ...context, current: undefined })) });
+    const deps = dependencies(setupStore);
+    const execute = vi.fn(async () => {
+      throw new SetupFileConflictError(".github/workflows/readiness-runner.yml");
+    });
+    deps.mutationService = vi.fn(() => ({ execute }));
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "create_pr", requestId: "setup-conflict" }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+    expect(response.status, await response.clone().text()).toBe(409);
+    expect(JSON.stringify(await response.json())).toContain("existing repository file");
+    expect(setupStore.applyRevision).not.toHaveBeenCalled();
+  });
+
+  it("requires a persisted setup revision and explicit opt-in before overwriting a custom setup file", async () => {
+    const setupStore = store({ getContext: vi.fn(async () => ({ ...context, current: undefined })) });
+    const deps = dependencies(setupStore);
+    const execute = vi.fn();
+    deps.mutationService = vi.fn(() => ({ execute }));
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "create_pr", requestId: "unsafe-update", updateExistingSetup: true }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+    expect(response.status, await response.clone().text()).toBe(409);
+    expect(execute).not.toHaveBeenCalled();
+    expect(setupStore.applyRevision).not.toHaveBeenCalled();
+  });
+
+  it("uses explicit setup-update intent only after a persisted revision exists", async () => {
+    const deps = dependencies();
+    const execute = vi.fn(async () => ({
+      outcome: "created" as const,
+      branchName: "boardreadyops/setup",
+      commitSha: "commit-123",
+      pullRequestNumber: 16,
+      pullRequestUrl: "https://github.test/octo/board/pull/16",
+    }));
+    deps.mutationService = vi.fn(() => ({ execute }));
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "create_pr", requestId: "confirmed-update", updateExistingSetup: true }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+    expect(response.status).toBe(201);
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ intent: "setup-update" }));
+  });
+
+  it("forwards explicit update from the authenticated dashboard path to the mutation service", async () => {
+    const deps = dependencies();
+    const execute = vi.fn(async () => ({
+      outcome: "created" as const,
+      branchName: "boardreadyops/setup",
+      commitSha: "commit-sha",
+      pullRequestNumber: 17,
+      pullRequestUrl: "https://github.test/octo/board/pull/17",
+    }));
+    deps.mutationService = vi.fn(() => ({ execute }));
+    const response = await handleRepositorySetupCreatePrForActor(
+      {
+        actorId: "actor-1",
+        installationId,
+        repositoryId,
+        preset: "production",
+        updateExistingSetup: true,
+        requestId: "dashboard-explicit-update",
+      },
+      deps,
+    );
+    expect(response.status).toBe(201);
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ intent: "setup-update" }));
+  });
+
   it("emits one scoped setup PR metric only after newly created and persisted setup", async () => {
     const emitted = vi.fn();
     const deps = dependencies();
@@ -236,7 +317,7 @@ describe("repository setup operator routes", () => {
         repositoryId,
         deps,
       );
-      expect(response.status).toBe(testCase.successStatus);
+      expect(response.status, await response.clone().text()).toBe(testCase.successStatus);
     }
     const deps = dependencies();
     deps.emitTelemetry = metric;
@@ -312,7 +393,7 @@ describe("repository setup operator routes", () => {
         inspect: vi.fn(async () => ({ actionsEnabled: false, workflowStatus: "actions_disabled" })),
       }),
     );
-    expect(response.status).toBe(409);
+    expect(response.status, await response.clone().text()).toBe(409);
     expect(await response.json()).toMatchObject({
       error: expect.stringContaining("confirm the App has Actions read/write permission"),
     });

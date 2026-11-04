@@ -429,6 +429,16 @@ async function createSetupPr(
   const context = await store.getContext({ installationId, repositoryId });
   if (!context) return controlPlaneJsonError("repository is unavailable", 404);
 
+  if (body.updateExistingSetup !== undefined && typeof body.updateExistingSetup !== "boolean") {
+    return controlPlaneJsonError("updateExistingSetup must be a boolean", 400);
+  }
+  if (
+    body.updateExistingSetup === true &&
+    (!context.current || !Number.isSafeInteger(context.current.revision) || context.current.revision <= 0)
+  ) {
+    return controlPlaneJsonError("an existing setup revision is required for an explicit setup update", 409);
+  }
+
   if (body.preset !== undefined && !isSelectableRepositorySetupPresetId(body.preset)) {
     return controlPlaneJsonError("preset is unavailable for new setup changes", 400);
   }
@@ -457,7 +467,7 @@ async function createSetupPr(
       owner: context.owner,
       repo: context.name,
       defaultBranch: context.defaultBranch,
-      intent: "setup",
+      intent: body.updateExistingSetup === true ? "setup-update" : "setup",
       branchName: plan.branchName,
       commitMessage: plan.commitMessage,
       prTitle: plan.prTitle,
@@ -508,6 +518,9 @@ async function createSetupPr(
       result.outcome === "created" ? 201 : 200,
     );
   } catch (error) {
+    if (error instanceof Error && error.name === "SetupFileConflictError") {
+      return controlPlaneJsonError(error.message, 409);
+    }
     const message = error instanceof Error ? error.message : String(error);
     return controlPlaneJsonError(`failed to create setup pull request: ${message}`, 502);
   }
@@ -526,6 +539,7 @@ export async function handleRepositorySetupCreatePrForActor(
     installationId: string;
     repositoryId: string;
     preset?: string;
+    updateExistingSetup?: boolean;
     requestId: string;
   }>,
   dependencies: RepositorySetupRouteDependencies = createRepositorySetupRouteDependencies(),
@@ -538,6 +552,7 @@ export async function handleRepositorySetupCreatePrForActor(
   const store = dependencies.createStore(executor);
   const body: Record<string, unknown> = { requestId: input.requestId };
   if (input.preset !== undefined) body.preset = input.preset;
+  if (input.updateExistingSetup === true) body.updateExistingSetup = true;
   try {
     return await createSetupPr(body, input.actorId, input.installationId, input.repositoryId, store, dependencies);
   } catch {

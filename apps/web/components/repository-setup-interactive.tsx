@@ -97,10 +97,19 @@ async function requestRepositoryAction(
  * passed the props that would have rendered it. The session-authenticated route re-checks that
  * the viewer's installations cover this repository before it writes anything.
  */
-async function requestSetupPr(repositoryId: string, presetId: string): Promise<SetupPrResult> {
+async function requestSetupPr(
+  repositoryId: string,
+  presetId: string,
+  updateExistingSetup = false,
+): Promise<SetupPrResult> {
   const response = await requestRepositoryAction(
     repositoryId,
-    { action: "setup", preset: presetId, requestId: `ui-setup-${Date.now()}` },
+    {
+      action: "setup",
+      preset: presetId,
+      requestId: `ui-setup-${Date.now()}`,
+      ...(updateExistingSetup ? { updateExistingSetup: true } : {}),
+    },
     "The setup pull request could not be opened.",
   );
   if (!response.ok) return response;
@@ -212,26 +221,29 @@ export function RepositorySetupInteractive({
     }
   }, []);
 
-  const handleCreateSetupPr = useCallback(async () => {
-    if (!repositoryId) return;
-    setIsCreatingPr(true);
-    setPrResult(null);
-    const result = await requestSetupPr(repositoryId, activePreset.id);
-    setPrResult(result);
-    const setupRevision = result.setupRevision;
-    if (result.ok && setupRevision !== undefined && Number.isSafeInteger(setupRevision) && setupRevision > 0) {
-      setSetupOverrides((current) => ({
-        ...current,
-        [repositoryId]: {
-          setupRevision,
-          setupPreset: activePreset.id,
-          setupWorkflowStatus: "unknown",
-          setupConfigStatus: "unknown",
-        },
-      }));
-    }
-    setIsCreatingPr(false);
-  }, [repositoryId, activePreset.id]);
+  const handleCreateSetupPr = useCallback(
+    async (updateExistingSetup = false) => {
+      if (!repositoryId) return;
+      setIsCreatingPr(true);
+      setPrResult(null);
+      const result = await requestSetupPr(repositoryId, activePreset.id, updateExistingSetup);
+      setPrResult(result);
+      const setupRevision = result.setupRevision;
+      if (result.ok && setupRevision !== undefined && Number.isSafeInteger(setupRevision) && setupRevision > 0) {
+        setSetupOverrides((current) => ({
+          ...current,
+          [repositoryId]: {
+            setupRevision,
+            setupPreset: activePreset.id,
+            setupWorkflowStatus: "unknown",
+            setupConfigStatus: "unknown",
+          },
+        }));
+      }
+      setIsCreatingPr(false);
+    },
+    [repositoryId, activePreset.id],
+  );
 
   const handleValidateReadiness = useCallback(async () => {
     if (!repositoryId) return;
@@ -395,7 +407,8 @@ export function RepositorySetupInteractive({
           repositoryId={repositoryId}
           {...(displayedRepository ? { repository: displayedRepository } : {})}
           onSelectRepository={handleSelectRepository}
-          onCreate={handleCreateSetupPr}
+          onCreate={() => void handleCreateSetupPr(false)}
+          onUpdate={() => void handleCreateSetupPr(true)}
           isCreating={isCreatingPr}
           selectionDisabled={isCreatingPr || isValidating}
           workflowPath={workflowPath}
@@ -797,6 +810,7 @@ type OneClickSetupProps = {
   repository?: SetupTargetRepository;
   onSelectRepository: (id: string) => void;
   onCreate: () => void;
+  onUpdate: () => void;
   isCreating: boolean;
   selectionDisabled: boolean;
   workflowPath: string;
@@ -819,6 +833,7 @@ function OneClickSetup({
   repository,
   onSelectRepository,
   onCreate,
+  onUpdate,
   isCreating,
   selectionDisabled,
   workflowPath,
@@ -891,7 +906,7 @@ function OneClickSetup({
               <>
                 Creates branch <code>boardreadyops/setup</code> with <code>boardreadyops.yml</code> and{" "}
                 <code>.github/workflows/{workflowPath}</code>, then opens a pull request. Nothing reaches your default
-                branch until you merge it.
+                branch until you merge it. Existing custom setup files are preserved during first-time setup.
               </>
             )}
           </p>
@@ -925,7 +940,7 @@ function OneClickSetup({
           <button
             type="button"
             disabled={isCreating || blockedReason !== undefined || !repositoryId}
-            onClick={onCreate}
+            onClick={onUpdate}
             className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50"
           >
             {isCreating ? "Opening pull request…" : "Open configuration update PR"}

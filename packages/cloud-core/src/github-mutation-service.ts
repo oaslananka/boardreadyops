@@ -294,6 +294,46 @@ async function ensurePullRequest(
   };
 }
 
+/** An existing repository file must not be replaced by an initial setup PR. */
+export class SetupFileConflictError extends Error {
+  constructor(readonly filePath: string) {
+    super(
+      `existing repository file "${filePath}" differs from generated setup; keep the custom file and reconcile it manually before initial setup`,
+    );
+    this.name = "SetupFileConflictError";
+  }
+}
+
+/** Check the pinned default-branch tree before any Git mutation. Unknown provider results fail closed. */
+async function preserveInitialSetupFiles(
+  client: GitHubMutationApiClient,
+  repoPath: string,
+  baseCommitSha: string,
+  files: MutationFile[],
+): Promise<void> {
+  await Promise.all(
+    files.map(async (file) => {
+      const encodedPath = file.path.split("/").map(encodeURIComponent).join("/");
+      const response = await client.request<{ type?: string; encoding?: string; content?: string }>(
+        `${repoPath}/contents/${encodedPath}?ref=${encodeURIComponent(baseCommitSha)}`,
+      );
+      if (response.status === 404) return;
+      if (
+        !response.ok ||
+        response.data?.type !== "file" ||
+        response.data.encoding !== "base64" ||
+        typeof response.data.content !== "string"
+      ) {
+        throw new Error(`unable to verify existing setup file "${file.path}" against the default branch`);
+      }
+      const existingBytes = Buffer.from(response.data.content, "base64");
+      if (!existingBytes.equals(Buffer.from(file.content, "utf8"))) {
+        throw new SetupFileConflictError(file.path);
+      }
+    }),
+  );
+}
+
 export function createGitHubMutationService(dependencies: GitHubMutationServiceDependencies): GitHubMutationService {
   const { client } = dependencies;
 
@@ -329,6 +369,13 @@ export function createGitHubMutationService(dependencies: GitHubMutationServiceD
         input.defaultBranch,
         input.expectedBaseCommitSha,
       );
+      if (input.intent === "setup") {
+        await preserveInitialSetupFiles(client, repoPath, baseCommitSha, input.files);
+        // Reject a default-branch race before writing a tree or PR.
+        if ((await resolveDefaultBranchCommitSha(client, repoPath, input.defaultBranch)) !== baseCommitSha) {
+          throw new Error("default branch changed during setup file verification; retry from the new base");
+        }
+      }
       const { branchExists, existingCommitSha, existingTreeSha } = await resolveBranchState(
         client,
         repoPath,

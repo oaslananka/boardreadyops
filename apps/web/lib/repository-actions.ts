@@ -53,6 +53,8 @@ export type RepositoryActionRequest = {
   ruleId?: string;
   reason?: string;
   preset?: string;
+  /** Explicitly allow a reviewed update only after a persisted setup revision. */
+  updateExistingSetup?: boolean;
   /** Caller-supplied idempotency key. One is generated when absent. */
   requestId?: string;
 };
@@ -126,6 +128,12 @@ export function parseRepositoryActionRequest(
   if (reason) request.reason = reason;
   if (preset) request.preset = preset;
   if (requestId) request.requestId = requestId;
+  if (body.updateExistingSetup !== undefined) {
+    if (action !== "setup" || typeof body.updateExistingSetup !== "boolean") {
+      return { error: "updateExistingSetup must be a boolean on setup actions" };
+    }
+    request.updateExistingSetup = body.updateExistingSetup;
+  }
 
   if (action === "rerun" || action === "release-preview") {
     if (!request.runId) return { error: "runId is required to re-run or preview a release" };
@@ -329,6 +337,7 @@ export async function handleRepositoryAction(
         installationId: context.installationId,
         repositoryId: scope.repositoryId,
         ...(parsed.preset ? { preset: parsed.preset } : {}),
+        ...(parsed.updateExistingSetup ? { updateExistingSetup: true } : {}),
         requestId,
       });
     }
