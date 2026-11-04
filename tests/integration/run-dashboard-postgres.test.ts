@@ -118,6 +118,32 @@ describeDatabase("run dashboard PostgreSQL integration", () => {
     });
   });
 
+  it("revokes direct access to a disabled private repository's run even with an old installation grant", async () => {
+    // A signed viewer session can still contain the original installation ID until expiry.
+    // A private repository disabled after that session was issued must not remain accessible
+    // by guessing the old Run URL, even when the installation itself is still active.
+    await database().query("update repositories set private = true, disabled_at = null where id = $1", [repositoryId]);
+    try {
+      const authorizeRepository = async () => true;
+      const beforeRevocation = await lookupRunDashboard(runId, database(), { authorizeRepository });
+      expect(beforeRevocation.state).toBe("found");
+
+      await database().query("update repositories set disabled_at = now() where id = $1", [repositoryId]);
+      await expect(lookupRunDashboard(runId, database(), { authorizeRepository })).resolves.toEqual({
+        state: "not-found",
+      });
+
+      // Public run links intentionally remain publicly readable by contract.
+      await database().query("update repositories set private = false where id = $1", [repositoryId]);
+      const historicalPublicRun = await lookupRunDashboard(runId, database());
+      expect(historicalPublicRun.state).toBe("found");
+    } finally {
+      await database().query("update repositories set private = false, disabled_at = null where id = $1", [
+        repositoryId,
+      ]);
+    }
+  });
+
   it("filters, sorts, and pages large run-owned result sets without exposing storage paths", async () => {
     const result = await lookupRunDashboard(runId, database(), {
       filters: {
