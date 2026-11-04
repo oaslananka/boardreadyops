@@ -124,14 +124,28 @@ export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>
           </p>
         </header>
 
-        <Panel title="Recent runs" description={`Showing up to ${limit} runs per page.`}>
+        <Panel
+          title={listing.state === "not-configured" ? "Run history" : "Recent runs"}
+          description={
+            listing.state === "not-configured"
+              ? "Run history requires a configured control-plane database."
+              : `Showing up to ${limit} runs per page.`
+          }
+        >
           <DataTable
             caption="Readiness runs across every visible repository"
             columns={columns}
             rows={runs}
             rowKey={(run) => run.id}
             empty={
-              viewer.session ? (
+              listing.state === "not-configured" ? (
+                <EmptyState title="Run history is not configured">
+                  <p>
+                    This deployment has no control-plane database, so stored runs cannot be loaded. Check the service
+                    configuration instead of repeating repository setup.
+                  </p>
+                </EmptyState>
+              ) : viewer.session ? (
                 <GuidedChecklist
                   heading="No runs recorded yet"
                   steps={[
@@ -162,13 +176,15 @@ export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>
           />
         </Panel>
 
-        <CursorPagination
-          basePath="/runs"
-          searchParameters={{ limit: first(parameters.limit) }}
-          {...(nextHref ? { nextHref } : {})}
-          {...(previousHref ? { previousHref } : {})}
-          label="Run pagination"
-        />
+        {listing.state === "ok" ? (
+          <CursorPagination
+            basePath="/runs"
+            searchParameters={{ limit: first(parameters.limit) }}
+            {...(nextHref ? { nextHref } : {})}
+            {...(previousHref ? { previousHref } : {})}
+            label="Run pagination"
+          />
+        ) : null}
       </main>
     </AppShell>
   );
