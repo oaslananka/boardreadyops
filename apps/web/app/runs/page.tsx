@@ -12,6 +12,7 @@ import {
   loadViewerRuns,
   normalizedRunListingLimit,
   type RunListingEntry,
+  type RunListingResult,
 } from "../../lib/run-listing.js";
 import { buildRunPaginationLinks } from "../../lib/run-pagination-links.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
@@ -97,6 +98,51 @@ const columns: readonly DataColumn<RunListingEntry>[] = [
   },
 ];
 
+function RunsEmptyState({ state, signedIn }: Readonly<{ state: RunListingResult["state"]; signedIn: boolean }>) {
+  if (state === "not-configured") {
+    return (
+      <EmptyState title="Run history is not configured">
+        <p>
+          This deployment has no control-plane database, so stored runs cannot be loaded. Check the service
+          configuration instead of repeating repository setup.
+        </p>
+      </EmptyState>
+    );
+  }
+
+  if (!signedIn) {
+    return (
+      <EmptyState title="Sign in to see your runs">
+        <p>Runs are scoped to the repositories your GitHub App installations can access.</p>
+        <Button asChild className="mt-3">
+          <a href="/api/auth/github/login">Sign in with GitHub</a>
+        </Button>
+      </EmptyState>
+    );
+  }
+
+  return (
+    <GuidedChecklist
+      heading="No runs recorded yet"
+      steps={[
+        {
+          id: "setup",
+          label: "Link a repository with a hardware project",
+          status: "current",
+          href: "/setup",
+          actionLabel: "Go to Setup",
+        },
+        {
+          id: "open-pr",
+          label: "Open a pull request so the readiness workflow runs",
+          status: "upcoming",
+        },
+        { id: "review", label: "Work the findings the run reports", status: "upcoming" },
+      ]}
+    />
+  );
+}
+
 export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>) {
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
@@ -124,51 +170,32 @@ export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>
           </p>
         </header>
 
-        <Panel title="Recent runs" description={`Showing up to ${limit} runs per page.`}>
+        <Panel
+          title={listing.state === "not-configured" ? "Run history" : "Recent runs"}
+          description={
+            listing.state === "not-configured"
+              ? "Run history requires a configured control-plane database."
+              : `Showing up to ${limit} runs per page.`
+          }
+        >
           <DataTable
             caption="Readiness runs across every visible repository"
             columns={columns}
             rows={runs}
             rowKey={(run) => run.id}
-            empty={
-              viewer.session ? (
-                <GuidedChecklist
-                  heading="No runs recorded yet"
-                  steps={[
-                    {
-                      id: "setup",
-                      label: "Link a repository with a hardware project",
-                      status: "current",
-                      href: "/setup",
-                      actionLabel: "Go to Setup",
-                    },
-                    {
-                      id: "open-pr",
-                      label: "Open a pull request so the readiness workflow runs",
-                      status: "upcoming",
-                    },
-                    { id: "review", label: "Work the findings the run reports", status: "upcoming" },
-                  ]}
-                />
-              ) : (
-                <EmptyState title="Sign in to see your runs">
-                  <p>Runs are scoped to the repositories your GitHub App installations can access.</p>
-                  <Button asChild className="mt-3">
-                    <a href="/api/auth/github/login">Sign in with GitHub</a>
-                  </Button>
-                </EmptyState>
-              )
-            }
+            empty={<RunsEmptyState state={listing.state} signedIn={Boolean(viewer.session)} />}
           />
         </Panel>
 
-        <CursorPagination
-          basePath="/runs"
-          searchParameters={{ limit: first(parameters.limit) }}
-          {...(nextHref ? { nextHref } : {})}
-          {...(previousHref ? { previousHref } : {})}
-          label="Run pagination"
-        />
+        {listing.state === "ok" && (
+          <CursorPagination
+            basePath="/runs"
+            searchParameters={{ limit: first(parameters.limit) }}
+            {...(nextHref ? { nextHref } : {})}
+            {...(previousHref ? { previousHref } : {})}
+            label="Run pagination"
+          />
+        )}
       </main>
     </AppShell>
   );

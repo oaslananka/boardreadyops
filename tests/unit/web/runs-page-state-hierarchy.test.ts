@@ -14,6 +14,28 @@ vi.mock("../../../apps/web/lib/run-listing.js", async (original) => ({
 const { default: RunsPage } = await import("../../../apps/web/app/runs/page.js");
 
 describe("RunsPage status hierarchy", () => {
+  it("distinguishes missing control-plane configuration from a genuinely empty run history", async () => {
+    loadViewerRuns.mockResolvedValue({ state: "not-configured" });
+    const unavailable = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));
+    expect(unavailable).toContain("Run history is not configured");
+    expect(unavailable).toContain("no control-plane database");
+    expect(unavailable).not.toContain("No runs recorded yet");
+    expect(unavailable).not.toContain("Open a pull request so the readiness workflow runs");
+
+    const cursor = Buffer.from(JSON.stringify({ startedAt: "2026-11-01T10:00:00.000Z", id: "run-1" })).toString(
+      "base64url",
+    );
+    const back = Buffer.from(JSON.stringify([""])).toString("base64url");
+    const unavailableWithPagination = renderToStaticMarkup(
+      await RunsPage({ searchParams: Promise.resolve({ cursor, back }) }),
+    );
+    expect(unavailableWithPagination).not.toContain('aria-label="Run pagination"');
+
+    loadViewerRuns.mockResolvedValue({ state: "ok", next: undefined, runs: [] });
+    const empty = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));
+    expect(empty).toContain("No runs recorded yet");
+    expect(empty).not.toContain("Run history is not configured");
+  });
   it("keeps execution and readiness decisions separately visible", async () => {
     loadViewerRuns.mockResolvedValue({
       state: "ok",
