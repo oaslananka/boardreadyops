@@ -225,16 +225,18 @@ separate #154 two-private-installation requirement.
 
 A workflow_dispatch run can check out a reviewed source commit that differs
 from the commit containing the target repository's workflow definition.
-GitHub's signed OIDC sha claim identifies the workflow ref commit (the
-signer), while the export manifest and its source fingerprint must identify
-the exact reviewed checkout. These values are not interchangeable.
+GitHub's signed OIDC `sha` claim identifies the commit that triggered the
+workflow run. The distinct signed `workflow_sha` claim identifies the commit
+containing the workflow file (the signer). Neither claim substitutes for the
+actual reviewed checkout, whose source SHA is independently verified.
 
 The verifier therefore accepts:
 - reviewedSha: the independently authorized target commit whose KiCad source
   and generated outputs are hashed;
 - signerSha: the workflow definition commit, obtained only from the
-  cryptographically verified GitHub OIDC sha claim for the exact persisted
-  repository/workflow/ref/run/attempt.
+  cryptographically verified GitHub OIDC `workflow_sha` claim for the exact
+  persisted repository/workflow/ref/run/attempt. The OIDC `sha` claim is
+  separately checked against the expected triggering commit.
 
 The CLI local policy path remains backward-compatible: when no separate
 signerSha is provided, it continues to expect the signer and source commit
@@ -245,7 +247,7 @@ expectations, then pass that verifier-returned workflowSha as signerSha.
 
 The composite export Action now verifies that Git HEAD equals the supplied
 reviewed-source-sha; it deliberately does not require this source SHA to
-equal GitHub's workflow-ref GITHUB_SHA. The signer SHA remains independently
+equal GitHub's workflow-run `GITHUB_SHA`. The signer SHA remains independently
 checked against the Sigstore certificate's githubWorkflowSHA and
 buildSignerDigest, while sourceRepositoryDigest must equal reviewedSha.
 
