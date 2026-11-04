@@ -63,6 +63,34 @@ describe("FindingsTab component (no local optimistic drift, accessible controls)
     delete runtime.IS_REACT_ACT_ENVIRONMENT;
   });
 
+  it("adds a corrective note only to legacy virtual BOM records without changing severity or disposition", async () => {
+    const inputs: DemoFinding[] = [
+      {
+        ...findings[0],
+        fingerprint: "virtual-finding",
+        ruleId: "bom.missing-mpn",
+        message: "#PWR030 is missing an MPN.",
+      },
+      {
+        ...findings[0],
+        fingerprint: "physical-finding",
+        ruleId: "bom.missing-mpn",
+        message: "R8 is missing an MPN.",
+      },
+    ];
+    await act(async () => {
+      root.render(createElement(FindingsTab, { findings: inputs }));
+    });
+    expect(container.innerHTML).toContain("#PWR030 is missing an MPN.");
+    expect(container.innerHTML).toContain("R8 is missing an MPN.");
+    expect(container.innerHTML).toContain("Exclude from BOM");
+    expect(container.innerHTML.match(/original recorded finding/g)).toHaveLength(1);
+    expect(Array.from(container.querySelectorAll("select.disposition-select"), (element) => element.value)).toEqual([
+      "open",
+      "open",
+    ]);
+  });
+
   it("calls onUpdateDisposition without mutating local state when the parent leaves the finding prop unchanged", async () => {
     const onUpdateDisposition = vi.fn();
     await act(async () => {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DemoFinding, DemoReview } from "../../lib/demo-data.js";
+import { recordedVirtualBomNotice } from "../../lib/finding-guidance.js";
 import { ReviewCanvas } from "./review-canvas.js";
 import { VerifiedObjectPositions } from "./verified-object-positions.js";
 
@@ -115,6 +116,11 @@ export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview 
           {finding.severity.toUpperCase()} · {finding.ruleId}
         </span>
         <span className="mt-1 line-clamp-2 block break-words text-sm text-foreground">{finding.message}</span>
+        {recordedVirtualBomNotice(finding.ruleId, finding.message) ? (
+          <span className="mt-1 block text-xs text-muted-foreground">
+            {recordedVirtualBomNotice(finding.ruleId, finding.message)}
+          </span>
+        ) : null}
         <span
           className={
             "mt-2 block text-xs " +

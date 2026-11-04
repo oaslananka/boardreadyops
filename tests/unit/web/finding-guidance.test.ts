@@ -3,6 +3,7 @@ import {
   findingDomainFromRule,
   findingGuidance,
   githubFindingSourceUrl,
+  recordedVirtualBomNotice,
 } from "../../../apps/web/lib/finding-guidance.js";
 import { catalogRules } from "../../../apps/web/lib/rule-catalog.js";
 
@@ -85,6 +86,25 @@ describe("finding remediation guidance", () => {
       expect(guidance).not.toContain("Supply a verifiable manufacturer part number");
     }
     expect(findingGuidance("bom.missing-mpn", "R1 is missing an MPN.")).toContain("manufacturer part number");
+  });
+
+  it("flags only recorded KiCad virtual-reference BOM diagnostics without changing the source message", () => {
+    for (const message of [
+      "#PWR030 is missing an MPN.",
+      "#FLG01 is missing an MPN.",
+      "KiCad virtual symbol #PWR010 was included in the exported BOM. Exclude it from the exported BOM.",
+    ]) {
+      const note = recordedVirtualBomNotice("bom.missing-mpn", message);
+      expect(note).toContain("Exclude from BOM");
+      expect(note).toContain("recorded finding");
+    }
+    for (const [ruleId, message] of [
+      ["bom.missing-mpn", "R8 is missing an MPN."],
+      ["bom.lifecycle", "#PWR030 is missing an MPN."],
+      ["bom.missing-mpn", "The wrong value #PWR030 is missing an MPN."],
+    ]) {
+      expect(recordedVirtualBomNotice(ruleId, message)).toBeUndefined();
+    }
   });
 
   it("never tells a release documentation error to edit a CAD design file", () => {

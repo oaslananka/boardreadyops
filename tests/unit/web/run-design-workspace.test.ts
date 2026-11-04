@@ -65,6 +65,25 @@ describe("recorded run design workspace", () => {
     expect(html).not.toContain("edit CAD");
   });
 
+  it("explains historical virtual reference warnings in the visible list while retaining the source record", () => {
+    const original = "#PWR030 is missing an MPN.";
+    const first = findings[0];
+    const second = findings[1];
+    if (!first || !second) throw new Error("fixtures absent");
+    const html = render(
+      [],
+      [
+        { ...first, id: "legacy", fingerprint: "virtual", ruleId: "bom.missing-mpn", message: original },
+        { ...second, id: "resistor", fingerprint: "real", ruleId: "bom.missing-mpn", message: "R8 is missing an MPN." },
+      ],
+    );
+    expect(html).toContain(original);
+    expect(html).toContain("R8 is missing an MPN.");
+    expect(html).toContain("Exclude from BOM");
+    expect(html.match(/recorded finding/g)).toHaveLength(1);
+    expect(html).toContain('aria-label="Run design investigation workspace"');
+  });
+
   it("selects a marker only when the recorded wire fingerprint matches (not its database row ID)", () => {
     const anchors = [
       {
