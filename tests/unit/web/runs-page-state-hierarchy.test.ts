@@ -6,6 +6,9 @@ vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
     session: { login: "octocat", installationIds: [1] },
   })),
 }));
+vi.mock("../../../apps/web/components/run-live-refresh.js", () => ({
+  RunLiveRefresh: () => "Live status updates refresh every five seconds and resume automatically after reconnect.",
+}));
 const loadViewerRuns = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/web/lib/run-listing.js", async (original) => ({
   ...(await original<Record<string, unknown>>()),
@@ -36,6 +39,55 @@ describe("RunsPage status hierarchy", () => {
     expect(empty).toContain("No runs recorded yet");
     expect(empty).not.toContain("Run history is not configured");
   });
+  it.each(["queued", "dispatching", "dispatched", "running", "reporting", "reconciliation_required"])(
+    "refreshes the run list while a %s run can still progress",
+    async (status) => {
+      loadViewerRuns.mockResolvedValue({
+        state: "ok",
+        next: undefined,
+        runs: [
+          {
+            id: "run-live",
+            repositoryId: "repo-a",
+            repository: "acme/board",
+            status,
+            decision: undefined,
+            commitSha: "1".repeat(40),
+            ref: "refs/heads/main",
+            startedAt: "2026-11-04T08:00:00.000Z",
+          },
+        ],
+      });
+      const markup = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));
+      expect(markup).toContain("Live status updates");
+      expect(markup).toContain("refresh every five seconds");
+    },
+  );
+
+  it.each(["completed", "failed", "timed_out", "cancelled", "superseded"])(
+    "does not poll a run list with only %s history",
+    async (status) => {
+      loadViewerRuns.mockResolvedValue({
+        state: "ok",
+        next: undefined,
+        runs: [
+          {
+            id: "run-terminal",
+            repositoryId: "repo-a",
+            repository: "acme/board",
+            status,
+            decision: undefined,
+            commitSha: "2".repeat(40),
+            ref: "refs/heads/main",
+            startedAt: "2026-11-04T08:00:00.000Z",
+          },
+        ],
+      });
+      const markup = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));
+      expect(markup).not.toContain("Live status updates");
+    },
+  );
+
   it("keeps execution and readiness decisions separately visible", async () => {
     loadViewerRuns.mockResolvedValue({
       state: "ok",
