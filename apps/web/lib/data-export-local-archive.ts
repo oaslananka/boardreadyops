@@ -124,5 +124,16 @@ export async function prepareClaimedLocalArchiveZip(input: {
 
   const currentManifest = await prepareClaimedExportManifest(new DataExportInventoryStore(input.db), input.claim);
   if (!currentManifest || currentManifest.sha256 !== slices.repositories.sha256) return null;
-  return prepareClaimedArchiveZip({ slices, verifiedObjects });
+
+  const archive = prepareClaimedArchiveZip({ slices, verifiedObjects });
+  // ZIP construction can outlast a claim or race an external object deletion.
+  // Recheck both physical-object authority and the original lease/scope after
+  // packaging, before making even this internal in-memory result available.
+  for (const candidate of verifiedObjects) {
+    const current = await lookupClaimedExportObject(input.db, input.claim, candidate.object.artifactId);
+    if (!current || !sameObject(current, candidate.object)) return null;
+  }
+  const afterPackaging = await prepareClaimedExportManifest(new DataExportInventoryStore(input.db), input.claim);
+  if (!afterPackaging || afterPackaging.sha256 !== slices.repositories.sha256) return null;
+  return archive;
 }

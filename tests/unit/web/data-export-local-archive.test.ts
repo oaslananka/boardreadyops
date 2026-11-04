@@ -93,8 +93,16 @@ async function fixture(options: { artifacts?: boolean } = {}) {
   );
   const liveReplies: Array<{ rows: Record<string, unknown>[] }> =
     options.artifacts === false
-      ? [{ rows: [inventory] }]
-      : [{ rows: [row] }, { rows: [row] }, { rows: [row] }, { rows: [row] }, { rows: [inventory] }];
+      ? [{ rows: [inventory] }, { rows: [inventory] }]
+      : [
+          { rows: [row] },
+          { rows: [row] },
+          { rows: [row] },
+          { rows: [row] },
+          { rows: [inventory] },
+          { rows: [row] },
+          { rows: [inventory] },
+        ];
   let liveIndex = 0;
   const query = vi.fn(async (sql: string) => {
     if (sql.includes("boardreadyops_begin_export_object_copy")) return { rows: [{ outcome: "reserved" }] };
@@ -123,7 +131,7 @@ describe("internal claim-bound local archive assembly", () => {
     expect(JSON.stringify(extracted.files.map(({ path: name }) => name))).not.toContain(f.row.storage_path);
     expect(f.withTransaction).toHaveBeenCalledTimes(1);
     expect(f.queryInside).toHaveBeenCalledTimes(7);
-    expect(f.query).toHaveBeenCalledTimes(7);
+    expect(f.query).toHaveBeenCalledTimes(9);
     for (const [sql, params] of f.query.mock.calls) {
       if (sql.includes("FROM data_exports AS exports")) {
         expect(sql).toContain("artifact_deletion_jobs");
@@ -143,7 +151,7 @@ describe("internal claim-bound local archive assembly", () => {
     const f = await fixture({ artifacts: false });
     const result = await prepareClaimedLocalArchiveZip(f.input);
     expect(result?.files).toBe(7);
-    expect(f.query).toHaveBeenCalledTimes(1);
+    expect(f.query).toHaveBeenCalledTimes(2);
   });
 
   it("rejects a revoked claim before reading or after filesystem IO", async () => {
@@ -166,6 +174,30 @@ describe("internal claim-bound local archive assembly", () => {
     later.liveReplies[4] = { rows: [] };
     await expect(prepareClaimedLocalArchiveZip(later.input)).resolves.toBeNull();
     expect(later.query).toHaveBeenCalledTimes(7);
+  });
+
+  it("rejects object deletion or replacement after ZIP packaging but before returning bytes", async () => {
+    const deleted = await fixture();
+    deleted.liveReplies[5] = { rows: [] };
+    await expect(prepareClaimedLocalArchiveZip(deleted.input)).resolves.toBeNull();
+    expect(deleted.query).toHaveBeenCalledTimes(8);
+
+    const replaced = await fixture();
+    replaced.liveReplies[5] = { rows: [{ ...replaced.row, storage_path: "other/file" }] };
+    await expect(prepareClaimedLocalArchiveZip(replaced.input)).resolves.toBeNull();
+    expect(replaced.query).toHaveBeenCalledTimes(8);
+  });
+
+  it("rejects a lost lease or changed inventory after ZIP packaging, including metadata-only", async () => {
+    const f = await fixture();
+    f.liveReplies[6] = { rows: [] };
+    await expect(prepareClaimedLocalArchiveZip(f.input)).resolves.toBeNull();
+    expect(f.query).toHaveBeenCalledTimes(9);
+
+    const metadata = await fixture({ artifacts: false });
+    metadata.liveReplies[1] = { rows: [] };
+    await expect(prepareClaimedLocalArchiveZip(metadata.input)).resolves.toBeNull();
+    expect(metadata.query).toHaveBeenCalledTimes(2);
   });
 
   it("rejects changed repository or storage path on the final object recheck", async () => {
