@@ -232,7 +232,27 @@ function validateReviewParents(
     revisionReviewIds.set(revision.id, revision.reviewId);
   }
 
+  validateAuditReviewSubjects(entryBytes[2]?.bytes, reviewRepositories);
   return { reviewRepositories, revisionReviewIds };
+}
+
+/** Check Review subjects present in this bounded snapshot; historic references
+ * whose original Review no longer exists do not imply foreign ownership. */
+function validateAuditReviewSubjects(
+  auditBytes: Buffer | undefined,
+  reviewRepositories: ReadonlyMap<string, string>,
+): void {
+  const auditEvents = decoded<{
+    auditEvents: Array<{ repositoryId?: unknown; subjectType?: unknown; subjectId?: unknown }>;
+  }>(auditBytes).auditEvents;
+  for (const event of auditEvents) {
+    if (event.subjectType === "review" && typeof event.subjectId === "string") {
+      const reviewRepository = reviewRepositories.get(event.subjectId);
+      if (reviewRepository !== undefined && reviewRepository !== event.repositoryId) {
+        throw new ExportArchivePreflightError();
+      }
+    }
+  }
 }
 
 function validateReviewChildren(
