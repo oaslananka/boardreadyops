@@ -77,7 +77,15 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
     const store = new DataLifecycleStore(executor);
     const tenantId = tenantLogin;
     const exp = await store.getExport(tenantId, exportId, canonicalInstallationId);
-    if (!exp)
+    // Status metadata includes the requester's identity and private scope. Installation
+    // membership alone does not grant access to another user's export request.
+    // Match GitHub logins case-insensitively, as with the requester-bound preview API.
+    if (
+      !exp ||
+      typeof exp.requestedBy !== "string" ||
+      typeof viewer.session.login !== "string" ||
+      exp.requestedBy.toLowerCase() !== viewer.session.login.toLowerCase()
+    )
       return Response.json(
         { ok: false, error: "not found" },
         { status: 404, headers: { "cache-control": "private, no-store" } },
