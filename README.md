@@ -10,7 +10,6 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 [![Security](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
 [![GitGem](https://gitgem.org/api/badge/github/oaslananka/boardreadyops.svg)](https://gitgem.org/github/oaslananka/boardreadyops)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oaslananka/boardreadyops)
 
 [![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
 [![npm downloads](https://img.shields.io/npm/dt/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
@@ -21,6 +20,7 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 [OpenSSF Evidence](docs/openssf-evidence.md) ·
 [Governance](GOVERNANCE.md) ·
 [Roadmap](docs/ROADMAP.md) ·
+[DeepWiki](https://deepwiki.com/oaslananka/boardreadyops) ·
 [Support](SUPPORT.md)
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-ffdd00?logo=buymeacoffee&logoColor=black&labelColor=ffdd00&color=111111)](https://www.buymeacoffee.com/oaslananka)
