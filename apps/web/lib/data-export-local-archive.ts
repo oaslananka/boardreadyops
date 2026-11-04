@@ -134,6 +134,6 @@ export async function prepareClaimedLocalArchiveZip(input: {
     if (!current || !sameObject(current, candidate.object)) return null;
   }
   const afterPackaging = await prepareClaimedExportManifest(new DataExportInventoryStore(input.db), input.claim);
-  if (!afterPackaging || afterPackaging.sha256 !== slices.repositories.sha256) return null;
+  if (afterPackaging?.sha256 !== slices.repositories.sha256) return null;
   return archive;
 }
