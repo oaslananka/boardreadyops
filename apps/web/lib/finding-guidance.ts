@@ -73,6 +73,22 @@ const ruleSteps: Readonly<Record<string, string>> = {
     "Find a current lifecycle statement from an attributable component data source for the affected part. Update the BOM or authorized provider data; do not treat missing lifecycle evidence as active.",
 };
 
+/**
+ * Add an honest interpretation beside immutable old run/review diagnostics.
+ * This does not amend severity, fingerprint, disposition, counts, or signed data.
+ */
+export function recordedVirtualBomNotice(ruleId: string, message: string): string | undefined {
+  if (ruleId !== "bom.missing-mpn") return undefined;
+  const oldVirtual = /^#[A-Za-z0-9_+-]+ is missing an MPN\.$/u.test(message);
+  const explicitVirtual =
+    /^KiCad virtual symbol #[A-Za-z0-9_+-]+ was included in the exported BOM\. Exclude it from the exported BOM\.$/u.test(
+      message,
+    );
+  return oldVirtual || explicitVirtual
+    ? "Virtual KiCad reference: Exclude from BOM and rerun. The original recorded finding and severity are unchanged."
+    : undefined;
+}
+
 export function findingGuidance(ruleId: string, message?: string): string {
   // Older persisted findings may still describe virtual KiCad symbols as
   // missing MPNs. The correct action is to exclude them from the purchase BOM.

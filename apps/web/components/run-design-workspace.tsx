@@ -2,7 +2,7 @@
 
 import type { SnapshotArtifact } from "@boardreadyops/contracts";
 import { useState } from "react";
-import { findingGuidance, githubFindingSourceUrl } from "../lib/finding-guidance.js";
+import { findingGuidance, githubFindingSourceUrl, recordedVirtualBomNotice } from "../lib/finding-guidance.js";
 import type { RunDetail } from "../lib/run-dashboard.js";
 import { ReviewCanvas } from "./review/review-canvas.js";
 
@@ -122,6 +122,11 @@ export function RunDesignWorkspace({
                     {finding.severity.toUpperCase()} · {finding.ruleId}
                   </span>
                   <span className="mt-1 line-clamp-2 block break-words text-sm text-foreground">{finding.message}</span>
+                  {recordedVirtualBomNotice(finding.ruleId, finding.message) ? (
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {recordedVirtualBomNotice(finding.ruleId, finding.message)}
+                    </span>
+                  ) : null}
                   {finding.waivedAt ? (
                     <span className="mt-1 block text-xs text-muted-foreground">Waived · remains recorded</span>
                   ) : null}

@@ -88,6 +88,23 @@ describe("Zaptrace-inspired BoardReadyOps review workspace", () => {
     expect(html).toContain('class="mt-1 break-words">Insufficient clearance on U1');
   });
 
+  it("keeps a virtual BOM warning's original evidence and shows corrective context in the list", () => {
+    const legacy = {
+      ...u1,
+      ruleId: "bom.missing-mpn",
+      message: "#PWR010 is missing an MPN.",
+      component: "#PWR010",
+    };
+    const html = renderToStaticMarkup(
+      createElement(ReviewDesignWorkspace, { review: { ...review, findings: [legacy, r2] } }),
+    );
+    expect(html).toContain("#PWR010 is missing an MPN.");
+    expect(html).toContain("Exclude from BOM");
+    expect(html).toContain("original recorded finding and severity are unchanged");
+    expect(html).toContain("1 open critical/error");
+    expect(html).not.toContain("R8 is missing an MPN.");
+  });
+
   it("filters actual blocker records by severity, disposition and query without losing other findings", () => {
     expect(visibleReviewFindings(review.findings, "blocking", "").map((x) => x.fingerprint)).toEqual([
       "fp-source-bound",

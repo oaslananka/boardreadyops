@@ -4,6 +4,7 @@ import type { FindingDisposition } from "@boardreadyops/contracts";
 import type { KeyboardEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DemoFinding } from "../../lib/demo-data.js";
+import { recordedVirtualBomNotice } from "../../lib/finding-guidance.js";
 import { DecisionModal } from "./decision-modal.js";
 
 export interface FindingsTabProps {
@@ -364,6 +365,11 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
                 </div>
 
                 <p className="mt-2 text-sm text-foreground">{finding.message}</p>
+                {recordedVirtualBomNotice(finding.ruleId, finding.message) ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {recordedVirtualBomNotice(finding.ruleId, finding.message)}
+                  </p>
+                ) : null}
 
                 {/* `finding-detail-grid` carries no styling any more -- kept as a stable
                     selector hook for tests/unit/web/keyboard-triage.test.ts. */}

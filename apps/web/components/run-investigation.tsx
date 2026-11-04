@@ -1,6 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { findingDomainFromRule, findingGuidance, githubFindingSourceUrl } from "../lib/finding-guidance.js";
+import {
+  findingDomainFromRule,
+  findingGuidance,
+  githubFindingSourceUrl,
+  recordedVirtualBomNotice,
+} from "../lib/finding-guidance.js";
 import { releaseRepositoryDispatchAvailability } from "../lib/release-rollout.js";
 import type { RunDashboardFilters, RunDetail } from "../lib/run-dashboard.js";
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
@@ -855,6 +860,11 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
                     <StatusBadge value={finding.severity} />
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{finding.message}</p>
+                  {recordedVirtualBomNotice(finding.ruleId, finding.message) ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {recordedVirtualBomNotice(finding.ruleId, finding.message)}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -1254,6 +1264,11 @@ function FindingRow({
         </div>
       </header>
       <p className="mt-1 text-sm text-foreground">{finding.message}</p>
+      {recordedVirtualBomNotice(finding.ruleId, finding.message) ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {recordedVirtualBomNotice(finding.ruleId, finding.message)}
+        </p>
+      ) : null}
       <dl className="mt-2 grid grid-cols-3 gap-3">
         <div>
           <dt className="text-xs uppercase text-muted-foreground">Path</dt>
