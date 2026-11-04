@@ -311,25 +311,27 @@ async function preserveInitialSetupFiles(
   baseCommitSha: string,
   files: MutationFile[],
 ): Promise<void> {
-  for (const file of files) {
-    const encodedPath = file.path.split("/").map(encodeURIComponent).join("/");
-    const response = await client.request<{ type?: string; encoding?: string; content?: string }>(
-      `${repoPath}/contents/${encodedPath}?ref=${encodeURIComponent(baseCommitSha)}`,
-    );
-    if (response.status === 404) continue;
-    if (
-      !response.ok ||
-      response.data?.type !== "file" ||
-      response.data.encoding !== "base64" ||
-      typeof response.data.content !== "string"
-    ) {
-      throw new Error(`unable to verify existing setup file "${file.path}" against the default branch`);
-    }
-    const existingBytes = Buffer.from(response.data.content, "base64");
-    if (!existingBytes.equals(Buffer.from(file.content, "utf8"))) {
-      throw new SetupFileConflictError(file.path);
-    }
-  }
+  await Promise.all(
+    files.map(async (file) => {
+      const encodedPath = file.path.split("/").map(encodeURIComponent).join("/");
+      const response = await client.request<{ type?: string; encoding?: string; content?: string }>(
+        `${repoPath}/contents/${encodedPath}?ref=${encodeURIComponent(baseCommitSha)}`,
+      );
+      if (response.status === 404) return;
+      if (
+        !response.ok ||
+        response.data?.type !== "file" ||
+        response.data.encoding !== "base64" ||
+        typeof response.data.content !== "string"
+      ) {
+        throw new Error(`unable to verify existing setup file "${file.path}" against the default branch`);
+      }
+      const existingBytes = Buffer.from(response.data.content, "base64");
+      if (!existingBytes.equals(Buffer.from(file.content, "utf8"))) {
+        throw new SetupFileConflictError(file.path);
+      }
+    }),
+  );
 }
 
 export function createGitHubMutationService(dependencies: GitHubMutationServiceDependencies): GitHubMutationService {
