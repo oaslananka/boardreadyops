@@ -49,13 +49,13 @@ export function ReviewEmptyVisualPreview({
         </span>
       </header>
       <div className="grid min-w-0 gap-4 p-4 sm:p-6 xl:grid-cols-2">
-        <figure className="group min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#101827] shadow-sm">
-          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-slate-100">
+        <figure className="group min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-e1">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 text-foreground">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-300">01 / Board layout</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">Board layout</p>
               <figcaption className="mt-1 text-sm font-semibold">PCB · assembled board</figcaption>
             </div>
-            <span className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-slate-300">
+            <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
               KiCad sample
             </span>
           </div>
@@ -64,7 +64,7 @@ export function ReviewEmptyVisualPreview({
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open full-resolution example PCB plot"
-            className="relative block overflow-hidden bg-[#0b1220] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-indigo-400"
+            className="relative block overflow-hidden bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
           >
             {/* biome-ignore lint/performance/noImgElement: Source-faithful native KiCad sample plot. */}
             <img
@@ -74,23 +74,21 @@ export function ReviewEmptyVisualPreview({
               decoding="async"
               className="h-64 w-full object-contain object-center transition-transform duration-300 motion-safe:group-hover:scale-[1.08] sm:h-80 sm:object-cover"
             />
-            <span className="absolute bottom-3 right-3 rounded-md border border-white/20 bg-[#080e1c]/90 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm">
+            <span className="absolute bottom-3 right-3 rounded-md border border-border bg-card/90 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm">
               Full view ↗
             </span>
           </a>
-          <p className="border-t border-white/10 px-4 py-3 text-xs leading-relaxed text-slate-300">
+          <p className="border-t border-border px-4 py-3 text-xs leading-relaxed text-muted-foreground">
             Genuine KiCad 3D render, not customer data or a verified manufacturing release.
           </p>
         </figure>
-        <figure className="group min-w-0 overflow-hidden rounded-xl border border-border bg-[#f7f6f2] shadow-sm">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 text-slate-900">
+        <figure className="group min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-e1">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 text-foreground">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
-                02 / Circuit logic
-              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">Circuit logic</p>
               <figcaption className="mt-1 text-sm font-semibold">Schematic · MCU and nets</figcaption>
             </div>
-            <span className="rounded-full border border-slate-300 px-2.5 py-1 text-[11px] text-slate-600">
+            <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
               KiCad sample
             </span>
           </div>
@@ -99,7 +97,7 @@ export function ReviewEmptyVisualPreview({
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open full-resolution example schematic plot"
-            className="relative block overflow-hidden bg-[#f7f6f2] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-indigo-600"
+            className="relative block overflow-hidden bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
           >
             {/* biome-ignore lint/performance/noImgElement: Source-faithful native KiCad sample plot. */}
             <img
@@ -109,11 +107,11 @@ export function ReviewEmptyVisualPreview({
               decoding="async"
               className="h-64 w-full object-contain object-center transition-transform duration-300 motion-safe:group-hover:scale-[1.08] sm:h-80 sm:object-cover"
             />
-            <span className="absolute bottom-3 right-3 rounded-md border border-slate-300 bg-white/95 px-2.5 py-1.5 text-xs font-medium text-slate-900 shadow-sm">
+            <span className="absolute bottom-3 right-3 rounded-md border border-border bg-card/90 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm">
               Full view ↗
             </span>
           </a>
-          <p className="border-t border-slate-200 px-4 py-3 text-xs leading-relaxed text-slate-700">
+          <p className="border-t border-border px-4 py-3 text-xs leading-relaxed text-muted-foreground">
             Native KiCad export cropped for legibility; circuit symbols and nets are unchanged.
           </p>
         </figure>
@@ -136,15 +134,15 @@ export function ReviewEmptyVisualPreview({
           aria-label="From design to production review"
         >
           <li className="rounded-lg border border-border bg-muted/25 p-3">
-            <span className="text-xs font-semibold text-primary">01 · See the design</span>
+            <span className="text-xs font-semibold text-primary">See the design</span>
             <p className="mt-1 text-foreground">PCB, schematic and source revision.</p>
           </li>
           <li className="rounded-lg border border-border bg-muted/25 p-3">
-            <span className="text-xs font-semibold text-primary">02 · Investigate blockers</span>
+            <span className="text-xs font-semibold text-primary">Investigate blockers</span>
             <p className="mt-1 text-foreground">Findings tied to recorded evidence.</p>
           </li>
           <li className="rounded-lg border border-border bg-muted/25 p-3">
-            <span className="text-xs font-semibold text-primary">03 · Prepare the handoff</span>
+            <span className="text-xs font-semibold text-primary">Prepare the handoff</span>
             <p className="mt-1 text-foreground">Verify the package before fabrication.</p>
           </li>
         </ol>

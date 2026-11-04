@@ -146,7 +146,10 @@ function ReviewNavigationTabs({
       >
         Checklist & Approvals
         {incompleteChecklistCount > 0 ? (
-          <span className="rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-bold text-white" aria-hidden="true">
+          <span
+            className="rounded-full border border-warning/40 bg-warning-surface px-1.5 py-0.5 text-[10px] font-bold text-warning"
+            aria-hidden="true"
+          >
             {incompleteChecklistCount}
           </span>
         ) : null}

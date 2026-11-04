@@ -92,11 +92,11 @@ function toImageSrc(content?: string): string {
 }
 
 const markerBase =
-  "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background px-1.5 py-0.5 text-[10px] font-medium shadow";
+  "absolute -translate-x-1/2 -translate-y-1/2 min-h-11 min-w-11 inline-flex items-center justify-center rounded-full border-2 border-background px-2 py-1 text-xs font-semibold shadow-e2";
 
 function markerSeverityClass(severity: string): string {
-  if (severity === "error" || severity === "critical") return "bg-danger text-white";
-  return "bg-warning text-white";
+  if (severity === "error" || severity === "critical") return "bg-danger text-danger-foreground";
+  return "bg-warning-surface text-warning border-warning/60";
 }
 
 /** Group native DRC references to the same physical object and image point. */
@@ -248,14 +248,14 @@ function CanvasMarkersLayer({
           <button
             type="button"
             key={comment.id}
-            className="pointer-events-auto absolute rounded-full bg-card px-1 text-sm shadow"
+            className="pointer-events-auto absolute min-h-11 min-w-11 inline-flex items-center justify-center rounded-full border border-border bg-card p-1 text-foreground shadow-e2"
             onClick={(e) => {
               e.stopPropagation();
               onSelectComment?.(comment.id);
             }}
             title={`Comment by ${comment.authorId}: ${comment.content}`}
           >
-            💬
+            <span aria-hidden="true">💬</span>
           </button>
         ))}
     </div>
@@ -698,7 +698,7 @@ export function ReviewCanvas({
             <button
               type="button"
               onClick={handleZoomOut}
-              className="rounded-sm border border-border px-2 py-1 hover:bg-accent"
+              className="inline-flex size-7 items-center justify-center rounded-sm border border-border hover:bg-accent"
               aria-label="Zoom out"
               title="Zoom Out (-)"
             >
@@ -708,7 +708,7 @@ export function ReviewCanvas({
             <button
               type="button"
               onClick={handleZoomIn}
-              className="rounded-sm border border-border px-2 py-1 hover:bg-accent"
+              className="inline-flex size-7 items-center justify-center rounded-sm border border-border hover:bg-accent"
               aria-label="Zoom in"
               title="Zoom In (+)"
             >
@@ -721,7 +721,7 @@ export function ReviewCanvas({
               aria-label="Reset zoom and pan"
               title="Reset View (0)"
             >
-              ↺ Reset
+              Reset
             </button>
           </div>
         </div>

@@ -37,6 +37,7 @@ export type QaRoute = {
 export const demoReviewId = "rev_gateway_42";
 export const demoRunId = "demo-1";
 export const missingRunId = "run-does-not-exist";
+export const missingBoardId = "board-does-not-exist";
 /** No delivery ever mints this token, so the guest route reliably renders its expired/404 state. */
 export const missingDeliveryToken = "token-does-not-exist";
 /** `/intake/[slug]` falls back to "<SLUG> Fabrication" for unknown slugs, so any value renders. */
@@ -45,6 +46,7 @@ export const demoIntakeSlug = "demo";
 export const routes: readonly QaRoute[] = [
   { id: "home", path: "/", label: "Landing", auth: "public", requiresDb: false },
   { id: "setup", path: "/setup", label: "Repository setup preview", auth: "public", requiresDb: false },
+  { id: "connect", path: "/connect", label: "AI integrations", auth: "public", requiresDb: false },
   {
     id: "reviews-list",
     path: "/reviews",
@@ -88,7 +90,22 @@ export const routes: readonly QaRoute[] = [
     requiresDb: true,
     skipWithoutDb: true,
   },
+  {
+    id: "repository-board-history",
+    path: `/repositories/repo-does-not-exist/boards/${missingBoardId}`,
+    label: "Board evidence history",
+    auth: "authenticated",
+    requiresDb: true,
+    skipWithoutDb: true,
+  },
   { id: "run-summary", path: `/runs/${demoRunId}`, label: "Run: Summary", auth: "authenticated", requiresDb: false },
+  {
+    id: "run-design",
+    path: `/runs/${demoRunId}/design`,
+    label: "Run: Design",
+    auth: "authenticated",
+    requiresDb: false,
+  },
   {
     id: "run-attempts",
     path: `/runs/${demoRunId}/attempts`,

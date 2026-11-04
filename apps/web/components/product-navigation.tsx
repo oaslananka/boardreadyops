@@ -174,7 +174,7 @@ export function ProductNavigation() {
           <BrandMarkLockup size={25} className="shrink-0" />
         </Link>
 
-        <nav aria-label="Product navigation" className="flex-1 overflow-y-auto px-2 py-3">
+        <nav aria-label="Product navigation" className="flex-1 overflow-y-auto overscroll-contain px-2 py-3">
           <Link
             ref={firstLinkRef}
             href={dashboardItem.href}

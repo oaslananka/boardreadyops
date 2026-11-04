@@ -78,13 +78,16 @@ function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunV
   );
 }
 
-export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
+export function RunHeader({
+  run,
+  headingTag: HeadingTag = "h1",
+}: Readonly<{ run: RunDetail; headingTag?: "h1" | "h2" | "div" }>) {
   const dispatch = releaseRepositoryDispatchAvailability(run.repository);
   return (
-    <header className="flex min-w-0 flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-lg lg:flex-row lg:items-start lg:justify-between">
+    <header className="flex min-w-0 flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-e2 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
         <p className="text-sm font-medium text-primary">Release readiness</p>
-        <h1 className="break-words text-xl font-bold text-foreground">{run.repository}</h1>
+        <HeadingTag className="break-words text-xl font-bold text-foreground">{run.repository}</HeadingTag>
         <p className="run-identity-meta mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>{run.repositoryPrivate ? "Private repository" : "Public repository"}</span>
           <span className="min-w-0 break-all">
@@ -156,7 +159,7 @@ export function RunPageFrame({
                 </span>
               </summary>
               <div className="p-2 pt-0">
-                <RunHeader run={run} />
+                <RunHeader run={run} headingTag="h2" />
               </div>
             </details>
             <div className="hidden lg:block">
@@ -516,7 +519,7 @@ function ReviewLifecyclePanel({ run }: Readonly<{ run: RunDetail }>) {
               </Link>
               <span className="text-muted-foreground">
                 {" "}
-                on source commit <code>{run.commitSha}</code>
+                on source commit <code className="break-all">{run.commitSha}</code>
                 {run.pullRequestNumber !== undefined ? ` (PR #${run.pullRequestNumber})` : ""}.
               </span>
             </li>
@@ -528,9 +531,14 @@ function ReviewLifecyclePanel({ run }: Readonly<{ run: RunDetail }>) {
               Publish Review evidence <strong>explicitly</strong> from the checked-out project using the configured CLI
               and authorized <code>BOARDREADYOPS_TOKEN</code>.
               {publishCommand ? (
-                <div className="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-2">
+                <section
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: axe requires a scrollable region to be keyboard-reachable
+                  tabIndex={0}
+                  aria-label="Publish Review command"
+                  className="mt-2 min-w-0 max-w-full overflow-x-auto rounded-md border border-border bg-muted p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
                   <code className="whitespace-pre text-xs">{publishCommand}</code>
-                </div>
+                </section>
               ) : (
                 <p className="mt-1 text-muted-foreground">
                   Use <code>boardreadyops review publish</code> with your authorized repository identity.
@@ -1635,7 +1643,7 @@ export function AuditView({ run }: Readonly<{ run: RunDetail }>) {
               {trace.backward.map((node) => (
                 <li key={node.id} className="rounded-md border border-border bg-muted/30 p-2 text-sm">
                   <span className="font-medium text-foreground">{humanize(node.kind)}</span>
-                  <span className="text-muted-foreground"> · {node.label}</span>
+                  <span className="break-all text-muted-foreground"> · {node.label}</span>
                 </li>
               ))}
             </ul>
@@ -1651,7 +1659,7 @@ export function AuditView({ run }: Readonly<{ run: RunDetail }>) {
                 {trace.forward.map((node) => (
                   <li key={node.id} className="rounded-md border border-border bg-muted/30 p-2 text-sm">
                     <span className="font-medium text-foreground">{humanize(node.kind)}</span>
-                    <span className="text-muted-foreground"> · {node.label}</span>
+                    <span className="break-all text-muted-foreground"> · {node.label}</span>
                   </li>
                 ))}
               </ul>

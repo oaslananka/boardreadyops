@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Dialog } from "../../components/dialog.js";
 import { Button } from "../../components/ui/button.js";
@@ -170,7 +171,7 @@ function PolicyCard({ policy, onEdit, onDelete }: PolicyCardProps) {
             <ul className="mt-2 flex flex-col gap-1 text-sm">
               {policy.requiredChecklist.map((chk) => (
                 <li key={chk} className="flex items-center gap-2">
-                  <span className="text-success">✓</span>
+                  <Check className="size-4 shrink-0 text-success" />
                   <span>{chk}</span>
                 </li>
               ))}
@@ -763,8 +764,9 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
       ) : null}
 
       {successMessage ? (
-        <output className="rounded-md border border-success/40 bg-success-surface px-4 py-3 text-sm text-success">
-          ✓ {successMessage}
+        <output className="flex items-center gap-2 rounded-md border border-success/40 bg-success-surface px-4 py-3 text-sm text-success">
+          <Check className="size-4 shrink-0" />
+          <span>{successMessage}</span>
         </output>
       ) : null}
 
@@ -799,11 +801,11 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
             </h2>
             <button
               type="button"
-              className="text-muted-foreground hover:text-foreground"
+              className="inline-flex size-6 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
               onClick={() => setPendingDelete(null)}
               aria-label="Close modal"
             >
-              ✕
+              <X className="size-4" />
             </button>
           </header>
           <div className="p-4 text-sm text-foreground">

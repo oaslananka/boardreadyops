@@ -51,7 +51,9 @@ export default function ConnectAiPage() {
               read-only repository access.
             </p>
             {isReady ? (
-              <p className="mt-3 break-all font-mono text-sm">https://boardreadyops.com/mcp</p>
+              <p className="mt-3 break-all text-sm">
+                <code className="rounded bg-muted px-1.5 py-0.5 text-xs">https://boardreadyops.com/mcp</code>
+              </p>
             ) : (
               <p className="mt-3 text-xs text-muted-foreground">Connection address will activate after acceptance.</p>
             )}
@@ -62,7 +64,9 @@ export default function ConnectAiPage() {
               Claude account or second data store.
             </p>
             {isReady ? (
-              <p className="mt-3 break-all font-mono text-sm">https://boardreadyops.com/mcp</p>
+              <p className="mt-3 break-all text-sm">
+                <code className="rounded bg-muted px-1.5 py-0.5 text-xs">https://boardreadyops.com/mcp</code>
+              </p>
             ) : (
               <p className="mt-3 text-xs text-muted-foreground">Connection address will activate after acceptance.</p>
             )}

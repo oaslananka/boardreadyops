@@ -89,7 +89,7 @@ export function Dialog({
         ref={panelRef}
         className={
           panelClassName ??
-          "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-popover shadow-e3"
+          "max-h-[90vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover shadow-e3"
         }
         tabIndex={-1}
       >
