@@ -98,6 +98,34 @@ describe("claimed, bounded review and audit descriptor snapshot", () => {
     expect(query.mock.calls[0]?.[0]).toContain("audit.installation_id");
   });
 
+  it("rejects a foreign Review audit subject even when that Review is outside the bounded export", async () => {
+    const foreign = {
+      ...audit,
+      repository_id: "repo-1",
+      subject_type: "review",
+      subject_id: "foreign-review",
+      foreign_review_subject: true,
+    };
+    const { db, query } = fixture([{ reviews: [review], revisions: [], audit_events: [foreign] }]);
+    await expect(prepareClaimedReviewAuditSnapshot(db, claim)).rejects.toThrow(
+      ExportReviewAuditSnapshotUnavailableError,
+    );
+    const sql = query.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("subject_review.id=audit.subject_id");
+    expect(sql).toContain("subject_review.repository_id<>audit.repository_id");
+    // Foreign ownership is an internal fail-closed SQL flag, never a metadata
+    // field to deliver. Historical absent subjects retain their audit record.
+    const historical = { ...foreign, foreign_review_subject: false };
+    const result = await prepareClaimedReviewAuditSnapshot(
+      fixture([{ reviews: [review], revisions: [], audit_events: [historical] }]).db,
+      claim,
+    );
+    const exported = JSON.parse(result?.bytes.toString("utf8") ?? "{}");
+    expect(exported.auditEvents).toEqual([expect.objectContaining({ subjectId: "foreign-review" })]);
+    expect(JSON.stringify(exported)).not.toContain("foreignReviewSubject");
+    expect(JSON.stringify(exported)).not.toContain("foreign_review_subject");
+  });
+
   it("returns an explicit empty scope when there are no authorized records", async () => {
     const { db } = fixture([{ reviews: [], revisions: [], audit_events: [] }]);
     const result = await prepareClaimedReviewAuditSnapshot(db, claim);

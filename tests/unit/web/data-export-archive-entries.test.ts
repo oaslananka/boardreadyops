@@ -392,6 +392,64 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
     }
   });
 
+  it("rejects audit review subjects belonging to another included repository", () => {
+    const { input } = fixture();
+    input.slices.repositories = slice({
+      coverage: "selected-installation-repositories-only",
+      repositories: [{ repositoryId: "repo_1" }, { repositoryId: "repo_2" }],
+    });
+    input.slices.records = slice({
+      kind: "boardreadyops.claimed-run-finding-snapshot",
+      runs: [
+        { id: "run_1", repositoryId: "repo_1" },
+        { id: "run_2", repositoryId: "repo_2" },
+      ],
+      findings: [],
+    });
+    const existing = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
+    const subject = {
+      id: "audit_1",
+      repositoryId: "repo_1",
+      releaseRunId: "run_1",
+      subjectType: "review",
+      subjectId: "review_1",
+    };
+    const audit = {
+      ...existing,
+      reviews: [
+        { id: "review_1", repositoryId: "repo_1", headRunId: "run_1" },
+        { id: "review_2", repositoryId: "repo_2", headRunId: "run_2" },
+      ],
+      auditEvents: [subject],
+    };
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: { ...input.slices, reviewAudit: slice(audit) },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: {
+          ...input.slices,
+          reviewAudit: slice({ ...audit, auditEvents: [{ ...subject, subjectId: "review_2" }] }),
+        },
+      }),
+    ).toThrow(ExportArchivePreflightError);
+    // An older audit event may outlive its Review; absence from this
+    // deliberately bounded snapshot is not proof of a foreign repository.
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: {
+          ...input.slices,
+          reviewAudit: slice({ ...audit, auditEvents: [{ ...subject, subjectId: "historical_review" }] }),
+        },
+      }),
+    ).not.toThrow();
+  });
+
   it("rejects review-linked records without a matching review and repository", () => {
     const { input } = fixture();
     const reviewAudit = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;

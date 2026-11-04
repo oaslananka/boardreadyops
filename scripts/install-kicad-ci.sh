@@ -50,42 +50,70 @@ apt_transport_options=(
   -o Acquire::https::Timeout=45
 )
 
-echo '::notice::Attempting signed KiCad 10.0 PPA installation'
-sudo add-apt-repository --yes --no-update "ppa:kicad/kicad-$ppa_series-releases"
+# add-apt-repository consults Launchpad's REST API before any APT download.
+# Retry only a confirmed upstream 503, then use the same pinned official OCI
+# fallback already permitted for signed KiCad PPA transport outages.
+transient_launchpad_api_outage() {
+  local log="$1"
+  if grep -Eiq 'NO_PUBKEY|BADSIG|EXPKEYSIG|KEYEXPIRED|GPG error|not signed|invalid signature' "$log"; then
+    return 1
+  fi
+  grep -Eq 'lazr\.restfulclient\.errors\.ServerError: HTTP Error 503(:| )' "$log"
+}
 
-native_ready=false
-for attempt in 1 2 3 4; do
-  if sudo apt-get update -o Acquire::Languages=none -o APT::Update::Error-Mode=any "${apt_transport_options[@]}" -qq 2>&1 | tee "$apt_log"; then
-    candidate="$(apt-cache policy kicad | awk '/Candidate:/ {print $2; exit}')"
-    if [[ "$candidate" != "$series".* ]]; then
-      echo "::error::Signed KiCad PPA returned an unexpected candidate: ${candidate:-none}"
-      exit 1
-    fi
-    if sudo apt-get install --yes --no-install-recommends "${apt_transport_options[@]}" kicad 2>&1 | tee "$apt_log"; then
-      native_ready=true
-      break
-    fi
-    # If the index was valid but the .deb download failed, this check still
-    # requires an explicit transient *KiCad PPA* failure before using OCI.
-    if ! transient_ppa_outage "$apt_log"; then
-      echo '::error::KiCad package install failed for a non-transient reason.'
-      tail -25 "$apt_log"
-      exit 1
-    fi
-  elif ! transient_ppa_outage "$apt_log"; then
-    echo '::error::APT index verification or a non-KiCad source failed.'
+echo '::notice::Attempting signed KiCad 10.0 PPA installation'
+ppa_ready=false
+for attempt in 1 2 3; do
+  if sudo add-apt-repository --yes --no-update "ppa:kicad/kicad-$ppa_series-releases" 2>&1 | tee "$apt_log"; then
+    ppa_ready=true
+    break
+  fi
+  if ! transient_launchpad_api_outage "$apt_log"; then
+    echo '::error::Signed KiCad PPA registration failed for a non-transient reason.'
     tail -25 "$apt_log"
     exit 1
   fi
-
-  if [[ "$attempt" -lt 4 ]]; then
-    echo "::warning::Signed KiCad PPA transiently unavailable (attempt $attempt/4)"
+  if [[ "$attempt" -lt 3 ]]; then
+    echo "::warning::Launchpad KiCad PPA API unavailable (attempt $attempt/3)"
     sleep 15
   fi
 done
 
+native_ready=false
+if [[ "$ppa_ready" == true ]]; then
+  for attempt in 1 2 3 4; do
+    if sudo apt-get update -o Acquire::Languages=none -o APT::Update::Error-Mode=any "${apt_transport_options[@]}" -qq 2>&1 | tee "$apt_log"; then
+      candidate="$(apt-cache policy kicad | awk '/Candidate:/ {print $2; exit}')"
+      if [[ "$candidate" != "$series".* ]]; then
+        echo "::error::Signed KiCad PPA returned an unexpected candidate: ${candidate:-none}"
+        exit 1
+      fi
+      if sudo apt-get install --yes --no-install-recommends "${apt_transport_options[@]}" kicad 2>&1 | tee "$apt_log"; then
+        native_ready=true
+        break
+      fi
+      # If the index was valid but the .deb download failed, this check still
+      # requires an explicit transient *KiCad PPA* failure before using OCI.
+      if ! transient_ppa_outage "$apt_log"; then
+        echo '::error::KiCad package install failed for a non-transient reason.'
+        tail -25 "$apt_log"
+        exit 1
+      fi
+    elif ! transient_ppa_outage "$apt_log"; then
+      echo '::error::APT index verification or a non-KiCad source failed.'
+      tail -25 "$apt_log"
+      exit 1
+    fi
+
+    if [[ "$attempt" -lt 4 ]]; then
+      echo "::warning::Signed KiCad PPA transiently unavailable (attempt $attempt/4)"
+      sleep 15
+    fi
+  done
+fi
+
 if [[ "$native_ready" != true ]]; then
-  echo '::warning::Verified KiCad PPA outage; switching to official OCI CLI by immutable SHA-256 digest.'
+  echo '::warning::Verified transient KiCad PPA registration or package outage; switching to official OCI CLI by immutable SHA-256 digest.'
   [[ "$(uname -m)" == 'x86_64' ]] || { echo '::error::Official OCI image is pinned for linux/amd64.'; exit 1; }
   timeout 300 docker pull --quiet "$image"
   vendor="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.vendor"}}' "$image")"

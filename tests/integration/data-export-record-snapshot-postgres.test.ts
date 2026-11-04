@@ -7,7 +7,10 @@ import {
   ExportRecordSnapshotUnavailableError,
   prepareClaimedRunFindingSnapshot,
 } from "../../packages/db/src/data-export-record-snapshot.js";
-import { prepareClaimedReviewAuditSnapshot } from "../../packages/db/src/data-export-review-audit-snapshot.js";
+import {
+  ExportReviewAuditSnapshotUnavailableError,
+  prepareClaimedReviewAuditSnapshot,
+} from "../../packages/db/src/data-export-review-audit-snapshot.js";
 import {
   ExportReviewCommentsSnapshotUnavailableError,
   prepareClaimedReviewCommentsSnapshot,
@@ -543,6 +546,49 @@ describeDatabase("claimed run/finding snapshot PostgreSQL isolation", () => {
         }
         expect(await prepareClaimedReviewAuditSnapshot(tx, { ...claim, token: "wrong" })).toBeNull();
         expect(await prepareClaimedReviewAuditSnapshot(tx, { ...claim, installationId: installation[1] })).toBeNull();
+        throw new Error(rollbackMarker);
+      }),
+    ).rejects.toThrow(rollbackMarker);
+  });
+
+  it("rejects a Review audit subject from another repository even outside the bounded snapshot", async () => {
+    const claim = { exportId, tenantId: tenant, installationId: installation[0], workerId: "snapshot-worker", token };
+    const rollbackMarker = "foreign-audit-subject-rollback";
+    await expect(
+      executor().withTransaction(async (tx) => {
+        const foreignReviewId = randomUUID();
+        const eventId = randomUUID();
+        const historical = randomUUID();
+        await tx.query(
+          `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+           VALUES($1,$2,'Synthetic foreign review','completed','approved',$3)`,
+          [foreignReviewId, repository[1], runId[1]],
+        );
+        // Append-only audit evidence cannot be updated. First test that a
+        // subject whose Review no longer exists remains exportable.
+        await tx.query(
+          `INSERT INTO audit_events(id,installation_id,event_type,actor_type,subject_type,subject_id,repository_id,release_run_id)
+           VALUES($1,$2,'review.approved','system','review',$3,$4,$5)`,
+          [eventId, installation[0], historical, repository[0], runId[0]],
+        );
+        const snapshot = await prepareClaimedReviewAuditSnapshot(tx, claim);
+        const parsed = JSON.parse(snapshot?.bytes.toString("utf8") ?? "{}");
+        expect(parsed.auditEvents).toEqual([expect.objectContaining({ id: eventId, subjectId: historical })]);
+        expect(parsed.reviews).toEqual([]);
+        expect(snapshot?.bytes.toString("utf8")).not.toContain(foreignReviewId);
+        expect(snapshot?.bytes.toString("utf8")).not.toContain("foreignReviewSubject");
+
+        // Then insert a separate immutable audit event with a foreign Review
+        // subject. The original repository-only claim must fail closed even
+        // though the foreign Review was excluded from its bounded slice.
+        await tx.query(
+          `INSERT INTO audit_events(id,installation_id,event_type,actor_type,subject_type,subject_id,repository_id,release_run_id)
+           VALUES($1,$2,'review.approved','system','review',$3,$4,$5)`,
+          [randomUUID(), installation[0], foreignReviewId, repository[0], runId[0]],
+        );
+        await expect(prepareClaimedReviewAuditSnapshot(tx, claim)).rejects.toThrow(
+          ExportReviewAuditSnapshotUnavailableError,
+        );
         throw new Error(rollbackMarker);
       }),
     ).rejects.toThrow(rollbackMarker);

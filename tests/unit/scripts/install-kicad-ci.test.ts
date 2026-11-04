@@ -10,7 +10,19 @@ const installScript = path.resolve("scripts/install-kicad-ci.sh");
 const sudoMock = [
   "#!/usr/bin/env bash",
   "set -euo pipefail",
-  'if [[ "$1" == "add-apt-repository" ]]; then exit 0; fi',
+  'if [[ "$1" == "add-apt-repository" ]]; then',
+  '  printf "%s\n" "$*" >> "$BRO_MOCK_REPO_CALLS"',
+  '  case "$BRO_MOCK_REPO_MODE" in',
+  '    launchpad503) echo "lazr.restfulclient.errors.ServerError: HTTP Error 503: Service Unavailable" >&2; exit 1;;',
+  '    launchpad404) echo "lazr.restfulclient.errors.NotFound: HTTP Error 404: Not Found" >&2; exit 1;;',
+  '    launchpad_signature) echo "GPG error: NO_PUBKEY for KiCad PPA" >&2; exit 1;;',
+  "    launchpad_flaky)",
+  '      if [[ "$(wc -l < "$BRO_MOCK_REPO_CALLS")" -eq 1 ]]; then',
+  '        echo "lazr.restfulclient.errors.ServerError: HTTP Error 503: Service Unavailable" >&2; exit 1',
+  "      fi;;",
+  "  esac",
+  "  exit 0",
+  "fi",
   'if [[ "$1" == "apt-get" ]]; then printf "%s\n" "$*" >> "$BRO_MOCK_APT_CALLS"; fi',
   'if [[ "$1" == "apt-get" && "$2" == "update" ]]; then',
   '  case "$BRO_MOCK_APT_MODE" in',
@@ -70,6 +82,8 @@ async function fixture() {
     GITHUB_PATH: githubPath,
     GITHUB_WORKSPACE: process.cwd(),
     BRO_MOCK_APT_MODE: "signed",
+    BRO_MOCK_REPO_MODE: "signed",
+    BRO_MOCK_REPO_CALLS: path.join(root, "repo-calls.log"),
     BRO_MOCK_CANDIDATE: "10.0.7~ubuntu24.04.1",
     BRO_MOCK_NATIVE_VERSION: "10.0.7",
     BRO_MOCK_OCI_VERSION: "10.0.7",
@@ -122,6 +136,49 @@ describe.runIf(process.platform === "linux")("Linux KiCad 10 signed PPA with off
       await rm(f.root, { recursive: true, force: true });
     }
   });
+
+  it("retries a transient Launchpad API 503 before installing signed KiCad", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_REPO_MODE: "launchpad_flaky" });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
+      expect((await readFile(f.env.BRO_MOCK_REPO_CALLS as string, "utf8")).trim().split("\n")).toHaveLength(2);
+      expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses only immutable official OCI after repeated Launchpad API 503 responses", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_REPO_MODE: "launchpad503" });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
+      expect((await readFile(f.env.BRO_MOCK_REPO_CALLS as string, "utf8")).trim().split("\n")).toHaveLength(3);
+      expect(existsSync(f.env.BRO_MOCK_APT_CALLS as string)).toBe(false);
+      const docker = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
+      expect(docker).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["launchpad404", "launchpad_signature"])(
+    "never selects OCI after a non-transient PPA registration failure: %s",
+    async (mode) => {
+      const f = await fixture();
+      try {
+        const result = execute({ ...f.env, BRO_MOCK_REPO_MODE: mode });
+        expect(result.status).not.toBe(0);
+        expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+        expect(existsSync(f.env.BRO_MOCK_APT_CALLS as string)).toBe(false);
+      } finally {
+        await rm(f.root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("uses only the immutable official image after an explicit KiCad PPA 503", async () => {
     const f = await fixture();

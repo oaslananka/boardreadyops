@@ -50,6 +50,7 @@ type AuditRow = {
   actor_type: string;
   subject_type: string;
   subject_id: string | null;
+  foreign_review_subject?: boolean;
 };
 
 /**
@@ -111,7 +112,12 @@ export async function prepareClaimedReviewAuditSnapshot(
      ),
      audit_rows AS (
        SELECT audit.id, audit.repository_id, audit.release_run_id,
-              audit.event_type, audit.actor_type, audit.subject_type, audit.subject_id
+              audit.event_type, audit.actor_type, audit.subject_type, audit.subject_id,
+              (audit.subject_type='review' AND audit.subject_id IS NOT NULL AND EXISTS (
+                SELECT 1 FROM reviews AS subject_review
+                WHERE subject_review.id=audit.subject_id
+                  AND subject_review.repository_id<>audit.repository_id
+              )) AS foreign_review_subject
        FROM audit_events AS audit
        JOIN permitted_repositories AS permitted
          ON permitted.id=audit.repository_id AND permitted.installation_id=audit.installation_id
@@ -173,7 +179,12 @@ export async function prepareClaimedReviewAuditSnapshot(
       !a ||
       ![a.id, a.repository_id, a.event_type, a.actor_type, a.subject_type].every(validId) ||
       !validOptionalId(a.release_run_id) ||
-      !validOptionalId(a.subject_id)
+      !validOptionalId(a.subject_id) ||
+      // An audit subject can reference a Review excluded by the repository
+      // selection. Detect an existing foreign Review inside the same DB
+      // snapshot, even when it is absent from the exported Review slice.
+      a.foreign_review_subject === true ||
+      (a.foreign_review_subject !== undefined && typeof a.foreign_review_subject !== "boolean")
     )
       throw new ExportReviewAuditSnapshotUnavailableError();
     return {
