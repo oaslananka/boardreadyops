@@ -676,7 +676,10 @@ export async function lookupRunDashboard(
      left join release_run_results on release_run_results.run_id = release_runs.id
      left join repository_setup_revisions
        on repository_setup_revisions.id = release_runs.repository_setup_revision_id
-     where release_runs.id = $1${runScopePredicate}`,
+     where release_runs.id = $1
+       -- Public run URLs remain link-readable. A disabled private repository must fail
+       -- closed even while an older signed viewer session still grants its installation.
+       and (repositories.private = false or repositories.disabled_at is null)${runScopePredicate}`,
     runParameters,
   );
   const runRow = rows(runResult)[0];
