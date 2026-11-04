@@ -593,7 +593,7 @@ export function ReviewCanvas({
   if (immersive) canvasHeightClass = "h-[min(75dvh,56rem)]";
 
   const modeButtonClass = (active: boolean) =>
-    `shrink-0 rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
+    `shrink-0 rounded-sm px-2 py-1.5 text-sm sm:px-3 ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
@@ -619,7 +619,7 @@ export function ReviewCanvas({
           </select>
 
           <fieldset
-            className={`${previewMobileControls ? "hidden sm:flex" : "flex"} w-full min-w-0 flex-nowrap gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0`}
+            className={`${previewMobileControls ? "hidden" : "grid"} w-full min-w-0 grid-cols-2 gap-1 pb-1 min-[360px]:grid-cols-3 sm:flex sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0`}
             aria-label="Revision comparison modes"
           >
             <button
