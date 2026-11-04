@@ -108,6 +108,9 @@ describe("GitHub Mutation Service", () => {
           if (path.includes("/git/commits/base-sha-111")) {
             return { status: 200, ok: true, data: { tree: { sha: "base-tree-222" } } as T };
           }
+          if (path.includes("/contents/")) {
+            return { status: 404, ok: false, data: {} as T };
+          }
           // 3. Check if target branch exists
           if (path.includes("/git/ref/heads/boardreadyops/setup")) {
             return { status: 404, ok: false, data: {} as T };
@@ -218,6 +221,9 @@ describe("GitHub Mutation Service", () => {
           if (path.includes("/git/commits/base-sha")) {
             return { status: 200, ok: true, data: { tree: { sha: "base-tree" } } as T };
           }
+          if (path.includes("/contents/")) {
+            return { status: 404, ok: false, data: {} as T };
+          }
           if (path.includes("/git/ref/heads/boardreadyops/setup")) {
             return { status: 200, ok: true, data: { object: { sha: "existing-commit" } } as T };
           }
@@ -283,6 +289,9 @@ describe("GitHub Mutation Service", () => {
           if (path.includes("/git/commits/base-sha-111")) {
             return { status: 200, ok: true, data: { tree: { sha: "base-tree-222" } } as T };
           }
+          if (path.includes("/contents/")) {
+            return { status: 404, ok: false, data: {} as T };
+          }
           if (path.includes("/git/ref/heads/boardreadyops/setup")) {
             return { status: 200, ok: true, data: { object: { sha: "existing-commit-sha" } } as T };
           }
@@ -335,6 +344,103 @@ describe("GitHub Mutation Service", () => {
       );
     });
 
+    function snapshotClient(
+      existing: Record<string, string>,
+      options: { lookupStatus?: number; changedBase?: boolean } = {},
+    ) {
+      const requests: Array<{ path: string; method: string }> = [];
+      let baseLookups = 0;
+      const client: GitHubMutationApiClient = {
+        async request<T>(path: string, init?: RequestInit): Promise<{ status: number; ok: boolean; data: T }> {
+          const method = init?.method ?? "GET";
+          requests.push({ path, method });
+          const make = (status: number, data: unknown) => ({
+            status,
+            ok: status >= 200 && status < 300,
+            data: data as T,
+          });
+          if (path.endsWith("/git/ref/heads/main")) {
+            baseLookups++;
+            return make(200, { object: { sha: options.changedBase && baseLookups > 1 ? "other-sha" : "base-sha" } });
+          }
+          if (path.endsWith("/git/commits/base-sha")) return make(200, { tree: { sha: "base-tree" } });
+          const contentMarker = "/contents/";
+          if (path.includes(contentMarker)) {
+            if (options.lookupStatus !== undefined) return make(options.lookupStatus, {});
+            const filePath = path.split(contentMarker)[1]?.split("?")[0];
+            if (filePath === undefined) throw new Error("missing file path");
+            const value = existing[filePath];
+            return value === undefined
+              ? make(404, {})
+              : make(200, { type: "file", encoding: "base64", content: Buffer.from(value).toString("base64") });
+          }
+          if (path.includes("/git/ref/heads/boardreadyops/setup")) return make(404, {});
+          if (path.includes("/pulls?")) return make(200, []);
+          if (method === "POST" && path.endsWith("/git/trees")) return make(201, { sha: "new-tree" });
+          if (method === "POST" && path.endsWith("/git/commits")) return make(201, { sha: "new-commit" });
+          if (method === "POST" && path.endsWith("/git/refs")) return make(201, {});
+          if (method === "POST" && path.endsWith("/pulls")) {
+            return make(201, { number: 42, html_url: "https://github.test/octo/hardware/pull/42" });
+          }
+          throw new Error(`unexpected mock request: ${method} ${path}`);
+        },
+      };
+      return { requests, client };
+    }
+
+    it.each([
+      ["custom workflow", ".github/workflows/readiness-runner.yml", "name: customized workflow\\n"],
+      ["custom configuration", "boardreadyops.yml", "version: 999\\n"],
+    ])("fails closed before Git writes for existing %s", async (_, filePath, existingContent) => {
+      const { client, requests } = snapshotClient({ [filePath]: existingContent });
+      await expect(createGitHubMutationService({ client }).execute(validMutationInput)).rejects.toMatchObject({
+        name: "SetupFileConflictError",
+        filePath,
+      });
+      expect(requests.filter((request) => request.method !== "GET")).toEqual([]);
+    });
+
+    it("accepts identical existing setup bytes without overwriting custom content", async () => {
+      const existing = Object.fromEntries(validMutationInput.files.map((file) => [file.path, file.content]));
+      const { client, requests } = snapshotClient(existing);
+      const outcome = await createGitHubMutationService({ client }).execute(validMutationInput);
+      expect(outcome.outcome).toBe("created");
+      expect(requests.filter((request) => request.path.includes("/contents/"))).toHaveLength(2);
+    });
+
+    it("allows a genuinely new repository with both setup paths absent", async () => {
+      const { client } = snapshotClient({});
+      await expect(createGitHubMutationService({ client }).execute(validMutationInput)).resolves.toMatchObject({
+        outcome: "created",
+      });
+    });
+
+    it("fails closed if the provider cannot verify existing setup files", async () => {
+      const { client, requests } = snapshotClient({}, { lookupStatus: 403 });
+      await expect(createGitHubMutationService({ client }).execute(validMutationInput)).rejects.toThrow(
+        /unable to verify existing setup file/u,
+      );
+      expect(requests.filter((request) => request.method !== "GET")).toEqual([]);
+    });
+
+    it("fails closed if the default branch changes during initial setup inspection", async () => {
+      const { client, requests } = snapshotClient({}, { changedBase: true });
+      await expect(createGitHubMutationService({ client }).execute(validMutationInput)).rejects.toThrow(
+        /default branch changed during setup file verification/u,
+      );
+      expect(requests.filter((request) => request.method !== "GET")).toEqual([]);
+    });
+
+    it("preserves the explicit update path without applying first-setup-only conflict rules", async () => {
+      const { client, requests } = snapshotClient({
+        "boardreadyops.yml": "custom existing configuration",
+      });
+      await expect(
+        createGitHubMutationService({ client }).execute({ ...validMutationInput, intent: "setup-update" }),
+      ).resolves.toMatchObject({ outcome: "created" });
+      expect(requests.some((request) => request.path.includes("/contents/"))).toBe(false);
+    });
+
     it("returns already_exists idempotently when target branch tree matches and open PR exists", async () => {
       const mockClient: GitHubMutationApiClient = {
         async request<T>(path: string, _init?: RequestInit): Promise<{ status: number; ok: boolean; data: T }> {
@@ -343,6 +449,9 @@ describe("GitHub Mutation Service", () => {
           }
           if (path.includes("/git/commits/base-sha-111")) {
             return { status: 200, ok: true, data: { tree: { sha: "base-tree-222" } } as T };
+          }
+          if (path.includes("/contents/")) {
+            return { status: 404, ok: false, data: {} as T };
           }
           if (path.includes("/git/ref/heads/boardreadyops/setup")) {
             return { status: 200, ok: true, data: { object: { sha: "existing-commit-sha" } } as T };

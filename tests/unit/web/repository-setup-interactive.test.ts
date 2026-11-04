@@ -272,7 +272,7 @@ describe("repository setup readiness controls", () => {
       setupConfigStatus: "ready",
       setupObservedSha: "a".repeat(40),
     };
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
       jsonResponse({
         ok: true,
         outcome: "created",
@@ -296,6 +296,12 @@ describe("repository setup readiness controls", () => {
       button(container, "Open configuration update PR").click();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const updateRequest = fetchMock.mock.calls[0];
+    if (!updateRequest) throw new Error("missing configuration update request");
+    expect(JSON.parse(updateRequest[1]?.body as string)).toMatchObject({
+      action: "setup",
+      updateExistingSetup: true,
+    });
     expect(container.textContent).toContain("Setup pull request #21");
   });
 });
