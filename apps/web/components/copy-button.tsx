@@ -61,13 +61,7 @@ export function CopyButton({ label, value, accessibleLabel }: CopyButtonProps) {
         onClick={copy}
         {...(accessibleLabel ? { "aria-label": accessibleLabel } : {})}
       >
-        {status === "copied" ? (
-          "Copied ✓"
-        ) : status === "failed" ? (
-          "Copy failed"
-        ) : (
-          label
-        )}
+        {status === "copied" ? "Copied ✓" : status === "failed" ? "Copy failed" : label}
       </Button>
       <span className="sr-only" aria-live="polite">
         {copyStatusMessage(status)}
