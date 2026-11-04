@@ -349,6 +349,49 @@ describe("claimed archive entry preflight (not a deliverable archive)", () => {
     ).not.toThrow();
   });
 
+  it("rejects cross-repository Run references in independently hashed Review, revision and audit slices", () => {
+    const { input } = fixture();
+    input.slices.repositories = slice({
+      coverage: "selected-installation-repositories-only",
+      repositories: [{ repositoryId: "repo_1" }, { repositoryId: "repo_2" }],
+    });
+    input.slices.records = slice({
+      kind: "boardreadyops.claimed-run-finding-snapshot",
+      runs: [
+        { id: "run_1", repositoryId: "repo_1" },
+        { id: "run_2", repositoryId: "repo_2" },
+      ],
+      findings: [],
+    });
+    const audit = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
+    const review = { id: "review_1", repositoryId: "repo_1", headRunId: "run_1" };
+    const revision = { id: "revision_1", reviewId: "review_1", headRunId: "run_1", baseRunId: null };
+    const event = { id: "audit_1", repositoryId: "repo_1", releaseRunId: "run_1" };
+    const valid = { ...audit, reviews: [review], revisions: [revision], auditEvents: [event] };
+    expect(() =>
+      prepareClaimedArchiveEntries({
+        ...input,
+        slices: { ...input.slices, reviewAudit: slice(valid) },
+      }),
+    ).not.toThrow();
+
+    for (const [field, mutation] of [
+      ["review.headRunId", { reviews: [{ ...review, headRunId: "run_2" }] }],
+      ["revision.headRunId", { revisions: [{ ...revision, headRunId: "run_2" }] }],
+      ["revision.baseRunId", { revisions: [{ ...revision, baseRunId: "run_2" }] }],
+      ["auditEvent.releaseRunId", { auditEvents: [{ ...event, releaseRunId: "run_2" }] }],
+    ] as const) {
+      expect(
+        () =>
+          prepareClaimedArchiveEntries({
+            ...input,
+            slices: { ...input.slices, reviewAudit: slice({ ...valid, ...mutation }) },
+          }),
+        field,
+      ).toThrow(ExportArchivePreflightError);
+    }
+  });
+
   it("rejects review-linked records without a matching review and repository", () => {
     const { input } = fixture();
     const reviewAudit = JSON.parse(input.slices.reviewAudit.bytes.toString("utf8")) as Record<string, unknown>;
