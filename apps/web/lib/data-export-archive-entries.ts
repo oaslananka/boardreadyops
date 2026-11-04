@@ -139,6 +139,7 @@ function validateInventoryAndRuns(
 function validateScopedCollections(
   entryBytes: readonly ArchiveEntryBuffer[],
   permittedRepositories: ReadonlySet<string>,
+  runs: ReadonlyMap<string, string>,
 ): void {
   // Review, audit, comment and collaboration snapshots may have independent
   // valid digests yet contain records scoped to another repository. Validate
@@ -165,13 +166,24 @@ function validateScopedCollections(
           if (!safeEntryId(repositoryId) || !permittedRepositories.has(repositoryId)) {
             throw new ExportArchivePreflightError();
           }
+          // Audit descriptors may reference a Run from another permitted repository.
+          // A valid per-slice digest is not proof that the relationship is scoped.
+          if (field === "auditEvents") {
+            const runId = (record as { releaseRunId?: unknown }).releaseRunId;
+            if (runId !== undefined && runId !== null && (!safeEntryId(runId) || runs.get(runId) !== repositoryId)) {
+              throw new ExportArchivePreflightError();
+            }
+          }
         }
       }
     }
   }
 }
 
-function validateReviewParents(entryBytes: readonly ArchiveEntryBuffer[]): {
+function validateReviewParents(
+  entryBytes: readonly ArchiveEntryBuffer[],
+  runs: ReadonlyMap<string, string>,
+): {
   reviewRepositories: Map<string, string>;
   revisionReviewIds: Map<string, string>;
 } {
@@ -182,14 +194,25 @@ function validateReviewParents(entryBytes: readonly ArchiveEntryBuffer[]): {
     revisions: Array<{ id?: unknown; reviewId?: unknown }>;
   }>(entryBytes[2]?.bytes);
   const reviewRepositories = new Map<string, string>();
-  for (const review of audit.reviews as Array<{ id?: unknown; repositoryId?: unknown }>) {
-    if (!validReviewLink(review?.id) || !safeEntryId(review.repositoryId) || reviewRepositories.has(review.id)) {
+  for (const review of audit.reviews as Array<{ id?: unknown; repositoryId?: unknown; headRunId?: unknown }>) {
+    if (
+      !validReviewLink(review?.id) ||
+      !safeEntryId(review.repositoryId) ||
+      reviewRepositories.has(review.id) ||
+      (review.headRunId !== undefined &&
+        (!safeEntryId(review.headRunId) || runs.get(review.headRunId) !== review.repositoryId))
+    ) {
       throw new ExportArchivePreflightError();
     }
     reviewRepositories.set(review.id, review.repositoryId);
   }
   const revisionReviewIds = new Map<string, string>();
-  for (const revision of audit.revisions) {
+  for (const revision of audit.revisions as Array<{
+    id?: unknown;
+    reviewId?: unknown;
+    headRunId?: unknown;
+    baseRunId?: unknown;
+  }>) {
     if (
       !validReviewLink(revision?.id) ||
       !validReviewLink(revision.reviewId) ||
@@ -197,6 +220,14 @@ function validateReviewParents(entryBytes: readonly ArchiveEntryBuffer[]): {
       revisionReviewIds.has(revision.id)
     ) {
       throw new ExportArchivePreflightError();
+    }
+    // The review and its revision Run pointers must belong to that review's
+    // original repository, even when both repositories are in the same export.
+    const repositoryId = reviewRepositories.get(revision.reviewId);
+    for (const runId of [revision.headRunId, revision.baseRunId]) {
+      if (runId !== undefined && runId !== null && (!safeEntryId(runId) || runs.get(runId) !== repositoryId)) {
+        throw new ExportArchivePreflightError();
+      }
     }
     revisionReviewIds.set(revision.id, revision.reviewId);
   }
@@ -379,8 +410,8 @@ export function prepareClaimedArchiveEntries(input: {
     throw new ExportArchivePreflightError();
   }
   const { permittedRepositories, runs, artifacts } = validateInventoryAndRuns(entryBytes, input.verifiedObjects.length);
-  validateScopedCollections(entryBytes, permittedRepositories);
-  const { reviewRepositories, revisionReviewIds } = validateReviewParents(entryBytes);
+  validateScopedCollections(entryBytes, permittedRepositories, runs);
+  const { reviewRepositories, revisionReviewIds } = validateReviewParents(entryBytes, runs);
   validateReviewChildren(entryBytes, reviewRepositories, revisionReviewIds);
   validateCommentThreads(entryBytes);
   appendVerifiedArtifactEntries(entryBytes, input.verifiedObjects, artifacts, runs, permittedRepositories);
