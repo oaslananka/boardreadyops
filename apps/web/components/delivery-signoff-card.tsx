@@ -21,9 +21,9 @@ function verdictBadgeVariant(isVerified: boolean, isPass: boolean): "secondary" 
   return isPass ? "success" : "danger";
 }
 
-function signOffStatus(signedBy: string | undefined, isVerified: boolean): string {
-  if (signedBy) return `Signed by ${signedBy}`;
-  return isVerified ? "Engineering Auto-Verified" : "Sign-off not recorded";
+function signOffStatus(signedBy: string | undefined): string {
+  if (signedBy) return `Sign-off recorded by ${signedBy}`;
+  return "Sign-off not recorded";
 }
 
 function waiverDisposition(waiverCount: number | undefined): string {
@@ -53,7 +53,7 @@ export function DeliverySignoffCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <span className="text-xs uppercase text-muted-foreground">
-            {isVerified ? "Verified Manufacturing Package" : "Unverified Package"}
+            {isVerified ? "Readiness result recorded" : "Unverified Package"}
           </span>
           <h2 className="text-xl font-bold text-foreground">Revision {revisionId}</h2>
         </div>
@@ -84,7 +84,7 @@ export function DeliverySignoffCard({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
           <span className="block text-xs uppercase text-muted-foreground">Sign-Off Status</span>
-          <span className="text-sm text-foreground">{signOffStatus(signedBy, isVerified)}</span>
+          <span className="text-sm text-foreground">{signOffStatus(signedBy)}</span>
           {signedAt && <span className="block text-xs text-muted-foreground">{new Date(signedAt).toUTCString()}</span>}
         </div>
 
@@ -101,7 +101,7 @@ export function DeliverySignoffCard({
 
       <Button asChild>
         <a className="download-bundle-button" href={signedArchiveUrl} download rel="noopener noreferrer">
-          {isVerified ? "Download Sealed Package (.zip)" : "Download Package (.zip)"}
+          Download package
         </a>
       </Button>
 
