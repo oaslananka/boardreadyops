@@ -11,6 +11,7 @@ import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
 import { ExportArchivePreflightError, type VerifiedArchiveObject } from "./data-export-archive-entries.js";
 import { verifyClaimedExportArchiveIntegrity } from "./data-export-archive-integrity.js";
 import { prepareClaimedArchiveZip } from "./data-export-archive-zip.js";
+import { sealLocalExportArchive } from "./data-export-local-archive-storage.js";
 import { readClaimedVerifiedLocalExportObject } from "./data-export-verified-object.js";
 
 const maxArchiveSourceBytes = 64 * 1024 * 1024;
@@ -168,4 +169,35 @@ export async function stageClaimedLocalArchiveCommitment(
     return null;
   }
   return { archive, expiresAt: staged.expiresAt };
+}
+
+/**
+ * Seals a local ZIP on a private, caller-provisioned 0700 filesystem BEFORE
+ * accepting its one-time database commitment. A crash before DB staging can
+ * leave private orphan bytes; no customer download or completed transition
+ * exists, and a later retention worker must reconcile these files.
+ *
+ * Do not expose this API as a customer route: retrieval needs fresh original
+ * requester authorization, revocation fencing and audited delivery.
+ */
+export async function stageClaimedDurableLocalArchiveCommitment(
+  input: Parameters<typeof prepareClaimedLocalArchiveZip>[0] & { privateArchiveRoot: string },
+): Promise<{ sha256: string; byteLength: number; files: number; expiresAt: string } | null> {
+  const archive = await prepareClaimedLocalArchiveZip(input);
+  if (!archive) return null;
+  const sealed = await sealLocalExportArchive({
+    archiveRoot: input.privateArchiveRoot,
+    exportId: input.claim.exportId,
+    archive,
+  });
+  if (!sealed || sealed.sha256 !== archive.sha256 || sealed.byteLength !== archive.byteLength) return null;
+  const staged = await new DataExportArchiveCommitmentStore(input.db).stage(input.claim, archive);
+  if (
+    !staged ||
+    staged.sha256 !== archive.sha256 ||
+    staged.byteLength !== archive.byteLength ||
+    staged.files !== archive.files
+  )
+    return null;
+  return { ...staged };
 }

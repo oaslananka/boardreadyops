@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { verifyClaimedExportArchiveIntegrity } from "../../apps/web/lib/data-export-archive-integrity.js";
 import {
   prepareClaimedLocalArchiveZip,
+  stageClaimedDurableLocalArchiveCommitment,
   stageClaimedLocalArchiveCommitment,
 } from "../../apps/web/lib/data-export-local-archive.js";
+import { readSealedLocalExportArchive } from "../../apps/web/lib/data-export-local-archive-storage.js";
 import { DataExportArchiveCommitmentStore } from "../../packages/db/src/data-export-archive-commitment-store.js";
 import { DataExportPreparationStore } from "../../packages/db/src/data-export-preparation-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
@@ -21,6 +23,7 @@ const installationId = randomUUID();
 const repositoryId = randomUUID();
 const createdExports: string[] = [];
 let storageRoot = "";
+let privateArchiveRoot = "";
 
 function executor() {
   if (!db) throw new Error("Disposable PostgreSQL required");
@@ -55,6 +58,8 @@ async function claimedExport() {
 beforeAll(async () => {
   if (!db) return;
   storageRoot = await mkdtemp(path.join(tmpdir(), "boardreadyops-postzip-pg-"));
+  privateArchiveRoot = await mkdtemp(path.join(tmpdir(), "boardreadyops-private-zip-pg-"));
+  await chmod(privateArchiveRoot, 0o700);
   await db.query(
     "INSERT INTO installations(id,github_installation_id,account_login,account_type) VALUES($1,$2,$3,'Organization')",
     [installationId, Number.parseInt(randomUUID().replaceAll("-", "").slice(0, 12), 16), tenant],
@@ -73,6 +78,7 @@ afterAll(async () => {
   } finally {
     await db.close();
     if (storageRoot) await rm(storageRoot, { recursive: true, force: true });
+    if (privateArchiveRoot) await rm(privateArchiveRoot, { recursive: true, force: true });
   }
 });
 
@@ -154,6 +160,86 @@ describeDatabase("local export post-packaging PostgreSQL admission", () => {
       download_url: null,
       completed_at: null,
     });
+  });
+
+  it("seals verified ZIP bytes BEFORE an immutable database commitment without enabling download", async () => {
+    const { exportId, claim } = await claimedExport();
+    const input = {
+      db: executor(),
+      claim,
+      storageRoot,
+      storageDriver: "local",
+      privateArchiveRoot,
+    };
+    const sealed = await stageClaimedDurableLocalArchiveCommitment(input);
+    expect(sealed).toMatchObject({ files: 8, sha256: expect.stringMatching(/^[a-f0-9]{64}$/u) });
+    if (!sealed) throw new Error("Expected durable internal archive commitment");
+    const bytes = await readSealedLocalExportArchive({
+      archiveRoot: privateArchiveRoot,
+      exportId,
+      sha256: sealed.sha256,
+      byteLength: sealed.byteLength,
+    });
+    expect(bytes).not.toBeNull();
+    expect(verifyClaimedExportArchiveIntegrity(bytes ?? Buffer.alloc(0), sealed.sha256, exportId)).toBe(true);
+    const store = new DataExportArchiveCommitmentStore(executor());
+    expect(
+      await store.readForRequester({
+        exportId,
+        tenantId: tenant,
+        installationId,
+        actorLogin: "original-requester",
+      }),
+    ).toMatchObject(sealed);
+    expect(await stageClaimedDurableLocalArchiveCommitment(input)).toBeNull();
+    const lifecycle = await executor().query("SELECT status,download_url,completed_at FROM data_exports WHERE id=$1", [
+      exportId,
+    ]);
+    expect((lifecycle as { rows: unknown[] }).rows[0]).toMatchObject({
+      status: "running",
+      download_url: null,
+      completed_at: null,
+    });
+    // A local file is neither proof of current access nor a download URL.
+    expect(
+      await store.revokeForRequester({ exportId, tenantId: tenant, installationId, actorLogin: "original-requester" }),
+    ).toBe(true);
+    expect(
+      await store.readForRequester({ exportId, tenantId: tenant, installationId, actorLogin: "original-requester" }),
+    ).toBeNull();
+    const target = path.join(privateArchiveRoot, `${exportId}.zip`);
+    await writeFile(target, Buffer.alloc(sealed.byteLength));
+    expect(
+      await readSealedLocalExportArchive({
+        archiveRoot: privateArchiveRoot,
+        exportId,
+        sha256: sealed.sha256,
+        byteLength: sealed.byteLength,
+      }),
+    ).toBeNull();
+  });
+
+  it("fails closed on a nonprivate export root before writing DB commitment", async () => {
+    const { exportId, claim } = await claimedExport();
+    await chmod(privateArchiveRoot, 0o750);
+    try {
+      expect(
+        await stageClaimedDurableLocalArchiveCommitment({
+          db: executor(),
+          claim,
+          storageRoot,
+          storageDriver: "local",
+          privateArchiveRoot,
+        }),
+      ).toBeNull();
+      const results = await executor().query(
+        "SELECT archive_sha256 FROM data_export_archive_commitments WHERE export_id=$1",
+        [exportId],
+      );
+      expect((results as { rows: unknown[] }).rows).toHaveLength(0);
+    } finally {
+      await chmod(privateArchiveRoot, 0o700);
+    }
   });
 
   it.each(["installation-suspended", "lease-expired"] as const)(
