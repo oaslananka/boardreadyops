@@ -51,13 +51,37 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
           { ok: false, error: "not found" },
           { status: 404, headers: { "cache-control": "private, no-store" } },
         );
-      const preview = await new DataExportPreparationStore(executor).readPublishedManifestPreview({
+      const previewStore = new DataExportPreparationStore(executor);
+      const preview = await previewStore.readPublishedManifestPreview({
         exportId,
         tenantId: tenantLogin,
         installationId: canonicalInstallationId,
         actorLogin: viewer.session.login,
       });
       if (!preview)
+        return Response.json(
+          { ok: false, error: "not found" },
+          { status: 404, headers: { "cache-control": "private, no-store" } },
+        );
+      // Database IO can overlap an uninstall or account/installation change.
+      // Refresh the viewer's installation boundary and the original requester's
+      // unexpired preview before releasing any previously read private bytes.
+      const currentInstallation = (await resolveSettingsTenantScope(viewer.session, canonicalInstallationId)).selected;
+      if (
+        currentInstallation?.id !== canonicalInstallationId ||
+        currentInstallation.accountLogin.trim().toLowerCase() !== tenantLogin.toLowerCase()
+      )
+        return Response.json(
+          { ok: false, error: "not found" },
+          { status: 404, headers: { "cache-control": "private, no-store" } },
+        );
+      const currentPreview = await previewStore.readPublishedManifestPreview({
+        exportId,
+        tenantId: tenantLogin,
+        installationId: canonicalInstallationId,
+        actorLogin: viewer.session.login,
+      });
+      if (currentPreview?.sha256 !== preview.sha256 || currentPreview.byteLength !== preview.byteLength)
         return Response.json(
           { ok: false, error: "not found" },
           { status: 404, headers: { "cache-control": "private, no-store" } },
