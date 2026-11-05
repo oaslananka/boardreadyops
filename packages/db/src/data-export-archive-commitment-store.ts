@@ -78,7 +78,8 @@ export class DataExportArchiveCommitmentStore {
       return null;
     }
     const result = await this.db.query(
-      `INSERT INTO data_export_archive_commitments (
+      `WITH staged AS (
+       INSERT INTO data_export_archive_commitments (
          export_id, installation_id, archive_sha256, archive_byte_length,
          archive_files, staged_at, expires_at
        )
@@ -98,7 +99,26 @@ export class DataExportArchiveCommitmentStore {
                 AND repositories.installation_id = installations.id
                 AND repositories.disabled_at IS NULL)))
        ON CONFLICT (export_id) DO NOTHING
-       RETURNING archive_sha256, archive_byte_length, archive_files, expires_at`,
+       RETURNING export_id, installation_id, archive_sha256, archive_byte_length, archive_files, expires_at
+       ), audited AS (
+         INSERT INTO audit_events (
+           installation_id, event_type, actor_type, actor_id,
+           subject_type, subject_id, metadata
+         )
+         SELECT staged.installation_id, 'data_export.archive.staged',
+                'system', $4, 'data_export', staged.export_id,
+                jsonb_build_object(
+                  'sha256', staged.archive_sha256,
+                  'byteLength', staged.archive_byte_length,
+                  'fileCount', staged.archive_files,
+                  'expiresAt', staged.expires_at
+                )
+           FROM staged
+         RETURNING id
+       )
+       SELECT staged.archive_sha256, staged.archive_byte_length,
+              staged.archive_files, staged.expires_at
+         FROM staged CROSS JOIN audited`,
       [
         claim.exportId,
         claim.tenantId,
@@ -131,7 +151,9 @@ export class DataExportArchiveCommitmentStore {
           AND exports.installation_id = $3 AND commitment.installation_id = installations.id
           AND lower(exports.requested_by) = lower($4)
           AND exports.status = 'running'
-          AND exports.preparation_lease_until > NOW()
+          -- The worker lease protects creation, not the original requester's
+          -- independent, shorter-lived ZIP commitment. Read authority is
+          -- bound to expiry, revocation and current installation/repo scope.
           AND commitment.expires_at > NOW() AND commitment.revoked_at IS NULL
           AND installations.suspended_at IS NULL
           AND lower(installations.account_login) = lower(exports.tenant_id)
@@ -155,7 +177,8 @@ export class DataExportArchiveCommitmentStore {
   }): Promise<boolean> {
     if (![input?.exportId, input?.tenantId, input?.installationId, input?.actorLogin].every(canonical)) return false;
     const result = await this.db.query(
-      `UPDATE data_export_archive_commitments AS commitment
+      `WITH revoked AS (
+       UPDATE data_export_archive_commitments AS commitment
           SET revoked_at = NOW()
          FROM data_exports AS exports
          JOIN installations ON installations.id = exports.installation_id
@@ -171,7 +194,18 @@ export class DataExportArchiveCommitmentStore {
               SELECT 1 FROM repositories WHERE repositories.id = exports.scope_id
                 AND repositories.installation_id = installations.id
                 AND repositories.disabled_at IS NULL)))
-       RETURNING commitment.export_id`,
+       RETURNING commitment.export_id, commitment.installation_id
+       ), audited AS (
+         INSERT INTO audit_events (
+           installation_id, event_type, actor_type, actor_login,
+           subject_type, subject_id, metadata
+         )
+         SELECT revoked.installation_id, 'data_export.archive.revoked',
+                'user', $4, 'data_export', revoked.export_id, '{}'::jsonb
+           FROM revoked
+         RETURNING id
+       )
+       SELECT revoked.export_id FROM revoked CROSS JOIN audited`,
       [input.exportId, input.tenantId, input.installationId, input.actorLogin],
     );
     return rows(result).length === 1;

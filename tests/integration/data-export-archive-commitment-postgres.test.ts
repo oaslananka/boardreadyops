@@ -61,7 +61,9 @@ afterAll(async () => {
   if (!executor) return;
   try {
     await db().query("DELETE FROM data_exports WHERE id=ANY($1::text[])", [created]);
-    await db().query("DELETE FROM installations WHERE id=$1", [installationId]);
+    // Archive-stage and revoke evidence is append-only. Keep its installation
+    // identity until the isolated disposable PostgreSQL database is destroyed.
+    // Deleting it here would violate the immutable audit trail contract.
   } finally {
     await db().close();
   }
@@ -74,11 +76,40 @@ describeDatabase("claim-bound archive commitment admission (PostgreSQL)", () => 
     const staged = await store.stage(claim, archive);
     expect(staged).toMatchObject(archive);
     expect(staged?.expiresAt).toMatch(/Z$/u);
+    const evidence = await db().query(
+      `SELECT event_type,actor_type,actor_id,actor_login,subject_type,metadata
+         FROM audit_events WHERE installation_id=$1 AND subject_id=$2 ORDER BY created_at,id`,
+      [installationId, exportId],
+    );
+    expect((evidence as { rows: Record<string, unknown>[] }).rows).toEqual([
+      {
+        event_type: "data_export.archive.staged",
+        actor_type: "system",
+        actor_id: "zip-worker",
+        actor_login: null,
+        subject_type: "data_export",
+        metadata: {
+          sha256: archive.sha256,
+          byteLength: archive.byteLength,
+          fileCount: archive.files,
+          expiresAt: expect.any(String),
+        },
+      },
+    ]);
+    const expiryInAudit =
+      (evidence as { rows: Array<{ metadata: { expiresAt: string } }> }).rows[0]?.metadata.expiresAt ?? "";
+    expect(Date.parse(expiryInAudit)).toBe(Date.parse(staged?.expiresAt ?? ""));
+    expect(JSON.stringify(evidence)).not.toContain(claim.token);
     expect(await store.readForRequester(viewer)).toEqual(staged);
     expect(await store.readForRequester({ ...viewer, actorLogin: "different-user" })).toBeNull();
     expect(await store.readForRequester({ ...viewer, tenantId: "another-tenant" })).toBeNull();
     expect(await store.readForRequester({ ...viewer, installationId: randomUUID() })).toBeNull();
     expect(await store.stage(claim, { ...archive, sha256: "b".repeat(64) })).toBeNull();
+    const again = await db().query("SELECT id FROM audit_events WHERE installation_id=$1 AND subject_id=$2", [
+      installationId,
+      exportId,
+    ]);
+    expect((again as { rows: unknown[] }).rows).toHaveLength(1);
     const status = await db().query("SELECT status,completed_at,download_url FROM data_exports WHERE id=$1", [
       exportId,
     ]);
@@ -146,8 +177,42 @@ describeDatabase("claim-bound archive commitment admission (PostgreSQL)", () => 
     expect(await store.revokeForRequester({ ...viewer, tenantId: "foreign" })).toBe(false);
     expect(await store.revokeForRequester(viewer)).toBe(true);
     expect(await store.revokeForRequester(viewer)).toBe(false);
+    const audited = await db().query(
+      `SELECT event_type,actor_type,actor_login,metadata
+       FROM audit_events WHERE installation_id=$1 AND subject_id=$2 ORDER BY created_at,id`,
+      [installationId, claim.exportId],
+    );
+    const events = (audited as { rows: Record<string, unknown>[] }).rows;
+    expect(events).toHaveLength(2);
+    expect(events).toContainEqual({
+      event_type: "data_export.archive.staged",
+      actor_type: "system",
+      actor_login: null,
+      metadata: expect.objectContaining({ sha256: archive.sha256 }),
+    });
+    expect(events).toContainEqual({
+      event_type: "data_export.archive.revoked",
+      actor_type: "user",
+      actor_login: "original-requester",
+      metadata: {},
+    });
+    expect(JSON.stringify(events)).not.toContain(claim.token);
     expect(await store.readForRequester(viewer)).toBeNull();
     expect(await store.stage(claim, archive)).toBeNull();
+  });
+
+  it("does not let the preparer's short lease cut off the original requester's fifteen-minute read window", async () => {
+    const { exportId, claim, viewer } = await claimExport();
+    const store = new DataExportArchiveCommitmentStore(db());
+    expect(await store.stage(claim, archive)).toMatchObject(archive);
+    await db().query("UPDATE data_exports SET preparation_lease_until=NOW()-interval '1 second' WHERE id=$1", [
+      exportId,
+    ]);
+    expect(await store.stage(claim, archive)).toBeNull();
+    expect(await store.readForRequester(viewer)).toMatchObject(archive);
+    expect(await store.readForRequester({ ...viewer, actorLogin: "other-requester" })).toBeNull();
+    expect(await store.revokeForRequester(viewer)).toBe(true);
+    expect(await store.readForRequester(viewer)).toBeNull();
   });
 
   it("denies expired commitment and lease without auto-reclaim or completing export", async () => {

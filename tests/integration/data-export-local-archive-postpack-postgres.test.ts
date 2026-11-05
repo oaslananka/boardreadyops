@@ -75,7 +75,9 @@ afterAll(async () => {
   if (!db) return;
   try {
     await db.query("DELETE FROM data_exports WHERE id=ANY($1::text[])", [createdExports]);
-    await db.query("DELETE FROM installations WHERE id=$1", [installationId]);
+    // Archive-stage and revoke evidence is append-only. Keep its installation
+    // identity until the isolated disposable PostgreSQL database is destroyed.
+    // Deleting it here would violate the immutable audit trail contract.
   } finally {
     await db.close();
     if (storageRoot) await rm(storageRoot, { recursive: true, force: true });
