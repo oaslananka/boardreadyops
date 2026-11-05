@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { verifyClaimedExportArchiveIntegrity } from "../../apps/web/lib/data-export-archive-integrity.js";
 import { prepareClaimedLocalArchiveZip } from "../../apps/web/lib/data-export-local-archive.js";
 import { DataExportPreparationStore } from "../../packages/db/src/data-export-preparation-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
@@ -82,6 +83,9 @@ describeDatabase("local export post-packaging PostgreSQL admission", () => {
     });
     expect(result?.files).toBe(8);
     expect(result?.sha256).toMatch(/^[a-f0-9]{64}$/u);
+    expect(verifyClaimedExportArchiveIntegrity(result?.bytes ?? Buffer.alloc(0), result?.sha256 ?? "", exportId)).toBe(
+      true,
+    );
     const status = await executor().query("SELECT status,download_url,completed_at FROM data_exports WHERE id=$1", [
       exportId,
     ]);
