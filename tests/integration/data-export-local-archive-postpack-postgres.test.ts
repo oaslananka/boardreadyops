@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { verifyClaimedExportArchiveIntegrity } from "../../apps/web/lib/data-export-archive-integrity.js";
-import { prepareClaimedLocalArchiveZip } from "../../apps/web/lib/data-export-local-archive.js";
+import {
+  prepareClaimedLocalArchiveZip,
+  stageClaimedLocalArchiveCommitment,
+} from "../../apps/web/lib/data-export-local-archive.js";
+import { DataExportArchiveCommitmentStore } from "../../packages/db/src/data-export-archive-commitment-store.js";
 import { DataExportPreparationStore } from "../../packages/db/src/data-export-preparation-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
@@ -86,6 +90,62 @@ describeDatabase("local export post-packaging PostgreSQL admission", () => {
     expect(verifyClaimedExportArchiveIntegrity(result?.bytes ?? Buffer.alloc(0), result?.sha256 ?? "", exportId)).toBe(
       true,
     );
+    const status = await executor().query("SELECT status,download_url,completed_at FROM data_exports WHERE id=$1", [
+      exportId,
+    ]);
+    expect((status as { rows: unknown[] }).rows[0]).toMatchObject({
+      status: "running",
+      download_url: null,
+      completed_at: null,
+    });
+  });
+
+  it("commits only the verified in-memory ZIP while leaving customer delivery disabled", async () => {
+    const { exportId, claim } = await claimedExport();
+    const published = await stageClaimedLocalArchiveCommitment({
+      db: executor(),
+      claim,
+      storageRoot,
+      storageDriver: "local",
+    });
+    expect(published?.archive.files).toBe(8);
+    expect(published?.expiresAt).toMatch(/Z$/u);
+    const store = new DataExportArchiveCommitmentStore(executor());
+    const viewed = await store.readForRequester({
+      exportId,
+      tenantId: tenant,
+      installationId,
+      actorLogin: "original-requester",
+    });
+    expect(viewed).toMatchObject({
+      sha256: published?.archive.sha256,
+      byteLength: published?.archive.byteLength,
+      files: 8,
+    });
+    expect(
+      await store.readForRequester({
+        exportId,
+        tenantId: tenant,
+        installationId,
+        actorLogin: "other-requester",
+      }),
+    ).toBeNull();
+    expect(
+      await new DataExportPreparationStore(executor()).releaseReadOnlyClaim({
+        exportId,
+        installationId,
+        workerId: claim.workerId,
+        token: claim.token,
+      }),
+    ).toBe(false);
+    expect(
+      await stageClaimedLocalArchiveCommitment({
+        db: executor(),
+        claim,
+        storageRoot,
+        storageDriver: "local",
+      }),
+    ).toBeNull();
     const status = await executor().query("SELECT status,download_url,completed_at FROM data_exports WHERE id=$1", [
       exportId,
     ]);

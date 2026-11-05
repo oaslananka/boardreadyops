@@ -1,3 +1,4 @@
+import { DataExportArchiveCommitmentStore } from "../../../packages/db/src/data-export-archive-commitment-store.js";
 import { prepareClaimedConsistentMetadataSlices } from "../../../packages/db/src/data-export-consistent-snapshot.js";
 import { DataExportInventoryStore } from "../../../packages/db/src/data-export-inventory.js";
 import { prepareClaimedExportManifest } from "../../../packages/db/src/data-export-manifest.js";
@@ -8,6 +9,7 @@ import {
 import type { ExportRecordClaim } from "../../../packages/db/src/data-export-record-snapshot.js";
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
 import { ExportArchivePreflightError, type VerifiedArchiveObject } from "./data-export-archive-entries.js";
+import { verifyClaimedExportArchiveIntegrity } from "./data-export-archive-integrity.js";
 import { prepareClaimedArchiveZip } from "./data-export-archive-zip.js";
 import { readClaimedVerifiedLocalExportObject } from "./data-export-verified-object.js";
 
@@ -136,4 +138,34 @@ export async function prepareClaimedLocalArchiveZip(input: {
   const afterPackaging = await prepareClaimedExportManifest(new DataExportInventoryStore(input.db), input.claim);
   if (afterPackaging?.sha256 !== slices.repositories.sha256) return null;
   return archive;
+}
+
+/**
+ * INTERNAL prepare-and-stage path. Unlike a raw DB digest assertion, the
+ * commitment is made ONLY after the scoped ZIP was generated, independently
+ * verified against its full-byte digest, and its original claim survived all
+ * post-packaging checks. The one-way DB reservation does NOT persist ZIP bytes,
+ * mark a customer export completed, authorize publication or create a link.
+ */
+export async function stageClaimedLocalArchiveCommitment(
+  input: Parameters<typeof prepareClaimedLocalArchiveZip>[0],
+): Promise<{
+  archive: NonNullable<Awaited<ReturnType<typeof prepareClaimedLocalArchiveZip>>>;
+  expiresAt: string;
+} | null> {
+  const archive = await prepareClaimedLocalArchiveZip(input);
+  if (!archive) return null;
+  if (!verifyClaimedExportArchiveIntegrity(archive.bytes, archive.sha256, input.claim.exportId)) {
+    throw new ExportArchivePreflightError();
+  }
+  const staged = await new DataExportArchiveCommitmentStore(input.db).stage(input.claim, archive);
+  if (
+    !staged ||
+    staged.sha256 !== archive.sha256 ||
+    staged.byteLength !== archive.byteLength ||
+    staged.files !== archive.files
+  ) {
+    return null;
+  }
+  return { archive, expiresAt: staged.expiresAt };
 }
