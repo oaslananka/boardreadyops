@@ -11,7 +11,7 @@ import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
 import { ExportArchivePreflightError, type VerifiedArchiveObject } from "./data-export-archive-entries.js";
 import { verifyClaimedExportArchiveIntegrity } from "./data-export-archive-integrity.js";
 import { prepareClaimedArchiveZip } from "./data-export-archive-zip.js";
-import { sealLocalExportArchive } from "./data-export-local-archive-storage.js";
+import { readSealedLocalExportArchive, sealLocalExportArchive } from "./data-export-local-archive-storage.js";
 import { readClaimedVerifiedLocalExportObject } from "./data-export-verified-object.js";
 
 const maxArchiveSourceBytes = 64 * 1024 * 1024;
@@ -200,4 +200,48 @@ export async function stageClaimedDurableLocalArchiveCommitment(
   )
     return null;
   return { ...staged };
+}
+
+/**
+ * INTERNAL source for a future audited HTTP retrieval edge. A file on disk,
+ * even with the correct hash, does not authorize a customer: check live
+ * original-requester/tenant/installation/lease/revocation before and after IO.
+ * This method does not issue an HTTP response, audit a download, hold a
+ * revocation fence during streaming, or grant post-uninstall access.
+ */
+export async function readAuthorizedSealedLocalExportArchive(input: {
+  db: Pick<PgQueryExecutor, "query">;
+  archiveRoot: string;
+  exportId: string;
+  tenantId: string;
+  installationId: string;
+  actorLogin: string;
+}): Promise<Buffer | null> {
+  const store = new DataExportArchiveCommitmentStore(input.db);
+  const request = {
+    exportId: input.exportId,
+    tenantId: input.tenantId,
+    installationId: input.installationId,
+    actorLogin: input.actorLogin,
+  };
+  const first = await store.readForRequester(request);
+  if (!first) return null;
+  const bytes = await readSealedLocalExportArchive({
+    archiveRoot: input.archiveRoot,
+    exportId: input.exportId,
+    sha256: first.sha256,
+    byteLength: first.byteLength,
+  });
+  if (!bytes) return null;
+  const last = await store.readForRequester(request);
+  if (
+    !last ||
+    last.sha256 !== first.sha256 ||
+    last.byteLength !== first.byteLength ||
+    last.files !== first.files ||
+    last.expiresAt !== first.expiresAt
+  ) {
+    return null;
+  }
+  return bytes;
 }

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { verifyClaimedExportArchiveIntegrity } from "../../apps/web/lib/data-export-archive-integrity.js";
 import {
   prepareClaimedLocalArchiveZip,
+  readAuthorizedSealedLocalExportArchive,
   stageClaimedDurableLocalArchiveCommitment,
   stageClaimedLocalArchiveCommitment,
 } from "../../apps/web/lib/data-export-local-archive.js";
@@ -182,6 +183,17 @@ describeDatabase("local export post-packaging PostgreSQL admission", () => {
     });
     expect(bytes).not.toBeNull();
     expect(verifyClaimedExportArchiveIntegrity(bytes ?? Buffer.alloc(0), sealed.sha256, exportId)).toBe(true);
+    const authorized = {
+      db: executor(),
+      archiveRoot: privateArchiveRoot,
+      exportId,
+      tenantId: tenant,
+      installationId,
+      actorLogin: "original-requester",
+    };
+    expect(await readAuthorizedSealedLocalExportArchive(authorized)).toEqual(bytes);
+    expect(await readAuthorizedSealedLocalExportArchive({ ...authorized, actorLogin: "other-requester" })).toBeNull();
+    expect(await readAuthorizedSealedLocalExportArchive({ ...authorized, tenantId: "foreign-tenant" })).toBeNull();
     const store = new DataExportArchiveCommitmentStore(executor());
     expect(
       await store.readForRequester({
@@ -207,6 +219,7 @@ describeDatabase("local export post-packaging PostgreSQL admission", () => {
     expect(
       await store.readForRequester({ exportId, tenantId: tenant, installationId, actorLogin: "original-requester" }),
     ).toBeNull();
+    expect(await readAuthorizedSealedLocalExportArchive(authorized)).toBeNull();
     const target = path.join(privateArchiveRoot, `${exportId}.zip`);
     await writeFile(target, Buffer.alloc(sealed.byteLength));
     expect(
@@ -217,6 +230,53 @@ describeDatabase("local export post-packaging PostgreSQL admission", () => {
         byteLength: sealed.byteLength,
       }),
     ).toBeNull();
+  });
+
+  it("fails closed when the original requester revokes during local file IO", async () => {
+    const { exportId, claim } = await claimedExport();
+    const sealed = await stageClaimedDurableLocalArchiveCommitment({
+      db: executor(),
+      claim,
+      storageRoot,
+      storageDriver: "local",
+      privateArchiveRoot,
+    });
+    expect(sealed).not.toBeNull();
+    let reads = 0;
+    const racedDb = {
+      async query(sql: string, params?: readonly unknown[]) {
+        if (sql.includes("FROM data_export_archive_commitments AS commitment")) {
+          reads++;
+          if (reads === 2) {
+            await new DataExportArchiveCommitmentStore(executor()).revokeForRequester({
+              exportId,
+              tenantId: tenant,
+              installationId,
+              actorLogin: "original-requester",
+            });
+          }
+        }
+        return await executor().query(sql, params);
+      },
+    };
+    const result = await readAuthorizedSealedLocalExportArchive({
+      db: racedDb,
+      archiveRoot: privateArchiveRoot,
+      exportId,
+      tenantId: tenant,
+      installationId,
+      actorLogin: "original-requester",
+    });
+    expect(reads).toBe(2);
+    expect(result).toBeNull();
+    const row = await executor().query("SELECT status,download_url,completed_at FROM data_exports WHERE id=$1", [
+      exportId,
+    ]);
+    expect((row as { rows: unknown[] }).rows[0]).toMatchObject({
+      status: "running",
+      download_url: null,
+      completed_at: null,
+    });
   });
 
   it("fails closed on a nonprivate export root before writing DB commitment", async () => {
