@@ -80,7 +80,7 @@ describeDatabase("local export post-packaging PostgreSQL admission", () => {
       storageRoot,
       storageDriver: "local",
     });
-    expect(result?.files).toBe(7);
+    expect(result?.files).toBe(8);
     expect(result?.sha256).toMatch(/^[a-f0-9]{64}$/u);
     const status = await executor().query("SELECT status,download_url,completed_at FROM data_exports WHERE id=$1", [
       exportId,
