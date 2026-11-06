@@ -497,50 +497,237 @@ type HistoricalAuditRow = {
   foreign_review_subject: boolean;
 };
 
-/**
- * INTERNAL read-only historical USER metadata preflight. One immutable
- * owner check, one PostgreSQL statement and one repeatable-read snapshot
- * for retained repository/run/finding, artifact DESCRIPTORS, review,
- * revision, repository-scoped and original-installation-only audit
- * DESCRIPTORS. Never returns artifact contents or storage paths, private
- * audit payloads, original installation IDs or signed links.
- * Intentionally partial; grants no ZIP, erasure, claim or download right.
- */
-export async function prepareVerifiedHistoricalUserConsistentCorePreflight(
-  db: Pick<PgQueryExecutor, "withTransaction">,
-  input: { exportId: string; verifiedGitHubUserId: number },
-): Promise<{
-  bytes: Buffer;
-  sha256: string;
-  byteLength: number;
-  repositoryCount: number;
-  runCount: number;
-  findingCount: number;
-  artifactCount: number;
-  reviewCount: number;
-  revisionCount: number;
-  auditCount: number;
-  installationAuditCount: number;
-  commentCount: number;
-  approvalCount: number;
-  checklistCount: number;
-  findingDecisionCount: number;
-  findingAssignmentCount: number;
+type HistoricalCoreSnapshotRows = {
+  repositories: HistoricalRepository[];
+  runs: HistoricalRunRow[];
+  findings: HistoricalFindingRow[];
+  artifacts: HistoricalArtifactRow[];
+  reviews: HistoricalReviewRow[];
+  revisions: HistoricalRevisionRow[];
+  audits: HistoricalAuditRow[];
+  installationAudits: HistoricalInstallationAuditRow[];
+  comments: HistoricalCommentRow[];
+  approvals: HistoricalApprovalRow[];
+  checklist: HistoricalChecklistRow[];
+  findingDecisions: HistoricalFindingDecisionRow[];
+  findingAssignments: HistoricalFindingAssignmentRow[];
   excludedSourceClassCounts: HistoricalExcludedClassCounts;
   redactedAuditFieldCounts: HistoricalAuditRedactionCounts;
-} | null> {
-  if (
-    !db?.withTransaction ||
-    !isUuid(input?.exportId) ||
-    !Number.isSafeInteger(input?.verifiedGitHubUserId) ||
-    input.verifiedGitHubUserId <= 0
-  )
-    return null;
+};
 
-  return db.withTransaction(
-    async (tx) => {
-      const result = await tx.query(
-        `WITH ${historicalOwnerCtes},
+function serializeHistoricalCoreSnapshot(input: { exportId: string }, rows: HistoricalCoreSnapshotRows) {
+  const {
+    repositories,
+    runs,
+    findings,
+    artifacts,
+    reviews,
+    revisions,
+    audits,
+    installationAudits,
+    comments,
+    approvals,
+    checklist,
+    findingDecisions,
+    findingAssignments,
+    excludedSourceClassCounts,
+    redactedAuditFieldCounts,
+  } = rows;
+  const bytes = Buffer.from(
+    JSON.stringify({
+      formatVersion: 1,
+      kind: "boardreadyops.historical-user-consistent-core-preflight",
+      coverage: "retained-suspended-user-installation-core-and-scoped-audit-descriptors-only",
+      completeCustomerExport: false,
+      exportId: input.exportId,
+      exclusions: [
+        "managed-artifact-bytes",
+        "review-comment-author-identities",
+        "review-approval-actor-identities",
+        "review-checklist-completion-actor-identities",
+        "finding-decision-owner-and-actor-identities",
+        "finding-assignment-assignee-and-assigner-identities",
+        "audit-metadata",
+        "run-snapshot-private-visual-content",
+        "api-token-hashes-prefixes-and-creator-identities",
+        "runner-registration-identifiers",
+        "installation-credential-envelopes",
+        "installation-component-observation-data",
+        "unverifiable-tenant-only-policy-and-billing-records",
+        "platform-storage",
+        "github-actions-source-logs",
+        "unverified-collaboration-and-finding-free-text",
+        "unverified-repository-review-and-artifact-identifying-metadata",
+      ],
+      // The original owner has not proven rights to disclose arbitrary
+      // third-party comments, approvals, checklists or finding reasons.
+      // Preserve the historical records in PostgreSQL, but NEVER embed
+      // their free text in this private PARTIAL ZIP candidate.
+      // Counts are the only contents for these five sensitive classes.
+      // Tenant-login-only audit/billing records cannot be verified
+      // against the immutable original numeric account and stay excluded.
+      excludedSourceClassCounts,
+      redactedAuditFieldCounts,
+      repositories: repositories.map((repository) => ({
+        ...repository,
+        owner: "",
+        name: "",
+      })),
+      runs: runs.map((run) => ({
+        id: run.id,
+        repositoryId: run.repository_id,
+        commitSha: run.commit_sha,
+        ref: "",
+        status: run.status,
+        decision: run.decision,
+      })),
+      findings: findings.map((finding) => ({
+        id: finding.id,
+        runId: finding.run_id,
+        ruleId: finding.rule_id,
+        severity: finding.severity,
+        message: "",
+        path: null,
+        kind: finding.kind,
+      })),
+      artifacts: artifacts.map((artifact) => ({
+        id: artifact.id,
+        runId: artifact.run_id,
+        kind: artifact.kind,
+        name: "",
+        role: artifact.role,
+        sha256: artifact.sha256,
+        byteLength: artifact.bytes,
+        contentType: artifact.content_type,
+        retentionExpired: artifact.retention_expired,
+        // The artifact's presence, bytes and checksum were NOT verified.
+        contentsVerified: false,
+        downloadAvailable: false,
+      })),
+      reviews: reviews.map((review) => ({
+        id: review.id,
+        repositoryId: review.repository_id,
+        headRunId: review.head_run_id,
+        title: "",
+        status: review.status,
+        decision: review.decision,
+      })),
+      revisions: revisions.map((revision) => ({
+        id: revision.id,
+        reviewId: revision.review_id,
+        sequence: revision.sequence,
+        headRunId: revision.head_run_id,
+        baseRunId: revision.base_run_id,
+        headCommitSha: revision.head_commit_sha,
+        evidenceDigest: revision.evidence_digest,
+      })),
+      reviewComments: comments.map((comment) => ({
+        id: comment.id,
+        repositoryId: comment.repository_id,
+        reviewId: comment.review_id,
+        parentId: comment.parent_id,
+        status: comment.status,
+        authorType: comment.author_type,
+        content: "",
+        findingFingerprint: comment.finding_fingerprint,
+        evidenceAnchor: null,
+        contentIncluded: false,
+        authorIdIncluded: false,
+      })),
+      reviewApprovals: approvals.map((approval) => ({
+        id: approval.id,
+        repositoryId: approval.repository_id,
+        reviewId: approval.review_id,
+        revisionId: approval.revision_id,
+        status: approval.status,
+        evidenceDigest: approval.evidence_digest,
+        reason: null,
+        invalidationReason: null,
+        isBreakGlass: approval.is_break_glass,
+        actorIncluded: false,
+      })),
+      reviewChecklist: checklist.map((item) => ({
+        id: item.id,
+        repositoryId: item.repository_id,
+        reviewId: item.review_id,
+        completed: item.completed,
+        title: "",
+        titleIncluded: false,
+        completedByIncluded: false,
+      })),
+      findingDecisions: findingDecisions.map((decision) => ({
+        id: decision.id,
+        repositoryId: decision.repository_id,
+        reviewId: decision.review_id,
+        findingFingerprint: decision.finding_fingerprint,
+        disposition: decision.disposition,
+        reason: "",
+        evidenceDigest: decision.evidence_digest,
+        expiresAt: decision.expires_at,
+        ownerIncluded: false,
+        actorIncluded: false,
+      })),
+      findingAssignments: findingAssignments.map((assignment) => ({
+        id: assignment.id,
+        repositoryId: assignment.repository_id,
+        reviewId: assignment.review_id,
+        findingFingerprint: assignment.finding_fingerprint,
+        assigneeIncluded: false,
+        assignedByIncluded: false,
+      })),
+      installationAuditEvents: installationAudits.map((audit) => ({
+        id: audit.id,
+        eventType: audit.event_type,
+        actorType: safeHistoricalActorClass(audit.actor_type),
+        subjectType: audit.subject_type,
+        // Retain only the count of suppressed private fields, never the
+        // human identifier, request token, metadata or installation ID.
+        actorDetailsIncluded: false,
+        subjectDetailsIncluded: false,
+        requestIdIncluded: false,
+        metadataIncluded: false,
+      })),
+      auditEvents: audits.map((audit) => ({
+        id: audit.id,
+        repositoryId: audit.repository_id,
+        releaseRunId: audit.release_run_id,
+        eventType: audit.event_type,
+        actorType: safeHistoricalActorClass(audit.actor_type),
+        subjectType: audit.subject_type,
+        actorDetailsIncluded: false,
+        subjectDetailsIncluded: false,
+        requestIdIncluded: false,
+        metadataIncluded: false,
+        // Deliberately omit subjectId, actor identity and arbitrary metadata.
+      })),
+    }),
+    "utf8",
+  );
+  if (bytes.length === 0 || bytes.length > maxBytes) throw new HistoricalUserInventoryUnavailableError();
+
+  return {
+    bytes,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    byteLength: bytes.length,
+    repositoryCount: repositories.length,
+    runCount: runs.length,
+    findingCount: findings.length,
+    artifactCount: artifacts.length,
+    reviewCount: reviews.length,
+    revisionCount: revisions.length,
+    auditCount: audits.length,
+    installationAuditCount: installationAudits.length,
+    commentCount: comments.length,
+    approvalCount: approvals.length,
+    checklistCount: checklist.length,
+    findingDecisionCount: findingDecisions.length,
+    findingAssignmentCount: findingAssignments.length,
+    excludedSourceClassCounts,
+    redactedAuditFieldCounts,
+  };
+}
+
+const historicalUserConsistentCoreSql = `WITH ${historicalOwnerCtes},
        permitted_repositories AS MATERIALIZED (
          SELECT repositories.id, repositories.installation_id,
                 repositories.github_repo_id::text AS github_repo_id,
@@ -743,9 +930,51 @@ export async function prepareVerifiedHistoricalUserConsistentCorePreflight(
                         FROM installation_audit_rows), '[]'::jsonb) AS installation_audit_events,
               COALESCE((SELECT jsonb_agg(to_jsonb(audit_rows) ORDER BY audit_rows.id)
                         FROM audit_rows), '[]'::jsonb) AS audit_events
-         FROM owner_export LIMIT 1`,
-        [input.exportId, input.verifiedGitHubUserId],
-      );
+         FROM owner_export LIMIT 1`;
+
+/**
+ * INTERNAL read-only historical USER metadata preflight. One immutable
+ * owner check, one PostgreSQL statement and one repeatable-read snapshot
+ * for retained repository/run/finding, artifact DESCRIPTORS, review,
+ * revision, repository-scoped and original-installation-only audit
+ * DESCRIPTORS. Never returns artifact contents or storage paths, private
+ * audit payloads, original installation IDs or signed links.
+ * Intentionally partial; grants no ZIP, erasure, claim or download right.
+ */
+export async function prepareVerifiedHistoricalUserConsistentCorePreflight(
+  db: Pick<PgQueryExecutor, "withTransaction">,
+  input: { exportId: string; verifiedGitHubUserId: number },
+): Promise<{
+  bytes: Buffer;
+  sha256: string;
+  byteLength: number;
+  repositoryCount: number;
+  runCount: number;
+  findingCount: number;
+  artifactCount: number;
+  reviewCount: number;
+  revisionCount: number;
+  auditCount: number;
+  installationAuditCount: number;
+  commentCount: number;
+  approvalCount: number;
+  checklistCount: number;
+  findingDecisionCount: number;
+  findingAssignmentCount: number;
+  excludedSourceClassCounts: HistoricalExcludedClassCounts;
+  redactedAuditFieldCounts: HistoricalAuditRedactionCounts;
+} | null> {
+  if (
+    !db?.withTransaction ||
+    !isUuid(input?.exportId) ||
+    !Number.isSafeInteger(input?.verifiedGitHubUserId) ||
+    input.verifiedGitHubUserId <= 0
+  )
+    return null;
+
+  return db.withTransaction(
+    async (tx) => {
+      const result = await tx.query(historicalUserConsistentCoreSql, [input.exportId, input.verifiedGitHubUserId]);
       const record = (result as { rows?: Array<Record<string, unknown>> }).rows?.[0];
       if (!record) return null;
       if (
@@ -1030,198 +1259,23 @@ export async function prepareVerifiedHistoricalUserConsistentCorePreflight(
       )
         throw new HistoricalUserInventoryUnavailableError();
 
-      const bytes = Buffer.from(
-        JSON.stringify({
-          formatVersion: 1,
-          kind: "boardreadyops.historical-user-consistent-core-preflight",
-          coverage: "retained-suspended-user-installation-core-and-scoped-audit-descriptors-only",
-          completeCustomerExport: false,
-          exportId: input.exportId,
-          exclusions: [
-            "managed-artifact-bytes",
-            "review-comment-author-identities",
-            "review-approval-actor-identities",
-            "review-checklist-completion-actor-identities",
-            "finding-decision-owner-and-actor-identities",
-            "finding-assignment-assignee-and-assigner-identities",
-            "audit-metadata",
-            "run-snapshot-private-visual-content",
-            "api-token-hashes-prefixes-and-creator-identities",
-            "runner-registration-identifiers",
-            "installation-credential-envelopes",
-            "installation-component-observation-data",
-            "unverifiable-tenant-only-policy-and-billing-records",
-            "platform-storage",
-            "github-actions-source-logs",
-            "unverified-collaboration-and-finding-free-text",
-            "unverified-repository-review-and-artifact-identifying-metadata",
-          ],
-          // The original owner has not proven rights to disclose arbitrary
-          // third-party comments, approvals, checklists or finding reasons.
-          // Preserve the historical records in PostgreSQL, but NEVER embed
-          // their free text in this private PARTIAL ZIP candidate.
-          // Counts are the only contents for these five sensitive classes.
-          // Tenant-login-only audit/billing records cannot be verified
-          // against the immutable original numeric account and stay excluded.
-          excludedSourceClassCounts,
-          redactedAuditFieldCounts,
-          repositories: repositories.map((repository) => ({
-            ...repository,
-            owner: "",
-            name: "",
-          })),
-          runs: runs.map((run) => ({
-            id: run.id,
-            repositoryId: run.repository_id,
-            commitSha: run.commit_sha,
-            ref: "",
-            status: run.status,
-            decision: run.decision,
-          })),
-          findings: findings.map((finding) => ({
-            id: finding.id,
-            runId: finding.run_id,
-            ruleId: finding.rule_id,
-            severity: finding.severity,
-            message: "",
-            path: null,
-            kind: finding.kind,
-          })),
-          artifacts: artifacts.map((artifact) => ({
-            id: artifact.id,
-            runId: artifact.run_id,
-            kind: artifact.kind,
-            name: "",
-            role: artifact.role,
-            sha256: artifact.sha256,
-            byteLength: artifact.bytes,
-            contentType: artifact.content_type,
-            retentionExpired: artifact.retention_expired,
-            // The artifact's presence, bytes and checksum were NOT verified.
-            contentsVerified: false,
-            downloadAvailable: false,
-          })),
-          reviews: reviews.map((review) => ({
-            id: review.id,
-            repositoryId: review.repository_id,
-            headRunId: review.head_run_id,
-            title: "",
-            status: review.status,
-            decision: review.decision,
-          })),
-          revisions: revisions.map((revision) => ({
-            id: revision.id,
-            reviewId: revision.review_id,
-            sequence: revision.sequence,
-            headRunId: revision.head_run_id,
-            baseRunId: revision.base_run_id,
-            headCommitSha: revision.head_commit_sha,
-            evidenceDigest: revision.evidence_digest,
-          })),
-          reviewComments: comments.map((comment) => ({
-            id: comment.id,
-            repositoryId: comment.repository_id,
-            reviewId: comment.review_id,
-            parentId: comment.parent_id,
-            status: comment.status,
-            authorType: comment.author_type,
-            content: "",
-            findingFingerprint: comment.finding_fingerprint,
-            evidenceAnchor: null,
-            contentIncluded: false,
-            authorIdIncluded: false,
-          })),
-          reviewApprovals: approvals.map((approval) => ({
-            id: approval.id,
-            repositoryId: approval.repository_id,
-            reviewId: approval.review_id,
-            revisionId: approval.revision_id,
-            status: approval.status,
-            evidenceDigest: approval.evidence_digest,
-            reason: null,
-            invalidationReason: null,
-            isBreakGlass: approval.is_break_glass,
-            actorIncluded: false,
-          })),
-          reviewChecklist: checklist.map((item) => ({
-            id: item.id,
-            repositoryId: item.repository_id,
-            reviewId: item.review_id,
-            completed: item.completed,
-            title: "",
-            titleIncluded: false,
-            completedByIncluded: false,
-          })),
-          findingDecisions: findingDecisions.map((decision) => ({
-            id: decision.id,
-            repositoryId: decision.repository_id,
-            reviewId: decision.review_id,
-            findingFingerprint: decision.finding_fingerprint,
-            disposition: decision.disposition,
-            reason: "",
-            evidenceDigest: decision.evidence_digest,
-            expiresAt: decision.expires_at,
-            ownerIncluded: false,
-            actorIncluded: false,
-          })),
-          findingAssignments: findingAssignments.map((assignment) => ({
-            id: assignment.id,
-            repositoryId: assignment.repository_id,
-            reviewId: assignment.review_id,
-            findingFingerprint: assignment.finding_fingerprint,
-            assigneeIncluded: false,
-            assignedByIncluded: false,
-          })),
-          installationAuditEvents: installationAudits.map((audit) => ({
-            id: audit.id,
-            eventType: audit.event_type,
-            actorType: safeHistoricalActorClass(audit.actor_type),
-            subjectType: audit.subject_type,
-            // Retain only the count of suppressed private fields, never the
-            // human identifier, request token, metadata or installation ID.
-            actorDetailsIncluded: false,
-            subjectDetailsIncluded: false,
-            requestIdIncluded: false,
-            metadataIncluded: false,
-          })),
-          auditEvents: audits.map((audit) => ({
-            id: audit.id,
-            repositoryId: audit.repository_id,
-            releaseRunId: audit.release_run_id,
-            eventType: audit.event_type,
-            actorType: safeHistoricalActorClass(audit.actor_type),
-            subjectType: audit.subject_type,
-            actorDetailsIncluded: false,
-            subjectDetailsIncluded: false,
-            requestIdIncluded: false,
-            metadataIncluded: false,
-            // Deliberately omit subjectId, actor identity and arbitrary metadata.
-          })),
-        }),
-        "utf8",
-      );
-      if (bytes.length === 0 || bytes.length > maxBytes) throw new HistoricalUserInventoryUnavailableError();
-
-      return {
-        bytes,
-        sha256: createHash("sha256").update(bytes).digest("hex"),
-        byteLength: bytes.length,
-        repositoryCount: repositories.length,
-        runCount: runs.length,
-        findingCount: findings.length,
-        artifactCount: artifacts.length,
-        reviewCount: reviews.length,
-        revisionCount: revisions.length,
-        auditCount: audits.length,
-        installationAuditCount: installationAudits.length,
-        commentCount: comments.length,
-        approvalCount: approvals.length,
-        checklistCount: checklist.length,
-        findingDecisionCount: findingDecisions.length,
-        findingAssignmentCount: findingAssignments.length,
+      return serializeHistoricalCoreSnapshot(input, {
+        repositories,
+        runs,
+        findings,
+        artifacts,
+        reviews,
+        revisions,
+        audits,
+        installationAudits,
+        comments,
+        approvals,
+        checklist,
+        findingDecisions,
+        findingAssignments,
         excludedSourceClassCounts,
         redactedAuditFieldCounts,
-      };
+      });
     },
     { consistentRead: true, statementTimeoutMs: 5_000 },
   );
