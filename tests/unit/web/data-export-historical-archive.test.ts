@@ -853,6 +853,62 @@ describe("private historical original-USER partial archive", () => {
     }
   });
 
+  it("denies omitted disclosure exclusions and identity-bearing audit descriptors with a fresh digest", () => {
+    const base = inputs();
+    const seed = JSON.parse(base.snapshot.bytes.toString("utf8")) as Record<string, unknown>;
+    const installationAudit = {
+      id: randomUUID(),
+      eventType: "system.installed",
+      actorType: "system",
+      subjectType: "installation",
+      actorDetailsIncluded: false,
+      subjectDetailsIncluded: false,
+      requestIdIncluded: false,
+      metadataIncluded: false,
+    };
+    const repositoryAudit = { ...installationAudit, id: randomUUID(), repositoryId: repoId, releaseRunId: runId };
+    const attempt = (mutate: (snapshot: Record<string, unknown>) => void) => {
+      const record = structuredClone(seed);
+      record.installationAuditEvents = [structuredClone(installationAudit)];
+      record.auditEvents = [structuredClone(repositoryAudit)];
+      mutate(record);
+      const bytes = Buffer.from(JSON.stringify(record));
+      return () =>
+        prepareHistoricalUserPartialArchive({
+          ...base,
+          snapshot: { bytes, sha256: sha256(bytes), byteLength: bytes.length },
+        });
+    };
+    expect(attempt(() => {})).not.toThrow();
+    const tamperers: Array<(record: Record<string, unknown>) => void> = [
+      (record) => {
+        record.exclusions = (record.exclusions as string[]).filter((value) => value !== "audit-metadata");
+      },
+      (record) => {
+        record.exclusions = null;
+      },
+      (record) => {
+        record.repositories = "forged";
+      },
+      (record) => {
+        record.installationAuditEvents = [installationAudit, installationAudit];
+      },
+      (record) => {
+        (record.auditEvents as Record<string, unknown>[])[0].metadataIncluded = true;
+      },
+      (record) => {
+        (record.auditEvents as Record<string, unknown>[])[0].actorId = "private-person";
+      },
+      (record) => {
+        (record.auditEvents as Record<string, unknown>[])[0].repositoryId = randomUUID();
+      },
+      (record) => {
+        (record.auditEvents as Record<string, unknown>[])[0].releaseRunId = randomUUID();
+      },
+    ];
+    for (const tamper of tamperers) expect(attempt(tamper)).toThrow(HistoricalUserArchivePreflightError);
+  });
+
   it("fails closed on unknown sensitive fields and changed privacy flags in every core class", () => {
     const first = (core: Record<string, unknown>, key: string) => (core[key] as Array<Record<string, unknown>>)[0];
     const attacks: Array<(core: Record<string, unknown>) => void> = [

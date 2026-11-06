@@ -310,6 +310,36 @@ function checkCorePrivacySchema(value: unknown): boolean {
   });
 }
 
+// These required disclosure exclusions are part of the existing v1 contract.
+// Do not silently remove a category when the snapshot format evolves.
+const requiredSnapshotExclusions = [
+  "managed-artifact-bytes",
+  "finding-decision-owner-and-actor-identities",
+  "finding-assignment-assignee-and-assigner-identities",
+  "audit-metadata",
+  "run-snapshot-private-visual-content",
+  "api-token-hashes-prefixes-and-creator-identities",
+  "runner-registration-identifiers",
+  "installation-credential-envelopes",
+  "installation-component-observation-data",
+  "unverifiable-tenant-only-policy-and-billing-records",
+] as const;
+
+/** Every declared slice must be an array within its independent count bound. */
+function boundedHistoricalSnapshotLists(snapshot: HistoricalSnapshot): boolean {
+  const lists: unknown[] = [
+    snapshot.reviews,
+    snapshot.installationAuditEvents,
+    snapshot.auditEvents,
+    snapshot.findingDecisions,
+    snapshot.findingAssignments,
+    snapshot.repositories,
+    snapshot.runs,
+    snapshot.artifacts,
+  ];
+  return lists.every((rows) => Array.isArray(rows) && rows.length <= maxObjects);
+}
+
 function validateSnapshotEnvelope(snapshot: HistoricalSnapshot): void {
   if (
     !checkCorePrivacySchema(snapshot) ||
@@ -319,32 +349,8 @@ function validateSnapshotEnvelope(snapshot: HistoricalSnapshot): void {
     !uuid.test(snapshot.exportId) ||
     snapshot.coverage !== "retained-suspended-user-installation-core-and-scoped-audit-descriptors-only" ||
     !Array.isArray(snapshot.exclusions) ||
-    !snapshot.exclusions.includes("managed-artifact-bytes") ||
-    !snapshot.exclusions.includes("finding-decision-owner-and-actor-identities") ||
-    !snapshot.exclusions.includes("finding-assignment-assignee-and-assigner-identities") ||
-    !snapshot.exclusions.includes("audit-metadata") ||
-    !snapshot.exclusions.includes("run-snapshot-private-visual-content") ||
-    !snapshot.exclusions.includes("api-token-hashes-prefixes-and-creator-identities") ||
-    !snapshot.exclusions.includes("runner-registration-identifiers") ||
-    !snapshot.exclusions.includes("installation-credential-envelopes") ||
-    !snapshot.exclusions.includes("installation-component-observation-data") ||
-    !snapshot.exclusions.includes("unverifiable-tenant-only-policy-and-billing-records") ||
-    !Array.isArray(snapshot.reviews) ||
-    !Array.isArray(snapshot.installationAuditEvents) ||
-    !Array.isArray(snapshot.auditEvents) ||
-    snapshot.installationAuditEvents.length > maxObjects ||
-    snapshot.auditEvents.length > maxObjects ||
-    !Array.isArray(snapshot.findingDecisions) ||
-    !Array.isArray(snapshot.findingAssignments) ||
-    snapshot.reviews.length > maxObjects ||
-    snapshot.findingDecisions.length > maxObjects ||
-    snapshot.findingAssignments.length > maxObjects ||
-    !Array.isArray(snapshot.repositories) ||
-    !Array.isArray(snapshot.runs) ||
-    !Array.isArray(snapshot.artifacts) ||
-    snapshot.repositories.length > maxObjects ||
-    snapshot.runs.length > maxObjects ||
-    snapshot.artifacts.length > maxObjects
+    requiredSnapshotExclusions.some((excluded) => !snapshot.exclusions.includes(excluded)) ||
+    !boundedHistoricalSnapshotLists(snapshot)
   )
     throw new HistoricalUserArchivePreflightError();
 }
@@ -378,23 +384,22 @@ function validateSnapshotCounters(snapshot: HistoricalSnapshot): void {
     throw new HistoricalUserArchivePreflightError();
 }
 
-function validateSnapshotOwnership(snapshot: HistoricalSnapshot): {
-  runs: Map<string, string>;
-  reviews: Map<string, string>;
-} {
-  const allowedEventKeys = [
-    "id",
-    "eventType",
-    "actorType",
-    "subjectType",
-    "actorDetailsIncluded",
-    "subjectDetailsIncluded",
-    "requestIdIncluded",
-    "metadataIncluded",
-  ];
-  const allowedRepositoryEventKeys = [...allowedEventKeys, "repositoryId", "releaseRunId"];
-  const validAudit = (audit: HistoricalAuditDescriptor, keys: string[]): boolean =>
-    audit &&
+const allowedEventKeys = [
+  "id",
+  "eventType",
+  "actorType",
+  "subjectType",
+  "actorDetailsIncluded",
+  "subjectDetailsIncluded",
+  "requestIdIncluded",
+  "metadataIncluded",
+];
+const allowedRepositoryEventKeys = [...allowedEventKeys, "repositoryId", "releaseRunId"];
+
+/** No unreviewed audit metadata or direct identity may enter the partial archive. */
+function validHistoricalAuditDescriptor(audit: HistoricalAuditDescriptor, keys: string[]): boolean {
+  return (
+    !!audit &&
     typeof audit === "object" &&
     !Array.isArray(audit) &&
     exactKeys(audit, keys) &&
@@ -409,13 +414,24 @@ function validateSnapshotOwnership(snapshot: HistoricalSnapshot): {
     audit.actorDetailsIncluded === false &&
     audit.subjectDetailsIncluded === false &&
     audit.requestIdIncluded === false &&
-    audit.metadataIncluded === false;
+    audit.metadataIncluded === false
+  );
+}
+
+function validHistoricalAuditCollection(audits: HistoricalAuditDescriptor[], keys: string[]): boolean {
+  return (
+    audits.every((audit) => validHistoricalAuditDescriptor(audit, keys)) &&
+    new Set(audits.map((audit) => audit.id)).size === audits.length
+  );
+}
+
+function validateSnapshotOwnership(snapshot: HistoricalSnapshot): {
+  runs: Map<string, string>;
+  reviews: Map<string, string>;
+} {
   if (
-    snapshot.installationAuditEvents.some((audit) => !validAudit(audit, allowedEventKeys)) ||
-    snapshot.auditEvents.some((audit) => !validAudit(audit, allowedRepositoryEventKeys)) ||
-    new Set(snapshot.installationAuditEvents.map((audit) => audit.id)).size !==
-      snapshot.installationAuditEvents.length ||
-    new Set(snapshot.auditEvents.map((audit) => audit.id)).size !== snapshot.auditEvents.length
+    !validHistoricalAuditCollection(snapshot.installationAuditEvents, allowedEventKeys) ||
+    !validHistoricalAuditCollection(snapshot.auditEvents, allowedRepositoryEventKeys)
   )
     throw new HistoricalUserArchivePreflightError();
 
