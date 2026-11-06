@@ -25,6 +25,9 @@ describe("historical original-user private reader input gate", () => {
       { ...goodBinding(), verifiedGitHubUserId: "415" },
       { ...goodBinding(), preflightId: undefined },
       { ...goodBinding(), sha256: null },
+      { ...goodBinding(), sha256: "A".repeat(64) },
+      { ...goodBinding(), sha256: `${"a".repeat(63)}é` },
+      { ...goodBinding(), sha256: "a".repeat(65) },
       { ...goodBinding(), byteLength: Number.POSITIVE_INFINITY },
       { ...goodBinding(), byteLength: 64 * 1024 * 1024 + 1 },
     ]) {

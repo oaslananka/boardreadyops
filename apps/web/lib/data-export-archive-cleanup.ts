@@ -1,4 +1,4 @@
-import { constants } from "node:fs";
+import { constants, type Stats } from "node:fs";
 import { lstat, open, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
 import { DataExportArchiveCommitmentStore } from "../../../packages/db/src/data-export-archive-commitment-store.js";
@@ -17,6 +17,87 @@ export type ArchiveCleanupResult =
   | "quarantined"
   | "busy";
 
+type CleanupInput = {
+  db: Pick<PgQueryExecutor, "withTransaction">;
+  archiveRoot: string;
+  exportId: string;
+  tenantId: string;
+  installationId: string;
+};
+
+type PhysicalCleanupOutcome = "deleted" | "missing" | "quarantined";
+
+/** Reject malformed cleanup scope before any filesystem or database IO. */
+function validCleanupInput(input: CleanupInput): boolean {
+  return (
+    !!input?.db?.withTransaction &&
+    uuid.test(input.exportId) &&
+    typeof input.tenantId === "string" &&
+    !!input.tenantId &&
+    typeof input.installationId === "string" &&
+    !!input.installationId &&
+    typeof input.archiveRoot === "string" &&
+    path.isAbsolute(input.archiveRoot) &&
+    path.basename(input.archiveRoot) === ".private-export-archives"
+  );
+}
+
+/** Require the original physical file to be single-linked and owner-private. */
+function validCleanupFile(stat: Stats, byteLength: number): boolean {
+  return (
+    stat.isFile() &&
+    !stat.isSymbolicLink() &&
+    stat.nlink === 1 &&
+    stat.size === byteLength &&
+    (stat.mode & 0o077) === 0 &&
+    (typeof process.getuid !== "function" || stat.uid === process.getuid())
+  );
+}
+
+/** Refuse unlink when the path was swapped or changed during verification. */
+function sameCleanupFile(before: Stats, after: Stats | null): boolean {
+  return (
+    after !== null &&
+    after.dev === before.dev &&
+    after.ino === before.ino &&
+    after.size === before.size &&
+    after.mtimeMs === before.mtimeMs
+  );
+}
+
+/**
+ * Call only while the commitment row + legal-hold locks are held. All
+ * checksum, path identity and durable fsync fences precede the DB audit.
+ */
+async function deleteVerifiedCleanupFile(
+  root: string,
+  exportId: string,
+  sha256: string,
+  byteLength: number,
+): Promise<PhysicalCleanupOutcome> {
+  const fileName = path.join(root, `${exportId}.zip`);
+  const before = await lstat(fileName).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!before) return "missing";
+  if (!validCleanupFile(before, byteLength)) return "quarantined";
+  const bytes = await readSealedLocalExportArchive({ archiveRoot: root, exportId, sha256, byteLength });
+  if (!bytes) return "quarantined";
+  bytes.fill(0);
+  const after = await lstat(fileName).catch(() => null);
+  if (!sameCleanupFile(before, after)) return "quarantined";
+  await unlink(fileName);
+  // Persist directory entry deletion before recording the audit outcome.
+  const directory = await open(root, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+  try {
+    await directory.sync();
+  } finally {
+    await directory.close();
+  }
+  return "deleted";
+}
+
 /**
  * INTERNAL opt-in cleanup for an EXACT original-claim-bound, expired/revoked
  * archive. Never enumerate, infer, or delete unbound orphan ZIPs: a missing
@@ -28,25 +109,8 @@ export type ArchiveCleanupResult =
  * together; a failed DB commit after unlink is recoverable as missing on
  * an explicit later retry. Never called automatically or by public HTTP.
  */
-export async function cleanupExpiredPrivateLocalExportArchive(input: {
-  db: Pick<PgQueryExecutor, "withTransaction">;
-  archiveRoot: string;
-  exportId: string;
-  tenantId: string;
-  installationId: string;
-}): Promise<ArchiveCleanupResult> {
-  if (
-    !input?.db?.withTransaction ||
-    !uuid.test(input.exportId) ||
-    typeof input.tenantId !== "string" ||
-    !input.tenantId ||
-    typeof input.installationId !== "string" ||
-    !input.installationId ||
-    typeof input.archiveRoot !== "string" ||
-    !path.isAbsolute(input.archiveRoot) ||
-    path.basename(input.archiveRoot) !== ".private-export-archives"
-  )
-    return "quarantined";
+export async function cleanupExpiredPrivateLocalExportArchive(input: CleanupInput): Promise<ArchiveCleanupResult> {
+  if (!validCleanupInput(input)) return "quarantined";
 
   const root = path.resolve(input.archiveRoot);
   const stat = await lstat(root).catch(() => null);
@@ -73,50 +137,10 @@ export async function cleanupExpiredPrivateLocalExportArchive(input: {
         if (!candidate) return "unknown";
         if (candidate.disposition !== "eligible") return candidate.disposition;
 
-        const fileName = path.join(root, `${input.exportId}.zip`);
-        const before = await lstat(fileName).catch((error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return null;
-          throw error;
-        });
-        if (before) {
-          if (
-            !before.isFile() ||
-            before.isSymbolicLink() ||
-            before.nlink !== 1 ||
-            before.size !== candidate.byteLength ||
-            (before.mode & 0o077) !== 0 ||
-            (typeof process.getuid === "function" && before.uid !== process.getuid())
-          )
-            return "quarantined";
-          const bytes = await readSealedLocalExportArchive({
-            archiveRoot: root,
-            exportId: input.exportId,
-            sha256: candidate.sha256,
-            byteLength: candidate.byteLength,
-          });
-          if (!bytes) return "quarantined";
-          bytes.fill(0);
-
-          const after = await lstat(fileName).catch(() => null);
-          if (
-            !after ||
-            after.dev !== before.dev ||
-            after.ino !== before.ino ||
-            after.size !== before.size ||
-            after.mtimeMs !== before.mtimeMs
-          )
-            return "quarantined";
-          await unlink(fileName);
-          // Fsync parent before recording the immutable cleanup outcome.
-          const directory = await open(root, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
-          try {
-            await directory.sync();
-          } finally {
-            await directory.close();
-          }
-        }
-        await store.markPhysicallyCleaned(request, before ? "deleted" : "missing");
-        return before ? "deleted" : "missing";
+        const outcome = await deleteVerifiedCleanupFile(root, input.exportId, candidate.sha256, candidate.byteLength);
+        if (outcome === "quarantined") return outcome;
+        await store.markPhysicallyCleaned(request, outcome);
+        return outcome;
       },
       { statementTimeoutMs: 10_000 },
     );

@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { isValidExportSha256 } from "./data-export-hex-digest.js";
 import { isHistoricalUserUuid } from "./data-export-historical-uuid.js";
 import type { PgQueryExecutor } from "./pg-executor.js";
-
-const digest = /^[0-9a-f]{64}$/u;
 
 type ReaderDb = Pick<PgQueryExecutor, "withTransaction">;
 type PrivatePartialBinding = {
@@ -25,8 +24,7 @@ function valid(input: unknown): input is PrivatePartialBinding {
     candidate.verifiedGitHubUserId > 0 &&
     typeof candidate.preflightId === "string" &&
     isHistoricalUserUuid(candidate.preflightId) &&
-    typeof candidate.sha256 === "string" &&
-    digest.test(candidate.sha256) &&
+    isValidExportSha256(candidate.sha256) &&
     typeof candidate.byteLength === "number" &&
     Number.isSafeInteger(candidate.byteLength) &&
     candidate.byteLength >= 1 &&
