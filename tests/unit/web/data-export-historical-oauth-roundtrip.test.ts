@@ -162,6 +162,18 @@ describe("historical GitHub USER step-up OAuth browser round-trip (no customer d
     expect(close).toHaveBeenCalledTimes(4);
   });
 
+  it("uses the trusted global fetch when no callback dependencies were provided", async () => {
+    const { state, cookieLine } = await begin();
+    const fetcher = network();
+    vi.stubGlobal("fetch", fetcher);
+    const response = await consumeHistoricalStepUp(callbackRequest(state, cookieLine), environment, undefined, now);
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(`/dashboard?historical_user_export=${exportId}`);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(consumeNonce).toHaveBeenCalledOnce();
+    expect(lookup).toHaveBeenCalledWith({ exportId, verifiedGitHubUserId: userId });
+  });
+
   it("rejects wrong, missing, cross-export or ordinary login state without contacting GitHub", async () => {
     const { cookieLine, state } = await begin();
     const foreign = cookieLine.replace(exportId, newExportId);

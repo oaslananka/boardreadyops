@@ -225,8 +225,7 @@ export async function prepareSealedHistoricalUserPrivatePartial(input: {
     // no durable DB/FS atomic claim after this short-lived check.
     confirmed = await prepareVerifiedHistoricalUserPartialArchive(input);
     if (
-      !confirmed ||
-      confirmed.byteLength !== initial.byteLength ||
+      confirmed?.byteLength !== initial.byteLength ||
       confirmed.sha256 !== initial.sha256 ||
       !confirmed.bytes.equals(initial.bytes)
     )

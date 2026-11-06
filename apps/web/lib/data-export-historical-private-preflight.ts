@@ -108,8 +108,7 @@ async function privatePartialManifestCurrent(
     if (artifact.retentionExpired) return false;
     const object = await lookupHistoricalUserExportObject(db, authority, artifact.id);
     if (
-      !object ||
-      object.artifactId !== artifact.id ||
+      object?.artifactId !== artifact.id ||
       object.runId !== artifact.runId ||
       object.repositoryId !== source.runRepositories.get(artifact.runId) ||
       object.sha256 !== artifact.sha256 ||

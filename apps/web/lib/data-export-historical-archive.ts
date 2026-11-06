@@ -790,6 +790,24 @@ export function prepareHistoricalUserPartialArchive(input: {
 
 type HistoricalReceipt = Record<string, unknown> & { entries: unknown[] };
 
+/** Private receipt exclusions must match both the snapshot and the exact archive contract. */
+function validHistoricalPartialReceiptExclusions(
+  receipt: Record<string, unknown>,
+  snapshot: HistoricalSnapshot,
+): boolean {
+  return (
+    JSON.stringify(receipt.metadataSnapshotExclusions) === JSON.stringify(snapshot.exclusions) &&
+    JSON.stringify(receipt.archiveExclusions) ===
+      JSON.stringify([
+        "review-actor-identities-and-audit-metadata",
+        "finding-decision-and-assignment-actor-identities",
+        "platform-storage",
+        "github-repository-source",
+        "github-actions-logs-and-artifacts",
+      ])
+  );
+}
+
 /** Exact v3 partial ZIP declaration, including non-customer privacy exclusions. */
 function validHistoricalPartialReceipt(
   receipt: Record<string, unknown>,
@@ -821,18 +839,10 @@ function validHistoricalPartialReceipt(
     receipt.completeCustomerExport !== false ||
     receipt.exportId !== expectedExportId ||
     snapshot.exportId !== expectedExportId ||
-    JSON.stringify(receipt.metadataSnapshotExclusions) !== JSON.stringify(snapshot.exclusions) ||
+    !validHistoricalPartialReceiptExclusions(receipt, snapshot) ||
     receipt.verifiedPhysicalArtifactCount !== snapshot.artifacts.length ||
     receipt.verifiedPrivateVisualDigestCount !== snapshot.excludedSourceClassCounts.runSnapshots ||
     receipt.privateVisualContentsIncluded !== false ||
-    JSON.stringify(receipt.archiveExclusions) !==
-      JSON.stringify([
-        "review-actor-identities-and-audit-metadata",
-        "finding-decision-and-assignment-actor-identities",
-        "platform-storage",
-        "github-repository-source",
-        "github-actions-logs-and-artifacts",
-      ]) ||
     !Array.isArray(receipt.entries) ||
     receipt.entries.length !== fileCount - 1
   );

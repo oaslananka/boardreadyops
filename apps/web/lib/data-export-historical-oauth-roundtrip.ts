@@ -331,7 +331,7 @@ function verifiedHistoricalCallback(
 export async function consumeHistoricalStepUp(
   request: Request,
   environment: Readonly<Record<string, string | undefined>> = process.env,
-  dependencies: { fetch: typeof fetch } = { fetch },
+  dependencies: { fetch: typeof fetch } | undefined = undefined,
   now = new Date(),
 ): Promise<Response> {
   // A disabled callback must consume stale state without contacting GitHub.
@@ -346,7 +346,7 @@ export async function consumeHistoricalStepUp(
     environment,
     now,
   });
-  if (!signed || signed.verifiedGitHubUserId !== challenge.userId) return consumed(null);
+  if (signed?.verifiedGitHubUserId !== challenge.userId) return consumed(null);
   // Consume-before-provider: any error, invalid authorization code or
   // concurrent replay burns this nonce. No second GitHub call can use it.
   if (
@@ -366,7 +366,7 @@ export async function consumeHistoricalStepUp(
     authorizationCode: callback.authorizationCode,
     environment,
     now,
-    fetch: dependencies.fetch,
+    fetch: dependencies === undefined ? fetch : dependencies.fetch,
   });
   if (!authority) return consumed(null);
   if (!(await currentOwnerExport(exportId, authority.verifiedGitHubUserId, now))) return consumed(null);
