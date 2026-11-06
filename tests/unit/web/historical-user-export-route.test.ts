@@ -66,9 +66,9 @@ describe("read-only historical user export status after uninstall", () => {
   it("rejects missing identity, query-supplied authority, unsafe origins and malformed IDs before DB access", async () => {
     viewerAuthorization.mockResolvedValueOnce({ session: undefined });
     expect((await GET(new Request(baseURL), context)).status).toBe(401);
-    expect((await GET(new Request(baseURL + "?installationId=old"), context)).status).toBe(400);
-    expect((await GET(new Request(baseURL + "?download=archive"), context)).status).toBe(400);
-    expect((await GET(new Request(baseURL + "?userId=47291"), context)).status).toBe(400);
+    expect((await GET(new Request(`${baseURL}?installationId=old`), context)).status).toBe(400);
+    expect((await GET(new Request(`${baseURL}?download=archive`), context)).status).toBe(400);
+    expect((await GET(new Request(`${baseURL}?userId=47291`), context)).status).toBe(400);
     expect((await GET(new Request(baseURL, { headers: { range: "bytes=0-1" } }), context)).status).toBe(400);
     expect(
       (await GET(new Request(baseURL, { headers: { origin: "https://untrusted.example" } }), context)).status,

@@ -394,31 +394,43 @@ describeDb("original USER private non-customer delivery preflight", () => {
     // Signed, RECENT GitHub OAuth is necessary before this private stage.
     // A recycled login from a different numeric GitHub USER must not work.
     expect(
-      await stageSessionBoundHistoricalUserPrivatePreflight({
-        db: executor(),
-        exportId,
-        ...recentOAuthSession(githubUserId + 1),
-        archiveBytes: verifiedArchiveBytes,
-        ttlSeconds: 60,
-      }),
+      await stageSessionBoundHistoricalUserPrivatePreflight(
+        {
+          exportId,
+          ...recentOAuthSession(githubUserId + 1),
+        },
+        {
+          db: executor(),
+          archiveBytes: verifiedArchiveBytes,
+          ttlSeconds: 60,
+        },
+      ),
     ).toBeNull();
     expect(
-      await stageSessionBoundHistoricalUserPrivatePreflight({
-        db: executor(),
+      await stageSessionBoundHistoricalUserPrivatePreflight(
+        {
+          exportId,
+          ...recentOAuthSession(),
+          sessionCookie: "forged-signed-session",
+        },
+        {
+          db: executor(),
+          archiveBytes: verifiedArchiveBytes,
+          ttlSeconds: 60,
+        },
+      ),
+    ).toBeNull();
+    const staged = await stageSessionBoundHistoricalUserPrivatePreflight(
+      {
         exportId,
         ...recentOAuthSession(),
-        sessionCookie: "forged-signed-session",
+      },
+      {
+        db: executor(),
         archiveBytes: verifiedArchiveBytes,
         ttlSeconds: 60,
-      }),
-    ).toBeNull();
-    const staged = await stageSessionBoundHistoricalUserPrivatePreflight({
-      db: executor(),
-      exportId,
-      ...recentOAuthSession(),
-      archiveBytes: verifiedArchiveBytes,
-      ttlSeconds: 60,
-    });
+      },
+    );
     expect(staged?.id).toMatch(/^[0-9a-f-]{36}$/u);
     if (!staged) throw new Error("Missing private staged record");
     preflightId = staged.id;
@@ -513,41 +525,43 @@ describeDb("original USER private non-customer delivery preflight", () => {
       archiveBytes: verifiedArchiveBytes,
     };
     expect(
-      await inspectSessionBoundHistoricalUserPrivatePreflight({
-        ...checked,
-        ...recentOAuthSession(),
-      }),
+      await inspectSessionBoundHistoricalUserPrivatePreflight(
+        { exportId, ...recentOAuthSession() },
+        { db: checked.db, id: checked.id, archiveBytes: checked.archiveBytes },
+      ),
     ).toBe("current");
     expect(
-      await inspectSessionBoundHistoricalUserPrivatePreflight({
-        ...checked,
-        ...recentOAuthSession(githubUserId + 1),
-      }),
+      await inspectSessionBoundHistoricalUserPrivatePreflight(
+        { exportId, ...recentOAuthSession(githubUserId + 1) },
+        { db: checked.db, id: checked.id, archiveBytes: checked.archiveBytes },
+      ),
     ).toBe("stale");
     expect(
-      await inspectSessionBoundHistoricalUserPrivatePreflight({
-        ...checked,
-        ...recentOAuthSession(),
-        sessionCookie: "forged-session",
-      }),
+      await inspectSessionBoundHistoricalUserPrivatePreflight(
+        { exportId, ...recentOAuthSession(), sessionCookie: "forged-session" },
+        { db: checked.db, id: checked.id, archiveBytes: checked.archiveBytes },
+      ),
     ).toBe("stale");
     const staleSignedIn = recentOAuthSession();
     const oldIssuedAt = new Date(staleSignedIn.now.getTime() - 6 * 60 * 1000);
     expect(
-      await inspectSessionBoundHistoricalUserPrivatePreflight({
-        ...checked,
-        ...staleSignedIn,
-        sessionCookie: encodeUserSession(
-          {
-            userId: githubUserId,
-            login: "reused-original-login",
-            installationIds: [],
-            issuedAt: oldIssuedAt.toISOString(),
-            expiresAt: new Date(oldIssuedAt.getTime() + 8 * 60 * 60 * 1000).toISOString(),
-          },
-          sessionSecret,
-        ),
-      }),
+      await inspectSessionBoundHistoricalUserPrivatePreflight(
+        {
+          exportId,
+          ...staleSignedIn,
+          sessionCookie: encodeUserSession(
+            {
+              userId: githubUserId,
+              login: "reused-original-login",
+              installationIds: [],
+              issuedAt: oldIssuedAt.toISOString(),
+              expiresAt: new Date(oldIssuedAt.getTime() + 8 * 60 * 60 * 1000).toISOString(),
+            },
+            sessionSecret,
+          ),
+        },
+        { db: checked.db, id: checked.id, archiveBytes: checked.archiveBytes },
+      ),
     ).toBe("stale");
   });
 

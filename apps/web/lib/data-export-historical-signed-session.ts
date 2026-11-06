@@ -53,13 +53,16 @@ export function recentSignedHistoricalUserAuthority(
 /** Private-only stage; the database still verifies current original-user
  * source/manifest/hold/erasure/retention. Never returns customer bytes. */
 export async function stageSessionBoundHistoricalUserPrivatePreflight(
-  input: SignedOriginalUserInput & {
+  session: SignedOriginalUserInput,
+  input: {
     db: PgQueryExecutor;
     archiveBytes: Buffer;
     ttlSeconds: number;
   },
 ): Promise<{ id: string } | null> {
-  const authority = recentSignedHistoricalUserAuthority(input);
+  // The signed credential is intentionally distinct from the bytes whose
+  // SHA-256 proves archive integrity; never hash or persist a session cookie.
+  const authority = recentSignedHistoricalUserAuthority(session);
   return authority
     ? stageVerifiedHistoricalUserPrivateArchivePreflight({
         db: input.db,
@@ -72,13 +75,14 @@ export async function stageSessionBoundHistoricalUserPrivatePreflight(
 
 /** "current" means only a PRIVATE diagnostic receipt, never a release. */
 export async function inspectSessionBoundHistoricalUserPrivatePreflight(
-  input: SignedOriginalUserInput & {
+  session: SignedOriginalUserInput,
+  input: {
     db: PgQueryExecutor;
     id: string;
     archiveBytes: Buffer;
   },
 ): Promise<"current" | "stale"> {
-  const authority = recentSignedHistoricalUserAuthority(input);
+  const authority = recentSignedHistoricalUserAuthority(session);
   return authority
     ? inspectVerifiedHistoricalUserPrivateArchivePreflight({
         db: input.db,

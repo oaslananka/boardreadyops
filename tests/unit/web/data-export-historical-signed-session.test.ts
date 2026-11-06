@@ -112,18 +112,16 @@ describe("historical original USER signed OAuth session boundary (private only)"
       sessionCookie: signed({}, "x".repeat(48)),
     };
     expect(
-      await stageSessionBoundHistoricalUserPrivatePreflight({
-        ...base,
-        archiveBytes: Buffer.from("not an archive"),
-        ttlSeconds: 60,
-      }),
+      await stageSessionBoundHistoricalUserPrivatePreflight(
+        { exportId: base.exportId, environment: base.environment, now: base.now, sessionCookie: base.sessionCookie },
+        { db: base.db, archiveBytes: Buffer.from("not an archive"), ttlSeconds: 60 },
+      ),
     ).toBeNull();
     expect(
-      await inspectSessionBoundHistoricalUserPrivatePreflight({
-        ...base,
-        archiveBytes: Buffer.from("not an archive"),
-        id: randomUUID(),
-      }),
+      await inspectSessionBoundHistoricalUserPrivatePreflight(
+        { exportId: base.exportId, environment: base.environment, now: base.now, sessionCookie: base.sessionCookie },
+        { db: base.db, archiveBytes: Buffer.from("not an archive"), id: randomUUID() },
+      ),
     ).toBe("stale");
     expect(
       await revokeSessionBoundHistoricalUserPrivatePreflight({

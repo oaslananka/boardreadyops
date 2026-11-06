@@ -186,12 +186,12 @@ afterAll(async () => {
 describeRuntime("real Next.js standalone private ZIP transport with disposable PG17", () => {
   it("authenticates a historical user export with the original numeric OAuth ID and no live installation", async () => {
     const historicalId = randomUUID();
-    const formerLogin = "former-" + randomUUID().slice(0, 8);
+    const formerLogin = `former-${randomUUID().slice(0, 8)}`;
     await executor().query(
       "INSERT INTO data_exports(id,tenant_id,requested_by,status,scope,scope_id,original_github_user_id,download_url) VALUES ($1,$2,'github_app_uninstall','pending','user',$2,12,'https://invalid.example/legacy-secret')",
       [historicalId, formerLogin],
     );
-    const url = baseURL + "/api/v1/historical-user-exports/" + historicalId;
+    const url = `${baseURL}/api/v1/historical-user-exports/${historicalId}`;
     expect((await fetch(url)).status).toBe(401);
     expect((await fetch(url, { headers: { cookie: sessionCookie(formerLogin, [], 13) } })).status).toBe(404);
     const authorized = await fetch(url, { headers: { cookie: sessionCookie("renamed-owner", [], 12) } });
@@ -211,7 +211,7 @@ describeRuntime("real Next.js standalone private ZIP transport with disposable P
     expect(JSON.stringify(payload)).not.toContain(formerLogin);
     expect(
       (
-        await fetch(url + "?download=archive", {
+        await fetch(`${url}?download=archive`, {
           headers: { cookie: sessionCookie("renamed-owner", [], 12) },
         })
       ).status,
