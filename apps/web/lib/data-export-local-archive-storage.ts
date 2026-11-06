@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { link, lstat, open, realpath, unlink } from "node:fs/promises";
+import { link, lstat, mkdir, open, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
 import { verifyClaimedExportArchiveIntegrity } from "./data-export-archive-integrity.js";
 
@@ -28,6 +28,42 @@ async function privateArchiveDirectory(root: string): Promise<string | null> {
     return null;
   }
   return resolved;
+}
+
+/**
+ * Opt-in worker provisioning inside the ALREADY mounted artifact Docker volume.
+ * Reuse one local volume without widening public artifact read permissions:
+ * only a reserved, owner-private sibling directory under the artifact root.
+ * Never chmod an existing directory or follow symlinks. No root is created
+ * when archive preparation is not explicitly configured.
+ */
+export async function ensurePrivateLocalExportArchiveDirectory(input: {
+  storageRoot: string;
+  privateArchiveRoot: string;
+}): Promise<boolean> {
+  if (typeof input?.storageRoot !== "string" || typeof input?.privateArchiveRoot !== "string") return false;
+  if (!path.isAbsolute(input.storageRoot) || !path.isAbsolute(input.privateArchiveRoot)) return false;
+  const parent = path.resolve(input.storageRoot);
+  const archiveRoot = path.resolve(input.privateArchiveRoot);
+  if (archiveRoot !== path.join(parent, ".private-export-archives")) return false;
+  const [parentInfo, parentReal] = await Promise.all([
+    lstat(parent).catch(() => null),
+    realpath(parent).catch(() => null),
+  ]);
+  if (
+    !parentInfo?.isDirectory() ||
+    parentInfo.isSymbolicLink() ||
+    parentReal !== parent ||
+    (parentInfo.mode & 0o022) !== 0 ||
+    (typeof process.getuid === "function" && parentInfo.uid !== process.getuid())
+  )
+    return false;
+  try {
+    await mkdir(archiveRoot, { mode: 0o700 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") return false;
+  }
+  return (await privateArchiveDirectory(archiveRoot)) === archiveRoot;
 }
 
 /** Bounded private read; caller must independently recheck current DB requester authority. */

@@ -1,6 +1,9 @@
-import { DataExportPreparationStore, DataLifecycleStore } from "@boardreadyops/db";
+import path from "node:path";
+import { DataExportArchiveCommitmentStore, DataExportPreparationStore, DataLifecycleStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { resolveCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
+import { readSealedLocalExportArchive } from "../../../../../lib/data-export-local-archive-storage.js";
+import { createAuthorizedSealedLocalExportWebStream } from "../../../../../lib/data-export-web-stream.js";
 import { resolveSettingsTenantScope } from "../../../../../lib/settings-tenant.js";
 import { viewerAuthorization } from "../../../../../lib/viewer-authorization.js";
 
@@ -13,7 +16,8 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
       { ok: false, error: "authentication required" },
       { status: 401, headers: { "cache-control": "private, no-store" } },
     );
-  const installationId = new URL(request.url).searchParams.get("installationId");
+  const url = new URL(request.url);
+  const installationId = url.searchParams.get("installationId");
   const canonicalInstallationId = installationId?.trim();
   if (!canonicalInstallationId || canonicalInstallationId !== installationId) {
     return Response.json(
@@ -22,8 +26,11 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
     );
   }
   const { exportId } = await context.params;
-  const download = new URL(request.url).searchParams.get("download");
-  if (download && download !== "metadata-manifest")
+  const download = url.searchParams.get("download");
+  if (
+    (download && download !== "metadata-manifest" && download !== "archive") ||
+    (download === "archive" && url.searchParams.getAll("download").length !== 1)
+  )
     return Response.json(
       { ok: false, error: "invalid download format" },
       { status: 400, headers: { "cache-control": "private, no-store" } },
@@ -41,6 +48,85 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
       { ok: false, error: "installation access denied" },
       { status: 403, headers: { "cache-control": "private, no-store" } },
     );
+  }
+  if (download === "archive") {
+    const noStore = { "cache-control": "private, no-store" };
+    if (url.searchParams.getAll("installationId").length !== 1)
+      return Response.json({ ok: false, error: "installationId is required" }, { status: 400, headers: noStore });
+    if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(exportId))
+      return Response.json({ ok: false, error: "not found" }, { status: 404, headers: noStore });
+
+    // An authenticated GET must never turn into a cross-site export trigger.
+    const origin = request.headers.get("origin");
+    if ((origin && origin !== url.origin) || request.headers.get("sec-fetch-site") === "cross-site")
+      return Response.json({ ok: false, error: "origin denied" }, { status: 403, headers: noStore });
+    if (request.headers.has("range"))
+      return Response.json({ ok: false, error: "range not supported" }, { status: 416, headers: noStore });
+
+    // Nothing is exposed until a separate private 0700 same-UID directory has
+    // been provisioned on the shared durable volume. Never use public uploads.
+    const archiveRoot = process.env.BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT?.trim();
+    const artifactRoot = process.env.ARTIFACT_STORAGE_ROOT?.trim();
+    if (
+      !archiveRoot ||
+      !path.isAbsolute(archiveRoot) ||
+      (artifactRoot && path.resolve(archiveRoot) === path.resolve(artifactRoot))
+    )
+      return Response.json({ ok: false, error: "ZIP delivery unavailable" }, { status: 503, headers: noStore });
+
+    const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+    let responseOwnsExecutor = false;
+    try {
+      const requester = {
+        exportId,
+        tenantId: tenantLogin,
+        installationId: canonicalInstallationId,
+        actorLogin: viewer.session.login,
+      };
+      // Fail closed before committing HTTP headers: current requester and
+      // installation/repo scope are checked again inside the streaming txn.
+      const staged = await new DataExportArchiveCommitmentStore(executor).readForRequester(requester);
+      if (!staged) return Response.json({ ok: false, error: "not found" }, { status: 404, headers: noStore });
+      const bytes = await readSealedLocalExportArchive({
+        archiveRoot,
+        exportId,
+        sha256: staged.sha256,
+        byteLength: staged.byteLength,
+      });
+      if (!bytes) return Response.json({ ok: false, error: "not found" }, { status: 404, headers: noStore });
+      // This preflight buffer is NOT passed to the response. The transactional
+      // stream independently validates the sealed bytes and current authority.
+      bytes.fill(0);
+
+      const { body, completed } = createAuthorizedSealedLocalExportWebStream({
+        db: executor,
+        archiveRoot,
+        ...requester,
+        signal: request.signal,
+      });
+      // Do not close the DB connection when GET returns the Response object.
+      // It owns the revocation fence until Web Streams final pull/cancel/timeout.
+      responseOwnsExecutor = true;
+      void completed
+        .then(
+          () => executor.close(),
+          () => executor.close(),
+        )
+        .catch(() => {});
+      return new Response(body, {
+        status: 200,
+        headers: {
+          ...noStore,
+          "content-type": "application/zip",
+          "content-disposition": `attachment; filename="boardreadyops-export-${exportId}.zip"`,
+          "content-length": String(staged.byteLength),
+          "x-content-type-options": "nosniff",
+          "content-security-policy": "sandbox",
+        },
+      });
+    } finally {
+      if (!responseOwnsExecutor) await executor.close();
+    }
   }
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
@@ -136,10 +222,17 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
   }
 }
 
-/** Revoke only the requester's metadata preview, without canceling the export or deleting evidence. */
+/**
+ * Revoke the original requester's preview (default), or an independently
+ * prepared ZIP commitment with ?revoke=archive. This never deletes evidence,
+ * marks an export complete, or exposes a download capability.
+ */
 export async function DELETE(request: Request, context: { params: Promise<{ exportId: string }> }): Promise<Response> {
   const noStore = { "cache-control": "private, no-store" };
   const url = new URL(request.url);
+  const revoke = url.searchParams.get("revoke");
+  if (revoke !== null && (revoke !== "archive" || url.searchParams.getAll("revoke").length !== 1))
+    return Response.json({ ok: false, error: "invalid revoke target" }, { status: 400, headers: noStore });
   const origin = request.headers.get("origin");
   if (!origin || origin !== url.origin)
     return Response.json({ ok: false, error: "origin denied" }, { status: 403, headers: noStore });
@@ -161,12 +254,11 @@ export async function DELETE(request: Request, context: { params: Promise<{ expo
     return Response.json({ ok: false, error: "installation access denied" }, { status: 403, headers: noStore });
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
-    const revoked = await new DataExportPreparationStore(executor).revokePublishedManifestPreview({
-      exportId,
-      tenantId,
-      installationId,
-      actorLogin: viewer.session.login,
-    });
+    const input = { exportId, tenantId, installationId, actorLogin: viewer.session.login };
+    const revoked =
+      revoke === "archive"
+        ? await new DataExportArchiveCommitmentStore(executor).revokeForRequester(input)
+        : await new DataExportPreparationStore(executor).revokePublishedManifestPreview(input);
     return Response.json(revoked ? { ok: true, revoked: true } : { ok: false, error: "not found" }, {
       status: revoked ? 200 : 404,
       headers: noStore,

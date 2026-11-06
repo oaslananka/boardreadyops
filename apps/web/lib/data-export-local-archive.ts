@@ -206,8 +206,9 @@ export async function stageClaimedDurableLocalArchiveCommitment(
  * INTERNAL source for a future audited HTTP retrieval edge. A file on disk,
  * even with the correct hash, does not authorize a customer: check live
  * original-requester/tenant/installation/lease/revocation before and after IO.
- * This method does not issue an HTTP response, audit a download, hold a
- * revocation fence during streaming, or grant post-uninstall access.
+ * The final read admission is atomically audited, but this method does not
+ * issue an HTTP response, audit a completed download, hold a revocation fence
+ * during streaming, or grant post-uninstall access.
  */
 export async function readAuthorizedSealedLocalExportArchive(input: {
   db: Pick<PgQueryExecutor, "query">;
@@ -233,7 +234,7 @@ export async function readAuthorizedSealedLocalExportArchive(input: {
     byteLength: first.byteLength,
   });
   if (!bytes) return null;
-  const last = await store.readForRequester(request);
+  const last = await store.auditVerifiedReadForRequester(request, first);
   if (
     !last ||
     last.sha256 !== first.sha256 ||
@@ -244,4 +245,78 @@ export async function readAuthorizedSealedLocalExportArchive(input: {
     return null;
   }
   return bytes;
+}
+
+/**
+ * Internal chunked ZIP transport adapter (NOT a customer HTTP endpoint).
+ *
+ * Wait for each sink acknowledgement before sending the next bounded chunk,
+ * preserving backpressure and the existing PostgreSQL revocation fence.
+ * Abort and deadline are checked before/after every awaited write. Sink writes
+ * MUST settle on disconnect; never race an in-flight write against a timeout
+ * and release the DB lock while the sink might still deliver bytes.
+ *
+ * A future route must own the authenticated session, response cancellation,
+ * same-origin policy, storage configuration, and delivery receipt separately.
+ */
+export async function consumeAuthorizedSealedLocalExportArchiveChunks(
+  input: Parameters<typeof consumeAuthorizedSealedLocalExportArchive>[0] & {
+    signal?: AbortSignal;
+  },
+  writeChunk: (chunk: Uint8Array) => Promise<void>,
+  finishResponse?: () => Promise<void>,
+): Promise<boolean> {
+  if (!input?.db?.withTransaction || typeof writeChunk !== "function") return false;
+  const deadline = Date.now() + 25_000;
+  const checkTransfer = () => {
+    if (input.signal?.aborted) throw new Error("ZIP transfer aborted");
+    if (Date.now() >= deadline) throw new Error("ZIP transfer deadline exceeded");
+  };
+  checkTransfer();
+  return consumeAuthorizedSealedLocalExportArchive(input, async (bytes) => {
+    const chunkBytes = 16 * 1024;
+    for (let offset = 0; offset < bytes.length; offset += chunkBytes) {
+      checkTransfer();
+      // Own each bounded chunk; never pass a view of the full private buffer.
+      const chunk = Uint8Array.from(bytes.subarray(offset, offset + chunkBytes));
+      await writeChunk(chunk);
+      checkTransfer();
+    }
+    // The HTTP finish callback must settle while the DB revocation lock
+    // remains held; a rejected finish rolls back the verified-read audit.
+    if (finishResponse) {
+      await finishResponse();
+      checkTransfer();
+    }
+  });
+}
+
+/**
+ * Internal transactional transfer fence for a future bounded ZIP response.
+ *
+ * The final verified-read audit takes a PostgreSQL FOR SHARE lock on the
+ * commitment; keeping the SAME transaction open through the consumer callback
+ * makes concurrent requester revocation wait until the callback finishes.
+ * Exceptions roll back the read audit. A caller MUST complete its bounded
+ * consumption inside the callback, not capture bytes for later async use.
+ *
+ * No HTTP handler is wired here: session cancellation, delivery receipts and
+ * transport/backpressure must be reviewed separately before customer release.
+ */
+export async function consumeAuthorizedSealedLocalExportArchive(
+  input: Omit<Parameters<typeof readAuthorizedSealedLocalExportArchive>[0], "db"> & {
+    db: Pick<PgQueryExecutor, "withTransaction">;
+  },
+  consume: (bytes: Buffer) => Promise<void>,
+): Promise<boolean> {
+  if (!input?.db?.withTransaction || typeof consume !== "function") return false;
+  return input.db.withTransaction(
+    async (tx) => {
+      const bytes = await readAuthorizedSealedLocalExportArchive({ ...input, db: tx });
+      if (!bytes) return false;
+      await consume(bytes);
+      return true;
+    },
+    { statementTimeoutMs: 30_000 },
+  );
 }

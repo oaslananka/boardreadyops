@@ -168,7 +168,7 @@ async function localArtifactTarget(storageRoot: string, storagePath: string): Pr
   const lexicalParent = path.dirname(lexicalPath);
   await mkdir(lexicalParent, { recursive: true, mode: 0o700 });
   const parent = await realpath(lexicalParent).catch(() => undefined);
-  if (!parent || !isInside(root, parent)) return undefined;
+  if (!parent || !isInside(root, parent) || !safeLocalArtifactPath(root, parent)) return undefined;
 
   const finalPath = path.join(parent, path.basename(lexicalPath));
   if (!isInside(root, finalPath)) return undefined;

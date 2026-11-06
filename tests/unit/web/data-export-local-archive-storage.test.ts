@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  ensurePrivateLocalExportArchiveDirectory,
   readSealedLocalExportArchive,
   sealLocalExportArchive,
 } from "../../../apps/web/lib/data-export-local-archive-storage.js";
@@ -51,6 +52,55 @@ afterEach(async () => {
 });
 
 describe("private, locally sealed export ZIP", () => {
+  it("creates only the reserved private subdirectory under the existing artifact volume", async () => {
+    const storageRoot = await root();
+    const privateArchiveRoot = path.join(storageRoot, ".private-export-archives");
+    const config = { storageRoot, privateArchiveRoot };
+    expect(await ensurePrivateLocalExportArchiveDirectory(config)).toBe(true);
+    const stat = await lstat(privateArchiveRoot);
+    expect(stat.isDirectory()).toBe(true);
+    expect(stat.mode & 0o077).toBe(0);
+    expect(await ensurePrivateLocalExportArchiveDirectory(config)).toBe(true);
+    expect(
+      await ensurePrivateLocalExportArchiveDirectory({
+        ...config,
+        privateArchiveRoot: storageRoot,
+      }),
+    ).toBe(false);
+    expect(
+      await ensurePrivateLocalExportArchiveDirectory({
+        ...config,
+        privateArchiveRoot: path.join(storageRoot, "objects"),
+      }),
+    ).toBe(false);
+    expect(
+      await ensurePrivateLocalExportArchiveDirectory({
+        ...config,
+        privateArchiveRoot: "relative/.private-export-archives",
+      }),
+    ).toBe(false);
+    expect(
+      await ensurePrivateLocalExportArchiveDirectory({
+        ...config,
+        storageRoot: "relative",
+      }),
+    ).toBe(false);
+  });
+
+  it("refuses group-readable and symlinked pre-existing private directories", async () => {
+    const storageRoot = await root();
+    const privateArchiveRoot = path.join(storageRoot, ".private-export-archives");
+    const config = { storageRoot, privateArchiveRoot };
+    await symlink(await root(), privateArchiveRoot);
+    expect(await ensurePrivateLocalExportArchiveDirectory(config)).toBe(false);
+    await rm(privateArchiveRoot);
+    expect(await ensurePrivateLocalExportArchiveDirectory(config)).toBe(true);
+    await chmod(privateArchiveRoot, 0o750);
+    expect(await ensurePrivateLocalExportArchiveDirectory(config)).toBe(false);
+    await chmod(storageRoot, 0o777);
+    expect(await ensurePrivateLocalExportArchiveDirectory(config)).toBe(false);
+  });
+
   it("fsyncs and stores a deterministic no-clobber ZIP, then independently verifies every entry", async () => {
     const archiveRoot = await root();
     const exportId = randomUUID();

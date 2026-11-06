@@ -1,3 +1,7 @@
+import {
+  consumeHistoricalStepUp,
+  shouldConsumeHistoricalStepUp,
+} from "../../../../../lib/data-export-historical-oauth-roundtrip.js";
 import { configuredGitHubOAuth, resolveGitHubUserIdentity } from "../../../../../lib/github-user-access.js";
 import { oauthStateCookieName, parseOAuthStateCookie, stateMatches } from "../../../../../lib/oauth-state.js";
 import { configuredSessionSecret, encodeUserSession } from "../../../../../lib/user-session.js";
@@ -28,6 +32,10 @@ function failed(reason: string): Response {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  // Historical USER reauthentication is separate from normal login:
+  // it never issues a new session or a customer ZIP. Shared GitHub callback.
+  if (shouldConsumeHistoricalStepUp(request, readCookie(request, oauthStateCookieName)))
+    return consumeHistoricalStepUp(request);
   const configuration = configuredGitHubOAuth(process.env);
   const secret = configuredSessionSecret(process.env);
   const publicUrl = process.env.BOARDREADYOPS_PUBLIC_URL ?? process.env.NEXT_PUBLIC_APP_URL;

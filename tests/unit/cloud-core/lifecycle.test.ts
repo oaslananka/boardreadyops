@@ -69,6 +69,46 @@ describe("GitHub App lifecycle normalization", () => {
     ]);
   });
 
+  it("retains the immutable numeric GitHub account id from a signed installation payload", () => {
+    const verified = normalizeGitHubAppWebhook({
+      event: "installation",
+      delivery: "account-id-created",
+      payload: {
+        action: "created",
+        installation: {
+          id: 54321,
+          account: { id: 987654321, login: "original-user", type: "User" },
+        },
+        repositories: [],
+      },
+    });
+    expect(verified.actions).toContainEqual({
+      type: "installation.upsert",
+      installation: {
+        id: 54321,
+        accountLogin: "original-user",
+        accountType: "User",
+        accountUserId: 987654321,
+      },
+    });
+    const malformed = normalizeGitHubAppWebhook({
+      event: "installation",
+      delivery: "invalid-account-id",
+      payload: {
+        action: "created",
+        installation: {
+          id: 54322,
+          account: { id: Number.MAX_SAFE_INTEGER + 1, login: "original-user", type: "User" },
+        },
+        repositories: [],
+      },
+    });
+    expect(malformed.actions).toContainEqual({
+      type: "installation.upsert",
+      installation: { id: 54322, accountLogin: "original-user", accountType: "User" },
+    });
+  });
+
   it("converts installation suspend and unsuspend events into dedicated actions without repository mutations", () => {
     const suspended = normalizeGitHubAppWebhook({
       event: "installation",

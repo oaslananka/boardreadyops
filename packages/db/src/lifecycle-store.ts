@@ -261,8 +261,8 @@ export function createSqlGitHubAppMetadataStore(
              from installations
             where github_installation_id = $2
          ), persisted as (
-           insert into installations (id, github_installation_id, account_login, account_type, created_at, suspended_at)
-           values ($1, $2, $3, $4, $5, null)
+           insert into installations (id, github_installation_id, account_login, account_type, created_at, suspended_at, account_user_id)
+           values ($1, $2, $3, $4, $5, null, $11::bigint)
            on conflict (github_installation_id)
            do update set
              -- Only overwrite when the event actually carried the account. Events such as
@@ -276,12 +276,22 @@ export function createSqlGitHubAppMetadataStore(
                when excluded.account_type <> '' then excluded.account_type
                else installations.account_type
              end,
+             account_user_id = coalesce(installations.account_user_id, excluded.account_user_id),
              suspended_at = case
                when $6::text is not null
                  and not exists (select 1 from audit_events where id = $6::text)
                then null
                else installations.suspended_at
              end
+           where installations.account_user_id is null
+              or installations.account_user_id = excluded.account_user_id
+              or (
+                excluded.account_user_id is null
+                and (
+                  excluded.account_login = ''
+                  or lower(excluded.account_login) = lower(installations.account_login)
+                )
+              )
            returning id, account_login
          ), canceled_uninstall_erasure as (
            update erasure_requests
@@ -296,6 +306,7 @@ export function createSqlGitHubAppMetadataStore(
                 select existing_installation.previous_account_login
                   from existing_installation
                  where btrim(existing_installation.previous_account_login) <> ''
+                   and exists (select 1 from persisted)
               )
               and status in ('pending', 'running', 'blocked_by_hold')
            returning id
@@ -320,6 +331,9 @@ export function createSqlGitHubAppMetadataStore(
           action.installation.accountType ?? "",
           at,
           ...auditParameters(audit),
+          Number.isSafeInteger(action.installation.accountUserId) && (action.installation.accountUserId ?? 0) > 0
+            ? action.installation.accountUserId
+            : null,
         ],
       );
 
@@ -357,10 +371,11 @@ export function createSqlGitHubAppMetadataStore(
                 $3::text is null
                 or not exists (select 1 from audit_events where id = $3::text)
               )
-           returning id, account_login, account_type
+           returning id, account_login, account_type, account_user_id
          ), erasure_scope as (
            select persisted.id,
                   persisted.account_login as tenant_id,
+                  persisted.account_user_id,
                   case
                     when lower(persisted.account_type) = 'user' then 'user'
                     when lower(persisted.account_type) = 'organization' then 'organization'
@@ -371,7 +386,7 @@ export function createSqlGitHubAppMetadataStore(
               and lower(persisted.account_type) in ('organization', 'user')
          ), queued_export as (
            insert into data_exports (
-             id, tenant_id, requested_by, status, scope, scope_id, created_at
+             id, tenant_id, requested_by, status, scope, scope_id, created_at, original_github_user_id
            )
            select gen_random_uuid()::text,
                   erasure_scope.tenant_id,
@@ -379,7 +394,8 @@ export function createSqlGitHubAppMetadataStore(
                   'pending',
                   erasure_scope.scope,
                   erasure_scope.scope_id,
-                  $2::timestamptz
+                  $2::timestamptz,
+                  case when erasure_scope.scope='user' then erasure_scope.account_user_id else null end
              from erasure_scope
            on conflict do nothing
            returning id

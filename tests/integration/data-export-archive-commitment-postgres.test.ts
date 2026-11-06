@@ -120,6 +120,101 @@ describeDatabase("claim-bound archive commitment admission (PostgreSQL)", () => 
     });
   });
 
+  it("atomically audits a verified original-requester read admission but never a denied read", async () => {
+    const { exportId, claim, viewer } = await claimExport();
+    const store = new DataExportArchiveCommitmentStore(db());
+    const staged = await store.stage(claim, archive);
+    expect(staged).toMatchObject(archive);
+    if (!staged) throw new Error("Expected verified archive commitment");
+    expect(await store.auditVerifiedReadForRequester({ ...viewer, actorLogin: "imposter" }, staged)).toBeNull();
+    expect(await store.auditVerifiedReadForRequester({ ...viewer, tenantId: "other-tenant" }, staged)).toBeNull();
+    expect(await store.auditVerifiedReadForRequester(viewer, { ...staged, sha256: "b".repeat(64) })).toBeNull();
+    expect(
+      await store.auditVerifiedReadForRequester(viewer, { ...staged, byteLength: staged.byteLength + 1 }),
+    ).toBeNull();
+    expect(await store.auditVerifiedReadForRequester(viewer, { ...staged, files: staged.files + 1 })).toBeNull();
+    expect(
+      await store.auditVerifiedReadForRequester(viewer, {
+        ...staged,
+        expiresAt: new Date(Date.parse(staged.expiresAt) - 1000).toISOString(),
+      }),
+    ).toBeNull();
+    expect(await store.auditVerifiedReadForRequester(viewer, staged)).toMatchObject(archive);
+    const events = await db().query(
+      "SELECT event_type,actor_type,actor_login,metadata FROM audit_events WHERE installation_id=$1 AND subject_id=$2 ORDER BY created_at,id",
+      [installationId, exportId],
+    );
+    const rows = (events as { rows: Array<Record<string, unknown>> }).rows;
+    expect(rows).toHaveLength(2);
+    expect(rows).toContainEqual({
+      event_type: "data_export.archive.read_verified",
+      actor_type: "user",
+      actor_login: "original-requester",
+      metadata: {
+        sha256: archive.sha256,
+        byteLength: archive.byteLength,
+        fileCount: archive.files,
+      },
+    });
+    expect(JSON.stringify(rows)).not.toContain(claim.token);
+    expect(await store.revokeForRequester(viewer)).toBe(true);
+    expect(await store.auditVerifiedReadForRequester(viewer, staged)).toBeNull();
+    const after = await db().query("SELECT event_type FROM audit_events WHERE installation_id=$1 AND subject_id=$2", [
+      installationId,
+      exportId,
+    ]);
+    expect((after as { rows: unknown[] }).rows).toHaveLength(3); // stage, read-verified, revoke only
+  });
+
+  it("does not audit a verified read when revocation wins the PostgreSQL row lock", async () => {
+    const { exportId, claim, viewer } = await claimExport();
+    const store = new DataExportArchiveCommitmentStore(db());
+    const staged = await store.stage(claim, archive);
+    if (!staged) throw new Error("Expected staged commitment");
+
+    let releaseBlocker: () => void = () => {};
+    let announceLocked: () => void = () => {};
+    const unlocked = new Promise<void>((resolve) => {
+      releaseBlocker = resolve;
+    });
+    const locked = new Promise<void>((resolve) => {
+      announceLocked = resolve;
+    });
+    const blockingUpdate = db().withTransaction(
+      async (tx) => {
+        await tx.query("UPDATE data_export_archive_commitments SET revoked_at=NOW() WHERE export_id=$1", [exportId]);
+        announceLocked();
+        await unlocked;
+      },
+      { statementTimeoutMs: 5000 },
+    );
+    let pendingRead: Promise<unknown> | undefined;
+    try {
+      await locked;
+      pendingRead = store.auditVerifiedReadForRequester(viewer, staged);
+      const state = await Promise.race([
+        pendingRead.then(
+          () => "settled" as const,
+          () => "failed" as const,
+        ),
+        new Promise<"waiting">((resolve) => setTimeout(() => resolve("waiting"), 180)),
+      ]);
+      expect(state).toBe("waiting");
+    } finally {
+      releaseBlocker();
+      await blockingUpdate;
+    }
+    expect(await pendingRead).toBeNull();
+    const records = await db().query("SELECT event_type FROM audit_events WHERE installation_id=$1 AND subject_id=$2", [
+      installationId,
+      exportId,
+    ]);
+    expect((records as { rows: Array<{ event_type: string }> }).rows.map((row) => row.event_type)).toEqual([
+      "data_export.archive.staged",
+    ]);
+    expect(await store.readForRequester(viewer)).toBeNull();
+  });
+
   it("rejects malformed, out-of-scope and forged lease inputs before staging", async () => {
     const { claim } = await claimExport();
     const store = new DataExportArchiveCommitmentStore(db());
@@ -213,6 +308,52 @@ describeDatabase("claim-bound archive commitment admission (PostgreSQL)", () => 
     expect(await store.readForRequester({ ...viewer, actorLogin: "other-requester" })).toBeNull();
     expect(await store.revokeForRequester(viewer)).toBe(true);
     expect(await store.readForRequester(viewer)).toBeNull();
+  });
+
+  it("classifies private ZIP retention without deleting bytes or bypassing any tenant legal hold", async () => {
+    const { exportId, claim, viewer } = await claimExport();
+    const store = new DataExportArchiveCommitmentStore(db());
+    const input = { exportId, tenantId: tenant, installationId };
+    expect(await store.previewRetention(input)).toBeNull(); // No DB commitment: orphan is never deletion-ready.
+    expect(await store.stage(claim, archive)).toMatchObject(archive);
+    expect(await store.previewRetention(input)).toBe("active");
+    expect(await store.previewRetention({ ...input, tenantId: "other-tenant" })).toBeNull();
+    expect(await store.previewRetention({ ...input, installationId: randomUUID() })).toBeNull();
+
+    const holdId = randomUUID();
+    try {
+      await db().query(
+        "INSERT INTO legal_holds(id,tenant_id,created_by,reason,scope,scope_id) VALUES ($1,$2,'test','retain source records','repository',$3)",
+        [holdId, tenant.toUpperCase(), randomUUID()],
+      );
+      expect(await store.previewRetention(input)).toBe("hold"); // Conservative cross-repository hold.
+      expect(await store.revokeForRequester(viewer)).toBe(true);
+      expect(await store.previewRetention(input)).toBe("hold");
+      await db().query("UPDATE legal_holds SET active=FALSE,released_at=NOW(),released_by='test' WHERE id=$1", [
+        holdId,
+      ]);
+      expect(await store.previewRetention(input)).toBe("cleanup_review");
+      const status = await db().query("SELECT status,download_url FROM data_exports WHERE id=$1", [exportId]);
+      expect((status as { rows: unknown[] }).rows[0]).toEqual({ status: "running", download_url: null });
+    } finally {
+      await db().query("DELETE FROM legal_holds WHERE id=$1", [holdId]);
+    }
+  });
+
+  it("never marks an expired retained archive as an automatic deletion", async () => {
+    const { exportId, claim } = await claimExport();
+    const store = new DataExportArchiveCommitmentStore(db());
+    const input = { exportId, tenantId: tenant, installationId };
+    expect(await store.stage(claim, archive)).toMatchObject(archive);
+    await db().query(
+      "UPDATE data_export_archive_commitments SET expires_at=NOW()-interval '1 second', staged_at=NOW()-interval '20 minutes' WHERE export_id=$1",
+      [exportId],
+    );
+    expect(await store.previewRetention(input)).toBe("cleanup_review");
+    const rows = await db().query("SELECT revoked_at FROM data_export_archive_commitments WHERE export_id=$1", [
+      exportId,
+    ]);
+    expect((rows as { rows: Array<{ revoked_at: unknown }> }).rows[0]?.revoked_at).toBeNull();
   });
 
   it("denies expired commitment and lease without auto-reclaim or completing export", async () => {

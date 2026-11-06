@@ -232,6 +232,32 @@ async function main() {
     const baseUrl = `http://127.0.0.1:${port}`;
     await waitForHealth(baseUrl, child, output);
 
+    // Exercise the actual compiled Next.js dynamic ZIP route in this
+    // disposable standalone runtime, without an authenticated session or
+    // private archive root. It must never send private bytes to an anonymous
+    // HTTP client, even when a well-formed export UUID is provided.
+    const privateZipPath =
+      "/api/v1/data-exports/3df63e1f-adf1-43d3-b252-63f483e76fe4" +
+      "?installationId=3df63e1f-adf1-43d3-b252-63f483e76fe5&download=archive";
+    const anonymousArchive = await fetch(`${baseUrl}${privateZipPath}`, {
+      headers: { Accept: "application/zip" },
+      cache: "no-store",
+      redirect: "manual",
+    });
+    if (
+      anonymousArchive.status !== 401 ||
+      anonymousArchive.headers.get("cache-control") !== "private, no-store" ||
+      (anonymousArchive.headers.get("content-type") ?? "").includes("application/zip")
+    ) {
+      throw new Error(
+        `Compiled private ZIP route anonymous admission failed (status ${anonymousArchive.status}).\n${output()}`,
+      );
+    }
+    const anonymousBody = await anonymousArchive.json().catch(() => null);
+    if (anonymousBody?.ok !== false || anonymousBody?.error !== "authentication required") {
+      throw new Error("Compiled ZIP route failed to return a bounded anonymous denial");
+    }
+
     const signature = createHmac("sha256", secret).update(payload).digest("hex");
     const response = await fetch(`${baseUrl}/api/github/webhook`, {
       method: "POST",

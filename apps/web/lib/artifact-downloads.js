@@ -103,7 +103,11 @@ export function artifactDownloadUrl(input) {
 export function safeLocalArtifactPath(storageRoot, storagePath) {
   const root = path.resolve(storageRoot);
   const candidate = path.resolve(root, storagePath);
-  return isInside(root, candidate) ? candidate : undefined;
+  if (!isInside(root, candidate)) return undefined;
+  // This reserved owner-private directory shares the existing Docker volume,
+  // but must NEVER be served, uploaded, or deleted through artifact endpoints.
+  const firstSegment = path.relative(root, candidate).split(path.sep)[0]?.toLowerCase();
+  return firstSegment === ".private-export-archives" ? undefined : candidate;
 }
 
 export async function resolveLocalArtifactFile(storageRoot, storagePath) {
@@ -122,7 +126,9 @@ export async function resolveLocalArtifactFile(storageRoot, storagePath) {
     return { state: "file-unavailable" };
   }
 
-  return isInside(realRoot, realCandidate) ? { state: "resolved", path: realCandidate } : { state: "outside-root" };
+  return isInside(realRoot, realCandidate) && safeLocalArtifactPath(realRoot, realCandidate)
+    ? { state: "resolved", path: realCandidate }
+    : { state: "outside-root" };
 }
 
 export function artifactAttachmentHeader(name) {
