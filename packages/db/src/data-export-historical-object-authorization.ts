@@ -25,13 +25,47 @@ export type HistoricalUserObjectReadAuthority = {
 const isUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(value);
 
-function validAuthority(input: HistoricalUserObjectReadAuthority, artifactId: string): boolean {
+function validAuthority(value: unknown, artifactId: unknown): value is HistoricalUserObjectReadAuthority {
+  if (value === null || typeof value !== "object") return false;
+  const authority = value as Record<string, unknown>;
   return (
-    isUuid(input?.exportId) &&
+    isUuid(authority.exportId) &&
     isUuid(artifactId) &&
-    Number.isSafeInteger(input?.verifiedGitHubUserId) &&
-    input.verifiedGitHubUserId > 0
+    typeof authority.verifiedGitHubUserId === "number" &&
+    Number.isSafeInteger(authority.verifiedGitHubUserId) &&
+    authority.verifiedGitHubUserId > 0
   );
+}
+
+function validOriginalUserObject(value: unknown): value is HistoricalUserExportObject {
+  if (value === null || typeof value !== "object") return false;
+  const object = value as Record<string, unknown>;
+  return (
+    isUuid(object.artifactId) &&
+    isUuid(object.repositoryId) &&
+    isUuid(object.runId) &&
+    typeof object.storagePath === "string" &&
+    object.storagePath.length >= 1 &&
+    object.storagePath.length <= 1024 &&
+    object.storagePath.trim() === object.storagePath &&
+    !object.storagePath.includes(String.fromCharCode(92)) &&
+    object.storagePath.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..") &&
+    typeof object.sha256 === "string" &&
+    /^[0-9a-f]{64}$/u.test(object.sha256) &&
+    typeof object.byteLength === "number" &&
+    Number.isSafeInteger(object.byteLength) &&
+    object.byteLength >= 0 &&
+    object.byteLength <= 64 * 1024 * 1024 &&
+    typeof object.retentionUntil === "string" &&
+    Number.isFinite(Date.parse(object.retentionUntil))
+  );
+}
+
+function acknowledgedCopyOutcome(result: unknown, expected: "reserved" | "released"): boolean {
+  if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) return false;
+  if (result.rows.length !== 1) return false;
+  const row: unknown = result.rows[0];
+  return row !== null && typeof row === "object" && "outcome" in row && row.outcome === expected;
 }
 
 /**
@@ -119,10 +153,10 @@ export async function reserveHistoricalUserObjectCopy(
   authority: HistoricalUserObjectReadAuthority,
   object: HistoricalUserExportObject,
 ): Promise<{ readerId: string; token: string } | null> {
-  if (!validAuthority(authority, object?.artifactId)) return null;
+  if (!validAuthority(authority, object?.artifactId) || !validOriginalUserObject(object)) return null;
   const readerId = randomUUID();
   const token = randomUUID();
-  const result = (await db.query(
+  const result: unknown = await db.query(
     `SELECT boardreadyops_begin_historical_user_artifact_copy(
        $1,$2,$3,$4,$5,$6,$7::uuid,$8::uuid
      ) AS outcome`,
@@ -136,8 +170,8 @@ export async function reserveHistoricalUserObjectCopy(
       readerId,
       token,
     ],
-  )) as { rows?: Array<{ outcome?: string }> };
-  return result.rows?.[0]?.outcome === "reserved" ? { readerId, token } : null;
+  );
+  return acknowledgedCopyOutcome(result, "reserved") ? { readerId, token } : null;
 }
 
 /** Any uncertain settlement throws, quarantining the physical deletion path. */
@@ -149,12 +183,12 @@ export async function releaseHistoricalUserObjectCopy(
   if (!isUuid(authority?.exportId) || !isUuid(reservation?.readerId) || !isUuid(reservation?.token)) {
     throw new Error("Historical user object reservation cannot be settled");
   }
-  const result = (await db.query("SELECT boardreadyops_finish_export_object_copy($1,$2,$3::uuid) AS outcome", [
+  const result: unknown = await db.query("SELECT boardreadyops_finish_export_object_copy($1,$2,$3::uuid) AS outcome", [
     authority.exportId,
     `historical-user:${reservation.readerId}`,
     reservation.token,
-  ])) as { rows?: Array<{ outcome?: string }> };
-  if (result.rows?.[0]?.outcome !== "released") {
+  ]);
+  if (!acknowledgedCopyOutcome(result, "released")) {
     throw new Error("Historical user object reservation cannot be settled");
   }
 }
@@ -180,19 +214,8 @@ export async function reserveHistoricalUserObjectBatch(
     authority.verifiedGitHubUserId <= 0 ||
     !Array.isArray(objects) ||
     objects.length > 100 ||
-    new Set(objects.map((object) => object?.artifactId)).size !== objects.length ||
-    objects.some(
-      (object) =>
-        !isUuid(object?.artifactId) ||
-        typeof object.storagePath !== "string" ||
-        !object.storagePath ||
-        object.storagePath.length > 1024 ||
-        object.storagePath.trim() !== object.storagePath ||
-        !/^[a-f0-9]{64}$/u.test(object.sha256) ||
-        !Number.isSafeInteger(object.byteLength) ||
-        object.byteLength < 0 ||
-        object.byteLength > 64 * 1024 * 1024,
-    )
+    objects.some((object) => !validOriginalUserObject(object)) ||
+    new Set(objects.map((object) => object.artifactId)).size !== objects.length
   )
     return null;
 
