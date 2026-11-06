@@ -146,6 +146,22 @@ describe("original-user artifact copy reservation boundary", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it("never discloses a private object locator from ambiguous lookup rows", async () => {
+    const value = object();
+    const row = {
+      id: value.artifactId,
+      run_id: value.runId,
+      repository_id: value.repositoryId,
+      storage_path: value.storagePath,
+      sha256: value.sha256,
+      bytes: value.byteLength,
+      retention_until: new Date(value.retentionUntil),
+    };
+    const query = vi.fn().mockResolvedValue({ rows: [row, row] });
+    expect(await lookupHistoricalUserExportObject({ query } as never, authority(), value.artifactId)).toBeNull();
+    expect(query).toHaveBeenCalledOnce();
+  });
+
   it("rejects invalid batch objects before a transaction starts", async () => {
     const withTransaction = vi.fn();
     const good = object();

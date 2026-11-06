@@ -79,7 +79,7 @@ export async function lookupHistoricalUserExportObject(
   artifactId: string,
 ): Promise<HistoricalUserExportObject | null> {
   if (!validAuthority(authority, artifactId)) return null;
-  const result = (await db.query(
+  const result: unknown = await db.query(
     `SELECT a.id, a.run_id, repo.id AS repository_id, a.storage_path,
             a.sha256, a.bytes, a.retention_until
        FROM data_exports AS e
@@ -115,8 +115,10 @@ export async function lookupHistoricalUserExportObject(
         )
       LIMIT 1`,
     [authority.exportId, authority.verifiedGitHubUserId, artifactId],
-  )) as { rows?: Record<string, unknown>[] };
-  const row = result.rows?.[0];
+  );
+  // Disclose no locator unless the adapter returned exactly one valid row.
+  const locatorRows = boundedPrepublicationRows(result);
+  const row = locatorRows?.length === 1 ? locatorRows[0] : null;
   if (
     !row ||
     row.id !== artifactId ||
@@ -452,8 +454,14 @@ export async function checkHistoricalUserArchivePrepublication(input: {
         const rows = result.rows;
         if (!Array.isArray(rows) || rows.length !== objects.length) return "stale";
         const expected = new Map(objects.map((obj) => [obj.artifactId, obj]));
+        const seen = new Set<string>();
         for (const row of rows) {
-          const obj = expected.get(String(row.artifact_id));
+          // Duplicate rows could conceal a missing expected object despite
+          // an otherwise matching row count.
+          if (!row || typeof row !== "object" || typeof row.artifact_id !== "string" || seen.has(row.artifact_id))
+            return "stale";
+          seen.add(row.artifact_id);
+          const obj = expected.get(row.artifact_id);
           if (
             !obj ||
             row.run_id !== obj.runId ||
@@ -469,6 +477,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
           )
             return "stale";
         }
+        if (seen.size !== expected.size) return "stale";
         // Compare the original-user scoped, repeatable-read audit/review
         // core digest against a previously sealed PRIVATE partial ZIP core.
         // This read uses a distinct read-only PG client; advisory writer
