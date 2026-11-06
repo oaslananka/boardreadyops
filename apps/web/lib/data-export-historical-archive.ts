@@ -821,13 +821,8 @@ function validHistoricalPartialReceiptCounts(receipt: Record<string, unknown>, s
   );
 }
 
-/** Exact v3 partial ZIP declaration, including non-customer privacy exclusions. */
-function validHistoricalPartialReceipt(
-  receipt: Record<string, unknown>,
-  snapshot: HistoricalSnapshot,
-  expectedExportId: string,
-  fileCount: number,
-): receipt is HistoricalReceipt {
+/** Only a versioned, exact-key, never-customer-ready receipt is admissible. */
+function validHistoricalPartialReceiptHeader(receipt: Record<string, unknown>, expectedExportId: string): boolean {
   const receiptFields = [
     "kind",
     "formatVersion",
@@ -850,11 +845,23 @@ function validHistoricalPartialReceipt(
     !sha256.test(receipt.originalUserMutationEpochSha256) ||
     receipt.scope !== "partial-preflight-not-customer-export" ||
     receipt.completeCustomerExport !== false ||
-    receipt.exportId !== expectedExportId ||
-    snapshot.exportId !== expectedExportId ||
-    !validHistoricalPartialReceiptExclusions(receipt, snapshot) ||
-    !validHistoricalPartialReceiptCounts(receipt, snapshot) ||
-    !validHistoricalReceiptEntryCount(receipt.entries, fileCount)
+    receipt.exportId !== expectedExportId
+  );
+}
+
+/** Exact v3 partial ZIP declaration, including non-customer privacy exclusions. */
+function validHistoricalPartialReceipt(
+  receipt: Record<string, unknown>,
+  snapshot: HistoricalSnapshot,
+  expectedExportId: string,
+  fileCount: number,
+): receipt is HistoricalReceipt {
+  return (
+    validHistoricalPartialReceiptHeader(receipt, expectedExportId) &&
+    snapshot.exportId === expectedExportId &&
+    validHistoricalPartialReceiptExclusions(receipt, snapshot) &&
+    validHistoricalPartialReceiptCounts(receipt, snapshot) &&
+    validHistoricalReceiptEntryCount(receipt.entries, fileCount)
   );
 }
 

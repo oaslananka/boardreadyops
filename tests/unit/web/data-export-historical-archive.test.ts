@@ -405,6 +405,15 @@ describe("private historical original-USER partial archive", () => {
         claim.scope = "customer-delivery-ready";
       },
       (claim) => {
+        claim.kind = "boardreadyops.customer-export";
+      },
+      (claim) => {
+        claim.formatVersion = 2;
+      },
+      (claim) => {
+        claim.exportId = randomUUID();
+      },
+      (claim) => {
         claim.completeCustomerExport = true;
       },
       (claim) => {
