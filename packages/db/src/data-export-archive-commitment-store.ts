@@ -18,14 +18,45 @@ export type StagedArchiveCommitment = {
 
 const canonical = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0 && value.length <= 256 && value.trim() === value;
-const validClaim = (claim: Claim): boolean =>
-  [claim.exportId, claim.tenantId, claim.installationId, claim.workerId, claim.token].every(canonical) &&
-  /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(claim.workerId);
+function validClaim(value: unknown): value is Claim {
+  if (value === null || typeof value !== "object") return false;
+  const claim = value as Record<string, unknown>;
+  return (
+    canonical(claim.exportId) &&
+    canonical(claim.tenantId) &&
+    canonical(claim.installationId) &&
+    canonical(claim.workerId) &&
+    canonical(claim.token) &&
+    /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(claim.workerId)
+  );
+}
+
+function validArchiveCandidate(value: unknown): value is { sha256: string; byteLength: number; files: number } {
+  if (value === null || typeof value !== "object") return false;
+  const archive = value as Record<string, unknown>;
+  return (
+    isValidExportSha256(archive.sha256) &&
+    typeof archive.byteLength === "number" &&
+    Number.isSafeInteger(archive.byteLength) &&
+    archive.byteLength >= 1 &&
+    archive.byteLength <= maxArchiveBytes &&
+    typeof archive.files === "number" &&
+    Number.isSafeInteger(archive.files) &&
+    archive.files >= 8 &&
+    archive.files <= 108
+  );
+}
 function rows(result: unknown): Record<string, unknown>[] {
   if (!result || typeof result !== "object" || !("rows" in result)) return [];
   const values = (result as { rows?: unknown }).rows;
   return Array.isArray(values) ? values : [];
 }
+function acknowledgedExport(result: unknown, expectedExportId: string): boolean {
+  const returned = rows(result);
+  // Audited DB mutations may only report success for this exact export.
+  return returned.length === 1 && returned[0]?.export_id === expectedExportId;
+}
+
 function checkedRow(row: Record<string, unknown> | undefined): StagedArchiveCommitment | null {
   if (!row) return null;
   const sha = row.archive_sha256;
@@ -56,8 +87,34 @@ type ArchiveRequester = {
   installationId: string;
   actorLogin: string;
 };
-const validRequester = (input: ArchiveRequester): boolean =>
-  Boolean(input) && [input.exportId, input.tenantId, input.installationId, input.actorLogin].every(canonical);
+function validRequester(value: unknown): value is ArchiveRequester {
+  if (value === null || typeof value !== "object") return false;
+  const requester = value as Record<string, unknown>;
+  return (
+    canonical(requester.exportId) &&
+    canonical(requester.tenantId) &&
+    canonical(requester.installationId) &&
+    canonical(requester.actorLogin)
+  );
+}
+
+function validCleanupScope(
+  value: unknown,
+): value is Pick<ArchiveRequester, "exportId" | "tenantId" | "installationId"> {
+  if (value === null || typeof value !== "object") return false;
+  const scope = value as Record<string, unknown>;
+  return canonical(scope.exportId) && canonical(scope.tenantId) && canonical(scope.installationId);
+}
+
+function validStagedCommitment(value: unknown): value is StagedArchiveCommitment {
+  if (!validArchiveCandidate(value)) return false;
+  const commitment = value as StagedArchiveCommitment;
+  return typeof commitment.expiresAt === "string" && Number.isFinite(Date.parse(commitment.expiresAt));
+}
+
+function validCleanupResult(value: unknown): value is "deleted" | "missing" {
+  return value === "deleted" || value === "missing";
+}
 
 // One canonical scope predicate for both the initial read and its final
 // audit-coupled attestation. The worker lease protects staging, NOT the
@@ -95,18 +152,7 @@ export class DataExportArchiveCommitmentStore {
     claim: Claim,
     archive: { sha256: string; byteLength: number; files: number },
   ): Promise<StagedArchiveCommitment | null> {
-    if (
-      !claim ||
-      !validClaim(claim) ||
-      !archive ||
-      !isValidExportSha256(archive.sha256) ||
-      !Number.isSafeInteger(archive.byteLength) ||
-      archive.byteLength < 1 ||
-      archive.byteLength > maxArchiveBytes ||
-      !Number.isSafeInteger(archive.files) ||
-      archive.files < 8 ||
-      archive.files > 108
-    ) {
+    if (!validClaim(claim) || !validArchiveCandidate(archive)) {
       return null;
     }
     const result = await this.db.query(
@@ -189,20 +235,7 @@ export class DataExportArchiveCommitmentStore {
     input: ArchiveRequester,
     verified: StagedArchiveCommitment,
   ): Promise<StagedArchiveCommitment | null> {
-    if (
-      !validRequester(input) ||
-      !verified ||
-      !isValidExportSha256(verified.sha256) ||
-      !Number.isSafeInteger(verified.byteLength) ||
-      verified.byteLength < 1 ||
-      verified.byteLength > maxArchiveBytes ||
-      !Number.isSafeInteger(verified.files) ||
-      verified.files < 8 ||
-      verified.files > 108 ||
-      typeof verified.expiresAt !== "string" ||
-      !Number.isFinite(Date.parse(verified.expiresAt))
-    )
-      return null;
+    if (!validRequester(input) || !validStagedCommitment(verified)) return null;
     const result = await this.db.query(
       `WITH allowed AS MATERIALIZED (
          ${authorizedRequesterSelect}
@@ -259,7 +292,7 @@ export class DataExportArchiveCommitmentStore {
     tenantId: string;
     installationId: string;
   }): Promise<"active" | "hold" | "cleanup_review" | "cleaned" | null> {
-    if (![input?.exportId, input?.tenantId, input?.installationId].every(canonical)) return null;
+    if (!validCleanupScope(input)) return null;
     const result = await this.db.query(
       `SELECT CASE
            WHEN commitment.cleaned_at IS NOT NULL THEN 'cleaned'
@@ -308,7 +341,7 @@ export class DataExportArchiveCommitmentStore {
     byteLength: number;
     disposition: "active" | "hold" | "cleaned" | "eligible";
   } | null> {
-    if (![input?.exportId, input?.tenantId, input?.installationId].every(canonical)) return null;
+    if (!validCleanupScope(input)) return null;
     await this.db.query("LOCK TABLE legal_holds IN SHARE MODE NOWAIT");
     const result = await this.db.query(
       `SELECT commitment.archive_sha256, commitment.archive_byte_length,
@@ -360,11 +393,7 @@ export class DataExportArchiveCommitmentStore {
     input: { exportId: string; tenantId: string; installationId: string },
     result: "deleted" | "missing",
   ): Promise<void> {
-    if (
-      ![input?.exportId, input?.tenantId, input?.installationId].every(canonical) ||
-      (result !== "deleted" && result !== "missing")
-    )
-      throw new Error("Invalid archive cleanup scope");
+    if (!validCleanupScope(input) || !validCleanupResult(result)) throw new Error("Invalid archive cleanup scope");
     const recorded = await this.db.query(
       `WITH cleaned AS (
          UPDATE data_export_archive_commitments AS commitment
@@ -395,7 +424,7 @@ export class DataExportArchiveCommitmentStore {
        SELECT cleaned.export_id FROM cleaned CROSS JOIN audited`,
       [input.exportId, input.tenantId, input.installationId, result],
     );
-    if (rows(recorded).length !== 1) throw new Error("Archive cleanup transaction lost eligibility");
+    if (!acknowledgedExport(recorded, input.exportId)) throw new Error("Archive cleanup transaction lost eligibility");
   }
 
   /** One-way requester revocation, scoped to an active installation. */
@@ -405,7 +434,7 @@ export class DataExportArchiveCommitmentStore {
     installationId: string;
     actorLogin: string;
   }): Promise<boolean> {
-    if (![input?.exportId, input?.tenantId, input?.installationId, input?.actorLogin].every(canonical)) return false;
+    if (!validRequester(input)) return false;
     const result = await this.db.query(
       `WITH revoked AS (
        UPDATE data_export_archive_commitments AS commitment
@@ -438,6 +467,6 @@ export class DataExportArchiveCommitmentStore {
        SELECT revoked.export_id FROM revoked CROSS JOIN audited`,
       [input.exportId, input.tenantId, input.installationId, input.actorLogin],
     );
-    return rows(result).length === 1;
+    return acknowledgedExport(result, input.exportId);
   }
 }
