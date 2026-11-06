@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   checkHistoricalUserArchivePrepublication,
   lookupHistoricalUserExportObject,
+  releaseHistoricalUserObjectBatch,
   releaseHistoricalUserObjectCopy,
   reserveHistoricalUserObjectBatch,
   reserveHistoricalUserObjectCopy,
@@ -71,6 +72,33 @@ describe("original-user artifact copy reservation boundary", () => {
       `historical-user:${reservation.readerId}`,
       reservation.token,
     ]);
+  });
+
+  it("fails closed on falsy settlement rejections while still attempting every reservation", async () => {
+    const reservations = Array.from({ length: 3 }, () => ({
+      reservation: { readerId: randomUUID(), token: randomUUID() },
+    }));
+    for (const cause of [undefined, null, false, 0, ""]) {
+      const query = vi
+        .fn()
+        .mockRejectedValueOnce(cause)
+        .mockResolvedValue({ rows: [{ outcome: "released" }] });
+      await expect(releaseHistoricalUserObjectBatch({ query } as never, authority(), reservations)).rejects.toThrow(
+        "Historical user object batch reservations cannot be fully settled",
+      );
+      expect(query).toHaveBeenCalledTimes(reservations.length);
+    }
+  });
+
+  it("settles every original-user reservation when all acknowledgements match", async () => {
+    const reservations = Array.from({ length: 3 }, () => ({
+      reservation: { readerId: randomUUID(), token: randomUUID() },
+    }));
+    const query = vi.fn().mockResolvedValue({ rows: [{ outcome: "released" }] });
+    await expect(
+      releaseHistoricalUserObjectBatch({ query } as never, authority(), reservations),
+    ).resolves.toBeUndefined();
+    expect(query).toHaveBeenCalledTimes(reservations.length);
   });
 
   it("rejects unsafe original-user object paths at the prepublication boundary before any transaction", async () => {

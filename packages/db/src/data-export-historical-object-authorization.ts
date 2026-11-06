@@ -267,15 +267,21 @@ export async function releaseHistoricalUserObjectBatch(
   authority: HistoricalUserObjectReadAuthority,
   admitted: readonly { reservation: { readerId: string; token: string } }[],
 ): Promise<void> {
-  let failure: unknown;
+  let failed = false;
+  let firstFailure: unknown;
   for (const { reservation } of admitted) {
     try {
       await releaseHistoricalUserObjectCopy(db, authority, reservation);
     } catch (error) {
-      failure ??= error;
+      if (!failed) firstFailure = error;
+      failed = true;
     }
   }
-  if (failure) throw failure;
+  // Promise rejections may contain undefined/null/false/0. Never mistake a
+  // falsy rejection for a fully settled batch: cleanup must stay quarantined.
+  if (failed) {
+    throw new Error("Historical user object batch reservations cannot be fully settled", { cause: firstFailure });
+  }
 }
 
 /**
