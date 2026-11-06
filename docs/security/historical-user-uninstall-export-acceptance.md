@@ -84,8 +84,14 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   current original USER DB/physical manifest, then releases it AFTER
   IO; it returns only non-customer verification metadata, NOT bytes.
   Manual cleanup checks unreleased private ZIP reservations as well as
-  artifact readers. A second PostgreSQL connection cannot clean an
-  unresolved private ZIP reader, including after export revocation.
+  artifact readers. Its destructive gate requires exactly one original
+  numeric USER/preflight owner row, one acquired advisory-lock row and
+  one clear hold/erasure/reader status row; duplicate or malformed SQL
+  results quarantine rather than unlink. Missing, duplicate or corrupt
+  prior cleanup audit responses also fail closed, and the final immutable
+  cleanup audit acknowledgement must match the actual missing/deleted
+  outcome. A second PostgreSQL connection cannot clean an unresolved
+  private ZIP reader, including after export revocation.
   Source-only migration 0125 also rejects parent export deletion while
   any private ZIP reader is unresolved, preventing cascade removal of
   the cross-worker fence. A crashed reader is quarantined indefinitely, NOT reaped on a timer.

@@ -11,11 +11,14 @@ const valid = {
   archiveRoot: "/srv/exports/.private-export-archives",
 };
 
-function lockedCleanupFixture(privateZipReader = false) {
+type CleanupQuery = "owner" | "advisory" | "blockers" | "prior" | "audit";
+
+function lockedCleanupFixture(privateZipReader = false, injected: Partial<Record<CleanupQuery, unknown>> = {}) {
+  const result = (stage: CleanupQuery, value: unknown) => (Object.hasOwn(injected, stage) ? injected[stage] : value);
   const query = vi.fn(async (sql: string, args?: unknown[]) => {
     if (sql.startsWith("LOCK TABLE")) return { rows: [] };
     if (sql.includes("SELECT e.tenant_id"))
-      return {
+      return result("owner", {
         rows: [
           {
             tenant_id: "original-user",
@@ -24,17 +27,18 @@ function lockedCleanupFixture(privateZipReader = false) {
             expected_archive_bytes: "17",
           },
         ],
-      };
-    if (sql.includes("pg_try_advisory_xact_lock")) return { rows: [{ acquired: true }] };
+      });
+    if (sql.includes("pg_try_advisory_xact_lock")) return result("advisory", { rows: [{ acquired: true }] });
     if (sql.includes("AS held"))
-      return {
+      return result("blockers", {
         rows: [
           { held: false, erasure: false, reader: false, private_zip_reader: privateZipReader, active_preflight: false },
         ],
-      };
-    if (sql.includes("SELECT outcome FROM public.historical_user_partial_cleanup_events")) return { rows: [] };
+      });
+    if (sql.includes("SELECT outcome FROM public.historical_user_partial_cleanup_events"))
+      return result("prior", { rows: [] });
     if (sql.includes("INSERT INTO public.historical_user_partial_cleanup_events"))
-      return { rows: [{ outcome: args?.[5] }] };
+      return result("audit", { rows: [{ outcome: args?.[5] }] });
     throw new Error("Unexpected cleanup SQL fixture");
   });
   const withTransaction = vi.fn(async (run: (tx: { query: typeof query }) => Promise<unknown>) => run({ query }));
@@ -95,6 +99,98 @@ describe("manual historical private cleanup input gate", () => {
         17,
         "missing",
       ]);
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["owner", { rows: [{ tenant_id: "original-user" }, { tenant_id: "original-user" }] }, "quarantined"],
+    ["owner", { rows: [null] }, "quarantined"],
+    ["owner", { rows: { length: 1 } }, "quarantined"],
+    [
+      "owner",
+      {
+        rows: [
+          {
+            tenant_id: "original-user",
+            preflight_id: randomUUID(),
+            expected_archive_sha256: "a".repeat(64),
+            expected_archive_bytes: "1e2",
+          },
+        ],
+      },
+      "quarantined",
+    ],
+    ["advisory", { rows: [{ acquired: true }, { acquired: true }] }, "busy"],
+    ["advisory", { rows: [{ acquired: true }, null] }, "busy"],
+    [
+      "blockers",
+      {
+        rows: [
+          { held: false, erasure: false, reader: false, private_zip_reader: false, active_preflight: false },
+          { held: false, erasure: false, reader: false, private_zip_reader: false, active_preflight: false },
+        ],
+      },
+      "quarantined",
+    ],
+    ["blockers", { rows: [null] }, "quarantined"],
+    ["prior", { rows: "not-an-array" }, "quarantined"],
+    ["prior", { rows: [{ outcome: "missing" }, { outcome: "missing" }] }, "quarantined"],
+    ["prior", { rows: [{ outcome: "untrusted" }] }, "quarantined"],
+  ] as const)(
+    "does not remove an original-user private archive for untrustworthy %s SQL response",
+    async (stage, response, expected) => {
+      const base = await mkdtemp(join(tmpdir(), "boardreadyops-unsafe-cleanup-"));
+      const archiveRoot = join(base, ".private-export-archives");
+      const filename = join(archiveRoot, `${valid.authority.exportId}.historical-private-partial-v3.zip`);
+      const privateText = "private file data";
+      try {
+        await mkdir(archiveRoot, { mode: 0o700 });
+        await writeFile(filename, privateText, { mode: 0o600 });
+        const fixture = lockedCleanupFixture(false, { [stage]: response });
+        expect(await cleanupHistoricalUserPrivatePartial({ ...valid, db: fixture.db, archiveRoot })).toBe(expected);
+        expect(await readFile(filename, "utf8")).toBe(privateText);
+        expect(
+          fixture.query.mock.calls.some(([sql]) =>
+            sql.includes("INSERT INTO public.historical_user_partial_cleanup_events"),
+          ),
+        ).toBe(false);
+      } finally {
+        await rm(base, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each([{ rows: [] }, { rows: [{ outcome: "wrong" }] }, { rows: [{ outcome: "missing" }, { outcome: "missing" }] }])(
+    "rejects a missing, mismatched or ambiguous cleanup audit acknowledgement",
+    async (audit) => {
+      const base = await mkdtemp(join(tmpdir(), "boardreadyops-audit-ack-"));
+      const archiveRoot = join(base, ".private-export-archives");
+      try {
+        await mkdir(archiveRoot, { mode: 0o700 });
+        const fixture = lockedCleanupFixture(false, { audit });
+        expect(await cleanupHistoricalUserPrivatePartial({ ...valid, db: fixture.db, archiveRoot })).toBe(
+          "quarantined",
+        );
+      } finally {
+        await rm(base, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("never revisits a previously committed exact cleanup audit", async () => {
+    const base = await mkdtemp(join(tmpdir(), "boardreadyops-cleanup-audited-"));
+    const archiveRoot = join(base, ".private-export-archives");
+    try {
+      await mkdir(archiveRoot, { mode: 0o700 });
+      const fixture = lockedCleanupFixture(false, { prior: { rows: [{ outcome: "missing" }] } });
+      expect(await cleanupHistoricalUserPrivatePartial({ ...valid, db: fixture.db, archiveRoot })).toBe("cleaned");
+      expect(
+        fixture.query.mock.calls.some(([sql]) =>
+          sql.includes("INSERT INTO public.historical_user_partial_cleanup_events"),
+        ),
+      ).toBe(false);
     } finally {
       await rm(base, { recursive: true, force: true });
     }

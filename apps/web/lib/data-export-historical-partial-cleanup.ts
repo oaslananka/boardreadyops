@@ -7,14 +7,16 @@ import { readSealedHistoricalUserPartial } from "./data-export-historical-partia
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
 const digest = /^[0-9a-f]{64}$/u;
 type Result = "deleted" | "missing" | "cleaned" | "quarantined" | "busy";
-type Locked = {
-  tenant_id: string;
-  preflight_id: string;
-  expected_archive_sha256: string;
-  expected_archive_bytes: string | number;
-};
-function rows(result: unknown): Record<string, unknown>[] {
-  return (result as { rows?: Record<string, unknown>[] })?.rows ?? [];
+/** Ambiguous/malformed SQL acknowledgements must never authorize physical deletion. */
+function checkedRows(result: unknown): Record<string, unknown>[] | null {
+  if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) return null;
+  if (result.rows.some((row: unknown) => row === null || typeof row !== "object" || Array.isArray(row))) return null;
+  return result.rows as Record<string, unknown>[];
+}
+
+function exactCleanupRow(result: unknown): Record<string, unknown> | null {
+  const found = checkedRows(result);
+  return found?.length === 1 ? (found[0] ?? null) : null;
 }
 
 type CleanupInput = {
@@ -47,11 +49,26 @@ type VerifiedCleanupCandidate = {
 type PhysicalCleanupResult = "deleted" | "missing" | "quarantined";
 
 /** Admit only one exact original-user binding and bounded ZIP commitment. */
-function validatedCleanupCandidate(candidate: Locked | undefined): VerifiedCleanupCandidate | null {
-  if (!candidate?.tenant_id || !uuid.test(candidate.preflight_id) || !digest.test(candidate.expected_archive_sha256))
+function validatedCleanupCandidate(candidate: Record<string, unknown> | null): VerifiedCleanupCandidate | null {
+  if (
+    typeof candidate?.tenant_id !== "string" ||
+    candidate.tenant_id.length === 0 ||
+    typeof candidate.preflight_id !== "string" ||
+    !uuid.test(candidate.preflight_id) ||
+    typeof candidate.expected_archive_sha256 !== "string" ||
+    !digest.test(candidate.expected_archive_sha256)
+  )
     return null;
-  const byteLength = Number(candidate.expected_archive_bytes);
-  if (!Number.isSafeInteger(byteLength) || byteLength < 1 || byteLength > 64 * 1024 * 1024) return null;
+  const rawBytes = candidate.expected_archive_bytes;
+  if (
+    !(
+      (typeof rawBytes === "number" && Number.isSafeInteger(rawBytes)) ||
+      (typeof rawBytes === "string" && /^[1-9]\d{0,7}$/u.test(rawBytes))
+    )
+  )
+    return null;
+  const byteLength = Number(rawBytes);
+  if (byteLength < 1 || byteLength > 64 * 1024 * 1024) return null;
   return {
     tenantId: candidate.tenant_id,
     preflightId: candidate.preflight_id,
@@ -61,14 +78,13 @@ function validatedCleanupCandidate(candidate: Locked | undefined): VerifiedClean
 }
 
 /** Unknown/ambiguous snapshots block physical cleanup, including crashed readers. */
-function noCleanupBlockers(blocker: Record<string, unknown>[]): boolean {
+function noCleanupBlockers(blocker: Record<string, unknown> | null): boolean {
   return (
-    blocker.length === 1 &&
-    blocker[0]?.held === false &&
-    blocker[0]?.erasure === false &&
-    blocker[0]?.reader === false &&
-    blocker[0]?.private_zip_reader === false &&
-    blocker[0]?.active_preflight === false
+    blocker?.held === false &&
+    blocker.erasure === false &&
+    blocker.reader === false &&
+    blocker.private_zip_reader === false &&
+    blocker.active_preflight === false
   );
 }
 
@@ -153,7 +169,7 @@ export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): 
     return await input.db.withTransaction(
       async (tx): Promise<Result> => {
         await tx.query("LOCK TABLE public.legal_holds IN SHARE MODE NOWAIT");
-        const owned = rows(
+        const owned = exactCleanupRow(
           await tx.query(
             `SELECT e.tenant_id, p.id AS preflight_id,
                 p.expected_archive_sha256, p.expected_archive_bytes
@@ -175,18 +191,18 @@ export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): 
           FOR UPDATE OF e,i,p NOWAIT`,
             [input.authority.exportId, input.authority.verifiedGitHubUserId],
           ),
-        ) as Locked[];
-        const candidate = validatedCleanupCandidate(owned[0]);
+        );
+        const candidate = validatedCleanupCandidate(owned);
         if (!candidate) return "quarantined";
 
-        const locks = rows(
+        const locks = exactCleanupRow(
           await tx.query(
             "SELECT pg_try_advisory_xact_lock(boardreadyops_historical_transfer_tenant_lock_key($1)) AS acquired",
             [candidate.tenantId],
           ),
         );
-        if (locks[0]?.acquired !== true) return "busy";
-        const blocker = rows(
+        if (locks?.acquired !== true) return "busy";
+        const blocker = exactCleanupRow(
           await tx.query(
             `SELECT
            EXISTS(SELECT 1 FROM public.legal_holds h
@@ -206,13 +222,16 @@ export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): 
         );
         if (!noCleanupBlockers(blocker)) return "quarantined";
 
-        const prior = rows(
+        const prior = checkedRows(
           await tx.query(
             "SELECT outcome FROM public.historical_user_partial_cleanup_events WHERE export_id=$1 AND original_github_user_id=$2",
             [input.authority.exportId, input.authority.verifiedGitHubUserId],
           ),
         );
-        if (prior.length) return "cleaned";
+        if (prior === null || prior.length > 1) return "quarantined";
+        if (prior.length === 1) {
+          return prior[0]?.outcome === "deleted" || prior[0]?.outcome === "missing" ? "cleaned" : "quarantined";
+        }
 
         const result = await deleteVerifiedHistoricalPartial(
           root,
@@ -221,7 +240,7 @@ export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): 
           candidate.byteLength,
         );
         if (result === "quarantined") return result;
-        const audit = rows(
+        const audit = exactCleanupRow(
           await tx.query(
             `INSERT INTO public.historical_user_partial_cleanup_events (
           export_id,original_github_user_id,preflight_id,
@@ -238,7 +257,7 @@ export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): 
             ],
           ),
         );
-        if (audit.length !== 1) throw new Error("Private historical cleanup audit not committed");
+        if (audit?.outcome !== result) throw new Error("Private historical cleanup audit not committed");
         return result;
       },
       { statementTimeoutMs: 10000 },
