@@ -788,6 +788,91 @@ export function prepareHistoricalUserPartialArchive(input: {
   return { bytes, sha256: digest(bytes), byteLength: bytes.length, files: entries.length };
 }
 
+type HistoricalReceipt = Record<string, unknown> & { entries: unknown[] };
+
+/** Exact v3 partial ZIP declaration, including non-customer privacy exclusions. */
+function validHistoricalPartialReceipt(
+  receipt: Record<string, unknown>,
+  snapshot: HistoricalSnapshot,
+  expectedExportId: string,
+  fileCount: number,
+): receipt is HistoricalReceipt {
+  const receiptFields = [
+    "kind",
+    "formatVersion",
+    "exportId",
+    "scope",
+    "completeCustomerExport",
+    "metadataSnapshotExclusions",
+    "verifiedPhysicalArtifactCount",
+    "verifiedPrivateVisualDigestCount",
+    "privateVisualContentsIncluded",
+    "originalUserMutationEpochSha256",
+    "archiveExclusions",
+    "entries",
+  ];
+  return !(
+    !exactKeys(receipt, receiptFields) ||
+    receipt?.kind !== "boardreadyops.historical-user-partial-integrity-receipt" ||
+    receipt.formatVersion !== 3 ||
+    typeof receipt.originalUserMutationEpochSha256 !== "string" ||
+    !sha256.test(receipt.originalUserMutationEpochSha256) ||
+    receipt.scope !== "partial-preflight-not-customer-export" ||
+    receipt.completeCustomerExport !== false ||
+    receipt.exportId !== expectedExportId ||
+    snapshot.exportId !== expectedExportId ||
+    JSON.stringify(receipt.metadataSnapshotExclusions) !== JSON.stringify(snapshot.exclusions) ||
+    receipt.verifiedPhysicalArtifactCount !== snapshot.artifacts.length ||
+    receipt.verifiedPrivateVisualDigestCount !== snapshot.excludedSourceClassCounts.runSnapshots ||
+    receipt.privateVisualContentsIncluded !== false ||
+    JSON.stringify(receipt.archiveExclusions) !==
+      JSON.stringify([
+        "review-actor-identities-and-audit-metadata",
+        "finding-decision-and-assignment-actor-identities",
+        "platform-storage",
+        "github-repository-source",
+        "github-actions-logs-and-artifacts",
+      ]) ||
+    !Array.isArray(receipt.entries) ||
+    receipt.entries.length !== fileCount - 1
+  );
+}
+
+/** Bind each ZIP path to the received bytes, receipt digest and retained artifact owner snapshot. */
+function validHistoricalPartialEntries(
+  files: Map<string, Buffer>,
+  receiptEntries: readonly unknown[],
+  snapshot: HistoricalSnapshot,
+): boolean {
+  const paths = [...files.keys()].filter((path) => path !== receiptPath).sort((a, b) => a.localeCompare(b));
+  if (paths.some((path) => path !== metadataPath && path !== visualEvidencePath && !objectPath.test(path)))
+    return false;
+  const artifactMap = new Map(snapshot.artifacts.map((artifact) => [artifact.id, artifact]));
+  if (paths.length !== artifactMap.size + 2) return false;
+  for (let i = 0; i < paths.length; i++) {
+    const path = paths[i];
+    if (!path) return false;
+    const bytes = files.get(path);
+    const entry = receiptEntries[i] as Record<string, unknown> | undefined;
+    if (
+      !bytes ||
+      !entry ||
+      !exactKeys(entry, ["path", "byteLength", "sha256"]) ||
+      entry.path !== path ||
+      entry.byteLength !== bytes.length ||
+      entry.sha256 !== digest(bytes)
+    )
+      return false;
+    if (path !== metadataPath && path !== visualEvidencePath) {
+      const match = objectPath.exec(path);
+      if (!match?.[1]) return false;
+      const artifact = artifactMap.get(match[1]);
+      if (!artifact || artifact.byteLength !== bytes.length || artifact.sha256 !== digest(bytes)) return false;
+    }
+  }
+  return true;
+}
+
 /** Independent integrity check; a digest supplied only inside the ZIP is untrusted. */
 export function verifyHistoricalUserPartialArchive(
   archive: Buffer,
@@ -828,73 +913,10 @@ export function verifyHistoricalUserPartialArchive(
       visualCount: snapshot.excludedSourceClassCounts.runSnapshots,
     });
     const receipt = JSON.parse(Buffer.from(receiptBytes).toString("utf8")) as Record<string, unknown>;
-    const receiptFields = [
-      "kind",
-      "formatVersion",
-      "exportId",
-      "scope",
-      "completeCustomerExport",
-      "metadataSnapshotExclusions",
-      "verifiedPhysicalArtifactCount",
-      "verifiedPrivateVisualDigestCount",
-      "privateVisualContentsIncluded",
-      "originalUserMutationEpochSha256",
-      "archiveExclusions",
-      "entries",
-    ];
-    if (
-      !exactKeys(receipt, receiptFields) ||
-      receipt?.kind !== "boardreadyops.historical-user-partial-integrity-receipt" ||
-      receipt.formatVersion !== 3 ||
-      typeof receipt.originalUserMutationEpochSha256 !== "string" ||
-      !sha256.test(receipt.originalUserMutationEpochSha256) ||
-      receipt.scope !== "partial-preflight-not-customer-export" ||
-      receipt.completeCustomerExport !== false ||
-      receipt.exportId !== expectedExportId ||
-      snapshot.exportId !== expectedExportId ||
-      JSON.stringify(receipt.metadataSnapshotExclusions) !== JSON.stringify(snapshot.exclusions) ||
-      receipt.verifiedPhysicalArtifactCount !== snapshot.artifacts.length ||
-      receipt.verifiedPrivateVisualDigestCount !== snapshot.excludedSourceClassCounts.runSnapshots ||
-      receipt.privateVisualContentsIncluded !== false ||
-      JSON.stringify(receipt.archiveExclusions) !==
-        JSON.stringify([
-          "review-actor-identities-and-audit-metadata",
-          "finding-decision-and-assignment-actor-identities",
-          "platform-storage",
-          "github-repository-source",
-          "github-actions-logs-and-artifacts",
-        ]) ||
-      !Array.isArray(receipt.entries) ||
-      receipt.entries.length !== files.size - 1
-    )
-      return false;
-    const paths = [...files.keys()].filter((path) => path !== receiptPath).sort((a, b) => a.localeCompare(b));
-    if (paths.some((path) => path !== metadataPath && path !== visualEvidencePath && !objectPath.test(path)))
-      return false;
-    const artifactMap = new Map(snapshot.artifacts.map((artifact) => [artifact.id, artifact]));
-    if (paths.length !== artifactMap.size + 2) return false;
-    for (let i = 0; i < paths.length; i++) {
-      const path = paths[i];
-      if (!path) return false;
-      const bytes = files.get(path);
-      const entry = receipt.entries[i] as Record<string, unknown> | undefined;
-      if (
-        !bytes ||
-        !entry ||
-        !exactKeys(entry, ["path", "byteLength", "sha256"]) ||
-        entry.path !== path ||
-        entry.byteLength !== bytes.length ||
-        entry.sha256 !== digest(bytes)
-      )
-        return false;
-      if (path !== metadataPath && path !== visualEvidencePath) {
-        const match = objectPath.exec(path);
-        if (!match?.[1]) return false;
-        const artifact = artifactMap.get(match[1]);
-        if (!artifact || artifact.byteLength !== bytes.length || artifact.sha256 !== digest(bytes)) return false;
-      }
-    }
-    return true;
+    return (
+      validHistoricalPartialReceipt(receipt, snapshot, expectedExportId, files.size) &&
+      validHistoricalPartialEntries(files, receipt.entries, snapshot)
+    );
   } catch {
     return false;
   }
@@ -962,6 +984,66 @@ export function prepareHistoricalUserMetadataOnlyArchive(input: HistoricalMetada
   return { bytes: zip, sha256: digest(zip), byteLength: zip.length, files: 3 };
 }
 
+/** Exact three-file metadata-only declaration: no physical bytes or customer entitlement. */
+function validHistoricalMetadataOnlyReceipt(
+  receipt: Record<string, unknown>,
+  snapshot: HistoricalSnapshot,
+  expectedExportId: string,
+): receipt is HistoricalReceipt {
+  const receiptFields = [
+    "kind",
+    "formatVersion",
+    "exportId",
+    "scope",
+    "completeCustomerExport",
+    "customerDeliveryReady",
+    "physicalArtifactContentsIncluded",
+    "artifactDescriptorCount",
+    "privateVisualContentsIncluded",
+    "privateVisualDescriptorCount",
+    "originalUserMutationEpochSha256",
+    "exclusions",
+    "entries",
+  ];
+  return !(
+    !exactKeys(receipt, receiptFields) ||
+    receipt.kind !== "boardreadyops.historical-user-metadata-only-integrity-receipt" ||
+    receipt.formatVersion !== 1 ||
+    receipt.exportId !== expectedExportId ||
+    snapshot.exportId !== expectedExportId ||
+    receipt.scope !== metadataOnlyScope ||
+    receipt.completeCustomerExport !== false ||
+    receipt.customerDeliveryReady !== false ||
+    receipt.physicalArtifactContentsIncluded !== false ||
+    receipt.artifactDescriptorCount !== snapshot.artifacts.length ||
+    receipt.privateVisualContentsIncluded !== false ||
+    receipt.privateVisualDescriptorCount !== snapshot.excludedSourceClassCounts.runSnapshots ||
+    typeof receipt.originalUserMutationEpochSha256 !== "string" ||
+    !sha256.test(receipt.originalUserMutationEpochSha256) ||
+    JSON.stringify(receipt.exclusions) !== JSON.stringify(metadataOnlyExclusions) ||
+    !Array.isArray(receipt.entries) ||
+    receipt.entries.length !== 2
+  );
+}
+
+/** Both metadata objects must be exactly SHA-bound to their own receipt entries. */
+function validHistoricalMetadataOnlyEntries(files: Map<string, Buffer>, entries: readonly unknown[]): boolean {
+  const paths = [metadataPath, visualEvidencePath].sort((a, b) => a.localeCompare(b));
+  const receiptEntries = entries as Array<Record<string, unknown>>;
+  return paths.every((path, index) => {
+    const content = files.get(path);
+    const row = receiptEntries[index];
+    return (
+      content !== undefined &&
+      row !== undefined &&
+      exactKeys(row, ["path", "byteLength", "sha256"]) &&
+      row.path === path &&
+      row.byteLength === content.length &&
+      row.sha256 === digest(content)
+    );
+  });
+}
+
 /**
  * Verifies the exact three-file private metadata-only contract, not ZIP v3.
  * Never accepts an objects/ entry, even with a fully recomputed ZIP digest.
@@ -1009,55 +1091,10 @@ export function verifyHistoricalUserMetadataOnlyArchive(
       visualCount: snapshot.excludedSourceClassCounts.runSnapshots,
     });
     const receipt = JSON.parse(Buffer.from(receiptBytes).toString("utf8")) as Record<string, unknown>;
-    const receiptFields = [
-      "kind",
-      "formatVersion",
-      "exportId",
-      "scope",
-      "completeCustomerExport",
-      "customerDeliveryReady",
-      "physicalArtifactContentsIncluded",
-      "artifactDescriptorCount",
-      "privateVisualContentsIncluded",
-      "privateVisualDescriptorCount",
-      "originalUserMutationEpochSha256",
-      "exclusions",
-      "entries",
-    ];
-    if (
-      !exactKeys(receipt, receiptFields) ||
-      receipt.kind !== "boardreadyops.historical-user-metadata-only-integrity-receipt" ||
-      receipt.formatVersion !== 1 ||
-      receipt.exportId !== expectedExportId ||
-      snapshot.exportId !== expectedExportId ||
-      receipt.scope !== metadataOnlyScope ||
-      receipt.completeCustomerExport !== false ||
-      receipt.customerDeliveryReady !== false ||
-      receipt.physicalArtifactContentsIncluded !== false ||
-      receipt.artifactDescriptorCount !== snapshot.artifacts.length ||
-      receipt.privateVisualContentsIncluded !== false ||
-      receipt.privateVisualDescriptorCount !== snapshot.excludedSourceClassCounts.runSnapshots ||
-      typeof receipt.originalUserMutationEpochSha256 !== "string" ||
-      !sha256.test(receipt.originalUserMutationEpochSha256) ||
-      JSON.stringify(receipt.exclusions) !== JSON.stringify(metadataOnlyExclusions) ||
-      !Array.isArray(receipt.entries) ||
-      receipt.entries.length !== 2
-    )
-      return false;
-    const paths = [metadataPath, visualEvidencePath].sort((a, b) => a.localeCompare(b));
-    const receiptEntries = receipt.entries as Array<Record<string, unknown>>;
-    return paths.every((path, index) => {
-      const content = files.get(path);
-      const row = receiptEntries[index];
-      return (
-        content !== undefined &&
-        row !== undefined &&
-        exactKeys(row, ["path", "byteLength", "sha256"]) &&
-        row.path === path &&
-        row.byteLength === content.length &&
-        row.sha256 === digest(content)
-      );
-    });
+    return (
+      validHistoricalMetadataOnlyReceipt(receipt, snapshot, expectedExportId) &&
+      validHistoricalMetadataOnlyEntries(files, receipt.entries)
+    );
   } catch {
     return false;
   }

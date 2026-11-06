@@ -381,6 +381,127 @@ describe("private historical original-USER partial archive", () => {
     expect(verifyHistoricalUserMetadataOnlyArchive(first.bytes, "0".repeat(64), exportId)).toBe(false);
   });
 
+  it("rejects rehashed partial ZIP with forged receipt scope, counts, exclusions or entries", () => {
+    const original = prepareHistoricalUserPartialArchive(inputs());
+    expect(verifyHistoricalUserPartialArchive(original.bytes, original.sha256, exportId)).toBe(true);
+    const files = sanitizeAndExtractArchive(original.bytes).files;
+    const receiptPath = "metadata/historical-integrity.json";
+    const encoded = files.find(({ path }) => path === receiptPath)?.data;
+    if (!encoded) throw new Error("Fixture must contain partial integrity receipt");
+    const receipt = JSON.parse(encoded.toString("utf8")) as Record<string, unknown>;
+    const forge = (mutate: (claim: Record<string, unknown>) => void) => {
+      const claim = structuredClone(receipt);
+      mutate(claim);
+      const bytes = createZipBuffer(
+        files.map(({ path, data }) => ({
+          name: path,
+          data: path === receiptPath ? Buffer.from(JSON.stringify(claim)) : data,
+        })),
+      );
+      return verifyHistoricalUserPartialArchive(bytes, sha256(bytes), exportId);
+    };
+    const mutations: Array<(claim: Record<string, unknown>) => void> = [
+      (claim) => {
+        claim.scope = "customer-delivery-ready";
+      },
+      (claim) => {
+        claim.completeCustomerExport = true;
+      },
+      (claim) => {
+        claim.privateVisualContentsIncluded = true;
+      },
+      (claim) => {
+        claim.verifiedPhysicalArtifactCount = 0;
+      },
+      (claim) => {
+        claim.verifiedPrivateVisualDigestCount = 0;
+      },
+      (claim) => {
+        claim.metadataSnapshotExclusions = [];
+      },
+      (claim) => {
+        claim.archiveExclusions = ["platform-storage"];
+      },
+      (claim) => {
+        claim.originalUserMutationEpochSha256 = "invalid";
+      },
+      (claim) => {
+        claim.customerDownloadToken = "untrusted";
+      },
+      (claim) => {
+        claim.entries = (claim.entries as unknown[]).slice(1);
+      },
+      (claim) => {
+        const first = (claim.entries as Record<string, unknown>[])[0];
+        if (first) first.sha256 = "0".repeat(64);
+      },
+      (claim) => {
+        const first = (claim.entries as Record<string, unknown>[])[0];
+        if (first) first.path = "objects/forged.bin";
+      },
+    ];
+    for (const mutate of mutations) expect(forge(mutate)).toBe(false);
+  });
+
+  it("rejects metadata-only ZIP with forged entry lists and private disclosure exclusions", () => {
+    const fixture = inputs();
+    const original = prepareHistoricalUserMetadataOnlyArchive({
+      snapshot: fixture.snapshot,
+      visualEvidence: fixture.visualEvidence,
+      mutationEpochSha256: fixture.mutationEpochSha256,
+    });
+    expect(verifyHistoricalUserMetadataOnlyArchive(original.bytes, original.sha256, exportId)).toBe(true);
+    const files = sanitizeAndExtractArchive(original.bytes).files;
+    const receiptPath = "metadata/historical-metadata-only-integrity.json";
+    const encoded = files.find(({ path }) => path === receiptPath)?.data;
+    if (!encoded) throw new Error("Fixture must contain metadata-only receipt");
+    const receipt = JSON.parse(encoded.toString("utf8")) as Record<string, unknown>;
+    const forge = (mutate: (claim: Record<string, unknown>) => void) => {
+      const claim = structuredClone(receipt);
+      mutate(claim);
+      const bytes = createZipBuffer(
+        files.map(({ path, data }) => ({
+          name: path,
+          data: path === receiptPath ? Buffer.from(JSON.stringify(claim)) : data,
+        })),
+      );
+      return verifyHistoricalUserMetadataOnlyArchive(bytes, sha256(bytes), exportId);
+    };
+    const mutations: Array<(claim: Record<string, unknown>) => void> = [
+      (claim) => {
+        claim.exclusions = ["all-physical-artifact-file-bytes"];
+      },
+      (claim) => {
+        claim.privateVisualContentsIncluded = true;
+      },
+      (claim) => {
+        claim.customerDeliveryReady = true;
+      },
+      (claim) => {
+        claim.entries = [...(claim.entries as unknown[]), {}];
+      },
+      (claim) => {
+        claim.entries = (claim.entries as unknown[]).slice(1);
+      },
+      (claim) => {
+        claim.entries = [...(claim.entries as unknown[])].reverse();
+      },
+      (claim) => {
+        const first = (claim.entries as Record<string, unknown>[])[0];
+        if (first) first.byteLength = -1;
+      },
+      (claim) => {
+        const first = (claim.entries as Record<string, unknown>[])[0];
+        if (first) first.sha256 = "0".repeat(64);
+      },
+      (claim) => {
+        const first = (claim.entries as Record<string, unknown>[])[0];
+        if (first) first.customerIdentity = "untrusted";
+      },
+    ];
+    for (const mutate of mutations) expect(forge(mutate)).toBe(false);
+  });
+
   it("rejects fully rehashed object-byte injection and metadata receipt/identity forgery", () => {
     const fixture = inputs();
     const valid = prepareHistoricalUserMetadataOnlyArchive({
