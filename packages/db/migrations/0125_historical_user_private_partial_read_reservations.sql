@@ -52,6 +52,32 @@ CREATE TRIGGER boardreadyops_historical_partial_read_immutable
 BEFORE UPDATE OR DELETE ON public.historical_user_partial_read_reservations
 FOR EACH ROW EXECUTE FUNCTION public.boardreadyops_guard_historical_partial_read_reservation();
 
+-- An unresolved private ZIP reader must survive lifecycle deletion of
+-- its parent export. Without this guard, ON DELETE CASCADE would erase the
+-- cross-worker reader fence while the private file might still be open.
+-- The original export row lock serializes a concurrent reserve operation;
+-- released readers do not block later lawful retention/erasure.
+CREATE OR REPLACE FUNCTION public.boardreadyops_guard_historical_export_private_read()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER
+SET search_path=pg_catalog,public
+AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.historical_user_partial_read_reservations r
+     WHERE r.export_id=OLD.id AND r.released_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'historical export has unresolved private ZIP readers'
+      USING ERRCODE='23514';
+  END IF;
+  RETURN OLD;
+END;
+$$;
+DROP TRIGGER IF EXISTS boardreadyops_historical_export_private_reader_guard
+  ON public.data_exports;
+CREATE TRIGGER boardreadyops_historical_export_private_reader_guard
+BEFORE DELETE ON public.data_exports
+FOR EACH ROW EXECUTE FUNCTION public.boardreadyops_guard_historical_export_private_read();
+
 INSERT INTO public.cloud_schema_migrations(version)
 VALUES ('0125_historical_user_private_partial_read_reservations')
 ON CONFLICT(version) DO NOTHING;

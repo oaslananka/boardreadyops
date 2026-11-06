@@ -82,7 +82,9 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   Manual cleanup checks unreleased private ZIP reservations as well as
   artifact readers. A second PostgreSQL connection cannot clean an
   unresolved private ZIP reader, including after export revocation.
-  A crashed reader is quarantined indefinitely, NOT reaped on a timer.
+  Source-only migration 0125 also rejects parent export deletion while
+  any private ZIP reader is unresolved, preventing cascade removal of
+  the cross-worker fence. A crashed reader is quarantined indefinitely, NOT reaped on a timer.
   The SOURCE-ONLY, READ-ONLY assessHistoricalUserPrivateReadRecovery
   helper now inspects only the exact suspended original numeric USER,
   uninstall export and private preflight using the same legal-hold,

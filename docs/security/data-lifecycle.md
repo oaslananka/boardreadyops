@@ -88,7 +88,9 @@ specific active private preflight and ZIP digest/size; it is explicitly
 released AFTER disk+DB source verification, not auto-expired. The manual
 cleanup rejects unresolved private ZIP reservations across PostgreSQL
 connections, including crashes and revoked exports; it also still
-rejects active artifact readers. This is NOT a customer transfer lease,
+rejects active artifact readers. A database-level export deletion guard
+prevents ON DELETE CASCADE from removing an unresolved private ZIP reader;
+the guard permits normal deletion only after reader settlement. This is NOT a customer transfer lease,
 does not automatically fence every low-level private file read,
 and lacks an automatic verified stale-reader recovery workflow.
 A new read-only, internal recovery assessment reports unresolved

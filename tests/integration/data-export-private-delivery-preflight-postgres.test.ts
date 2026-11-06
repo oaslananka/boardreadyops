@@ -807,6 +807,14 @@ describeDb("original USER private non-customer delivery preflight", () => {
       expect(
         await rows("SELECT released_at FROM historical_user_partial_read_reservations WHERE token=$1", [pending.token]),
       ).toEqual([{ released_at: null }]);
+      // A parent export delete must not cascade away an unresolved private
+      // ZIP reader: cleanup could otherwise lose its cross-worker fence.
+      await expect(executor().query("DELETE FROM data_exports WHERE id=$1", [liveExportId])).rejects.toMatchObject({
+        code: "23514",
+      });
+      expect(
+        await rows("SELECT released_at FROM historical_user_partial_read_reservations WHERE token=$1", [pending.token]),
+      ).toEqual([{ released_at: null }]);
       const recovery = () =>
         assessHistoricalUserPrivateReadRecovery({
           db: executor(),
