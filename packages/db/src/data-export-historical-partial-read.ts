@@ -46,9 +46,12 @@ function hasQuery(db: unknown): db is Pick<PgQueryExecutor, "query"> {
   return db !== null && typeof db === "object" && "query" in db && typeof db.query === "function";
 }
 
-function rows(result: unknown): Record<string, unknown>[] {
-  if (!result || typeof result !== "object" || !("rows" in result)) return [];
-  return Array.isArray(result.rows) ? (result.rows as Record<string, unknown>[]) : [];
+/** A duplicate or malformed SQL authority/lock row never establishes a private reader right. */
+function exactAdmissionRow(result: unknown): Record<string, unknown> | null {
+  if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) return null;
+  if (result.rows.length !== 1) return null;
+  const row: unknown = result.rows[0];
+  return row !== null && typeof row === "object" && !Array.isArray(row) ? (row as Record<string, unknown>) : null;
 }
 
 function acknowledgedPrivateReaderToken(result: unknown, expected: string): boolean {
@@ -76,7 +79,7 @@ export async function reserveHistoricalUserPrivatePartialRead(
     return await db.withTransaction(
       async (tx) => {
         await tx.query("LOCK TABLE public.legal_holds IN SHARE MODE NOWAIT");
-        const owner = rows(
+        const owner = exactAdmissionRow(
           await tx.query(
             `SELECT e.tenant_id
            FROM public.data_exports e
@@ -106,16 +109,16 @@ export async function reserveHistoricalUserPrivatePartialRead(
             [binding.exportId, binding.verifiedGitHubUserId, binding.preflightId, binding.sha256, binding.byteLength],
           ),
         );
-        const tenant = owner[0]?.tenant_id;
+        const tenant = owner?.tenant_id;
         if (typeof tenant !== "string" || tenant.length < 1) return null;
-        const locked = rows(
+        const locked = exactAdmissionRow(
           await tx.query(
             "SELECT pg_try_advisory_xact_lock(boardreadyops_historical_transfer_tenant_lock_key($1)) AS acquired",
             [tenant],
           ),
         );
-        if (locked[0]?.acquired !== true) return null;
-        const blockers = rows(
+        if (locked?.acquired !== true) return null;
+        const blockers = exactAdmissionRow(
           await tx.query(
             `SELECT
           EXISTS(SELECT 1 FROM public.legal_holds h
@@ -126,7 +129,7 @@ export async function reserveHistoricalUserPrivatePartialRead(
             [tenant],
           ),
         );
-        if (blockers[0]?.held !== false || blockers[0]?.erasure !== false) return null;
+        if (blockers?.held !== false || blockers.erasure !== false) return null;
 
         const created = await tx.query(
           `INSERT INTO public.historical_user_partial_read_reservations(

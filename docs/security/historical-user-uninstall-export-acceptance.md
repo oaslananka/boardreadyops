@@ -74,8 +74,12 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   private ZIP reader reservation with SHA/byte-length, immutable
   identity, once-only release and NO automatic expiry. Its admission
   shares the legal-hold table, original USER/installation/preflight row,
-  and tenant advisory locks with the cleanup gate. The internal
-  verifyReservedHistoricalUserPrivatePartial path COMMITs the reservation
+  and tenant advisory locks with the cleanup gate. Registration
+  requires exactly one well-formed original-owner, advisory-lock and
+  active hold/erasure SQL response row. Duplicate or malformed
+  responses fail closed before any reader token is inserted; the
+  first row of an ambiguous result grants no ownership or safety.
+  The internal verifyReservedHistoricalUserPrivatePartial path COMMITs the reservation
   BEFORE physical ZIP IO, independently verifies disk ZIP+SHA and the
   current original USER DB/physical manifest, then releases it AFTER
   IO; it returns only non-customer verification metadata, NOT bytes.

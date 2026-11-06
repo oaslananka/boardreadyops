@@ -73,6 +73,53 @@ describe("historical original-user private reader input gate", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it.each(["owner", "advisory", "blockers"] as const)(
+    "refuses ambiguous original-user private reader %s query rows before an INSERT",
+    async (ambiguousStage) => {
+      const binding = goodBinding();
+      const original = { tenant_id: "original-user" };
+      const lock = { acquired: true };
+      const clear = { held: false, erasure: false };
+      const query = vi.fn(async (sql: string) => {
+        if (sql.startsWith("LOCK TABLE")) return { rows: [] };
+        if (sql.includes("SELECT e.tenant_id"))
+          return { rows: ambiguousStage === "owner" ? [original, original] : [original] };
+        if (sql.includes("pg_try_advisory_xact_lock"))
+          return { rows: ambiguousStage === "advisory" ? [lock, lock] : [lock] };
+        if (sql.includes("AS held")) return { rows: ambiguousStage === "blockers" ? [clear, clear] : [clear] };
+        throw new Error("Unexpected SQL: ambiguous rows must never authorize reader INSERT");
+      });
+      const withTransaction = vi.fn(async (callback: (tx: { query: typeof query }) => Promise<unknown>) =>
+        callback({ query }),
+      );
+      expect(await reserveHistoricalUserPrivatePartialRead({ withTransaction } as never, binding)).toBeNull();
+      expect(withTransaction).toHaveBeenCalledOnce();
+      expect(query.mock.calls.some(([sql]) => sql.includes("INSERT INTO"))).toBe(false);
+    },
+  );
+
+  it.each(["owner", "advisory", "blockers"] as const)(
+    "refuses malformed original-user private reader %s response instead of trusting a first row",
+    async (invalidStage) => {
+      const binding = goodBinding();
+      const query = vi.fn(async (sql: string) => {
+        if (sql.startsWith("LOCK TABLE")) return { rows: [] };
+        if (sql.includes("SELECT e.tenant_id"))
+          return invalidStage === "owner" ? { rows: [null] } : { rows: [{ tenant_id: "original-user" }] };
+        if (sql.includes("pg_try_advisory_xact_lock"))
+          return invalidStage === "advisory" ? { rows: [{ acquired: true }, null] } : { rows: [{ acquired: true }] };
+        if (sql.includes("AS held"))
+          return invalidStage === "blockers" ? { rows: { length: 1 } } : { rows: [{ held: false, erasure: false }] };
+        throw new Error("Unexpected SQL: malformed response must never authorize reader INSERT");
+      });
+      const withTransaction = vi.fn(async (callback: (tx: { query: typeof query }) => Promise<unknown>) =>
+        callback({ query }),
+      );
+      expect(await reserveHistoricalUserPrivatePartialRead({ withTransaction } as never, binding)).toBeNull();
+      expect(query.mock.calls.some(([sql]) => sql.includes("INSERT INTO"))).toBe(false);
+    },
+  );
+
   it("refuses ambiguous inserts during durable private reader registration", async () => {
     const binding = goodBinding();
     const query = vi.fn(async (sql: string, params?: unknown[]) => {
