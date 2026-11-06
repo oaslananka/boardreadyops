@@ -49,6 +49,8 @@ function validOriginalUserObject(value: unknown): value is HistoricalUserExportO
     object.storagePath.length <= 1024 &&
     object.storagePath.trim() === object.storagePath &&
     !object.storagePath.includes(String.fromCharCode(92)) &&
+    !object.storagePath.includes("\0") &&
+    !object.storagePath.includes(":") &&
     object.storagePath.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..") &&
     typeof object.sha256 === "string" &&
     /^[0-9a-f]{64}$/u.test(object.sha256) &&
@@ -136,15 +138,18 @@ export async function lookupHistoricalUserExportObject(
   ) {
     return null;
   }
-  return {
+  const object = {
     artifactId,
     repositoryId: row.repository_id,
     runId: row.run_id,
     storagePath: row.storage_path,
     sha256: row.sha256,
-    byteLength: row.bytes as number,
+    byteLength: row.bytes,
     retentionUntil: row.retention_until.toISOString(),
   };
+  // Even an authorized DB row must pass the SAME safe-path gate used
+  // before physical reservation. Never disclose traversal locators.
+  return validOriginalUserObject(object) ? object : null;
 }
 
 /** Durable cross-tenant path reservation before any physical IO. */
@@ -331,23 +336,8 @@ export async function checkHistoricalUserArchivePrepublication(input: {
     authority.verifiedGitHubUserId <= 0 ||
     !Array.isArray(objects) ||
     objects.length > 100 ||
-    new Set(objects.map((obj) => obj?.artifactId)).size !== objects.length ||
-    objects.some(
-      (obj) =>
-        !isUuid(obj?.artifactId) ||
-        !isUuid(obj?.repositoryId) ||
-        !isUuid(obj?.runId) ||
-        typeof obj?.storagePath !== "string" ||
-        obj.storagePath.length < 1 ||
-        obj.storagePath.length > 1024 ||
-        obj.storagePath.trim() !== obj.storagePath ||
-        !/^[0-9a-f]{64}$/u.test(obj?.sha256) ||
-        !Number.isSafeInteger(obj?.byteLength) ||
-        obj.byteLength < 0 ||
-        obj.byteLength > 64 * 1024 * 1024 ||
-        typeof obj?.retentionUntil !== "string" ||
-        !Number.isFinite(Date.parse(obj.retentionUntil)),
-    )
+    objects.some((object) => !validOriginalUserObject(object)) ||
+    new Set(objects.map((object) => object.artifactId)).size !== objects.length
   )
     return "stale";
 

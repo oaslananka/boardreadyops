@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
+  checkHistoricalUserArchivePrepublication,
   lookupHistoricalUserExportObject,
   releaseHistoricalUserObjectCopy,
   reserveHistoricalUserObjectBatch,
@@ -70,6 +71,51 @@ describe("original-user artifact copy reservation boundary", () => {
       `historical-user:${reservation.readerId}`,
       reservation.token,
     ]);
+  });
+
+  it("rejects unsafe original-user object paths at the prepublication boundary before any transaction", async () => {
+    const withTransaction = vi.fn().mockResolvedValue("eligible");
+    const db = { withTransaction } as never;
+    const fixture = object();
+    for (const storagePath of [
+      "../escaped.bin",
+      "/absolute.bin",
+      "artifacts//file.bin",
+      "artifacts/./file.bin",
+      "artifacts/../file.bin",
+      "C:/private.bin",
+      "artifacts/private.bin:alternate-stream",
+      "artifacts/zero\0byte.bin",
+      "artifacts\\\\file.bin",
+    ]) {
+      expect(
+        await checkHistoricalUserArchivePrepublication({
+          db,
+          authority: authority(),
+          objects: [{ ...fixture, storagePath }],
+        }),
+      ).toBe("stale");
+    }
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses to disclose a private storage locator containing traversal segments", async () => {
+    const fixture = object();
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: fixture.artifactId,
+          run_id: fixture.runId,
+          repository_id: fixture.repositoryId,
+          storage_path: "../private.bin",
+          sha256: fixture.sha256,
+          bytes: fixture.byteLength,
+          retention_until: new Date(fixture.retentionUntil),
+        },
+      ],
+    });
+    expect(await lookupHistoricalUserExportObject({ query } as never, authority(), fixture.artifactId)).toBeNull();
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it("rejects invalid batch objects before a transaction starts", async () => {
