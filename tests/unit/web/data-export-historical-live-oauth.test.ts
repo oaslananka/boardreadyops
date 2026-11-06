@@ -114,6 +114,11 @@ describe("historical original numeric USER fresh live GitHub OAuth step-up (priv
       { exportId: "not-a-uuid" },
       { environment: { ...environment, SESSION_SECRET: "invalid" } },
       { environment: { ...environment, BOARDREADYOPS_PUBLIC_URL: "http://boardreadyops.example/" } },
+      { environment: { ...environment, BOARDREADYOPS_PUBLIC_URL: "https://user:secret@boardreadyops.example/" } },
+      { environment: { ...environment, BOARDREADYOPS_PUBLIC_URL: "https://boardreadyops.example/path" } },
+      { environment: { ...environment, BOARDREADYOPS_PUBLIC_URL: "https://boardreadyops.example/?next=callback" } },
+      { environment: { ...environment, BOARDREADYOPS_PUBLIC_URL: "https://boardreadyops.example/#fragment" } },
+      { environment: { ...environment, BOARDREADYOPS_PUBLIC_URL: "not-a-url" } },
       { environment: { ...environment, GITHUB_CLIENT_SECRET: "" } },
     ];
     for (const patch of cases) {

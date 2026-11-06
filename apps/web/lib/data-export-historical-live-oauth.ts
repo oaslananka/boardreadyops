@@ -20,6 +20,48 @@ type LiveProofInput = {
   fetch: typeof fetch;
 };
 
+/** Validate CSRF state and the bound export redirect before network access. */
+function verifiedCallbackState(input: LiveProofInput, exportId: string): boolean {
+  if (
+    typeof input.oauthStateCookie !== "string" ||
+    typeof input.callbackState !== "string" ||
+    !statePattern.test(input.callbackState) ||
+    typeof input.authorizationCode !== "string" ||
+    !authorizationCodePattern.test(input.authorizationCode) ||
+    typeof input.fetch !== "function"
+  )
+    return false;
+
+  const state = parseOAuthStateCookie(input.oauthStateCookie);
+  return (
+    state != null &&
+    statePattern.test(state.state) &&
+    stateMatches(state.state, input.callbackState) &&
+    state.returnTo === expectedReturnPath(exportId)
+  );
+}
+
+/** Only the exact HTTPS application origin may be an OAuth callback base. */
+function verifiedGitHubCallbackUrl(environment: LiveProofInput["environment"]): string | null {
+  const publicUrl = environment.BOARDREADYOPS_PUBLIC_URL ?? environment.NEXT_PUBLIC_APP_URL;
+  if (typeof publicUrl !== "string") return null;
+  try {
+    const origin = new URL(publicUrl);
+    if (
+      origin.protocol !== "https:" ||
+      origin.username ||
+      origin.password ||
+      origin.search ||
+      origin.hash ||
+      origin.pathname !== "/"
+    )
+      return null;
+    return new URL("/api/auth/github/callback", origin).toString();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * INTERNAL only: a one-time OAuth CODE proves a GitHub /user identity NOW.
  * The signed existing session and the callback CSRF state must match, and
@@ -35,45 +77,11 @@ export async function freshLiveGitHubOriginalUserAuthority(
   input: LiveProofInput,
 ): Promise<{ exportId: string; verifiedGitHubUserId: number } | null> {
   const signed = recentSignedHistoricalUserAuthority(input);
-  if (
-    !signed ||
-    typeof input.oauthStateCookie !== "string" ||
-    typeof input.callbackState !== "string" ||
-    !statePattern.test(input.callbackState) ||
-    typeof input.authorizationCode !== "string" ||
-    !authorizationCodePattern.test(input.authorizationCode) ||
-    typeof input.fetch !== "function"
-  )
-    return null;
-
-  const state = parseOAuthStateCookie(input.oauthStateCookie);
-  if (
-    !state ||
-    !statePattern.test(state.state) ||
-    !stateMatches(state.state, input.callbackState) ||
-    state.returnTo !== expectedReturnPath(signed.exportId)
-  )
-    return null;
+  if (!signed || !verifiedCallbackState(input, signed.exportId)) return null;
 
   const configuration = configuredGitHubOAuth(input.environment);
-  const publicUrl = input.environment.BOARDREADYOPS_PUBLIC_URL ?? input.environment.NEXT_PUBLIC_APP_URL;
-  if (!configuration || typeof publicUrl !== "string") return null;
-  let callbackUrl: string;
-  try {
-    const origin = new URL(publicUrl);
-    if (
-      origin.protocol !== "https:" ||
-      origin.username ||
-      origin.password ||
-      origin.search ||
-      origin.hash ||
-      origin.pathname !== "/"
-    )
-      return null;
-    callbackUrl = new URL("/api/auth/github/callback", origin).toString();
-  } catch {
-    return null;
-  }
+  const callbackUrl = verifiedGitHubCallbackUrl(input.environment);
+  if (!configuration || !callbackUrl) return null;
 
   try {
     const identity = await resolveGitHubUserIdentity(configuration, input.authorizationCode, callbackUrl, {

@@ -17,6 +17,26 @@ function rows(result: unknown): Record<string, unknown>[] {
   return (result as { rows?: Record<string, unknown>[] })?.rows ?? [];
 }
 
+type CleanupInput = {
+  db: Pick<PgQueryExecutor, "withTransaction">;
+  archiveRoot: string;
+  authority: { exportId: string; verifiedGitHubUserId: number };
+};
+
+/** Reject unbound owners and untrusted archive roots before disk or DB IO. */
+function validCleanupInput(input: CleanupInput): boolean {
+  return (
+    !!input?.db?.withTransaction &&
+    uuid.test(input?.authority?.exportId) &&
+    Number.isSafeInteger(input?.authority?.verifiedGitHubUserId) &&
+    input.authority.verifiedGitHubUserId > 0 &&
+    typeof input.archiveRoot === "string" &&
+    path.isAbsolute(input.archiveRoot) &&
+    path.resolve(input.archiveRoot) === input.archiveRoot &&
+    path.basename(input.archiveRoot) === ".private-export-archives"
+  );
+}
+
 /**
  * Explicit/manual, SOURCE-ONLY. Never enumerate orphan filenames or expose
  * an HTTP/worker janitor. Destruction requires an immutable exact preflight
@@ -29,22 +49,8 @@ function rows(result: unknown): Record<string, unknown>[] {
  * The manual-only procedure remains source-only, NOT a background janitor
  * or customer ZIP delivery (which remains NO_GO).
  */
-export async function cleanupHistoricalUserPrivatePartial(input: {
-  db: Pick<PgQueryExecutor, "withTransaction">;
-  archiveRoot: string;
-  authority: { exportId: string; verifiedGitHubUserId: number };
-}): Promise<Result> {
-  if (
-    !input?.db?.withTransaction ||
-    !uuid.test(input?.authority?.exportId) ||
-    !Number.isSafeInteger(input?.authority?.verifiedGitHubUserId) ||
-    input.authority.verifiedGitHubUserId <= 0 ||
-    typeof input.archiveRoot !== "string" ||
-    !path.isAbsolute(input.archiveRoot) ||
-    path.resolve(input.archiveRoot) !== input.archiveRoot ||
-    path.basename(input.archiveRoot) !== ".private-export-archives"
-  )
-    return "quarantined";
+export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): Promise<Result> {
+  if (!validCleanupInput(input)) return "quarantined";
   const root = input.archiveRoot;
   const [folder, actual] = await Promise.all([lstat(root).catch(() => null), realpath(root).catch(() => null)]);
   if (
