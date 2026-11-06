@@ -36,10 +36,14 @@ function fixture(
     erasure?: DbEnvelope;
     manifest?: DbEnvelope;
     objects?: ReturnType<typeof artifact>[];
+    onTransactionStart?: () => void;
   } = {},
 ) {
-  const query = vi.fn(async (sql: string): Promise<unknown> => {
-    if (sql.startsWith("LOCK TABLE public.legal_holds")) return { rows: [] };
+  const query = vi.fn(async (sql: string, _params?: unknown[]): Promise<unknown> => {
+    if (sql.startsWith("LOCK TABLE public.legal_holds")) {
+      evidence.onTransactionStart?.();
+      return { rows: [] };
+    }
     if (sql.includes("SELECT e.tenant_id")) return evidence.owner ?? { rows: [{ tenant_id: "original-user" }] };
     if (sql.includes("pg_advisory_xact_lock")) return evidence.advisory ?? { rows: [{ pg_advisory_xact_lock: "" }] };
     if (sql.includes("SELECT 1 FROM public.legal_holds")) return evidence.hold ?? { rows: [] };
@@ -52,14 +56,15 @@ function fixture(
     callback({ query }),
   );
   const underLock = vi.fn(async () => {});
+  const authority = { exportId: randomUUID(), verifiedGitHubUserId: 507 };
   const check = () =>
     checkHistoricalUserArchivePrepublication({
       db: { withTransaction } as never,
-      authority: { exportId: randomUUID(), verifiedGitHubUserId: 507 },
+      authority,
       objects: evidence.objects ?? [],
       underLock,
     });
-  return { check, query, underLock };
+  return { check, query, underLock, authority };
 }
 
 describe("original USER archive prepublication authorization evidence", () => {
@@ -82,6 +87,35 @@ describe("original USER archive prepublication authorization evidence", () => {
     const fx = fixture(evidence);
     expect(await fx.check()).toBe("stale");
     expect(fx.underLock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an object whose path mutates into unsafe traversal after initial input validation", async () => {
+    const candidate = artifact();
+    const forged = { ...candidate, storagePath: "../unsafe-after-validation.bin" };
+    const fx = fixture({
+      objects: [candidate],
+      manifest: { rows: [manifestRow(forged)] },
+      onTransactionStart: () => {
+        candidate.storagePath = forged.storagePath;
+      },
+    });
+    expect(await fx.check()).toBe("stale");
+    expect(fx.underLock).not.toHaveBeenCalled();
+  });
+
+  it("does not forward a caller-mutated original user identity after acquiring the transaction lock", async () => {
+    let mutate: () => void = () => {};
+    const fx = fixture({
+      onTransactionStart: () => mutate(),
+    });
+    const verified = { ...fx.authority };
+    mutate = () => {
+      fx.authority.exportId = randomUUID();
+      fx.authority.verifiedGitHubUserId = 999;
+    };
+    expect(await fx.check()).toBe("eligible");
+    const sourceQuery = fx.query.mock.calls.find((call) => call[0].includes("SELECT e.tenant_id"));
+    expect(sourceQuery?.[1]).toEqual([verified.exportId, verified.verifiedGitHubUserId]);
   });
 
   it("rejects duplicate manifest rows that impersonate a missing expected artifact", async () => {

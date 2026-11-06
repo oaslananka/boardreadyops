@@ -216,21 +216,25 @@ export async function reserveHistoricalUserObjectBatch(
   authority: HistoricalUserObjectReadAuthority,
   objects: readonly HistoricalUserExportObject[],
 ): Promise<Array<{ object: HistoricalUserExportObject; reservation: { readerId: string; token: string } }> | null> {
+  // Capture untrusted mutable object fields synchronously. The caller may
+  // change its original array or objects while we await DB locks.
+  const stableObjects = Array.isArray(objects) ? objects.map((item) => ({ ...item })) : null;
+  const stableAuthority = authority && typeof authority === "object" ? { ...authority } : null;
   if (
     !db?.withTransaction ||
-    !isHistoricalUserUuid(authority?.exportId) ||
-    !Number.isSafeInteger(authority?.verifiedGitHubUserId) ||
-    authority.verifiedGitHubUserId <= 0 ||
-    !Array.isArray(objects) ||
-    objects.length > 100 ||
-    objects.some((object) => !validOriginalUserObject(object)) ||
-    new Set(objects.map((object) => object.artifactId)).size !== objects.length
+    !isHistoricalUserUuid(stableAuthority?.exportId) ||
+    !Number.isSafeInteger(stableAuthority?.verifiedGitHubUserId) ||
+    stableAuthority.verifiedGitHubUserId <= 0 ||
+    !stableObjects ||
+    stableObjects.length > 100 ||
+    stableObjects.some((object) => !validOriginalUserObject(object)) ||
+    new Set(stableObjects.map((object) => object.artifactId)).size !== stableObjects.length
   )
     return null;
 
   // Keep the existing bytewise lock ordering: every worker must claim
   // artifacts in a stable order to avoid cross-worker deadlocks.
-  const sorted = [...objects].sort((a, b) => {
+  const sorted = stableObjects.sort((a, b) => {
     if (a.storagePath < b.storagePath) return -1;
     if (a.storagePath > b.storagePath) return 1;
     if (a.artifactId < b.artifactId) return -1;
@@ -246,7 +250,7 @@ export async function reserveHistoricalUserObjectBatch(
           reservation: { readerId: string; token: string };
         }> = [];
         for (const object of sorted) {
-          const reservation = await reserveHistoricalUserObjectCopy(tx, authority, object);
+          const reservation = await reserveHistoricalUserObjectCopy(tx, stableAuthority, object);
           if (!reservation) throw new BatchAdmissionUnavailable();
           admitted.push({ object, reservation });
         }
@@ -332,6 +336,10 @@ export async function checkHistoricalUserArchivePrepublication(input: {
   underLock?: () => Promise<void>;
 }): Promise<"eligible" | "held" | "stale" | "busy"> {
   const { db, authority, objects } = input ?? {};
+  // Snapshot each physical object's scalar properties BEFORE any transaction
+  // await. An incoming readonly array is not proof its members are immutable.
+  const stableObjects = Array.isArray(objects) ? objects.map((item) => ({ ...item })) : null;
+  const stableAuthority = authority && typeof authority === "object" ? { ...authority } : null;
   if (
     !db?.withTransaction ||
     (input?.expectedMutationEpochSha256 !== undefined &&
@@ -356,13 +364,13 @@ export async function checkHistoricalUserArchivePrepublication(input: {
         !Number.isSafeInteger(input.expectedVisual.visualCount) ||
         input.expectedVisual.visualCount < 0 ||
         input.expectedVisual.visualCount > 100)) ||
-    !isHistoricalUserUuid(authority?.exportId) ||
-    !Number.isSafeInteger(authority?.verifiedGitHubUserId) ||
-    authority.verifiedGitHubUserId <= 0 ||
-    !Array.isArray(objects) ||
-    objects.length > 100 ||
-    objects.some((object) => !validOriginalUserObject(object)) ||
-    new Set(objects.map((object) => object.artifactId)).size !== objects.length
+    !isHistoricalUserUuid(stableAuthority?.exportId) ||
+    !Number.isSafeInteger(stableAuthority?.verifiedGitHubUserId) ||
+    stableAuthority.verifiedGitHubUserId <= 0 ||
+    !stableObjects ||
+    stableObjects.length > 100 ||
+    stableObjects.some((object) => !validOriginalUserObject(object)) ||
+    new Set(stableObjects.map((object) => object.artifactId)).size !== stableObjects.length
   )
     return "stale";
 
@@ -384,7 +392,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
               AND lower(e.scope_id)=lower(e.tenant_id)
               AND (e.expires_at IS NULL OR e.expires_at>clock_timestamp())
             FOR SHARE OF e,i NOWAIT`,
-          [authority.exportId, authority.verifiedGitHubUserId],
+          [stableAuthority.exportId, stableAuthority.verifiedGitHubUserId],
         );
         const sourceRows = boundedPrepublicationRows(sourceResult);
         if (sourceRows?.length !== 1) return "stale";
@@ -420,7 +428,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
                 (er.scope='repository' AND er.scope_id=ANY($2::text[]))
               )
             LIMIT 1`,
-          [tenant, [...new Set(objects.map((obj) => obj.repositoryId))]],
+          [tenant, [...new Set(stableObjects.map((obj) => obj.repositoryId))]],
         );
         const erasureRows = boundedPrepublicationRows(erasureResult);
         if (erasureRows === null || erasureRows.length !== 0) return "stale";
@@ -449,11 +457,11 @@ export async function checkHistoricalUserArchivePrepublication(input: {
               AND lower(i.account_type)='user' AND i.suspended_at IS NOT NULL
             ORDER BY a.id LIMIT 101
             FOR SHARE OF a,run,repo,i NOWAIT`,
-          [authority.verifiedGitHubUserId, tenant],
+          [stableAuthority.verifiedGitHubUserId, tenant],
         )) as { rows?: Array<Record<string, unknown>> };
         const rows = result.rows;
-        if (!Array.isArray(rows) || rows.length !== objects.length) return "stale";
-        const expected = new Map(objects.map((obj) => [obj.artifactId, obj]));
+        if (!Array.isArray(rows) || rows.length !== stableObjects.length) return "stale";
+        const expected = new Map(stableObjects.map((obj) => [obj.artifactId, obj]));
         const seen = new Set<string>();
         for (const row of rows) {
           // Duplicate rows could conceal a missing expected object despite
@@ -485,7 +493,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
         // Other review-content edits can still race, hence recheck after IO.
         const coreMatches = async (): Promise<boolean> => {
           if (!input.expectedCore) return true;
-          const core = await prepareVerifiedHistoricalUserConsistentCorePreflight(db, authority);
+          const core = await prepareVerifiedHistoricalUserConsistentCorePreflight(db, stableAuthority);
           return (
             core !== null &&
             core.sha256 === input.expectedCore.sha256 &&
@@ -494,7 +502,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
         };
         const visualMatches = async (): Promise<boolean> => {
           if (!input.expectedVisual) return true;
-          const evidence = await prepareVerifiedHistoricalUserPrivateVisualEvidence(db, authority);
+          const evidence = await prepareVerifiedHistoricalUserPrivateVisualEvidence(db, stableAuthority);
           return (
             evidence !== null &&
             evidence.sha256 === input.expectedVisual.sha256 &&
@@ -504,7 +512,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
         };
         const allMatches = async (): Promise<boolean> => {
           if (input.expectedCore && input.expectedVisual) {
-            const pair = await prepareVerifiedHistoricalUserCompositePreflight(db, authority);
+            const pair = await prepareVerifiedHistoricalUserCompositePreflight(db, stableAuthority);
             return (
               pair !== null &&
               pair.core.sha256 === input.expectedCore.sha256 &&

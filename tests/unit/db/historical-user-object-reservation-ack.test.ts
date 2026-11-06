@@ -162,6 +162,43 @@ describe("original-user artifact copy reservation boundary", () => {
     expect(query).toHaveBeenCalledOnce();
   });
 
+  it("does not admit a caller-mutated storage path after batch validation", async () => {
+    const candidate = object();
+    const original = { ...candidate };
+    const query = vi.fn(async (_sql: string, params: unknown[]) => {
+      expect(params[3]).toBe(original.storagePath);
+      expect(params[4]).toBe(original.sha256);
+      return { rows: [{ outcome: "reserved" }] };
+    });
+    const withTransaction = vi.fn(async (callback: (tx: { query: typeof query }) => Promise<unknown>) => {
+      // This happens after synchronous input validation but before awaited DB IO.
+      candidate.storagePath = "../changed-during-transaction.bin";
+      candidate.sha256 = "b".repeat(64);
+      return callback({ query });
+    });
+    const admitted = await reserveHistoricalUserObjectBatch({ withTransaction } as never, authority(), [candidate]);
+    expect(admitted?.[0]?.object).toEqual(original);
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("retains the original user authority throughout asynchronous batch admission", async () => {
+    const original = authority();
+    const identity = { ...original };
+    const query = vi.fn(async (_sql: string, params: unknown[]) => {
+      expect(params[0]).toBe(identity.exportId);
+      expect(params[1]).toBe(identity.verifiedGitHubUserId);
+      return { rows: [{ outcome: "reserved" }] };
+    });
+    const withTransaction = vi.fn(async (callback: (tx: { query: typeof query }) => Promise<unknown>) => {
+      original.exportId = randomUUID();
+      original.verifiedGitHubUserId = 999;
+      return callback({ query });
+    });
+    await expect(
+      reserveHistoricalUserObjectBatch({ withTransaction } as never, original, [object()]),
+    ).resolves.toHaveLength(1);
+  });
+
   it("rejects invalid batch objects before a transaction starts", async () => {
     const withTransaction = vi.fn();
     const good = object();
