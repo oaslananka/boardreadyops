@@ -89,6 +89,31 @@ describe("original USER archive prepublication authorization evidence", () => {
     expect(fx.underLock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["missing core digest", { expectedCore: { sha256: "bad", byteLength: 128 } }],
+    ["empty core receipt", { expectedCore: { sha256: "a".repeat(64), byteLength: 0 } }],
+    ["invalid visual count", { expectedVisual: { sha256: "a".repeat(64), byteLength: 128, visualCount: 101 } }],
+    [
+      "missing visual receipt",
+      { expectedMutationEpochSha256: "a".repeat(64), expectedCore: { sha256: "a".repeat(64), byteLength: 128 } },
+    ],
+    ["unpaired epoch digest", { expectedMutationEpochSha256: "a".repeat(64) }],
+    ["non-hex epoch digest", { expectedMutationEpochSha256: "z".repeat(64) }],
+    ["null core receipt", { expectedCore: null }],
+  ])("rejects %s before acquiring any SQL lock", async (_name, expected) => {
+    const query = vi.fn();
+    const withTransaction = vi.fn();
+    const result = await checkHistoricalUserArchivePrepublication({
+      db: { withTransaction } as never,
+      authority: { exportId: randomUUID(), verifiedGitHubUserId: 507 },
+      objects: [],
+      ...expected,
+    } as never);
+    expect(result).toBe("stale");
+    expect(withTransaction).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("rejects an object whose path mutates into unsafe traversal after initial input validation", async () => {
     const candidate = artifact();
     const forged = { ...candidate, storagePath: "../unsafe-after-validation.bin" };

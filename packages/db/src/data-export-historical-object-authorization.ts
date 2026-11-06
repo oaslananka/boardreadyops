@@ -305,6 +305,100 @@ function boundedPrepublicationRows(result: unknown): readonly Record<string, unk
   return result.rows as Record<string, unknown>[];
 }
 
+type ExpectedPrepublicationEvidence = {
+  expectedCore?: { sha256: string; byteLength: number };
+  expectedVisual?: { sha256: string; byteLength: number; visualCount: number };
+  expectedMutationEpochSha256?: string;
+};
+
+function validExpectedPrepublicationCore(value: unknown): boolean {
+  if (value === null || typeof value !== "object") return false;
+  const core = value as Record<string, unknown>;
+  return (
+    typeof core.sha256 === "string" &&
+    /^[0-9a-f]{64}$/u.test(core.sha256) &&
+    typeof core.byteLength === "number" &&
+    Number.isSafeInteger(core.byteLength) &&
+    core.byteLength >= 1 &&
+    core.byteLength <= 256 * 1024
+  );
+}
+
+function validExpectedPrepublicationVisual(value: unknown): boolean {
+  if (value === null || typeof value !== "object") return false;
+  const visual = value as Record<string, unknown>;
+  return (
+    typeof visual.sha256 === "string" &&
+    /^[0-9a-f]{64}$/u.test(visual.sha256) &&
+    typeof visual.byteLength === "number" &&
+    Number.isSafeInteger(visual.byteLength) &&
+    visual.byteLength >= 1 &&
+    visual.byteLength <= 256 * 1024 &&
+    typeof visual.visualCount === "number" &&
+    Number.isSafeInteger(visual.visualCount) &&
+    visual.visualCount >= 0 &&
+    visual.visualCount <= 100
+  );
+}
+
+function validExpectedPrepublicationEvidence(input: ExpectedPrepublicationEvidence): boolean {
+  if (input.expectedCore !== undefined && !validExpectedPrepublicationCore(input.expectedCore)) return false;
+  if (input.expectedVisual !== undefined && !validExpectedPrepublicationVisual(input.expectedVisual)) return false;
+  if (input.expectedMutationEpochSha256 === undefined) return true;
+  return (
+    typeof input.expectedMutationEpochSha256 === "string" &&
+    /^[0-9a-f]{64}$/u.test(input.expectedMutationEpochSha256) &&
+    input.expectedCore !== undefined &&
+    input.expectedVisual !== undefined
+  );
+}
+
+function validPrepublicationSource(
+  db: Pick<import("./pg-executor.js").PgQueryExecutor, "withTransaction">,
+  authority: HistoricalUserObjectReadAuthority | null,
+  objects: readonly HistoricalUserExportObject[] | null,
+): boolean {
+  return (
+    !!db?.withTransaction &&
+    isHistoricalUserUuid(authority?.exportId) &&
+    Number.isSafeInteger(authority?.verifiedGitHubUserId) &&
+    (authority?.verifiedGitHubUserId ?? 0) > 0 &&
+    objects !== null &&
+    objects.length <= 100 &&
+    objects.every((item) => validOriginalUserObject(item)) &&
+    new Set(objects.map((item) => item.artifactId)).size === objects.length
+  );
+}
+
+function matchesPrepublicationArtifactRow(row: Record<string, unknown>, expected: HistoricalUserExportObject): boolean {
+  return (
+    row.run_id === expected.runId &&
+    row.repository_id === expected.repositoryId &&
+    row.storage_path === expected.storagePath &&
+    row.sha256 === expected.sha256 &&
+    row.bytes === expected.byteLength &&
+    row.retention_until instanceof Date &&
+    row.retention_until.toISOString() === expected.retentionUntil &&
+    row.retention_safe === true &&
+    row.queued_for_deletion === false &&
+    row.unlink_in_progress === false
+  );
+}
+
+function matchesCompletePrepublicationManifest(rows: unknown, objects: readonly HistoricalUserExportObject[]): boolean {
+  if (!Array.isArray(rows) || rows.length !== objects.length) return false;
+  const expected = new Map(objects.map((item) => [item.artifactId, item]));
+  const seen = new Set<string>();
+  for (const item of rows) {
+    if (item === null || typeof item !== "object" || typeof item.artifact_id !== "string") return false;
+    if (seen.has(item.artifact_id)) return false;
+    const object = expected.get(item.artifact_id);
+    if (!object || !matchesPrepublicationArtifactRow(item, object)) return false;
+    seen.add(item.artifact_id);
+  }
+  return seen.size === expected.size;
+}
+
 /**
  * Internal, point-in-time original-USER archive readiness gate.
  * Locks original export, all retained artifact rows and the legal-hold table
@@ -341,36 +435,10 @@ export async function checkHistoricalUserArchivePrepublication(input: {
   const stableObjects = Array.isArray(objects) ? objects.map((item) => ({ ...item })) : null;
   const stableAuthority = authority && typeof authority === "object" ? { ...authority } : null;
   if (
-    !db?.withTransaction ||
-    (input?.expectedMutationEpochSha256 !== undefined &&
-      (typeof input.expectedMutationEpochSha256 !== "string" ||
-        !/^[0-9a-f]{64}$/u.test(input.expectedMutationEpochSha256) ||
-        !input.expectedCore ||
-        !input.expectedVisual)) ||
-    (input?.expectedCore !== undefined &&
-      (!input.expectedCore ||
-        typeof input.expectedCore.sha256 !== "string" ||
-        !/^[0-9a-f]{64}$/u.test(input.expectedCore.sha256) ||
-        !Number.isSafeInteger(input.expectedCore.byteLength) ||
-        input.expectedCore.byteLength < 1 ||
-        input.expectedCore.byteLength > 256 * 1024)) ||
-    (input?.expectedVisual !== undefined &&
-      (!input.expectedVisual ||
-        typeof input.expectedVisual.sha256 !== "string" ||
-        !/^[0-9a-f]{64}$/u.test(input.expectedVisual.sha256) ||
-        !Number.isSafeInteger(input.expectedVisual.byteLength) ||
-        input.expectedVisual.byteLength < 1 ||
-        input.expectedVisual.byteLength > 256 * 1024 ||
-        !Number.isSafeInteger(input.expectedVisual.visualCount) ||
-        input.expectedVisual.visualCount < 0 ||
-        input.expectedVisual.visualCount > 100)) ||
-    !isHistoricalUserUuid(stableAuthority?.exportId) ||
-    !Number.isSafeInteger(stableAuthority?.verifiedGitHubUserId) ||
-    stableAuthority.verifiedGitHubUserId <= 0 ||
-    !stableObjects ||
-    stableObjects.length > 100 ||
-    stableObjects.some((object) => !validOriginalUserObject(object)) ||
-    new Set(stableObjects.map((object) => object.artifactId)).size !== stableObjects.length
+    stableAuthority === null ||
+    stableObjects === null ||
+    !validExpectedPrepublicationEvidence(input) ||
+    !validPrepublicationSource(db, stableAuthority, stableObjects)
   )
     return "stale";
 
@@ -459,33 +527,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
             FOR SHARE OF a,run,repo,i NOWAIT`,
           [stableAuthority.verifiedGitHubUserId, tenant],
         )) as { rows?: Array<Record<string, unknown>> };
-        const rows = result.rows;
-        if (!Array.isArray(rows) || rows.length !== stableObjects.length) return "stale";
-        const expected = new Map(stableObjects.map((obj) => [obj.artifactId, obj]));
-        const seen = new Set<string>();
-        for (const row of rows) {
-          // Duplicate rows could conceal a missing expected object despite
-          // an otherwise matching row count.
-          if (!row || typeof row !== "object" || typeof row.artifact_id !== "string" || seen.has(row.artifact_id))
-            return "stale";
-          seen.add(row.artifact_id);
-          const obj = expected.get(row.artifact_id);
-          if (
-            !obj ||
-            row.run_id !== obj.runId ||
-            row.repository_id !== obj.repositoryId ||
-            row.storage_path !== obj.storagePath ||
-            row.sha256 !== obj.sha256 ||
-            row.bytes !== obj.byteLength ||
-            !(row.retention_until instanceof Date) ||
-            row.retention_until.toISOString() !== obj.retentionUntil ||
-            row.retention_safe !== true ||
-            row.queued_for_deletion !== false ||
-            row.unlink_in_progress !== false
-          )
-            return "stale";
-        }
-        if (seen.size !== expected.size) return "stale";
+        if (!matchesCompletePrepublicationManifest(result.rows, stableObjects)) return "stale";
         // Compare the original-user scoped, repeatable-read audit/review
         // core digest against a previously sealed PRIVATE partial ZIP core.
         // This read uses a distinct read-only PG client; advisory writer
