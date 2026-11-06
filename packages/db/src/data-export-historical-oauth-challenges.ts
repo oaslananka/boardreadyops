@@ -17,16 +17,22 @@ type OriginalUserNonce = {
   state: string;
 };
 
-function valid(input: OriginalUserNonce): boolean {
+function valid(input: unknown): input is OriginalUserNonce {
+  if (input === null || typeof input !== "object") return false;
+  const candidate = input as Record<string, unknown>;
   return (
-    !!input &&
-    typeof input.exportId === "string" &&
-    uuid.test(input.exportId) &&
-    Number.isSafeInteger(input.verifiedGitHubUserId) &&
-    input.verifiedGitHubUserId > 0 &&
-    typeof input.state === "string" &&
-    oauthState.test(input.state)
+    typeof candidate.exportId === "string" &&
+    uuid.test(candidate.exportId) &&
+    typeof candidate.verifiedGitHubUserId === "number" &&
+    Number.isSafeInteger(candidate.verifiedGitHubUserId) &&
+    candidate.verifiedGitHubUserId > 0 &&
+    typeof candidate.state === "string" &&
+    oauthState.test(candidate.state)
   );
+}
+
+function hasTransaction(db: unknown): db is NonceDb {
+  return db !== null && typeof db === "object" && "withTransaction" in db && typeof db.withTransaction === "function";
 }
 
 function digest(state: string): string {
@@ -34,7 +40,21 @@ function digest(state: string): string {
 }
 
 function rows(result: unknown): readonly Record<string, unknown>[] {
-  return (result as { rows?: readonly Record<string, unknown>[] })?.rows ?? [];
+  if (result === null || typeof result !== "object" || !("rows" in result)) return [];
+  const values = result.rows;
+  if (
+    !Array.isArray(values) ||
+    !values.every((row: unknown) => row !== null && typeof row === "object" && !Array.isArray(row))
+  )
+    return [];
+  return values as Record<string, unknown>[];
+}
+
+function acknowledgedNonceDigest(result: unknown, expectedDigest: string): boolean {
+  const entries = rows(result);
+  // A malformed DB/adapter result cannot acknowledge a state change. The
+  // returned SHA-256 must refer to this exact original-user OAuth challenge.
+  return entries.length === 1 && entries[0]?.state_sha256 === expectedDigest;
 }
 
 type NonceDb = Pick<PgQueryExecutor, "withTransaction">;
@@ -53,7 +73,7 @@ async function withOriginalUserNonceAdmission(
   input: OriginalUserNonce,
   apply: (tx: SqlQueryExecutor) => Promise<boolean>,
 ): Promise<boolean> {
-  if (!valid(input)) return false;
+  if (!hasTransaction(db) || !valid(input)) return false;
   try {
     return await db.withTransaction(
       async (tx) => {
@@ -118,6 +138,7 @@ async function withOriginalUserNonceAdmission(
  * export capability. */
 export async function registerHistoricalUserOAuthChallenge(db: NonceDb, input: OriginalUserNonce): Promise<boolean> {
   return withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const stateDigest = digest(input.state);
     const result = await tx.query(
       `INSERT INTO public.historical_user_oauth_challenges(
        state_sha256,export_id,original_github_user_id,created_at,expires_at
@@ -159,12 +180,12 @@ export async function registerHistoricalUserOAuthChallenge(db: NonceDb, input: O
       [
         input.exportId,
         input.verifiedGitHubUserId,
-        digest(input.state),
+        stateDigest,
         maximumChallengesPerFiveMinutes,
         maximumChallengesPerExport,
       ],
     );
-    return rows(result).length === 1;
+    return acknowledgedNonceDigest(result, stateDigest);
   });
 }
 
@@ -173,6 +194,7 @@ export async function registerHistoricalUserOAuthChallenge(db: NonceDb, input: O
  * provider call cannot restore a consumed challenge. */
 export async function consumeHistoricalUserOAuthChallenge(db: NonceDb, input: OriginalUserNonce): Promise<boolean> {
   return withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const stateDigest = digest(input.state);
     const result = await tx.query(
       `UPDATE public.historical_user_oauth_challenges challenge
         SET consumed_at=clock_timestamp()
@@ -202,8 +224,8 @@ export async function consumeHistoricalUserOAuthChallenge(db: NonceDb, input: Or
              AND er.dry_run=FALSE AND er.status IN ('running','completed')
         )
      RETURNING challenge.state_sha256`,
-      [input.exportId, input.verifiedGitHubUserId, digest(input.state)],
+      [input.exportId, input.verifiedGitHubUserId, stateDigest],
     );
-    return rows(result).length === 1;
+    return acknowledgedNonceDigest(result, stateDigest);
   });
 }
