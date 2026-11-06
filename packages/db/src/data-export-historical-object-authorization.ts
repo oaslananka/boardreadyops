@@ -35,6 +35,33 @@ function validAuthority(value: unknown, artifactId: unknown): value is Historica
   );
 }
 
+/** Never accept path traversal, alternate data streams or ambiguous physical segments. */
+function validOriginalUserStoragePath(value: unknown): value is string {
+  if (
+    typeof value !== "string" ||
+    value.length < 1 ||
+    value.length > 1024 ||
+    value.trim() !== value ||
+    value.includes(String.fromCharCode(92)) ||
+    value.includes("\0") ||
+    value.includes(":")
+  )
+    return false;
+  return value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
+}
+
+function validOriginalUserArtifactDigest(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
+}
+
+function validOriginalUserArtifactSize(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 64 * 1024 * 1024;
+}
+
+function validOriginalUserRetention(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
 function validOriginalUserObject(value: unknown): value is HistoricalUserExportObject {
   if (value === null || typeof value !== "object") return false;
   const object = value as Record<string, unknown>;
@@ -42,22 +69,10 @@ function validOriginalUserObject(value: unknown): value is HistoricalUserExportO
     isHistoricalUserUuid(object.artifactId) &&
     isHistoricalUserUuid(object.repositoryId) &&
     isHistoricalUserUuid(object.runId) &&
-    typeof object.storagePath === "string" &&
-    object.storagePath.length >= 1 &&
-    object.storagePath.length <= 1024 &&
-    object.storagePath.trim() === object.storagePath &&
-    !object.storagePath.includes(String.fromCharCode(92)) &&
-    !object.storagePath.includes("\0") &&
-    !object.storagePath.includes(":") &&
-    object.storagePath.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..") &&
-    typeof object.sha256 === "string" &&
-    /^[0-9a-f]{64}$/u.test(object.sha256) &&
-    typeof object.byteLength === "number" &&
-    Number.isSafeInteger(object.byteLength) &&
-    object.byteLength >= 0 &&
-    object.byteLength <= 64 * 1024 * 1024 &&
-    typeof object.retentionUntil === "string" &&
-    Number.isFinite(Date.parse(object.retentionUntil))
+    validOriginalUserStoragePath(object.storagePath) &&
+    validOriginalUserArtifactDigest(object.sha256) &&
+    validOriginalUserArtifactSize(object.byteLength) &&
+    validOriginalUserRetention(object.retentionUntil)
   );
 }
 

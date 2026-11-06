@@ -41,6 +41,37 @@ describe("original-user artifact copy reservation boundary", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it("enforces the same private artifact storage, SHA, size and retention bounds", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ outcome: "reserved" }] });
+    const db = { query } as never;
+    const fixture = object();
+    for (const invalid of [
+      { storagePath: "" },
+      { storagePath: "x".repeat(1025) },
+      { storagePath: " artifacts/file.bin" },
+      { storagePath: "artifacts/file.bin " },
+      { storagePath: "artifacts//file.bin" },
+      { storagePath: "artifacts/./file.bin" },
+      { storagePath: "artifacts/../file.bin" },
+      { storagePath: "artifacts\\file.bin" },
+      { storagePath: "artifacts/file.bin:stream" },
+      { storagePath: "artifacts/file\0.bin" },
+      { sha256: "A".repeat(64) },
+      { sha256: "a".repeat(63) },
+      { byteLength: Number.NaN },
+      { byteLength: 2 ** 53 },
+      { byteLength: -1 },
+      { byteLength: 64 * 1024 * 1024 + 1 },
+      { retentionUntil: "not-a-date" },
+      { retentionUntil: "" },
+    ]) {
+      await expect(reserveHistoricalUserObjectCopy(db, authority(), { ...fixture, ...invalid })).resolves.toBeNull();
+    }
+    expect(query).not.toHaveBeenCalled();
+    expect(await reserveHistoricalUserObjectCopy(db, authority(), fixture)).not.toBeNull();
+    expect(query).toHaveBeenCalledOnce();
+  });
+
   it("rejects malformed original-user identity without querying", async () => {
     const query = vi.fn();
     const db = { query } as never;
