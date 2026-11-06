@@ -1,4 +1,4 @@
-import { constants } from "node:fs";
+import { constants, type Stats } from "node:fs";
 import { lstat, open, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
@@ -35,6 +35,93 @@ function validCleanupInput(input: CleanupInput): boolean {
     path.resolve(input.archiveRoot) === input.archiveRoot &&
     path.basename(input.archiveRoot) === ".private-export-archives"
   );
+}
+
+type VerifiedCleanupCandidate = {
+  tenantId: string;
+  preflightId: string;
+  sha256: string;
+  byteLength: number;
+};
+
+type PhysicalCleanupResult = "deleted" | "missing" | "quarantined";
+
+/** Admit only one exact original-user binding and bounded ZIP commitment. */
+function validatedCleanupCandidate(candidate: Locked | undefined): VerifiedCleanupCandidate | null {
+  if (!candidate?.tenant_id || !uuid.test(candidate.preflight_id) || !digest.test(candidate.expected_archive_sha256))
+    return null;
+  const byteLength = Number(candidate.expected_archive_bytes);
+  if (!Number.isSafeInteger(byteLength) || byteLength < 1 || byteLength > 64 * 1024 * 1024) return null;
+  return {
+    tenantId: candidate.tenant_id,
+    preflightId: candidate.preflight_id,
+    sha256: candidate.expected_archive_sha256,
+    byteLength,
+  };
+}
+
+/** Unknown/ambiguous snapshots block physical cleanup, including crashed readers. */
+function noCleanupBlockers(blocker: Record<string, unknown>[]): boolean {
+  return (
+    blocker.length === 1 &&
+    blocker[0]?.held === false &&
+    blocker[0]?.erasure === false &&
+    blocker[0]?.reader === false &&
+    blocker[0]?.private_zip_reader === false &&
+    blocker[0]?.active_preflight === false
+  );
+}
+
+/** Require a single-link, private, original-owner file of the committed size. */
+function validPrivatePartialFile(stat: Stats, byteLength: number): boolean {
+  return (
+    stat.isFile() &&
+    !stat.isSymbolicLink() &&
+    stat.nlink === 1 &&
+    stat.size === byteLength &&
+    (stat.mode & 0o077) === 0 &&
+    (typeof process.getuid !== "function" || stat.uid === process.getuid())
+  );
+}
+
+function samePrivatePartialFile(before: Stats, after: Stats | null): boolean {
+  return (
+    after !== null &&
+    after.dev === before.dev &&
+    after.ino === before.ino &&
+    after.size === before.size &&
+    after.ctimeMs === before.ctimeMs &&
+    after.mtimeMs === before.mtimeMs
+  );
+}
+
+/** Called only inside the still-held original-user transaction and lock gates. */
+async function deleteVerifiedHistoricalPartial(
+  root: string,
+  exportId: string,
+  sha256: string,
+  byteLength: number,
+): Promise<PhysicalCleanupResult> {
+  const file = path.join(root, `${exportId}.historical-private-partial-v3.zip`);
+  const before = await lstat(file).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!before) return "missing";
+  if (!validPrivatePartialFile(before, byteLength)) return "quarantined";
+  const bytes = await readSealedHistoricalUserPartial({ archiveRoot: root, exportId, sha256, byteLength });
+  if (!bytes) return "quarantined";
+  bytes.fill(0);
+  const after = await lstat(file).catch(() => null);
+  if (!samePrivatePartialFile(before, after)) return "quarantined";
+  await unlink(file);
+  const directory = await open(root, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+  try {
+    await directory.sync();
+  } finally {
+    await directory.close();
+  }
+  return "deleted";
 }
 
 /**
@@ -89,20 +176,13 @@ export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): 
             [input.authority.exportId, input.authority.verifiedGitHubUserId],
           ),
         ) as Locked[];
-        const candidate = owned[0];
-        if (
-          !candidate?.tenant_id ||
-          !uuid.test(candidate.preflight_id) ||
-          !digest.test(candidate.expected_archive_sha256)
-        )
-          return "quarantined";
-        const byteLength = Number(candidate.expected_archive_bytes);
-        if (!Number.isSafeInteger(byteLength) || byteLength < 1 || byteLength > 64 * 1024 * 1024) return "quarantined";
+        const candidate = validatedCleanupCandidate(owned[0]);
+        if (!candidate) return "quarantined";
 
         const locks = rows(
           await tx.query(
             "SELECT pg_try_advisory_xact_lock(boardreadyops_historical_transfer_tenant_lock_key($1)) AS acquired",
-            [candidate.tenant_id],
+            [candidate.tenantId],
           ),
         );
         if (locks[0]?.acquired !== true) return "busy";
@@ -121,18 +201,10 @@ export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): 
            EXISTS(SELECT 1 FROM public.historical_user_private_delivery_preflights p
              WHERE p.export_id=$2 AND p.revoked_at IS NULL
                AND p.expires_at>clock_timestamp()) AS active_preflight`,
-            [candidate.tenant_id, input.authority.exportId],
+            [candidate.tenantId, input.authority.exportId],
           ),
         );
-        if (
-          blocker.length !== 1 ||
-          blocker[0]?.held !== false ||
-          blocker[0]?.erasure !== false ||
-          blocker[0]?.reader !== false ||
-          blocker[0]?.private_zip_reader !== false ||
-          blocker[0]?.active_preflight !== false
-        )
-          return "quarantined";
+        if (!noCleanupBlockers(blocker)) return "quarantined";
 
         const prior = rows(
           await tx.query(
@@ -142,49 +214,13 @@ export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): 
         );
         if (prior.length) return "cleaned";
 
-        const file = path.join(root, `${input.authority.exportId}.historical-private-partial-v3.zip`);
-        const before = await lstat(file).catch((error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return null;
-          throw error;
-        });
-        if (before) {
-          if (
-            !before.isFile() ||
-            before.isSymbolicLink() ||
-            before.nlink !== 1 ||
-            before.size !== byteLength ||
-            (before.mode & 0o077) !== 0 ||
-            (typeof process.getuid === "function" && before.uid !== process.getuid())
-          )
-            return "quarantined";
-          const bytes = await readSealedHistoricalUserPartial({
-            archiveRoot: root,
-            exportId: input.authority.exportId,
-            sha256: candidate.expected_archive_sha256,
-            byteLength,
-          });
-          if (!bytes) return "quarantined";
-          bytes.fill(0);
-          const after = await lstat(file).catch(() => null);
-          if (
-            !after ||
-            after.dev !== before.dev ||
-            after.ino !== before.ino ||
-            after.size !== before.size ||
-            after.ctimeMs !== before.ctimeMs ||
-            after.mtimeMs !== before.mtimeMs
-          )
-            return "quarantined";
-          await unlink(file);
-          const directory = await open(root, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
-          try {
-            await directory.sync();
-          } finally {
-            await directory.close();
-          }
-        }
-
-        const result: "deleted" | "missing" = before ? "deleted" : "missing";
+        const result = await deleteVerifiedHistoricalPartial(
+          root,
+          input.authority.exportId,
+          candidate.sha256,
+          candidate.byteLength,
+        );
+        if (result === "quarantined") return result;
         const audit = rows(
           await tx.query(
             `INSERT INTO public.historical_user_partial_cleanup_events (
@@ -195,9 +231,9 @@ export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): 
             [
               input.authority.exportId,
               input.authority.verifiedGitHubUserId,
-              candidate.preflight_id,
-              candidate.expected_archive_sha256,
-              byteLength,
+              candidate.preflightId,
+              candidate.sha256,
+              candidate.byteLength,
               result,
             ],
           ),

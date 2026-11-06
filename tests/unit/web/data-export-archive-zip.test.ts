@@ -207,6 +207,49 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
     expect(repack(changedReceipt)).toBe(false);
   });
 
+  it("rejects forged receipt envelopes and entry claims with a newly hashed outer ZIP", () => {
+    const original = prepareClaimedArchiveZip(fixture().input);
+    const files = sanitizeAndExtractArchive(original.bytes).files;
+    const receiptPath = "metadata/archive-integrity.json";
+    const receiptBytes = files.find(({ path }) => path === receiptPath)?.data;
+    expect(receiptBytes).toBeDefined();
+    const receipt = JSON.parse(receiptBytes?.toString("utf8") ?? "{}") as {
+      kind: string;
+      formatVersion: number;
+      scope: string;
+      excludes: string[];
+      entries: Array<{ path: string; sha256: string; byteLength: number }>;
+    };
+    const repack = (claim: unknown) => {
+      const bytes = createZipBuffer(
+        files.map(({ path, data }) => ({
+          name: path,
+          data: path === receiptPath ? Buffer.from(JSON.stringify(claim)) : data,
+        })),
+      );
+      return verifyClaimedExportArchiveIntegrity(bytes, sha256(bytes), "export-1");
+    };
+    expect(repack(receipt)).toBe(true);
+    const first = receipt.entries[0];
+    expect(first).toBeDefined();
+    const forged = [
+      null,
+      [],
+      { ...receipt, kind: "untrusted-archive" },
+      { ...receipt, formatVersion: 2 },
+      { ...receipt, scope: "full-user-data" },
+      { ...receipt, excludes: ["github-repository-source"] },
+      { ...receipt, excludes: [...receipt.excludes].reverse() },
+      { ...receipt, entries: null },
+      { ...receipt, entries: receipt.entries.slice(1) },
+      { ...receipt, entries: [null, ...receipt.entries.slice(1)] },
+      { ...receipt, entries: [{ ...first, path: "objects/renamed.bin" }, ...receipt.entries.slice(1)] },
+      { ...receipt, entries: [{ ...first, byteLength: -1 }, ...receipt.entries.slice(1)] },
+      { ...receipt, entries: [{ ...first, sha256: "0".repeat(64) }, ...receipt.entries.slice(1)] },
+    ];
+    for (const claim of forged) expect(repack(claim)).toBe(false);
+  });
+
   it("rejects modified artifact bytes and out-of-scope run references before producing ZIP", () => {
     const { input } = fixture();
     input.verifiedObjects[0].bytes[0] ^= 1;
