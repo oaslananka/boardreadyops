@@ -226,7 +226,7 @@ export async function revokeHistoricalUserPrivateDeliveryPreflight(input: {
   id: string;
 }): Promise<"revoked" | "stale"> {
   if (!input?.db?.query || !validAuthority(input.authority) || !uuid.test(input.id)) return "stale";
-  const result = (await input.db.query(
+  const result: unknown = await input.db.query(
     `UPDATE public.historical_user_private_delivery_preflights AS p
           SET revoked_at=clock_timestamp()
          FROM public.data_exports AS e
@@ -236,6 +236,11 @@ export async function revokeHistoricalUserPrivateDeliveryPreflight(input: {
           AND e.scope='user' AND e.requested_by='github_app_uninstall'
        RETURNING p.id`,
     [input.id, input.authority.exportId, input.authority.verifiedGitHubUserId],
-  )) as { rows?: unknown[] };
-  return result.rows?.length === 1 ? "revoked" : "stale";
+  );
+  if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows))
+    return "stale";
+  if (result.rows.length !== 1) return "stale";
+  const row: unknown = result.rows[0];
+  // Only the exact original USER preflight may acknowledge this revocation.
+  return row !== null && typeof row === "object" && "id" in row && row.id === input.id ? "revoked" : "stale";
 }
