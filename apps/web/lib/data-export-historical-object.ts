@@ -32,10 +32,13 @@ export async function readVerifiedHistoricalUserLocalObject(input: {
   if (!initial) return null;
   const reservation = await reserveHistoricalUserObjectCopy(input.db, input.authority, initial);
   if (!reservation) return null;
+  let bytes: Buffer | null = null;
+  let verified = false;
+  let settled = false;
   try {
     const before = await lookupHistoricalUserExportObject(input.db, input.authority, input.artifactId);
     if (!before || JSON.stringify(before) !== JSON.stringify(initial)) return null;
-    const bytes = await readVerifiedLocalExportObject({
+    bytes = await readVerifiedLocalExportObject({
       storageRoot: input.storageRoot,
       storageDriver: input.storageDriver,
       object: initial,
@@ -43,6 +46,7 @@ export async function readVerifiedHistoricalUserLocalObject(input: {
     if (!bytes) return null;
     const after = await lookupHistoricalUserExportObject(input.db, input.authority, input.artifactId);
     if (!after || JSON.stringify(after) !== JSON.stringify(initial)) return null;
+    verified = true;
     return {
       bytes,
       exportId: input.authority.exportId,
@@ -52,7 +56,14 @@ export async function readVerifiedHistoricalUserLocalObject(input: {
       sha256: initial.sha256,
     };
   } finally {
-    // Uncertain release fails closed; do not return bytes on settlement failure.
-    await releaseHistoricalUserObjectCopy(input.db, input.authority, reservation);
+    try {
+      // Uncertain release fails closed; do not return bytes on settlement failure.
+      await releaseHistoricalUserObjectCopy(input.db, input.authority, reservation);
+      settled = true;
+    } finally {
+      // Transfer buffer ownership only after both final source authorization
+      // and durable reservation settlement succeeded.
+      if (!verified || !settled) bytes?.fill(0);
+    }
   }
 }
