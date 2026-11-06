@@ -53,6 +53,13 @@ function rows(result: unknown): Record<string, unknown>[] {
   return Array.isArray(result.rows) ? (result.rows as Record<string, unknown>[]) : [];
 }
 
+function acknowledgedPrivateReaderToken(result: unknown, expected: string): boolean {
+  if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) return false;
+  if (result.rows.length !== 1) return false;
+  const row: unknown = result.rows[0];
+  return row !== null && typeof row === "object" && !Array.isArray(row) && "token" in row && row.token === expected;
+}
+
 /**
  * SOURCE-ONLY durable internal verification reservation (NEVER a download
  * token). Registration must commit BEFORE physical read. A release is
@@ -123,24 +130,27 @@ export async function reserveHistoricalUserPrivatePartialRead(
         );
         if (blockers[0]?.held !== false || blockers[0]?.erasure !== false) return null;
 
-        const created = rows(
-          await tx.query(
-            `INSERT INTO public.historical_user_partial_read_reservations(
+        const created = await tx.query(
+          `INSERT INTO public.historical_user_partial_read_reservations(
           token,export_id,preflight_id,original_github_user_id,
           archive_sha256,archive_byte_length
         ) VALUES($1::uuid,$2,$3::uuid,$4::bigint,$5,$6::bigint)
         RETURNING token::text AS token`,
-            [
-              token,
-              binding.exportId,
-              binding.preflightId,
-              binding.verifiedGitHubUserId,
-              binding.sha256,
-              binding.byteLength,
-            ],
-          ),
+          [
+            token,
+            binding.exportId,
+            binding.preflightId,
+            binding.verifiedGitHubUserId,
+            binding.sha256,
+            binding.byteLength,
+          ],
         );
-        return created[0]?.token === token ? { token } : null;
+        // Reject ambiguous acknowledgements INSIDE the transaction to roll
+        // back any unverified reservation rather than committing it.
+        if (!acknowledgedPrivateReaderToken(created, token)) {
+          throw new Error("Historical private reader reservation was not acknowledged");
+        }
+        return { token };
       },
       { statementTimeoutMs: 5000 },
     );
@@ -159,19 +169,17 @@ export async function releaseHistoricalUserPrivatePartialRead(
 ): Promise<boolean> {
   if (!hasQuery(db) || !validReservation(input)) return false;
   try {
-    const released = rows(
-      await db.query(
-        `UPDATE public.historical_user_partial_read_reservations r
+    const released = await db.query(
+      `UPDATE public.historical_user_partial_read_reservations r
           SET released_at=clock_timestamp()
         WHERE r.token=$1::uuid AND r.export_id=$2 AND r.preflight_id=$3::uuid
           AND r.original_github_user_id=$4::bigint
           AND r.archive_sha256=$5 AND r.archive_byte_length=$6::bigint
           AND r.released_at IS NULL
         RETURNING r.token::text AS token`,
-        [input.token, input.exportId, input.preflightId, input.verifiedGitHubUserId, input.sha256, input.byteLength],
-      ),
+      [input.token, input.exportId, input.preflightId, input.verifiedGitHubUserId, input.sha256, input.byteLength],
     );
-    return released[0]?.token === input.token;
+    return acknowledgedPrivateReaderToken(released, input.token);
   } catch {
     return false;
   }
