@@ -184,6 +184,43 @@ describe("historical GitHub USER step-up OAuth browser round-trip (no customer d
     expect(shouldConsumeHistoricalStepUp(callbackRequest(state, cookieLine), normal)).toBe(true);
   });
 
+  it("rejects ambiguous callback parameters and manipulated return paths before consuming the nonce", async () => {
+    const { state, cookieLine } = await begin();
+    const validRequest = callbackRequest(state, cookieLine);
+    const base = new URL(validRequest.url);
+    const cases: Request[] = [];
+    for (const [key, value] of [
+      ["code", "second-code"],
+      ["state", state ?? "missing"],
+      ["error", "access_denied"],
+    ]) {
+      const changed = new URL(base);
+      changed.searchParams.append(key, value);
+      cases.push(new Request(changed, { headers: validRequest.headers }));
+    }
+    for (const path of [
+      `/dashboard?historical_user_export=${newExportId}`,
+      `/dashboard?historical_user_export=${exportId}&extra=1`,
+      `/different?historical_user_export=${exportId}`,
+      `//attacker.example/dashboard?historical_user_export=${exportId}`,
+    ]) {
+      const modified = cookieLine.replace(
+        encodeURIComponent(`/dashboard?historical_user_export=${exportId}`),
+        encodeURIComponent(path),
+      );
+      cases.push(callbackRequest(state, modified));
+    }
+    for (const request of cases) {
+      const fetcher = network();
+      const response = await consumeHistoricalStepUp(request, environment, { fetch: fetcher }, now);
+      expect(response.status).toBe(303);
+      expect(response.headers.get("location")).toBe("/dashboard");
+      expect(response.headers.getSetCookie()).toHaveLength(2);
+      expect(fetcher).not.toHaveBeenCalled();
+    }
+    expect(consumeNonce).not.toHaveBeenCalled();
+  });
+
   it("requires durable nonce registration before OAuth redirect, failing closed if DB cannot store it", async () => {
     registerNonce.mockResolvedValueOnce(false);
     const failed = await begin();

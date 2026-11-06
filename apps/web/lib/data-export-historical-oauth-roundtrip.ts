@@ -266,6 +266,61 @@ function consumed(allowedExportId: string | null): Response {
   });
 }
 
+type VerifiedHistoricalCallback = {
+  readonly exportId: string;
+  readonly stateCookie: string | undefined;
+  readonly callbackState: string;
+  readonly authorizationCode: string;
+  readonly challenge: Challenge;
+};
+
+/** Only a matching, signed, export-bound and unambiguous callback may enter the DB consume gate. */
+function verifiedHistoricalCallback(
+  request: Request,
+  environment: Readonly<Record<string, string | undefined>>,
+  now: Date,
+): VerifiedHistoricalCallback | null {
+  const stateCookie = serverCookie(request, historicalStepUpStateCookieName);
+  const secret = configuredSessionSecret(environment);
+  const challenge = secret ? validChallenge(serverCookie(request, historicalStepUpProofCookieName), secret, now) : null;
+  const state = parseOAuthStateCookie(stateCookie);
+  const parameters = new URL(request.url).searchParams;
+  const callbackState = parameters.get("state");
+  if (
+    !state ||
+    !validState.test(state.state) ||
+    !stateMatches(state.state, callbackState) ||
+    !challenge ||
+    challenge.state !== state.state ||
+    parameters.getAll("code").length !== 1 ||
+    parameters.getAll("state").length !== 1 ||
+    parameters.has("error")
+  )
+    return null;
+  try {
+    const target = new URL(state.returnTo, "https://boardreadyops.invalid");
+    const exportId = target.searchParams.get("historical_user_export");
+    if (
+      target.origin !== "https://boardreadyops.invalid" ||
+      target.pathname !== "/dashboard" ||
+      target.searchParams.size !== 1 ||
+      !exportId ||
+      !uuid.test(exportId) ||
+      challenge.exportId !== exportId
+    )
+      return null;
+    return {
+      exportId,
+      stateCookie,
+      callbackState: callbackState ?? "",
+      authorizationCode: parameters.get("code") ?? "",
+      challenge,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Browser callback branch: STATE cookie is always cleared, including
  * invalid/missing code, wrong account, revoked export or GitHub downtime.
@@ -281,29 +336,9 @@ export async function consumeHistoricalStepUp(
 ): Promise<Response> {
   // A disabled callback must consume stale state without contacting GitHub.
   if (environment.BOARDREADYOPS_ENABLE_HISTORICAL_OAUTH_STEPUP !== "true") return consumed(null);
-  const stateCookie = serverCookie(request, historicalStepUpStateCookieName);
-  const secret = configuredSessionSecret(environment);
-  const challenge = secret ? validChallenge(serverCookie(request, historicalStepUpProofCookieName), secret, now) : null;
-  const state = parseOAuthStateCookie(stateCookie);
-  const parameters = new URL(request.url).searchParams;
-  const match = state && validState.test(state.state) && stateMatches(state.state, parameters.get("state"));
-  const target = match ? new URL(state.returnTo, "https://boardreadyops.invalid") : null;
-  const exportId = target?.searchParams.get("historical_user_export");
-  if (
-    !match ||
-    !challenge ||
-    !target ||
-    challenge.state !== state.state ||
-    challenge.exportId !== exportId ||
-    target.pathname !== "/dashboard" ||
-    target.searchParams.size !== 1 ||
-    !exportId ||
-    !uuid.test(exportId) ||
-    parameters.getAll("code").length !== 1 ||
-    parameters.getAll("state").length !== 1 ||
-    parameters.has("error")
-  )
-    return consumed(null);
+  const callback = verifiedHistoricalCallback(request, environment, now);
+  if (!callback) return consumed(null);
+  const { exportId, challenge } = callback;
 
   const signed = recentSignedHistoricalUserAuthority({
     exportId,
@@ -326,9 +361,9 @@ export async function consumeHistoricalStepUp(
   const authority = await freshLiveGitHubOriginalUserAuthority({
     exportId,
     sessionCookie: serverCookie(request, sessionCookieName) ?? "",
-    oauthStateCookie: stateCookie ?? "",
-    callbackState: parameters.get("state") ?? "",
-    authorizationCode: parameters.get("code") ?? "",
+    oauthStateCookie: callback.stateCookie ?? "",
+    callbackState: callback.callbackState,
+    authorizationCode: callback.authorizationCode,
     environment,
     now,
     fetch: dependencies.fetch,
