@@ -727,42 +727,41 @@ function serializeHistoricalCoreSnapshot(input: { exportId: string }, rows: Hist
   };
 }
 
+/** Each source class has a mandatory non-truncated array, including empty arrays. */
+const historicalCoreSectionLimits: ReadonlyArray<readonly [string, number]> = [
+  ["repositories", maxRepositories],
+  ["runs", maxRuns],
+  ["findings", maxFindings],
+  ["artifacts", 100],
+  ["reviews", 100],
+  ["revisions", 100],
+  ["audit_events", 100],
+  ["installation_audit_events", 100],
+  ["comments", 100],
+  ["approvals", 100],
+  ["checklist", 100],
+  ["finding_decisions", 100],
+  ["finding_assignments", 100],
+];
+
+function validHistoricalCoreSectionLayout(record: Record<string, unknown>): boolean {
+  return historicalCoreSectionLimits.every(([key, limit]) => {
+    const section = record[key];
+    return Array.isArray(section) && section.length <= limit;
+  });
+}
+
 function assertHistoricalCoreRecordLayout(record: Record<string, unknown>, expectedExportId: string): void {
   if (
     record.id !== expectedExportId ||
-    !Array.isArray(record.repositories) ||
-    !Array.isArray(record.runs) ||
-    !Array.isArray(record.findings) ||
-    !Array.isArray(record.artifacts) ||
-    !Array.isArray(record.reviews) ||
-    !Array.isArray(record.revisions) ||
-    !Array.isArray(record.audit_events) ||
-    !Array.isArray(record.installation_audit_events) ||
-    !Array.isArray(record.comments) ||
-    !Array.isArray(record.approvals) ||
-    !Array.isArray(record.checklist) ||
-    !Array.isArray(record.finding_decisions) ||
-    !Array.isArray(record.finding_assignments) ||
+    !validHistoricalCoreSectionLayout(record) ||
     !validExcludedClassCounts(record.excluded_source_class_counts) ||
     !validAuditRedactionCounts(
       record.redacted_audit_field_counts,
-      record.installation_audit_events.length,
-      record.audit_events.length,
+      (record.installation_audit_events as unknown[]).length,
+      (record.audit_events as unknown[]).length,
     ) ||
-    record.repositories.length > maxRepositories ||
-    record.runs.length > maxRuns ||
-    record.findings.length > maxFindings ||
-    record.artifacts.length > 100 ||
-    record.reviews.length > 100 ||
-    record.revisions.length > 100 ||
-    record.audit_events.length > 100 ||
-    record.installation_audit_events.length > 100 ||
-    record.comments.length > 100 ||
-    record.approvals.length > 100 ||
-    record.checklist.length > 100 ||
-    record.finding_decisions.length > 100 ||
-    record.finding_assignments.length > 100 ||
-    !record.repositories.every(validRepository)
+    !(record.repositories as unknown[]).every(validRepository)
   )
     throw new HistoricalUserInventoryUnavailableError();
 }
@@ -839,85 +838,157 @@ function assertHistoricalCoreFindingRows(rows: HistoricalCoreSnapshotRows): void
     throw new HistoricalUserInventoryUnavailableError();
 }
 
+/** Reject malformed or out-of-owner comments before any partial archive is serialized. */
+function invalidHistoricalCommentRow(comment: HistoricalCommentRow): boolean {
+  return (
+    !validText(comment?.id) ||
+    !isUuid(comment.repository_id) ||
+    !isUuid(comment.review_id) ||
+    (comment.parent_id !== null && !validText(comment.parent_id)) ||
+    !["open", "resolved", "stale"].includes(comment.status) ||
+    !["internal", "guest"].includes(comment.author_type) ||
+    typeof comment.content !== "string" ||
+    Buffer.byteLength(comment.content, "utf8") > 8192 ||
+    (comment.finding_fingerprint !== null &&
+      (!validText(comment.finding_fingerprint, 256) || Buffer.byteLength(comment.finding_fingerprint, "utf8") > 512)) ||
+    (comment.evidence_anchor !== null &&
+      (!validText(comment.evidence_anchor, 2048) || Buffer.byteLength(comment.evidence_anchor, "utf8") > 4096)) ||
+    comment.foreign_repository !== false ||
+    comment.invalid_parent !== false
+  );
+}
+
+/** Reject malformed or out-of-owner approvals before any partial archive is serialized. */
+function invalidHistoricalApprovalRow(approval: HistoricalApprovalRow): boolean {
+  return (
+    !validText(approval?.id) ||
+    !isUuid(approval.repository_id) ||
+    !isUuid(approval.review_id) ||
+    !isUuid(approval.revision_id) ||
+    !/^[0-9a-f]{64}$/u.test(approval.evidence_digest) ||
+    !["approved", "changes_requested", "invalidated", "dismissed"].includes(approval.status) ||
+    (approval.reason !== null &&
+      (typeof approval.reason !== "string" || Buffer.byteLength(approval.reason, "utf8") > 8192)) ||
+    (approval.invalidation_reason !== null &&
+      (typeof approval.invalidation_reason !== "string" ||
+        Buffer.byteLength(approval.invalidation_reason, "utf8") > 8192)) ||
+    typeof approval.is_break_glass !== "boolean" ||
+    approval.foreign_repository !== false
+  );
+}
+
+/** Reject malformed or out-of-owner checklist before any partial archive is serialized. */
+function invalidHistoricalChecklistRow(item: HistoricalChecklistRow): boolean {
+  return (
+    !validText(item?.id) ||
+    !isUuid(item.repository_id) ||
+    !isUuid(item.review_id) ||
+    typeof item.completed !== "boolean" ||
+    typeof item.title !== "string" ||
+    Buffer.byteLength(item.title, "utf8") > 8192 ||
+    item.foreign_repository !== false
+  );
+}
+
+/** Reject malformed or out-of-owner reviews before any partial archive is serialized. */
+function invalidHistoricalReviewRow(review: HistoricalReviewRow): boolean {
+  return (
+    !isUuid(review?.id) ||
+    !isUuid(review.repository_id) ||
+    !isUuid(review.head_run_id) ||
+    typeof review.title !== "string" ||
+    Buffer.byteLength(review.title, "utf8") > 8192 ||
+    !validText(review.status) ||
+    !validText(review.decision) ||
+    review.foreign_head_run !== false
+  );
+}
+
+/** Reject malformed or out-of-owner revisions before any partial archive is serialized. */
+function invalidHistoricalRevisionRow(revision: HistoricalRevisionRow): boolean {
+  return (
+    !isUuid(revision?.id) ||
+    !isUuid(revision.review_id) ||
+    !Number.isSafeInteger(revision.sequence) ||
+    revision.sequence < 1 ||
+    !isUuid(revision.head_run_id) ||
+    (revision.base_run_id !== null && !isUuid(revision.base_run_id)) ||
+    typeof revision.head_commit_sha !== "string" ||
+    !/^[0-9a-f]{40,64}$/u.test(revision.head_commit_sha) ||
+    typeof revision.evidence_digest !== "string" ||
+    !/^[0-9a-f]{64}$/u.test(revision.evidence_digest) ||
+    revision.foreign_run !== false
+  );
+}
+
+/** Reject malformed or out-of-owner audits before any partial archive is serialized. */
+function invalidHistoricalAuditRow(audit: HistoricalAuditRow): boolean {
+  return (
+    !isUuid(audit?.id) ||
+    !isUuid(audit.repository_id) ||
+    (audit.release_run_id !== null && !isUuid(audit.release_run_id)) ||
+    !validText(audit.event_type, 160) ||
+    !validText(audit.actor_type, 64) ||
+    !validText(audit.subject_type, 64) ||
+    audit.foreign_review_subject !== false
+  );
+}
+
+/** Reject malformed or out-of-owner artifacts before any partial archive is serialized. */
+function invalidHistoricalArtifactRow(artifact: HistoricalArtifactRow): boolean {
+  return (
+    !isUuid(artifact?.id) ||
+    !isUuid(artifact.run_id) ||
+    !validText(artifact.kind) ||
+    !validText(artifact.name, 1024) ||
+    !validText(artifact.role) ||
+    !validText(artifact.content_type) ||
+    typeof artifact.sha256 !== "string" ||
+    !/^[0-9a-f]{64}$/u.test(artifact.sha256) ||
+    typeof artifact.bytes !== "number" ||
+    !Number.isSafeInteger(artifact.bytes) ||
+    artifact.bytes < 0 ||
+    typeof artifact.retention_expired !== "boolean"
+  );
+}
+
+/** Reject malformed or out-of-owner runs before any partial archive is serialized. */
+function invalidHistoricalRunRow(run: HistoricalRunRow): boolean {
+  return (
+    !isUuid(run?.id) ||
+    !isUuid(run.repository_id) ||
+    !validText(run.commit_sha, 128) ||
+    !validText(run.ref) ||
+    !validText(run.status) ||
+    (run.decision !== null && !validText(run.decision))
+  );
+}
+
+/** Reject malformed or out-of-owner findings before any partial archive is serialized. */
+function invalidHistoricalFindingRow(finding: HistoricalFindingRow): boolean {
+  return (
+    !isUuid(finding?.id) ||
+    !isUuid(finding.run_id) ||
+    !validText(finding.rule_id) ||
+    !validText(finding.severity) ||
+    typeof finding.message !== "string" ||
+    (finding.path !== null && typeof finding.path !== "string") ||
+    (finding.kind !== null && !validText(finding.kind))
+  );
+}
+
 function assertHistoricalCoreCommentsApprovalsRows(rows: HistoricalCoreSnapshotRows): void {
   const { comments, approvals } = rows;
-  if (
-    comments.some(
-      (comment) =>
-        !validText(comment?.id) ||
-        !isUuid(comment.repository_id) ||
-        !isUuid(comment.review_id) ||
-        (comment.parent_id !== null && !validText(comment.parent_id)) ||
-        !["open", "resolved", "stale"].includes(comment.status) ||
-        !["internal", "guest"].includes(comment.author_type) ||
-        typeof comment.content !== "string" ||
-        Buffer.byteLength(comment.content, "utf8") > 8192 ||
-        (comment.finding_fingerprint !== null &&
-          (!validText(comment.finding_fingerprint, 256) ||
-            Buffer.byteLength(comment.finding_fingerprint, "utf8") > 512)) ||
-        (comment.evidence_anchor !== null &&
-          (!validText(comment.evidence_anchor, 2048) || Buffer.byteLength(comment.evidence_anchor, "utf8") > 4096)) ||
-        comment.foreign_repository !== false ||
-        comment.invalid_parent !== false,
-    ) ||
-    approvals.some(
-      (approval) =>
-        !validText(approval?.id) ||
-        !isUuid(approval.repository_id) ||
-        !isUuid(approval.review_id) ||
-        !isUuid(approval.revision_id) ||
-        !/^[0-9a-f]{64}$/u.test(approval.evidence_digest) ||
-        !["approved", "changes_requested", "invalidated", "dismissed"].includes(approval.status) ||
-        (approval.reason !== null &&
-          (typeof approval.reason !== "string" || Buffer.byteLength(approval.reason, "utf8") > 8192)) ||
-        (approval.invalidation_reason !== null &&
-          (typeof approval.invalidation_reason !== "string" ||
-            Buffer.byteLength(approval.invalidation_reason, "utf8") > 8192)) ||
-        typeof approval.is_break_glass !== "boolean" ||
-        approval.foreign_repository !== false,
-    )
-  )
+  if (comments.some(invalidHistoricalCommentRow) || approvals.some(invalidHistoricalApprovalRow))
     throw new HistoricalUserInventoryUnavailableError();
 }
 
 function assertHistoricalCoreReviewRows(rows: HistoricalCoreSnapshotRows): void {
   const { checklist, reviews, revisions } = rows;
   if (
-    checklist.some(
-      (item) =>
-        !validText(item?.id) ||
-        !isUuid(item.repository_id) ||
-        !isUuid(item.review_id) ||
-        typeof item.completed !== "boolean" ||
-        typeof item.title !== "string" ||
-        Buffer.byteLength(item.title, "utf8") > 8192 ||
-        item.foreign_repository !== false,
-    ) ||
-    reviews.some(
-      (review) =>
-        !isUuid(review?.id) ||
-        !isUuid(review.repository_id) ||
-        !isUuid(review.head_run_id) ||
-        typeof review.title !== "string" ||
-        Buffer.byteLength(review.title, "utf8") > 8192 ||
-        !validText(review.status) ||
-        !validText(review.decision) ||
-        review.foreign_head_run !== false,
-    ) ||
-    revisions.some(
-      (revision) =>
-        !isUuid(revision?.id) ||
-        !isUuid(revision.review_id) ||
-        !Number.isSafeInteger(revision.sequence) ||
-        revision.sequence < 1 ||
-        !isUuid(revision.head_run_id) ||
-        (revision.base_run_id !== null && !isUuid(revision.base_run_id)) ||
-        typeof revision.head_commit_sha !== "string" ||
-        !/^[0-9a-f]{40,64}$/u.test(revision.head_commit_sha) ||
-        typeof revision.evidence_digest !== "string" ||
-        !/^[0-9a-f]{64}$/u.test(revision.evidence_digest) ||
-        revision.foreign_run !== false,
-    )
+    checklist.some(invalidHistoricalChecklistRow) ||
+    reviews.some(invalidHistoricalReviewRow) ||
+    revisions.some(invalidHistoricalRevisionRow)
   )
     throw new HistoricalUserInventoryUnavailableError();
 }
@@ -925,52 +996,36 @@ function assertHistoricalCoreReviewRows(rows: HistoricalCoreSnapshotRows): void 
 function assertHistoricalCoreArtifactRows(rows: HistoricalCoreSnapshotRows): void {
   const { audits, artifacts, runs, findings } = rows;
   if (
-    audits.some(
-      (audit) =>
-        !isUuid(audit?.id) ||
-        !isUuid(audit.repository_id) ||
-        (audit.release_run_id !== null && !isUuid(audit.release_run_id)) ||
-        !validText(audit.event_type, 160) ||
-        !validText(audit.actor_type, 64) ||
-        !validText(audit.subject_type, 64) ||
-        audit.foreign_review_subject !== false,
-    ) ||
-    artifacts.some(
-      (artifact) =>
-        !isUuid(artifact?.id) ||
-        !isUuid(artifact.run_id) ||
-        !validText(artifact.kind) ||
-        !validText(artifact.name, 1024) ||
-        !validText(artifact.role) ||
-        !validText(artifact.content_type) ||
-        typeof artifact.sha256 !== "string" ||
-        !/^[0-9a-f]{64}$/u.test(artifact.sha256) ||
-        typeof artifact.bytes !== "number" ||
-        !Number.isSafeInteger(artifact.bytes) ||
-        artifact.bytes < 0 ||
-        typeof artifact.retention_expired !== "boolean",
-    ) ||
-    runs.some(
-      (run) =>
-        !isUuid(run?.id) ||
-        !isUuid(run.repository_id) ||
-        !validText(run.commit_sha, 128) ||
-        !validText(run.ref) ||
-        !validText(run.status) ||
-        (run.decision !== null && !validText(run.decision)),
-    ) ||
-    findings.some(
-      (finding) =>
-        !isUuid(finding?.id) ||
-        !isUuid(finding.run_id) ||
-        !validText(finding.rule_id) ||
-        !validText(finding.severity) ||
-        typeof finding.message !== "string" ||
-        (finding.path !== null && typeof finding.path !== "string") ||
-        (finding.kind !== null && !validText(finding.kind)),
-    )
+    audits.some(invalidHistoricalAuditRow) ||
+    artifacts.some(invalidHistoricalArtifactRow) ||
+    runs.some(invalidHistoricalRunRow) ||
+    findings.some(invalidHistoricalFindingRow)
   )
     throw new HistoricalUserInventoryUnavailableError();
+}
+
+/** A parent chain must stay within the original review and repository and never cycle. */
+function invalidHistoricalCommentRelationship(
+  comment: HistoricalCommentRow,
+  permittedReviews: Set<string>,
+  commentParents: Map<string, HistoricalCommentRow>,
+): boolean {
+  if (!permittedReviews.has(comment.review_id)) return true;
+  const seen = new Set([comment.id]);
+  let cursor = comment;
+  while (cursor.parent_id !== null) {
+    const parent = commentParents.get(cursor.parent_id);
+    if (
+      !parent ||
+      parent.review_id !== comment.review_id ||
+      parent.repository_id !== comment.repository_id ||
+      seen.has(parent.id)
+    )
+      return true;
+    seen.add(parent.id);
+    cursor = parent;
+  }
+  return false;
 }
 
 function assertHistoricalCoreRelationships(rows: HistoricalCoreSnapshotRows): void {
@@ -1011,24 +1066,7 @@ function assertHistoricalCoreRelationships(rows: HistoricalCoreSnapshotRows): vo
         (revision.base_run_id !== null &&
           runRepositories.get(revision.base_run_id) !== reviewRepositories.get(revision.review_id)),
     ) ||
-    comments.some((comment) => {
-      if (!permittedReviews.has(comment.review_id)) return true;
-      const seen = new Set([comment.id]);
-      let cursor = comment;
-      while (cursor.parent_id !== null) {
-        const parent = commentParents.get(cursor.parent_id);
-        if (
-          !parent ||
-          parent.review_id !== comment.review_id ||
-          parent.repository_id !== comment.repository_id ||
-          seen.has(parent.id)
-        )
-          return true;
-        seen.add(parent.id);
-        cursor = parent;
-      }
-      return false;
-    }) ||
+    comments.some((comment) => invalidHistoricalCommentRelationship(comment, permittedReviews, commentParents)) ||
     approvals.some(
       (approval) =>
         !permittedReviews.has(approval.review_id) ||
