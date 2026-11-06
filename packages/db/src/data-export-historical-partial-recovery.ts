@@ -41,9 +41,11 @@ type RecoveryAssessment =
       workerLivenessProven: false;
     };
 
-function rows(result: unknown): Record<string, unknown>[] {
-  if (!result || typeof result !== "object" || !("rows" in result)) return [];
-  return Array.isArray(result.rows) ? (result.rows as Record<string, unknown>[]) : [];
+function exactRecoveryRow(result: unknown): Record<string, unknown> | null {
+  if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) return null;
+  if (result.rows.length !== 1) return null;
+  const row: unknown = result.rows[0];
+  return row !== null && typeof row === "object" && !Array.isArray(row) ? (row as Record<string, unknown>) : null;
 }
 
 /**
@@ -63,7 +65,7 @@ export async function assessHistoricalUserPrivateReadRecovery(input: RecoveryInp
     return await input.db.withTransaction(
       async (tx): Promise<RecoveryAssessment> => {
         await tx.query("LOCK TABLE public.legal_holds IN SHARE MODE NOWAIT");
-        const owner = rows(
+        const original = exactRecoveryRow(
           await tx.query(
             `SELECT e.tenant_id, (e.status='failed' AND e.created_at <
                    clock_timestamp()-INTERVAL '1 hour') AS failed_aged,
@@ -88,16 +90,16 @@ export async function assessHistoricalUserPrivateReadRecovery(input: RecoveryInp
             [input.authority.exportId, input.authority.verifiedGitHubUserId, input.preflightId],
           ),
         );
-        const original = owner[0];
-        if (typeof original?.tenant_id !== "string") return denied;
-        const lock = rows(
+        if (typeof original?.tenant_id !== "string" || original.tenant_id.length === 0) return denied;
+        const lock = exactRecoveryRow(
           await tx.query(
             "SELECT pg_try_advisory_xact_lock(boardreadyops_historical_transfer_tenant_lock_key($1)) AS acquired",
             [original.tenant_id],
           ),
         );
-        if (lock[0]?.acquired !== true) return { status: "busy", releaseAllowed: false };
-        const blockers = rows(
+        if (!lock) return denied;
+        if (lock.acquired !== true) return { status: "busy", releaseAllowed: false };
+        const blockers = exactRecoveryRow(
           await tx.query(
             `SELECT EXISTS(
            SELECT 1 FROM public.legal_holds h
@@ -111,9 +113,10 @@ export async function assessHistoricalUserPrivateReadRecovery(input: RecoveryInp
             [original.tenant_id],
           ),
         );
-        if (blockers[0]?.held !== false) return { status: "legal_hold", releaseAllowed: false };
-        if (blockers[0]?.erasure !== false) return { status: "real_erasure", releaseAllowed: false };
-        const count = rows(
+        if (!blockers) return denied;
+        if (blockers.held !== false) return { status: "legal_hold", releaseAllowed: false };
+        if (blockers.erasure !== false) return { status: "real_erasure", releaseAllowed: false };
+        const count = exactRecoveryRow(
           await tx.query(
             `SELECT COUNT(*)::integer AS n, MIN(started_at) AS oldest
            FROM public.historical_user_partial_read_reservations
@@ -121,15 +124,16 @@ export async function assessHistoricalUserPrivateReadRecovery(input: RecoveryInp
             AND preflight_id=$3::uuid AND released_at IS NULL`,
             [input.authority.exportId, input.authority.verifiedGitHubUserId, input.preflightId],
           ),
-        )[0];
-        const total = count?.n;
-        if (!Number.isSafeInteger(total) || Number(total) < 0) return denied;
+        );
+        if (!count) return denied;
+        const total = count.n;
+        if (typeof total !== "number" || !Number.isSafeInteger(total) || total < 0) return denied;
         if (total === 0) return { status: "no_unresolved", releaseAllowed: false, unresolvedReaders: 0 };
 
         // DB clock avoids operator/worker clock skew; never proves death.
         const ageEligible = original.failed_aged === true && original.preflight_inactive === true;
         if (!ageEligible) return { status: "active_export", releaseAllowed: false, unresolvedReaders: Number(total) };
-        if (!(count?.oldest instanceof Date)) return denied;
+        if (!(count.oldest instanceof Date) || !Number.isFinite(count.oldest.getTime())) return denied;
         return {
           status: "manual_host_review",
           releaseAllowed: false,
