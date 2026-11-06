@@ -1016,8 +1016,7 @@ function invalidHistoricalCommentRelationship(
   while (cursor.parent_id !== null) {
     const parent = commentParents.get(cursor.parent_id);
     if (
-      !parent ||
-      parent.review_id !== comment.review_id ||
+      parent?.review_id !== comment.review_id ||
       parent.repository_id !== comment.repository_id ||
       seen.has(parent.id)
     )
@@ -1582,8 +1581,7 @@ export async function prepareVerifiedHistoricalUserCompositePreflight(
         revisions.length === 0 ||
         revisions.length > 100 ||
         revisions.some(
-          (row) =>
-            !isUuid(row.id) || typeof row.revision !== "string" || !/^(?:0|[1-9][0-9]{0,18})$/u.test(row.revision),
+          (row) => !isUuid(row.id) || typeof row.revision !== "string" || !/^(?:0|[1-9]\d{0,18})$/u.test(row.revision),
         )
       )
         throw new HistoricalUserInventoryUnavailableError();

@@ -132,8 +132,7 @@ export async function lookupHistoricalUserExportObject(
   const locatorRows = boundedPrepublicationRows(result);
   const row = locatorRows?.length === 1 ? locatorRows[0] : null;
   if (
-    !row ||
-    row.id !== artifactId ||
+    row?.id !== artifactId ||
     !isHistoricalUserUuid(row.run_id) ||
     !isHistoricalUserUuid(row.repository_id) ||
     typeof row.storage_path !== "string" ||
@@ -511,7 +510,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
           [tenant, [...new Set(stableObjects.map((obj) => obj.repositoryId))]],
         );
         const erasureRows = boundedPrepublicationRows(erasureResult);
-        if (erasureRows === null || erasureRows.length !== 0) return "stale";
+        if (erasureRows?.length !== 0) return "stale";
 
         // Enumerate ALL current retained objects, even expired ones, to avoid
         // accidentally accepting a truncated subset of the original account.

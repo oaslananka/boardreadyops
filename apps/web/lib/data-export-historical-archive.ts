@@ -705,8 +705,7 @@ function checkedObjectEntries(
   return snapshot.artifacts.map((artifact) => {
     const object = byId.get(artifact.id);
     if (
-      !object ||
-      object.exportId !== snapshot.exportId ||
+      object?.exportId !== snapshot.exportId ||
       object.runId !== artifact.runId ||
       object.repositoryId !== runRepositories.get(artifact.runId) ||
       object.sha256 !== artifact.sha256 ||
@@ -808,6 +807,11 @@ function validHistoricalPartialReceiptExclusions(
   );
 }
 
+/** Refuse truncated or padded manifest entry lists before any byte/digest checks. */
+function validHistoricalReceiptEntryCount(entries: unknown, fileCount: number): entries is unknown[] {
+  return Array.isArray(entries) && entries.length === fileCount - 1;
+}
+
 /** Exact v3 partial ZIP declaration, including non-customer privacy exclusions. */
 function validHistoricalPartialReceipt(
   receipt: Record<string, unknown>,
@@ -843,8 +847,7 @@ function validHistoricalPartialReceipt(
     receipt.verifiedPhysicalArtifactCount !== snapshot.artifacts.length ||
     receipt.verifiedPrivateVisualDigestCount !== snapshot.excludedSourceClassCounts.runSnapshots ||
     receipt.privateVisualContentsIncluded !== false ||
-    !Array.isArray(receipt.entries) ||
-    receipt.entries.length !== fileCount - 1
+    !validHistoricalReceiptEntryCount(receipt.entries, fileCount)
   );
 }
 

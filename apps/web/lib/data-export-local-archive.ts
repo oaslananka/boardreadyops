@@ -160,12 +160,7 @@ export async function stageClaimedLocalArchiveCommitment(
     throw new ExportArchivePreflightError();
   }
   const staged = await new DataExportArchiveCommitmentStore(input.db).stage(input.claim, archive);
-  if (
-    !staged ||
-    staged.sha256 !== archive.sha256 ||
-    staged.byteLength !== archive.byteLength ||
-    staged.files !== archive.files
-  ) {
+  if (staged?.sha256 !== archive.sha256 || staged.byteLength !== archive.byteLength || staged.files !== archive.files) {
     return null;
   }
   return { archive, expiresAt: staged.expiresAt };
@@ -190,14 +185,9 @@ export async function stageClaimedDurableLocalArchiveCommitment(
     exportId: input.claim.exportId,
     archive,
   });
-  if (!sealed || sealed.sha256 !== archive.sha256 || sealed.byteLength !== archive.byteLength) return null;
+  if (sealed?.sha256 !== archive.sha256 || sealed.byteLength !== archive.byteLength) return null;
   const staged = await new DataExportArchiveCommitmentStore(input.db).stage(input.claim, archive);
-  if (
-    !staged ||
-    staged.sha256 !== archive.sha256 ||
-    staged.byteLength !== archive.byteLength ||
-    staged.files !== archive.files
-  )
+  if (staged?.sha256 !== archive.sha256 || staged.byteLength !== archive.byteLength || staged.files !== archive.files)
     return null;
   return { ...staged };
 }
@@ -236,8 +226,7 @@ export async function readAuthorizedSealedLocalExportArchive(input: {
   if (!bytes) return null;
   const last = await store.auditVerifiedReadForRequester(request, first);
   if (
-    !last ||
-    last.sha256 !== first.sha256 ||
+    last?.sha256 !== first.sha256 ||
     last.byteLength !== first.byteLength ||
     last.files !== first.files ||
     last.expiresAt !== first.expiresAt
