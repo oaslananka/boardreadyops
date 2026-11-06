@@ -176,8 +176,10 @@ export function assessHistoricalUserPrivateArchiveDisclosure(input: {
       privateTextReviewCounts,
       textRightsAcceptance,
       deliveryAcceptance,
-      excludedSensitiveSourceCounts: Object.fromEntries(Object.entries(excluded).sort()),
-      redactedAuditFieldCounts: Object.fromEntries(Object.entries(redacted).sort()),
+      excludedSensitiveSourceCounts: Object.fromEntries(
+        Object.entries(excluded).sort(([a], [b]) => a.localeCompare(b)),
+      ),
+      redactedAuditFieldCounts: Object.fromEntries(Object.entries(redacted).sort(([a], [b]) => a.localeCompare(b))),
       blockers,
     };
   } catch {

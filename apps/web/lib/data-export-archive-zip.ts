@@ -27,7 +27,11 @@ export function prepareClaimedArchiveZip(input: Parameters<typeof prepareClaimed
   }
 
   const names = new Set<string>();
-  const entries = [...prepared.entries].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  const entries = [...prepared.entries].sort((a, b) => {
+    if (a.path < b.path) return -1;
+    if (a.path > b.path) return 1;
+    return 0;
+  });
   for (const entry of entries) {
     if (names.has(entry.path) || entry.bytes.length !== entry.byteLength) {
       throw new ExportArchivePreflightError();
@@ -67,7 +71,11 @@ export function prepareClaimedArchiveZip(input: Parameters<typeof prepareClaimed
     sha256: createHash("sha256").update(receiptBytes).digest("hex"),
     byteLength: receiptBytes.length,
   });
-  entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  entries.sort((a, b) => {
+    if (a.path < b.path) return -1;
+    if (a.path > b.path) return 1;
+    return 0;
+  });
 
   // Reuse the repository's established ZIP writer; no external service, disk,
   // secret or database mutation. Fail closed if ZIP framing exceeds the budget.

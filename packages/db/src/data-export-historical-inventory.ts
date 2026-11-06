@@ -209,7 +209,9 @@ function validAuditRedactionCounts(
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const counts = value as Record<string, unknown>;
   return (
-    Object.keys(counts).sort().join("|") === [...auditRedactionClassNames].sort().join("|") &&
+    Object.keys(counts)
+      .sort((a, b) => a.localeCompare(b))
+      .join("|") === [...auditRedactionClassNames].sort((a, b) => a.localeCompare(b)).join("|") &&
     auditRedactionClassNames.every(
       (key) =>
         Number.isSafeInteger(counts[key]) &&
@@ -223,7 +225,9 @@ function validExcludedClassCounts(value: unknown): value is HistoricalExcludedCl
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return (
-    Object.keys(record).sort().join("|") === [...excludedClassNames].sort().join("|") &&
+    Object.keys(record)
+      .sort((a, b) => a.localeCompare(b))
+      .join("|") === [...excludedClassNames].sort((a, b) => a.localeCompare(b)).join("|") &&
     excludedClassNames.every(
       (key) => Number.isSafeInteger(record[key]) && (record[key] as number) >= 0 && (record[key] as number) <= 100,
     )

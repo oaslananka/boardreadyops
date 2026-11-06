@@ -59,7 +59,7 @@ function verifiedPrivatePartialZipFingerprint(
     const visual = files.get(visualPath);
     const receiptBytes = files.get(receiptPath);
     if (!core || !visual || !receiptBytes || receiptBytes.length > 32 * 1024) return null;
-    const receipt = JSON.parse(receiptBytes.toString("utf8")) as Record<string, unknown>;
+    const receipt = JSON.parse(Buffer.from(receiptBytes).toString("utf8")) as Record<string, unknown>;
     if (
       receipt.exportId !== exportId ||
       receipt.formatVersion !== 3 ||
@@ -70,7 +70,7 @@ function verifiedPrivatePartialZipFingerprint(
       !digestPattern.test(receipt.originalUserMutationEpochSha256)
     )
       return null;
-    const snapshot = JSON.parse(core.toString("utf8")) as {
+    const snapshot = JSON.parse(Buffer.from(core).toString("utf8")) as {
       artifacts: Array<{ id: string; runId: string; sha256: string; byteLength: number; retentionExpired: boolean }>;
       runs: Array<{ id: string; repositoryId: string }>;
       excludedSourceClassCounts: { runSnapshots: number };

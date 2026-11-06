@@ -196,17 +196,15 @@ export async function reserveHistoricalUserObjectBatch(
   )
     return null;
 
-  const sorted = [...objects].sort((a, b) =>
-    a.storagePath < b.storagePath
-      ? -1
-      : a.storagePath > b.storagePath
-        ? 1
-        : a.artifactId < b.artifactId
-          ? -1
-          : a.artifactId > b.artifactId
-            ? 1
-            : 0,
-  );
+  // Keep the existing bytewise lock ordering: every worker must claim
+  // artifacts in a stable order to avoid cross-worker deadlocks.
+  const sorted = [...objects].sort((a, b) => {
+    if (a.storagePath < b.storagePath) return -1;
+    if (a.storagePath > b.storagePath) return 1;
+    if (a.artifactId < b.artifactId) return -1;
+    if (a.artifactId > b.artifactId) return 1;
+    return 0;
+  });
   class BatchAdmissionUnavailable extends Error {}
   try {
     return await db.withTransaction(

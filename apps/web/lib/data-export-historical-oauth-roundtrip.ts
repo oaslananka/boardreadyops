@@ -14,7 +14,7 @@ import { configuredSessionSecret } from "./user-session.js";
 import { sessionCookieName } from "./viewer-authorization.js";
 
 export const historicalStepUpStateCookieName = "__Host-brops_historical_stepup_state";
-export const historicalStepUpProofCookieName = "__Host-brops_historical_stepup_proof";
+const historicalStepUpProofCookieName = "__Host-brops_historical_stepup_proof";
 const challengeLifetimeMs = 5 * 60_000;
 const maximumClockSkewMs = 30_000;
 const domainSeparator = "boardreadyops-historical-oauth-challenge-v1";

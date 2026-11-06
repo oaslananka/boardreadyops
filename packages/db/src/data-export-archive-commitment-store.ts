@@ -336,14 +336,14 @@ export class DataExportArchiveCommitmentStore {
       (row.archive_byte_length as number) > maxArchiveBytes
     )
       return null;
-    const disposition =
-      row.cleaned_at != null
-        ? "cleaned"
-        : row.has_hold === true
-          ? "hold"
-          : row.revoked_at != null || Date.parse(String(row.expires_at)) <= Date.now()
-            ? "eligible"
-            : "active";
+    let disposition: "cleaned" | "hold" | "eligible" | "active" = "active";
+    if (row.cleaned_at != null) {
+      disposition = "cleaned";
+    } else if (row.has_hold === true) {
+      disposition = "hold";
+    } else if (row.revoked_at != null || Date.parse(String(row.expires_at)) <= Date.now()) {
+      disposition = "eligible";
+    }
     return {
       sha256: row.archive_sha256,
       byteLength: row.archive_byte_length as number,

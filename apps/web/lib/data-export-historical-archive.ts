@@ -367,7 +367,7 @@ function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: numbe
     !excluded ||
     typeof excluded !== "object" ||
     Array.isArray(excluded) ||
-    Object.keys(excluded).sort().join("|") !== [...excludedSourceClassNames].sort().join("|") ||
+    !exactKeys(excluded, excludedSourceClassNames) ||
     excludedSourceClassNames.some(
       (key) => !Number.isSafeInteger(excluded[key]) || excluded[key] < 0 || excluded[key] > maxObjects,
     )
@@ -378,7 +378,7 @@ function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: numbe
     !redacted ||
     typeof redacted !== "object" ||
     Array.isArray(redacted) ||
-    Object.keys(redacted).sort().join("|") !== [...redactedAuditCountKeys].sort().join("|") ||
+    !exactKeys(redacted, redactedAuditCountKeys) ||
     redactedAuditCountKeys.some(
       (key) =>
         !Number.isSafeInteger(redacted[key]) ||
@@ -403,7 +403,7 @@ function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: numbe
     audit &&
     typeof audit === "object" &&
     !Array.isArray(audit) &&
-    Object.keys(audit).sort().join("|") === [...keys].sort().join("|") &&
+    exactKeys(audit, keys) &&
     uuid.test(audit.id) &&
     typeof audit.eventType === "string" &&
     audit.eventType.length <= 160 &&
@@ -544,10 +544,15 @@ function checkedVisualEvidence(snapshot: HistoricalSnapshot, evidence: Historica
     !parsed ||
     typeof parsed !== "object" ||
     Array.isArray(parsed) ||
-    Object.keys(parsed).sort().join("|") !==
-      ["kind", "formatVersion", "exportId", "completeCustomerExport", "contentIncluded", "exclusions", "visuals"]
-        .sort()
-        .join("|") ||
+    !exactKeys(parsed, [
+      "kind",
+      "formatVersion",
+      "exportId",
+      "completeCustomerExport",
+      "contentIncluded",
+      "exclusions",
+      "visuals",
+    ]) ||
     parsed.kind !== "boardreadyops.historical-user-private-visual-evidence-preflight" ||
     parsed.formatVersion !== 1 ||
     parsed.exportId !== snapshot.exportId ||
@@ -576,8 +581,7 @@ function checkedVisualEvidence(snapshot: HistoricalSnapshot, evidence: Historica
     }
     const visual = item as Record<string, unknown>;
     if (
-      Object.keys(visual).sort().join("|") !==
-        ["id", "runId", "repositoryId", "kind", "format", "sha256", "byteLength"].sort().join("|") ||
+      !exactKeys(visual, ["id", "runId", "repositoryId", "kind", "format", "sha256", "byteLength"]) ||
       typeof visual.id !== "string" ||
       !uuid.test(visual.id) ||
       ids.has(visual.id) ||
@@ -657,7 +661,7 @@ export function prepareHistoricalUserPartialArchive(input: {
     { name: metadataPath, data: Buffer.from(input.snapshot.bytes), store: false },
     { name: visualEvidencePath, data: visualBytes, store: false },
     ...objects,
-  ].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  ].sort((a, b) => a.name.localeCompare(b.name));
   let totalBytes = 0;
   for (const entry of entries) {
     totalBytes += entry.data.length;
@@ -698,7 +702,7 @@ export function prepareHistoricalUserPartialArchive(input: {
     throw new HistoricalUserArchivePreflightError();
   }
   entries.push({ name: receiptPath, data: receipt, store: false });
-  entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  entries.sort((a, b) => a.name.localeCompare(b.name));
   const bytes = createZipBuffer(entries, fixedTime);
   if (!bytes.length || bytes.length > maxArchiveBytes) throw new HistoricalUserArchivePreflightError();
   return { bytes, sha256: digest(bytes), byteLength: bytes.length, files: entries.length };
@@ -743,7 +747,7 @@ export function verifyHistoricalUserPartialArchive(
       sha256: digest(visualBytes),
       visualCount: snapshot.excludedSourceClassCounts.runSnapshots,
     });
-    const receipt = JSON.parse(receiptBytes.toString("utf8")) as Record<string, unknown>;
+    const receipt = JSON.parse(Buffer.from(receiptBytes).toString("utf8")) as Record<string, unknown>;
     const receiptFields = [
       "kind",
       "formatVersion",
@@ -784,7 +788,7 @@ export function verifyHistoricalUserPartialArchive(
       receipt.entries.length !== files.size - 1
     )
       return false;
-    const paths = [...files.keys()].filter((path) => path !== receiptPath).sort();
+    const paths = [...files.keys()].filter((path) => path !== receiptPath).sort((a, b) => a.localeCompare(b));
     if (paths.some((path) => path !== metadataPath && path !== visualEvidencePath && !objectPath.test(path)))
       return false;
     const artifactMap = new Map(snapshot.artifacts.map((artifact) => [artifact.id, artifact]));
@@ -924,7 +928,7 @@ export function verifyHistoricalUserMetadataOnlyArchive(
       byteLength: visualBytes.length,
       visualCount: snapshot.excludedSourceClassCounts.runSnapshots,
     });
-    const receipt = JSON.parse(receiptBytes.toString("utf8")) as Record<string, unknown>;
+    const receipt = JSON.parse(Buffer.from(receiptBytes).toString("utf8")) as Record<string, unknown>;
     const receiptFields = [
       "kind",
       "formatVersion",
@@ -960,7 +964,7 @@ export function verifyHistoricalUserMetadataOnlyArchive(
       receipt.entries.length !== 2
     )
       return false;
-    const paths = [metadataPath, visualEvidencePath].sort();
+    const paths = [metadataPath, visualEvidencePath].sort((a, b) => a.localeCompare(b));
     const receiptEntries = receipt.entries as Array<Record<string, unknown>>;
     return paths.every((path, index) => {
       const content = files.get(path);

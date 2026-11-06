@@ -77,7 +77,7 @@ export function verifyClaimedExportArchiveIntegrity(
       return false;
     }
 
-    const paths = [...files.keys()].filter((path) => path !== receiptPath).sort();
+    const paths = [...files.keys()].filter((path) => path !== receiptPath).sort((a, b) => a.localeCompare(b));
     if (record.entries.length !== paths.length) return false;
     if ([...metadataPaths].some((path) => !files.has(path))) return false;
     if (paths.some((path) => !metadataPaths.has(path) && !artifactPath.test(path))) return false;
