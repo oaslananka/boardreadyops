@@ -2,6 +2,35 @@ import type { PgQueryExecutor } from "./pg-executor.js";
 
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
 
+type RecoveryInput = {
+  db: Pick<PgQueryExecutor, "withTransaction">;
+  authority: { exportId: string; verifiedGitHubUserId: number };
+  preflightId: string;
+};
+
+function validRecoveryInput(input: unknown): input is RecoveryInput {
+  if (input === null || typeof input !== "object") return false;
+  const candidate = input as Record<string, unknown>;
+  if (
+    candidate.db === null ||
+    typeof candidate.db !== "object" ||
+    !("withTransaction" in candidate.db) ||
+    typeof candidate.db.withTransaction !== "function"
+  )
+    return false;
+  if (candidate.authority === null || typeof candidate.authority !== "object") return false;
+  const authority = candidate.authority as Record<string, unknown>;
+  return (
+    typeof authority.exportId === "string" &&
+    uuid.test(authority.exportId) &&
+    typeof authority.verifiedGitHubUserId === "number" &&
+    Number.isSafeInteger(authority.verifiedGitHubUserId) &&
+    authority.verifiedGitHubUserId > 0 &&
+    typeof candidate.preflightId === "string" &&
+    uuid.test(candidate.preflightId)
+  );
+}
+
 type RecoveryAssessment =
   | { status: "unverified" | "busy" | "legal_hold" | "real_erasure"; releaseAllowed: false }
   | { status: "active_export" | "no_unresolved"; releaseAllowed: false; unresolvedReaders: number }
@@ -14,7 +43,8 @@ type RecoveryAssessment =
     };
 
 function rows(result: unknown): Record<string, unknown>[] {
-  return (result as { rows?: Record<string, unknown>[] })?.rows ?? [];
+  if (!result || typeof result !== "object" || !("rows" in result)) return [];
+  return Array.isArray(result.rows) ? (result.rows as Record<string, unknown>[]) : [];
 }
 
 /**
@@ -27,20 +57,9 @@ function rows(result: unknown): Record<string, unknown>[] {
  * revoked/expired preflight must retain every unresolved reservation until
  * an independent, future worker-liveness/fencing protocol is accepted.
  */
-export async function assessHistoricalUserPrivateReadRecovery(input: {
-  db: Pick<PgQueryExecutor, "withTransaction">;
-  authority: { exportId: string; verifiedGitHubUserId: number };
-  preflightId: string;
-}): Promise<RecoveryAssessment> {
+export async function assessHistoricalUserPrivateReadRecovery(input: RecoveryInput): Promise<RecoveryAssessment> {
   const denied: RecoveryAssessment = { status: "unverified", releaseAllowed: false };
-  if (
-    !input?.db?.withTransaction ||
-    !uuid.test(input?.authority?.exportId) ||
-    !Number.isSafeInteger(input?.authority?.verifiedGitHubUserId) ||
-    input.authority.verifiedGitHubUserId <= 0 ||
-    !uuid.test(input?.preflightId)
-  )
-    return denied;
+  if (!validRecoveryInput(input)) return denied;
   try {
     return await input.db.withTransaction(
       async (tx): Promise<RecoveryAssessment> => {

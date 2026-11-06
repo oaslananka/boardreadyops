@@ -14,20 +14,43 @@ type PrivatePartialBinding = {
 };
 type PrivatePartialReservation = { token: string };
 
-function valid(input: PrivatePartialBinding): boolean {
+function valid(input: unknown): input is PrivatePartialBinding {
+  if (input === null || typeof input !== "object") return false;
+  const candidate = input as Record<string, unknown>;
   return (
-    uuid.test(input?.exportId) &&
-    Number.isSafeInteger(input?.verifiedGitHubUserId) &&
-    input.verifiedGitHubUserId > 0 &&
-    uuid.test(input?.preflightId) &&
-    digest.test(input?.sha256) &&
-    Number.isSafeInteger(input?.byteLength) &&
-    input.byteLength >= 1 &&
-    input.byteLength <= 64 * 1024 * 1024
+    typeof candidate.exportId === "string" &&
+    uuid.test(candidate.exportId) &&
+    typeof candidate.verifiedGitHubUserId === "number" &&
+    Number.isSafeInteger(candidate.verifiedGitHubUserId) &&
+    candidate.verifiedGitHubUserId > 0 &&
+    typeof candidate.preflightId === "string" &&
+    uuid.test(candidate.preflightId) &&
+    typeof candidate.sha256 === "string" &&
+    digest.test(candidate.sha256) &&
+    typeof candidate.byteLength === "number" &&
+    Number.isSafeInteger(candidate.byteLength) &&
+    candidate.byteLength >= 1 &&
+    candidate.byteLength <= 64 * 1024 * 1024
   );
 }
+
+function validReservation(input: unknown): input is PrivatePartialBinding & PrivatePartialReservation {
+  if (!valid(input)) return false;
+  const candidate = input as unknown as Record<string, unknown>;
+  return typeof candidate.token === "string" && uuid.test(candidate.token);
+}
+
+function hasTransaction(db: unknown): db is ReaderDb {
+  return db !== null && typeof db === "object" && "withTransaction" in db && typeof db.withTransaction === "function";
+}
+
+function hasQuery(db: unknown): db is Pick<PgQueryExecutor, "query"> {
+  return db !== null && typeof db === "object" && "query" in db && typeof db.query === "function";
+}
+
 function rows(result: unknown): Record<string, unknown>[] {
-  return (result as { rows?: Record<string, unknown>[] })?.rows ?? [];
+  if (!result || typeof result !== "object" || !("rows" in result)) return [];
+  return Array.isArray(result.rows) ? (result.rows as Record<string, unknown>[]) : [];
 }
 
 /**
@@ -42,7 +65,7 @@ export async function reserveHistoricalUserPrivatePartialRead(
   db: ReaderDb,
   binding: PrivatePartialBinding,
 ): Promise<PrivatePartialReservation | null> {
-  if (!db?.withTransaction || !valid(binding)) return null;
+  if (!hasTransaction(db) || !valid(binding)) return null;
   const token = randomUUID();
   try {
     return await db.withTransaction(
@@ -134,7 +157,7 @@ export async function releaseHistoricalUserPrivatePartialRead(
   db: Pick<PgQueryExecutor, "query">,
   input: PrivatePartialBinding & PrivatePartialReservation,
 ): Promise<boolean> {
-  if (!db?.query || !valid(input) || !uuid.test(input?.token)) return false;
+  if (!hasQuery(db) || !validReservation(input)) return false;
   try {
     const released = rows(
       await db.query(
