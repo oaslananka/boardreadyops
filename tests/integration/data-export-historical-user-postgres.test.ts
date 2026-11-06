@@ -50,6 +50,674 @@ afterAll(async () => {
   }
 });
 
+function makeHistoricalSnapshotFixture(exportId: string, sourceInstallationId: string) {
+  const ownerRepo = randomUUID();
+  const ownerRun = randomUUID();
+  const ownerFinding = randomUUID();
+  const lookalikeInstallation = randomUUID();
+  const lookalikeRepo = randomUUID();
+  const lookalikeRun = randomUUID();
+  const lookalikeFinding = randomUUID();
+  const ownerArtifact = randomUUID();
+  const foreignArtifact = randomUUID();
+  const ownerReview = randomUUID();
+  const foreignReview = randomUUID();
+  const ownerRevision = randomUUID();
+  const foreignRevision = randomUUID();
+  const ownerComment = randomUUID();
+  const foreignComment = randomUUID();
+  const ownerApproval = randomUUID();
+  const foreignApproval = randomUUID();
+  const ownerChecklist = randomUUID();
+  const foreignChecklist = randomUUID();
+  const ownerDecision = `fdec_${randomUUID()}`;
+  const foreignDecision = `fdec_${randomUUID()}`;
+  const ownerAssignment = `fasn_${randomUUID()}`;
+  const foreignAssignment = `fasn_${randomUUID()}`;
+  const ownerInstallationAudit = randomUUID();
+  const foreignInstallationAudit = randomUUID();
+  const ownerAudit = randomUUID();
+  const foreignAudit = randomUUID();
+  const crossAudit = randomUUID();
+  const repoNumber = 8_000_000_000 + Math.floor(Math.random() * 100_000);
+  return {
+    exportId,
+    sourceInstallationId,
+    ownerRepo,
+    ownerRun,
+    ownerFinding,
+    lookalikeInstallation,
+    lookalikeRepo,
+    lookalikeRun,
+    lookalikeFinding,
+    ownerArtifact,
+    foreignArtifact,
+    ownerReview,
+    foreignReview,
+    ownerRevision,
+    foreignRevision,
+    ownerComment,
+    foreignComment,
+    ownerApproval,
+    foreignApproval,
+    ownerChecklist,
+    foreignChecklist,
+    ownerDecision,
+    foreignDecision,
+    ownerAssignment,
+    foreignAssignment,
+    ownerInstallationAudit,
+    foreignInstallationAudit,
+    ownerAudit,
+    foreignAudit,
+    crossAudit,
+    repoNumber,
+  };
+}
+
+type HistoricalSnapshotFixture = ReturnType<typeof makeHistoricalSnapshotFixture>;
+type HistoricalTestProbe = Parameters<typeof prepareVerifiedHistoricalUserConsistentCorePreflight>[0] & {
+  query: ReturnType<typeof executor>["query"];
+};
+
+async function seedHistoricalSnapshotFixtures(
+  probe: HistoricalTestProbe,
+  fixture: HistoricalSnapshotFixture,
+): Promise<void> {
+  const {
+    sourceInstallationId,
+    ownerRepo,
+    ownerRun,
+    ownerFinding,
+    lookalikeInstallation,
+    lookalikeRepo,
+    lookalikeRun,
+    lookalikeFinding,
+    ownerArtifact,
+    foreignArtifact,
+    ownerReview,
+    foreignReview,
+    ownerRevision,
+    foreignRevision,
+    ownerComment,
+    foreignComment,
+    ownerApproval,
+    foreignApproval,
+    ownerChecklist,
+    foreignChecklist,
+    ownerDecision,
+    foreignDecision,
+    ownerAssignment,
+    foreignAssignment,
+    ownerInstallationAudit,
+    foreignInstallationAudit,
+    ownerAudit,
+    foreignAudit,
+    repoNumber,
+  } = fixture;
+  await probe.query(
+    `INSERT INTO repositories(id,installation_id,github_repo_id,owner,name,default_branch,disabled_at)
+  VALUES($1,$2,$3,$4,'retained-user-evidence','main',NOW())`,
+    [ownerRepo, sourceInstallationId, repoNumber, login],
+  );
+  await probe.query(
+    `INSERT INTO installations(id,github_installation_id,account_login,account_type,account_user_id,suspended_at)
+  VALUES($1,$2,$3,'User',$4,NOW())`,
+    [lookalikeInstallation, externalInstallationId + 8_000_000, login, accountUserId + 99],
+  );
+  await probe.query(
+    `INSERT INTO repositories(id,installation_id,github_repo_id,owner,name,default_branch)
+  VALUES($1,$2,$3,$4,'lookalike-evidence','main')`,
+    [lookalikeRepo, lookalikeInstallation, repoNumber + 1, login],
+  );
+  for (const [repo, run, finding, tag] of [
+    [ownerRepo, ownerRun, ownerFinding, "owner"],
+    [lookalikeRepo, lookalikeRun, lookalikeFinding, "foreign"],
+  ]) {
+    await probe.query(
+      `INSERT INTO release_runs(id,repository_id,commit_sha,ref,trigger_kind,status)
+    VALUES($1,$2,$3,'refs/heads/main','manual','completed')`,
+      [run, repo, "a".repeat(40)],
+    );
+    await probe.query(
+      `INSERT INTO findings(id,run_id,rule_id,severity,message,path,kind)
+    VALUES($1,$2,$3,'warning',$4,'board.kicad_pcb','erc')`,
+      [finding, run, `rule-${tag}`, `private-finding-${tag}`],
+    );
+    await probe.query(
+      `INSERT INTO artifacts(id,run_id,kind,name,role,storage_path,sha256,bytes,content_type,uploaded_at,retention_until)
+    VALUES($1,$2,'manufacturing',$3,'package',$4,$5,512,'application/zip',
+           '2026-11-01'::timestamptz,'2026-11-02'::timestamptz)`,
+      [
+        tag === "owner" ? ownerArtifact : foreignArtifact,
+        run,
+        `test-${tag}.zip`,
+        `secret/internal/owner-${tag}`,
+        tag === "owner" ? "d".repeat(64) : "e".repeat(64),
+      ],
+    );
+    const reviewId = tag === "owner" ? ownerReview : foreignReview;
+    await probe.query(
+      `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
+    VALUES($1,$2,$3,'completed','approved',$4)`,
+      [reviewId, repo, `sensitive-review-${tag}`, run],
+    );
+    await probe.query(
+      `INSERT INTO review_revisions(id,review_id,sequence,head_run_id,head_commit_sha,evidence_digest)
+    VALUES($1,$2,1,$3,$4,$5)`,
+      [tag === "owner" ? ownerRevision : foreignRevision, reviewId, run, "a".repeat(40), "b".repeat(64)],
+    );
+    await probe.query(
+      `INSERT INTO review_comments(id,repository_id,review_id,author_id,content)
+        VALUES($1,$2,$3,$4,$5)`,
+      [tag === "owner" ? ownerComment : foreignComment, repo, reviewId, `reviewer-${tag}`, `private-comment-${tag}`],
+    );
+    await probe.query(
+      `INSERT INTO review_approvals(id,repository_id,review_id,revision_id,evidence_digest,approver_id,status,reason)
+        VALUES($1,$2,$3,$4,$5,$6,'approved',$7)`,
+      [
+        tag === "owner" ? ownerApproval : foreignApproval,
+        repo,
+        reviewId,
+        tag === "owner" ? ownerRevision : foreignRevision,
+        "b".repeat(64),
+        `reviewer-${tag}`,
+        `private-approval-reason-${tag}`,
+      ],
+    );
+    await probe.query(
+      `INSERT INTO review_checklist_items(id,repository_id,review_id,title,completed)
+        VALUES($1,$2,$3,$4,TRUE)`,
+      [tag === "owner" ? ownerChecklist : foreignChecklist, repo, reviewId, `private-title-${tag}`],
+    );
+    await probe.query(
+      `INSERT INTO finding_decisions(id,repository_id,review_id,finding_fingerprint,disposition,reason,owner,evidence_digest,actor_id)
+        VALUES($1,$2,$3,$4,'mitigated',$5,$6,$7,$8)`,
+      [
+        tag === "owner" ? ownerDecision : foreignDecision,
+        repo,
+        reviewId,
+        `finding-fingerprint-${tag}`,
+        `private-finding-decision-reason-${tag}`,
+        `secret-finding-owner-${tag}`,
+        "c".repeat(64),
+        `secret-finding-actor-${tag}`,
+      ],
+    );
+    await probe.query(
+      `INSERT INTO finding_assignments(id,repository_id,review_id,finding_fingerprint,assignee,assigned_by)
+        VALUES($1,$2,$3,$4,$5,$6)`,
+      [
+        tag === "owner" ? ownerAssignment : foreignAssignment,
+        repo,
+        reviewId,
+        `finding-fingerprint-${tag}`,
+        `private-finding-assignee-${tag}`,
+        `private-assigned-by-${tag}`,
+      ],
+    );
+    // Count sensitive records without copying secrets, design IP or
+    // runner identities. Include same-login foreign owner adversary.
+    const fixtureInstallation = tag === "owner" ? sourceInstallationId : lookalikeInstallation;
+    await probe.query(
+      `INSERT INTO run_snapshots(id,run_id,snapshot_id,name,kind,format,sheet_or_layer,width,height,content,sha256)
+        VALUES($1,$2,$3,$4,'pcb_layer','svg','F.Cu',100,80,$5,$6)`,
+      [
+        randomUUID(),
+        run,
+        `snapshot-${tag}`,
+        `private-visual-${tag}`,
+        `<svg>private-kicad-design-${tag}</svg>`,
+        tag === "owner" ? "7".repeat(64) : "8".repeat(64),
+      ],
+    );
+    await probe.query(
+      `INSERT INTO api_tokens(id,repository_id,name,token_prefix,token_hash)
+        VALUES($1,$2,$3,$4,$5)`,
+      [
+        randomUUID(),
+        repo,
+        `private-api-token-${tag}`,
+        `secret-prefix-${tag}`,
+        tag === "owner" ? "7".repeat(64) : "8".repeat(64),
+      ],
+    );
+    await probe.query(
+      `INSERT INTO runner_registrations(id,installation_id,name)
+        VALUES($1,$2,$3)`,
+      [randomUUID(), fixtureInstallation, `private-runner-${tag}`],
+    );
+    await probe.query(
+      `INSERT INTO installation_component_credentials(installation_id,provider,credential_envelope)
+        VALUES($1,'synthetic',$2)`,
+      [fixtureInstallation, `private-credential-envelope-${tag}`],
+    );
+    await probe.query(
+      `INSERT INTO installation_component_observations(id,installation_id,provider,mpn,status,source)
+        VALUES($1,$2,'synthetic',$3,'unknown','synthetic')`,
+      [randomUUID(), fixtureInstallation, `private-component-${tag}`],
+    );
+    await probe.query(
+      `INSERT INTO audit_events(id,installation_id,event_type,actor_type,actor_id,actor_login,subject_type,subject_id,request_id,metadata)
+        VALUES($1,$2,'installation.suspended','system','hidden-actor',$3,'installation',$4,$5,$6::jsonb)`,
+      [
+        tag === "owner" ? ownerInstallationAudit : foreignInstallationAudit,
+        tag === "owner" ? sourceInstallationId : lookalikeInstallation,
+        `hidden-inst-login-${tag}`,
+        tag === "owner" ? sourceInstallationId : lookalikeInstallation,
+        `hidden-inst-request-${tag}`,
+        JSON.stringify({ privateAuditMetadata: `hidden-installation-${tag}` }),
+      ],
+    );
+    await probe.query(
+      `INSERT INTO audit_events(id,installation_id,event_type,actor_type,actor_id,actor_login,subject_type,subject_id,repository_id,release_run_id,request_id,metadata)
+    VALUES($1,$2,'review.approved',$3,$4,$5,'review',$6,$7,$8,$9,$10::jsonb)`,
+      [
+        tag === "owner" ? ownerAudit : foreignAudit,
+        tag === "owner" ? sourceInstallationId : lookalikeInstallation,
+        `private_actor_type_${tag}`,
+        `hidden-repo-actor-${tag}`,
+        `hidden-repo-login-${tag}`,
+        reviewId,
+        repo,
+        run,
+        `hidden-repo-request-${tag}`,
+        JSON.stringify({ privateAuditMetadata: `never-export-${tag}` }),
+      ],
+    );
+  }
+}
+
+async function verifyHistoricalSourceEvidence(probe: HistoricalTestProbe, fixture: HistoricalSnapshotFixture) {
+  const { exportId, ownerRepo, ownerRun, ownerFinding, lookalikeRepo } = fixture;
+  const evidence = await prepareVerifiedHistoricalUserRunFindingSnapshot(probe, {
+    exportId,
+    verifiedGitHubUserId: accountUserId,
+  });
+  expect(evidence?.runCount).toBe(1);
+  expect(evidence?.findingCount).toBe(1);
+  expect(evidence?.sha256).toBe(
+    createHash("sha256")
+      .update(evidence?.bytes ?? Buffer.alloc(0))
+      .digest("hex"),
+  );
+  const body = JSON.parse(evidence?.bytes.toString("utf8") ?? "{}");
+  expect(body).toMatchObject({
+    kind: "boardreadyops.historical-user-run-finding-preflight",
+    completeCustomerExport: false,
+    exportId,
+  });
+  expect(body.runs).toEqual([expect.objectContaining({ id: ownerRun, repositoryId: ownerRepo })]);
+  expect(body.findings).toEqual([
+    expect.objectContaining({ id: ownerFinding, runId: ownerRun, message: "private-finding-owner" }),
+  ]);
+  expect(JSON.stringify(body)).not.toContain("private-finding-foreign");
+  expect(JSON.stringify(body)).not.toContain(lookalikeRepo);
+  const combined = await prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
+    exportId,
+    verifiedGitHubUserId: accountUserId,
+  });
+  expect(combined).toMatchObject({
+    repositoryCount: 1,
+    runCount: 1,
+    findingCount: 1,
+    artifactCount: 1,
+    reviewCount: 1,
+    revisionCount: 1,
+    auditCount: 1,
+    installationAuditCount: expect.any(Number),
+    commentCount: 1,
+    approvalCount: 1,
+    checklistCount: 1,
+    findingDecisionCount: 1,
+    findingAssignmentCount: 1,
+    excludedSourceClassCounts: {
+      runSnapshots: 1,
+      apiTokens: 1,
+      runnerRegistrations: 1,
+      installationComponentCredentials: 1,
+      installationComponentObservations: 1,
+    },
+  });
+  expect(combined?.byteLength).toBe(combined?.bytes.byteLength);
+  expect(combined?.sha256).toBe(
+    createHash("sha256")
+      .update(combined?.bytes ?? Buffer.alloc(0))
+      .digest("hex"),
+  );
+  const combinedPayload = JSON.parse(combined?.bytes.toString("utf8") ?? "{}");
+  return { combined, combinedPayload };
+}
+
+async function verifyHistoricalPrivacyRedactions(
+  probe: HistoricalTestProbe,
+  fixture: HistoricalSnapshotFixture,
+  combined: Awaited<ReturnType<typeof prepareVerifiedHistoricalUserConsistentCorePreflight>>,
+  combinedPayload: Awaited<ReturnType<typeof verifyHistoricalSourceEvidence>>["combinedPayload"],
+): Promise<void> {
+  const {
+    exportId,
+    ownerRepo,
+    ownerRun,
+    ownerFinding,
+    ownerArtifact,
+    ownerReview,
+    ownerRevision,
+    ownerComment,
+    ownerApproval,
+    ownerChecklist,
+    ownerDecision,
+    ownerAssignment,
+    ownerInstallationAudit,
+    ownerAudit,
+  } = fixture;
+  expect(combinedPayload).toMatchObject({
+    kind: "boardreadyops.historical-user-consistent-core-preflight",
+    completeCustomerExport: false,
+    exportId,
+  });
+  expect(combinedPayload.repositories).toEqual([expect.objectContaining({ repositoryId: ownerRepo, disabled: true })]);
+  expect(combinedPayload.runs).toEqual([expect.objectContaining({ id: ownerRun, repositoryId: ownerRepo })]);
+  expect(combinedPayload.findings).toEqual([
+    expect.objectContaining({ id: ownerFinding, runId: ownerRun, message: "" }),
+  ]);
+  expect(combinedPayload.excludedSourceClassCounts).toEqual({
+    runSnapshots: 1,
+    apiTokens: 1,
+    runnerRegistrations: 1,
+    installationComponentCredentials: 1,
+    installationComponentObservations: 1,
+  });
+  expect(combinedPayload.exclusions).toContain("unverified-collaboration-and-finding-free-text");
+  expect(combinedPayload.exclusions).toContain("unverified-repository-review-and-artifact-identifying-metadata");
+  expect(combinedPayload.repositories[0]).toMatchObject({ owner: "", name: "" });
+  expect(combinedPayload.runs[0].ref).toBe("");
+  expect(combinedPayload.findings[0].path).toBeNull();
+  expect(combinedPayload.artifacts[0].name).toBe("");
+  expect(combinedPayload.reviewComments[0].evidenceAnchor).toBeNull();
+  expect(JSON.stringify(combinedPayload)).not.toContain("sensitive-review-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-retained");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-owner");
+  expect(combinedPayload.exclusions).toEqual(
+    expect.arrayContaining([
+      "run-snapshot-private-visual-content",
+      "api-token-hashes-prefixes-and-creator-identities",
+      "runner-registration-identifiers",
+      "installation-credential-envelopes",
+      "installation-component-observation-data",
+      "unverifiable-tenant-only-policy-and-billing-records",
+    ]),
+  );
+  expect(combinedPayload.artifacts).toEqual([
+    expect.objectContaining({
+      id: ownerArtifact,
+      runId: ownerRun,
+      sha256: "d".repeat(64),
+      byteLength: 512,
+      retentionExpired: true,
+      contentsVerified: false,
+      downloadAvailable: false,
+    }),
+  ]);
+  expect(combinedPayload.reviews).toEqual([
+    expect.objectContaining({
+      id: ownerReview,
+      repositoryId: ownerRepo,
+      headRunId: ownerRun,
+      title: "",
+    }),
+  ]);
+  expect(combinedPayload.revisions).toEqual([
+    expect.objectContaining({
+      id: ownerRevision,
+      reviewId: ownerReview,
+      headRunId: ownerRun,
+      evidenceDigest: "b".repeat(64),
+    }),
+  ]);
+  expect(combinedPayload.reviewComments).toEqual([
+    expect.objectContaining({
+      id: ownerComment,
+      reviewId: ownerReview,
+      repositoryId: ownerRepo,
+      status: "open",
+      content: "",
+      contentIncluded: false,
+      authorIdIncluded: false,
+    }),
+  ]);
+  expect(combinedPayload.reviewApprovals).toEqual([
+    expect.objectContaining({
+      id: ownerApproval,
+      reviewId: ownerReview,
+      revisionId: ownerRevision,
+      reason: null,
+      invalidationReason: null,
+      actorIncluded: false,
+    }),
+  ]);
+  expect(combinedPayload.reviewChecklist).toEqual([
+    expect.objectContaining({
+      id: ownerChecklist,
+      reviewId: ownerReview,
+      completed: true,
+      title: "",
+      titleIncluded: false,
+      completedByIncluded: false,
+    }),
+  ]);
+  expect(combinedPayload.findingDecisions).toEqual([
+    expect.objectContaining({
+      id: ownerDecision,
+      reviewId: ownerReview,
+      repositoryId: ownerRepo,
+      findingFingerprint: "finding-fingerprint-owner",
+      disposition: "mitigated",
+      reason: "",
+      evidenceDigest: "c".repeat(64),
+      ownerIncluded: false,
+      actorIncluded: false,
+    }),
+  ]);
+  expect(combinedPayload.findingAssignments).toEqual([
+    expect.objectContaining({
+      id: ownerAssignment,
+      reviewId: ownerReview,
+      repositoryId: ownerRepo,
+      findingFingerprint: "finding-fingerprint-owner",
+      assigneeIncluded: false,
+      assignedByIncluded: false,
+    }),
+  ]);
+  expect(combined?.installationAuditCount).toBeGreaterThanOrEqual(1);
+  expect(combinedPayload.installationAuditEvents).toHaveLength(combined?.installationAuditCount ?? -1);
+  expect(combinedPayload.installationAuditEvents).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: ownerInstallationAudit,
+        eventType: "installation.suspended",
+        actorType: "system",
+        subjectType: "installation",
+        actorDetailsIncluded: false,
+        subjectDetailsIncluded: false,
+        requestIdIncluded: false,
+        metadataIncluded: false,
+      }),
+    ]),
+  );
+  expect(combinedPayload.auditEvents).toEqual([
+    expect.objectContaining({
+      id: ownerAudit,
+      repositoryId: ownerRepo,
+      releaseRunId: ownerRun,
+      eventType: "review.approved",
+      actorType: "redacted",
+      actorDetailsIncluded: false,
+      subjectDetailsIncluded: false,
+      requestIdIncluded: false,
+      metadataIncluded: false,
+    }),
+  ]);
+  expect(combined?.redactedAuditFieldCounts).toMatchObject({
+    repositoryActorIdentities: 1,
+    repositorySubjectIdentifiers: 1,
+    repositoryRequestIdentifiers: 1,
+    repositoryPrivateMetadata: 1,
+  });
+  expect(combinedPayload.redactedAuditFieldCounts).toEqual(combined?.redactedAuditFieldCounts);
+  expect(combinedPayload.redactedAuditFieldCounts).toMatchObject({
+    repositoryActorIdentities: 1,
+    repositorySubjectIdentifiers: 1,
+    repositoryRequestIdentifiers: 1,
+    repositoryPrivateMetadata: 1,
+  });
+  for (const key of [
+    "installationActorIdentities",
+    "installationSubjectIdentifiers",
+    "installationRequestIdentifiers",
+    "installationPrivateMetadata",
+  ])
+    expect(combinedPayload.redactedAuditFieldCounts[key]).toBeGreaterThanOrEqual(1);
+  await verifyHistoricalNoLeakage(probe, fixture, combinedPayload);
+}
+
+async function verifyHistoricalNoLeakage(
+  probe: HistoricalTestProbe,
+  fixture: HistoricalSnapshotFixture,
+  combinedPayload: Awaited<ReturnType<typeof verifyHistoricalSourceEvidence>>["combinedPayload"],
+): Promise<void> {
+  const {
+    sourceInstallationId,
+    lookalikeRepo,
+    foreignArtifact,
+    foreignReview,
+    foreignRevision,
+    ownerComment,
+    foreignComment,
+    foreignApproval,
+    foreignChecklist,
+    foreignDecision,
+    foreignAssignment,
+    foreignInstallationAudit,
+    foreignAudit,
+  } = fixture;
+  for (const owner of ["owner", "foreign"]) {
+    for (const confidential of [
+      `hidden-inst-login-${owner}`,
+      `hidden-inst-request-${owner}`,
+      `hidden-repo-actor-${owner}`,
+      `hidden-repo-login-${owner}`,
+      `hidden-repo-request-${owner}`,
+      `private_actor_type_${owner}`,
+    ])
+      expect(JSON.stringify(combinedPayload)).not.toContain(confidential);
+  }
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-comment-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-comment-foreign");
+  const storedComment = await probe.query("SELECT content FROM review_comments WHERE id=$1", [ownerComment]);
+  expect((storedComment as { rows?: Array<{ content: string }> }).rows?.[0]?.content).toBe("private-comment-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-title-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-approval-reason-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-approval-reason-foreign");
+  expect(JSON.stringify(combinedPayload)).not.toContain("reviewer-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-decision-reason-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-decision-reason-foreign");
+  expect(JSON.stringify(combinedPayload)).not.toContain("secret-finding-owner-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("secret-finding-actor-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-assignee-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-assigned-by-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignDecision);
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignAssignment);
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignComment);
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignApproval);
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignChecklist);
+  expect(JSON.stringify(combinedPayload)).not.toContain("hidden-actor");
+  expect(JSON.stringify(combinedPayload)).not.toContain("hidden-installation-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("hidden-installation-foreign");
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignInstallationAudit);
+  expect(JSON.stringify(combinedPayload)).not.toContain(sourceInstallationId);
+  expect(JSON.stringify(combinedPayload)).not.toContain("never-export-owner");
+  expect(JSON.stringify(combinedPayload)).not.toContain("never-export-foreign");
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignReview);
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignRevision);
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignAudit);
+  expect(JSON.stringify(combinedPayload)).not.toContain("secret/internal/");
+  expect(JSON.stringify(combinedPayload)).not.toContain(lookalikeRepo);
+  for (const tag of ["owner", "foreign"]) {
+    for (const protectedValue of [
+      `private-kicad-design-${tag}`,
+      `private-api-token-${tag}`,
+      `secret-prefix-${tag}`,
+      `private-runner-${tag}`,
+      `private-credential-envelope-${tag}`,
+      `private-component-${tag}`,
+    ])
+      expect(JSON.stringify(combinedPayload)).not.toContain(protectedValue);
+  }
+  expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-foreign");
+  expect(JSON.stringify(combinedPayload)).not.toContain(foreignArtifact);
+}
+
+async function verifyHistoricalAdversarialCases(
+  probe: HistoricalTestProbe,
+  fixture: HistoricalSnapshotFixture,
+): Promise<void> {
+  const { exportId, sourceInstallationId, ownerRepo, ownerRun, foreignReview, crossAudit } = fixture;
+  // A known sensitive source class above 100 must not be silently
+  // truncated into an apparently complete source inventory.
+  await probe.query(
+    `INSERT INTO run_snapshots(id,run_id,snapshot_id,name,kind,format,sheet_or_layer,width,height,content,sha256)
+        SELECT gen_random_uuid()::text,$1,'overflow-'||i,'private-overflow-'||i,
+               'pcb_layer','svg','F.Cu',100,80,'<svg>hidden</svg>',$2
+          FROM generate_series(1,101) AS i`,
+    [ownerRun, "7".repeat(64)],
+  );
+  await expect(
+    prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
+      exportId,
+      verifiedGitHubUserId: accountUserId,
+    }),
+  ).rejects.toBeInstanceOf(HistoricalUserInventoryUnavailableError);
+  await probe.query("DELETE FROM run_snapshots WHERE run_id=$1 AND snapshot_id LIKE 'overflow-%'", [ownerRun]);
+  // Repository-linked audit pointing at a foreign review must fail closed,
+  // even though the DB permits an opaque subject id without a review FK.
+  await probe.query(
+    `INSERT INTO audit_events(id,installation_id,event_type,actor_type,subject_type,subject_id,repository_id,release_run_id)
+  VALUES($1,$2,'review.approved','system','review',$3,$4,$5)`,
+    [crossAudit, sourceInstallationId, foreignReview, ownerRepo, ownerRun],
+  );
+  await expect(
+    prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
+      exportId,
+      verifiedGitHubUserId: accountUserId,
+    }),
+  ).rejects.toBeInstanceOf(HistoricalUserInventoryUnavailableError);
+  expect(
+    await prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
+      exportId,
+      verifiedGitHubUserId: accountUserId + 99,
+    }),
+  ).toBeNull();
+  expect(
+    await prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
+      exportId: "../unsafe",
+      verifiedGitHubUserId: accountUserId,
+    }),
+  ).toBeNull();
+  expect(
+    await prepareVerifiedHistoricalUserRunFindingSnapshot(probe, {
+      exportId,
+      verifiedGitHubUserId: accountUserId + 99,
+    }),
+  ).toBeNull();
+  expect(
+    await prepareVerifiedHistoricalUserRunFindingSnapshot(probe, {
+      exportId: "../unsafe",
+      verifiedGitHubUserId: accountUserId,
+    }),
+  ).toBeNull();
+}
+
 describeDatabase("immutable GitHub original-account evidence after user App uninstall", () => {
   it("persists stable account ID and creates one identity-bound uninstalled user-scope export", async () => {
     const lifecycle = store();
@@ -374,550 +1042,12 @@ describeDatabase("immutable GitHub original-account evidence after user App unin
         )[0];
         const exportId = String(exportRow?.id);
         const sourceInstallationId = String(former?.id);
-        const ownerRepo = randomUUID();
-        const ownerRun = randomUUID();
-        const ownerFinding = randomUUID();
-        const lookalikeInstallation = randomUUID();
-        const lookalikeRepo = randomUUID();
-        const lookalikeRun = randomUUID();
-        const lookalikeFinding = randomUUID();
-        const ownerArtifact = randomUUID();
-        const foreignArtifact = randomUUID();
-        const ownerReview = randomUUID();
-        const foreignReview = randomUUID();
-        const ownerRevision = randomUUID();
-        const foreignRevision = randomUUID();
-        const ownerComment = randomUUID();
-        const foreignComment = randomUUID();
-        const ownerApproval = randomUUID();
-        const foreignApproval = randomUUID();
-        const ownerChecklist = randomUUID();
-        const foreignChecklist = randomUUID();
-        const ownerDecision = `fdec_${randomUUID()}`;
-        const foreignDecision = `fdec_${randomUUID()}`;
-        const ownerAssignment = `fasn_${randomUUID()}`;
-        const foreignAssignment = `fasn_${randomUUID()}`;
-        const ownerInstallationAudit = randomUUID();
-        const foreignInstallationAudit = randomUUID();
-        const ownerAudit = randomUUID();
-        const foreignAudit = randomUUID();
-        const crossAudit = randomUUID();
-        const repoNumber = 8_000_000_000 + Math.floor(Math.random() * 100_000);
+        const fixture = makeHistoricalSnapshotFixture(exportId, sourceInstallationId);
         {
-          await probe.query(
-            `INSERT INTO repositories(id,installation_id,github_repo_id,owner,name,default_branch,disabled_at)
-         VALUES($1,$2,$3,$4,'retained-user-evidence','main',NOW())`,
-            [ownerRepo, sourceInstallationId, repoNumber, login],
-          );
-          await probe.query(
-            `INSERT INTO installations(id,github_installation_id,account_login,account_type,account_user_id,suspended_at)
-         VALUES($1,$2,$3,'User',$4,NOW())`,
-            [lookalikeInstallation, externalInstallationId + 8_000_000, login, accountUserId + 99],
-          );
-          await probe.query(
-            `INSERT INTO repositories(id,installation_id,github_repo_id,owner,name,default_branch)
-         VALUES($1,$2,$3,$4,'lookalike-evidence','main')`,
-            [lookalikeRepo, lookalikeInstallation, repoNumber + 1, login],
-          );
-          for (const [repo, run, finding, tag] of [
-            [ownerRepo, ownerRun, ownerFinding, "owner"],
-            [lookalikeRepo, lookalikeRun, lookalikeFinding, "foreign"],
-          ]) {
-            await probe.query(
-              `INSERT INTO release_runs(id,repository_id,commit_sha,ref,trigger_kind,status)
-           VALUES($1,$2,$3,'refs/heads/main','manual','completed')`,
-              [run, repo, "a".repeat(40)],
-            );
-            await probe.query(
-              `INSERT INTO findings(id,run_id,rule_id,severity,message,path,kind)
-           VALUES($1,$2,$3,'warning',$4,'board.kicad_pcb','erc')`,
-              [finding, run, `rule-${tag}`, `private-finding-${tag}`],
-            );
-            await probe.query(
-              `INSERT INTO artifacts(id,run_id,kind,name,role,storage_path,sha256,bytes,content_type,uploaded_at,retention_until)
-           VALUES($1,$2,'manufacturing',$3,'package',$4,$5,512,'application/zip',
-                  '2026-11-01'::timestamptz,'2026-11-02'::timestamptz)`,
-              [
-                tag === "owner" ? ownerArtifact : foreignArtifact,
-                run,
-                `test-${tag}.zip`,
-                `secret/internal/owner-${tag}`,
-                tag === "owner" ? "d".repeat(64) : "e".repeat(64),
-              ],
-            );
-            const reviewId = tag === "owner" ? ownerReview : foreignReview;
-            await probe.query(
-              `INSERT INTO reviews(id,repository_id,title,status,decision,head_run_id)
-           VALUES($1,$2,$3,'completed','approved',$4)`,
-              [reviewId, repo, `sensitive-review-${tag}`, run],
-            );
-            await probe.query(
-              `INSERT INTO review_revisions(id,review_id,sequence,head_run_id,head_commit_sha,evidence_digest)
-           VALUES($1,$2,1,$3,$4,$5)`,
-              [tag === "owner" ? ownerRevision : foreignRevision, reviewId, run, "a".repeat(40), "b".repeat(64)],
-            );
-            await probe.query(
-              `INSERT INTO review_comments(id,repository_id,review_id,author_id,content)
-               VALUES($1,$2,$3,$4,$5)`,
-              [
-                tag === "owner" ? ownerComment : foreignComment,
-                repo,
-                reviewId,
-                `reviewer-${tag}`,
-                `private-comment-${tag}`,
-              ],
-            );
-            await probe.query(
-              `INSERT INTO review_approvals(id,repository_id,review_id,revision_id,evidence_digest,approver_id,status,reason)
-               VALUES($1,$2,$3,$4,$5,$6,'approved',$7)`,
-              [
-                tag === "owner" ? ownerApproval : foreignApproval,
-                repo,
-                reviewId,
-                tag === "owner" ? ownerRevision : foreignRevision,
-                "b".repeat(64),
-                `reviewer-${tag}`,
-                `private-approval-reason-${tag}`,
-              ],
-            );
-            await probe.query(
-              `INSERT INTO review_checklist_items(id,repository_id,review_id,title,completed)
-               VALUES($1,$2,$3,$4,TRUE)`,
-              [tag === "owner" ? ownerChecklist : foreignChecklist, repo, reviewId, `private-title-${tag}`],
-            );
-            await probe.query(
-              `INSERT INTO finding_decisions(id,repository_id,review_id,finding_fingerprint,disposition,reason,owner,evidence_digest,actor_id)
-               VALUES($1,$2,$3,$4,'mitigated',$5,$6,$7,$8)`,
-              [
-                tag === "owner" ? ownerDecision : foreignDecision,
-                repo,
-                reviewId,
-                `finding-fingerprint-${tag}`,
-                `private-finding-decision-reason-${tag}`,
-                `secret-finding-owner-${tag}`,
-                "c".repeat(64),
-                `secret-finding-actor-${tag}`,
-              ],
-            );
-            await probe.query(
-              `INSERT INTO finding_assignments(id,repository_id,review_id,finding_fingerprint,assignee,assigned_by)
-               VALUES($1,$2,$3,$4,$5,$6)`,
-              [
-                tag === "owner" ? ownerAssignment : foreignAssignment,
-                repo,
-                reviewId,
-                `finding-fingerprint-${tag}`,
-                `private-finding-assignee-${tag}`,
-                `private-assigned-by-${tag}`,
-              ],
-            );
-            // Count sensitive records without copying secrets, design IP or
-            // runner identities. Include same-login foreign owner adversary.
-            const fixtureInstallation = tag === "owner" ? sourceInstallationId : lookalikeInstallation;
-            await probe.query(
-              `INSERT INTO run_snapshots(id,run_id,snapshot_id,name,kind,format,sheet_or_layer,width,height,content,sha256)
-               VALUES($1,$2,$3,$4,'pcb_layer','svg','F.Cu',100,80,$5,$6)`,
-              [
-                randomUUID(),
-                run,
-                `snapshot-${tag}`,
-                `private-visual-${tag}`,
-                `<svg>private-kicad-design-${tag}</svg>`,
-                tag === "owner" ? "7".repeat(64) : "8".repeat(64),
-              ],
-            );
-            await probe.query(
-              `INSERT INTO api_tokens(id,repository_id,name,token_prefix,token_hash)
-               VALUES($1,$2,$3,$4,$5)`,
-              [
-                randomUUID(),
-                repo,
-                `private-api-token-${tag}`,
-                `secret-prefix-${tag}`,
-                tag === "owner" ? "7".repeat(64) : "8".repeat(64),
-              ],
-            );
-            await probe.query(
-              `INSERT INTO runner_registrations(id,installation_id,name)
-               VALUES($1,$2,$3)`,
-              [randomUUID(), fixtureInstallation, `private-runner-${tag}`],
-            );
-            await probe.query(
-              `INSERT INTO installation_component_credentials(installation_id,provider,credential_envelope)
-               VALUES($1,'synthetic',$2)`,
-              [fixtureInstallation, `private-credential-envelope-${tag}`],
-            );
-            await probe.query(
-              `INSERT INTO installation_component_observations(id,installation_id,provider,mpn,status,source)
-               VALUES($1,$2,'synthetic',$3,'unknown','synthetic')`,
-              [randomUUID(), fixtureInstallation, `private-component-${tag}`],
-            );
-            await probe.query(
-              `INSERT INTO audit_events(id,installation_id,event_type,actor_type,actor_id,actor_login,subject_type,subject_id,request_id,metadata)
-               VALUES($1,$2,'installation.suspended','system','hidden-actor',$3,'installation',$4,$5,$6::jsonb)`,
-              [
-                tag === "owner" ? ownerInstallationAudit : foreignInstallationAudit,
-                tag === "owner" ? sourceInstallationId : lookalikeInstallation,
-                `hidden-inst-login-${tag}`,
-                tag === "owner" ? sourceInstallationId : lookalikeInstallation,
-                `hidden-inst-request-${tag}`,
-                JSON.stringify({ privateAuditMetadata: `hidden-installation-${tag}` }),
-              ],
-            );
-            await probe.query(
-              `INSERT INTO audit_events(id,installation_id,event_type,actor_type,actor_id,actor_login,subject_type,subject_id,repository_id,release_run_id,request_id,metadata)
-           VALUES($1,$2,'review.approved',$3,$4,$5,'review',$6,$7,$8,$9,$10::jsonb)`,
-              [
-                tag === "owner" ? ownerAudit : foreignAudit,
-                tag === "owner" ? sourceInstallationId : lookalikeInstallation,
-                `private_actor_type_${tag}`,
-                `hidden-repo-actor-${tag}`,
-                `hidden-repo-login-${tag}`,
-                reviewId,
-                repo,
-                run,
-                `hidden-repo-request-${tag}`,
-                JSON.stringify({ privateAuditMetadata: `never-export-${tag}` }),
-              ],
-            );
-          }
-          const evidence = await prepareVerifiedHistoricalUserRunFindingSnapshot(probe, {
-            exportId,
-            verifiedGitHubUserId: accountUserId,
-          });
-          expect(evidence?.runCount).toBe(1);
-          expect(evidence?.findingCount).toBe(1);
-          expect(evidence?.sha256).toBe(
-            createHash("sha256")
-              .update(evidence?.bytes ?? Buffer.alloc(0))
-              .digest("hex"),
-          );
-          const body = JSON.parse(evidence?.bytes.toString("utf8") ?? "{}");
-          expect(body).toMatchObject({
-            kind: "boardreadyops.historical-user-run-finding-preflight",
-            completeCustomerExport: false,
-            exportId,
-          });
-          expect(body.runs).toEqual([expect.objectContaining({ id: ownerRun, repositoryId: ownerRepo })]);
-          expect(body.findings).toEqual([
-            expect.objectContaining({ id: ownerFinding, runId: ownerRun, message: "private-finding-owner" }),
-          ]);
-          expect(JSON.stringify(body)).not.toContain("private-finding-foreign");
-          expect(JSON.stringify(body)).not.toContain(lookalikeRepo);
-          const combined = await prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
-            exportId,
-            verifiedGitHubUserId: accountUserId,
-          });
-          expect(combined).toMatchObject({
-            repositoryCount: 1,
-            runCount: 1,
-            findingCount: 1,
-            artifactCount: 1,
-            reviewCount: 1,
-            revisionCount: 1,
-            auditCount: 1,
-            installationAuditCount: expect.any(Number),
-            commentCount: 1,
-            approvalCount: 1,
-            checklistCount: 1,
-            findingDecisionCount: 1,
-            findingAssignmentCount: 1,
-            excludedSourceClassCounts: {
-              runSnapshots: 1,
-              apiTokens: 1,
-              runnerRegistrations: 1,
-              installationComponentCredentials: 1,
-              installationComponentObservations: 1,
-            },
-          });
-          expect(combined?.byteLength).toBe(combined?.bytes.byteLength);
-          expect(combined?.sha256).toBe(
-            createHash("sha256")
-              .update(combined?.bytes ?? Buffer.alloc(0))
-              .digest("hex"),
-          );
-          const combinedPayload = JSON.parse(combined?.bytes.toString("utf8") ?? "{}");
-          expect(combinedPayload).toMatchObject({
-            kind: "boardreadyops.historical-user-consistent-core-preflight",
-            completeCustomerExport: false,
-            exportId,
-          });
-          expect(combinedPayload.repositories).toEqual([
-            expect.objectContaining({ repositoryId: ownerRepo, disabled: true }),
-          ]);
-          expect(combinedPayload.runs).toEqual([expect.objectContaining({ id: ownerRun, repositoryId: ownerRepo })]);
-          expect(combinedPayload.findings).toEqual([
-            expect.objectContaining({ id: ownerFinding, runId: ownerRun, message: "" }),
-          ]);
-          expect(combinedPayload.excludedSourceClassCounts).toEqual({
-            runSnapshots: 1,
-            apiTokens: 1,
-            runnerRegistrations: 1,
-            installationComponentCredentials: 1,
-            installationComponentObservations: 1,
-          });
-          expect(combinedPayload.exclusions).toContain("unverified-collaboration-and-finding-free-text");
-          expect(combinedPayload.exclusions).toContain(
-            "unverified-repository-review-and-artifact-identifying-metadata",
-          );
-          expect(combinedPayload.repositories[0]).toMatchObject({ owner: "", name: "" });
-          expect(combinedPayload.runs[0].ref).toBe("");
-          expect(combinedPayload.findings[0].path).toBeNull();
-          expect(combinedPayload.artifacts[0].name).toBe("");
-          expect(combinedPayload.reviewComments[0].evidenceAnchor).toBeNull();
-          expect(JSON.stringify(combinedPayload)).not.toContain("sensitive-review-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-retained");
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-owner");
-          expect(combinedPayload.exclusions).toEqual(
-            expect.arrayContaining([
-              "run-snapshot-private-visual-content",
-              "api-token-hashes-prefixes-and-creator-identities",
-              "runner-registration-identifiers",
-              "installation-credential-envelopes",
-              "installation-component-observation-data",
-              "unverifiable-tenant-only-policy-and-billing-records",
-            ]),
-          );
-          expect(combinedPayload.artifacts).toEqual([
-            expect.objectContaining({
-              id: ownerArtifact,
-              runId: ownerRun,
-              sha256: "d".repeat(64),
-              byteLength: 512,
-              retentionExpired: true,
-              contentsVerified: false,
-              downloadAvailable: false,
-            }),
-          ]);
-          expect(combinedPayload.reviews).toEqual([
-            expect.objectContaining({
-              id: ownerReview,
-              repositoryId: ownerRepo,
-              headRunId: ownerRun,
-              title: "",
-            }),
-          ]);
-          expect(combinedPayload.revisions).toEqual([
-            expect.objectContaining({
-              id: ownerRevision,
-              reviewId: ownerReview,
-              headRunId: ownerRun,
-              evidenceDigest: "b".repeat(64),
-            }),
-          ]);
-          expect(combinedPayload.reviewComments).toEqual([
-            expect.objectContaining({
-              id: ownerComment,
-              reviewId: ownerReview,
-              repositoryId: ownerRepo,
-              status: "open",
-              content: "",
-              contentIncluded: false,
-              authorIdIncluded: false,
-            }),
-          ]);
-          expect(combinedPayload.reviewApprovals).toEqual([
-            expect.objectContaining({
-              id: ownerApproval,
-              reviewId: ownerReview,
-              revisionId: ownerRevision,
-              reason: null,
-              invalidationReason: null,
-              actorIncluded: false,
-            }),
-          ]);
-          expect(combinedPayload.reviewChecklist).toEqual([
-            expect.objectContaining({
-              id: ownerChecklist,
-              reviewId: ownerReview,
-              completed: true,
-              title: "",
-              titleIncluded: false,
-              completedByIncluded: false,
-            }),
-          ]);
-          expect(combinedPayload.findingDecisions).toEqual([
-            expect.objectContaining({
-              id: ownerDecision,
-              reviewId: ownerReview,
-              repositoryId: ownerRepo,
-              findingFingerprint: "finding-fingerprint-owner",
-              disposition: "mitigated",
-              reason: "",
-              evidenceDigest: "c".repeat(64),
-              ownerIncluded: false,
-              actorIncluded: false,
-            }),
-          ]);
-          expect(combinedPayload.findingAssignments).toEqual([
-            expect.objectContaining({
-              id: ownerAssignment,
-              reviewId: ownerReview,
-              repositoryId: ownerRepo,
-              findingFingerprint: "finding-fingerprint-owner",
-              assigneeIncluded: false,
-              assignedByIncluded: false,
-            }),
-          ]);
-          expect(combined?.installationAuditCount).toBeGreaterThanOrEqual(1);
-          expect(combinedPayload.installationAuditEvents).toHaveLength(combined?.installationAuditCount ?? -1);
-          expect(combinedPayload.installationAuditEvents).toEqual(
-            expect.arrayContaining([
-              expect.objectContaining({
-                id: ownerInstallationAudit,
-                eventType: "installation.suspended",
-                actorType: "system",
-                subjectType: "installation",
-                actorDetailsIncluded: false,
-                subjectDetailsIncluded: false,
-                requestIdIncluded: false,
-                metadataIncluded: false,
-              }),
-            ]),
-          );
-          expect(combinedPayload.auditEvents).toEqual([
-            expect.objectContaining({
-              id: ownerAudit,
-              repositoryId: ownerRepo,
-              releaseRunId: ownerRun,
-              eventType: "review.approved",
-              actorType: "redacted",
-              actorDetailsIncluded: false,
-              subjectDetailsIncluded: false,
-              requestIdIncluded: false,
-              metadataIncluded: false,
-            }),
-          ]);
-          expect(combined?.redactedAuditFieldCounts).toMatchObject({
-            repositoryActorIdentities: 1,
-            repositorySubjectIdentifiers: 1,
-            repositoryRequestIdentifiers: 1,
-            repositoryPrivateMetadata: 1,
-          });
-          expect(combinedPayload.redactedAuditFieldCounts).toEqual(combined?.redactedAuditFieldCounts);
-          expect(combinedPayload.redactedAuditFieldCounts).toMatchObject({
-            repositoryActorIdentities: 1,
-            repositorySubjectIdentifiers: 1,
-            repositoryRequestIdentifiers: 1,
-            repositoryPrivateMetadata: 1,
-          });
-          for (const key of [
-            "installationActorIdentities",
-            "installationSubjectIdentifiers",
-            "installationRequestIdentifiers",
-            "installationPrivateMetadata",
-          ])
-            expect(combinedPayload.redactedAuditFieldCounts[key]).toBeGreaterThanOrEqual(1);
-          for (const owner of ["owner", "foreign"]) {
-            for (const confidential of [
-              `hidden-inst-login-${owner}`,
-              `hidden-inst-request-${owner}`,
-              `hidden-repo-actor-${owner}`,
-              `hidden-repo-login-${owner}`,
-              `hidden-repo-request-${owner}`,
-              `private_actor_type_${owner}`,
-            ])
-              expect(JSON.stringify(combinedPayload)).not.toContain(confidential);
-          }
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-comment-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-comment-foreign");
-          const storedComment = await probe.query("SELECT content FROM review_comments WHERE id=$1", [ownerComment]);
-          expect((storedComment as { rows?: Array<{ content: string }> }).rows?.[0]?.content).toBe(
-            "private-comment-owner",
-          );
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-title-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-approval-reason-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-approval-reason-foreign");
-          expect(JSON.stringify(combinedPayload)).not.toContain("reviewer-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-decision-reason-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-decision-reason-foreign");
-          expect(JSON.stringify(combinedPayload)).not.toContain("secret-finding-owner-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("secret-finding-actor-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-assignee-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-assigned-by-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignDecision);
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignAssignment);
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignComment);
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignApproval);
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignChecklist);
-          expect(JSON.stringify(combinedPayload)).not.toContain("hidden-actor");
-          expect(JSON.stringify(combinedPayload)).not.toContain("hidden-installation-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("hidden-installation-foreign");
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignInstallationAudit);
-          expect(JSON.stringify(combinedPayload)).not.toContain(sourceInstallationId);
-          expect(JSON.stringify(combinedPayload)).not.toContain("never-export-owner");
-          expect(JSON.stringify(combinedPayload)).not.toContain("never-export-foreign");
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignReview);
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignRevision);
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignAudit);
-          expect(JSON.stringify(combinedPayload)).not.toContain("secret/internal/");
-          expect(JSON.stringify(combinedPayload)).not.toContain(lookalikeRepo);
-          for (const tag of ["owner", "foreign"]) {
-            for (const protectedValue of [
-              `private-kicad-design-${tag}`,
-              `private-api-token-${tag}`,
-              `secret-prefix-${tag}`,
-              `private-runner-${tag}`,
-              `private-credential-envelope-${tag}`,
-              `private-component-${tag}`,
-            ])
-              expect(JSON.stringify(combinedPayload)).not.toContain(protectedValue);
-          }
-          expect(JSON.stringify(combinedPayload)).not.toContain("private-finding-foreign");
-          expect(JSON.stringify(combinedPayload)).not.toContain(foreignArtifact);
-          // A known sensitive source class above 100 must not be silently
-          // truncated into an apparently complete source inventory.
-          await probe.query(
-            `INSERT INTO run_snapshots(id,run_id,snapshot_id,name,kind,format,sheet_or_layer,width,height,content,sha256)
-               SELECT gen_random_uuid()::text,$1,'overflow-'||i,'private-overflow-'||i,
-                      'pcb_layer','svg','F.Cu',100,80,'<svg>hidden</svg>',$2
-                 FROM generate_series(1,101) AS i`,
-            [ownerRun, "7".repeat(64)],
-          );
-          await expect(
-            prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
-              exportId,
-              verifiedGitHubUserId: accountUserId,
-            }),
-          ).rejects.toBeInstanceOf(HistoricalUserInventoryUnavailableError);
-          await probe.query("DELETE FROM run_snapshots WHERE run_id=$1 AND snapshot_id LIKE 'overflow-%'", [ownerRun]);
-          // Repository-linked audit pointing at a foreign review must fail closed,
-          // even though the DB permits an opaque subject id without a review FK.
-          await probe.query(
-            `INSERT INTO audit_events(id,installation_id,event_type,actor_type,subject_type,subject_id,repository_id,release_run_id)
-         VALUES($1,$2,'review.approved','system','review',$3,$4,$5)`,
-            [crossAudit, sourceInstallationId, foreignReview, ownerRepo, ownerRun],
-          );
-          await expect(
-            prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
-              exportId,
-              verifiedGitHubUserId: accountUserId,
-            }),
-          ).rejects.toBeInstanceOf(HistoricalUserInventoryUnavailableError);
-          expect(
-            await prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
-              exportId,
-              verifiedGitHubUserId: accountUserId + 99,
-            }),
-          ).toBeNull();
-          expect(
-            await prepareVerifiedHistoricalUserConsistentCorePreflight(probe, {
-              exportId: "../unsafe",
-              verifiedGitHubUserId: accountUserId,
-            }),
-          ).toBeNull();
-          expect(
-            await prepareVerifiedHistoricalUserRunFindingSnapshot(probe, {
-              exportId,
-              verifiedGitHubUserId: accountUserId + 99,
-            }),
-          ).toBeNull();
-          expect(
-            await prepareVerifiedHistoricalUserRunFindingSnapshot(probe, {
-              exportId: "../unsafe",
-              verifiedGitHubUserId: accountUserId,
-            }),
-          ).toBeNull();
+          await seedHistoricalSnapshotFixtures(probe, fixture);
+          const { combined, combinedPayload } = await verifyHistoricalSourceEvidence(probe, fixture);
+          await verifyHistoricalPrivacyRedactions(probe, fixture, combined, combinedPayload);
+          await verifyHistoricalAdversarialCases(probe, fixture);
         }
         throw new Error(rollback);
       }),
