@@ -138,8 +138,7 @@ describe("historical original numeric USER fresh live GitHub OAuth step-up (priv
         throw new Error("DB must not be reached");
       },
     };
-    const result = await stageLiveGitHubVerifiedHistoricalPrivatePreflight({
-      ...proof(liveFetch(identityId + 1)),
+    const result = await stageLiveGitHubVerifiedHistoricalPrivatePreflight(proof(liveFetch(identityId + 1)), {
       db: db as never,
       archiveBytes: Buffer.from("malformed partial ZIP"),
       ttlSeconds: 60,

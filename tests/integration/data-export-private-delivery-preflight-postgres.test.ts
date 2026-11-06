@@ -659,10 +659,11 @@ describeDb("original USER private non-customer delivery preflight", () => {
           return new Response(JSON.stringify({ installations: [] }));
         throw new Error("Unexpected external endpoint");
       }) as typeof fetch;
-    const data = {
-      db: executor(),
+    const signedUser = recentOAuthSession(liveGithubUserId);
+    const proofData = {
       exportId: liveExportId,
-      ...recentOAuthSession(liveGithubUserId),
+      sessionCookie: signedUser.sessionCookie,
+      now: signedUser.now,
       environment: {
         ...signingEnvironment,
         GITHUB_CLIENT_ID: "Iv1.test-app",
@@ -672,36 +673,47 @@ describeDb("original USER private non-customer delivery preflight", () => {
       oauthStateCookie,
       callbackState,
       authorizationCode: "one-time-fixture-code",
-      archiveBytes: liveVerifiedArchiveBytes,
-      ttlSeconds: 60,
     };
+    const archiveData = { db: executor(), archiveBytes: liveVerifiedArchiveBytes, ttlSeconds: 60 };
 
     // A recycled login with a DIFFERENT immutable /user numeric ID is not authority.
     expect(
-      await stageLiveGitHubVerifiedHistoricalPrivatePreflight({
-        ...data,
-        fetch: liveOAuthFetch(liveGithubUserId + 1),
-      }),
+      await stageLiveGitHubVerifiedHistoricalPrivatePreflight(
+        {
+          ...proofData,
+          fetch: liveOAuthFetch(liveGithubUserId + 1),
+        },
+        archiveData,
+      ),
     ).toBeNull();
     expect(
-      await stageLiveGitHubVerifiedHistoricalPrivatePreflight({
-        ...data,
-        callbackState: "H".repeat(48),
-        fetch: liveOAuthFetch(liveGithubUserId),
-      }),
+      await stageLiveGitHubVerifiedHistoricalPrivatePreflight(
+        {
+          ...proofData,
+          callbackState: "H".repeat(48),
+          fetch: liveOAuthFetch(liveGithubUserId),
+        },
+        archiveData,
+      ),
     ).toBeNull();
     expect(
-      await stageLiveGitHubVerifiedHistoricalPrivatePreflight({
-        ...data,
-        oauthStateCookie: `${csrfState}.${encodeURIComponent(`/dashboard?historical_user_export=${expiringExportId}`)}`,
-        fetch: liveOAuthFetch(liveGithubUserId),
-      }),
+      await stageLiveGitHubVerifiedHistoricalPrivatePreflight(
+        {
+          ...proofData,
+          oauthStateCookie: `${csrfState}.${encodeURIComponent(`/dashboard?historical_user_export=${expiringExportId}`)}`,
+          fetch: liveOAuthFetch(liveGithubUserId),
+        },
+        archiveData,
+      ),
     ).toBeNull();
 
-    const allowed = await stageLiveGitHubVerifiedHistoricalPrivatePreflight({
-      ...data,
-      fetch: liveOAuthFetch(liveGithubUserId),
-    });
+    const allowed = await stageLiveGitHubVerifiedHistoricalPrivatePreflight(
+      {
+        ...proofData,
+        fetch: liveOAuthFetch(liveGithubUserId),
+      },
+      archiveData,
+    );
     expect(allowed?.id).toMatch(/^[0-9a-f-]{36}$/u);
     if (!allowed) throw new Error("Missing private GitHub reauthenticated preflight");
     const saved = await rows(

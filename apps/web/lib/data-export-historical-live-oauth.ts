@@ -93,13 +93,15 @@ export async function freshLiveGitHubOriginalUserAuthority(
  * succeed. This remains private and permanently customer-delivery denied.
  */
 export async function stageLiveGitHubVerifiedHistoricalPrivatePreflight(
-  input: LiveProofInput & {
+  proof: LiveProofInput,
+  input: {
     db: PgQueryExecutor;
     archiveBytes: Buffer;
     ttlSeconds: number;
   },
 ): Promise<{ id: string } | null> {
-  const authority = await freshLiveGitHubOriginalUserAuthority(input);
+  // OAuth credentials remain in a distinct trust class from archive bytes.
+  const authority = await freshLiveGitHubOriginalUserAuthority(proof);
   if (!authority) return null;
   return stageVerifiedHistoricalUserPrivateArchivePreflight({
     db: input.db,
