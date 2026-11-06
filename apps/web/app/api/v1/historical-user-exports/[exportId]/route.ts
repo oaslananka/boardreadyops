@@ -1,4 +1,5 @@
 import { DataLifecycleStore } from "@boardreadyops/db";
+import { isHistoricalUserUuid } from "@boardreadyops/db/data-export-historical-uuid";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { optionalCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
 import { viewerAuthorization } from "../../../../../lib/viewer-authorization.js";
@@ -36,7 +37,7 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
     return denied(403, "origin denied");
 
   const { exportId } = await context.params;
-  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(exportId)) return denied(404, "not found");
+  if (!isHistoricalUserUuid(exportId)) return denied(404, "not found");
 
   const config = optionalCloudPersistenceConfiguration();
   if (config?.mode !== "postgres") return denied(503, "Database not configured");

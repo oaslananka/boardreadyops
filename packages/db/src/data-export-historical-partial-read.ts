@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { isHistoricalUserUuid } from "./data-export-historical-uuid.js";
 import type { PgQueryExecutor } from "./pg-executor.js";
 
-const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
 const digest = /^[0-9a-f]{64}$/u;
 
 type ReaderDb = Pick<PgQueryExecutor, "withTransaction">;
@@ -19,12 +19,12 @@ function valid(input: unknown): input is PrivatePartialBinding {
   const candidate = input as Record<string, unknown>;
   return (
     typeof candidate.exportId === "string" &&
-    uuid.test(candidate.exportId) &&
+    isHistoricalUserUuid(candidate.exportId) &&
     typeof candidate.verifiedGitHubUserId === "number" &&
     Number.isSafeInteger(candidate.verifiedGitHubUserId) &&
     candidate.verifiedGitHubUserId > 0 &&
     typeof candidate.preflightId === "string" &&
-    uuid.test(candidate.preflightId) &&
+    isHistoricalUserUuid(candidate.preflightId) &&
     typeof candidate.sha256 === "string" &&
     digest.test(candidate.sha256) &&
     typeof candidate.byteLength === "number" &&
@@ -37,7 +37,7 @@ function valid(input: unknown): input is PrivatePartialBinding {
 function validReservation(input: unknown): input is PrivatePartialBinding & PrivatePartialReservation {
   if (!valid(input)) return false;
   const candidate = input as unknown as Record<string, unknown>;
-  return typeof candidate.token === "string" && uuid.test(candidate.token);
+  return typeof candidate.token === "string" && isHistoricalUserUuid(candidate.token);
 }
 
 function hasTransaction(db: unknown): db is ReaderDb {

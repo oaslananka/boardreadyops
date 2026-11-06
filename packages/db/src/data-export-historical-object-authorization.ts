@@ -4,6 +4,7 @@ import {
   prepareVerifiedHistoricalUserConsistentCorePreflight,
   prepareVerifiedHistoricalUserPrivateVisualEvidence,
 } from "./data-export-historical-inventory.js";
+import { isHistoricalUserUuid } from "./data-export-historical-uuid.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
 /** Original-user-gated private object reference; never an HTTP capability. */
@@ -22,15 +23,12 @@ export type HistoricalUserObjectReadAuthority = {
   verifiedGitHubUserId: number;
 };
 
-const isUuid = (value: unknown): value is string =>
-  typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(value);
-
 function validAuthority(value: unknown, artifactId: unknown): value is HistoricalUserObjectReadAuthority {
   if (value === null || typeof value !== "object") return false;
   const authority = value as Record<string, unknown>;
   return (
-    isUuid(authority.exportId) &&
-    isUuid(artifactId) &&
+    isHistoricalUserUuid(authority.exportId) &&
+    isHistoricalUserUuid(artifactId) &&
     typeof authority.verifiedGitHubUserId === "number" &&
     Number.isSafeInteger(authority.verifiedGitHubUserId) &&
     authority.verifiedGitHubUserId > 0
@@ -41,9 +39,9 @@ function validOriginalUserObject(value: unknown): value is HistoricalUserExportO
   if (value === null || typeof value !== "object") return false;
   const object = value as Record<string, unknown>;
   return (
-    isUuid(object.artifactId) &&
-    isUuid(object.repositoryId) &&
-    isUuid(object.runId) &&
+    isHistoricalUserUuid(object.artifactId) &&
+    isHistoricalUserUuid(object.repositoryId) &&
+    isHistoricalUserUuid(object.runId) &&
     typeof object.storagePath === "string" &&
     object.storagePath.length >= 1 &&
     object.storagePath.length <= 1024 &&
@@ -122,8 +120,8 @@ export async function lookupHistoricalUserExportObject(
   if (
     !row ||
     row.id !== artifactId ||
-    !isUuid(row.run_id) ||
-    !isUuid(row.repository_id) ||
+    !isHistoricalUserUuid(row.run_id) ||
+    !isHistoricalUserUuid(row.repository_id) ||
     typeof row.storage_path !== "string" ||
     row.storage_path.length === 0 ||
     row.storage_path.length > 1024 ||
@@ -185,7 +183,11 @@ export async function releaseHistoricalUserObjectCopy(
   authority: HistoricalUserObjectReadAuthority,
   reservation: { readerId: string; token: string },
 ): Promise<void> {
-  if (!isUuid(authority?.exportId) || !isUuid(reservation?.readerId) || !isUuid(reservation?.token)) {
+  if (
+    !isHistoricalUserUuid(authority?.exportId) ||
+    !isHistoricalUserUuid(reservation?.readerId) ||
+    !isHistoricalUserUuid(reservation?.token)
+  ) {
     throw new Error("Historical user object reservation cannot be settled");
   }
   const result: unknown = await db.query("SELECT boardreadyops_finish_export_object_copy($1,$2,$3::uuid) AS outcome", [
@@ -214,7 +216,7 @@ export async function reserveHistoricalUserObjectBatch(
 ): Promise<Array<{ object: HistoricalUserExportObject; reservation: { readerId: string; token: string } }> | null> {
   if (
     !db?.withTransaction ||
-    !isUuid(authority?.exportId) ||
+    !isHistoricalUserUuid(authority?.exportId) ||
     !Number.isSafeInteger(authority?.verifiedGitHubUserId) ||
     authority.verifiedGitHubUserId <= 0 ||
     !Array.isArray(objects) ||
@@ -331,7 +333,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
         !Number.isSafeInteger(input.expectedVisual.visualCount) ||
         input.expectedVisual.visualCount < 0 ||
         input.expectedVisual.visualCount > 100)) ||
-    !isUuid(authority?.exportId) ||
+    !isHistoricalUserUuid(authority?.exportId) ||
     !Number.isSafeInteger(authority?.verifiedGitHubUserId) ||
     authority.verifiedGitHubUserId <= 0 ||
     !Array.isArray(objects) ||

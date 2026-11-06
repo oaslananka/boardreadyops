@@ -1,6 +1,5 @@
+import { isHistoricalUserUuid } from "./data-export-historical-uuid.js";
 import type { PgQueryExecutor } from "./pg-executor.js";
-
-const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
 
 type RecoveryInput = {
   db: Pick<PgQueryExecutor, "withTransaction">;
@@ -22,12 +21,12 @@ function validRecoveryInput(input: unknown): input is RecoveryInput {
   const authority = candidate.authority as Record<string, unknown>;
   return (
     typeof authority.exportId === "string" &&
-    uuid.test(authority.exportId) &&
+    isHistoricalUserUuid(authority.exportId) &&
     typeof authority.verifiedGitHubUserId === "number" &&
     Number.isSafeInteger(authority.verifiedGitHubUserId) &&
     authority.verifiedGitHubUserId > 0 &&
     typeof candidate.preflightId === "string" &&
-    uuid.test(candidate.preflightId)
+    isHistoricalUserUuid(candidate.preflightId)
   );
 }
 

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { prepareVerifiedHistoricalUserCompositePreflight } from "./data-export-historical-inventory.js";
+import { isHistoricalUserUuid } from "./data-export-historical-uuid.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 import type { PgQueryExecutor } from "./pg-executor.js";
 
@@ -17,10 +18,12 @@ type PrivateArchiveFingerprint = {
   mutationEpochSha256: string;
 };
 type PreflightDb = Pick<PgQueryExecutor, "withTransaction">;
-const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
+
 const digest = /^[0-9a-f]{64}$/u;
 function validAuthority(a: HistoricalUserAuthority): boolean {
-  return uuid.test(a?.exportId) && Number.isSafeInteger(a?.verifiedGitHubUserId) && a.verifiedGitHubUserId > 0;
+  return (
+    isHistoricalUserUuid(a?.exportId) && Number.isSafeInteger(a?.verifiedGitHubUserId) && a.verifiedGitHubUserId > 0
+  );
 }
 function validFingerprint(f: PrivateArchiveFingerprint): boolean {
   return (
@@ -172,7 +175,7 @@ export async function inspectHistoricalUserPrivateDeliveryPreflight(input: {
   if (
     !input?.db?.withTransaction ||
     !validAuthority(input.authority) ||
-    !uuid.test(input.id) ||
+    !isHistoricalUserUuid(input.id) ||
     !validFingerprint(input.fingerprint)
   )
     return "stale";
@@ -225,7 +228,7 @@ export async function revokeHistoricalUserPrivateDeliveryPreflight(input: {
   authority: HistoricalUserAuthority;
   id: string;
 }): Promise<"revoked" | "stale"> {
-  if (!input?.db?.query || !validAuthority(input.authority) || !uuid.test(input.id)) return "stale";
+  if (!input?.db?.query || !validAuthority(input.authority) || !isHistoricalUserUuid(input.id)) return "stale";
   const result: unknown = await input.db.query(
     `UPDATE public.historical_user_private_delivery_preflights AS p
           SET revoked_at=clock_timestamp()

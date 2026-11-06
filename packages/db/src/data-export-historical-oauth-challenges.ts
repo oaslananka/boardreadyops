@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
+import { isHistoricalUserUuid } from "./data-export-historical-uuid.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 import type { PgQueryExecutor } from "./pg-executor.js";
 
-const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
 const oauthState = /^[A-Za-z0-9_-]{43}$/u;
 const domain = "boardreadyops-original-user-oauth-state-v1";
 // Conservative, per-export quota; consumed/failed OAuth steps still count,
@@ -22,7 +22,7 @@ function valid(input: unknown): input is OriginalUserNonce {
   const candidate = input as Record<string, unknown>;
   return (
     typeof candidate.exportId === "string" &&
-    uuid.test(candidate.exportId) &&
+    isHistoricalUserUuid(candidate.exportId) &&
     typeof candidate.verifiedGitHubUserId === "number" &&
     Number.isSafeInteger(candidate.verifiedGitHubUserId) &&
     candidate.verifiedGitHubUserId > 0 &&
