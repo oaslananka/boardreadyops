@@ -126,7 +126,7 @@ export async function stageHistoricalUserPrivateDeliveryPreflight(input: {
     return await input.db.withTransaction(
       async (tx) => {
         if (!(await authorizeSuspendedOriginalUser(tx, input.authority))) return null;
-        const result = (await tx.query(
+        const result: unknown = await tx.query(
           `INSERT INTO public.historical_user_private_delivery_preflights (
             id,export_id,original_github_user_id,
             expected_archive_sha256,expected_archive_bytes,
@@ -149,8 +149,22 @@ export async function stageHistoricalUserPrivateDeliveryPreflight(input: {
             f.mutationEpochSha256,
             input.ttlSeconds,
           ],
-        )) as { rows?: Array<{ id: string }> };
-        return result.rows?.[0]?.id === id ? { id } : null;
+        );
+        if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) {
+          throw new Error("Historical private preflight insertion was not acknowledged");
+        }
+        // ON CONFLICT DO NOTHING legitimately returns zero rows.
+        if (result.rows.length === 0) return null;
+        // Any other ambiguous reply must abort the transaction instead of
+        // committing a preflight with an unverified result.
+        if (result.rows.length !== 1) {
+          throw new Error("Historical private preflight insertion was not acknowledged");
+        }
+        const row: unknown = result.rows[0];
+        if (row === null || typeof row !== "object" || !("id" in row) || row.id !== id) {
+          throw new Error("Historical private preflight insertion was not acknowledged");
+        }
+        return { id };
       },
       { statementTimeoutMs: 5_000 },
     );
