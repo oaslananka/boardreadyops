@@ -466,17 +466,16 @@ function validateSnapshotOwnership(snapshot: HistoricalSnapshot): {
   return { runs, reviews };
 }
 
-function validateSnapshotRows(
-  snapshot: HistoricalSnapshot,
-  runs: Map<string, string>,
-  reviews: Map<string, string>,
-): void {
-  const validFingerprint = (value: unknown): value is string =>
-    typeof value === "string" && value.length > 0 && Buffer.byteLength(value, "utf8") <= 2048;
-  const validRowId = (value: unknown): value is string =>
-    typeof value === "string" && value.length > 0 && value.length <= 256 && value.trim() === value;
+/** Exactly the same bounded UTF-8/identifier checks across review rows. */
+const validFingerprint = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && Buffer.byteLength(value, "utf8") <= 2048;
+const validRowId = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && value.length <= 256 && value.trim() === value;
+
+/** Enforce bounded original-review decision rows with no owner/actor identities. */
+function validateHistoricalDecisionRows(decisionsInput: FindingDecision[], reviews: Map<string, string>): void {
   const decisions = new Set<string>();
-  for (const decision of snapshot.findingDecisions) {
+  for (const decision of decisionsInput) {
     if (
       !validRowId(decision?.id) ||
       decisions.has(decision.id) ||
@@ -496,8 +495,12 @@ function validateSnapshotRows(
       throw new HistoricalUserArchivePreflightError();
     decisions.add(decision.id);
   }
+}
+
+/** Reject duplicate assignments and any actor field even when hashes are regenerated. */
+function validateHistoricalAssignmentRows(assignmentsInput: FindingAssignment[], reviews: Map<string, string>): void {
   const assignments = new Set<string>();
-  for (const assignment of snapshot.findingAssignments) {
+  for (const assignment of assignmentsInput) {
     if (
       !validRowId(assignment?.id) ||
       assignments.has(assignment.id) ||
@@ -511,8 +514,12 @@ function validateSnapshotRows(
       throw new HistoricalUserArchivePreflightError();
     assignments.add(assignment.id);
   }
+}
+
+/** Validate only retained, committed physical artifact descriptors. */
+function validateHistoricalArtifactRows(artifactsInput: Artifact[], runs: Map<string, string>): void {
   const artifactIds = new Set<string>();
-  for (const artifact of snapshot.artifacts) {
+  for (const artifact of artifactsInput) {
     if (
       !uuid.test(artifact?.id) ||
       !runs.has(artifact.runId) ||
@@ -527,6 +534,16 @@ function validateSnapshotRows(
       throw new HistoricalUserArchivePreflightError();
     artifactIds.add(artifact.id);
   }
+}
+
+function validateSnapshotRows(
+  snapshot: HistoricalSnapshot,
+  runs: Map<string, string>,
+  reviews: Map<string, string>,
+): void {
+  validateHistoricalDecisionRows(snapshot.findingDecisions, reviews);
+  validateHistoricalAssignmentRows(snapshot.findingAssignments, reviews);
+  validateHistoricalArtifactRows(snapshot.artifacts, runs);
 }
 
 function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: number }): HistoricalSnapshot {
@@ -559,9 +576,9 @@ type HistoricalVisualEvidenceBytes = {
   visualCount: number;
 };
 
-// A private manifest of SHA-verifiable visual evidence, never actual SVG.
-function checkedVisualEvidence(snapshot: HistoricalSnapshot, evidence: HistoricalVisualEvidenceBytes): Buffer {
-  if (
+/** Immutable visual evidence claim must match the retained snapshot count and digest. */
+function validHistoricalVisualClaim(snapshot: HistoricalSnapshot, evidence: HistoricalVisualEvidenceBytes): boolean {
+  return !(
     !evidence ||
     !Buffer.isBuffer(evidence.bytes) ||
     evidence.bytes.length < 1 ||
@@ -571,16 +588,16 @@ function checkedVisualEvidence(snapshot: HistoricalSnapshot, evidence: Historica
     digest(evidence.bytes) !== evidence.sha256 ||
     !Number.isSafeInteger(evidence.visualCount) ||
     evidence.visualCount !== snapshot.excludedSourceClassCounts.runSnapshots
-  )
-    throw new HistoricalUserArchivePreflightError();
+  );
+}
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(evidence.bytes.toString("utf8")) as Record<string, unknown>;
-  } catch {
-    throw new HistoricalUserArchivePreflightError();
-  }
-  if (
+/** Only the immutable, content-free visual metadata envelope is permitted. */
+function validHistoricalVisualEnvelope(
+  parsed: Record<string, unknown>,
+  snapshot: HistoricalSnapshot,
+  evidence: HistoricalVisualEvidenceBytes,
+): parsed is Record<string, unknown> & { visuals: unknown[] } {
+  return !(
     !parsed ||
     typeof parsed !== "object" ||
     Array.isArray(parsed) ||
@@ -607,8 +624,48 @@ function checkedVisualEvidence(snapshot: HistoricalSnapshot, evidence: Historica
       ]) ||
     !Array.isArray(parsed.visuals) ||
     parsed.visuals.length !== evidence.visualCount
-  )
+  );
+}
+
+/** Reject visual identity changes, foreign runs, content injection and oversized entries. */
+function validHistoricalVisualRow(
+  visual: Record<string, unknown>,
+  ids: Set<string>,
+  previousId: string,
+  repositories: Set<string>,
+  runs: Map<string, string>,
+): boolean {
+  return !(
+    !exactKeys(visual, ["id", "runId", "repositoryId", "kind", "format", "sha256", "byteLength"]) ||
+    typeof visual.id !== "string" ||
+    !uuid.test(visual.id) ||
+    ids.has(visual.id) ||
+    visual.id <= previousId ||
+    typeof visual.runId !== "string" ||
+    !uuid.test(visual.runId) ||
+    !repositories.has(visual.repositoryId as string) ||
+    runs.get(visual.runId) !== visual.repositoryId ||
+    !["schematic", "pcb_layer", "3d_render"].includes(String(visual.kind)) ||
+    visual.format !== "svg" ||
+    typeof visual.sha256 !== "string" ||
+    !sha256.test(visual.sha256) ||
+    !Number.isSafeInteger(visual.byteLength) ||
+    (visual.byteLength as number) < 1 ||
+    (visual.byteLength as number) > 262144
+  );
+}
+
+// A private manifest of SHA-verifiable visual evidence, never actual SVG.
+function checkedVisualEvidence(snapshot: HistoricalSnapshot, evidence: HistoricalVisualEvidenceBytes): Buffer {
+  if (!validHistoricalVisualClaim(snapshot, evidence)) throw new HistoricalUserArchivePreflightError();
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(evidence.bytes.toString("utf8")) as Record<string, unknown>;
+  } catch {
     throw new HistoricalUserArchivePreflightError();
+  }
+  if (!validHistoricalVisualEnvelope(parsed, snapshot, evidence)) throw new HistoricalUserArchivePreflightError();
 
   const repositories = new Set(snapshot.repositories.map((r) => r.repositoryId));
   const runs = new Map(snapshot.runs.map((r) => [r.id, r.repositoryId]));
@@ -620,27 +677,10 @@ function checkedVisualEvidence(snapshot: HistoricalSnapshot, evidence: Historica
       throw new HistoricalUserArchivePreflightError();
     }
     const visual = item as Record<string, unknown>;
-    if (
-      !exactKeys(visual, ["id", "runId", "repositoryId", "kind", "format", "sha256", "byteLength"]) ||
-      typeof visual.id !== "string" ||
-      !uuid.test(visual.id) ||
-      ids.has(visual.id) ||
-      visual.id <= previousId ||
-      typeof visual.runId !== "string" ||
-      !uuid.test(visual.runId) ||
-      !repositories.has(visual.repositoryId as string) ||
-      runs.get(visual.runId) !== visual.repositoryId ||
-      !["schematic", "pcb_layer", "3d_render"].includes(String(visual.kind)) ||
-      visual.format !== "svg" ||
-      typeof visual.sha256 !== "string" ||
-      !sha256.test(visual.sha256) ||
-      !Number.isSafeInteger(visual.byteLength) ||
-      (visual.byteLength as number) < 1 ||
-      (visual.byteLength as number) > 262144
-    )
+    if (!validHistoricalVisualRow(visual, ids, previousId, repositories, runs))
       throw new HistoricalUserArchivePreflightError();
-    ids.add(visual.id);
-    previousId = visual.id;
+    ids.add(visual.id as string);
+    previousId = visual.id as string;
     totalBytes += visual.byteLength as number;
     if (totalBytes > 4 * 1024 * 1024) throw new HistoricalUserArchivePreflightError();
   }

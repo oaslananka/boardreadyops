@@ -780,6 +780,45 @@ describe("private historical original-USER partial archive", () => {
     }
   });
 
+  it("rejects duplicate or out-of-order visual IDs, forged exclusions and zero byte claims under a fresh digest", () => {
+    const tampering: Array<(body: Record<string, unknown>) => void> = [
+      (body) => {
+        const visuals = body.visuals as Record<string, unknown>[];
+        visuals[1] = { ...visuals[0] };
+      },
+      (body) => {
+        (body.visuals as unknown[]).reverse();
+      },
+      (body) => {
+        const visuals = body.visuals as Record<string, unknown>[];
+        visuals[0].byteLength = 0;
+      },
+      (body) => {
+        body.exclusions = ["visual-svg-content"];
+      },
+      (body) => {
+        body.actorIdentity = "private-person";
+      },
+    ];
+    for (const mutate of tampering) {
+      const input = inputs();
+      const body = JSON.parse(input.visualEvidence.bytes.toString("utf8")) as Record<string, unknown>;
+      mutate(body);
+      const bytes = Buffer.from(JSON.stringify(body));
+      expect(() =>
+        prepareHistoricalUserPartialArchive({
+          ...input,
+          visualEvidence: {
+            ...input.visualEvidence,
+            bytes,
+            sha256: sha256(bytes),
+            byteLength: bytes.length,
+          },
+        }),
+      ).toThrow(HistoricalUserArchivePreflightError);
+    }
+  });
+
   it("rejects missing visual evidence and forged ZIP visual ownership despite recomputed hashes", () => {
     const valid = inputs();
     expect(() =>
@@ -1136,6 +1175,41 @@ describe("private historical original-USER partial archive", () => {
         ];
       },
     ]) {
+      const original = inputs();
+      const core = JSON.parse(original.snapshot.bytes.toString("utf8")) as Record<string, unknown>;
+      mutate(core);
+      const bytes = Buffer.from(JSON.stringify(core));
+      expect(() =>
+        prepareHistoricalUserPartialArchive({
+          ...original,
+          snapshot: { bytes, sha256: sha256(bytes), byteLength: bytes.length },
+        }),
+      ).toThrow(HistoricalUserArchivePreflightError);
+    }
+  });
+
+  it("rejects duplicate historical decision, assignment and artifact identifiers with a recomputed snapshot digest", () => {
+    const tampering: Array<(core: Record<string, unknown>) => void> = [
+      (core) => {
+        const decisions = core.findingDecisions as Record<string, unknown>[];
+        decisions.push({ ...decisions[0] });
+      },
+      (core) => {
+        const assignments = core.findingAssignments as Record<string, unknown>[];
+        assignments.push({ ...assignments[0] });
+      },
+      (core) => {
+        const artifacts = core.artifacts as Record<string, unknown>[];
+        artifacts.push({ ...artifacts[0] });
+      },
+      (core) => {
+        (core.findingDecisions as Record<string, unknown>[])[0].evidenceDigest = "A".repeat(64);
+      },
+      (core) => {
+        (core.findingAssignments as Record<string, unknown>[])[0].actorId = "private-person";
+      },
+    ];
+    for (const mutate of tampering) {
       const original = inputs();
       const core = JSON.parse(original.snapshot.bytes.toString("utf8")) as Record<string, unknown>;
       mutate(core);
