@@ -310,22 +310,7 @@ function checkCorePrivacySchema(value: unknown): boolean {
   });
 }
 
-function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: number }): HistoricalSnapshot {
-  if (
-    !Buffer.isBuffer(input?.bytes) ||
-    input.bytes.length === 0 ||
-    input.bytes.length > maxSnapshotBytes ||
-    input.byteLength !== input.bytes.length ||
-    !sha256.test(input.sha256) ||
-    digest(input.bytes) !== input.sha256
-  )
-    throw new HistoricalUserArchivePreflightError();
-  let snapshot: HistoricalSnapshot;
-  try {
-    snapshot = JSON.parse(input.bytes.toString("utf8")) as HistoricalSnapshot;
-  } catch {
-    throw new HistoricalUserArchivePreflightError();
-  }
+function validateSnapshotEnvelope(snapshot: HistoricalSnapshot): void {
   if (
     !checkCorePrivacySchema(snapshot) ||
     snapshot?.kind !== "boardreadyops.historical-user-consistent-core-preflight" ||
@@ -362,6 +347,9 @@ function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: numbe
     snapshot.artifacts.length > maxObjects
   )
     throw new HistoricalUserArchivePreflightError();
+}
+
+function validateSnapshotCounters(snapshot: HistoricalSnapshot): void {
   const excluded = snapshot.excludedSourceClassCounts;
   if (
     !excluded ||
@@ -388,6 +376,12 @@ function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: numbe
     )
   )
     throw new HistoricalUserArchivePreflightError();
+}
+
+function validateSnapshotOwnership(snapshot: HistoricalSnapshot): {
+  runs: Map<string, string>;
+  reviews: Map<string, string>;
+} {
   const allowedEventKeys = [
     "id",
     "eventType",
@@ -453,6 +447,14 @@ function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: numbe
     }
     reviews.set(review.id, review.repositoryId);
   }
+  return { runs, reviews };
+}
+
+function validateSnapshotRows(
+  snapshot: HistoricalSnapshot,
+  runs: Map<string, string>,
+  reviews: Map<string, string>,
+): void {
   const validFingerprint = (value: unknown): value is string =>
     typeof value === "string" && value.length > 0 && Buffer.byteLength(value, "utf8") <= 2048;
   const validRowId = (value: unknown): value is string =>
@@ -509,6 +511,28 @@ function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: numbe
       throw new HistoricalUserArchivePreflightError();
     artifactIds.add(artifact.id);
   }
+}
+
+function parseSnapshot(input: { bytes: Buffer; sha256: string; byteLength: number }): HistoricalSnapshot {
+  if (
+    !Buffer.isBuffer(input?.bytes) ||
+    input.bytes.length === 0 ||
+    input.bytes.length > maxSnapshotBytes ||
+    input.byteLength !== input.bytes.length ||
+    !sha256.test(input.sha256) ||
+    digest(input.bytes) !== input.sha256
+  )
+    throw new HistoricalUserArchivePreflightError();
+  let snapshot: HistoricalSnapshot;
+  try {
+    snapshot = JSON.parse(input.bytes.toString("utf8")) as HistoricalSnapshot;
+  } catch {
+    throw new HistoricalUserArchivePreflightError();
+  }
+  validateSnapshotEnvelope(snapshot);
+  validateSnapshotCounters(snapshot);
+  const { runs, reviews } = validateSnapshotOwnership(snapshot);
+  validateSnapshotRows(snapshot, runs, reviews);
   return snapshot;
 }
 
