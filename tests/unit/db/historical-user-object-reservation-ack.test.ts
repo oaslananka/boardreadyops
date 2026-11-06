@@ -58,6 +58,8 @@ describe("original-user artifact copy reservation boundary", () => {
       { storagePath: "artifacts/file\0.bin" },
       { sha256: "A".repeat(64) },
       { sha256: "a".repeat(63) },
+      { sha256: `${"a".repeat(63)}é` },
+      { sha256: `${"a".repeat(63)}\n` },
       { byteLength: Number.NaN },
       { byteLength: 2 ** 53 },
       { byteLength: -1 },

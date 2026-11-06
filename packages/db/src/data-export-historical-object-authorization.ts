@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isValidExportSha256 } from "./data-export-hex-digest.js";
 import {
   prepareVerifiedHistoricalUserCompositePreflight,
   prepareVerifiedHistoricalUserConsistentCorePreflight,
@@ -50,10 +51,6 @@ function validOriginalUserStoragePath(value: unknown): value is string {
   return value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
-function validOriginalUserArtifactDigest(value: unknown): value is string {
-  return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
-}
-
 function validOriginalUserArtifactSize(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 64 * 1024 * 1024;
 }
@@ -70,7 +67,7 @@ function validOriginalUserObject(value: unknown): value is HistoricalUserExportO
     isHistoricalUserUuid(object.repositoryId) &&
     isHistoricalUserUuid(object.runId) &&
     validOriginalUserStoragePath(object.storagePath) &&
-    validOriginalUserArtifactDigest(object.sha256) &&
+    isValidExportSha256(object.sha256) &&
     validOriginalUserArtifactSize(object.byteLength) &&
     validOriginalUserRetention(object.retentionUntil)
   );

@@ -31,6 +31,32 @@ function fakeAdmissionDatabase(
 }
 
 describe("original-user OAuth challenge DB result verification", () => {
+  it("rejects invalid or non-ASCII nonce characters before opening a transaction", async () => {
+    const input = identity();
+    const invalid = [
+      "A".repeat(42),
+      "A".repeat(44),
+      `${"A".repeat(42)}=`,
+      `${"A".repeat(42)}.`,
+      `${"A".repeat(42)} `,
+      `${"A".repeat(42)}\n`,
+      `${"A".repeat(42)}\0`,
+      `${"A".repeat(42)}é`,
+    ];
+    for (const state of invalid) {
+      const fixture = fakeAdmissionDatabase([]);
+      for (const operation of [registerHistoricalUserOAuthChallenge, consumeHistoricalUserOAuthChallenge]) {
+        expect(await operation(fixture.db, { ...input, state })).toBe(false);
+      }
+      expect(fixture.withTransaction).not.toHaveBeenCalled();
+    }
+    for (const state of [`${"A".repeat(41)}_-`, `${"z".repeat(43)}`]) {
+      const fixture = fakeAdmissionDatabase((params: unknown[]) => [{ state_sha256: params[2] }]);
+      expect(await registerHistoricalUserOAuthChallenge(fixture.db, { ...input, state })).toBe(true);
+      expect(fixture.withTransaction).toHaveBeenCalledOnce();
+    }
+  });
+
   it("denies an INSERT acknowledgement without the exact requested nonce digest", async () => {
     const input = identity();
     for (const returnedRows of [{ length: 1 }, [null], [{}], [{ state_sha256: "f".repeat(64) }]]) {

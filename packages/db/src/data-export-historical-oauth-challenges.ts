@@ -3,7 +3,24 @@ import { isHistoricalUserUuid } from "./data-export-historical-uuid.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 import type { PgQueryExecutor } from "./pg-executor.js";
 
-const oauthState = /^[A-Za-z0-9_-]{43}$/u;
+/** A 32-byte base64url nonce is exactly 43 ASCII chars; scan in linear time. */
+function validOAuthState(value: unknown): value is string {
+  if (typeof value !== "string" || value.length !== 43) return false;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (
+      !(
+        (code >= 65 && code <= 90) ||
+        (code >= 97 && code <= 122) ||
+        (code >= 48 && code <= 57) ||
+        code === 45 ||
+        code === 95
+      )
+    )
+      return false;
+  }
+  return true;
+}
 const domain = "boardreadyops-original-user-oauth-state-v1";
 // Conservative, per-export quota; consumed/failed OAuth steps still count,
 // avoiding unbounded append-only audit growth from retries or repeated aborts.
@@ -26,8 +43,7 @@ function valid(input: unknown): input is OriginalUserNonce {
     typeof candidate.verifiedGitHubUserId === "number" &&
     Number.isSafeInteger(candidate.verifiedGitHubUserId) &&
     candidate.verifiedGitHubUserId > 0 &&
-    typeof candidate.state === "string" &&
-    oauthState.test(candidate.state)
+    validOAuthState(candidate.state)
   );
 }
 

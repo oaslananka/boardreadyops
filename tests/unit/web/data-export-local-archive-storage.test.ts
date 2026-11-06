@@ -116,6 +116,12 @@ describe("private, locally sealed export ZIP", () => {
     expect(stat.mode & 0o077).toBe(0);
     expect(stat.nlink).toBe(1);
     expect(await readSealedLocalExportArchive({ archiveRoot, exportId, ...archive })).toEqual(archive.bytes);
+    for (const byteLength of [0, -1, Number.NaN, 2 ** 53, 64 * 1024 * 1024 + 1]) {
+      expect(await readSealedLocalExportArchive({ archiveRoot, exportId, ...archive, byteLength })).toBeNull();
+    }
+    expect(
+      await readSealedLocalExportArchive({ archiveRoot, exportId, ...archive, sha256: "A".repeat(64) }),
+    ).toBeNull();
     expect(await sealLocalExportArchive({ archiveRoot, exportId, archive })).toMatchObject({
       sha256: archive.sha256,
     });

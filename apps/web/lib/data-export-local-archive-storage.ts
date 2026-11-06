@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { constants } from "node:fs";
+import { constants, type Stats } from "node:fs";
 import { link, lstat, mkdir, open, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
 import { verifyClaimedExportArchiveIntegrity } from "./data-export-archive-integrity.js";
@@ -66,22 +66,38 @@ export async function ensurePrivateLocalExportArchiveDirectory(input: {
   return (await privateArchiveDirectory(archiveRoot)) === archiveRoot;
 }
 
-/** Bounded private read; caller must independently recheck current DB requester authority. */
-export async function readSealedLocalExportArchive(input: {
+type SealedArchiveRead = {
   archiveRoot: string;
   exportId: string;
   sha256: string;
   byteLength: number;
-}): Promise<Buffer | null> {
-  if (
-    !exportIdPattern.test(input.exportId) ||
-    !validSha(input.sha256) ||
-    !Number.isSafeInteger(input.byteLength) ||
-    input.byteLength < 1 ||
-    input.byteLength > maxArchiveBytes
-  ) {
-    return null;
-  }
+};
+
+/** Validate the exact immutable commitment before opening any private file. */
+function validSealedArchiveRead(input: SealedArchiveRead): boolean {
+  return (
+    exportIdPattern.test(input.exportId) &&
+    validSha(input.sha256) &&
+    Number.isSafeInteger(input.byteLength) &&
+    input.byteLength >= 1 &&
+    input.byteLength <= maxArchiveBytes
+  );
+}
+
+/** Require a regular, single-link, owner-private file of the committed size. */
+function validSealedArchiveStat(stat: Stats, expectedByteLength: number): boolean {
+  return (
+    stat.isFile() &&
+    stat.nlink === 1 &&
+    (stat.mode & 0o077) === 0 &&
+    (typeof process.getuid !== "function" || stat.uid === process.getuid()) &&
+    stat.size === expectedByteLength
+  );
+}
+
+/** Bounded private read; caller must independently recheck current DB requester authority. */
+export async function readSealedLocalExportArchive(input: SealedArchiveRead): Promise<Buffer | null> {
+  if (!validSealedArchiveRead(input)) return null;
   const root = await privateArchiveDirectory(input.archiveRoot);
   if (!root) return null;
   const filename = path.join(root, `${input.exportId}.zip`);
@@ -90,15 +106,7 @@ export async function readSealedLocalExportArchive(input: {
   if (!file) return null;
   try {
     const stat = await file.stat();
-    if (
-      !stat.isFile() ||
-      stat.nlink !== 1 ||
-      (stat.mode & 0o077) !== 0 ||
-      (typeof process.getuid === "function" && stat.uid !== process.getuid()) ||
-      stat.size !== input.byteLength
-    ) {
-      return null;
-    }
+    if (!validSealedArchiveStat(stat, input.byteLength)) return null;
     const bytes = await file.readFile();
     if (bytes.length !== input.byteLength) return null;
     const after = await file.stat();
