@@ -1100,6 +1100,118 @@ export function verifyHistoricalUserMetadataOnlyArchive(
   }
 }
 
+type HistoricalComposite = NonNullable<Awaited<ReturnType<typeof prepareVerifiedHistoricalUserCompositePreflight>>>;
+type HistoricalOwnedObject = NonNullable<Awaited<ReturnType<typeof lookupHistoricalUserExportObject>>>;
+type HistoricalReservedObjects = NonNullable<Awaited<ReturnType<typeof reserveHistoricalUserObjectBatch>>>;
+type HistoricalArchiveAuthority = { exportId: string; verifiedGitHubUserId: number };
+type HistoricalArchiveScope = { db: PgQueryExecutor; authority: HistoricalArchiveAuthority };
+
+/** Both same-owner reads must retain every original signed/visual byte and epoch. */
+function sameHistoricalCompositeClaim(first: HistoricalComposite, second: HistoricalComposite): boolean {
+  return (
+    second.core.sha256 === first.core.sha256 &&
+    second.core.byteLength === first.core.byteLength &&
+    second.core.bytes.equals(first.core.bytes) &&
+    second.visual.sha256 === first.visual.sha256 &&
+    second.visual.byteLength === first.visual.byteLength &&
+    second.visual.bytes.equals(first.visual.bytes) &&
+    second.mutationEpochSha256 === first.mutationEpochSha256
+  );
+}
+
+/** Physical ZIP additionally pins the visual descriptor count across both reads. */
+function sameHistoricalPhysicalClaim(first: HistoricalComposite, second: HistoricalComposite): boolean {
+  return sameHistoricalCompositeClaim(first, second) && second.visual.visualCount === first.visual.visualCount;
+}
+
+/** No caller-supplied locator is authoritative without the retained snapshot match. */
+function matchesHistoricalArtifact(
+  object: HistoricalOwnedObject | null,
+  artifact: Artifact,
+  repositoryId: string | undefined,
+): object is HistoricalOwnedObject {
+  return (
+    !!object &&
+    object.artifactId === artifact.id &&
+    object.runId === artifact.runId &&
+    object.repositoryId === repositoryId &&
+    object.sha256 === artifact.sha256 &&
+    object.byteLength === artifact.byteLength
+  );
+}
+
+/** Metadata-only checks locators, not physical bytes, and fails closed on expired retention. */
+async function metadataOnlyObjectLocators(
+  input: HistoricalArchiveScope,
+  snapshot: HistoricalSnapshot,
+): Promise<HistoricalOwnedObject[] | null> {
+  const runRepositories = new Map(snapshot.runs.map((run) => [run.id, run.repositoryId]));
+  const objects: HistoricalOwnedObject[] = [];
+  for (const artifact of snapshot.artifacts) {
+    if (artifact.retentionExpired) return null;
+    const object = await lookupHistoricalUserExportObject(input.db, input.authority, artifact.id);
+    if (!matchesHistoricalArtifact(object, artifact, runRepositories.get(artifact.runId))) return null;
+    objects.push(object);
+  }
+  return objects;
+}
+
+/** Reservation must only be attempted after all declared locators and byte budgets match. */
+async function physicalObjectLocators(
+  input: HistoricalArchiveScope,
+  snapshot: HistoricalSnapshot,
+  initialByteLength: number,
+): Promise<HistoricalOwnedObject[]> {
+  const runRepositories = new Map(snapshot.runs.map((run) => [run.id, run.repositoryId]));
+  const objects: HistoricalOwnedObject[] = [];
+  let byteBudget = initialByteLength;
+  for (const artifact of snapshot.artifacts) {
+    const object = await lookupHistoricalUserExportObject(input.db, input.authority, artifact.id);
+    if (!matchesHistoricalArtifact(object, artifact, runRepositories.get(artifact.runId))) {
+      throw new HistoricalUserArchivePreflightError();
+    }
+    byteBudget += object.byteLength;
+    if (!Number.isSafeInteger(byteBudget) || byteBudget > maxArchiveBytes - 128 * 1024) {
+      throw new HistoricalUserArchivePreflightError();
+    }
+    objects.push(object);
+  }
+  return objects;
+}
+
+/** Each physical read remains surrounded by fresh original-user locator checks. */
+async function readReservedHistoricalObjects(
+  input: HistoricalArchiveScope & { storageRoot: string; storageDriver: string },
+  admitted: HistoricalReservedObjects,
+): Promise<VerifiedHistoricalArchiveObject[]> {
+  const verifiedObjects: VerifiedHistoricalArchiveObject[] = [];
+  for (const { object } of admitted) {
+    const before = await lookupHistoricalUserExportObject(input.db, input.authority, object.artifactId);
+    if (!before || JSON.stringify(before) !== JSON.stringify(object)) {
+      throw new HistoricalUserArchivePreflightError();
+    }
+    const bytes = await readVerifiedLocalExportObject({
+      storageRoot: input.storageRoot,
+      storageDriver: input.storageDriver,
+      object,
+    });
+    if (!bytes) throw new HistoricalUserArchivePreflightError();
+    const after = await lookupHistoricalUserExportObject(input.db, input.authority, object.artifactId);
+    if (!after || JSON.stringify(after) !== JSON.stringify(object)) {
+      throw new HistoricalUserArchivePreflightError();
+    }
+    verifiedObjects.push({
+      bytes,
+      artifactId: object.artifactId,
+      exportId: input.authority.exportId,
+      repositoryId: object.repositoryId,
+      runId: object.runId,
+      sha256: object.sha256,
+    });
+  }
+  return verifiedObjects;
+}
+
 /**
  * Trusted DB-only diagnostic entrypoint: never reads physical storage.
  * Two same-owner composite checks catch drift between source reads; a final
@@ -1121,37 +1233,13 @@ export async function prepareVerifiedHistoricalUserMetadataOnlyArchive(input: {
   const first = await prepareVerifiedHistoricalUserCompositePreflight(input.db, input.authority);
   if (!first) return null;
   const second = await prepareVerifiedHistoricalUserCompositePreflight(input.db, input.authority);
-  if (
-    !second ||
-    second.core.sha256 !== first.core.sha256 ||
-    second.core.byteLength !== first.core.byteLength ||
-    !second.core.bytes.equals(first.core.bytes) ||
-    second.visual.sha256 !== first.visual.sha256 ||
-    second.visual.byteLength !== first.visual.byteLength ||
-    !second.visual.bytes.equals(first.visual.bytes) ||
-    second.mutationEpochSha256 !== first.mutationEpochSha256
-  )
-    return null;
+  if (!second || !sameHistoricalCompositeClaim(first, second)) return null;
   // A ZIP without physical bytes still refers to managed artifact rows:
   // compare EVERY current original-USER artifact locator against the core.
   // We never read storage files or create copy reservations here.
   const snapshot = parseSnapshot(second.core);
-  const runRepositories = new Map(snapshot.runs.map((run) => [run.id, run.repositoryId]));
-  const objects = [];
-  for (const artifact of snapshot.artifacts) {
-    if (artifact.retentionExpired) return null;
-    const object = await lookupHistoricalUserExportObject(input.db, input.authority, artifact.id);
-    if (
-      !object ||
-      object.artifactId !== artifact.id ||
-      object.runId !== artifact.runId ||
-      object.repositoryId !== runRepositories.get(artifact.runId) ||
-      object.sha256 !== artifact.sha256 ||
-      object.byteLength !== artifact.byteLength
-    )
-      return null;
-    objects.push(object);
-  }
+  const objects = await metadataOnlyObjectLocators(input, snapshot);
+  if (!objects) return null;
   const archive = prepareHistoricalUserMetadataOnlyArchive({
     snapshot: second.core,
     visualEvidence: second.visual,
@@ -1197,71 +1285,20 @@ export async function prepareVerifiedHistoricalUserPartialArchive(input: {
   const { core: initial, visual: initialVisual, mutationEpochSha256: originalEpoch } = originalPair;
   const parsed = parseSnapshot(initial);
   checkedVisualEvidence(parsed, initialVisual);
-  const expected = new Map(parsed.runs.map((run) => [run.id, run.repositoryId]));
-  const objects = [];
-  let byteBudget = initial.byteLength;
-  for (const artifact of parsed.artifacts) {
-    const object = await lookupHistoricalUserExportObject(input.db, input.authority, artifact.id);
-    if (
-      !object ||
-      object.artifactId !== artifact.id ||
-      object.runId !== artifact.runId ||
-      object.repositoryId !== expected.get(artifact.runId) ||
-      object.sha256 !== artifact.sha256 ||
-      object.byteLength !== artifact.byteLength
-    )
-      throw new HistoricalUserArchivePreflightError();
-    byteBudget += object.byteLength;
-    if (!Number.isSafeInteger(byteBudget) || byteBudget > maxArchiveBytes - 128 * 1024) {
-      throw new HistoricalUserArchivePreflightError();
-    }
-    objects.push(object);
-  }
+  const objects = await physicalObjectLocators(input, parsed, initial.byteLength);
 
   // All-or-nothing reservation admission occurs before even the first file
   // read. Every artifact's physical path stays fenced through ZIP assembly.
   const admitted = await reserveHistoricalUserObjectBatch(input.db, input.authority, objects);
   if (!admitted) throw new HistoricalUserArchivePreflightError();
   try {
-    const verifiedObjects: VerifiedHistoricalArchiveObject[] = [];
-    for (const { object } of admitted) {
-      const before = await lookupHistoricalUserExportObject(input.db, input.authority, object.artifactId);
-      if (!before || JSON.stringify(before) !== JSON.stringify(object)) {
-        throw new HistoricalUserArchivePreflightError();
-      }
-      const bytes = await readVerifiedLocalExportObject({
-        storageRoot: input.storageRoot,
-        storageDriver: input.storageDriver,
-        object,
-      });
-      if (!bytes) throw new HistoricalUserArchivePreflightError();
-      const after = await lookupHistoricalUserExportObject(input.db, input.authority, object.artifactId);
-      if (!after || JSON.stringify(after) !== JSON.stringify(object)) {
-        throw new HistoricalUserArchivePreflightError();
-      }
-      verifiedObjects.push({
-        bytes,
-        artifactId: object.artifactId,
-        exportId: input.authority.exportId,
-        repositoryId: object.repositoryId,
-        runId: object.runId,
-        sha256: object.sha256,
-      });
-    }
+    const verifiedObjects = await readReservedHistoricalObjects(input, admitted);
     const finalPair = await prepareVerifiedHistoricalUserCompositePreflight(input.db, input.authority);
     if (!finalPair) throw new HistoricalUserArchivePreflightError();
     const { core: final, visual: finalVisual } = finalPair;
-    if (
-      final.byteLength !== initial.byteLength ||
-      final.sha256 !== initial.sha256 ||
-      !final.bytes.equals(initial.bytes) ||
-      finalVisual.sha256 !== initialVisual.sha256 ||
-      finalVisual.byteLength !== initialVisual.byteLength ||
-      finalVisual.visualCount !== initialVisual.visualCount ||
-      !finalVisual.bytes.equals(initialVisual.bytes) ||
-      finalPair.mutationEpochSha256 !== originalEpoch
-    )
+    if (!sameHistoricalPhysicalClaim(originalPair, finalPair)) {
       throw new HistoricalUserArchivePreflightError();
+    }
     const archive = prepareHistoricalUserPartialArchive({
       snapshot: final,
       verifiedObjects,

@@ -43,7 +43,7 @@ function validOriginalUserStoragePath(value: unknown): value is string {
     value.length < 1 ||
     value.length > 1024 ||
     value.trim() !== value ||
-    value.includes(String.fromCharCode(92)) ||
+    value.includes(String.fromCodePoint(92)) ||
     value.includes("\0") ||
     value.includes(":")
   )
@@ -246,7 +246,7 @@ export async function reserveHistoricalUserObjectBatch(
 
   // Keep the existing bytewise lock ordering: every worker must claim
   // artifacts in a stable order to avoid cross-worker deadlocks.
-  const sorted = stableObjects.sort((a, b) => {
+  const sorted = stableObjects.toSorted((a, b) => {
     if (a.storagePath < b.storagePath) return -1;
     if (a.storagePath > b.storagePath) return 1;
     if (a.artifactId < b.artifactId) return -1;

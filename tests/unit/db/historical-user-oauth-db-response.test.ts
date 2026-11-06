@@ -42,6 +42,7 @@ describe("original-user OAuth challenge DB result verification", () => {
       `${"A".repeat(42)}\n`,
       `${"A".repeat(42)}\0`,
       `${"A".repeat(42)}é`,
+      `${"A".repeat(41)}🔒`,
     ];
     for (const state of invalid) {
       const fixture = fakeAdmissionDatabase([]);

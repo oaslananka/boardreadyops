@@ -232,6 +232,30 @@ describe("original-user artifact copy reservation boundary", () => {
     ).resolves.toHaveLength(1);
   });
 
+  it("locks a copied artifact batch in bytewise storage-path order without mutating caller input", async () => {
+    const inputs = [
+      { ...object(), storagePath: "artifacts/z.bin" },
+      { ...object(), storagePath: "artifacts/a.bin" },
+      { ...object(), storagePath: "artifacts/m.bin" },
+    ];
+    const originalOrder = inputs.map((item) => item.storagePath);
+    const query = vi.fn().mockResolvedValue({ rows: [{ outcome: "reserved" }] });
+    const withTransaction = vi.fn(async (run: (tx: { query: typeof query }) => Promise<unknown>) => run({ query }));
+    const admitted = await reserveHistoricalUserObjectBatch({ withTransaction } as never, authority(), inputs);
+    expect(admitted?.map(({ object: item }) => item.storagePath)).toEqual([
+      "artifacts/a.bin",
+      "artifacts/m.bin",
+      "artifacts/z.bin",
+    ]);
+    expect(query.mock.calls.map(([, params]) => params[3])).toEqual([
+      "artifacts/a.bin",
+      "artifacts/m.bin",
+      "artifacts/z.bin",
+    ]);
+    expect(inputs.map((item) => item.storagePath)).toEqual(originalOrder);
+    expect(withTransaction).toHaveBeenCalledOnce();
+  });
+
   it("rejects invalid batch objects before a transaction starts", async () => {
     const withTransaction = vi.fn();
     const good = object();

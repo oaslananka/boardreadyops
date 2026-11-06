@@ -7,7 +7,7 @@ import type { PgQueryExecutor } from "./pg-executor.js";
 function validOAuthState(value: unknown): value is string {
   if (typeof value !== "string" || value.length !== 43) return false;
   for (let index = 0; index < value.length; index++) {
-    const code = value.charCodeAt(index);
+    const code = value.codePointAt(index) ?? -1;
     if (
       !(
         (code >= 65 && code <= 90) ||
