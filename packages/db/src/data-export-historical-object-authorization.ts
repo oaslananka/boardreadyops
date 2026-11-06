@@ -285,6 +285,21 @@ export async function releaseHistoricalUserObjectBatch(
 }
 
 /**
+ * A SELECT ... LIMIT 1 must yield either zero or one object row. Missing,
+ * malformed or multiple rows are ambiguous evidence, never "no hold".
+ * Shared only by the source-only prepublication gate; NOT delivery auth.
+ */
+function boundedPrepublicationRows(result: unknown): readonly Record<string, unknown>[] | null {
+  if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) return null;
+  if (
+    result.rows.length > 1 ||
+    !result.rows.every((row: unknown) => row !== null && typeof row === "object" && !Array.isArray(row))
+  )
+    return null;
+  return result.rows as Record<string, unknown>[];
+}
+
+/**
  * Internal, point-in-time original-USER archive readiness gate.
  * Locks original export, all retained artifact rows and the legal-hold table
  * for this bounded transaction. Migration 0117 additionally fences relevant
@@ -354,7 +369,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
       async (tx) => {
         // Prevent concurrent hold writes only during this bounded check.
         await tx.query("LOCK TABLE public.legal_holds IN SHARE MODE NOWAIT");
-        const source = (await tx.query(
+        const sourceResult: unknown = await tx.query(
           `SELECT e.tenant_id
              FROM public.data_exports AS e
              JOIN public.installations AS i
@@ -368,23 +383,32 @@ export async function checkHistoricalUserArchivePrepublication(input: {
               AND (e.expires_at IS NULL OR e.expires_at>clock_timestamp())
             FOR SHARE OF e,i NOWAIT`,
           [authority.exportId, authority.verifiedGitHubUserId],
-        )) as { rows?: Array<{ tenant_id?: string }> };
-        const tenant = source.rows?.[0]?.tenant_id;
+        );
+        const sourceRows = boundedPrepublicationRows(sourceResult);
+        if (sourceRows?.length !== 1) return "stale";
+        const tenant = sourceRows[0]?.tenant_id;
         if (typeof tenant !== "string" || !tenant) return "stale";
 
         // Migration 0117 makes erasure writers and new artifact inserts
         // acquire this tenant key before their changes commit. Take the key
         // BEFORE querying for both erasure and the complete object manifest.
-        await tx.query("SELECT pg_advisory_xact_lock(boardreadyops_historical_transfer_tenant_lock_key($1))", [tenant]);
-        const holds = (await tx.query(
+        const advisoryRows = boundedPrepublicationRows(
+          await tx.query("SELECT pg_advisory_xact_lock(boardreadyops_historical_transfer_tenant_lock_key($1))", [
+            tenant,
+          ]),
+        );
+        if (advisoryRows?.length !== 1) return "stale";
+        const holdsResult: unknown = await tx.query(
           `SELECT 1 FROM public.legal_holds
             WHERE lower(tenant_id)=lower($1) AND active=TRUE LIMIT 1`,
           [tenant],
-        )) as { rows?: unknown[] };
+        );
+        const holdRows = boundedPrepublicationRows(holdsResult);
+        if (holdRows === null) return "stale";
         // A hold is an internal review requirement, not an export prohibition.
-        if (holds.rows?.length) return "held";
+        if (holdRows.length === 1) return "held";
 
-        const activeErasure = (await tx.query(
+        const erasureResult: unknown = await tx.query(
           `SELECT 1 FROM public.erasure_requests er
             WHERE lower(er.tenant_id)=lower($1)
               AND er.dry_run=FALSE AND er.status IN ('running','completed')
@@ -395,8 +419,9 @@ export async function checkHistoricalUserArchivePrepublication(input: {
               )
             LIMIT 1`,
           [tenant, [...new Set(objects.map((obj) => obj.repositoryId))]],
-        )) as { rows?: unknown[] };
-        if (activeErasure.rows?.length) return "stale";
+        );
+        const erasureRows = boundedPrepublicationRows(erasureResult);
+        if (erasureRows === null || erasureRows.length !== 0) return "stale";
 
         // Enumerate ALL current retained objects, even expired ones, to avoid
         // accidentally accepting a truncated subset of the original account.
