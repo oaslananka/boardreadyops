@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { prepareVerifiedHistoricalUserCompositePreflight } from "../../../packages/db/src/data-export-historical-inventory.js";
-import { stageHistoricalUserPrivateDeliveryPreflight } from "../../../packages/db/src/data-export-historical-private-preflight.js";
+import {
+  inspectHistoricalUserPrivateDeliveryPreflight,
+  stageHistoricalUserPrivateDeliveryPreflight,
+} from "../../../packages/db/src/data-export-historical-private-preflight.js";
 
 vi.mock("../../../packages/db/src/data-export-historical-inventory.js", () => ({
   prepareVerifiedHistoricalUserCompositePreflight: vi.fn(),
@@ -15,7 +18,10 @@ const fingerprint = () => ({
   mutationEpochSha256: "d".repeat(64),
 });
 
-function buildFixture(rowsForInsert: (id: unknown) => unknown) {
+function buildFixture(
+  rowsForInsert: (id: unknown) => unknown,
+  admission?: { ownerRows?: unknown[]; blockerRows?: unknown[] },
+) {
   const f = fingerprint();
   vi.mocked(prepareVerifiedHistoricalUserCompositePreflight).mockResolvedValue({
     core: { sha256: f.coreSha256 },
@@ -25,11 +31,14 @@ function buildFixture(rowsForInsert: (id: unknown) => unknown) {
   let rollback = false;
   const query = vi.fn(async (sql: string, args?: unknown[]) => {
     if (sql.startsWith("LOCK TABLE")) return { rows: [] };
-    if (sql.includes("SELECT e.tenant_id")) return { rows: [{ tenant_id: "original-user" }] };
+    if (sql.includes("SELECT e.tenant_id")) return { rows: admission?.ownerRows ?? [{ tenant_id: "original-user" }] };
     if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
-    if (sql.includes("AS active_hold")) return { rows: [{ active_hold: false, active_erasure: false }] };
+    if (sql.includes("AS active_hold"))
+      return { rows: admission?.blockerRows ?? [{ active_hold: false, active_erasure: false }] };
     if (sql.includes("INSERT INTO public.historical_user_private_delivery_preflights"))
       return { rows: rowsForInsert(args?.[0]) };
+    if (sql.includes("SELECT 1 FROM public.historical_user_private_delivery_preflights"))
+      return { rows: [{ "?column?": 1 }] };
     throw new Error("Unexpected SQL in private preflight insert test");
   });
   const withTransaction = vi.fn(async (fn: (tx: { query: typeof query }) => Promise<unknown>) => {
@@ -47,6 +56,7 @@ function buildFixture(rowsForInsert: (id: unknown) => unknown) {
       fingerprint: f,
       ttlSeconds: 60,
     },
+    preflightId: randomUUID(),
     query,
     wasRolledBack: () => rollback,
   };
@@ -74,6 +84,45 @@ describe("original USER private preflight INSERT acknowledgement", () => {
     await expect(stageHistoricalUserPrivateDeliveryPreflight(fixture.input)).resolves.toBeNull();
     expect(fixture.wasRolledBack()).toBe(false);
   });
+
+  it.each(["owner", "blockers"] as const)(
+    "denies private preflight creation on ambiguous %s authorization rows",
+    async (type) => {
+      const ownerRows = [{ tenant_id: "original-user" }, { tenant_id: "original-user" }];
+      const blockerRows = [
+        { active_hold: false, active_erasure: false },
+        { active_hold: false, active_erasure: false },
+      ];
+      const fixture = buildFixture((id) => [{ id }], type === "owner" ? { ownerRows } : { blockerRows });
+      expect(await stageHistoricalUserPrivateDeliveryPreflight(fixture.input)).toBeNull();
+      expect(fixture.query.mock.calls.some((call) => call[0].includes("INSERT INTO"))).toBe(false);
+    },
+  );
+
+  it.each(["owner", "blockers"] as const)(
+    "denies private preflight inspection on ambiguous %s authorization rows",
+    async (type) => {
+      const ownerRows = [{ tenant_id: "original-user" }, { tenant_id: "original-user" }];
+      const blockerRows = [
+        { active_hold: false, active_erasure: false },
+        { active_hold: false, active_erasure: false },
+      ];
+      const fixture = buildFixture((id) => [{ id }], type === "owner" ? { ownerRows } : { blockerRows });
+      expect(
+        await inspectHistoricalUserPrivateDeliveryPreflight({
+          db: fixture.input.db,
+          authority: fixture.input.authority,
+          id: fixture.preflightId,
+          fingerprint: fixture.input.fingerprint,
+        }),
+      ).toBe("stale");
+      expect(
+        fixture.query.mock.calls.some((call) =>
+          call[0].includes("SELECT 1 FROM public.historical_user_private_delivery_preflights"),
+        ),
+      ).toBe(false);
+    },
+  );
 
   it("accepts one exact preflight INSERT result", async () => {
     const fixture = buildFixture((id) => [{ id }]);

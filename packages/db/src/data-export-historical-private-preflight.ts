@@ -55,6 +55,14 @@ async function currentOriginalUserSnapshotMatches(
 }
 
 type Admission = { tenant_id: string };
+
+function exactPreflightAdmissionRow(result: unknown): Record<string, unknown> | null {
+  if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) return null;
+  if (result.rows.length !== 1) return null;
+  const row: unknown = result.rows[0];
+  return row !== null && typeof row === "object" && !Array.isArray(row) ? (row as Record<string, unknown>) : null;
+}
+
 async function authorizeSuspendedOriginalUser(
   tx: SqlQueryExecutor,
   authority: HistoricalUserAuthority,
@@ -62,7 +70,7 @@ async function authorizeSuspendedOriginalUser(
   // Keep the legal-hold DDL / writer lock only for a bounded DB transaction,
   // NEVER through an HTTP send or customer-facing stream.
   await tx.query("LOCK TABLE public.legal_holds IN SHARE MODE NOWAIT");
-  const result = (await tx.query(
+  const result: unknown = await tx.query(
     `SELECT e.tenant_id
        FROM public.data_exports e
        JOIN public.installations i
@@ -77,11 +85,11 @@ async function authorizeSuspendedOriginalUser(
         AND (e.expires_at IS NULL OR e.expires_at>clock_timestamp())
       FOR SHARE OF e,i NOWAIT`,
     [authority.exportId, authority.verifiedGitHubUserId],
-  )) as { rows?: Admission[] };
-  const tenant = result.rows?.[0]?.tenant_id;
+  );
+  const tenant = exactPreflightAdmissionRow(result)?.tenant_id;
   if (typeof tenant !== "string" || tenant.length < 1) return null;
   await tx.query("SELECT pg_advisory_xact_lock(boardreadyops_historical_transfer_tenant_lock_key($1))", [tenant]);
-  const blocks = (await tx.query(
+  const blocks: unknown = await tx.query(
     `SELECT EXISTS (
         SELECT 1 FROM public.legal_holds h
          WHERE lower(h.tenant_id)=lower($1) AND h.active=TRUE
@@ -92,8 +100,9 @@ async function authorizeSuspendedOriginalUser(
            AND er.status IN ('running','completed')
        ) AS active_erasure`,
     [tenant],
-  )) as { rows?: Array<{ active_hold: boolean; active_erasure: boolean }> };
-  if (blocks.rows?.[0]?.active_hold !== false || blocks.rows?.[0]?.active_erasure !== false) return null;
+  );
+  const blockers = exactPreflightAdmissionRow(blocks);
+  if (blockers?.active_hold !== false || blockers.active_erasure !== false) return null;
   return { tenant_id: tenant };
 }
 
