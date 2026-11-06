@@ -414,7 +414,16 @@ describe("private historical original-USER partial archive", () => {
         claim.verifiedPhysicalArtifactCount = 0;
       },
       (claim) => {
+        claim.verifiedPhysicalArtifactCount = 1.5;
+      },
+      (claim) => {
         claim.verifiedPrivateVisualDigestCount = 0;
+      },
+      (claim) => {
+        claim.verifiedPrivateVisualDigestCount = -1;
+      },
+      (claim) => {
+        claim.privateVisualContentsIncluded = null;
       },
       (claim) => {
         claim.metadataSnapshotExclusions = [];

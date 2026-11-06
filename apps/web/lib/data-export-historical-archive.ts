@@ -812,6 +812,15 @@ function validHistoricalReceiptEntryCount(entries: unknown, fileCount: number): 
   return Array.isArray(entries) && entries.length === fileCount - 1;
 }
 
+/** Match retained physical and private-visual counts without admitting customer-ready bytes. */
+function validHistoricalPartialReceiptCounts(receipt: Record<string, unknown>, snapshot: HistoricalSnapshot): boolean {
+  return (
+    receipt.verifiedPhysicalArtifactCount === snapshot.artifacts.length &&
+    receipt.verifiedPrivateVisualDigestCount === snapshot.excludedSourceClassCounts.runSnapshots &&
+    receipt.privateVisualContentsIncluded === false
+  );
+}
+
 /** Exact v3 partial ZIP declaration, including non-customer privacy exclusions. */
 function validHistoricalPartialReceipt(
   receipt: Record<string, unknown>,
@@ -844,9 +853,7 @@ function validHistoricalPartialReceipt(
     receipt.exportId !== expectedExportId ||
     snapshot.exportId !== expectedExportId ||
     !validHistoricalPartialReceiptExclusions(receipt, snapshot) ||
-    receipt.verifiedPhysicalArtifactCount !== snapshot.artifacts.length ||
-    receipt.verifiedPrivateVisualDigestCount !== snapshot.excludedSourceClassCounts.runSnapshots ||
-    receipt.privateVisualContentsIncluded !== false ||
+    !validHistoricalPartialReceiptCounts(receipt, snapshot) ||
     !validHistoricalReceiptEntryCount(receipt.entries, fileCount)
   );
 }
