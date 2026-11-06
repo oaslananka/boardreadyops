@@ -11,12 +11,16 @@ const identity = () => ({
   state: "A".repeat(43),
 });
 
-function fakeAdmissionDatabase(returnedRows: unknown) {
+function fakeAdmissionDatabase(
+  returnedRows: unknown,
+  admission?: { ownerRows?: unknown; lockRows?: unknown; blockerRows?: unknown },
+) {
   const query = vi.fn(async (sql: string, params?: unknown[]) => {
     if (sql.startsWith("LOCK TABLE")) return { rows: [] };
-    if (sql.includes("SELECT e.tenant_id")) return { rows: [{ tenant_id: "original-user" }] };
-    if (sql.includes("pg_try_advisory_xact_lock")) return { rows: [{ acquired: true }] };
-    if (sql.includes("active_hold")) return { rows: [{ active_hold: false, active_erasure: false }] };
+    if (sql.includes("SELECT e.tenant_id")) return { rows: admission?.ownerRows ?? [{ tenant_id: "original-user" }] };
+    if (sql.includes("pg_try_advisory_xact_lock")) return { rows: admission?.lockRows ?? [{ acquired: true }] };
+    if (sql.includes("active_hold"))
+      return { rows: admission?.blockerRows ?? [{ active_hold: false, active_erasure: false }] };
     if (sql.includes("historical_user_oauth_challenges")) {
       return { rows: typeof returnedRows === "function" ? returnedRows(params) : returnedRows };
     }
@@ -49,6 +53,27 @@ describe("original-user OAuth challenge DB result verification", () => {
     expect(await registerHistoricalUserOAuthChallenge(db, input)).toBe(true);
     expect(await consumeHistoricalUserOAuthChallenge(db, input)).toBe(true);
   });
+
+  it.each(["owner", "lock", "blockers"] as const)(
+    "denies issue and consumption of private OAuth nonce with ambiguous %s evidence",
+    async (type) => {
+      const input = identity();
+      const ownerRows = [{ tenant_id: "original-user" }, { tenant_id: "original-user" }];
+      const lockRows = [{ acquired: true }, { acquired: true }];
+      const blockerRows = [
+        { active_hold: false, active_erasure: false },
+        { active_hold: false, active_erasure: false },
+      ];
+      const admission = type === "owner" ? { ownerRows } : type === "lock" ? { lockRows } : { blockerRows };
+      for (const operation of [registerHistoricalUserOAuthChallenge, consumeHistoricalUserOAuthChallenge]) {
+        const fixture = fakeAdmissionDatabase((params: unknown[]) => [{ state_sha256: params[2] }], admission);
+        expect(await operation(fixture.db, input)).toBe(false);
+        expect(fixture.query.mock.calls.some((call) => call[0].includes("historical_user_oauth_challenges"))).toBe(
+          false,
+        );
+      }
+    },
+  );
 
   it("rejects malformed owner identity before requesting a DB transaction", async () => {
     const fixture = fakeAdmissionDatabase([]);

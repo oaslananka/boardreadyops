@@ -95,6 +95,7 @@ async function withOriginalUserNonceAdmission(
             [input.exportId, input.verifiedGitHubUserId],
           ),
         );
+        if (owner.length !== 1) return false;
         const tenant = owner[0]?.tenant_id;
         if (typeof tenant !== "string" || tenant.length === 0) return false;
         const tenantLock = rows(
@@ -103,7 +104,7 @@ async function withOriginalUserNonceAdmission(
             [tenant],
           ),
         );
-        if (tenantLock[0]?.acquired !== true) return false;
+        if (tenantLock.length !== 1 || tenantLock[0]?.acquired !== true) return false;
         const blockers = rows(
           await tx.query(
             `SELECT EXISTS(
@@ -118,7 +119,8 @@ async function withOriginalUserNonceAdmission(
             [tenant],
           ),
         );
-        if (blockers[0]?.active_hold !== false || blockers[0]?.active_erasure !== false) return false;
+        if (blockers.length !== 1 || blockers[0]?.active_hold !== false || blockers[0]?.active_erasure !== false)
+          return false;
         return await apply(tx);
       },
       { statementTimeoutMs: 5000 },
