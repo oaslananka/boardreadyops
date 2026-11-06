@@ -4,7 +4,7 @@ import { createServer, get } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   HistoricalUserArchivePreflightError,
   prepareVerifiedHistoricalUserMetadataOnlyArchive,
@@ -334,8 +334,31 @@ describeDb("historical original-USER physical artifact preflight", () => {
           })
         )?.equals(archive.bytes),
       ).toBe(true);
-      // No-clobber idempotent retry when bytes match.
+      // An otherwise valid ZIP with a forged expected digest must be rejected,
+      // and the temporary private bytes must be erased before returning.
+      const wipeSpy = vi.spyOn(Buffer.prototype, "fill");
+      try {
+        expect(
+          await readSealedHistoricalUserPartial({
+            archiveRoot: privateRoot,
+            exportId,
+            sha256: "0".repeat(64),
+            byteLength: archive.byteLength,
+          }),
+        ).toBeNull();
+        expect(
+          wipeSpy.mock.contexts.some(
+            (context) =>
+              Buffer.isBuffer(context) && context.length === archive.byteLength && context.every((byte) => byte === 0),
+          ),
+        ).toBe(true);
+      } finally {
+        wipeSpy.mockRestore();
+      }
+      // The sealing routine must not erase its caller-owned fixture.
       expect(await sealHistoricalUserPrivatePartial(input)).toEqual(sealed);
+      expect(archive.bytes.length).toBe(archive.byteLength);
+      expect(verifyHistoricalUserPartialArchive(archive.bytes, archive.sha256, exportId)).toBe(true);
       // Wrong original export identity or forged archive digest cannot open.
       expect(
         await readSealedHistoricalUserPartial({

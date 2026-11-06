@@ -69,6 +69,8 @@ export async function readSealedHistoricalUserPartial(input: {
     constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
   ).catch(() => null);
   if (!handle) return null;
+  let bytes: Buffer | null = null;
+  let accepted = false;
   try {
     const before = await handle.stat();
     if (
@@ -79,7 +81,7 @@ export async function readSealedHistoricalUserPartial(input: {
       before.size !== input.byteLength
     )
       return null;
-    const bytes = await handle.readFile();
+    bytes = await handle.readFile();
     const after = await handle.stat();
     if (
       bytes.length !== input.byteLength ||
@@ -90,10 +92,14 @@ export async function readSealedHistoricalUserPartial(input: {
       before.ctimeMs !== after.ctimeMs
     )
       return null;
-    return verifyHistoricalUserPartialArchive(bytes, input.sha256, input.exportId) ? bytes : null;
+    if (!verifyHistoricalUserPartialArchive(bytes, input.sha256, input.exportId)) return null;
+    accepted = true; // Ownership of the verified buffer transfers to the caller.
+    return bytes;
   } catch {
     return null;
   } finally {
+    // Failed integrity validation must not retain private ZIP bytes in memory.
+    if (!accepted) bytes?.fill(0);
     await handle.close();
   }
 }
@@ -152,15 +158,20 @@ export async function sealHistoricalUserPrivatePartial(input: {
       sha256: input.archive.sha256,
       byteLength: input.archive.byteLength,
     });
-    return bytes?.equals(input.archive.bytes)
-      ? {
-          exportId: input.exportId,
-          sha256: input.archive.sha256,
-          byteLength: input.archive.byteLength,
-          completeCustomerExport: false,
-          customerDeliveryAllowed: false,
-        }
-      : null;
+    try {
+      return bytes?.equals(input.archive.bytes)
+        ? {
+            exportId: input.exportId,
+            sha256: input.archive.sha256,
+            byteLength: input.archive.byteLength,
+            completeCustomerExport: false,
+            customerDeliveryAllowed: false,
+          }
+        : null;
+    } finally {
+      // This successful read is internal verification; only the input is caller-owned.
+      bytes?.fill(0);
+    }
   } catch {
     return null;
   }
@@ -196,8 +207,11 @@ export async function prepareSealedHistoricalUserPrivatePartial(input: {
     }))
   )
     return null;
+  let initial: Awaited<ReturnType<typeof prepareVerifiedHistoricalUserPartialArchive>> = null;
+  let confirmed: Awaited<ReturnType<typeof prepareVerifiedHistoricalUserPartialArchive>> = null;
+  let disk: Buffer | null = null;
   try {
-    const initial = await prepareVerifiedHistoricalUserPartialArchive(input);
+    initial = await prepareVerifiedHistoricalUserPartialArchive(input);
     if (!initial) return null;
     const persisted = await sealHistoricalUserPrivatePartial({
       archiveRoot: root,
@@ -209,7 +223,7 @@ export async function prepareSealedHistoricalUserPrivatePartial(input: {
     // A second complete original-USER/physical-object read is intentionally
     // bounded and refuses any stale source after disk fsync. There is STILL
     // no durable DB/FS atomic claim after this short-lived check.
-    const confirmed = await prepareVerifiedHistoricalUserPartialArchive(input);
+    confirmed = await prepareVerifiedHistoricalUserPartialArchive(input);
     if (
       !confirmed ||
       confirmed.byteLength !== initial.byteLength ||
@@ -217,7 +231,7 @@ export async function prepareSealedHistoricalUserPrivatePartial(input: {
       !confirmed.bytes.equals(initial.bytes)
     )
       return null;
-    const disk = await readSealedHistoricalUserPartial({
+    disk = await readSealedHistoricalUserPartial({
       archiveRoot: root,
       exportId: input.authority.exportId,
       sha256: initial.sha256,
@@ -226,5 +240,10 @@ export async function prepareSealedHistoricalUserPrivatePartial(input: {
     return disk?.equals(initial.bytes) ? persisted : null;
   } catch {
     return null;
+  } finally {
+    // These are internal private snapshots, never caller-visible ZIP buffers.
+    initial?.bytes.fill(0);
+    confirmed?.bytes.fill(0);
+    disk?.fill(0);
   }
 }
