@@ -865,6 +865,15 @@ function validHistoricalPartialReceipt(
   );
 }
 
+/** A physical ZIP entry must match the immutable retained artifact, not only its receipt hash. */
+function matchesHistoricalPhysicalArchiveEntry(path: string, bytes: Buffer, artifacts: Map<string, Artifact>): boolean {
+  if (path === metadataPath || path === visualEvidencePath) return true;
+  const match = objectPath.exec(path);
+  if (!match?.[1]) return false;
+  const artifact = artifacts.get(match[1]);
+  return !!artifact && artifact.byteLength === bytes.length && artifact.sha256 === digest(bytes);
+}
+
 /** Bind each ZIP path to the received bytes, receipt digest and retained artifact owner snapshot. */
 function validHistoricalPartialEntries(
   files: Map<string, Buffer>,
@@ -890,12 +899,7 @@ function validHistoricalPartialEntries(
       entry.sha256 !== digest(bytes)
     )
       return false;
-    if (path !== metadataPath && path !== visualEvidencePath) {
-      const match = objectPath.exec(path);
-      if (!match?.[1]) return false;
-      const artifact = artifactMap.get(match[1]);
-      if (!artifact || artifact.byteLength !== bytes.length || artifact.sha256 !== digest(bytes)) return false;
-    }
+    if (!matchesHistoricalPhysicalArchiveEntry(path, bytes, artifactMap)) return false;
   }
   return true;
 }
