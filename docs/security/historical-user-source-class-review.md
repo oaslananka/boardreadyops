@@ -257,6 +257,67 @@ multi-party redistribution, customer ZIP, legal/IP rights or completeness.
 No migration, new public endpoint, permanent worker, export allowlist,
 new dependency or paid infrastructure was added.
 
+## Remaining nine historical private-control classes and three platform operations
+
+The private `assessHistoricalUserPrivateLifecycleCandidates` is a
+**COUNT-ONLY / NO CUSTOMER EXPORT** review of the nine remaining
+FK-unlinked *privacy/lifecycle control record* classes:
+`artifact_export_copy_reservations`, `artifact_unlink_fences`,
+`data_export_archive_commitments`,
+`historical_user_live_oauth_verified_proofs`,
+`historical_user_oauth_challenges`,
+`historical_user_partial_cleanup_events`,
+`historical_user_partial_read_reservations`,
+`historical_user_private_delivery_preflights` and
+`historical_user_private_preflight_events`. These records are private
+reservation/fencing, claim, preflight, cleanup or OAuth evidence — **NOT**
+the original user's customer payload, an archive receipt or permission
+to download. A source record's presence is not evidence that every DB
+row or physical file has been preserved or lawfully redisclosed.
+
+The assessor runs under the same strict original **numeric** GitHub USER,
+pending uninstalled export, retained suspended original USER
+installation, live legal hold and destructive erasure veto in one
+`REPEATABLE READ READ ONLY` transaction with a 5-second statement
+timeout. Nine per-class counts are bounded to 100 rows, and a 101st
+rejects the entire review. Only known hard-coded table identifiers
+are queried; no row IDs, OAuth nonce or state hash, access token,
+secret, worker identifier, storage path, archive digest, raw object or
+customer bytes appear in the output. For the private preflight-event
+class, source count is joined through its preflight's export ID, not a
+bare untrusted event ID. Inconsistent original numeric GitHub USER
+IDs in bound OAuth/preflight/cleanup/read records or mismatched tenant
+keys on export-copy reservations cause a **fail-closed null result**,
+not ownership reassignment. Unlink fences are tenant-login-only and
+**explicitly never count as original-owner proof**, even if another
+installation with that login is not currently visible. All successful
+results are hard-coded `releaseDecision=NO_GO` and
+`customerDeliveryAllowed=false`.
+
+The remaining three no-FK classes are recorded as **platform
+operational exclusions**, not scanned for customer ZIP content:
+`cloud_schema_migrations` (deployment ledger),
+`component_lifecycle_observations` (platform-managed provider/supply
+intelligence, potentially tenant-sensitive), and `control_plane_jobs`
+(queue/worker operational metadata). Exclusion from a customer archive
+does **not** imply those rows are free of customer personal data,
+retention duties, licensed content, or lawful erasure/hold obligations;
+those policies require their **separate** platform review. No read
+of these three tables is made by this assessor.
+
+Thus the full **29/29 no-FK-class triage map** is now accounted for:
+**26** classes have bounded internal source-candidate reviews
+(previous **17** plus these **9**), while **3** platform-operated
+classes are explicitly excluded from the customer ZIP source scope.
+This is **ZERO** new verified customer-owned/redistributable
+classes, **ZERO** complete customer export rights, and **ZERO**
+signed DB+physical-object completeness acceptance. All **63**
+unresolved classes remain DENY for customer delivery. Disposable
+PostgreSQL tests validate cross-tenant reservation misuse, conflicting
+numeric OAuth identity, active hold/erasure, and over-100 fences.
+No schema migration, new service, public endpoint, feature flag,
+external provider call, or paid infrastructure was introduced.
+
 ## Individual table review queue
 
 ### Privacy, export lifecycle and installation authority — 17 tables

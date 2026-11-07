@@ -373,10 +373,23 @@ project, membership and append-only policy-audit classes. It returns
 bounded numeric-user versus reusable-login candidate counts only:
 workspace membership does **not** prove rights to disclose shared
 projects, collaborators' material, audit events or third-party IP.
-**17 of 29** FK-unlinked classes now have internal candidate reviews;
-the remaining **12** need a distinct provenance assessment.
-All **63** unresolved classes remain DENY and customer archive
-release remains NO_GO.
+The final **nine** FK-unlinked private export/OAuth/reservation
+control classes now have a separate count-only original numeric
+USER source review. Conflicting numeric identity or cross-tenant
+reservation evidence fails closed; a login-only unlink fence can
+never authorize a customer export. The remaining **three** no-FK
+classes — `cloud_schema_migrations`,
+`component_lifecycle_observations` and `control_plane_jobs` —
+are explicitly **platform operational exclusions** from customer ZIP
+content, with independent retention/privacy/licensing obligations
+still unverified.
+
+The **29/29 no-FK-class triage map** is complete: **26 bounded
+private source-candidate reviews plus 3 platform-only exclusions**.
+It is **not 29 verified customer ownership classes** and does
+not prove DB+physical object archive completeness or third-party
+disclosure rights. All **63** unresolved classes remain DENY and
+customer archive release remains NO_GO.
 The internal source-only partial-integrity observation additionally
 requires the schema fingerprint and all nineteen bounded hardware
 class counts to pass under a **single PostgreSQL REPEATABLE READ READ
