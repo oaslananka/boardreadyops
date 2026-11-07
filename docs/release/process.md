@@ -127,6 +127,15 @@ This path builds the current container definition around the already-published
 npm package version, then publishes `ghcr.io/oaslananka/boardreadyops-full:vX.Y.Z`.
 For stable versions it also updates the `vX` and `latest` image aliases.
 
+Container release jobs require the actual npm tarball to download successfully
+before building, since npm version metadata can be visible before the CDN serves
+the package bytes. Only this exact, first-party published release tarball probe
+uses `--min-release-age=0`, because the repository's 7-day npm policy applies
+to third-party dependency installation and would otherwise reject new releases
+we just published. All other dependency-age checks remain intact. The readiness
+retry is bounded to 30 attempts at 10-second intervals; container smoke and
+security scans are never skipped.
+
 ## Remote Verification
 
 After creating the GitHub Release:
