@@ -3,12 +3,14 @@ import {
   assessHistoricalUserHardwareOwnedRowCounts,
   historicalUserHardwareSourceNames,
 } from "./data-export-historical-hardware-owner-counts.js";
+import { prepareVerifiedHistoricalUserMutationEpochSha256 } from "./data-export-historical-inventory.js";
 import { assessHistoricalUserSchemaCoverage } from "./data-export-historical-schema-coverage.js";
 import type { PgQueryExecutor } from "./pg-executor.js";
 
 /**
- * INTERNAL source-only diagnostic. The catalog and 19 related private row
- * counts MUST be observed inside ONE read-only repeatable-read transaction.
+ * INTERNAL source-only diagnostic. The catalog, 19 private source-count
+ * classes and existing partly-covered mutation epochs are observed inside
+ * ONE read-only repeatable-read transaction.
  * This does not prove third-party rights, include physical object bytes,
  * guarantee complete legacy rows, or create a customer-export capability.
  */
@@ -26,7 +28,7 @@ export type HistoricalUserSourceScopeObservation = {
 
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
 const sha256 = /^[0-9a-f]{64}$/u;
-const scopeDomain = Buffer.from("boardreadyops:historical-user:internal-relational-scope:v1\0", "utf8");
+const scopeDomain = Buffer.from("boardreadyops:historical-user:internal-relational-scope:v2\0", "utf8");
 
 export async function assessHistoricalUserSourceScope(
   db: Pick<PgQueryExecutor, "withTransaction">,
@@ -94,12 +96,20 @@ export async function assessHistoricalUserSourceScope(
         )
           return null;
 
-        // Digest binds immutable original USER/export identity, fixed
-        // catalog metadata and bounded counts in ONE database snapshot.
-        // The identity is hashed, never returned as plaintext source data.
-        // This is INTERNAL only, not a signature or delivery capability.
+        // Edits restored to identical content leave a count unchanged.
+        // Existing triggers cover core/review/visual classes (not all 19
+        // hardware classes). Bind their immutable ABA epoch too, inside
+        // this SAME read-only PostgreSQL snapshot.
+        const mutationEpochSha256 = await prepareVerifiedHistoricalUserMutationEpochSha256(transaction, originalUser);
+        if (!sha256.test(mutationEpochSha256)) return null;
         const message = Buffer.from(
-          JSON.stringify([originalUser.exportId, originalUser.verifiedGitHubUserId, schema.schemaSha256, ordered]),
+          JSON.stringify([
+            originalUser.exportId,
+            originalUser.verifiedGitHubUserId,
+            schema.schemaSha256,
+            ordered,
+            mutationEpochSha256,
+          ]),
           "utf8",
         );
         try {

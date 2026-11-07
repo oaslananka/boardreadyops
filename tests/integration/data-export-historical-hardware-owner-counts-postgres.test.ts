@@ -406,6 +406,24 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
     );
   });
 
+  it("detects edit-restore ABA on a historically epoch-tracked owned repository with unchanged counts", async () => {
+    const before = await assessHistoricalUserSourceScope(database(), identity());
+    expect(before?.status).toBe("known-relational-source-scope-unapproved");
+    try {
+      await database().query("UPDATE repositories SET default_branch='historical-aba-probe' WHERE id=$1", [
+        ids.repository,
+      ]);
+    } finally {
+      await database().query("UPDATE repositories SET default_branch='main' WHERE id=$1", [ids.repository]);
+    }
+    const restored = await assessHistoricalUserSourceScope(database(), identity());
+    expect(restored?.scopeFingerprintSha256).toMatch(/^[0-9a-f]{64}$/u);
+    expect(restored?.scopeFingerprintSha256).not.toBe(before?.scopeFingerprintSha256);
+    expect(restored?.customerDeliveryAllowed).toBe(false);
+    const row = await database().query("SELECT default_branch FROM repositories WHERE id=$1", [ids.repository]);
+    expect((row as { rows: Array<{ default_branch: string }> }).rows[0]?.default_branch).toBe("main");
+  });
+
   it("refuses internal source-only observation after a new unknown schema table appears", async () => {
     await database().query("CREATE TABLE public.boardreadyops_scope_drift_probe (id integer PRIMARY KEY)");
     try {

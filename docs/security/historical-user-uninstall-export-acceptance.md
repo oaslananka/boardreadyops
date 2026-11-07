@@ -154,9 +154,20 @@ signature, then independently re-reads the original numeric USER's current
 source-scope digest and all NO_GO invariants. A changed schema, bounded
 source-count digest, legal hold, real erasure or denied owner scope blocks
 the private observation even within five minutes.
-**Count-preserving row edits, unlinkable legacy rows, cross-DB/FS races and
+For existing historical mutation epoch triggers from migrations 0118–0120
+(core repository/run/finding/artifact rows, supported review/collaboration,
+private visual and audit classes), the private source-scope digest now
+also incorporates the **original-USER installation-bound mutation epoch**
+captured inside the **same** read-only PostgreSQL snapshot as catalog and
+the nineteen bounded source counts. Count-preserving edit-restore changes
+to those *tracked* sources invalidate the previous scope digest even when
+the original bytes and source counts return to their previous state.
+The counter is not a physical-object integrity lease and does not track
+every hardware class; the v2 internal scope digest domain was changed
+to prevent confusing the earlier count-only fingerprint with this one.
+**Untracked hardware row edits, unlinkable legacy rows, cross-DB/FS races and
 third-party rights remain unproven; a live digest match is NOT archival
-completeness, no-mutation evidence or customer delivery authorization.**
+completeness or customer delivery authorization.**
 The signing timestamp comes from the server clock, not a request parameter.
 The private signing key is injected by the trusted server caller, never
 generated, logged, persisted or read from a user-provided field here.

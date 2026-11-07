@@ -1524,6 +1524,41 @@ export async function prepareVerifiedHistoricalUserPrivateVisualEvidence(
 }
 
 /**
+ * Original-USER bounded mutation-epoch fingerprint for existing trigger
+ * coverage only. Called INSIDE one already-open repeatable-read transaction.
+ * It cannot detect changes to classes without historical epoch triggers.
+ */
+export async function prepareVerifiedHistoricalUserMutationEpochSha256(
+  tx: SqlQueryExecutor,
+  authority: { exportId: string; verifiedGitHubUserId: number },
+): Promise<string> {
+  const result = await tx.query(
+    `WITH ${historicalOwnerCtes}
+       SELECT fi.id,COALESCE(epoch.revision,0)::text AS revision
+         FROM former_installations fi
+         LEFT JOIN public.historical_user_snapshot_mutation_epochs epoch
+           ON epoch.installation_id=fi.id
+        ORDER BY fi.id LIMIT 101`,
+    [authority.exportId, authority.verifiedGitHubUserId],
+  );
+  const revisions = (result as { rows?: Array<{ id: unknown; revision: unknown }> }).rows;
+  if (
+    !revisions ||
+    revisions.length === 0 ||
+    revisions.length > 100 ||
+    revisions.some(
+      (row) => !isUuid(row.id) || typeof row.revision !== "string" || !/^(?:0|[1-9]\d{0,18})$/u.test(row.revision),
+    ) ||
+    new Set(revisions.map((row) => row.id)).size !== revisions.length
+  )
+    throw new HistoricalUserInventoryUnavailableError();
+  return createHash("sha256")
+    .update("boardreadyops.historical-user-snapshot-mutation-v1\n")
+    .update(JSON.stringify(revisions.map((r) => [r.id, r.revision])))
+    .digest("hex");
+}
+
+/**
  * SOURCE-ONLY: produce BOTH historical original numeric-USER metadata and
  * visual SHA-evidence from one PostgreSQL REPEATABLE READ READ ONLY snapshot.
  *
@@ -1563,32 +1598,9 @@ export async function prepareVerifiedHistoricalUserCompositePreflight(
       if (!core) return null;
       const visual = await prepareVerifiedHistoricalUserPrivateVisualEvidence(bound, authority);
       if (!visual) throw new HistoricalUserInventoryUnavailableError();
-      // In THIS same repeatable-read snapshot, capture committed mutations
-      // that may have changed and later restored byte-identical core/visuals.
-      // Only owner-ID-verified, suspended USER installations may contribute.
-      const revisionsResult = await tx.query(
-        `WITH ${historicalOwnerCtes}
-           SELECT fi.id,COALESCE(epoch.revision,0)::text AS revision
-             FROM former_installations fi
-             LEFT JOIN public.historical_user_snapshot_mutation_epochs epoch
-               ON epoch.installation_id=fi.id
-            ORDER BY fi.id LIMIT 101`,
-        [authority.exportId, authority.verifiedGitHubUserId],
-      );
-      const revisions = (revisionsResult as { rows?: Array<{ id: unknown; revision: unknown }> }).rows;
-      if (
-        !revisions ||
-        revisions.length === 0 ||
-        revisions.length > 100 ||
-        revisions.some(
-          (row) => !isUuid(row.id) || typeof row.revision !== "string" || !/^(?:0|[1-9]\d{0,18})$/u.test(row.revision),
-        )
-      )
-        throw new HistoricalUserInventoryUnavailableError();
-      const mutationEpochSha256 = createHash("sha256")
-        .update("boardreadyops.historical-user-snapshot-mutation-v1\n")
-        .update(JSON.stringify(revisions.map((r) => [r.id, r.revision])))
-        .digest("hex");
+      // Share the same bound epoch digest across the core/visual and
+      // source-only checks without opening another database snapshot.
+      const mutationEpochSha256 = await prepareVerifiedHistoricalUserMutationEpochSha256(tx, authority);
       return { core, visual, mutationEpochSha256 };
     },
     { consistentRead: true, statementTimeoutMs: 10_000 },

@@ -22,10 +22,10 @@ const hardware = vi.mocked(assessHistoricalUserHardwareOwnedRowCounts);
 const binding = { exportId: randomUUID(), verifiedGitHubUserId: 9_815_471 };
 const rowCounts = Object.fromEntries(historicalUserHardwareSourceNames.map((key) => [key, 1]));
 function fixture() {
-  const query = vi.fn();
+  const query = vi.fn().mockResolvedValue({ rows: [{ id: randomUUID(), revision: "3" }] });
   const tx = { query };
   const withTransaction = vi.fn(async (work: (connection: typeof tx) => Promise<unknown>) => work(tx));
-  return { db: { withTransaction } as never, tx, withTransaction };
+  return { db: { withTransaction } as never, tx, withTransaction, query };
 }
 
 beforeEach(() => {
@@ -82,6 +82,8 @@ describe("single repeatable-read original USER catalog+hardware source-only obse
     });
     expect(catalog).toHaveBeenCalledOnce();
     expect(hardware).toHaveBeenCalledExactlyOnceWith(expect.anything(), binding);
+    expect(f.query).toHaveBeenCalledOnce();
+    expect(f.query.mock.calls[0]?.[1]).toEqual([binding.exportId, binding.verifiedGitHubUserId]);
     const sharedCatalog = catalog.mock.calls[0]?.[0];
     const sharedHardware = hardware.mock.calls[0]?.[0];
     expect(sharedCatalog).toBe(sharedHardware);
@@ -102,6 +104,32 @@ describe("single repeatable-read original USER catalog+hardware source-only obse
     const f = fixture();
     expect(await assessHistoricalUserSourceScope(f.db, binding)).toBeNull();
     expect(hardware).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing, duplicated or malformed original USER epoch revisions", async () => {
+    const f = fixture();
+    for (const rows of [
+      [],
+      [{ id: randomUUID(), revision: "-1" }],
+      [{ id: randomUUID(), revision: "184467440737095516160000" }],
+      [{ id: "other-tenant-id", revision: "3" }],
+    ]) {
+      f.query.mockResolvedValueOnce({ rows });
+      expect(await assessHistoricalUserSourceScope(f.db, binding)).toBeNull();
+    }
+    f.query.mockRejectedValueOnce(new Error("Epoch inspection unavailable"));
+    expect(await assessHistoricalUserSourceScope(f.db, binding)).toBeNull();
+  });
+
+  it("changes the internal source-scope fingerprint across count-preserving existing epoch mutations", async () => {
+    const f = fixture();
+    const installationId = randomUUID();
+    f.query.mockResolvedValueOnce({ rows: [{ id: installationId, revision: "8" }] });
+    const first = await assessHistoricalUserSourceScope(f.db, binding);
+    f.query.mockResolvedValueOnce({ rows: [{ id: installationId, revision: "10" }] });
+    const restored = await assessHistoricalUserSourceScope(f.db, binding);
+    expect(restored?.scopeFingerprintSha256).not.toBe(first?.scopeFingerprintSha256);
+    expect(restored?.customerDeliveryAllowed).toBe(false);
   });
 
   it("denies an ambiguous or unauthorized original USER source-row snapshot", async () => {
