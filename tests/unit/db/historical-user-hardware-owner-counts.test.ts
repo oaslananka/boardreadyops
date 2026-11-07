@@ -29,6 +29,7 @@ const sourceKeys = [
 const validRow = () => ({
   export_id: exportId,
   ...Object.fromEntries(sourceKeys.map((key) => [key, 2])),
+  ...Object.fromEntries(sourceKeys.map((key) => [`${key}Digest`, "a".repeat(64)])),
   foreignBomRunMismatch: 0,
   foreignFirmwareRunMismatch: 0,
   foreignFootprintRunMismatch: 0,
@@ -74,6 +75,7 @@ describe("source-only original numeric USER hardware ownership COUNT gate", () =
       sourceRightsVerified: false,
       thirdPartyDisclosureRightsVerified: false,
       rowCounts: Object.fromEntries(sourceKeys.map((key) => [key, 2])),
+      rowDigests: Object.fromEntries(sourceKeys.map((key) => [key, "a".repeat(64)])),
     });
     expect(db.withTransaction).toHaveBeenCalledWith(expect.any(Function), {
       consistentRead: true,
@@ -102,6 +104,12 @@ describe("source-only original numeric USER hardware ownership COUNT gate", () =
     expect(sql).toContain("share.authorized_by_github_user_id=(SELECT original_github_user_id FROM owner_export)");
     expect(sql).toContain('AS "unattributableManufacturingShare"');
     expect(sql).toContain("LIMIT 101");
+    expect(sql).toContain("to_jsonb(b)::text");
+    expect(sql).toContain("to_jsonb(c)::text");
+    expect(sql).toContain("to_jsonb(eligible)::text");
+    expect(sql).toContain('AS "boardBomComponentsDigest"');
+    expect(sql).toContain('AS "manufacturingShareAuthorizationsDigest"');
+    expect(sql).toContain("string_agg(row_hash, ':' ORDER BY row_hash)");
     expect(sql).not.toContain("SELECT *");
     expect(db.query.mock.calls[0]?.[1]).toEqual([exportId, originalUserId]);
   });
@@ -129,6 +137,9 @@ describe("source-only original numeric USER hardware ownership COUNT gate", () =
     ["too many signed manufacturing records", [{ ...validRow(), signedManufacturingExportEvidence: 101 }]],
     ["missing supply class", [{ ...validRow(), boardSupplyWatch: undefined }]],
     ["unbounded manufacturing", [{ ...validRow(), productionBatchDefects: 101 }]],
+    ["missing owner hardware digest", [{ ...validRow(), boardBomComponentsDigest: undefined }]],
+    ["malformed hardware digest", [{ ...validRow(), boardsDigest: "not-a-sha256" }]],
+    ["uppercase hardware digest", [{ ...validRow(), boardsDigest: "A".repeat(64) }]],
     ["missing class", [{ ...validRow(), firmwareAdvisoryWatch: undefined }]],
     ["unparseable", { length: 1 }],
   ])("fails closed on %s", async (_, rows) => {

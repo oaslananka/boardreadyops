@@ -28,7 +28,7 @@ export type HistoricalUserSourceScopeObservation = {
 
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
 const sha256 = /^[0-9a-f]{64}$/u;
-const scopeDomain = Buffer.from("boardreadyops:historical-user:internal-relational-scope:v2\0", "utf8");
+const scopeDomain = Buffer.from("boardreadyops:historical-user:internal-relational-scope:v3\0", "utf8");
 
 export async function assessHistoricalUserSourceScope(
   db: Pick<PgQueryExecutor, "withTransaction">,
@@ -96,10 +96,25 @@ export async function assessHistoricalUserSourceScope(
         )
           return null;
 
-        // Edits restored to identical content leave a count unchanged.
-        // Existing triggers cover core/review/visual classes (not all 19
-        // hardware classes). Bind their immutable ABA epoch too, inside
-        // this SAME read-only PostgreSQL snapshot.
+        // All 19 owner-joined hardware multiset digests are SHA256-hashed
+        // entirely inside PostgreSQL, never materializing raw IP/BOM rows
+        // in the application. Count-preserving hardware edits change scope.
+        // Still bind existing mutation epochs for tracked ABA activity
+        // (even if the rows are subsequently restored byte-identically).
+        const orderedDigests = Object.entries(counts.rowDigests).sort(([left], [right]) =>
+          left < right ? -1 : left > right ? 1 : 0,
+        );
+        if (
+          orderedDigests.length !== historicalUserHardwareSourceNames.length ||
+          orderedDigests.length !== 19 ||
+          orderedDigests.some(
+            ([name, digest]) =>
+              !historicalUserHardwareSourceNames.includes(name as (typeof historicalUserHardwareSourceNames)[number]) ||
+              typeof digest !== "string" ||
+              !sha256.test(digest),
+          )
+        )
+          return null;
         const mutationEpochSha256 = await prepareVerifiedHistoricalUserMutationEpochSha256(transaction, originalUser);
         if (!sha256.test(mutationEpochSha256)) return null;
         const message = Buffer.from(
@@ -108,6 +123,7 @@ export async function assessHistoricalUserSourceScope(
             originalUser.verifiedGitHubUserId,
             schema.schemaSha256,
             ordered,
+            orderedDigests,
             mutationEpochSha256,
           ]),
           "utf8",

@@ -21,6 +21,7 @@ const catalog = vi.mocked(assessHistoricalUserSchemaCoverage);
 const hardware = vi.mocked(assessHistoricalUserHardwareOwnedRowCounts);
 const binding = { exportId: randomUUID(), verifiedGitHubUserId: 9_815_471 };
 const rowCounts = Object.fromEntries(historicalUserHardwareSourceNames.map((key) => [key, 1]));
+const rowDigests = Object.fromEntries(historicalUserHardwareSourceNames.map((key) => [key, "a".repeat(64)]));
 function fixture() {
   const query = vi.fn().mockResolvedValue({ rows: [{ id: randomUUID(), revision: "3" }] });
   const tx = { query };
@@ -55,6 +56,7 @@ beforeEach(() => {
           sourceRightsVerified: false,
           thirdPartyDisclosureRightsVerified: false,
           rowCounts,
+          rowDigests,
         }) as never,
       { consistentRead: true, statementTimeoutMs: 5000 },
     ),
@@ -152,6 +154,46 @@ describe("single repeatable-read original USER catalog+hardware source-only obse
       sourceRightsVerified: false,
       thirdPartyDisclosureRightsVerified: false,
       rowCounts: malformed,
+      rowDigests,
+    } as never);
+    expect(await assessHistoricalUserSourceScope(fixture().db, binding)).toBeNull();
+  });
+
+  it("binds owner hardware content changes even when source class counts and epochs are unchanged", async () => {
+    const f = fixture();
+    const first = await assessHistoricalUserSourceScope(f.db, binding);
+    const mutated = { ...rowDigests, boardBomComponents: "b".repeat(64) };
+    hardware.mockImplementationOnce(async (db) =>
+      db.withTransaction(
+        async () =>
+          ({
+            scope: "original-numeric-user-retained-suspended-installation-only",
+            releaseDecision: "NO_GO",
+            completeCustomerExport: false,
+            customerDeliveryAllowed: false,
+            sourceRightsVerified: false,
+            thirdPartyDisclosureRightsVerified: false,
+            rowCounts,
+            rowDigests: mutated,
+          }) as never,
+        { consistentRead: true, statementTimeoutMs: 5000 },
+      ),
+    );
+    const second = await assessHistoricalUserSourceScope(f.db, binding);
+    expect(second?.scopeFingerprintSha256).not.toBe(first?.scopeFingerprintSha256);
+    expect(second?.customerDeliveryAllowed).toBe(false);
+  });
+
+  it("fails closed on malformed hardware digest metadata before hashing a private source scope", async () => {
+    hardware.mockResolvedValueOnce({
+      scope: "original-numeric-user-retained-suspended-installation-only",
+      releaseDecision: "NO_GO",
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      sourceRightsVerified: false,
+      thirdPartyDisclosureRightsVerified: false,
+      rowCounts,
+      rowDigests: { ...rowDigests, boards: undefined },
     } as never);
     expect(await assessHistoricalUserSourceScope(fixture().db, binding)).toBeNull();
   });
@@ -220,6 +262,7 @@ describe("single repeatable-read original USER catalog+hardware source-only obse
             sourceRightsVerified: false,
             thirdPartyDisclosureRightsVerified: false,
             rowCounts: swapped,
+            rowDigests,
           }) as never,
         { consistentRead: true, statementTimeoutMs: 5000 },
       ),

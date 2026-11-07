@@ -169,9 +169,20 @@ captured inside the **same** read-only PostgreSQL snapshot as catalog and
 the nineteen bounded source counts. Count-preserving edit-restore changes
 to those *tracked* sources invalidate the previous scope digest even when
 the original bytes and source counts return to their previous state.
-The counter is not a physical-object integrity lease and does not track
-every hardware class; the v2 internal scope digest domain was changed
-to prevent confusing the earlier count-only fingerprint with this one.
+The internal v3 source-scope hash additionally binds **all nineteen original
+numeric USER owner-joined, bounded hardware row-multiset SHA-256 digests**.
+PostgreSQL hashes each complete row's JSONB representation and then hashes
+sorted per-row digests, so no BOM, firmware, private IP or third-party raw
+row content is transferred to the application. Any row count above 100 per
+class, ambiguous owner, foreign scope or malformed digest fails closed.
+Changing hardware/BOM data while keeping row counts unchanged now changes
+the internal source-scope digest. Existing 0118–0120 mutation epochs also
+detect edit-then-restore for the tracked core/review/visual classes.
+No hardware mutation epoch was added: an edit restored byte-identically
+between independent reads remains unobservable for untracked tables.
+These DB-only hashes do not prove physical file bytes or disclosure rights.
+The v3 internal scope domain separates the earlier v2 count-plus-epoch
+digest; the source-only Ed25519 partial observation format remains v2.
 **Internal partial signer pre/post source-scope guard:** Before initiating
 any reserved physical ZIP read, the original numeric USER source scope is
 checked using a fresh read-only repeatable-read PostgreSQL snapshot; after
@@ -183,8 +194,8 @@ and length are unchanged. Failure to read either scope also denies the
 observation; it does not publish a capability or deliver archive bytes.
 These are **two independent database snapshots**, NOT one atomic DB/FS
 commitment or a guarantee against mutations after the final check.
-**Untracked hardware row edits, unlinkable legacy rows, cross-DB/FS races and
-third-party rights remain unproven; a live digest match is NOT archival
+**Untracked edit-then-restore hardware history, unlinkable legacy rows,
+cross-DB/FS races and third-party rights remain unproven; a live digest match is NOT archival
 completeness or customer delivery authorization.**
 The signing timestamp comes from the server clock, not a request parameter.
 The private signing key is injected by the trusted server caller, never

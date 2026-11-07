@@ -424,6 +424,48 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
     expect((row as { rows: Array<{ default_branch: string }> }).rows[0]?.default_branch).toBe("main");
   });
 
+  it("detects count-preserving BOM and board edits in SAME original USER snapshot without exposing raw IP", async () => {
+    const before = await assessHistoricalUserSourceScope(database(), identity());
+    const beforeCounts = await assessHistoricalUserHardwareOwnedRowCounts(database(), identity());
+    expect(before?.status).toBe("known-relational-source-scope-unapproved");
+    expect(beforeCounts?.rowCounts.boardBomComponents).toBe(1);
+    try {
+      await database().query("UPDATE board_bom_components SET value='20k' WHERE snapshot_id=$1 AND reference='R1'", [
+        ids.boardSnapshot,
+      ]);
+      const after = await assessHistoricalUserSourceScope(database(), identity());
+      const afterCounts = await assessHistoricalUserHardwareOwnedRowCounts(database(), identity());
+      expect(after?.scopeFingerprintSha256).not.toBe(before?.scopeFingerprintSha256);
+      expect(afterCounts?.rowCounts).toEqual(beforeCounts?.rowCounts);
+      expect(afterCounts?.rowDigests.boardBomComponents).not.toBe(beforeCounts?.rowDigests.boardBomComponents);
+      expect(afterCounts?.rowDigests.boards).toBe(beforeCounts?.rowDigests.boards);
+      expect(afterCounts?.customerDeliveryAllowed).toBe(false);
+    } finally {
+      await database().query("UPDATE board_bom_components SET value='10k' WHERE snapshot_id=$1 AND reference='R1'", [
+        ids.boardSnapshot,
+      ]);
+    }
+    const restored = await assessHistoricalUserHardwareOwnedRowCounts(database(), identity());
+    expect(restored?.rowDigests.boardBomComponents).toBe(beforeCounts?.rowDigests.boardBomComponents);
+  });
+
+  it("never incorporates a FOREIGN GitHub USER's modified hardware row into the original-owner digest", async () => {
+    const before = await assessHistoricalUserHardwareOwnedRowCounts(database(), identity());
+    const originalScope = await assessHistoricalUserSourceScope(database(), identity());
+    expect(before?.rowDigests.boards).toMatch(/^[0-9a-f]{64}$/u);
+    try {
+      await database().query("UPDATE boards SET display_name='foreign-new-private-design' WHERE id=$1", [
+        ids.foreignBoard,
+      ]);
+      const after = await assessHistoricalUserHardwareOwnedRowCounts(database(), identity());
+      const afterScope = await assessHistoricalUserSourceScope(database(), identity());
+      expect(after?.rowDigests).toEqual(before?.rowDigests);
+      expect(afterScope?.scopeFingerprintSha256).toBe(originalScope?.scopeFingerprintSha256);
+    } finally {
+      await database().query("UPDATE boards SET display_name='private' WHERE id=$1", [ids.foreignBoard]);
+    }
+  });
+
   it("refuses internal source-only observation after a new unknown schema table appears", async () => {
     await database().query("CREATE TABLE public.boardreadyops_scope_drift_probe (id integer PRIMARY KEY)");
     try {
@@ -437,7 +479,13 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
   });
 
   it("counts nineteen related private source classes only under original numeric USER / suspended installation", async () => {
-    expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toEqual({
+    const ownerSnapshot = await assessHistoricalUserHardwareOwnedRowCounts(database(), identity());
+    expect(ownerSnapshot?.rowDigests).toEqual(
+      Object.fromEntries(
+        Object.keys(ownerSnapshot?.rowCounts ?? {}).map((name) => [name, expect.stringMatching(/^[0-9a-f]{64}$/u)]),
+      ),
+    );
+    expect(ownerSnapshot).toMatchObject({
       scope: "original-numeric-user-retained-suspended-installation-only",
       releaseDecision: "NO_GO",
       completeCustomerExport: false,
