@@ -368,9 +368,15 @@ read-only numeric-versus-login owner-candidate review. Four classes
 expose tenant-login-only bounded counts; the GitHub Marketplace
 class can distinguish a direct numeric account match from a different
 account using the same login. Tenantless provider billing events and
-all provider-disclosure rights remain unresolved. The remaining
-**19 FK-unlinked classes** require dedicated review. All **63**
-unresolved classes remain DENY and customer archive release remains NO_GO.
+all provider-disclosure rights remain unresolved. A separate read-only review covers **seven** more workspace,
+project, membership and append-only policy-audit classes. It returns
+bounded numeric-user versus reusable-login candidate counts only:
+workspace membership does **not** prove rights to disclose shared
+projects, collaborators' material, audit events or third-party IP.
+**17 of 29** FK-unlinked classes now have internal candidate reviews;
+the remaining **12** need a distinct provenance assessment.
+All **63** unresolved classes remain DENY and customer archive
+release remains NO_GO.
 The internal source-only partial-integrity observation additionally
 requires the schema fingerprint and all nineteen bounded hardware
 class counts to pass under a **single PostgreSQL REPEATABLE READ READ

@@ -210,6 +210,53 @@ object integrity and real OAuth customer authorization must be
 reviewed independently. No migration, public endpoint, export whitelist,
 billing credential, provider API call or customer ZIP was introduced.
 
+## Shared workspaces, projects, grants and append-only policy audit — seven-class candidate review
+
+A separate internal, read-only `assessHistoricalUserWorkspaceCandidates`
+now covers **seven** more classes lacking an FK path to a GitHub
+installation: `workspaces`, `projects`, `workspace_members`,
+`workspace_member_audit_events`, `workspace_memberships`,
+`review_policies` and `review_policy_audit_events`.
+
+Under the **original numeric GitHub USER** authority (still-pending
+uninstall export, original suspended USER installation and current
+hold/real erasure veto), one `REPEATABLE READ READ ONLY` transaction
+returns **eleven bounded counts**. It separates: workspaces and
+projects joined through an explicitly *numeric* member; legacy
+`workspace_members` with a NULL GitHub ID and reused login; audit
+events whose *actor* or *subject* matches the original numeric user;
+tenant-login-only seat memberships and review policies; and policy
+audit events acted on by the numeric user versus a **different**
+numeric user within the reused tenant. Counts cap at 100 each, a 101st
+candidate fails closed, and a separate boolean flags competing/unbound
+installation identities under the login. Only counts and a boolean
+are returned — **no** user details, membership identifiers, project
+contents, before/after policy JSON, CAD files, email, audit content,
+sharing tokens or archive bytes are selected.
+
+These are **potential involvement references, NOT proof of ownership**:
+being a member of a workspace never confers rights to export its projects,
+all collaborators' CAD designs, signed evidence, other members or audit
+history. An actor or subject numeric ID only identifies the person
+named in that event, not the owner of the event's complete payload.
+A login-only legacy row cannot be reassigned to the present account;
+no visible conflict also does not establish sole historic ownership.
+Deleted-workspace orphan audit events or workspaces with no retained
+member are explicitly **not proven absent** by this query. Physical
+archives and delivery rights remain outside this review.
+The append-only audit triggers remain unchanged; PostgreSQL tests use
+a disposable database and remove its container instead of deleting
+audit history.
+
+With the earlier numeric export, four tenant lifecycle and five billing
+candidate reviews, **17 of 29** FK-unlinked classes now have *internal*
+bounded candidate-assessment evidence; the remaining **12** lack a
+dedicated provenance assessment. **All 63 classes stay DENY/NO_GO**.
+Neither this review nor its exact numeric identity matches grant
+multi-party redistribution, customer ZIP, legal/IP rights or completeness.
+No migration, new public endpoint, permanent worker, export allowlist,
+new dependency or paid infrastructure was added.
+
 ## Individual table review queue
 
 ### Privacy, export lifecycle and installation authority — 17 tables
