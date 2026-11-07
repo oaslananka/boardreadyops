@@ -50,7 +50,13 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   partial ZIP under the reserved 0700 owner-private archive directory
   as a dedicated .historical-private-partial-v3.zip file, mode 0600.
   It reopens and independently rechecks disk bytes, SHA-256 and
-  the partial-ZIP v3 receipt; a separate private orchestration path
+  the partial-ZIP v3 receipt. The SOURCE-ONLY direct reader allocates
+  only the exact preflight byte length (at most 64 MiB), reads by
+  explicit descriptor offsets and probes one extra byte; concurrent
+  growth, truncation, changed file metadata or a failed digest rejects
+  and zeroes the private read buffer instead of allowing unbounded
+  readFile allocation. This is still NOT customer streaming. A separate
+  private orchestration path
   performs a SECOND original numeric USER DB and physical object/
   hold/retention verification AFTER fsync. Wrong user, changed bytes,
   unsafe directory permissions or symlinks fail closed. An existing

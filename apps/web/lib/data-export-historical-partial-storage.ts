@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { link, lstat, open, realpath, unlink } from "node:fs/promises";
+import { type FileHandle, link, lstat, open, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
 import {
@@ -52,6 +52,32 @@ function valid(input: { exportId: string; sha256: string; byteLength: number }):
   );
 }
 
+/**
+ * A concurrent writer cannot make the ZIP reader allocate past the approved
+ * preflight size. Probe the next byte to refuse appended content; a short
+ * read is never a valid sealed archive. Caller owns and zeroes the result.
+ */
+async function readExactPrivateArchive(handle: FileHandle, expectedBytes: number): Promise<Buffer | null> {
+  const bytes = Buffer.alloc(expectedBytes);
+  const probe = Buffer.alloc(1);
+  let accepted = false;
+  try {
+    let offset = 0;
+    while (offset < expectedBytes) {
+      const { bytesRead } = await handle.read(bytes, offset, expectedBytes - offset, offset);
+      if (bytesRead === 0) return null;
+      offset += bytesRead;
+    }
+    const { bytesRead: extra } = await handle.read(probe, 0, 1, expectedBytes);
+    if (extra !== 0) return null;
+    accepted = true;
+    return bytes;
+  } finally {
+    probe.fill(0);
+    if (!accepted) bytes.fill(0);
+  }
+}
+
 /** SOURCE-ONLY private read. Revalidate original USER and legal holds
  * independently before any future use. NEVER serves customer bytes.
  */
@@ -81,7 +107,8 @@ export async function readSealedHistoricalUserPartial(input: {
       before.size !== input.byteLength
     )
       return null;
-    bytes = await handle.readFile();
+    bytes = await readExactPrivateArchive(handle, input.byteLength);
+    if (!bytes) return null;
     const after = await handle.stat();
     if (
       bytes.length !== input.byteLength ||
