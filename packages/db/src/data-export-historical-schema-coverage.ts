@@ -503,8 +503,12 @@ export async function assessHistoricalUserSchemaCoverage(
           trigger.definition,
           trigger.enabled,
         ]);
-        const actualTriggerBindings = orderedTriggers.map((trigger) => trigger.slice(0, 3).join("|")).sort();
-        const expectedTriggerBindings = expectedMutationEpochTriggers.map((trigger) => trigger.join("|")).sort();
+        const actualTriggerBindings = orderedTriggers
+          .map((trigger) => trigger.slice(0, 3).join("|"))
+          .sort((left, right) => left.localeCompare(right));
+        const expectedTriggerBindings = expectedMutationEpochTriggers
+          .map((trigger) => trigger.join("|"))
+          .sort((left, right) => left.localeCompare(right));
         const triggerBindingsMatch = JSON.stringify(actualTriggerBindings) === JSON.stringify(expectedTriggerBindings);
         const triggersEnabled = (triggerRows as MutationEpochTrigger[]).every((trigger) => trigger.enabled === "O");
 
