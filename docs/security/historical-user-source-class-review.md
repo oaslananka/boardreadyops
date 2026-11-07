@@ -97,6 +97,44 @@ class. The diagnostic must never become a customer delivery gate on its
 own; no migration, endpoint, scope allowlist or customer permissions were
 added here.
 
+## Original-user export request records: numeric-owner candidate review
+
+The `data_exports` table is one of the **29 without a foreign-key path**
+to `installations`, and this lack of a path is intentional for suspended
+original GitHub USER accounts (`installation_id IS NULL`). Migration `0115`
+preserves `original_github_user_id` only when the original signed GitHub
+uninstall event supplied a numeric identity. Historical login-only records
+are deliberately **not backfilled**, since a username can be reused.
+
+The private, read-only `assessHistoricalUserExportIdentityReview` makes this
+specific ownership gap explicit. Inside a single PostgreSQL
+`REPEATABLE READ READ ONLY` transaction, it first enforces the existing
+original **numeric GitHub USER + pending uninstall export + suspended USER
+installation** predicate and current hold/erasure exclusions. It then
+counts at most **100** nearby export records in five disjoint review
+categories: matching numeric owner and login, matching numeric owner under a
+different historical login, login-only unbound legacy requests, another
+numeric USER with the *same* login, and other same-login lifecycle records.
+The query returns counts **only**; it never selects an export ID list,
+download URL, manifest, physical artifact, OAuth proof, personal content
+or third-party data. A missing source, invalid count or excess scope
+fails closed.
+
+The independently verified numeric ID is required for any positive
+attribution; a reused login or a null numeric owner is **never** treated
+as proof. Records found under a previous login remain *review candidates*,
+not automatically eligible content. Disposable PostgreSQL adversarial tests
+include two suspended accounts with the same login, historical login-only
+data, an alias-changed original USER, and live legal-hold/erasure vetoes.
+
+This closes **no customer disclosure or completeness requirement**.
+It neither proves that all pre-0115 legacy records belong to the original
+USER nor authorizes redistribution, other 28 no-FK classes, or a full
+DB-plus-physical-object snapshot. Every result retains
+`completeCustomerExport=false`, `customerDeliveryAllowed=false`,
+`independentOwnershipComplete=false` and `releaseDecision=NO_GO`.
+No schema migration, customer endpoint or delivery feature is added.
+
 ## Individual table review queue
 
 ### Privacy, export lifecycle and installation authority — 17 tables

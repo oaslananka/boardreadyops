@@ -352,6 +352,12 @@ not read customer rows or establish any original numeric USER ownership,
 redistribution right or ZIP entitlement. The 29 disconnected classes
 require separate historical linkage evidence, and 34 structurally
 connected classes still need independent rights and content validation.
+For the unlinked `data_exports` class, a separate **count-only** original
+numeric USER lineage review now distinguishes retained numeric-ID records,
+historical aliases, login-only legacy rows and other numeric USERs reusing
+that login. It refuses missing/expired authority, holds, erasures and
+oversized candidates; it neither backfills ambiguous users nor exposes
+customer bytes, URLs or records. All classes remain **DENY**.
 The internal source-only partial-integrity observation additionally
 requires the schema fingerprint and all nineteen bounded hardware
 class counts to pass under a **single PostgreSQL REPEATABLE READ READ
