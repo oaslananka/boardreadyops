@@ -61,6 +61,13 @@ beforeEach(() => {
     partialPrivateMetadataTableCount: 13,
     withheldSensitiveTableCount: 16,
     otherTablesRequiringScopeReview: 63,
+    unresolvedReviewTrackCounts: {
+      privacy_lifecycle: 17,
+      billing_and_marketplace: 5,
+      hardware_and_release: 19,
+      collaboration_and_workspace: 10,
+      platform_operations: 12,
+    },
     unrecognizedTableCount: 0,
     schemaSha256: "45d6db6d25b6e61a0950333a5f9d81b17e2895c21736688b08cc00d49b3dfe63",
   });

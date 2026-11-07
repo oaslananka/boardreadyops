@@ -1,5 +1,9 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
-import { assessHistoricalUserSchemaCoverage } from "../../../packages/db/src/data-export-historical-schema-coverage.js";
+import {
+  assessHistoricalUserSchemaCoverage,
+  historicalUserUnresolvedSourceReviewTracks,
+} from "../../../packages/db/src/data-export-historical-schema-coverage.js";
 
 const column = (
   table_name: string,
@@ -15,6 +19,25 @@ function adapter(rows: unknown) {
 }
 
 describe("original numeric USER source schema coverage must never grant customer export", () => {
+  it("accounts for every unresolved source table in EXACTLY one five-track review queue, with no implicit grant", async () => {
+    const text = await readFile("docs/security/historical-user-source-class-review.md", "utf8");
+    const rows = [...text.matchAll(/^\| `([a-z_]+)` \| Not verified \| DENY \|$/gmu)].map((match) => match[1]);
+    const tracks = Object.entries(historicalUserUnresolvedSourceReviewTracks);
+    const names = tracks.flatMap(([, tables]) => tables);
+    expect(tracks).toHaveLength(5);
+    expect(names).toHaveLength(63);
+    expect(new Set(names).size).toBe(63);
+    expect(new Set(rows).size).toBe(63);
+    expect(rows.sort()).toEqual([...names].sort());
+    for (const [track, tables] of tracks) {
+      expect(text).toContain(`| \`${track}\` | ${tables.length} |`);
+      expect(tables.length).toBeGreaterThan(0);
+    }
+    expect(text).toContain("completeCustomerExport=false");
+    expect(text).toContain("customerDeliveryAllowed=false");
+    expect(text).toContain("original GitHub USER");
+  });
+
   it("rejects missing database access without a catalog read", async () => {
     expect(await assessHistoricalUserSchemaCoverage(null as never)).toMatchObject({
       status: "unavailable",

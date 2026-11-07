@@ -143,6 +143,92 @@ const deliberatelyWithheldSensitive = new Set<string>([
   "webhook_inbox",
 ]);
 
+/**
+ * EXPLICIT REVIEW QUEUE FOR ALL 63 UNRESOLVED SOURCE CLASSES.
+ *
+ * These are NOT whitelists for disclosure. Every track stays blocked until
+ * the original numeric USER ownership, licensed/customer rights, retention,
+ * deletion/hold and third-party content provenance have independently passed.
+ *
+ * Never derive "eligible" from membership in a review track. A track
+ * categorizes work and makes schema changes visible, nothing more.
+ */
+export const historicalUserUnresolvedSourceReviewTracks = {
+  privacy_lifecycle: [
+    "artifact_deletion_jobs",
+    "artifact_export_copy_reservations",
+    "artifact_unlink_fences",
+    "data_export_archive_commitments",
+    "data_exports",
+    "erasure_requests",
+    "historical_user_live_oauth_verified_proofs",
+    "historical_user_oauth_challenges",
+    "historical_user_partial_cleanup_events",
+    "historical_user_partial_read_reservations",
+    "historical_user_private_delivery_preflights",
+    "historical_user_private_preflight_events",
+    "historical_user_snapshot_mutation_epochs",
+    "installations",
+    "legal_holds",
+    "repository_retention_policies",
+    "retention_policies",
+  ],
+  billing_and_marketplace: [
+    "billing_activity",
+    "billing_customers",
+    "billing_events",
+    "billing_subscriptions",
+    "github_marketplace_subscriptions",
+  ],
+  hardware_and_release: [
+    "board_bom_components",
+    "board_bom_snapshots",
+    "board_supply_findings",
+    "board_supply_watch",
+    "boards",
+    "manufacturing_share_authorizations",
+    "production_batch_defects",
+    "production_batches",
+    "protected_release_execution_seals",
+    "protected_release_intent_candidates",
+    "release_run_attempts",
+    "release_run_results",
+    "release_run_transition_events",
+    "repository_firmware_advisory_watch",
+    "repository_firmware_dependencies",
+    "repository_firmware_snapshots",
+    "run_pcb_footprint_summaries",
+    "signed_manufacturing_export_evidence",
+    "supply_finding_suppressions",
+  ],
+  collaboration_and_workspace: [
+    "external_review_invitations",
+    "product_events",
+    "projects",
+    "review_policies",
+    "review_policy_audit_events",
+    "revisions",
+    "workspace_member_audit_events",
+    "workspace_members",
+    "workspace_memberships",
+    "workspaces",
+  ],
+  platform_operations: [
+    "cloud_schema_migrations",
+    "component_lifecycle_observations",
+    "control_plane_jobs",
+    "control_plane_outbox",
+    "control_plane_reconciliation_items",
+    "control_plane_replay_operations",
+    "deliveries",
+    "notification_channels",
+    "notification_deliveries",
+    "repository_setup_probes",
+    "repository_setup_revisions",
+    "runner_execution_policies",
+  ],
+} as const;
+
 const expectedColumns = 1033;
 const expectedSchemaSha256 = "45d6db6d25b6e61a0950333a5f9d81b17e2895c21736688b08cc00d49b3dfe63";
 const maxCatalogColumns = 1200;
@@ -154,6 +240,41 @@ type Column = {
   is_nullable: "YES" | "NO";
 };
 
+type UnresolvedReviewTrack = keyof typeof historicalUserUnresolvedSourceReviewTracks;
+type UnresolvedReviewTrackCounts = Record<UnresolvedReviewTrack, number>;
+
+function emptyReviewCounts(): UnresolvedReviewTrackCounts {
+  return {
+    privacy_lifecycle: 0,
+    billing_and_marketplace: 0,
+    hardware_and_release: 0,
+    collaboration_and_workspace: 0,
+    platform_operations: 0,
+  };
+}
+
+function reviewCountsForTables(tables: ReadonlySet<string>): UnresolvedReviewTrackCounts {
+  const counts = emptyReviewCounts();
+  for (const track of Object.keys(historicalUserUnresolvedSourceReviewTracks) as UnresolvedReviewTrack[]) {
+    counts[track] = historicalUserUnresolvedSourceReviewTracks[track].filter((name) => tables.has(name)).length;
+  }
+  return counts;
+}
+
+function validSourceClassPartition(): boolean {
+  const allClassified: string[] = [
+    ...partialPrivateMetadata,
+    ...deliberatelyWithheldSensitive,
+    ...Object.values(historicalUserUnresolvedSourceReviewTracks).flat(),
+  ];
+  const known = new Set<string>(knownTables);
+  return (
+    allClassified.length === known.size &&
+    new Set(allClassified).size === known.size &&
+    allClassified.every((name) => known.has(name))
+  );
+}
+
 type ScopeCoverage = {
   status: "known_schema_scope_unapproved" | "schema_drift" | "unavailable";
   releaseDecision: "NO_GO";
@@ -164,6 +285,7 @@ type ScopeCoverage = {
   partialPrivateMetadataTableCount: number;
   withheldSensitiveTableCount: number;
   otherTablesRequiringScopeReview: number;
+  unresolvedReviewTrackCounts: UnresolvedReviewTrackCounts;
   unrecognizedTableCount: number;
   schemaSha256: string | null;
 };
@@ -178,6 +300,7 @@ const denied = (): ScopeCoverage => ({
   partialPrivateMetadataTableCount: 0,
   withheldSensitiveTableCount: 0,
   otherTablesRequiringScopeReview: 0,
+  unresolvedReviewTrackCounts: emptyReviewCounts(),
   unrecognizedTableCount: 0,
   schemaSha256: null,
 });
@@ -239,7 +362,9 @@ export async function assessHistoricalUserSchemaCoverage(
         const unrecognized = [...tableNames].filter((name) => !known.has(name)).length;
         const privatePartialCount = [...tableNames].filter((name) => partialPrivateMetadata.has(name)).length;
         const withheldCount = [...tableNames].filter((name) => deliberatelyWithheldSensitive.has(name)).length;
+        const unresolvedReviewTrackCounts = reviewCountsForTables(tableNames);
         const isMatched =
+          validSourceClassPartition() &&
           sha === expectedSchemaSha256 &&
           rows.length === expectedColumns &&
           tableNames.size === known.size &&
@@ -257,6 +382,7 @@ export async function assessHistoricalUserSchemaCoverage(
           partialPrivateMetadataTableCount: privatePartialCount,
           withheldSensitiveTableCount: withheldCount,
           otherTablesRequiringScopeReview: tableNames.size - privatePartialCount - withheldCount,
+          unresolvedReviewTrackCounts,
           unrecognizedTableCount: unrecognized,
           schemaSha256: sha,
         };

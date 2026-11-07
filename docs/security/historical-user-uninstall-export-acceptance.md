@@ -258,7 +258,9 @@ types and nullability as observed in PostgreSQL 17 after migration 0126.
 The explicit baseline is **92 tables / 1,033 columns**, with 13 tables
 contributing to the **redacted partial private metadata candidate**,
 16 deliberately sensitive withheld classes and **63 further tables still
-requiring an independent source/ownership/IP-scope decision**. A newly
+requiring an independent source/ownership/IP-scope decision**. These
+63 source classes are individually assigned to five non-authorizing
+review queues in [the original USER source-class review register](historical-user-source-class-review.md). A newly
 added table, changed column or unavailable catalog produces a
 `schema_drift` or `unavailable` assessment. Neither the known baseline
 nor a green signature means a complete export or approved legal scope:
