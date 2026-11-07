@@ -136,6 +136,25 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
 - No historical customer ZIP endpoint, bearer capability or release status
   exists. Every diagnostic returns customer-ready false / NO_GO.
 
+**SOURCE-ONLY Ed25519 partial-integrity observation (NOT a customer signature):**
+After a durable private ZIP reader reservation, independent original numeric
+GitHub USER/preflight/physical-object revalidation and successful reader
+release, an internal helper can sign a **five-minute** domain-separated
+observation. Its canonical message pins the original numeric USER, exact
+export UUID, private preflight UUID, ZIP SHA-256 and byte length, signing-key
+identifier and immutable `completeCustomerExport=false` /
+`customerDeliveryAllowed=false` flags. Verification requires an explicitly
+trusted, pinned Ed25519 public key and the exact expected binding; changing
+identity, archive, expiry, key or flags invalidates the signature. The
+signing timestamp comes from the server clock, not a request parameter.
+The private signing key is injected by the trusted server caller, never
+generated, logged, persisted or read from a user-provided field here.
+There is **no production key configuration, signer deployment, customer
+endpoint, complete DB+filesystem commitment or live delivery grant**.
+Signing a partial ZIP does not transform it into a complete archive or
+authorize disclosure. Independent key lifecycle, coherent DB+filesystem
+signatures and customer publication/retrieval acceptance remain NO_GO.
+
 **Source-only signed-session private preflight:** The internal
 data-export-historical-signed-session module now derives the immutable
 numeric GitHub USER solely from a verified, same-server HMAC-signed
