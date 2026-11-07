@@ -167,7 +167,15 @@ preflight and durably release the reservation. The signed source fingerprint
 must match both before AND after this physical re-read; a deleted/replaced
 ZIP, failed reservation/settlement, changed schema, bounded source-count
 digest, tracked mutation epoch, legal hold, real erasure or denied owner
-scope blocks the private observation even within five minutes.
+scope blocks the private observation even within five minutes. The
+LIVE physical+DB re-verifier checks the signed five-minute window using
+the trusted server clock BOTH before any reserved ZIP read and after
+all DB+physical verification. It ignores any caller-supplied test/offline
+clock override, denies signatures that expire during the read or a
+backward-moving server clock, and pins the trusted signature key/DB,
+original numeric USER and private root throughout asynchronous checks.
+This is a short-lived private diagnostic truth claim, NOT a customer's
+download authorization or a complete DB+filesystem commitment.
 The archive root is a trusted server-injected private path, NOT a user-supplied
 URL, and no bytes or download capability are returned.
 For existing historical mutation epoch triggers from migrations 0118–0120

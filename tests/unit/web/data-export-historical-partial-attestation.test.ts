@@ -353,6 +353,75 @@ describe("source-only original USER signed partial integrity observations", () =
     );
   });
 
+  it("rejects a forged caller clock before touching DB or physical ZIP when the signed claim has EXPIRED", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    scopeCheck.mockClear();
+    verifiedRead.mockClear();
+    vi.mocked(Date.now).mockReturnValue(now + lifetime);
+    // The caller tries to bypass expired live evidence with the offline
+    // cryptographic verifier's historical/test-only clock override.
+    expect(verifyHistoricalUserPartialObservation({ ...f.expected, observation: proof, nowMs: now })).toBe(true);
+    expect(
+      await verifyHistoricalUserPartialObservationCurrent({
+        ...f.expected,
+        db: f.db,
+        observation: proof,
+        nowMs: now,
+      }),
+    ).toBe(false);
+    expect(scopeCheck).not.toHaveBeenCalled();
+    expect(verifiedRead).not.toHaveBeenCalled();
+  });
+
+  it("refuses a live signature that expires DURING private ZIP read despite matching DB scope and bytes", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    scopeCheck.mockClear();
+    verifiedRead.mockClear();
+    vi.mocked(Date.now).mockReturnValue(now + lifetime - 1);
+    verifiedRead.mockImplementationOnce(async (binding) => {
+      // All physical data remains correct, but the signature expires
+      // while the filesystem/DB reservation is being verified.
+      vi.mocked(Date.now).mockReturnValue(now + lifetime);
+      return {
+        sha256: binding.sha256,
+        byteLength: binding.byteLength,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+      };
+    });
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      false,
+    );
+    expect(scopeCheck).toHaveBeenCalledTimes(2);
+    expect(verifiedRead).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed if the trusted server clock rolls backward during a physical private read", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    const clock = vi.mocked(Date.now);
+    clock.mockReturnValueOnce(now + 2).mockReturnValueOnce(now + 1);
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      false,
+    );
+    expect(verifiedRead).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not allow a caller's future fake clock to invalidate a still-live source-only observation", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    expect(
+      await verifyHistoricalUserPartialObservationCurrent({
+        ...f.expected,
+        db: f.db,
+        observation: proof,
+        nowMs: now + lifetime + 60_000,
+      }),
+    ).toBe(true);
+  });
+
   it("rechecks the ACTUAL reserved private ZIP before accepting a current signed observation", async () => {
     const f = fixture();
     const proof = await signHistoricalUserPartialObservation(f);

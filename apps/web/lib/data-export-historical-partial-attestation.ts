@@ -268,15 +268,14 @@ export function verifyHistoricalUserPartialObservation(input: {
 }
 
 /**
- * INTERNAL physical+source LIVE re-verification. An authentic signature
- * only describes a past PRIVATE partial ZIP observation, never an active
- * entitlement or a customer delivery grant. Before and after an independently
- * reserved/committed private ZIP read, scope must match the signed digest.
- * Missing/deleted/corrupt ZIP, revoked preflight, failed durable release,
- * source count/catalog/tracked epoch drift or DB outages FAIL CLOSED.
+ * INTERNAL physical+source LIVE re-verification. A signature attests only
+ * to a past PRIVATE partial ZIP, never a customer entitlement.
  *
- * Independent read-only DB snapshots and physical I/O are NOT a full
- * DB/filesystem atomic snapshot; no rights, export completeness or delivery.
+ * Read original USER scope before and after a separately reserved physical
+ * ZIP recheck. The signature must remain valid under the TRUSTED server
+ * clock after all DB and physical IO. An expired five-minute claim, clock
+ * rollback, changed source, missing ZIP or failed durable release deny.
+ * Independent DB snapshots + filesystem IO are NOT atomic DB+FS proof.
  */
 export async function verifyHistoricalUserPartialObservationCurrent(input: {
   db: PgQueryExecutor;
@@ -285,23 +284,23 @@ export async function verifyHistoricalUserPartialObservationCurrent(input: {
   trustedPublicKey: KeyObject;
   expectedKeyId: string;
   expectedBinding: OriginalUserBinding;
-  nowMs?: number;
 }): Promise<boolean> {
   const proof = input?.observation;
   if (!proof || typeof proof !== "object" || Array.isArray(proof)) return false;
-  const candidate = proof as Record<string, unknown>;
-  const expectedSourceScopeSha256 = candidate.sourceScopeSha256;
+  const expectedSourceScopeSha256 = (proof as Record<string, unknown>).sourceScopeSha256;
+  const startedAtMs = Date.now();
   if (
+    !validClock(startedAtMs) ||
     typeof expectedSourceScopeSha256 !== "string" ||
-    !verifyHistoricalUserPartialObservation({ ...input, expectedSourceScopeSha256 }) ||
     !input?.db?.withTransaction ||
     !input.db.query ||
-    typeof input.archiveRoot !== "string"
+    typeof input.archiveRoot !== "string" ||
+    !validBinding(input.expectedBinding)
   )
     return false;
 
-  // Freeze all identifiers before any independent DB/physical asynchronous
-  // re-verification; never permit a mutable caller to switch identities.
+  // Pin trusted key, original numeric USER, ZIP identity, root and DB
+  // before the first async call. A mutable request cannot retarget phases.
   const binding: OriginalUserBinding = {
     exportId: input.expectedBinding.exportId,
     verifiedGitHubUserId: input.expectedBinding.verifiedGitHubUserId,
@@ -309,17 +308,27 @@ export async function verifyHistoricalUserPartialObservationCurrent(input: {
     sha256: input.expectedBinding.sha256,
     byteLength: input.expectedBinding.byteLength,
   };
+  const db = input.db;
+  const archiveRoot = input.archiveRoot;
+  const verification = {
+    observation: proof,
+    trustedPublicKey: input.trustedPublicKey,
+    expectedKeyId: input.expectedKeyId,
+    expectedBinding: binding,
+    expectedSourceScopeSha256,
+  };
+  // Never spread input into this verifier: a caller-provided nowMs must
+  // NEVER override the real clock in a LIVE DB/physical read.
+  if (!verifyHistoricalUserPartialObservation({ ...verification, nowMs: startedAtMs })) return false;
   const authority = { exportId: binding.exportId, verifiedGitHubUserId: binding.verifiedGitHubUserId };
+
   try {
-    const initial = await assessHistoricalUserSourceScope(input.db, authority);
+    const initial = await assessHistoricalUserSourceScope(db, authority);
     if (!validPrivateScope(initial) || initial.scopeFingerprintSha256 !== expectedSourceScopeSha256) return false;
 
-    // A signature is never proof that the underlying ZIP still exists:
-    // independently reserve, physically hash/revalidate, recheck preflight
-    // and durably release before accepting any current private observation.
     const receipt = await verifyReservedHistoricalUserPrivatePartial({
-      db: input.db,
-      archiveRoot: input.archiveRoot,
+      db,
+      archiveRoot,
       authority,
       preflightId: binding.preflightId,
       sha256: binding.sha256,
@@ -333,8 +342,17 @@ export async function verifyHistoricalUserPartialObservationCurrent(input: {
     )
       return false;
 
-    const final = await assessHistoricalUserSourceScope(input.db, authority);
-    return validPrivateScope(final) && final.scopeFingerprintSha256 === expectedSourceScopeSha256;
+    const final = await assessHistoricalUserSourceScope(db, authority);
+    const finishedAtMs = Date.now();
+    return (
+      validClock(finishedAtMs) &&
+      finishedAtMs >= startedAtMs &&
+      validPrivateScope(final) &&
+      final.scopeFingerprintSha256 === expectedSourceScopeSha256 &&
+      // The complete physically verified observation must still be within
+      // its signed five-minute validity at the final trusted clock read.
+      verifyHistoricalUserPartialObservation({ ...verification, nowMs: finishedAtMs })
+    );
   } catch {
     return false;
   }
