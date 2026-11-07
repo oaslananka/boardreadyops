@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
+  confirmHistoricalUserLiveOAuthProof,
   consumeHistoricalUserOAuthChallenge,
+  inspectHistoricalUserLiveOAuthProof,
   registerHistoricalUserOAuthChallenge,
+  revokeHistoricalUserLiveOAuthProof,
 } from "../../../packages/db/src/data-export-historical-oauth-challenges.js";
 
 const identity = () => ({
@@ -21,7 +24,10 @@ function fakeAdmissionDatabase(
     if (sql.includes("pg_try_advisory_xact_lock")) return { rows: admission?.lockRows ?? [{ acquired: true }] };
     if (sql.includes("active_hold"))
       return { rows: admission?.blockerRows ?? [{ active_hold: false, active_erasure: false }] };
-    if (sql.includes("historical_user_oauth_challenges")) {
+    if (
+      sql.includes("historical_user_oauth_challenges") ||
+      sql.includes("historical_user_live_oauth_verified_proofs")
+    ) {
       return { rows: typeof returnedRows === "function" ? returnedRows(params) : returnedRows };
     }
     throw new Error("Unexpected SQL fixture");
@@ -101,6 +107,76 @@ describe("original-user OAuth challenge DB result verification", () => {
       }
     },
   );
+
+  it("confirms a live original USER OAuth code only with exact one-row durable acknowledgement", async () => {
+    const input = identity();
+    const fixture = fakeAdmissionDatabase((params: unknown[]) => [{ id: params[3], state_sha256: params[2] }]);
+    expect(await confirmHistoricalUserLiveOAuthProof(fixture.db, input)).toBe(true);
+    expect(
+      fixture.query.mock.calls.some(
+        ([sql, args]) =>
+          sql.includes("historical_user_live_oauth_verified_proofs") &&
+          sql.includes("c.consumed_at IS NOT NULL") &&
+          args?.[0] === input.exportId &&
+          args?.[1] === input.verifiedGitHubUserId &&
+          typeof args?.[2] === "string" &&
+          args?.[2] !== input.state,
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["missing", []],
+    ["malformed", [{}]],
+    ["wrong UUID", [{ id: randomUUID() }]],
+    ["ambiguous", [{ id: randomUUID() }, { id: randomUUID() }]],
+    ["bad rows", [null]],
+    ["non-array rows", { length: 1 }],
+  ])("denies a %s live OAuth confirmation acknowledgement", async (_, returnedRows) => {
+    const fixture = fakeAdmissionDatabase(returnedRows);
+    expect(await confirmHistoricalUserLiveOAuthProof(fixture.db, identity())).toBe(false);
+  });
+
+  it("only inspects and revokes a current exact original-user signed-in proof", async () => {
+    const input = identity();
+    const fixture = fakeAdmissionDatabase((params: unknown[]) => [{ state_sha256: params[2] }]);
+    expect(await inspectHistoricalUserLiveOAuthProof(fixture.db, input)).toBe("current");
+    expect(await revokeHistoricalUserLiveOAuthProof(fixture.db, input)).toBe(true);
+    expect(fixture.query.mock.calls.some(([sql]) => sql.includes("p.revoked_at IS NULL"))).toBe(true);
+    expect(fixture.query.mock.calls.some(([sql]) => sql.includes("p.customer_delivery_allowed=FALSE"))).toBe(true);
+  });
+
+  it.each(["owner", "lock", "blockers"] as const)(
+    "refuses to confirm, inspect or revoke OAuth evidence without one clear %s admission row",
+    async (type) => {
+      const ownerRows = [{ tenant_id: "original-user" }, { tenant_id: "original-user" }];
+      const lockRows = [{ acquired: true }, { acquired: true }];
+      const blockerRows = [
+        { active_hold: false, active_erasure: false },
+        { active_hold: false, active_erasure: false },
+      ];
+      const admission = type === "owner" ? { ownerRows } : type === "lock" ? { lockRows } : { blockerRows };
+      const fixture = fakeAdmissionDatabase(
+        (params: unknown[]) => [{ state_sha256: params[2], id: params[3] }],
+        admission,
+      );
+      expect(await confirmHistoricalUserLiveOAuthProof(fixture.db, identity())).toBe(false);
+      expect(await inspectHistoricalUserLiveOAuthProof(fixture.db, identity())).toBe("stale");
+      expect(await revokeHistoricalUserLiveOAuthProof(fixture.db, identity())).toBe(false);
+      expect(fixture.query.mock.calls.some(([sql]) => sql.includes("historical_user_live_oauth_verified_proofs"))).toBe(
+        false,
+      );
+    },
+  );
+
+  it("rejects forged or duplicated proof inspection and revoke database acknowledgements", async () => {
+    const input = identity();
+    for (const result of [[null], [{}], [{ state_sha256: "f".repeat(64) }], [{}, {}]]) {
+      const fixture = fakeAdmissionDatabase(result);
+      expect(await inspectHistoricalUserLiveOAuthProof(fixture.db, input)).toBe("stale");
+      expect(await revokeHistoricalUserLiveOAuthProof(fixture.db, input)).toBe(false);
+    }
+  });
 
   it("rejects malformed owner identity before requesting a DB transaction", async () => {
     const fixture = fakeAdmissionDatabase([]);

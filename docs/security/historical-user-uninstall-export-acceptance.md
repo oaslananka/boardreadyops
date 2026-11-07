@@ -229,6 +229,28 @@ Feature flag:
 means disabled). It must remain off in production pending acceptance.
 No customer-download endpoint exists.
 
+**SOURCE-ONLY durable fresh GitHub USER OAuth confirmation:** Migration
+`0126_historical_user_live_oauth_verified_proof` adds a separate append-only
+five-minute verification record tied to the existing one-use, SHA-256-only
+OAuth nonce ledger, exact original numeric GitHub USER and suspended
+uninstalled-account export. The normal successful historical callback
+now commits this record ONLY after the consumed nonce, successful GitHub
+OAuth code exchange, live `/user` numeric identity match, and current
+original-export check. Confirmation, independent inspection and one-way
+revocation use legal-hold SHARE NOWAIT, original USER/installation locks,
+the tenant transaction advisory TRY lock and active real-erasure checks.
+Wrong account/export, consumed-but-unsuccessful codes, expired nonce,
+duplicate callback/confirmation, hold and erasure fail closed. The
+verification record cannot be selectively deleted or converted to a
+download grant, and it does not retain OAuth tokens, codes, browser
+state or login. A callback redirects to the safe dashboard only if
+the durable confirmation succeeded; missing migration, unavailable DB
+or interrupted provider verification fails closed. **Even a fresh,
+unrevoked record is diagnostic authentication evidence only**: no
+customer ZIP, independently scoped source rights, complete archive,
+delivery URL, bearer token or streaming entitlement exists. This
+migration and its feature flag remain UNDEPLOYED and OFF.
+
 ## Required to satisfy Issue #44's outstanding customer acceptance
 
 1. Approve and test exact BoardReadyOps-owned include/exclude boundaries,

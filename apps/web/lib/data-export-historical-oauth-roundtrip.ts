@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { DataLifecycleStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import {
+  confirmHistoricalUserLiveOAuthProof,
   consumeHistoricalUserOAuthChallenge,
   registerHistoricalUserOAuthChallenge,
 } from "../../../packages/db/src/data-export-historical-oauth-challenges.js";
@@ -138,7 +139,7 @@ async function persistHistoricalOAuthNonce(input: {
   exportId: string;
   verifiedGitHubUserId: number;
   state: string;
-  operation: "register" | "consume";
+  operation: "register" | "consume" | "confirm";
 }): Promise<boolean> {
   const config = optionalCloudPersistenceConfiguration();
   if (config?.mode !== "postgres") return false;
@@ -149,9 +150,9 @@ async function persistHistoricalOAuthNonce(input: {
       verifiedGitHubUserId: input.verifiedGitHubUserId,
       state: input.state,
     };
-    return input.operation === "register"
-      ? await registerHistoricalUserOAuthChallenge(db, nonce)
-      : await consumeHistoricalUserOAuthChallenge(db, nonce);
+    if (input.operation === "register") return await registerHistoricalUserOAuthChallenge(db, nonce);
+    if (input.operation === "consume") return await consumeHistoricalUserOAuthChallenge(db, nonce);
+    return await confirmHistoricalUserLiveOAuthProof(db, nonce);
   } catch {
     return false;
   } finally {
@@ -370,6 +371,18 @@ export async function consumeHistoricalStepUp(
   });
   if (!authority) return consumed(null);
   if (!(await currentOwnerExport(exportId, authority.verifiedGitHubUserId, now))) return consumed(null);
+  // A consumed nonce alone NEVER proves that GitHub accepted the code.
+  // Append a bounded, irrevocable-by-caller confirmation only after
+  // a real /user numeric ID match. No tokens or customer rights are saved.
+  if (
+    !(await persistHistoricalOAuthNonce({
+      exportId,
+      verifiedGitHubUserId: authority.verifiedGitHubUserId,
+      state: challenge.state,
+      operation: "confirm",
+    }))
+  )
+    return consumed(null);
   return consumed(exportId);
 }
 

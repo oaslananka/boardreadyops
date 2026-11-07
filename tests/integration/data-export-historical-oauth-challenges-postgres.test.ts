@@ -14,8 +14,11 @@ import {
 } from "../../apps/web/lib/data-export-historical-oauth-roundtrip.js";
 import { encodeUserSession } from "../../apps/web/lib/user-session.js";
 import {
+  confirmHistoricalUserLiveOAuthProof,
   consumeHistoricalUserOAuthChallenge,
+  inspectHistoricalUserLiveOAuthProof,
   registerHistoricalUserOAuthChallenge,
+  revokeHistoricalUserLiveOAuthProof,
 } from "../../packages/db/src/data-export-historical-oauth-challenges.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
@@ -105,6 +108,141 @@ describeDb("disposable PostgreSQL: original USER OAuth digest challenge is irrev
         matched[0]?.state_sha256,
       ]),
     ).rejects.toThrow();
+  });
+
+  it("durably confirms and one-way revokes ONLY a consumed successful original-user OAuth challenge", async () => {
+    const state = issue();
+    const subject = identity(state);
+    const hashedState = createHash("sha256")
+      .update("boardreadyops-original-user-oauth-state-v1")
+      .update("\0")
+      .update(state)
+      .digest("hex");
+    expect(await registerHistoricalUserOAuthChallenge(executor(), subject)).toBe(true);
+    expect(await confirmHistoricalUserLiveOAuthProof(executor(), subject)).toBe(false);
+    expect(await consumeHistoricalUserOAuthChallenge(executor(), subject)).toBe(true);
+    expect(await confirmHistoricalUserLiveOAuthProof(executor(), subject)).toBe(true);
+    expect(await confirmHistoricalUserLiveOAuthProof(executor(), subject)).toBe(false);
+    expect(await inspectHistoricalUserLiveOAuthProof(executor(), subject)).toBe("current");
+    const confirmed = await rows(
+      "SELECT state_sha256,original_github_user_id,verified_at,expires_at,revoked_at,purpose,complete_customer_export,customer_delivery_allowed FROM historical_user_live_oauth_verified_proofs WHERE export_id=$1 AND state_sha256=$2",
+      [exportId, hashedState],
+    );
+    expect(confirmed).toHaveLength(1);
+    expect(confirmed[0]).toMatchObject({
+      state_sha256: hashedState,
+      original_github_user_id: String(userId),
+      revoked_at: null,
+      purpose: "private-original-user-live-oauth-proof",
+      complete_customer_export: false,
+      customer_delivery_allowed: false,
+    });
+    expect(JSON.stringify(confirmed)).not.toContain(state);
+    expect(confirmed[0]?.verified_at).toBeInstanceOf(Date);
+    expect(confirmed[0]?.expires_at).toBeInstanceOf(Date);
+    const record = confirmed[0];
+    if (!(record?.verified_at instanceof Date) || !(record.expires_at instanceof Date))
+      throw new Error("Missing bounded live OAuth evidence timestamps");
+    const delta = record.expires_at.getTime() - record.verified_at.getTime();
+    expect(delta).toBe(5 * 60_000);
+    await expect(
+      executor().query(
+        "UPDATE historical_user_live_oauth_verified_proofs SET customer_delivery_allowed=true WHERE state_sha256=$1",
+        [hashedState],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      executor().query(
+        "UPDATE historical_user_live_oauth_verified_proofs SET original_github_user_id=$2 WHERE state_sha256=$1",
+        [hashedState, userId + 1],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      executor().query("DELETE FROM historical_user_live_oauth_verified_proofs WHERE state_sha256=$1", [hashedState]),
+    ).rejects.toThrow();
+    expect(await revokeHistoricalUserLiveOAuthProof(executor(), subject)).toBe(true);
+    expect(await revokeHistoricalUserLiveOAuthProof(executor(), subject)).toBe(false);
+    expect(await inspectHistoricalUserLiveOAuthProof(executor(), subject)).toBe("stale");
+    await expect(
+      executor().query("UPDATE historical_user_live_oauth_verified_proofs SET revoked_at=NULL WHERE state_sha256=$1", [
+        hashedState,
+      ]),
+    ).rejects.toThrow();
+  });
+
+  it("never allows a proof from another original USER, wrong export, expired nonce or revoked source", async () => {
+    const state = issue();
+    const subject = identity(state);
+    expect(await registerHistoricalUserOAuthChallenge(executor(), subject)).toBe(true);
+    expect(await consumeHistoricalUserOAuthChallenge(executor(), subject)).toBe(true);
+    expect(
+      await confirmHistoricalUserLiveOAuthProof(executor(), identity(state, { verifiedGitHubUserId: userId + 1 })),
+    ).toBe(false);
+    expect(await confirmHistoricalUserLiveOAuthProof(executor(), identity(state, { exportId: randomUUID() }))).toBe(
+      false,
+    );
+    expect(
+      await inspectHistoricalUserLiveOAuthProof(executor(), identity(state, { verifiedGitHubUserId: userId + 1 })),
+    ).toBe("stale");
+    expect(await confirmHistoricalUserLiveOAuthProof(executor(), subject)).toBe(true);
+    expect(await inspectHistoricalUserLiveOAuthProof(executor(), identity(issue()))).toBe("stale");
+    await executor().query("UPDATE data_exports SET status='failed' WHERE id=$1", [exportId]);
+    expect(await inspectHistoricalUserLiveOAuthProof(executor(), subject)).toBe("stale");
+    expect(await revokeHistoricalUserLiveOAuthProof(executor(), subject)).toBe(false);
+    await executor().query("UPDATE data_exports SET status='pending' WHERE id=$1", [exportId]);
+    const expired = issue();
+    const digest = createHash("sha256")
+      .update("boardreadyops-original-user-oauth-state-v1")
+      .update("\0")
+      .update(expired)
+      .digest("hex");
+    await executor().query(
+      "INSERT INTO historical_user_oauth_challenges(state_sha256,export_id,original_github_user_id,created_at,expires_at,consumed_at) VALUES($1,$2,$3,clock_timestamp()-INTERVAL '9 minutes',clock_timestamp()-INTERVAL '4 minutes',clock_timestamp()-INTERVAL '5 minutes')",
+      [digest, exportId, userId],
+    );
+    expect(await confirmHistoricalUserLiveOAuthProof(executor(), identity(expired))).toBe(false);
+  });
+
+  it("denies live verification confirmation/inspection/revocation through real hold and erasure fences", async () => {
+    const state = issue();
+    const subject = identity(state);
+    expect(await registerHistoricalUserOAuthChallenge(executor(), subject)).toBe(true);
+    expect(await consumeHistoricalUserOAuthChallenge(executor(), subject)).toBe(true);
+    const localHoldId = randomUUID();
+    const localErasureId = randomUUID();
+    try {
+      await executor().query(
+        "INSERT INTO legal_holds(id,tenant_id,created_by,reason,scope,scope_id) VALUES($1,$2,'test','Historical live proof hold','user',$2)",
+        [localHoldId, tenant],
+      );
+      expect(await confirmHistoricalUserLiveOAuthProof(executor(), subject)).toBe(false);
+      expect(await inspectHistoricalUserLiveOAuthProof(executor(), subject)).toBe("stale");
+      await executor().query("DELETE FROM legal_holds WHERE id=$1", [localHoldId]);
+      expect(await confirmHistoricalUserLiveOAuthProof(executor(), subject)).toBe(true);
+      await executor().query(
+        "INSERT INTO erasure_requests(id,tenant_id,requested_by,scope,scope_id,status,dry_run) VALUES($1,$2,'test','user',$2,'running',FALSE)",
+        [localErasureId, tenant],
+      );
+      expect(await inspectHistoricalUserLiveOAuthProof(executor(), subject)).toBe("stale");
+      expect(await revokeHistoricalUserLiveOAuthProof(executor(), subject)).toBe(false);
+      await executor().query("DELETE FROM erasure_requests WHERE id=$1", [localErasureId]);
+      expect(await inspectHistoricalUserLiveOAuthProof(executor(), subject)).toBe("current");
+      expect(await revokeHistoricalUserLiveOAuthProof(executor(), subject)).toBe(true);
+    } finally {
+      await executor().query("DELETE FROM legal_holds WHERE id=$1", [localHoldId]);
+      await executor().query("DELETE FROM erasure_requests WHERE id=$1", [localErasureId]);
+    }
+  });
+
+  it("persists at most one successful verified OAuth proof per consumed state across workers", async () => {
+    const state = issue();
+    expect(await registerHistoricalUserOAuthChallenge(executor(), identity(state))).toBe(true);
+    expect(await consumeHistoricalUserOAuthChallenge(executor(), identity(state))).toBe(true);
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () => confirmHistoricalUserLiveOAuthProof(executor(), identity(state))),
+    );
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(results.filter((ok) => !ok)).toHaveLength(5);
   });
 
   it("rejects wrong numeric USER, unknown state/export, unsuspended App and non-pending exports", async () => {

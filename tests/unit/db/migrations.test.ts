@@ -175,6 +175,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0123_historical_user_oauth_challenge_export_bounds.sql",
       "0124_historical_user_private_partial_cleanup_audit.sql",
       "0125_historical_user_private_partial_read_reservations.sql",
+      "0126_historical_user_live_oauth_verified_proof.sql",
     ]);
   });
 
@@ -231,6 +232,25 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("immutable except first release");
     expect(sql).toContain("customer_delivery_allowed boolean not null default false");
     expect(sql).not.toContain("delete from public.historical_user_partial_read_reservations");
+  });
+
+  it("binds a consumed original USER nonce to a private, revocable but never downloadable verified OAuth proof in schema v126", async () => {
+    const sql = (
+      await readFile(join(migrationsDir, "0126_historical_user_live_oauth_verified_proof.sql"), "utf8")
+    ).toLowerCase();
+    expect(sql).toContain("historical_user_live_oauth_verified_proofs");
+    expect(sql).toContain("state_sha256 text not null unique");
+    expect(sql).toContain("references public.historical_user_oauth_challenges(state_sha256) on delete cascade");
+    expect(sql).toContain("original_github_user_id bigint not null");
+    expect(sql).toContain("revoked_at timestamptz");
+    expect(sql).toContain("interval '5 minutes'");
+    expect(sql).toContain("customer_delivery_allowed boolean not null default false");
+    expect(sql).toContain("complete_customer_export boolean not null default false");
+    expect(sql).toContain("boardreadyops_guard_historical_live_oauth_verified_proof");
+    expect(sql).toContain("immutable except first revocation");
+    expect(sql).not.toContain("access_token text");
+    expect(sql).not.toContain("authorization_code text");
+    expect(sql).not.toContain("customer_delivery_allowed boolean not null default true");
   });
 
   it("stores tenant-scoped append-only review policy audit history in schema v85", async () => {

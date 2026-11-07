@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { isHistoricalUserUuid } from "./data-export-historical-uuid.js";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
 import type { PgQueryExecutor } from "./pg-executor.js";
@@ -245,5 +245,113 @@ export async function consumeHistoricalUserOAuthChallenge(db: NonceDb, input: Or
       [input.exportId, input.verifiedGitHubUserId, stateDigest],
     );
     return acknowledgedNonceDigest(result, stateDigest);
+  });
+}
+
+/**
+ * SOURCE-ONLY durable evidence that an already CONSUMED one-use nonce was
+ * followed by a successful fresh HTTPS GitHub /user numeric ID match.
+ * The trusted callback must call this ONLY AFTER verifying GitHub /user and
+ * rechecking the original export. No customer grant or bearer ID is returned.
+ * Explicit original USER, legal-hold and tenant advisory locks are reused.
+ */
+export async function confirmHistoricalUserLiveOAuthProof(db: NonceDb, input: OriginalUserNonce): Promise<boolean> {
+  return withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const id = randomUUID();
+    const stateDigest = digest(input.state);
+    const result = await tx.query(
+      `INSERT INTO public.historical_user_live_oauth_verified_proofs (
+         id,state_sha256,export_id,original_github_user_id,verified_at,expires_at
+       )
+       SELECT $4::uuid,c.state_sha256,e.id,e.original_github_user_id,
+              verified.tick, verified.tick + INTERVAL '5 minutes'
+         FROM public.historical_user_oauth_challenges c
+         JOIN public.data_exports e ON e.id=c.export_id
+         CROSS JOIN LATERAL (SELECT clock_timestamp() AS tick) AS verified
+        WHERE c.state_sha256=$3
+          AND c.export_id=$1 AND c.original_github_user_id=$2::bigint
+          AND c.consumed_at IS NOT NULL
+          AND c.consumed_at >= c.created_at
+          AND c.consumed_at <= verified.tick
+          AND c.consumed_at > verified.tick - INTERVAL '5 minutes'
+          AND c.expires_at>verified.tick
+          AND e.original_github_user_id=c.original_github_user_id
+          AND e.status='pending' AND e.scope='user'
+          AND e.installation_id IS NULL AND e.requested_by='github_app_uninstall'
+          AND lower(e.scope_id)=lower(e.tenant_id)
+          AND (e.expires_at IS NULL OR e.expires_at>verified.tick)
+       ON CONFLICT DO NOTHING
+       RETURNING id::text AS id`,
+      [input.exportId, input.verifiedGitHubUserId, stateDigest, id],
+    );
+    const acknowledged = rows(result);
+    if (acknowledged.length === 0) return false;
+    // A forged/ambiguous INSERT acknowledgement MUST roll back this
+    // transaction instead of silently committing an unverifiable proof.
+    if (acknowledged.length !== 1 || acknowledged[0]?.id !== id) {
+      throw new Error("Historical live OAuth proof acknowledgement mismatch");
+    }
+    return true;
+  });
+}
+
+/**
+ * Non-customer diagnostic only: a fresh OAuth proof is NOT a source right or
+ * an independent delivery entitlement. Read under the original USER/hold/
+ * erasure admission locks so a hold or revocation denies consistently.
+ */
+export async function inspectHistoricalUserLiveOAuthProof(
+  db: NonceDb,
+  input: OriginalUserNonce,
+): Promise<"current" | "stale"> {
+  let current = false;
+  const allowed = await withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const result = await tx.query(
+      `SELECT p.state_sha256
+         FROM public.historical_user_live_oauth_verified_proofs p
+         JOIN public.historical_user_oauth_challenges c ON c.state_sha256=p.state_sha256
+        WHERE p.state_sha256=$3 AND p.export_id=$1
+          AND p.original_github_user_id=$2::bigint
+          AND c.export_id=p.export_id AND c.original_github_user_id=p.original_github_user_id
+          AND c.consumed_at IS NOT NULL AND c.consumed_at<=p.verified_at
+          AND p.verified_at<=clock_timestamp()
+          AND p.expires_at>clock_timestamp()
+          AND p.revoked_at IS NULL
+          AND p.complete_customer_export=FALSE
+          AND p.customer_delivery_allowed=FALSE
+          AND p.purpose='private-original-user-live-oauth-proof'
+        FOR SHARE OF p,c NOWAIT`,
+      [input.exportId, input.verifiedGitHubUserId, digest(input.state)],
+    );
+    current = acknowledgedNonceDigest(result, digest(input.state));
+    return current;
+  });
+  return allowed && current ? "current" : "stale";
+}
+
+/**
+ * Irreversible explicit revocation of ONE original-user OAuth observation.
+ * This never unblocks a private reader or permits customer ZIP delivery.
+ */
+export async function revokeHistoricalUserLiveOAuthProof(db: NonceDb, input: OriginalUserNonce): Promise<boolean> {
+  return withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const stateDigest = digest(input.state);
+    const result = await tx.query(
+      `UPDATE public.historical_user_live_oauth_verified_proofs p
+          SET revoked_at=clock_timestamp()
+        WHERE p.state_sha256=$3
+          AND p.export_id=$1 AND p.original_github_user_id=$2::bigint
+          AND p.revoked_at IS NULL
+          AND p.customer_delivery_allowed=FALSE
+        RETURNING p.state_sha256`,
+      [input.exportId, input.verifiedGitHubUserId, stateDigest],
+    );
+    const acknowledgement = rows(result);
+    if (acknowledgement.length === 0) return false;
+    if (!acknowledgedNonceDigest(result, stateDigest)) {
+      // Reject contradictory SQL acknowledgements before commit.
+      throw new Error("Historical live OAuth proof revocation acknowledgement mismatch");
+    }
+    return true;
   });
 }

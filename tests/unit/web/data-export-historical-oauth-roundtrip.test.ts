@@ -7,9 +7,11 @@ const close = vi.hoisted(() => vi.fn());
 const executor = vi.hoisted(() => vi.fn());
 const registerNonce = vi.hoisted(() => vi.fn());
 const consumeNonce = vi.hoisted(() => vi.fn());
+const confirmNonce = vi.hoisted(() => vi.fn());
 vi.mock("../../../packages/db/src/data-export-historical-oauth-challenges.js", () => ({
   registerHistoricalUserOAuthChallenge: registerNonce,
   consumeHistoricalUserOAuthChallenge: consumeNonce,
+  confirmHistoricalUserLiveOAuthProof: confirmNonce,
 }));
 vi.mock("../../../apps/web/lib/cloud-runtime-config.js", () => ({
   optionalCloudPersistenceConfiguration: config,
@@ -114,6 +116,7 @@ describe("historical GitHub USER step-up OAuth browser round-trip (no customer d
     vi.clearAllMocks();
     registerNonce.mockResolvedValue(true);
     consumeNonce.mockResolvedValue(true);
+    confirmNonce.mockResolvedValue(true);
     lookup.mockResolvedValue({ id: exportId, status: "pending", expiresAt: null });
     config.mockReturnValue({ mode: "postgres", databaseUrl: "postgresql://fixture-only" });
     executor.mockImplementation(() => ({ close: close.mockResolvedValue(undefined) }));
@@ -159,7 +162,31 @@ describe("historical GitHub USER step-up OAuth browser round-trip (no customer d
       verifiedGitHubUserId: userId,
       state,
     });
-    expect(close).toHaveBeenCalledTimes(4);
+    expect(confirmNonce).toHaveBeenCalledOnce();
+    expect(confirmNonce.mock.calls[0]?.[1]).toEqual({
+      exportId,
+      verifiedGitHubUserId: userId,
+      state,
+    });
+    expect(close).toHaveBeenCalledTimes(5);
+  });
+
+  it("consumes nonce and denies confirmation when durable verified-identity proof cannot be committed", async () => {
+    const { state, cookieLine } = await begin();
+    confirmNonce.mockResolvedValueOnce(false);
+    const fetcher = network();
+    const response = await consumeHistoricalStepUp(
+      callbackRequest(state, cookieLine),
+      environment,
+      { fetch: fetcher },
+      now,
+    );
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/dashboard");
+    expect(consumeNonce).toHaveBeenCalledOnce();
+    expect(confirmNonce).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(response.headers.getSetCookie()).toHaveLength(2);
   });
 
   it("uses the trusted global fetch when no callback dependencies were provided", async () => {
