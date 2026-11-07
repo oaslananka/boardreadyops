@@ -123,6 +123,28 @@ Required independent review: Tenant versus platform-owned boundary, service inte
 | `repository_setup_revisions` | Not verified | DENY |
 | `runner_execution_policies` | Not verified | DENY |
 
+## Numeric original USER source-row attribution — seven hardware classes
+
+A separate **SOURCE-ONLY / COUNT-ONLY** PostgreSQL preflight now
+inspects the following seven classes from the hardware track using
+the exact immutable GitHub numeric USER on a pending uninstall export,
+its matching suspended USER installation and repository/run relationships:
+`boards`, `board_bom_snapshots`, `board_bom_components`,
+`repository_firmware_snapshots`, `repository_firmware_dependencies`,
+`repository_firmware_advisory_watch` and `run_pcb_footprint_summaries`.
+All seven remain **Not verified / DENY for customer disclosure**; this
+preflight merely discovers bounded retained source-row counts (0–100
+per class). It does NOT inspect or return BOM values, repository names,
+firmware metadata, design files, private identifiers or row IDs.
+Unknown owner, non-suspended installation, active tenant legal hold,
+real erasure or crossed foreign-repository run references reject the
+entire candidate. PostgreSQL returns counts in one consistent
+read-only snapshot. A zero count is NOT proof of archive completeness
+and a nonzero count is NOT a license to disclose. The remaining 12
+hardware-track classes are not yet covered by this row-attribution
+preflight. The future independently signed complete DB+filesystem
+export and customer authorization remain blocked.
+
 ## Acceptance conditions (not met)
 
 The source-only 13-table partial metadata preview is not a complete source

@@ -16,7 +16,7 @@ export class HistoricalUserInventoryUnavailableError extends Error {
 
 // Shared, immutable account authority: do not drift between independent
 // historical preflights. Never infer ownership from a recycled login alone.
-const historicalOwnerCtes = `owner_export AS MATERIALIZED (
+export const historicalOwnerCtes = `owner_export AS MATERIALIZED (
           SELECT exports.id, exports.tenant_id, exports.original_github_user_id
             FROM data_exports AS exports
            WHERE exports.id=$1
