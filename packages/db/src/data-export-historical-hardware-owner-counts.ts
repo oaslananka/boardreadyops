@@ -25,6 +25,7 @@ const sourceNames = [
   "signedManufacturingExportEvidence",
   "manufacturingShareAuthorizations",
 ] as const;
+export const historicalUserHardwareSourceNames: readonly HardwareSourceName[] = sourceNames;
 type HardwareSourceName = (typeof sourceNames)[number];
 
 /**

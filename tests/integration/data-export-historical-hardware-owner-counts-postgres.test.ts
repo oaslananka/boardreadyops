@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { assessHistoricalUserHardwareOwnedRowCounts } from "../../packages/db/src/data-export-historical-hardware-owner-counts.js";
+import { assessHistoricalUserSourceScope } from "../../packages/db/src/data-export-historical-source-scope.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -363,6 +364,60 @@ afterAll(async () => {
 });
 
 describeDb("disposable PostgreSQL: original USER hardware data owner-count scope", () => {
+  it("inspects all 19 private source classes AND public schema under one read-only PG17 snapshot", async () => {
+    const scope = await assessHistoricalUserSourceScope(database(), identity());
+    expect(scope).toMatchObject({
+      status: "known-relational-source-scope-unapproved",
+      releaseDecision: "NO_GO",
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      sourceRightsVerified: false,
+      thirdPartyDisclosureRightsVerified: false,
+      tableCount: 92,
+      sourceClassCount: 19,
+      scopeFingerprintSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+    });
+    expect((await assessHistoricalUserSourceScope(database(), identity()))?.scopeFingerprintSha256).toBe(
+      scope?.scopeFingerprintSha256,
+    );
+    expect(
+      await assessHistoricalUserSourceScope(database(), { ...identity(), verifiedGitHubUserId: otherUserId }),
+    ).toBeNull();
+  });
+
+  it("changes the private source fingerprint when one retained hardware row changes", async () => {
+    const id = randomUUID();
+    const initial = await assessHistoricalUserSourceScope(database(), identity());
+    expect(initial?.status).toBe("known-relational-source-scope-unapproved");
+    try {
+      await database().query(
+        "INSERT INTO board_supply_findings(id,board_id,mpn,status,severity) VALUES($1,$2,'new-verified-part','nrnd','high')",
+        [id, ids.board],
+      );
+      const changed = await assessHistoricalUserSourceScope(database(), identity());
+      expect(changed?.scopeFingerprintSha256).toMatch(/^[0-9a-f]{64}$/u);
+      expect(changed?.scopeFingerprintSha256).not.toBe(initial?.scopeFingerprintSha256);
+      expect(changed?.customerDeliveryAllowed).toBe(false);
+    } finally {
+      await database().query("DELETE FROM board_supply_findings WHERE id=$1", [id]);
+    }
+    expect((await assessHistoricalUserSourceScope(database(), identity()))?.scopeFingerprintSha256).toBe(
+      initial?.scopeFingerprintSha256,
+    );
+  });
+
+  it("refuses internal source-only observation after a new unknown schema table appears", async () => {
+    await database().query("CREATE TABLE public.boardreadyops_scope_drift_probe (id integer PRIMARY KEY)");
+    try {
+      expect(await assessHistoricalUserSourceScope(database(), identity())).toBeNull();
+    } finally {
+      await database().query("DROP TABLE public.boardreadyops_scope_drift_probe");
+    }
+    expect((await assessHistoricalUserSourceScope(database(), identity()))?.status).toBe(
+      "known-relational-source-scope-unapproved",
+    );
+  });
+
   it("counts nineteen related private source classes only under original numeric USER / suspended installation", async () => {
     expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toEqual({
       scope: "original-numeric-user-retained-suspended-installation-only",

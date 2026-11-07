@@ -5,10 +5,10 @@ import {
   verifyHistoricalUserPartialObservation,
 } from "../../../apps/web/lib/data-export-historical-partial-attestation.js";
 import { verifyReservedHistoricalUserPrivatePartial } from "../../../apps/web/lib/data-export-historical-partial-read.js";
-import { assessHistoricalUserSchemaCoverage } from "../../../packages/db/src/data-export-historical-schema-coverage.js";
+import { assessHistoricalUserSourceScope } from "../../../packages/db/src/data-export-historical-source-scope.js";
 
-vi.mock("../../../packages/db/src/data-export-historical-schema-coverage.js", () => ({
-  assessHistoricalUserSchemaCoverage: vi.fn(),
+vi.mock("../../../packages/db/src/data-export-historical-source-scope.js", () => ({
+  assessHistoricalUserSourceScope: vi.fn(),
 }));
 
 vi.mock("../../../apps/web/lib/data-export-historical-partial-read.js", () => ({
@@ -16,7 +16,7 @@ vi.mock("../../../apps/web/lib/data-export-historical-partial-read.js", () => ({
 }));
 
 const verifiedRead = vi.mocked(verifyReservedHistoricalUserPrivatePartial);
-const schemaCheck = vi.mocked(assessHistoricalUserSchemaCoverage);
+const scopeCheck = vi.mocked(assessHistoricalUserSourceScope);
 const now = 1794015000000;
 const lifetime = 5 * 60_000;
 
@@ -51,25 +51,16 @@ function fixture() {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.spyOn(Date, "now").mockReturnValue(now);
-  schemaCheck.mockResolvedValue({
-    status: "known_schema_scope_unapproved",
+  scopeCheck.mockResolvedValue({
+    status: "known-relational-source-scope-unapproved",
     releaseDecision: "NO_GO",
     completeCustomerExport: false,
     customerDeliveryAllowed: false,
+    sourceRightsVerified: false,
+    thirdPartyDisclosureRightsVerified: false,
     tableCount: 92,
-    columnCount: 1033,
-    partialPrivateMetadataTableCount: 13,
-    withheldSensitiveTableCount: 16,
-    otherTablesRequiringScopeReview: 63,
-    unresolvedReviewTrackCounts: {
-      privacy_lifecycle: 17,
-      billing_and_marketplace: 5,
-      hardware_and_release: 19,
-      collaboration_and_workspace: 10,
-      platform_operations: 12,
-    },
-    unrecognizedTableCount: 0,
-    schemaSha256: "45d6db6d25b6e61a0950333a5f9d81b17e2895c21736688b08cc00d49b3dfe63",
+    sourceClassCount: 19,
+    scopeFingerprintSha256: "a".repeat(64),
   });
   verifiedRead.mockImplementation(async (input) => ({
     sha256: input.sha256,
@@ -137,20 +128,23 @@ describe("source-only original USER signed partial integrity observations", () =
     expect(await signHistoricalUserPartialObservation(f)).toBeNull();
   });
 
-  it.each(["schema_drift", "unavailable"] as const)(
-    "refuses to sign a verified ZIP when database catalog status is %s",
-    async (status) => {
+  it.each(["schema_drift", "unavailable", "foreign-scope", "ambiguous-owner"] as const)(
+    "refuses to sign when the unified source snapshot reports %s",
+    async () => {
       const f = fixture();
-      schemaCheck.mockResolvedValueOnce({ status } as never);
+      scopeCheck.mockResolvedValueOnce(null);
       expect(await signHistoricalUserPartialObservation(f)).toBeNull();
       expect(verifiedRead).toHaveBeenCalledOnce();
-      expect(schemaCheck).toHaveBeenCalledExactlyOnceWith(f.db);
+      expect(scopeCheck).toHaveBeenCalledExactlyOnceWith(f.db, {
+        exportId: f.binding.exportId,
+        verifiedGitHubUserId: f.binding.verifiedGitHubUserId,
+      });
     },
   );
 
-  it("does not sign a verified ZIP if PostgreSQL schema inspection throws", async () => {
+  it("does not sign when unified source snapshot inspection throws", async () => {
     const f = fixture();
-    schemaCheck.mockRejectedValueOnce(new Error("No permissions to inspect catalog"));
+    scopeCheck.mockRejectedValueOnce(new Error("No database scope access"));
     expect(await signHistoricalUserPartialObservation(f)).toBeNull();
   });
 

@@ -265,6 +265,14 @@ nineteen-class source-only hardware row-attribution preflight uses original nume
 GitHub USER/suspended-installation repository/run joins only to
 produce bounded private row COUNTS, including strictly cross-checked
 manufacturing share/run/attempt/artifact/signed-evidence candidates.
+The internal source-only partial-integrity observation additionally
+requires the schema fingerprint and all nineteen bounded hardware
+class counts to pass under a **single PostgreSQL REPEATABLE READ READ
+ONLY** transaction, with exact original numeric USER/export binding.
+Any schema drift, foreign ownership, legal hold, real erasure, malformed
+count, failed transaction or denied scope blocks that internal signature.
+The scope digest remains private and is not the signed artifact's claim
+of DB+filesystem atomicity, completeness or customer delivery.
 Ambiguous original USER share authority, actor, workspace, digests,
 deleted references and cross-tenant linkage fail closed. No source
 payloads, consent/third-party disclosure rights, guaranteed coverage
