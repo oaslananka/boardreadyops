@@ -12,6 +12,7 @@ const edge = (
   target_table,
   required,
   constraint_name,
+  validated: true,
 });
 function fixture(rows: unknown) {
   const query = vi.fn(
@@ -67,6 +68,7 @@ describe("original USER unresolved-class FK lineage is structural ONLY, NEVER an
     expect(tableSql).toContain("LIMIT 93");
     const sql = f.query.mock.calls[1]?.[0] ?? "";
     expect(sql).toContain("pg_catalog.pg_constraint");
+    expect(sql).toContain("c.convalidated AS validated");
     expect(sql).toContain("pg_catalog.pg_attribute");
     expect(sql).not.toMatch(/FROM\s+public\./iu);
     expect(sql).not.toContain("SELECT *");

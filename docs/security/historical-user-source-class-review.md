@@ -30,7 +30,7 @@ classes after migrations through **0126**, tested on disposable PostgreSQL 17.
 The audit first verifies that the exact **92 declared public tables**
 are present with no additional table, then inspects **123 public
 foreign-key constraints** in the SAME read-only snapshot and checks only
-whether a table has an enforced *structural path* to the \`installations\`
+whether a table has a *validated catalog FK path* to the \`installations\`
 table. It **never queries application table rows, customer/source content,
 numeric user IDs, artifact bytes or billing data**. This is a triage aid,
 **not** a verified historical GitHub USER owner, tenant, legal/IP right or
@@ -88,6 +88,16 @@ repositories → installations\` contains at least one nullable reference:
 rights**. All 19 hardware classes still require the existing, separate
 original-numeric-user, owner/run/revision/share consistency vetoes and
 legal/IP review. No source is automatically included in a customer ZIP.
+
+The FK review now **rejects NOT VALID or unknown-validation catalog
+constraints** instead of presenting their relationships as proven for
+existing historical rows. For tables with competing FK routes, it
+prioritizes a path composed solely of non-nullable FK columns when one
+exists, rather than whichever optional path appears first in catalog
+order. If all routes contain nullable columns, the reported path remains
+explicitly optional. The schema fingerprint, separate historical USER
+authorization, row-level ownership and third-party rights still require
+independent evidence; no FK path grants customer delivery.
 
 This evidence shortens the next review: verify independent owner provenance
 for the **29 unlinked** classes, then separately establish retained-row

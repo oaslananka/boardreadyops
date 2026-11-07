@@ -9,7 +9,13 @@ import type { PgQueryExecutor } from "./pg-executor.js";
  * A structural FK chain is NOT a proof of original USER identity, consent,
  * customer ownership, lawful disclosure, legal hold or complete customer ZIP.
  */
-type Link = { source_table: string; target_table: string; constraint_name: string; required: boolean };
+type Link = {
+  source_table: string;
+  target_table: string;
+  constraint_name: string;
+  required: boolean;
+  validated: true;
+};
 type ReviewTrack = keyof typeof historicalUserUnresolvedSourceReviewTracks;
 type Entry = {
   table: string;
@@ -47,32 +53,41 @@ function validLink(value: unknown): value is Link {
     allKnownTables.has(row.target_table) &&
     typeof row.constraint_name === "string" &&
     identifier.test(row.constraint_name) &&
-    typeof row.required === "boolean"
+    typeof row.required === "boolean" &&
+    // A NOT VALID FK can exist without proving existing historical rows
+    // satisfy the relationship; an unknown validation state is no proof.
+    row.validated === true
   );
 }
 
+/** Prefer a path whose EVERY FK column is non-nullable when one exists.
+ * Choosing the first catalog-ordered route can otherwise report an
+ * optional FK path even if a stronger fully-required route is available.
+ * Still only structural metadata, NEVER proof of actual user ownership.
+ */
 function pathToInstallation(
   start: string,
   links: ReadonlyMap<string, Link[]>,
-): {
-  path: string[] | null;
-  required: boolean;
-} {
-  const pending = [{ table: start, path: [start], required: true }];
-  const visited = new Set([start]);
-  for (const current of pending) {
-    if (current.table === "installations") return { path: current.path, required: current.required };
-    for (const link of links.get(current.table) ?? []) {
-      if (visited.has(link.target_table)) continue;
-      visited.add(link.target_table);
-      pending.push({
-        table: link.target_table,
-        path: [...current.path, link.target_table],
-        required: current.required && link.required,
-      });
+): { path: string[] | null; required: boolean } {
+  const findPath = (requireNonNullable: boolean): string[] | null => {
+    const pending = [[start]];
+    const visited = new Set([start]);
+    for (const path of pending) {
+      const current = path[path.length - 1];
+      if (current === undefined) return null;
+      if (current === "installations") return path;
+      for (const link of links.get(current) ?? []) {
+        if (requireNonNullable && !link.required) continue;
+        if (visited.has(link.target_table)) continue;
+        visited.add(link.target_table);
+        pending.push([...path, link.target_table]);
+      }
     }
-  }
-  return { path: null, required: false };
+    return null;
+  };
+  const requiredPath = findPath(true);
+  if (requiredPath) return { path: requiredPath, required: true };
+  return { path: findPath(false), required: false };
 }
 
 const publicTableCatalogSql = [
@@ -84,7 +99,7 @@ const publicTableCatalogSql = [
 
 const catalogSql = [
   "SELECT source.relname AS source_table, target.relname AS target_table,",
-  "c.conname AS constraint_name,",
+  "c.conname AS constraint_name, c.convalidated AS validated,",
   "NOT EXISTS (SELECT 1 FROM unnest(c.conkey) AS key(attnum)",
   "JOIN pg_catalog.pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=key.attnum",
   "WHERE a.attnotnull=FALSE) AS required",
