@@ -135,6 +135,40 @@ DB-plus-physical-object snapshot. Every result retains
 `independentOwnershipComplete=false` and `releaseDecision=NO_GO`.
 No schema migration, customer endpoint or delivery feature is added.
 
+## Four tenant-login-only lifecycle classes: ambiguity and bounded count review
+
+The private `assessHistoricalUserTenantOnlyLifecycleCandidates` now
+examines **four more** of the remaining 28 FK-unlinked classes:
+`retention_policies`, `legal_holds`, `erasure_requests` and
+`product_events`. All four use a tenant/login string rather than
+an immutable original numeric GitHub USER ownership FK. One read-only,
+repeatable-read transaction verifies the original pending uninstall export
+and matching suspended numeric USER installation, with active hold and
+non-dry-run erasure vetoes. It returns only bounded **candidate counts**
+(up to 100 per class) and a boolean indicating whether an installation
+with that login has a *different or unknown* numeric USER identity.
+No record IDs, reasons, policy text, actors, personal fields or event
+payloads are selected. Over 100 candidates for **any** class, malformed
+counts or missing authority fails closed rather than truncating evidence.
+
+These counts are **not original-user ownership assignments**: even
+without a detected competing installation, a tenant string is reusable,
+legacy rows can be detached and a private hold or event may be platform-
+or third-party-owned. With an active hold or an in-progress/completed
+non-dry-run erasure, the existing owner-authority predicate refuses
+the entire review before any candidate evidence is returned. Disposable
+PostgreSQL tests cover same-login different numeric USER identities,
+foreign-tenant isolation, hold/erasure vetoes and the over-100 cap.
+
+After the separate `data_exports` review, these four classes are
+**triaged but still NOT cleared for customer disclosure**. The other
+**24 FK-unlinked classes** remain without a dedicated owner-evidence
+review. All 63 original-user source classes are still DENY; any future
+complete export also needs independent immutable provenance, multi-party
+IP/privacy rights, full signed DB+physical-object coherence and audited
+OAuth delivery. No migration, public route, export whitelist, tokens or
+customer permission were added.
+
 ## Individual table review queue
 
 ### Privacy, export lifecycle and installation authority — 17 tables

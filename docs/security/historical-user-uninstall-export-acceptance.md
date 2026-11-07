@@ -358,6 +358,12 @@ historical aliases, login-only legacy rows and other numeric USERs reusing
 that login. It refuses missing/expired authority, holds, erasures and
 oversized candidates; it neither backfills ambiguous users nor exposes
 customer bytes, URLs or records. All classes remain **DENY**.
+A further read-only, bounded review covers four additional tenant-login
+only classes (`retention_policies`, `legal_holds`, `erasure_requests`
+and `product_events`), returning only per-class candidate counts and
+a recycled/unbound-user identity collision flag. It cannot attribute
+legacy rows by username, and still denies a customer export.
+The remaining **24 FK-unlinked classes** require a dedicated review.
 The internal source-only partial-integrity observation additionally
 requires the schema fingerprint and all nineteen bounded hardware
 class counts to pass under a **single PostgreSQL REPEATABLE READ READ
