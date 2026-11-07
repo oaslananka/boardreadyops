@@ -44,11 +44,13 @@ function verifiedPrivatePartialZipFingerprint(
   if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > maxArchiveBytes) return null;
   const archiveSha256 = sha256(bytes);
   if (!verifyHistoricalUserPartialArchive(bytes, archiveSha256, exportId)) return null;
+  let extracted: ReturnType<typeof sanitizeAndExtractArchive> | null = null;
   try {
     // The independent verifier above already checked path uniqueness, the
     // receipt's per-file digests, artifact ownership, evidence and ZIP hash.
     // Re-extract ONLY to read the three exact metadata fields for DB binding.
-    const extracted = sanitizeAndExtractArchive(bytes, {
+    // These extracted Buffers are independent PRIVATE copies, never caller-owned.
+    extracted = sanitizeAndExtractArchive(bytes, {
       maxCompressedSizeBytes: maxArchiveBytes,
       maxTotalExtractedBytes: maxArchiveBytes,
       maxSingleFileBytes: maxArchiveBytes,
@@ -89,6 +91,11 @@ function verifiedPrivatePartialZipFingerprint(
     };
   } catch {
     return null;
+  } finally {
+    // The original ZIP belongs to the caller. The extracted metadata and
+    // physical source copies do NOT: wipe each even on a malformed receipt,
+    // failed JSON parse, or a successfully computed non-customer fingerprint.
+    for (const file of extracted?.files ?? []) file.data.fill(0);
   }
 }
 

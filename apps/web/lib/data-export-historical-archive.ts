@@ -919,8 +919,10 @@ export function verifyHistoricalUserPartialArchive(
     !uuid.test(expectedExportId)
   )
     return false;
+  let extracted: ReturnType<typeof sanitizeAndExtractArchive> | null = null;
   try {
-    const extracted = sanitizeAndExtractArchive(archive, {
+    // The uncompressed files are temporary private copies, not caller-owned.
+    extracted = sanitizeAndExtractArchive(archive, {
       maxCompressedSizeBytes: maxArchiveBytes,
       maxTotalExtractedBytes: maxArchiveBytes,
       maxSingleFileBytes: maxArchiveBytes,
@@ -950,6 +952,10 @@ export function verifyHistoricalUserPartialArchive(
     );
   } catch {
     return false;
+  } finally {
+    // Both successful and rejected ZIPs can contain original USER private
+    // source bytes. Never leave the extracted copies to await garbage collection.
+    for (const file of extracted?.files ?? []) file.data.fill(0);
   }
 }
 
@@ -1094,8 +1100,10 @@ export function verifyHistoricalUserMetadataOnlyArchive(
     !uuid.test(expectedExportId)
   )
     return false;
+  let extracted: ReturnType<typeof sanitizeAndExtractArchive> | null = null;
   try {
-    const extracted = sanitizeAndExtractArchive(archive, {
+    // The uncompressed files are temporary private copies, not caller-owned.
+    extracted = sanitizeAndExtractArchive(archive, {
       maxCompressedSizeBytes: maxMetadataOnlyZipBytes,
       maxTotalExtractedBytes: maxMetadataOnlyZipBytes,
       maxSingleFileBytes: maxSnapshotBytes,
@@ -1128,6 +1136,10 @@ export function verifyHistoricalUserMetadataOnlyArchive(
     );
   } catch {
     return false;
+  } finally {
+    // Both successful and rejected ZIPs can contain original USER private
+    // source bytes. Never leave the extracted copies to await garbage collection.
+    for (const file of extracted?.files ?? []) file.data.fill(0);
   }
 }
 

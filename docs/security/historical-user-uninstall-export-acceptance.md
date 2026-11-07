@@ -50,8 +50,12 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   partial ZIP under the reserved 0700 owner-private archive directory
   as a dedicated .historical-private-partial-v3.zip file, mode 0600.
   It reopens and independently rechecks disk bytes, SHA-256 and
-  the partial-ZIP v3 receipt. The SOURCE-ONLY direct reader allocates
-  only the exact preflight byte length (at most 64 MiB), reads by
+  the partial-ZIP v3 receipt. All three historical ZIP verification
+  paths (partial, metadata-only and original USER private preflight)
+  explicitly zero temporary extracted metadata and physical-file
+  copies on success or rejection; caller-owned ZIP input bytes are
+  never overwritten by these verifiers. The SOURCE-ONLY direct reader
+  allocates only the exact preflight byte length (at most 64 MiB), reads by
   explicit descriptor offsets and probes one extra byte; concurrent
   growth, truncation, changed file metadata, failed descriptor close
   or a failed digest rejects and zeroes the private read buffer instead
