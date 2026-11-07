@@ -1,5 +1,8 @@
 import { type KeyObject, sign, verify } from "node:crypto";
-import { assessHistoricalUserSourceScope } from "../../../packages/db/src/data-export-historical-source-scope.js";
+import {
+  assessHistoricalUserSourceScope,
+  type HistoricalUserSourceScopeObservation,
+} from "../../../packages/db/src/data-export-historical-source-scope.js";
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
 import { verifyReservedHistoricalUserPrivatePartial } from "./data-export-historical-partial-read.js";
 
@@ -110,6 +113,28 @@ function isValidObservation(value: unknown, nowMs: number): value is HistoricalU
 }
 
 /**
+ * Both BEFORE and AFTER physical verification, require the same owner-bound
+ * NO_GO scope. These are separate read-only PostgreSQL snapshots; equality
+ * detects catalog/count and covered mutation-epoch drift during the read,
+ * not a DB+filesystem atomic transaction or a customer entitlement.
+ */
+function validPrivateScope(
+  scope: HistoricalUserSourceScopeObservation | null,
+): scope is HistoricalUserSourceScopeObservation {
+  return (
+    scope?.status === "known-relational-source-scope-unapproved" &&
+    scope.releaseDecision === "NO_GO" &&
+    scope.completeCustomerExport === false &&
+    scope.customerDeliveryAllowed === false &&
+    scope.sourceRightsVerified === false &&
+    scope.thirdPartyDisclosureRightsVerified === false &&
+    scope.tableCount === 92 &&
+    scope.sourceClassCount === 19 &&
+    sha256.test(scope.scopeFingerprintSha256)
+  );
+}
+
+/**
  * Source-only proof of an INTERNAL privacy-preserving verification event.
  *
  * The original numeric USER, live private preflight, local ZIP and retained
@@ -142,10 +167,17 @@ export async function signHistoricalUserPartialObservation(input: {
     byteLength: input.binding.byteLength,
   };
   try {
+    // Capture source catalog, owner-scoped row counts and existing mutation
+    // epochs BEFORE physical ZIP verification. The second check below must
+    // match this exact digest or the signer refuses the observation.
+    const authority = { exportId: binding.exportId, verifiedGitHubUserId: binding.verifiedGitHubUserId };
+    const initialScope = await assessHistoricalUserSourceScope(input.db, authority);
+    if (!validPrivateScope(initialScope)) return null;
+
     const receipt = await verifyReservedHistoricalUserPrivatePartial({
       db: input.db,
       archiveRoot: input.archiveRoot,
-      authority: { exportId: binding.exportId, verifiedGitHubUserId: binding.verifiedGitHubUserId },
+      authority,
       preflightId: binding.preflightId,
       sha256: binding.sha256,
       byteLength: binding.byteLength,
@@ -157,26 +189,12 @@ export async function signHistoricalUserPartialObservation(input: {
       receipt.customerDeliveryAllowed !== false
     )
       return null;
-    // Reject schema drift, foreign original-USER source rows and malformed
-    // class inventories BEFORE signing. Catalog and the 19 bounded row
-    // counts are checked under ONE PostgreSQL repeatable-read snapshot.
-    // This still does NOT attest to complete DB+filesystem or customer rights.
-    const scope = await assessHistoricalUserSourceScope(input.db, {
-      exportId: binding.exportId,
-      verifiedGitHubUserId: binding.verifiedGitHubUserId,
-    });
-    if (
-      scope?.status !== "known-relational-source-scope-unapproved" ||
-      scope.releaseDecision !== "NO_GO" ||
-      scope.completeCustomerExport !== false ||
-      scope.customerDeliveryAllowed !== false ||
-      scope.sourceRightsVerified !== false ||
-      scope.thirdPartyDisclosureRightsVerified !== false ||
-      scope.tableCount !== 92 ||
-      scope.sourceClassCount !== 19 ||
-      !sha256.test(scope.scopeFingerprintSha256)
-    )
-      return null;
+    // Re-sample after the physical ZIP read and durable reader release.
+    // Fail closed on original-USER schema, hardware-count or tracked ABA
+    // epoch changes while IO was in progress; do NOT assert this guards
+    // untracked row edits or supplies a DB/FS atomic materialization.
+    const scope = await assessHistoricalUserSourceScope(input.db, authority);
+    if (!validPrivateScope(scope) || scope.scopeFingerprintSha256 !== initialScope.scopeFingerprintSha256) return null;
     // Never accept an externally selected signing time.
     const issuedAtMs = Date.now();
     if (!validClock(issuedAtMs)) return null;
@@ -280,17 +298,7 @@ export async function verifyHistoricalUserPartialObservationCurrent(input: {
       exportId: input.expectedBinding.exportId,
       verifiedGitHubUserId: input.expectedBinding.verifiedGitHubUserId,
     });
-    return (
-      scope?.status === "known-relational-source-scope-unapproved" &&
-      scope.releaseDecision === "NO_GO" &&
-      scope.completeCustomerExport === false &&
-      scope.customerDeliveryAllowed === false &&
-      scope.sourceRightsVerified === false &&
-      scope.thirdPartyDisclosureRightsVerified === false &&
-      scope.tableCount === 92 &&
-      scope.sourceClassCount === 19 &&
-      scope.scopeFingerprintSha256 === expectedSourceScopeSha256
-    );
+    return validPrivateScope(scope) && scope.scopeFingerprintSha256 === expectedSourceScopeSha256;
   } catch {
     return false;
   }

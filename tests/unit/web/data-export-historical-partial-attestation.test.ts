@@ -137,13 +137,124 @@ describe("source-only original USER signed partial integrity observations", () =
       const f = fixture();
       scopeCheck.mockResolvedValueOnce(null);
       expect(await signHistoricalUserPartialObservation(f)).toBeNull();
-      expect(verifiedRead).toHaveBeenCalledOnce();
+      // The pre-read scope guard rejects the request BEFORE reserving
+      // or touching the private ZIP, unlike the previous post-only guard.
+      expect(verifiedRead).not.toHaveBeenCalled();
       expect(scopeCheck).toHaveBeenCalledExactlyOnceWith(f.db, {
         exportId: f.binding.exportId,
         verifiedGitHubUserId: f.binding.verifiedGitHubUserId,
       });
     },
   );
+
+  it("pins owner/source scope before and after the entire reserved private ZIP read", async () => {
+    const f = fixture();
+    const order: string[] = [];
+    scopeCheck.mockImplementation(async () => {
+      order.push("source-read");
+      return {
+        status: "known-relational-source-scope-unapproved",
+        releaseDecision: "NO_GO",
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+        sourceRightsVerified: false,
+        thirdPartyDisclosureRightsVerified: false,
+        tableCount: 92,
+        sourceClassCount: 19,
+        scopeFingerprintSha256: "a".repeat(64),
+      };
+    });
+    verifiedRead.mockImplementationOnce(async () => {
+      order.push("private-zip");
+      return {
+        sha256: f.binding.sha256,
+        byteLength: f.binding.byteLength,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+      };
+    });
+    const proof = await signHistoricalUserPartialObservation(f);
+    expect(order).toEqual(["source-read", "private-zip", "source-read"]);
+    expect(proof?.sourceScopeSha256).toBe("a".repeat(64));
+  });
+
+  it("refuses a signature when the source fingerprint changes DURING the reserved ZIP read", async () => {
+    const f = fixture();
+    const original = { ...f.binding };
+    scopeCheck.mockResolvedValueOnce({
+      status: "known-relational-source-scope-unapproved",
+      releaseDecision: "NO_GO",
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      sourceRightsVerified: false,
+      thirdPartyDisclosureRightsVerified: false,
+      tableCount: 92,
+      sourceClassCount: 19,
+      scopeFingerprintSha256: "a".repeat(64),
+    });
+    verifiedRead.mockImplementationOnce(async () => {
+      // Simulate a real committed owner-bound count or ABA-epoch mutation
+      // while the private archive is being verified.
+      scopeCheck.mockResolvedValueOnce({
+        status: "known-relational-source-scope-unapproved",
+        releaseDecision: "NO_GO",
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+        sourceRightsVerified: false,
+        thirdPartyDisclosureRightsVerified: false,
+        tableCount: 92,
+        sourceClassCount: 19,
+        scopeFingerprintSha256: "b".repeat(64),
+      });
+      return {
+        sha256: original.sha256,
+        byteLength: original.byteLength,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+      };
+    });
+    expect(await signHistoricalUserPartialObservation(f)).toBeNull();
+    expect(scopeCheck).toHaveBeenCalledTimes(2);
+    expect(verifiedRead).toHaveBeenCalledOnce();
+  });
+
+  it("denies a failed second source read even after the reserved private ZIP read succeeds", async () => {
+    const f = fixture();
+    scopeCheck.mockResolvedValueOnce({
+      status: "known-relational-source-scope-unapproved",
+      releaseDecision: "NO_GO",
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      sourceRightsVerified: false,
+      thirdPartyDisclosureRightsVerified: false,
+      tableCount: 92,
+      sourceClassCount: 19,
+      scopeFingerprintSha256: "a".repeat(64),
+    });
+    scopeCheck.mockResolvedValueOnce(null);
+    expect(await signHistoricalUserPartialObservation(f)).toBeNull();
+    expect(verifiedRead).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the frozen original USER in both scopes when caller mutates identity during ZIP verification", async () => {
+    const f = fixture();
+    const original = f.binding.verifiedGitHubUserId;
+    verifiedRead.mockImplementationOnce(async () => {
+      f.binding.verifiedGitHubUserId++;
+      return {
+        sha256: f.binding.sha256,
+        byteLength: f.binding.byteLength,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+      };
+    });
+    const signed = await signHistoricalUserPartialObservation(f);
+    expect(signed?.verifiedGitHubUserId).toBe(original);
+    expect(scopeCheck).toHaveBeenCalledTimes(2);
+    for (const call of scopeCheck.mock.calls) {
+      expect(call[1]).toEqual({ exportId: f.binding.exportId, verifiedGitHubUserId: original });
+    }
+  });
 
   it("does not sign when unified source snapshot inspection throws", async () => {
     const f = fixture();

@@ -165,6 +165,17 @@ the original bytes and source counts return to their previous state.
 The counter is not a physical-object integrity lease and does not track
 every hardware class; the v2 internal scope digest domain was changed
 to prevent confusing the earlier count-only fingerprint with this one.
+**Internal partial signer pre/post source-scope guard:** Before initiating
+any reserved physical ZIP read, the original numeric USER source scope is
+checked using a fresh read-only repeatable-read PostgreSQL snapshot; after
+the full private ZIP read, original preflight revalidation and durable
+reader release, the scope is checked again under a second read-only snapshot.
+A changed catalog, bounded hardware count, or already tracked mutation
+epoch during that verification denies the signature even when the ZIP SHA
+and length are unchanged. Failure to read either scope also denies the
+observation; it does not publish a capability or deliver archive bytes.
+These are **two independent database snapshots**, NOT one atomic DB/FS
+commitment or a guarantee against mutations after the final check.
 **Untracked hardware row edits, unlinkable legacy rows, cross-DB/FS races and
 third-party rights remain unproven; a live digest match is NOT archival
 completeness or customer delivery authorization.**
