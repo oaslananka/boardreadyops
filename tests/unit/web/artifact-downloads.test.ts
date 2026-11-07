@@ -155,6 +155,24 @@ describe("local artifact containment", () => {
     });
   });
 
+  it("never exposes the private ZIP directory via normal artifact paths or symlink aliases", async () => {
+    const root = await temporaryDirectory("boardreadyops-private-artifact-guard-");
+    const privateRoot = path.join(root, ".private-export-archives");
+    await mkdir(privateRoot, { mode: 0o700 });
+    await writeFile(path.join(privateRoot, "private.zip"), "protected");
+    expect(safeLocalArtifactPath(root, ".private-export-archives/private.zip")).toBeUndefined();
+    expect(safeLocalArtifactPath(root, path.join(privateRoot, "private.zip"))).toBeUndefined();
+    await expect(resolveLocalArtifactFile(root, ".private-export-archives/private.zip")).resolves.toEqual({
+      state: "outside-root",
+    });
+    if (process.platform !== "win32") {
+      await symlink(privateRoot, path.join(root, "alias"), "dir");
+      await expect(resolveLocalArtifactFile(root, "alias/private.zip")).resolves.toEqual({
+        state: "outside-root",
+      });
+    }
+  });
+
   it.skipIf(process.platform === "win32")("rejects a symlink that escapes the storage root", async () => {
     const parent = await temporaryDirectory("boardreadyops-artifact-links-");
     const root = path.join(parent, "root");

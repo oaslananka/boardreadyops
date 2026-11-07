@@ -123,10 +123,10 @@ describe("internal claim-bound local archive assembly", () => {
   it("builds an independently verifiable ZIP only after snapshot and repeated live claim checks", async () => {
     const f = await fixture();
     const result = await prepareClaimedLocalArchiveZip(f.input);
-    expect(result?.files).toBe(8);
+    expect(result?.files).toBe(9);
     expect(result?.sha256).toBe(sha(result?.bytes ?? Buffer.alloc(0)));
     const extracted = sanitizeAndExtractArchive(result?.bytes ?? Buffer.alloc(0));
-    expect(extracted.fileCount).toBe(8);
+    expect(extracted.fileCount).toBe(9);
     expect(extracted.files.find(({ path: name }) => name === "objects/artifact-1.bin")?.data).toEqual(f.bytes);
     expect(JSON.stringify(extracted.files.map(({ path: name }) => name))).not.toContain(f.row.storage_path);
     expect(f.withTransaction).toHaveBeenCalledTimes(1);
@@ -150,7 +150,7 @@ describe("internal claim-bound local archive assembly", () => {
   it("works for metadata-only snapshots while revalidating the empty export's claim", async () => {
     const f = await fixture({ artifacts: false });
     const result = await prepareClaimedLocalArchiveZip(f.input);
-    expect(result?.files).toBe(7);
+    expect(result?.files).toBe(8);
     expect(f.query).toHaveBeenCalledTimes(2);
   });
 

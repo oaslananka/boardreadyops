@@ -96,7 +96,7 @@ async function resolveArtifactObject(
 }
 
 function assertInsideStorageRoot(root: string, candidate: string, message: string): void {
-  if (!isInside(root, candidate)) {
+  if (!isInside(root, candidate) || !safeLocalArtifactPath(root, candidate)) {
     throw new ArtifactObjectDeletionError(message, { retryable: false, beforeUnlink: true });
   }
 }

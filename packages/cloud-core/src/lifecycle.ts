@@ -24,6 +24,8 @@ export type GitHubInstallationRef = {
   id: number;
   accountLogin?: string;
   accountType?: string;
+  /** Immutable GitHub account id from the signed installation webhook, if present. */
+  accountUserId?: number;
 };
 
 export type PullRequestSafeModeReason = "draft-pull-request" | "fork-pull-request" | "private-repository";
@@ -209,6 +211,10 @@ function installationFromPayload(payload: Record<string, unknown>): GitHubInstal
   if (isRecord(account)) {
     const accountLogin = stringValue(account, "login");
     const accountType = stringValue(account, "type");
+    const accountUserId = numberValue(account, "id");
+    if (accountUserId !== undefined && Number.isSafeInteger(accountUserId) && accountUserId > 0) {
+      result.accountUserId = accountUserId;
+    }
 
     if (accountLogin) {
       result.accountLogin = accountLogin;

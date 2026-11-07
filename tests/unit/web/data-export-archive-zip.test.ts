@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { ExportArchivePreflightError } from "../../../apps/web/lib/data-export-archive-entries.js";
+import { verifyClaimedExportArchiveIntegrity } from "../../../apps/web/lib/data-export-archive-integrity.js";
 import { prepareClaimedArchiveZip } from "../../../apps/web/lib/data-export-archive-zip.js";
 import { sanitizeAndExtractArchive } from "../../../packages/cloud-core/src/archive-sanitizer.js";
+import { createZipBuffer } from "../../../src/util/zip.js";
 
 type ZipInput = Parameters<typeof prepareClaimedArchiveZip>[0];
 const sha256 = (value: Buffer): string => createHash("sha256").update(value).digest("hex");
@@ -71,9 +73,9 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
     expect(first).toEqual(second);
     expect(first.sha256).toBe(sha256(first.bytes));
     expect(first.byteLength).toBe(first.bytes.length);
-    expect(first.files).toBe(8);
+    expect(first.files).toBe(9);
     const result = sanitizeAndExtractArchive(first.bytes);
-    expect(result.fileCount).toBe(8);
+    expect(result.fileCount).toBe(9);
     const files = new Map(result.files.map(({ path, data }) => [path, data]));
     expect(files.get("objects/artifact_1.bin")).toEqual(bytes);
     expect(JSON.parse(files.get("metadata/repositories.json")?.toString("utf8") ?? "{}")).toEqual({
@@ -82,7 +84,34 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
       coverage: "selected-installation-repositories-only",
       repositories: [{ repositoryId: "repo_1" }],
     });
-    expect([...files.keys()].filter((name) => name.startsWith("metadata/"))).toHaveLength(7);
+    expect([...files.keys()].filter((name) => name.startsWith("metadata/"))).toHaveLength(8);
+    const receipt = JSON.parse(files.get("metadata/archive-integrity.json")?.toString("utf8") ?? "{}") as {
+      kind?: string;
+      formatVersion?: number;
+      exportId?: string;
+      scope?: string;
+      excludes?: string[];
+      entries?: Array<{ path: string; byteLength: number; sha256: string }>;
+    };
+    expect(receipt).toMatchObject({
+      kind: "boardreadyops.claimed-export-integrity-receipt",
+      formatVersion: 1,
+      exportId: "export-1",
+      scope: "bounded-platform-data-only",
+      excludes: ["github-repository-source", "github-actions-logs-and-artifacts"],
+    });
+    const entries = receipt.entries ?? [];
+    expect(entries).toHaveLength(8);
+    expect(entries.map((entry) => entry.path)).toEqual(
+      [...files.keys()].filter((p) => p !== "metadata/archive-integrity.json").sort(),
+    );
+    for (const entry of entries) {
+      const data = files.get(entry.path);
+      expect(data).toBeDefined();
+      expect(entry.byteLength).toBe(data?.length);
+      expect(entry.sha256).toBe(sha256(data ?? Buffer.alloc(0)));
+    }
+    expect(JSON.stringify(receipt)).not.toContain(artifact.storagePath);
     expect([...files.keys()].every((path) => !path.includes("..") && !path.includes("\\"))).toBe(true);
     expect(JSON.stringify([...files.keys()])).not.toContain(artifact.storagePath);
   });
@@ -104,7 +133,7 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
     const extractedObject = extracted.files.find((file) => file.path === "objects/artifact_1.bin")?.data;
     expect(extractedObject?.length).toBe(bytes.length);
     expect(sha256(extractedObject ?? Buffer.alloc(0))).toBe(sha);
-    expect(result.files).toBe(8);
+    expect(result.files).toBe(9);
   }, 30_000);
 
   it("can assemble a metadata-only ZIP without inventing artifact content", () => {
@@ -115,9 +144,110 @@ describe("bounded, internal claim-scoped ZIP packaging", () => {
     });
     input.verifiedObjects = [];
     const prepared = prepareClaimedArchiveZip(input);
-    expect(prepared.files).toBe(7);
+    expect(prepared.files).toBe(8);
     const extracted = sanitizeAndExtractArchive(prepared.bytes);
     expect(extracted.files.every(({ path }) => path.startsWith("metadata/"))).toBe(true);
+    const receipt = extracted.files.find(({ path }) => path === "metadata/archive-integrity.json");
+    const listed = JSON.parse(receipt?.data.toString("utf8") ?? "{}") as { entries?: Array<{ path: string }> };
+    expect(listed.entries?.length).toBe(7);
+    expect(listed.entries?.every(({ path }) => path.startsWith("metadata/"))).toBe(true);
+  });
+
+  it("verifies a complete archive only against an independently trusted ZIP digest and export ID", () => {
+    const { input } = fixture();
+    const result = prepareClaimedArchiveZip(input);
+    expect(verifyClaimedExportArchiveIntegrity(result.bytes, result.sha256, "export-1")).toBe(true);
+    expect(verifyClaimedExportArchiveIntegrity(result.bytes, "0".repeat(64), "export-1")).toBe(false);
+    expect(verifyClaimedExportArchiveIntegrity(result.bytes, result.sha256, "other-export")).toBe(false);
+    expect(verifyClaimedExportArchiveIntegrity(result.bytes.subarray(0, -1), result.sha256, "export-1")).toBe(false);
+
+    input.verifiedObjects = [];
+    input.slices.artifactMetadata = slice({
+      ...JSON.parse(input.slices.artifactMetadata.bytes.toString("utf8")),
+      artifacts: [],
+    });
+    const metadataOnly = prepareClaimedArchiveZip(input);
+    expect(verifyClaimedExportArchiveIntegrity(metadataOnly.bytes, metadataOnly.sha256, "export-1")).toBe(true);
+  });
+
+  it("rejects forged ZIP entries even when the caller supplies a digest of the forged ZIP", () => {
+    const { input } = fixture();
+    const original = prepareClaimedArchiveZip(input);
+    const files = sanitizeAndExtractArchive(original.bytes).files;
+    const repack = (list: Array<{ path: string; data: Buffer }>) => {
+      const bytes = createZipBuffer(list.map(({ path, data }) => ({ name: path, data })));
+      return verifyClaimedExportArchiveIntegrity(bytes, sha256(bytes), "export-1");
+    };
+    const originalFiles = files.map((f) => ({ path: f.path, data: f.data }));
+    expect(repack(originalFiles)).toBe(true);
+
+    const replaced = originalFiles.map((file) =>
+      file.path === "objects/artifact_1.bin" ? { ...file, data: Buffer.from("changed artifact") } : file,
+    );
+    expect(repack(replaced)).toBe(false);
+    expect(repack(originalFiles.filter((file) => file.path !== "objects/artifact_1.bin"))).toBe(false);
+    expect(repack([...originalFiles, { path: "metadata/unlisted.json", data: Buffer.from("{}") }])).toBe(false);
+    expect(repack([...originalFiles, originalFiles[0]])).toBe(false);
+
+    const receipt = originalFiles.find((file) => file.path === "metadata/archive-integrity.json");
+    expect(receipt).toBeDefined();
+    const changedReceipt = originalFiles.map((file) =>
+      file.path === "metadata/archive-integrity.json"
+        ? {
+            ...file,
+            data: Buffer.from(
+              JSON.stringify({
+                ...JSON.parse(file.data.toString("utf8")),
+                exportId: "other-export",
+              }),
+            ),
+          }
+        : file,
+    );
+    expect(repack(changedReceipt)).toBe(false);
+  });
+
+  it("rejects forged receipt envelopes and entry claims with a newly hashed outer ZIP", () => {
+    const original = prepareClaimedArchiveZip(fixture().input);
+    const files = sanitizeAndExtractArchive(original.bytes).files;
+    const receiptPath = "metadata/archive-integrity.json";
+    const receiptBytes = files.find(({ path }) => path === receiptPath)?.data;
+    expect(receiptBytes).toBeDefined();
+    const receipt = JSON.parse(receiptBytes?.toString("utf8") ?? "{}") as {
+      kind: string;
+      formatVersion: number;
+      scope: string;
+      excludes: string[];
+      entries: Array<{ path: string; sha256: string; byteLength: number }>;
+    };
+    const repack = (claim: unknown) => {
+      const bytes = createZipBuffer(
+        files.map(({ path, data }) => ({
+          name: path,
+          data: path === receiptPath ? Buffer.from(JSON.stringify(claim)) : data,
+        })),
+      );
+      return verifyClaimedExportArchiveIntegrity(bytes, sha256(bytes), "export-1");
+    };
+    expect(repack(receipt)).toBe(true);
+    const first = receipt.entries[0];
+    expect(first).toBeDefined();
+    const forged = [
+      null,
+      [],
+      { ...receipt, kind: "untrusted-archive" },
+      { ...receipt, formatVersion: 2 },
+      { ...receipt, scope: "full-user-data" },
+      { ...receipt, excludes: ["github-repository-source"] },
+      { ...receipt, excludes: [...receipt.excludes].reverse() },
+      { ...receipt, entries: null },
+      { ...receipt, entries: receipt.entries.slice(1) },
+      { ...receipt, entries: [null, ...receipt.entries.slice(1)] },
+      { ...receipt, entries: [{ ...first, path: "objects/renamed.bin" }, ...receipt.entries.slice(1)] },
+      { ...receipt, entries: [{ ...first, byteLength: -1 }, ...receipt.entries.slice(1)] },
+      { ...receipt, entries: [{ ...first, sha256: "0".repeat(64) }, ...receipt.entries.slice(1)] },
+    ];
+    for (const claim of forged) expect(repack(claim)).toBe(false);
   });
 
   it("rejects modified artifact bytes and out-of-scope run references before producing ZIP", () => {

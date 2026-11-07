@@ -16,6 +16,16 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./data-export-historical-uuid": {
+      "types": "./src/data-export-historical-uuid.ts",
+      "import": "./src/data-export-historical-uuid.ts",
+      "default": "./src/data-export-historical-uuid.ts"
+    },
+    "./data-export-historical-object-authorization": {
+      "types": "./src/data-export-historical-object-authorization.ts",
+      "import": "./src/data-export-historical-object-authorization.ts",
+      "default": "./src/data-export-historical-object-authorization.ts"
+    },
     "./data-export-object-authorization": {
       "types": "./src/data-export-object-authorization.ts",
       "import": "./src/data-export-object-authorization.ts",
