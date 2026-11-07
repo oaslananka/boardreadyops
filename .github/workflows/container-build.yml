@@ -82,14 +82,19 @@ jobs:
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
         run: |
           set -euo pipefail
+          # Registry metadata may precede tarball availability on npm's CDN.
+          # Require real package bytes; the first-party exact release is newer
+          # than the repo's 7-day dependency age policy, so exempt only this probe.
+          pack_dir="$(mktemp -d)"
+          trap 'rm -rf "${pack_dir}"' EXIT
           for attempt in {1..30}; do
-            if npm view "boardreadyops@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            if npm pack --min-release-age=0 --ignore-scripts --silent --pack-destination "${pack_dir}" "boardreadyops@${PACKAGE_VERSION}" >/dev/null 2>&1; then
               exit 0
             fi
-            echo "boardreadyops@${PACKAGE_VERSION} is not available on npm yet; retry ${attempt}/30"
+            echo "boardreadyops@${PACKAGE_VERSION} tarball is not downloadable yet; retry ${attempt}/30"
             sleep 10
           done
-          echo "::error::boardreadyops@${PACKAGE_VERSION} is not available on npm yet"
+          echo "::error::boardreadyops@${PACKAGE_VERSION} tarball is still unavailable after bounded retries"
           exit 1
       - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
       - name: Build local smoke image
@@ -156,14 +161,19 @@ jobs:
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
         run: |
           set -euo pipefail
+          # Registry metadata may precede tarball availability on npm's CDN.
+          # Require real package bytes; the first-party exact release is newer
+          # than the repo's 7-day dependency age policy, so exempt only this probe.
+          pack_dir="$(mktemp -d)"
+          trap 'rm -rf "${pack_dir}"' EXIT
           for attempt in {1..30}; do
-            if npm view "boardreadyops@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            if npm pack --min-release-age=0 --ignore-scripts --silent --pack-destination "${pack_dir}" "boardreadyops@${PACKAGE_VERSION}" >/dev/null 2>&1; then
               exit 0
             fi
-            echo "boardreadyops@${PACKAGE_VERSION} is not available on npm yet; retry ${attempt}/30"
+            echo "boardreadyops@${PACKAGE_VERSION} tarball is not downloadable yet; retry ${attempt}/30"
             sleep 10
           done
-          echo "::error::boardreadyops@${PACKAGE_VERSION} is not available on npm yet"
+          echo "::error::boardreadyops@${PACKAGE_VERSION} tarball is still unavailable after bounded retries"
           exit 1
       - id: image-tags
         name: Resolve image tags
