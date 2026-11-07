@@ -162,8 +162,12 @@ describe("container action release surfaces", () => {
   it("waits for npm package availability before publishing the container", async () => {
     const workflow = await readFile(".github/workflows/container-build.yml", "utf8");
 
-    expect(workflow).toContain("Wait for npm package availability");
-    expect(workflow).toContain(`npm view "boardreadyops@${shellVariable("PACKAGE_VERSION")}" version`);
+    expect(workflow.match(/Wait for npm package availability/g)).toHaveLength(2);
+    expect(workflow.match(/npm pack --min-release-age=0 --ignore-scripts --silent --pack-destination/g)).toHaveLength(
+      2,
+    );
+    expect(workflow).toContain(`"boardreadyops@${shellVariable("PACKAGE_VERSION")}"`);
+    expect(workflow).not.toContain(`npm view "boardreadyops@${shellVariable("PACKAGE_VERSION")}" version`);
   });
 
   it("uses the published package version for pull request smoke builds", async () => {
