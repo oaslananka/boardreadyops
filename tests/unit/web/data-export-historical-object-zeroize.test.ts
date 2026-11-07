@@ -26,7 +26,7 @@ function testFixture({
     retention_until: new Date(Date.now() + 86400000),
   };
   let lookups = 0;
-  const query = vi.fn(async (sql: string) => {
+  const query = vi.fn(async (sql: string, _args?: unknown[]) => {
     if (sql.includes("SELECT a.id")) {
       lookups++;
       if (afterThrows && lookups === 3) throw new Error("Final PostgreSQL lookup failed");
@@ -40,15 +40,15 @@ function testFixture({
     throw new Error("Unexpected SQL in private object fixture");
   });
   vi.mocked(readVerifiedLocalExportObject).mockResolvedValue(privateBytes);
-  const read = () =>
-    readVerifiedHistoricalUserLocalObject({
-      db: { query } as never,
-      authority,
-      artifactId,
-      storageRoot: "/private-test-root",
-      storageDriver: "local",
-    });
-  return { read, query, privateBytes };
+  const input = {
+    db: { query } as never,
+    authority,
+    artifactId,
+    storageRoot: "/private-test-root",
+    storageDriver: "local",
+  };
+  const read = () => readVerifiedHistoricalUserLocalObject(input);
+  return { read, query, privateBytes, input, authority, artifactId };
 }
 
 describe("original USER physical object transient memory", () => {
@@ -75,6 +75,63 @@ describe("original USER physical object transient memory", () => {
     const fixture = testFixture({ releaseThrows: true });
     await expect(fixture.read()).rejects.toThrow("PostgreSQL reservation settlement failed");
     expect(fixture.privateBytes.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("never rebinds original numeric USER, export, artifact or storage root while the physical read is in flight", async () => {
+    const fixture = testFixture();
+    const originalExport = fixture.authority.exportId;
+    const originalUser = fixture.authority.verifiedGitHubUserId;
+    const originalArtifact = fixture.artifactId;
+    const originalDb = fixture.input.db;
+    vi.mocked(readVerifiedLocalExportObject).mockImplementationOnce(async (params) => {
+      expect(params.storageRoot).toBe("/private-test-root");
+      expect(params.object.artifactId).toBe(originalArtifact);
+      fixture.authority.exportId = randomUUID();
+      fixture.authority.verifiedGitHubUserId = originalUser + 1;
+      fixture.input.artifactId = randomUUID();
+      fixture.input.storageRoot = "/forged-tenant-root";
+      fixture.input.db = { query: vi.fn().mockRejectedValue(new Error("Caller-swapped DB connection")) } as never;
+      return fixture.privateBytes;
+    });
+    const result = await fixture.read();
+    expect(result?.exportId).toBe(originalExport);
+    expect(result?.artifactId).toBe(originalArtifact);
+    expect(result?.bytes).toBe(fixture.privateBytes);
+    expect(originalDb).not.toBe(fixture.input.db);
+    const originalUserQueries = fixture.query.mock.calls.filter(([sql]) => sql.includes("SELECT a.id"));
+    expect(originalUserQueries).toHaveLength(3);
+    for (const [_sql, args] of originalUserQueries) {
+      expect(args).toEqual([originalExport, originalUser, originalArtifact]);
+    }
+    const settlement = fixture.query.mock.calls.find(([sql]) =>
+      sql.includes("boardreadyops_finish_export_object_copy"),
+    );
+    expect(settlement?.[1]?.[0]).toBe(originalExport);
+  });
+
+  it("pins the local storage root and account before the FIRST asynchronous object lookup", async () => {
+    const fixture = testFixture();
+    const originalExport = fixture.authority.exportId;
+    const originalUser = fixture.authority.verifiedGitHubUserId;
+    const originalArtifact = fixture.artifactId;
+    const originalQuery = fixture.query.getMockImplementation();
+    expect(originalQuery).toBeDefined();
+    fixture.query.mockImplementationOnce(async (sql, args) => {
+      fixture.authority.exportId = randomUUID();
+      fixture.authority.verifiedGitHubUserId = originalUser + 2;
+      fixture.input.artifactId = randomUUID();
+      fixture.input.storageRoot = "/swapped-root";
+      if (!originalQuery) throw new Error("Test fixture DB query unavailable");
+      return await originalQuery(sql, args);
+    });
+    await fixture.read();
+    expect(readVerifiedLocalExportObject).toHaveBeenCalledWith(
+      expect.objectContaining({ storageRoot: "/private-test-root" }),
+    );
+    for (const [sql, args] of fixture.query.mock.calls.filter(([sql]) => sql.includes("SELECT a.id"))) {
+      expect(sql).toContain("SELECT a.id");
+      expect(args).toEqual([originalExport, originalUser, originalArtifact]);
+    }
   });
 
   it("preserves caller-owned private bytes only after verified and settled read", async () => {

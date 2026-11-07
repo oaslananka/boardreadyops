@@ -48,12 +48,24 @@ export async function verifyReservedHistoricalUserPrivatePartial(input: {
     sha256: input.sha256,
     byteLength: input.byteLength,
   };
-  const reservation = await reserveHistoricalUserPrivatePartialRead(input.db, binding);
+  // Every downstream DB/ZIP operation must use this SAME frozen original
+  // numeric USER and exact export binding, not the caller's mutable object.
+  const authority = { exportId: binding.exportId, verifiedGitHubUserId: binding.verifiedGitHubUserId };
+  const db = input.db;
+  const archiveRoot = input.archiveRoot;
+  let reservation: Awaited<ReturnType<typeof reserveHistoricalUserPrivatePartialRead>>;
+  try {
+    reservation = await reserveHistoricalUserPrivatePartialRead(db, binding);
+  } catch {
+    // Do not disclose database/provider exceptions or attempt file IO when
+    // no committed reservation is known to exist.
+    return null;
+  }
   if (!reservation) return null;
   let current = false;
   try {
     const bytes = await readSealedHistoricalUserPartial({
-      archiveRoot: input.archiveRoot,
+      archiveRoot,
       exportId: binding.exportId,
       sha256: binding.sha256,
       byteLength: binding.byteLength,
@@ -62,8 +74,8 @@ export async function verifyReservedHistoricalUserPrivatePartial(input: {
       try {
         current =
           (await inspectVerifiedHistoricalUserPrivateArchivePreflight({
-            db: input.db,
-            authority: input.authority,
+            db,
+            authority,
             id: binding.preflightId,
             archiveBytes: bytes,
           })) === "current";
@@ -74,11 +86,18 @@ export async function verifyReservedHistoricalUserPrivatePartial(input: {
   } catch {
     current = false;
   }
-  // An unresolved release means the failed read remains a durable blocker.
-  const settled = await releaseHistoricalUserPrivatePartialRead(input.db, {
-    ...binding,
-    token: reservation.token,
-  });
+  // A thrown or unacknowledged release must NOT leak provider details or
+  // yield a private receipt. The durable unresolved reservation continues
+  // blocking cooperative cleanup, including cross-worker deletion.
+  let settled = false;
+  try {
+    settled = await releaseHistoricalUserPrivatePartialRead(db, {
+      ...binding,
+      token: reservation.token,
+    });
+  } catch {
+    return null;
+  }
   if (!current || !settled) return null;
   return {
     sha256: binding.sha256,

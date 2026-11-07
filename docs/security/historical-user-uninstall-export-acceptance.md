@@ -63,7 +63,16 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   an unsuccessful close. The higher-level SOURCE-ONLY reserved reader
   returns no receipt without its committed reader reservation,
   independent original USER preflight revalidation, successful
-  zeroization and durable reservation release. This is still NOT
+  zeroization and durable reservation release. The original numeric
+  USER/export/preflight/ZIP identifiers and trusted local archive root
+  are frozen before asynchronous reservation, physical read and
+  preflight checks: caller mutation cannot retarget one phase to a
+  different identity or physical root. Both a false release and an
+  exception from the release provider deny the private receipt. The
+  original USER artifact file reader similarly pins the original
+  user/export/artifact and trusted local storage root before the first
+  asynchronous lookup; a failed durable object release already throws,
+  wiping transient private bytes before any return. This is still NOT
   customer streaming. A separate
   private orchestration path
   performs a SECOND original numeric USER DB and physical object/

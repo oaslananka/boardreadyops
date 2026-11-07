@@ -85,6 +85,79 @@ describe("historical private ZIP reservation/read/settlement lifecycle", () => {
     expect(order).toEqual(["reserve", "disk-read", "revalidated", "release"]);
   });
 
+  it("pins original numeric USER, export and private root across an asynchronous reservation", async () => {
+    const { archiveBytes, input, token } = fixture();
+    const originalDb = input.db;
+    const expected = {
+      exportId: input.authority.exportId,
+      verifiedGitHubUserId: input.authority.verifiedGitHubUserId,
+      preflightId: input.preflightId,
+      sha256: input.sha256,
+      byteLength: input.byteLength,
+      archiveRoot: input.archiveRoot,
+    };
+    reserve.mockImplementationOnce(async (_db, binding) => {
+      expect(binding).toEqual({
+        exportId: expected.exportId,
+        verifiedGitHubUserId: expected.verifiedGitHubUserId,
+        preflightId: expected.preflightId,
+        sha256: expected.sha256,
+        byteLength: expected.byteLength,
+      });
+      input.authority.exportId = randomUUID();
+      input.authority.verifiedGitHubUserId += 1;
+      input.preflightId = randomUUID();
+      input.sha256 = "b".repeat(64);
+      input.byteLength++;
+      input.archiveRoot = "/another-tenant-private-root";
+      input.db = { withTransaction: vi.fn(), query: vi.fn().mockRejectedValue(new Error("Swapped database")) } as never;
+      return { token };
+    });
+    read.mockResolvedValueOnce(archiveBytes);
+    inspect.mockResolvedValueOnce("current");
+    release.mockResolvedValueOnce(true);
+    const receipt = await verifyReservedHistoricalUserPrivatePartial(input);
+    expect(receipt).toEqual({
+      sha256: expected.sha256,
+      byteLength: expected.byteLength,
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+    });
+    expect(read).toHaveBeenCalledWith({
+      archiveRoot: expected.archiveRoot,
+      exportId: expected.exportId,
+      sha256: expected.sha256,
+      byteLength: expected.byteLength,
+    });
+    expect(inspect).toHaveBeenCalledWith({
+      db: originalDb,
+      authority: {
+        exportId: expected.exportId,
+        verifiedGitHubUserId: expected.verifiedGitHubUserId,
+      },
+      id: expected.preflightId,
+      archiveBytes,
+    });
+    expect(release).toHaveBeenCalledWith(originalDb, {
+      exportId: expected.exportId,
+      verifiedGitHubUserId: expected.verifiedGitHubUserId,
+      preflightId: expected.preflightId,
+      sha256: expected.sha256,
+      byteLength: expected.byteLength,
+      token,
+    });
+    expect(archiveBytes.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("rejects reservation provider exceptions before any ZIP IO or preflight", async () => {
+    const { input } = fixture();
+    reserve.mockRejectedValueOnce(new Error("Original-user reservation backend unavailable"));
+    expect(await verifyReservedHistoricalUserPrivatePartial(input)).toBeNull();
+    expect(read).not.toHaveBeenCalled();
+    expect(inspect).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+  });
+
   it("settles its reservation when the private ZIP cannot be read", async () => {
     const { input, token } = fixture();
     reserve.mockResolvedValueOnce({ token });
@@ -123,6 +196,17 @@ describe("historical private ZIP reservation/read/settlement lifecycle", () => {
     read.mockResolvedValueOnce(archiveBytes);
     inspect.mockResolvedValueOnce("current");
     release.mockResolvedValueOnce(false);
+    expect(await verifyReservedHistoricalUserPrivatePartial(input)).toBeNull();
+    expect(archiveBytes.every((byte) => byte === 0)).toBe(true);
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("returns no receipt if durable release THROWS after complete private verification", async () => {
+    const { archiveBytes, input, token } = fixture();
+    reserve.mockResolvedValueOnce({ token });
+    read.mockResolvedValueOnce(archiveBytes);
+    inspect.mockResolvedValueOnce("current");
+    release.mockRejectedValueOnce(new Error("Provider settlement failed with private diagnostic details"));
     expect(await verifyReservedHistoricalUserPrivatePartial(input)).toBeNull();
     expect(archiveBytes.every((byte) => byte === 0)).toBe(true);
     expect(release).toHaveBeenCalledOnce();
