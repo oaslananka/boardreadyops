@@ -19,6 +19,9 @@ describeDb("disposable PG17: historical original USER full-source schema drift g
         customerDeliveryAllowed: false,
         tableCount: 92,
         columnCount: 1033,
+        mutationEpochTriggerCount: 13,
+        mutationEpochFunctionCount: 6,
+        mutationEpochSha256: "559ec18ed5083fc41bb4aebdf94e840fd59baf44705227b9975fa6a6d570a9a5",
         partialPrivateMetadataTableCount: 13,
         withheldSensitiveTableCount: 16,
         otherTablesRequiringScopeReview: 63,
@@ -32,6 +35,82 @@ describeDb("disposable PG17: historical original USER full-source schema drift g
         unrecognizedTableCount: 0,
         schemaSha256: "45d6db6d25b6e61a0950333a5f9d81b17e2895c21736688b08cc00d49b3dfe63",
       });
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("detects a disabled original-user ABA trigger inside a rolled-back transaction", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL is required");
+    const db = createPgQueryExecutor({ connectionString });
+    const rollback = new Error("Disabled mutation trigger probe rollback");
+    try {
+      await expect(
+        db.withTransaction(async (tx) => {
+          await tx.query("ALTER TABLE public.run_snapshots DISABLE TRIGGER boardreadyops_historical_visual_epoch");
+          const changed = await assessHistoricalUserSchemaCoverage({
+            async withTransaction<T>(
+              work: (connection: typeof tx) => Promise<T>,
+              options?: { consistentRead?: true; statementTimeoutMs?: number },
+            ): Promise<T> {
+              if (options?.consistentRead !== true || options.statementTimeoutMs !== 5000)
+                throw new Error("Must remain consistent");
+              return work(tx);
+            },
+          } as never);
+          expect(changed).toMatchObject({
+            status: "schema_drift",
+            mutationEpochTriggerCount: 13,
+            mutationEpochFunctionCount: 6,
+            completeCustomerExport: false,
+            customerDeliveryAllowed: false,
+            releaseDecision: "NO_GO",
+          });
+          expect(changed.mutationEpochSha256).not.toBe(
+            "559ec18ed5083fc41bb4aebdf94e840fd59baf44705227b9975fa6a6d570a9a5",
+          );
+          throw rollback;
+        }),
+      ).rejects.toBe(rollback);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("detects a modified mutation-epoch function body inside a rolled-back transaction", async () => {
+    if (!connectionString) throw new Error("Disposable PostgreSQL is required");
+    const db = createPgQueryExecutor({ connectionString });
+    const rollback = new Error("Mutation function probe rollback");
+    try {
+      await expect(
+        db.withTransaction(async (tx) => {
+          await tx.query(
+            "CREATE OR REPLACE FUNCTION public.boardreadyops_note_historical_audit_epoch() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,public AS $$ BEGIN RETURN NULL; END; $$",
+          );
+          const changed = await assessHistoricalUserSchemaCoverage({
+            async withTransaction<T>(
+              work: (connection: typeof tx) => Promise<T>,
+              options?: { consistentRead?: true; statementTimeoutMs?: number },
+            ): Promise<T> {
+              if (options?.consistentRead !== true || options.statementTimeoutMs !== 5000)
+                throw new Error("Must remain consistent");
+              return work(tx);
+            },
+          } as never);
+          expect(changed).toMatchObject({
+            status: "schema_drift",
+            mutationEpochTriggerCount: 13,
+            mutationEpochFunctionCount: 6,
+            completeCustomerExport: false,
+            customerDeliveryAllowed: false,
+            releaseDecision: "NO_GO",
+          });
+          expect(changed.mutationEpochSha256).not.toBe(
+            "559ec18ed5083fc41bb4aebdf94e840fd59baf44705227b9975fa6a6d570a9a5",
+          );
+          throw rollback;
+        }),
+      ).rejects.toBe(rollback);
     } finally {
       await db.close();
     }

@@ -12,8 +12,12 @@ const column = (
   is_nullable: "YES" | "NO" = "NO",
 ) => ({ table_name, column_name, data_type, is_nullable });
 
-function adapter(rows: unknown) {
-  const query = vi.fn(async (_sql: string) => ({ rows }));
+function adapter(rows: unknown, mutationEpochTriggers: unknown[] = [], mutationEpochFunctions: unknown[] = []) {
+  const query = vi.fn(async (sql: string) => {
+    if (sql.includes("pg_catalog.pg_trigger")) return { rows: mutationEpochTriggers };
+    if (sql.includes("pg_catalog.pg_proc")) return { rows: mutationEpochFunctions };
+    return { rows };
+  });
   const withTransaction = vi.fn(async (fn: (tx: { query: typeof query }) => Promise<unknown>) => fn({ query }));
   return { query, withTransaction, db: { withTransaction } as never };
 }
@@ -45,6 +49,24 @@ describe("original numeric USER source schema coverage must never grant customer
       customerDeliveryAllowed: false,
       releaseDecision: "NO_GO",
     });
+  });
+
+  it("fails closed when any original-user mutation-epoch trigger or function is absent", async () => {
+    const fake = adapter([column("repositories"), column("release_runs")]);
+    const result = await assessHistoricalUserSchemaCoverage(fake.db);
+    expect(result).toMatchObject({
+      status: "schema_drift",
+      mutationEpochTriggerCount: 0,
+      mutationEpochFunctionCount: 0,
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      releaseDecision: "NO_GO",
+    });
+    expect(result.mutationEpochSha256).toMatch(/^[0-9a-f]{64}$/u);
+    const queries = fake.query.mock.calls.map(([sql]) => sql);
+    expect(queries.some((sql) => sql.includes("pg_catalog.pg_trigger"))).toBe(true);
+    expect(queries.some((sql) => sql.includes("pg_get_triggerdef"))).toBe(true);
+    expect(queries.some((sql) => sql.includes("pg_get_functiondef"))).toBe(true);
   });
 
   it("reports a newly added source table as schema drift, not customer completeness", async () => {

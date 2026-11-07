@@ -356,7 +356,22 @@ Ambiguous original USER share authority, actor, workspace, digests,
 deleted references and cross-tenant linkage fail closed. No source
 payloads, consent/third-party disclosure rights, guaranteed coverage
 of disconnected legacy rows, customer ZIP eligibility or complete
-snapshot are implied. A newly
+snapshot are implied.
+
+The same read-only repeatable-read catalog audit now also fingerprints
+the exact **13 enabled original-user mutation-epoch triggers** and their
+**six SECURITY INVOKER function definitions/configurations**. This matters
+because the partial source receipt relies on these triggers to detect
+committed edits that restore identical row bytes (ABA): a dropped, disabled,
+retargeted trigger, changed function body, changed search_path, or changed
+security mode produces schema drift and blocks that internal signature.
+Rollback-only PostgreSQL regressions exercise both a disabled trigger and
+a changed function body. This guard protects only the currently implemented
+13-trigger partial-snapshot coverage; it does NOT add mutation-epoch coverage
+for the other source classes or prove row completeness, cross-store atomicity,
+ownership, third-party rights, or customer disclosure.
+
+A newly
 added table, changed column or unavailable catalog produces a
 `schema_drift` or `unavailable` assessment. Neither the known baseline
 nor a green signature means a complete export or approved legal scope:

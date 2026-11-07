@@ -233,11 +233,80 @@ const expectedColumns = 1033;
 const expectedSchemaSha256 = "45d6db6d25b6e61a0950333a5f9d81b17e2895c21736688b08cc00d49b3dfe63";
 const maxCatalogColumns = 1200;
 
+// The source-scope digest relies on these exact AFTER triggers to detect
+// committed edits that restore identical row bytes (ABA). A column-only
+// catalog fingerprint cannot detect a dropped/disabled trigger or changed
+// trigger function, so pin both trigger bindings and their function bodies.
+const expectedMutationEpochTriggers = [
+  ["artifacts", "boardreadyops_historical_core_source_epoch", "boardreadyops_note_historical_core_source_mutation"],
+  ["audit_events", "boardreadyops_historical_audit_epoch", "boardreadyops_note_historical_audit_epoch"],
+  [
+    "finding_assignments",
+    "boardreadyops_historical_collaboration_epoch",
+    "boardreadyops_note_historical_review_collaboration_mutation",
+  ],
+  ["findings", "boardreadyops_historical_core_source_epoch", "boardreadyops_note_historical_core_source_mutation"],
+  [
+    "finding_decisions",
+    "boardreadyops_historical_collaboration_epoch",
+    "boardreadyops_note_historical_review_collaboration_mutation",
+  ],
+  ["release_runs", "boardreadyops_historical_core_source_epoch", "boardreadyops_note_historical_core_source_mutation"],
+  ["repositories", "boardreadyops_historical_core_source_epoch", "boardreadyops_note_historical_core_source_mutation"],
+  [
+    "review_approvals",
+    "boardreadyops_historical_collaboration_epoch",
+    "boardreadyops_note_historical_review_collaboration_mutation",
+  ],
+  [
+    "review_checklist_items",
+    "boardreadyops_historical_collaboration_epoch",
+    "boardreadyops_note_historical_review_collaboration_mutation",
+  ],
+  [
+    "review_comments",
+    "boardreadyops_historical_collaboration_epoch",
+    "boardreadyops_note_historical_review_collaboration_mutation",
+  ],
+  [
+    "review_revisions",
+    "boardreadyops_historical_collaboration_epoch",
+    "boardreadyops_note_historical_review_collaboration_mutation",
+  ],
+  ["reviews", "boardreadyops_historical_review_epoch", "boardreadyops_note_historical_review_mutation"],
+  ["run_snapshots", "boardreadyops_historical_visual_epoch", "boardreadyops_note_historical_visual_mutation"],
+] as const;
+const expectedMutationEpochFunctions = [
+  "boardreadyops_bump_historical_user_snapshot_epoch",
+  "boardreadyops_note_historical_audit_epoch",
+  "boardreadyops_note_historical_core_source_mutation",
+  "boardreadyops_note_historical_review_collaboration_mutation",
+  "boardreadyops_note_historical_review_mutation",
+  "boardreadyops_note_historical_visual_mutation",
+] as const;
+const expectedMutationEpochTriggerCount = expectedMutationEpochTriggers.length;
+const expectedMutationEpochFunctionCount = expectedMutationEpochFunctions.length;
+const expectedMutationEpochSha256 = "559ec18ed5083fc41bb4aebdf94e840fd59baf44705227b9975fa6a6d570a9a5";
+
 type Column = {
   table_name: string;
   column_name: string;
   data_type: string;
   is_nullable: "YES" | "NO";
+};
+type MutationEpochTrigger = {
+  table_name: string;
+  trigger_name: string;
+  function_name: string;
+  definition: string;
+  enabled: string;
+};
+type MutationEpochFunction = {
+  function_name: string;
+  identity_arguments: string;
+  definition: string;
+  security_definer: boolean;
+  configuration: string[];
 };
 
 type UnresolvedReviewTrack = keyof typeof historicalUserUnresolvedSourceReviewTracks;
@@ -282,6 +351,9 @@ type ScopeCoverage = {
   customerDeliveryAllowed: false;
   tableCount: number;
   columnCount: number;
+  mutationEpochTriggerCount: number;
+  mutationEpochFunctionCount: number;
+  mutationEpochSha256: string | null;
   partialPrivateMetadataTableCount: number;
   withheldSensitiveTableCount: number;
   otherTablesRequiringScopeReview: number;
@@ -297,6 +369,9 @@ const denied = (): ScopeCoverage => ({
   customerDeliveryAllowed: false,
   tableCount: 0,
   columnCount: 0,
+  mutationEpochTriggerCount: 0,
+  mutationEpochFunctionCount: 0,
+  mutationEpochSha256: null,
   partialPrivateMetadataTableCount: 0,
   withheldSensitiveTableCount: 0,
   otherTablesRequiringScopeReview: 0,
@@ -320,12 +395,48 @@ function validColumn(row: unknown): row is Column {
   );
 }
 
+function validMutationEpochTrigger(row: unknown): row is MutationEpochTrigger {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+  const trigger = row as Record<string, unknown>;
+  return (
+    typeof trigger.table_name === "string" &&
+    /^[a-z][a-z0-9_]{0,127}$/u.test(trigger.table_name) &&
+    typeof trigger.trigger_name === "string" &&
+    /^boardreadyops_historical_[a-z0-9_]+_epoch$/u.test(trigger.trigger_name) &&
+    typeof trigger.function_name === "string" &&
+    expectedMutationEpochFunctions.includes(trigger.function_name as (typeof expectedMutationEpochFunctions)[number]) &&
+    typeof trigger.definition === "string" &&
+    trigger.definition.length > 0 &&
+    trigger.definition.length <= 2048 &&
+    typeof trigger.enabled === "string" &&
+    ["O", "D", "R", "A"].includes(trigger.enabled)
+  );
+}
+
+function validMutationEpochFunction(row: unknown): row is MutationEpochFunction {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+  const fn = row as Record<string, unknown>;
+  return (
+    typeof fn.function_name === "string" &&
+    expectedMutationEpochFunctions.includes(fn.function_name as (typeof expectedMutationEpochFunctions)[number]) &&
+    typeof fn.identity_arguments === "string" &&
+    fn.identity_arguments.length <= 256 &&
+    typeof fn.definition === "string" &&
+    fn.definition.length > 0 &&
+    fn.definition.length <= 16_384 &&
+    typeof fn.security_definer === "boolean" &&
+    Array.isArray(fn.configuration) &&
+    fn.configuration.every((item) => typeof item === "string" && item.length <= 256)
+  );
+}
+
 /**
- * One PostgreSQL READ ONLY, REPEATABLE READ statement, catalog metadata only.
- * The exact schema fingerprint includes column type and nullability in
- * ordinal order. Unknown tables OR mutations to existing known tables block
- * any future completeness assertion. This independent audit does NOT prove
- * row completeness, tenant authorization or source/disclosure rights.
+ * One PostgreSQL READ ONLY, REPEATABLE READ transaction reads catalog
+ * metadata only: ordered table columns plus the exact enabled historical
+ * mutation-epoch trigger bindings and invoker function definitions. Dropped,
+ * disabled or changed ABA guards therefore block the source-scope signature.
+ * Unknown tables or changed known tables also block completeness. This audit
+ * does NOT prove row completeness, tenant authorization or disclosure rights.
  */
 export async function assessHistoricalUserSchemaCoverage(
   db: Pick<PgQueryExecutor, "withTransaction">,
@@ -358,6 +469,83 @@ export async function assessHistoricalUserSchemaCoverage(
           is_nullable,
         ]);
         const sha = createHash("sha256").update(JSON.stringify(ordered)).digest("hex");
+
+        const triggerResult: unknown = await tx.query(
+          `SELECT relation.relname AS table_name,
+                  trigger.tgname AS trigger_name,
+                  procedure.proname AS function_name,
+                  pg_get_triggerdef(trigger.oid,true) AS definition,
+                  trigger.tgenabled AS enabled
+             FROM pg_catalog.pg_trigger AS trigger
+             JOIN pg_catalog.pg_class AS relation ON relation.oid=trigger.tgrelid
+             JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=relation.relnamespace
+             JOIN pg_catalog.pg_proc AS procedure ON procedure.oid=trigger.tgfoid
+            WHERE namespace.nspname='public'
+              AND trigger.tgisinternal=FALSE
+              AND trigger.tgname LIKE 'boardreadyops_historical_%_epoch'
+            ORDER BY relation.relname,trigger.tgname
+            LIMIT 14`,
+        );
+        if (
+          !triggerResult ||
+          typeof triggerResult !== "object" ||
+          !("rows" in triggerResult) ||
+          !Array.isArray(triggerResult.rows)
+        )
+          return denied();
+        const triggerRows: unknown[] = triggerResult.rows;
+        if (triggerRows.length > expectedMutationEpochTriggerCount || !triggerRows.every(validMutationEpochTrigger))
+          return denied();
+        const orderedTriggers = (triggerRows as MutationEpochTrigger[]).map((trigger) => [
+          trigger.table_name,
+          trigger.trigger_name,
+          trigger.function_name,
+          trigger.definition,
+          trigger.enabled,
+        ]);
+        const actualTriggerBindings = orderedTriggers.map((trigger) => trigger.slice(0, 3).join("|")).sort();
+        const expectedTriggerBindings = expectedMutationEpochTriggers.map((trigger) => trigger.join("|")).sort();
+        const triggerBindingsMatch = JSON.stringify(actualTriggerBindings) === JSON.stringify(expectedTriggerBindings);
+        const triggersEnabled = (triggerRows as MutationEpochTrigger[]).every((trigger) => trigger.enabled === "O");
+
+        const functionResult: unknown = await tx.query(
+          `SELECT procedure.proname AS function_name,
+                  pg_get_function_identity_arguments(procedure.oid) AS identity_arguments,
+                  pg_get_functiondef(procedure.oid) AS definition,
+                  procedure.prosecdef AS security_definer,
+                  COALESCE(procedure.proconfig,ARRAY[]::text[]) AS configuration
+             FROM pg_catalog.pg_proc AS procedure
+             JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=procedure.pronamespace
+            WHERE namespace.nspname='public'
+              AND procedure.prokind='f'
+              AND procedure.proname=ANY($1::text[])
+            ORDER BY procedure.proname,pg_get_function_identity_arguments(procedure.oid)
+            LIMIT 7`,
+          [[...expectedMutationEpochFunctions]],
+        );
+        if (
+          !functionResult ||
+          typeof functionResult !== "object" ||
+          !("rows" in functionResult) ||
+          !Array.isArray(functionResult.rows)
+        )
+          return denied();
+        const functionRows: unknown[] = functionResult.rows;
+        if (functionRows.length > expectedMutationEpochFunctionCount || !functionRows.every(validMutationEpochFunction))
+          return denied();
+        const functionsInvokerOnly = (functionRows as MutationEpochFunction[]).every(
+          (fn) => fn.security_definer === false,
+        );
+        const orderedFunctions = (functionRows as MutationEpochFunction[]).map((fn) => [
+          fn.function_name,
+          fn.identity_arguments,
+          fn.definition,
+          fn.security_definer,
+          fn.configuration,
+        ]);
+        const mutationEpochSha = createHash("sha256")
+          .update(JSON.stringify({ triggers: orderedTriggers, functions: orderedFunctions }))
+          .digest("hex");
         const known = new Set<string>(knownTables);
         const unrecognized = [...tableNames].filter((name) => !known.has(name)).length;
         const privatePartialCount = [...tableNames].filter((name) => partialPrivateMetadata.has(name)).length;
@@ -367,6 +555,12 @@ export async function assessHistoricalUserSchemaCoverage(
           validSourceClassPartition() &&
           sha === expectedSchemaSha256 &&
           rows.length === expectedColumns &&
+          triggerBindingsMatch &&
+          triggersEnabled &&
+          functionsInvokerOnly &&
+          triggerRows.length === expectedMutationEpochTriggerCount &&
+          functionRows.length === expectedMutationEpochFunctionCount &&
+          mutationEpochSha === expectedMutationEpochSha256 &&
           tableNames.size === known.size &&
           unrecognized === 0 &&
           [...known].every((name) => tableNames.has(name)) &&
@@ -379,6 +573,9 @@ export async function assessHistoricalUserSchemaCoverage(
           customerDeliveryAllowed: false,
           tableCount: tableNames.size,
           columnCount: rows.length,
+          mutationEpochTriggerCount: triggerRows.length,
+          mutationEpochFunctionCount: functionRows.length,
+          mutationEpochSha256: mutationEpochSha,
           partialPrivateMetadataTableCount: privatePartialCount,
           withheldSensitiveTableCount: withheldCount,
           otherTablesRequiringScopeReview: tableNames.size - privatePartialCount - withheldCount,
