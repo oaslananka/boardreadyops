@@ -41,6 +41,12 @@ const ids = {
   foreignSealAttempt: randomUUID(),
   artifact: randomUUID(),
   foreignArtifact: randomUUID(),
+  workspace: randomUUID(),
+  foreignWorkspace: randomUUID(),
+  project: randomUUID(),
+  foreignProject: randomUUID(),
+  revision: randomUUID(),
+  foreignRevision: randomUUID(),
   crossBom: randomUUID(),
   crossFirmware: randomUUID(),
   crossFootprint: randomUUID(),
@@ -285,6 +291,56 @@ beforeAll(async () => {
        FROM repositories r WHERE r.id=$7`,
     [ids.foreignRun, ids.foreignAttempt, ids.foreignArtifact, "123456790", sha, "d".repeat(64), ids.foreignRepository],
   );
+  await db.query("INSERT INTO workspaces(id,name,slug) VALUES($1,'Owned workspace',$2),($3,'Foreign workspace',$4)", [
+    ids.workspace,
+    `owned-${ids.workspace}`,
+    ids.foreignWorkspace,
+    `foreign-${ids.foreignWorkspace}`,
+  ]);
+  await db.query(
+    `INSERT INTO projects(id,workspace_id,name,github_repo_full_name)
+     VALUES($1,$2,'Owned project',$3),($4,$5,'Foreign project',$6)`,
+    [ids.project, ids.workspace, `${owner}/pcb`, ids.foreignProject, ids.foreignWorkspace, `${foreignOwner}/foreign`],
+  );
+  await db.query(
+    `INSERT INTO revisions
+      (id,project_id,revision_label,source_kind,commit_sha,bundle_sha256,validation_run_id,validation_artifact_id)
+     VALUES($1,$2,'main','github_commit',$3,$4,$5,$6),
+           ($7,$8,'foreign','github_commit',$3,$9,$10,$11)`,
+    [
+      ids.revision,
+      ids.project,
+      sha,
+      "a".repeat(64),
+      ids.run,
+      ids.artifact,
+      ids.foreignRevision,
+      ids.foreignProject,
+      "b".repeat(64),
+      ids.foreignRun,
+      ids.foreignArtifact,
+    ],
+  );
+  await db.query(
+    `INSERT INTO manufacturing_share_authorizations
+      (revision_id,workspace_id,run_id,artifact_id,commit_sha,archive_sha256,authorized_by_github_user_id,authorized_by_login)
+     VALUES($1,$2,$3,$4,$5,$6,$7,'original-user'),($8,$9,$10,$11,$5,$12,$13,'foreign-user')`,
+    [
+      ids.revision,
+      ids.workspace,
+      ids.run,
+      ids.artifact,
+      sha,
+      "a".repeat(64),
+      originalUserId,
+      ids.foreignRevision,
+      ids.foreignWorkspace,
+      ids.foreignRun,
+      ids.foreignArtifact,
+      "b".repeat(64),
+      otherUserId,
+    ],
+  );
   await db.query(
     `INSERT INTO run_pcb_footprint_summaries(
        run_id,repository_id,base_commit_sha,head_commit_sha,summary_sha256,summary)
@@ -299,6 +355,7 @@ afterAll(async () => {
     await db.query("DELETE FROM legal_holds WHERE id=$1", [ids.hold]);
     await db.query("DELETE FROM erasure_requests WHERE id=$1", [ids.erasure]);
     await db.query("DELETE FROM data_exports WHERE id=$1", [ids.exportId]);
+    await db.query("DELETE FROM workspaces WHERE id IN ($1,$2)", [ids.workspace, ids.foreignWorkspace]);
     await db.query("DELETE FROM installations WHERE id IN ($1,$2)", [ids.installation, ids.foreignInstallation]);
   } finally {
     await db.close();
@@ -306,7 +363,7 @@ afterAll(async () => {
 });
 
 describeDb("disposable PostgreSQL: original USER hardware data owner-count scope", () => {
-  it("counts eighteen related private source classes only under original numeric USER / suspended installation", async () => {
+  it("counts nineteen related private source classes only under original numeric USER / suspended installation", async () => {
     expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toEqual({
       scope: "original-numeric-user-retained-suspended-installation-only",
       releaseDecision: "NO_GO",
@@ -333,6 +390,7 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
         protectedReleaseIntentCandidates: 1,
         protectedReleaseExecutionSeals: 1,
         signedManufacturingExportEvidence: 1,
+        manufacturingShareAuthorizations: 1,
       },
     });
     expect(
@@ -479,6 +537,94 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
       (await assessHistoricalUserHardwareOwnedRowCounts(database(), identity()))?.rowCounts
         .protectedReleaseExecutionSeals,
     ).toBe(1);
+  });
+
+  it.each([
+    ["foreign workspace", "workspace_id", "foreignWorkspace"],
+    ["foreign actor", "authorized_by_github_user_id", "otherUserId"],
+    ["lost run link", "run_id", "null"],
+    ["lost artifact link", "artifact_id", "null"],
+    ["foreign artifact", "artifact_id", "foreignArtifact"],
+  ] as const)("rejects original-user manufacturing share with %s", async (_name, field, kind) => {
+    const originals = {
+      workspace_id: ids.workspace,
+      authorized_by_github_user_id: originalUserId,
+      run_id: ids.run,
+      artifact_id: ids.artifact,
+    };
+    const replacements = {
+      foreignWorkspace: ids.foreignWorkspace,
+      otherUserId,
+      foreignArtifact: ids.foreignArtifact,
+      null: null,
+    };
+    const wrongValue = replacements[kind];
+    // Field names only come from the fixed test vector; values are parameters.
+    try {
+      await database().query(`UPDATE manufacturing_share_authorizations SET ${field}=$1 WHERE revision_id=$2`, [
+        wrongValue,
+        ids.revision,
+      ]);
+      expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toBeNull();
+    } finally {
+      await database().query(`UPDATE manufacturing_share_authorizations SET ${field}=$1 WHERE revision_id=$2`, [
+        originals[field],
+        ids.revision,
+      ]);
+    }
+    expect(
+      (await assessHistoricalUserHardwareOwnedRowCounts(database(), identity()))?.rowCounts
+        .manufacturingShareAuthorizations,
+    ).toBe(1);
+  });
+
+  it("rejects relabeled source repository when immutable run and share appear consistent", async () => {
+    try {
+      await database().query("UPDATE projects SET github_repo_full_name=$1 WHERE id=$2", [
+        `${foreignOwner}/foreign`,
+        ids.project,
+      ]);
+      expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toBeNull();
+    } finally {
+      await database().query("UPDATE projects SET github_repo_full_name=$1 WHERE id=$2", [`${owner}/pcb`, ids.project]);
+    }
+  });
+
+  it("denies a former USER share after BOTH run and artifact references were lost", async () => {
+    try {
+      await database().query(
+        "UPDATE manufacturing_share_authorizations SET run_id=NULL, artifact_id=NULL WHERE revision_id=$1",
+        [ids.revision],
+      );
+      expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toBeNull();
+    } finally {
+      await database().query(
+        "UPDATE manufacturing_share_authorizations SET run_id=$1, artifact_id=$2 WHERE revision_id=$3",
+        [ids.run, ids.artifact, ids.revision],
+      );
+    }
+    expect(
+      (await assessHistoricalUserHardwareOwnedRowCounts(database(), identity()))?.rowCounts
+        .manufacturingShareAuthorizations,
+    ).toBe(1);
+  });
+
+  it("does not attribute a FOREIGN run share even when authorized by the original user", async () => {
+    try {
+      await database().query(
+        "UPDATE manufacturing_share_authorizations SET authorized_by_github_user_id=$1 WHERE revision_id=$2",
+        [originalUserId, ids.foreignRevision],
+      );
+      expect(
+        (await assessHistoricalUserHardwareOwnedRowCounts(database(), identity()))?.rowCounts
+          .manufacturingShareAuthorizations,
+      ).toBe(1);
+    } finally {
+      await database().query(
+        "UPDATE manufacturing_share_authorizations SET authorized_by_github_user_id=$1 WHERE revision_id=$2",
+        [otherUserId, ids.foreignRevision],
+      );
+    }
   });
 
   it("blocks even count-only diagnostics under legal hold and real erasure, then recovers safely", async () => {

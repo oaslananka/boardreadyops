@@ -123,40 +123,55 @@ Required independent review: Tenant versus platform-owned boundary, service inte
 | `repository_setup_revisions` | Not verified | DENY |
 | `runner_execution_policies` | Not verified | DENY |
 
-## Numeric original USER source-row attribution — eighteen hardware classes
+## Numeric original USER source-row attribution — nineteen hardware classes
 
-A separate **SOURCE-ONLY / COUNT-ONLY** PostgreSQL preflight now
-inspects the following eighteen classes from the hardware track using
-the exact immutable GitHub numeric USER on a pending uninstall export,
-its matching suspended USER installation and repository/run relationships:
-`boards`, `board_bom_snapshots`, `board_bom_components`,
-`repository_firmware_snapshots`, `repository_firmware_dependencies`,
-`repository_firmware_advisory_watch`, `run_pcb_footprint_summaries`,
-`board_supply_watch`, `board_supply_findings`, `production_batches`,
-`production_batch_defects`, `release_run_attempts`, `release_run_results`
-and `release_run_transition_events`, `supply_finding_suppressions`,
-`protected_release_intent_candidates`, `protected_release_execution_seals`
-and `signed_manufacturing_export_evidence`.
-All eighteen remain **Not verified / DENY for customer disclosure**; this
-preflight merely discovers bounded retained source-row counts (0–100
-per class). It does NOT inspect or return BOM values, repository names,
-firmware metadata, design files, private identifiers or row IDs.
-Unknown owner, non-suspended installation, active tenant legal hold,
-real erasure or crossed foreign-repository run references reject the
-entire candidate. PostgreSQL returns counts in one consistent
-read-only snapshot. A zero count is NOT proof of archive completeness
-and a nonzero count is NOT a license to disclose. The remaining **one** hardware-track class,
-`manufacturing_share_authorizations`, is NOT included: its workspace
-revision and mutable `projects.github_repo_full_name` do not alone
-establish immutable original USER repository ownership. Grant/revocation
-history can describe a third-party workspace member's explicit consent,
-not the former installation owner's redisclosure rights. This requires a
-separate, fully tested, identity-preserving linkage and rights decision.
-Protected-release candidates/seals and signed manufacturing evidence
-are counted only when their immutable repository, installation, run,
-attempt and artifact links match; forged cross-tenant links reject the
-entire count candidate. Counting them is NOT a release grant. The future independently signed complete DB+filesystem
-export and customer authorization remain blocked.
+A **SOURCE-ONLY / COUNT-ONLY** PostgreSQL diagnostic now inspects bounded,
+relationally attributable candidates across all **19 hardware-track table
+classes**, under the exact numeric GitHub USER of a pending uninstall export,
+its suspended USER installation, owned repositories and release runs.
+It includes boards/BOM, firmware, PCB footprints, supply watch/findings and
+suppressions, production batches/defects, release attempt/results/transitions,
+protected release intent/seals, signed manufacturing evidence, and
+`manufacturing_share_authorizations`.
+
+The manufacturing-share class is **not** attributed by
+`projects.github_repo_full_name` alone: that name can change or be
+reused. A count is allowed only if the share's original numeric GitHub
+author, workspace/revision, immutable owned run, release attempt,
+manufacturing artifact, project-name consistency, source commit/archive
+digest and independently bound signed manufacturing evidence all agree.
+A share linked to the original USER's run or artifact but mismatching
+author, revision, workspace, run, artifact, source digest or signed
+evidence **rejects the entire diagnostic**. A former USER's share
+with a deleted run/artifact link is likewise denied rather than
+silently counted as complete. Another USER's unrelated private
+workspace/repository shares are excluded.
+
+**19/19 is a count-join review surface, NOT 19/19 source completeness
+or customer export eligibility.** Legacy shares can have both
+`run_id` and `artifact_id` set to NULL on reference deletion;
+other people's workspace shares may be impossible to link to a former
+installation. Those ambiguous or untraceable rows, third-party
+author/revocation history and original-author redisclosure rights are
+**not proven complete or lawful** by this bounded relational count.
+The mutable project name is an additional consistency veto, never
+affirmative identity authority. No historical GitHub session/ownership
+proof, legal/IP analysis or collaborator permission can be inferred
+from a matching count.
+
+All nineteen classes remain **NOT VERIFIED / DENY for customer disclosure**.
+Counts are limited to 0–100 per class, and any unknown/ambiguous source,
+foreign repository/installation, active legal hold, real erasure, or
+missing/malformed SQL response fails closed. The transaction uses one
+consistent PostgreSQL snapshot; it is **not** an atomic
+database-plus-filesystem export. Neither raw BOM values, source IP,
+personal names, tokens, private row IDs, binary artifacts nor ZIP bytes
+are disclosed. `completeCustomerExport=false`,
+`customerDeliveryAllowed=false`, `sourceRightsVerified=false`
+and `thirdPartyDisclosureRightsVerified=false` remain immutable
+NO_GO decisions in this diagnostic. The future independently signed
+complete DB+physical-storage snapshot and separate revocable customer
+delivery authorization are still blocked.
 
 ## Acceptance conditions (not met)
 

@@ -24,6 +24,7 @@ const sourceKeys = [
   "protectedReleaseIntentCandidates",
   "protectedReleaseExecutionSeals",
   "signedManufacturingExportEvidence",
+  "manufacturingShareAuthorizations",
 ] as const;
 const validRow = () => ({
   export_id: exportId,
@@ -36,6 +37,7 @@ const validRow = () => ({
   foreignProtectedIntentMismatch: 0,
   foreignProtectedSealMismatch: 0,
   foreignSignedManufacturingMismatch: 0,
+  unattributableManufacturingShare: 0,
 });
 const fake = (returned: unknown) => {
   const query = vi.fn(async (_sql: string, _args: unknown[]) => ({ rows: returned }));
@@ -95,7 +97,10 @@ describe("source-only original numeric USER hardware ownership COUNT gate", () =
     expect(sql).toContain("public.protected_release_intent_candidates");
     expect(sql).toContain("public.protected_release_execution_seals");
     expect(sql).toContain("public.signed_manufacturing_export_evidence");
-    expect(sql).not.toContain("public.manufacturing_share_authorizations");
+    expect(sql).toContain("public.manufacturing_share_authorizations");
+    expect(sql).toContain("evidence.source_sha=run.commit_sha");
+    expect(sql).toContain("share.authorized_by_github_user_id=(SELECT original_github_user_id FROM owner_export)");
+    expect(sql).toContain('AS "unattributableManufacturingShare"');
     expect(sql).toContain("LIMIT 101");
     expect(sql).not.toContain("SELECT *");
     expect(db.query.mock.calls[0]?.[1]).toEqual([exportId, originalUserId]);
@@ -117,6 +122,9 @@ describe("source-only original numeric USER hardware ownership COUNT gate", () =
     ["cross tenant intent", [{ ...validRow(), foreignProtectedIntentMismatch: 1 }]],
     ["cross tenant seal", [{ ...validRow(), foreignProtectedSealMismatch: 1 }]],
     ["cross tenant manufacturing evidence", [{ ...validRow(), foreignSignedManufacturingMismatch: 1 }]],
+    ["foreign manufacturing share", [{ ...validRow(), unattributableManufacturingShare: 1 }]],
+    ["missing manufacturing share class", [{ ...validRow(), manufacturingShareAuthorizations: undefined }]],
+    ["unbounded manufacturing shares", [{ ...validRow(), manufacturingShareAuthorizations: 101 }]],
     ["missing protected seal class", [{ ...validRow(), protectedReleaseExecutionSeals: undefined }]],
     ["too many signed manufacturing records", [{ ...validRow(), signedManufacturingExportEvidence: 101 }]],
     ["missing supply class", [{ ...validRow(), boardSupplyWatch: undefined }]],

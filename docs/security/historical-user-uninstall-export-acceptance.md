@@ -261,10 +261,15 @@ contributing to the **redacted partial private metadata candidate**,
 requiring an independent source/ownership/IP-scope decision**. These
 63 source classes are individually assigned to five non-authorizing
 review queues in [the original USER source-class review register](historical-user-source-class-review.md). The
-eighteen-class hardware row-attribution preflight uses original numeric
+nineteen-class source-only hardware row-attribution preflight uses original numeric
 GitHub USER/suspended-installation repository/run joins only to
-produce bounded private row COUNTS; no source payloads, rights,
-customer ZIP eligibility or complete snapshot are implied. A newly
+produce bounded private row COUNTS, including strictly cross-checked
+manufacturing share/run/attempt/artifact/signed-evidence candidates.
+Ambiguous original USER share authority, actor, workspace, digests,
+deleted references and cross-tenant linkage fail closed. No source
+payloads, consent/third-party disclosure rights, guaranteed coverage
+of disconnected legacy rows, customer ZIP eligibility or complete
+snapshot are implied. A newly
 added table, changed column or unavailable catalog produces a
 `schema_drift` or `unavailable` assessment. Neither the known baseline
 nor a green signature means a complete export or approved legal scope:
