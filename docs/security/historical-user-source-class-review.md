@@ -169,6 +169,47 @@ IP/privacy rights, full signed DB+physical-object coherence and audited
 OAuth delivery. No migration, public route, export whitelist, tokens or
 customer permission were added.
 
+## Billing and GitHub Marketplace — numeric account versus reusable tenant
+
+The five **FK-unlinked** billing classes now have a single bounded internal
+source candidate review, ~assessHistoricalUserBillingOwnershipCandidates~.
+It is anchored to the existing original **numeric GitHub USER** authority
+and pending uninstall export, and reads in one ~REPEATABLE READ READ ONLY~
+snapshot. It counts the four tenant-login-only classes
+~billing_customers~, ~billing_subscriptions~, ~billing_events~ **with
+a tenant ID**, and ~billing_activity~ (each at most 100 candidates)
+separately from ~github_marketplace_subscriptions~. The latter has a
+**numeric GitHub account ID**, allowing exact account-ID matches to be
+distinguished from *different* numeric accounts that share a recycled
+login, or an exact numeric account under a different historical login.
+One boolean also reports a competing/unknown numeric GitHub USER
+installation for the original login. The query selects **no provider
+payload, financial amount, billing customer ID, Stripe ID, event content,
+receipt, account number, raw record identifier or external URL**.
+
+An exact Marketplace numeric ID is useful **identity evidence for that
+Marketplace row only**, not permission to release provider invoices,
+payment events, subscription information, or records of other users.
+~billing_events~ with a **NULL tenant_id** remain untraceable by this
+review and are explicitly declared **unresolved**, rather than silently
+counted as absent. The four tenant-login classes cannot be attributed
+to a historical numeric USER by username alone; an unaffected login can
+still have changed ownership in the past. A 101st candidate for any
+class fails closed, as do expired/orphan exports, competing authority,
+live legal holds and destructive erasures. Tests use entirely synthetic
+records on disposable PostgreSQL and verify both numeric collisions,
+tenant isolation, missing billing tenant and the bound.
+
+This is the second grouped inspection after the previous tenant-only
+lifecycle review: **10 of 29** no-FK classes now have a dedicated
+internal candidate review, while **19** still lack one. **Zero** of the
+63 unresolved classes has passed the required customer ownership,
+privacy and redistribution rights acceptance. Provider contracts,
+retention, billing/PII disclosure, source completeness, DB+physical
+object integrity and real OAuth customer authorization must be
+reviewed independently. No migration, public endpoint, export whitelist,
+billing credential, provider API call or customer ZIP was introduced.
+
 ## Individual table review queue
 
 ### Privacy, export lifecycle and installation authority — 17 tables

@@ -363,7 +363,14 @@ only classes (`retention_policies`, `legal_holds`, `erasure_requests`
 and `product_events`), returning only per-class candidate counts and
 a recycled/unbound-user identity collision flag. It cannot attribute
 legacy rows by username, and still denies a customer export.
-The remaining **24 FK-unlinked classes** require a dedicated review.
+Five additional billing/Marketplace classes now have a separate,
+read-only numeric-versus-login owner-candidate review. Four classes
+expose tenant-login-only bounded counts; the GitHub Marketplace
+class can distinguish a direct numeric account match from a different
+account using the same login. Tenantless provider billing events and
+all provider-disclosure rights remain unresolved. The remaining
+**19 FK-unlinked classes** require dedicated review. All **63**
+unresolved classes remain DENY and customer archive release remains NO_GO.
 The internal source-only partial-integrity observation additionally
 requires the schema fingerprint and all nineteen bounded hardware
 class counts to pass under a **single PostgreSQL REPEATABLE READ READ
