@@ -196,8 +196,11 @@ describeDb("disposable PostgreSQL: original USER OAuth digest challenge is irrev
       .update("\0")
       .update(expired)
       .digest("hex");
+    // Keep an expired but internally valid 3-minute nonce window. At exactly
+    // five minutes the independent clock_timestamp() calls can differ by
+    // microseconds and spuriously violate the database CHECK in CI.
     await executor().query(
-      "INSERT INTO historical_user_oauth_challenges(state_sha256,export_id,original_github_user_id,created_at,expires_at,consumed_at) VALUES($1,$2,$3,clock_timestamp()-INTERVAL '9 minutes',clock_timestamp()-INTERVAL '4 minutes',clock_timestamp()-INTERVAL '5 minutes')",
+      "INSERT INTO historical_user_oauth_challenges(state_sha256,export_id,original_github_user_id,created_at,expires_at,consumed_at) VALUES($1,$2,$3,clock_timestamp()-INTERVAL '9 minutes',clock_timestamp()-INTERVAL '6 minutes',clock_timestamp()-INTERVAL '7 minutes')",
       [digest, exportId, userId],
     );
     expect(await confirmHistoricalUserLiveOAuthProof(executor(), identity(expired))).toBe(false);
