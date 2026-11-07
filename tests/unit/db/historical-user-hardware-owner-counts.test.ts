@@ -13,6 +13,13 @@ const sourceKeys = [
   "firmwareDependencies",
   "firmwareAdvisoryWatch",
   "runPcbFootprintSummaries",
+  "boardSupplyWatch",
+  "boardSupplyFindings",
+  "productionBatches",
+  "productionBatchDefects",
+  "releaseRunAttempts",
+  "releaseRunResults",
+  "releaseRunTransitionEvents",
 ] as const;
 const validRow = () => ({
   export_id: exportId,
@@ -20,6 +27,8 @@ const validRow = () => ({
   foreignBomRunMismatch: 0,
   foreignFirmwareRunMismatch: 0,
   foreignFootprintRunMismatch: 0,
+  foreignResultAttemptMismatch: 0,
+  foreignTransitionScopeMismatch: 0,
 });
 const fake = (returned: unknown) => {
   const query = vi.fn(async (_sql: string, _args: unknown[]) => ({ rows: returned }));
@@ -68,6 +77,10 @@ describe("source-only original numeric USER hardware ownership COUNT gate", () =
     expect(sql).toContain("hold.active=TRUE");
     expect(sql).toContain("erasure.status IN ('running','completed')");
     expect(sql).toContain("run.repository_id=b.repository_id");
+    expect(sql).toContain("public.production_batch_defects");
+    expect(sql).toContain("public.release_run_transition_events");
+    expect(sql).toContain('AS "foreignResultAttemptMismatch"');
+    expect(sql).toContain('AS "foreignTransitionScopeMismatch"');
     expect(sql).toContain("LIMIT 101");
     expect(sql).not.toContain("SELECT *");
     expect(db.query.mock.calls[0]?.[1]).toEqual([exportId, originalUserId]);
@@ -84,6 +97,10 @@ describe("source-only original numeric USER hardware ownership COUNT gate", () =
     ["cross tenant BOM", [{ ...validRow(), foreignBomRunMismatch: 1 }]],
     ["cross tenant firmware", [{ ...validRow(), foreignFirmwareRunMismatch: 1 }]],
     ["cross tenant footprint", [{ ...validRow(), foreignFootprintRunMismatch: 1 }]],
+    ["cross tenant result attempt", [{ ...validRow(), foreignResultAttemptMismatch: 1 }]],
+    ["cross tenant transition", [{ ...validRow(), foreignTransitionScopeMismatch: 1 }]],
+    ["missing supply class", [{ ...validRow(), boardSupplyWatch: undefined }]],
+    ["unbounded manufacturing", [{ ...validRow(), productionBatchDefects: 101 }]],
     ["missing class", [{ ...validRow(), firmwareAdvisoryWatch: undefined }]],
     ["unparseable", { length: 1 }],
   ])("fails closed on %s", async (_, rows) => {

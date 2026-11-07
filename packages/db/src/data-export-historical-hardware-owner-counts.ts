@@ -12,6 +12,13 @@ const sourceNames = [
   "firmwareDependencies",
   "firmwareAdvisoryWatch",
   "runPcbFootprintSummaries",
+  "boardSupplyWatch",
+  "boardSupplyFindings",
+  "productionBatches",
+  "productionBatchDefects",
+  "releaseRunAttempts",
+  "releaseRunResults",
+  "releaseRunTransitionEvents",
 ] as const;
 type HardwareSourceName = (typeof sourceNames)[number];
 
@@ -27,7 +34,7 @@ export type HistoricalUserHardwareOwnerCounts = {
   completeCustomerExport: false;
   customerDeliveryAllowed: false;
   rowCounts: Record<HardwareSourceName, number>;
-  // These seven classes remain under independent provenance and IP review.
+  // All fourteen classes remain under independent provenance and IP review.
   sourceRightsVerified: false;
   thirdPartyDisclosureRightsVerified: false;
 };
@@ -60,9 +67,18 @@ const sql = `WITH ${historicalOwnerCtes},
    ${bounded("public.repository_firmware_dependencies d JOIN public.repository_firmware_snapshots s ON s.id=d.snapshot_id JOIN owned_repositories r ON r.id=s.repository_id JOIN owned_runs run ON run.id=s.run_id AND run.repository_id=s.repository_id")} AS "firmwareDependencies",
    ${bounded("public.repository_firmware_advisory_watch w JOIN owned_repositories r ON r.id=w.repository_id")} AS "firmwareAdvisoryWatch",
    ${bounded("public.run_pcb_footprint_summaries f JOIN owned_repositories r ON r.id=f.repository_id JOIN owned_runs run ON run.id=f.run_id AND run.repository_id=f.repository_id")} AS "runPcbFootprintSummaries",
+   ${bounded("public.board_supply_watch w JOIN public.boards b ON b.id=w.board_id JOIN owned_repositories r ON r.id=b.repository_id")} AS "boardSupplyWatch",
+   ${bounded("public.board_supply_findings f JOIN public.boards b ON b.id=f.board_id JOIN owned_repositories r ON r.id=b.repository_id")} AS "boardSupplyFindings",
+   ${bounded("public.production_batches b JOIN owned_runs run ON run.id=b.release_run_id")} AS "productionBatches",
+   ${bounded("public.production_batch_defects d JOIN public.production_batches b ON b.id=d.production_batch_id JOIN owned_runs run ON run.id=b.release_run_id")} AS "productionBatchDefects",
+   ${bounded("public.release_run_attempts a JOIN owned_runs run ON run.id=a.run_id")} AS "releaseRunAttempts",
+   ${bounded("public.release_run_results res JOIN owned_runs run ON run.id=res.run_id")} AS "releaseRunResults",
+   ${bounded("public.release_run_transition_events e JOIN owned_runs run ON run.id=e.release_run_id JOIN public.repositories repo ON repo.id=run.repository_id AND e.repository_id=repo.id AND e.installation_id=repo.installation_id")} AS "releaseRunTransitionEvents",
    ${bounded("public.board_bom_snapshots s JOIN public.boards b ON b.id=s.board_id JOIN owned_repositories r ON r.id=b.repository_id JOIN public.release_runs run ON run.id=s.run_id AND run.repository_id<>b.repository_id")} AS "foreignBomRunMismatch",
    ${bounded("public.repository_firmware_snapshots s JOIN owned_repositories r ON r.id=s.repository_id JOIN public.release_runs run ON run.id=s.run_id AND run.repository_id<>s.repository_id")} AS "foreignFirmwareRunMismatch",
-   ${bounded("public.run_pcb_footprint_summaries f JOIN owned_repositories r ON r.id=f.repository_id JOIN public.release_runs run ON run.id=f.run_id AND run.repository_id<>f.repository_id")} AS "foreignFootprintRunMismatch"
+   ${bounded("public.run_pcb_footprint_summaries f JOIN owned_repositories r ON r.id=f.repository_id JOIN public.release_runs run ON run.id=f.run_id AND run.repository_id<>f.repository_id")} AS "foreignFootprintRunMismatch",
+   ${bounded("public.release_run_results res JOIN owned_runs run ON run.id=res.run_id WHERE res.execution_attempt_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.release_run_attempts a WHERE a.id=res.execution_attempt_id AND a.run_id=res.run_id)")} AS "foreignResultAttemptMismatch",
+   ${bounded("public.release_run_transition_events e JOIN owned_runs run ON run.id=e.release_run_id JOIN public.repositories repo ON repo.id=run.repository_id WHERE e.repository_id<>run.repository_id OR e.installation_id<>repo.installation_id OR (e.execution_attempt_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.release_run_attempts a WHERE a.id=e.execution_attempt_id AND a.run_id=e.release_run_id))")} AS "foreignTransitionScopeMismatch"
    FROM owner_export
   WHERE EXISTS (SELECT 1 FROM former_installations)
   LIMIT 2`;
@@ -103,6 +119,8 @@ export async function assessHistoricalUserHardwareOwnedRowCounts(
           !validBoundedCount(record.foreignBomRunMismatch, 0) ||
           !validBoundedCount(record.foreignFirmwareRunMismatch, 0) ||
           !validBoundedCount(record.foreignFootprintRunMismatch, 0) ||
+          !validBoundedCount(record.foreignResultAttemptMismatch, 0) ||
+          !validBoundedCount(record.foreignTransitionScopeMismatch, 0) ||
           !sourceNames.every((name) => validBoundedCount(record[name]))
         )
           return null;

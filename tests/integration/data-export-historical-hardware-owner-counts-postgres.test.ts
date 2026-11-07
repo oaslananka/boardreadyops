@@ -21,6 +21,12 @@ const ids = {
   foreignBoardSnapshot: randomUUID(),
   firmwareSnapshot: randomUUID(),
   foreignFirmwareSnapshot: randomUUID(),
+  productionBatch: randomUUID(),
+  foreignProductionBatch: randomUUID(),
+  attempt: randomUUID(),
+  foreignAttempt: randomUUID(),
+  transition: randomUUID(),
+  foreignTransition: randomUUID(),
   crossBom: randomUUID(),
   crossFirmware: randomUUID(),
   crossFootprint: randomUUID(),
@@ -137,6 +143,51 @@ beforeAll(async () => {
     [randomUUID(), ids.foreignFirmwareSnapshot],
   );
   await db.query("INSERT INTO repository_firmware_advisory_watch(repository_id) VALUES ($1)", [ids.foreignRepository]);
+  await db.query("INSERT INTO board_supply_watch(board_id) VALUES($1),($2)", [ids.board, ids.foreignBoard]);
+  await db.query(
+    `INSERT INTO board_supply_findings(board_id,mpn,status,severity)
+     VALUES($1,'own-part','nrnd','high'),($2,'foreign-part','eol','critical')`,
+    [ids.board, ids.foreignBoard],
+  );
+  await db.query(
+    `INSERT INTO production_batches(id,release_run_id,external_batch_id,manufacturer,manufactured_on,quantity,source_kind,source_sha256)
+     VALUES($1,$2,'own-lot','owned-mfg',DATE '2026-08-05',2,'manual',$5),
+           ($3,$4,'foreign-lot','foreign-mfg',DATE '2026-08-05',2,'manual',$5)`,
+    [ids.productionBatch, ids.run, ids.foreignProductionBatch, ids.foreignRun, "b".repeat(64)],
+  );
+  await db.query(
+    `INSERT INTO production_batch_defects(production_batch_id,category,code,defect_count)
+     VALUES($1,'aoi','owned-defect',1),($2,'aoi','foreign-defect',1)`,
+    [ids.productionBatch, ids.foreignProductionBatch],
+  );
+  await db.query(
+    `INSERT INTO release_run_attempts(id,run_id,attempt_number,status)
+     VALUES($1,$2,1,'queued'),($3,$4,1,'queued')`,
+    [ids.attempt, ids.run, ids.foreignAttempt, ids.foreignRun],
+  );
+  await db.query(
+    `INSERT INTO release_run_results(run_id,execution_attempt_id,contract_version,status,conclusion,payload,result_digest)
+     VALUES($1,$2,1,'completed','success','{}'::jsonb,$5),
+           ($3,$4,1,'completed','success','{}'::jsonb,$6)`,
+    [ids.run, ids.attempt, ids.foreignRun, ids.foreignAttempt, "c".repeat(64), "d".repeat(64)],
+  );
+  await db.query(
+    `INSERT INTO release_run_transition_events(
+       id,installation_id,repository_id,release_run_id,entity_type,
+       from_status,to_status,from_version,to_version,reason_code)
+     VALUES($1,$2,$3,$4,'release_run','queued','running',0,1,'test_transition'),
+           ($5,$6,$7,$8,'release_run','queued','running',0,1,'test_transition')`,
+    [
+      ids.transition,
+      ids.installation,
+      ids.repository,
+      ids.run,
+      ids.foreignTransition,
+      ids.foreignInstallation,
+      ids.foreignRepository,
+      ids.foreignRun,
+    ],
+  );
   await db.query(
     `INSERT INTO run_pcb_footprint_summaries(
        run_id,repository_id,base_commit_sha,head_commit_sha,summary_sha256,summary)
@@ -158,7 +209,7 @@ afterAll(async () => {
 });
 
 describeDb("disposable PostgreSQL: original USER hardware data owner-count scope", () => {
-  it("counts seven related private source classes only under original numeric USER / suspended installation", async () => {
+  it("counts fourteen related private source classes only under original numeric USER / suspended installation", async () => {
     expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toEqual({
       scope: "original-numeric-user-retained-suspended-installation-only",
       releaseDecision: "NO_GO",
@@ -174,6 +225,13 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
         firmwareDependencies: 1,
         firmwareAdvisoryWatch: 1,
         runPcbFootprintSummaries: 1,
+        boardSupplyWatch: 1,
+        boardSupplyFindings: 1,
+        productionBatches: 1,
+        productionBatchDefects: 1,
+        releaseRunAttempts: 1,
+        releaseRunResults: 1,
+        releaseRunTransitionEvents: 1,
       },
     });
     expect(
@@ -231,6 +289,34 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
     } finally {
       await db?.query("DELETE FROM run_pcb_footprint_summaries WHERE run_id=$1", [ids.foreignRun]);
     }
+  });
+
+  it("fails closed when the original-user run result points to a FOREIGN user's execution attempt", async () => {
+    // Real PG uniqueness blocks one attempt referenced by two results.
+    // Temporarily clear the foreign result pointer first; leave all
+    // uniqueness constraints and the application-side fence intact.
+    try {
+      await database().query("UPDATE release_run_results SET execution_attempt_id=NULL WHERE run_id=$1", [
+        ids.foreignRun,
+      ]);
+      await database().query("UPDATE release_run_results SET execution_attempt_id=$1 WHERE run_id=$2", [
+        ids.foreignAttempt,
+        ids.run,
+      ]);
+      expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toBeNull();
+    } finally {
+      await database().query("UPDATE release_run_results SET execution_attempt_id=$1 WHERE run_id=$2", [
+        ids.attempt,
+        ids.run,
+      ]);
+      await database().query("UPDATE release_run_results SET execution_attempt_id=$1 WHERE run_id=$2", [
+        ids.foreignAttempt,
+        ids.foreignRun,
+      ]);
+    }
+    expect(
+      (await assessHistoricalUserHardwareOwnedRowCounts(database(), identity()))?.rowCounts.releaseRunResults,
+    ).toBe(1);
   });
 
   it("blocks even count-only diagnostics under legal hold and real erasure, then recovers safely", async () => {
