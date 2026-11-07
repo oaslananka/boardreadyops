@@ -123,10 +123,10 @@ Required independent review: Tenant versus platform-owned boundary, service inte
 | `repository_setup_revisions` | Not verified | DENY |
 | `runner_execution_policies` | Not verified | DENY |
 
-## Numeric original USER source-row attribution — fourteen hardware classes
+## Numeric original USER source-row attribution — eighteen hardware classes
 
 A separate **SOURCE-ONLY / COUNT-ONLY** PostgreSQL preflight now
-inspects the following fourteen classes from the hardware track using
+inspects the following eighteen classes from the hardware track using
 the exact immutable GitHub numeric USER on a pending uninstall export,
 its matching suspended USER installation and repository/run relationships:
 `boards`, `board_bom_snapshots`, `board_bom_components`,
@@ -134,8 +134,10 @@ its matching suspended USER installation and repository/run relationships:
 `repository_firmware_advisory_watch`, `run_pcb_footprint_summaries`,
 `board_supply_watch`, `board_supply_findings`, `production_batches`,
 `production_batch_defects`, `release_run_attempts`, `release_run_results`
-and `release_run_transition_events`.
-All fourteen remain **Not verified / DENY for customer disclosure**; this
+and `release_run_transition_events`, `supply_finding_suppressions`,
+`protected_release_intent_candidates`, `protected_release_execution_seals`
+and `signed_manufacturing_export_evidence`.
+All eighteen remain **Not verified / DENY for customer disclosure**; this
 preflight merely discovers bounded retained source-row counts (0–100
 per class). It does NOT inspect or return BOM values, repository names,
 firmware metadata, design files, private identifiers or row IDs.
@@ -143,9 +145,17 @@ Unknown owner, non-suspended installation, active tenant legal hold,
 real erasure or crossed foreign-repository run references reject the
 entire candidate. PostgreSQL returns counts in one consistent
 read-only snapshot. A zero count is NOT proof of archive completeness
-and a nonzero count is NOT a license to disclose. The remaining 5
-hardware-track classes are not yet covered by this row-attribution
-preflight. The future independently signed complete DB+filesystem
+and a nonzero count is NOT a license to disclose. The remaining **one** hardware-track class,
+`manufacturing_share_authorizations`, is NOT included: its workspace
+revision and mutable `projects.github_repo_full_name` do not alone
+establish immutable original USER repository ownership. Grant/revocation
+history can describe a third-party workspace member's explicit consent,
+not the former installation owner's redisclosure rights. This requires a
+separate, fully tested, identity-preserving linkage and rights decision.
+Protected-release candidates/seals and signed manufacturing evidence
+are counted only when their immutable repository, installation, run,
+attempt and artifact links match; forged cross-tenant links reject the
+entire count candidate. Counting them is NOT a release grant. The future independently signed complete DB+filesystem
 export and customer authorization remain blocked.
 
 ## Acceptance conditions (not met)

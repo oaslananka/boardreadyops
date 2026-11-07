@@ -20,6 +20,10 @@ const sourceKeys = [
   "releaseRunAttempts",
   "releaseRunResults",
   "releaseRunTransitionEvents",
+  "supplyFindingSuppressions",
+  "protectedReleaseIntentCandidates",
+  "protectedReleaseExecutionSeals",
+  "signedManufacturingExportEvidence",
 ] as const;
 const validRow = () => ({
   export_id: exportId,
@@ -29,6 +33,9 @@ const validRow = () => ({
   foreignFootprintRunMismatch: 0,
   foreignResultAttemptMismatch: 0,
   foreignTransitionScopeMismatch: 0,
+  foreignProtectedIntentMismatch: 0,
+  foreignProtectedSealMismatch: 0,
+  foreignSignedManufacturingMismatch: 0,
 });
 const fake = (returned: unknown) => {
   const query = vi.fn(async (_sql: string, _args: unknown[]) => ({ rows: returned }));
@@ -81,6 +88,14 @@ describe("source-only original numeric USER hardware ownership COUNT gate", () =
     expect(sql).toContain("public.release_run_transition_events");
     expect(sql).toContain('AS "foreignResultAttemptMismatch"');
     expect(sql).toContain('AS "foreignTransitionScopeMismatch"');
+    expect(sql).toContain('AS "foreignProtectedIntentMismatch"');
+    expect(sql).toContain('AS "foreignProtectedSealMismatch"');
+    expect(sql).toContain('AS "foreignSignedManufacturingMismatch"');
+    expect(sql).toContain("public.supply_finding_suppressions");
+    expect(sql).toContain("public.protected_release_intent_candidates");
+    expect(sql).toContain("public.protected_release_execution_seals");
+    expect(sql).toContain("public.signed_manufacturing_export_evidence");
+    expect(sql).not.toContain("public.manufacturing_share_authorizations");
     expect(sql).toContain("LIMIT 101");
     expect(sql).not.toContain("SELECT *");
     expect(db.query.mock.calls[0]?.[1]).toEqual([exportId, originalUserId]);
@@ -99,6 +114,11 @@ describe("source-only original numeric USER hardware ownership COUNT gate", () =
     ["cross tenant footprint", [{ ...validRow(), foreignFootprintRunMismatch: 1 }]],
     ["cross tenant result attempt", [{ ...validRow(), foreignResultAttemptMismatch: 1 }]],
     ["cross tenant transition", [{ ...validRow(), foreignTransitionScopeMismatch: 1 }]],
+    ["cross tenant intent", [{ ...validRow(), foreignProtectedIntentMismatch: 1 }]],
+    ["cross tenant seal", [{ ...validRow(), foreignProtectedSealMismatch: 1 }]],
+    ["cross tenant manufacturing evidence", [{ ...validRow(), foreignSignedManufacturingMismatch: 1 }]],
+    ["missing protected seal class", [{ ...validRow(), protectedReleaseExecutionSeals: undefined }]],
+    ["too many signed manufacturing records", [{ ...validRow(), signedManufacturingExportEvidence: 101 }]],
     ["missing supply class", [{ ...validRow(), boardSupplyWatch: undefined }]],
     ["unbounded manufacturing", [{ ...validRow(), productionBatchDefects: 101 }]],
     ["missing class", [{ ...validRow(), firmwareAdvisoryWatch: undefined }]],

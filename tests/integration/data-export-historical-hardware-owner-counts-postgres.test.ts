@@ -27,6 +27,20 @@ const ids = {
   foreignAttempt: randomUUID(),
   transition: randomUUID(),
   foreignTransition: randomUUID(),
+  finding: randomUUID(),
+  foreignFinding: randomUUID(),
+  suppression: randomUUID(),
+  foreignSuppression: randomUUID(),
+  intent: randomUUID(),
+  foreignIntent: randomUUID(),
+  seal: randomUUID(),
+  foreignSeal: randomUUID(),
+  sealRun: randomUUID(),
+  foreignSealRun: randomUUID(),
+  sealAttempt: randomUUID(),
+  foreignSealAttempt: randomUUID(),
+  artifact: randomUUID(),
+  foreignArtifact: randomUUID(),
   crossBom: randomUUID(),
   crossFirmware: randomUUID(),
   crossFootprint: randomUUID(),
@@ -145,9 +159,15 @@ beforeAll(async () => {
   await db.query("INSERT INTO repository_firmware_advisory_watch(repository_id) VALUES ($1)", [ids.foreignRepository]);
   await db.query("INSERT INTO board_supply_watch(board_id) VALUES($1),($2)", [ids.board, ids.foreignBoard]);
   await db.query(
-    `INSERT INTO board_supply_findings(board_id,mpn,status,severity)
-     VALUES($1,'own-part','nrnd','high'),($2,'foreign-part','eol','critical')`,
-    [ids.board, ids.foreignBoard],
+    `INSERT INTO board_supply_findings(id,board_id,mpn,status,severity)
+     VALUES($1,$2,'own-part','nrnd','high'),($3,$4,'foreign-part','eol','critical')`,
+    [ids.finding, ids.board, ids.foreignFinding, ids.foreignBoard],
+  );
+  await db.query(
+    `INSERT INTO supply_finding_suppressions(id,finding_id,reason,created_by,expires_at)
+     VALUES($1,$2,'owned test suppression','owner',now()+interval '1 day'),
+           ($3,$4,'foreign suppression','foreign',now()+interval '1 day')`,
+    [ids.suppression, ids.finding, ids.foreignSuppression, ids.foreignFinding],
   );
   await db.query(
     `INSERT INTO production_batches(id,release_run_id,external_batch_id,manufacturer,manufactured_on,quantity,source_kind,source_sha256)
@@ -189,6 +209,83 @@ beforeAll(async () => {
     ],
   );
   await db.query(
+    `INSERT INTO protected_release_intent_candidates
+       (id,installation_id,repository_id,github_repository_id,actor_github_user_id,actor_login,
+        ref,commit_sha,request_id,evidence_digest,observed_at)
+     SELECT $1,r.installation_id,r.id,r.github_repo_id,$2,$3,'refs/heads/main',$4,$5,$6,now()
+       FROM repositories r WHERE r.id=$7`,
+    [ids.intent, originalUserId, "owned-user", sha, "own-release-request", "e".repeat(64), ids.repository],
+  );
+  await db.query(
+    `INSERT INTO protected_release_intent_candidates
+       (id,installation_id,repository_id,github_repository_id,actor_github_user_id,actor_login,
+        ref,commit_sha,request_id,evidence_digest,observed_at)
+     SELECT $1,r.installation_id,r.id,r.github_repo_id,$2,$3,'refs/heads/main',$4,$5,$6,now()
+       FROM repositories r WHERE r.id=$7`,
+    [
+      ids.foreignIntent,
+      otherUserId,
+      "other-user",
+      sha,
+      "foreign-release-request",
+      "f".repeat(64),
+      ids.foreignRepository,
+    ],
+  );
+  await db.query(
+    `INSERT INTO protected_release_execution_seals
+       (id,candidate_id,installation_id,repository_id,github_repository_id,actor_github_user_id,
+        ref,commit_sha,evidence_digest,run_id,execution_attempt_id,snapshot_digest,sealed_at)
+     SELECT $1,c.id,c.installation_id,c.repository_id,c.github_repository_id,c.actor_github_user_id,
+            c.ref,c.commit_sha,c.evidence_digest,$2,$3,$4,now()
+       FROM protected_release_intent_candidates c WHERE c.id=$5`,
+    [ids.seal, ids.sealRun, ids.sealAttempt, "1".repeat(64), ids.intent],
+  );
+  await db.query(
+    `INSERT INTO protected_release_execution_seals
+       (id,candidate_id,installation_id,repository_id,github_repository_id,actor_github_user_id,
+        ref,commit_sha,evidence_digest,run_id,execution_attempt_id,snapshot_digest,sealed_at)
+     SELECT $1,c.id,c.installation_id,c.repository_id,c.github_repository_id,c.actor_github_user_id,
+            c.ref,c.commit_sha,c.evidence_digest,$2,$3,$4,now()
+       FROM protected_release_intent_candidates c WHERE c.id=$5`,
+    [ids.foreignSeal, ids.foreignSealRun, ids.foreignSealAttempt, "2".repeat(64), ids.foreignIntent],
+  );
+  await db.query(
+    `INSERT INTO artifacts(id,run_id,execution_attempt_id,kind,name,storage_path,sha256,bytes,role)
+     VALUES($1,$2,$3,'archive','manufacturing.tar.gz','private/own.tar.gz',$4,24,'manufacturing'),
+           ($5,$6,$7,'archive','foreign-manufacturing.tar.gz','private/foreign.tar.gz',$8,25,'manufacturing')`,
+    [
+      ids.artifact,
+      ids.run,
+      ids.attempt,
+      "a".repeat(64),
+      ids.foreignArtifact,
+      ids.foreignRun,
+      ids.foreignAttempt,
+      "b".repeat(64),
+    ],
+  );
+  await db.query(
+    `INSERT INTO signed_manufacturing_export_evidence
+       (run_id,execution_attempt_id,repository_id,installation_id,artifact_id,
+        github_repository_id,github_run_id,run_attempt,source_sha,signer_sha,source_ref,
+        workflow_path,manifest_sha256,bundle_sha256,subject_count)
+     SELECT $1,$2,r.id,r.installation_id,$3,r.github_repo_id,$4,1,$5,$5,'refs/heads/main',
+            '.github/workflows/release.yml',$6,$6,1
+       FROM repositories r WHERE r.id=$7`,
+    [ids.run, ids.attempt, ids.artifact, "123456789", sha, "c".repeat(64), ids.repository],
+  );
+  await db.query(
+    `INSERT INTO signed_manufacturing_export_evidence
+       (run_id,execution_attempt_id,repository_id,installation_id,artifact_id,
+        github_repository_id,github_run_id,run_attempt,source_sha,signer_sha,source_ref,
+        workflow_path,manifest_sha256,bundle_sha256,subject_count)
+     SELECT $1,$2,r.id,r.installation_id,$3,r.github_repo_id,$4,1,$5,$5,'refs/heads/main',
+            '.github/workflows/release.yml',$6,$6,1
+       FROM repositories r WHERE r.id=$7`,
+    [ids.foreignRun, ids.foreignAttempt, ids.foreignArtifact, "123456790", sha, "d".repeat(64), ids.foreignRepository],
+  );
+  await db.query(
     `INSERT INTO run_pcb_footprint_summaries(
        run_id,repository_id,base_commit_sha,head_commit_sha,summary_sha256,summary)
      VALUES($1,$2,$3,$3,$4,'{}'::jsonb)`,
@@ -209,7 +306,7 @@ afterAll(async () => {
 });
 
 describeDb("disposable PostgreSQL: original USER hardware data owner-count scope", () => {
-  it("counts fourteen related private source classes only under original numeric USER / suspended installation", async () => {
+  it("counts eighteen related private source classes only under original numeric USER / suspended installation", async () => {
     expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toEqual({
       scope: "original-numeric-user-retained-suspended-installation-only",
       releaseDecision: "NO_GO",
@@ -232,6 +329,10 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
         releaseRunAttempts: 1,
         releaseRunResults: 1,
         releaseRunTransitionEvents: 1,
+        supplyFindingSuppressions: 1,
+        protectedReleaseIntentCandidates: 1,
+        protectedReleaseExecutionSeals: 1,
+        signedManufacturingExportEvidence: 1,
       },
     });
     expect(
@@ -319,6 +420,67 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
     ).toBe(1);
   });
 
+  it("denies a protected intent with a FOREIGN installation on an original-user repository", async () => {
+    const forgedId = randomUUID();
+    try {
+      await database().query(
+        `INSERT INTO protected_release_intent_candidates
+           (id,installation_id,repository_id,github_repository_id,actor_github_user_id,actor_login,
+            ref,commit_sha,request_id,evidence_digest,observed_at)
+         SELECT $1,$2,r.id,r.github_repo_id,$3,'owned-user','refs/heads/main',$4,$5,$6,now()
+           FROM repositories r WHERE r.id=$7`,
+        [
+          forgedId,
+          ids.foreignInstallation,
+          originalUserId,
+          sha,
+          "forged-cross-installation",
+          "e".repeat(64),
+          ids.repository,
+        ],
+      );
+      expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toBeNull();
+    } finally {
+      await database().query("DELETE FROM protected_release_intent_candidates WHERE id=$1", [forgedId]);
+    }
+    expect(
+      (await assessHistoricalUserHardwareOwnedRowCounts(database(), identity()))?.rowCounts
+        .protectedReleaseIntentCandidates,
+    ).toBe(1);
+  });
+
+  it("denies a protected seal with a FOREIGN installation despite an owned candidate", async () => {
+    const forgedId = randomUUID();
+    try {
+      await database().query("DELETE FROM protected_release_execution_seals WHERE id=$1", [ids.seal]);
+      await database().query(
+        `INSERT INTO protected_release_execution_seals
+          (id,candidate_id,installation_id,repository_id,github_repository_id,actor_github_user_id,
+           ref,commit_sha,evidence_digest,run_id,execution_attempt_id,snapshot_digest,sealed_at)
+         SELECT $1,c.id,$2,c.repository_id,c.github_repository_id,c.actor_github_user_id,
+           c.ref,c.commit_sha,c.evidence_digest,$3,$4,$5,now()
+           FROM protected_release_intent_candidates c WHERE c.id=$6`,
+        [forgedId, ids.foreignInstallation, ids.sealRun, ids.sealAttempt, "1".repeat(64), ids.intent],
+      );
+      expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toBeNull();
+    } finally {
+      await database().query("DELETE FROM protected_release_execution_seals WHERE id=$1", [forgedId]);
+      await database().query(
+        `INSERT INTO protected_release_execution_seals
+          (id,candidate_id,installation_id,repository_id,github_repository_id,actor_github_user_id,
+           ref,commit_sha,evidence_digest,run_id,execution_attempt_id,snapshot_digest,sealed_at)
+         SELECT $1,c.id,c.installation_id,c.repository_id,c.github_repository_id,c.actor_github_user_id,
+           c.ref,c.commit_sha,c.evidence_digest,$2,$3,$4,now()
+           FROM protected_release_intent_candidates c WHERE c.id=$5`,
+        [ids.seal, ids.sealRun, ids.sealAttempt, "1".repeat(64), ids.intent],
+      );
+    }
+    expect(
+      (await assessHistoricalUserHardwareOwnedRowCounts(database(), identity()))?.rowCounts
+        .protectedReleaseExecutionSeals,
+    ).toBe(1);
+  });
+
   it("blocks even count-only diagnostics under legal hold and real erasure, then recovers safely", async () => {
     try {
       await db?.query(
@@ -338,5 +500,31 @@ describeDb("disposable PostgreSQL: original USER hardware data owner-count scope
       await db?.query("DELETE FROM legal_holds WHERE id=$1", [ids.hold]);
       await db?.query("DELETE FROM erasure_requests WHERE id=$1", [ids.erasure]);
     }
+  });
+
+  it("denies an additional immutable signed evidence row with FOREIGN installation despite an owned run", async () => {
+    const forgedAttempt = randomUUID();
+    const forgedArtifact = randomUUID();
+    await database().query(
+      "INSERT INTO release_run_attempts(id,run_id,attempt_number,status) VALUES($1,$2,2,'queued')",
+      [forgedAttempt, ids.run],
+    );
+    await database().query(
+      `INSERT INTO artifacts(id,run_id,execution_attempt_id,kind,name,storage_path,sha256,bytes,role)
+        VALUES($1,$2,$3,'archive','forged-manufacturing.tar.gz','private/forged.tar.gz',$4,22,'manufacturing')`,
+      [forgedArtifact, ids.run, forgedAttempt, "e".repeat(64)],
+    );
+    await database().query(
+      `INSERT INTO signed_manufacturing_export_evidence
+        (run_id,execution_attempt_id,repository_id,installation_id,artifact_id,
+         github_repository_id,github_run_id,run_attempt,source_sha,signer_sha,source_ref,
+         workflow_path,manifest_sha256,bundle_sha256,subject_count)
+       SELECT $1,$2,r.id,$3,$4,r.github_repo_id,'123456791',1,$5,$5,'refs/heads/main',
+        '.github/workflows/release.yml',$6,$6,1 FROM repositories r WHERE r.id=$7`,
+      [ids.run, forgedAttempt, ids.foreignInstallation, forgedArtifact, sha, "f".repeat(64), ids.repository],
+    );
+    expect(await assessHistoricalUserHardwareOwnedRowCounts(database(), identity())).toBeNull();
+    // Immutable evidence is deliberately not mutated or erased by this test.
+    // Disposable DB cleanup cascades the forged source record after the test.
   });
 });
