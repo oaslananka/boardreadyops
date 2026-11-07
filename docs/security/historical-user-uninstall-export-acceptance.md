@@ -272,6 +272,13 @@ session's original numeric user ID, not its mutable login. The temporary
 GitHub access token is not persisted or placed into the private ZIP.
 Only after a successful match may a private, permanently non-customer
 preflight be staged using existing locked database and artifact gates.
+The server rechecks the SAME pinned signed original-USER session after all
+GitHub provider IO. Elapsed server time is added to the initially verified
+clock, so a session aging beyond five minutes while GitHub responds, or a
+backward server clock jump during the call, denies even a valid numeric
+/user match. Request mutation cannot swap the signed cookie mid-flight.
+This is still only a source-side privacy diagnostic; it does not grant
+customer delivery, legal rights or archive completeness.
 It rejects invalid, expired, unrelated and foreign-account proofs.
 A separate **default-OFF** source-only OAuth start route now uses the
 already-registered GitHub callback URL. It requires a fresh signed session

@@ -128,6 +128,40 @@ describe("historical original numeric USER fresh live GitHub OAuth step-up (priv
     }
   });
 
+  it("rejects an OAuth provider response delivered after the signed original-user session becomes stale", async () => {
+    let clockMs = 1_794_015_000_000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => clockMs);
+    try {
+      const fetcher = liveFetch();
+      const delayedFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        const response = await fetcher(url, init);
+        if (String(url).startsWith("https://api.github.com/user/installations?")) clockMs += 6 * 60_000;
+        return response;
+      }) as typeof fetch;
+      expect(await freshLiveGitHubOriginalUserAuthority(proof(delayedFetch))).toBeNull();
+      expect(fetcher).toHaveBeenCalledTimes(3);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("rejects an OAuth response if the server clock rolls backward during provider IO", async () => {
+    let clockMs = 1_794_015_000_000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => clockMs);
+    try {
+      const fetcher = liveFetch();
+      const rollbackFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        const response = await fetcher(url, init);
+        if (String(url).startsWith("https://api.github.com/user/installations?")) clockMs -= 1;
+        return response;
+      }) as typeof fetch;
+      expect(await freshLiveGitHubOriginalUserAuthority(proof(rollbackFetch))).toBeNull();
+      expect(fetcher).toHaveBeenCalledTimes(3);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it("denies GitHub authorization-code exchange, /user auth failure and network errors", async () => {
     for (const failure of ["exchange", "viewer", "network"] as const) {
       expect(await freshLiveGitHubOriginalUserAuthority(proof(liveFetch(identityId, failure)))).toBeNull();

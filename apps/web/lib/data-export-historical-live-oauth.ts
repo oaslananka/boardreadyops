@@ -76,7 +76,18 @@ function verifiedGitHubCallbackUrl(environment: LiveProofInput["environment"]): 
 export async function freshLiveGitHubOriginalUserAuthority(
   input: LiveProofInput,
 ): Promise<{ exportId: string; verifiedGitHubUserId: number } | null> {
-  const signed = recentSignedHistoricalUserAuthority(input);
+  // The signed session must still be fresh AFTER the awaited provider call.
+  // Pin the request-bound identity and clock before any network IO; a caller
+  // mutating the input object cannot replace the cookie midway through OAuth.
+  const startedAtMs = Date.now();
+  const initialNowMs = input.now?.getTime() ?? startedAtMs;
+  if (!Number.isSafeInteger(startedAtMs) || !Number.isSafeInteger(initialNowMs)) return null;
+  const session = {
+    exportId: input.exportId,
+    sessionCookie: input.sessionCookie,
+    environment: input.environment,
+  };
+  const signed = recentSignedHistoricalUserAuthority({ ...session, now: new Date(initialNowMs) });
   if (!signed || !verifiedCallbackState(input, signed.exportId)) return null;
 
   const configuration = configuredGitHubOAuth(input.environment);
@@ -87,7 +98,18 @@ export async function freshLiveGitHubOriginalUserAuthority(
     const identity = await resolveGitHubUserIdentity(configuration, input.authorizationCode, callbackUrl, {
       fetch: input.fetch,
     });
-    return identity?.userId === signed.verifiedGitHubUserId ? signed : null;
+    const finishedAtMs = Date.now();
+    if (!Number.isSafeInteger(finishedAtMs) || finishedAtMs < startedAtMs) return null;
+    const elapsedMs = finishedAtMs - startedAtMs;
+    const current = recentSignedHistoricalUserAuthority({
+      ...session,
+      now: new Date(initialNowMs + elapsedMs),
+    });
+    return identity?.userId === signed.verifiedGitHubUserId &&
+      current?.verifiedGitHubUserId === signed.verifiedGitHubUserId &&
+      current.exportId === signed.exportId
+      ? signed
+      : null;
   } catch {
     // GitHub availability, code exchange, identity or transport failure
     // may NEVER turn stale browser-session claims into trusted authority.
