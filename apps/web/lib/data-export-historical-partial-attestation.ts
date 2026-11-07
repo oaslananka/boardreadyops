@@ -1,4 +1,5 @@
 import { type KeyObject, sign, verify } from "node:crypto";
+import { assessHistoricalUserSchemaCoverage } from "../../../packages/db/src/data-export-historical-schema-coverage.js";
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
 import { verifyReservedHistoricalUserPrivatePartial } from "./data-export-historical-partial-read.js";
 
@@ -152,6 +153,12 @@ export async function signHistoricalUserPartialObservation(input: {
       receipt.customerDeliveryAllowed !== false
     )
       return null;
+    // A cryptographic source-only statement must not silently inherit
+    // unknown database classes or changed columns after a schema migration.
+    // This separate diagnostic does NOT prove a complete/customer-eligible
+    // data snapshot; it is an extra fail-closed signing precondition only.
+    const schema = await assessHistoricalUserSchemaCoverage(input.db);
+    if (schema.status !== "known_schema_scope_unapproved") return null;
     // Never accept an externally selected signing time.
     const issuedAtMs = Date.now();
     if (!validClock(issuedAtMs)) return null;

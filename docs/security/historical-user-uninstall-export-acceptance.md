@@ -251,6 +251,24 @@ customer ZIP, independently scoped source rights, complete archive,
 delivery URL, bearer token or streaming entitlement exists. This
 migration and its feature flag remain UNDEPLOYED and OFF.
 
+**SOURCE-ONLY source-schema coverage guard:** The original-user private
+data-class audit now fingerprints the complete catalog structure, not
+customer rows: public base-table names and all ordered column names,
+types and nullability as observed in PostgreSQL 17 after migration 0126.
+The explicit baseline is **92 tables / 1,033 columns**, with 13 tables
+contributing to the **redacted partial private metadata candidate**,
+16 deliberately sensitive withheld classes and **63 further tables still
+requiring an independent source/ownership/IP-scope decision**. A newly
+added table, changed column or unavailable catalog produces a
+`schema_drift` or `unavailable` assessment. Neither the known baseline
+nor a green signature means a complete export or approved legal scope:
+**every assessment is NO_GO / customerDeliveryAllowed=false**. The
+source-only Ed25519 partial-integrity helper refuses to sign unless this
+independent catalog check recognizes the current schema. Its check is
+not an atomic DB+filesystem snapshot seal and does not inspect row
+completeness, user consent, provider files or disclosure rights.
+Public customer delivery must not be enabled based on this report.
+
 ## Required to satisfy Issue #44's outstanding customer acceptance
 
 1. Approve and test exact BoardReadyOps-owned include/exclude boundaries,

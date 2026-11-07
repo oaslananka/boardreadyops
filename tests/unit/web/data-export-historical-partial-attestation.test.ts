@@ -5,12 +5,18 @@ import {
   verifyHistoricalUserPartialObservation,
 } from "../../../apps/web/lib/data-export-historical-partial-attestation.js";
 import { verifyReservedHistoricalUserPrivatePartial } from "../../../apps/web/lib/data-export-historical-partial-read.js";
+import { assessHistoricalUserSchemaCoverage } from "../../../packages/db/src/data-export-historical-schema-coverage.js";
+
+vi.mock("../../../packages/db/src/data-export-historical-schema-coverage.js", () => ({
+  assessHistoricalUserSchemaCoverage: vi.fn(),
+}));
 
 vi.mock("../../../apps/web/lib/data-export-historical-partial-read.js", () => ({
   verifyReservedHistoricalUserPrivatePartial: vi.fn(),
 }));
 
 const verifiedRead = vi.mocked(verifyReservedHistoricalUserPrivatePartial);
+const schemaCheck = vi.mocked(assessHistoricalUserSchemaCoverage);
 const now = 1794015000000;
 const lifetime = 5 * 60_000;
 
@@ -45,6 +51,19 @@ function fixture() {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.spyOn(Date, "now").mockReturnValue(now);
+  schemaCheck.mockResolvedValue({
+    status: "known_schema_scope_unapproved",
+    releaseDecision: "NO_GO",
+    completeCustomerExport: false,
+    customerDeliveryAllowed: false,
+    tableCount: 92,
+    columnCount: 1033,
+    partialPrivateMetadataTableCount: 13,
+    withheldSensitiveTableCount: 16,
+    otherTablesRequiringScopeReview: 63,
+    unrecognizedTableCount: 0,
+    schemaSha256: "45d6db6d25b6e61a0950333a5f9d81b17e2895c21736688b08cc00d49b3dfe63",
+  });
   verifiedRead.mockImplementation(async (input) => ({
     sha256: input.sha256,
     byteLength: input.byteLength,
@@ -108,6 +127,23 @@ describe("source-only original USER signed partial integrity observations", () =
   ] as const)("does not sign %s", async (_, result) => {
     const f = fixture();
     verifiedRead.mockResolvedValueOnce(result as never);
+    expect(await signHistoricalUserPartialObservation(f)).toBeNull();
+  });
+
+  it.each(["schema_drift", "unavailable"] as const)(
+    "refuses to sign a verified ZIP when database catalog status is %s",
+    async (status) => {
+      const f = fixture();
+      schemaCheck.mockResolvedValueOnce({ status } as never);
+      expect(await signHistoricalUserPartialObservation(f)).toBeNull();
+      expect(verifiedRead).toHaveBeenCalledOnce();
+      expect(schemaCheck).toHaveBeenCalledExactlyOnceWith(f.db);
+    },
+  );
+
+  it("does not sign a verified ZIP if PostgreSQL schema inspection throws", async () => {
+    const f = fixture();
+    schemaCheck.mockRejectedValueOnce(new Error("No permissions to inspect catalog"));
     expect(await signHistoricalUserPartialObservation(f)).toBeNull();
   });
 
