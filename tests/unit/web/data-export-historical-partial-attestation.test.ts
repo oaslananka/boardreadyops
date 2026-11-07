@@ -108,6 +108,96 @@ describe("source-only original USER signed partial integrity observations", () =
     ).toBe(true);
   });
 
+  it("pins DB, private ZIP root, key ID and signing key before an async source-read mutation", async () => {
+    const f = fixture();
+    const originalDb = f.db;
+    const originalRoot = f.archiveRoot;
+    const originalKeyId = f.keyId;
+    const originalBinding = { ...f.binding };
+    const other = generateKeyPairSync("ed25519");
+    scopeCheck.mockImplementationOnce(async () => {
+      // Simulate an attacker changing a mutable caller-owned request *after*
+      // the source-read started but *before* the physical ZIP reservation.
+      f.db = { query: vi.fn(), withTransaction: vi.fn() } as never;
+      f.archiveRoot = "/untrusted/private-zip-root";
+      f.keyId = "untrusted-rotated-key";
+      f.privateKey = other.privateKey;
+      return {
+        status: "known-relational-source-scope-unapproved",
+        releaseDecision: "NO_GO",
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+        sourceRightsVerified: false,
+        thirdPartyDisclosureRightsVerified: false,
+        tableCount: 92,
+        sourceClassCount: 19,
+        scopeFingerprintSha256: "a".repeat(64),
+      };
+    });
+
+    const proof = await signHistoricalUserPartialObservation(f);
+    const authority = {
+      exportId: originalBinding.exportId,
+      verifiedGitHubUserId: originalBinding.verifiedGitHubUserId,
+    };
+    expect(scopeCheck).toHaveBeenNthCalledWith(1, originalDb, authority);
+    expect(scopeCheck).toHaveBeenNthCalledWith(2, originalDb, authority);
+    expect(verifiedRead).toHaveBeenCalledExactlyOnceWith({
+      db: originalDb,
+      archiveRoot: originalRoot,
+      authority,
+      preflightId: originalBinding.preflightId,
+      sha256: originalBinding.sha256,
+      byteLength: originalBinding.byteLength,
+    });
+    expect(proof?.keyId).toBe(originalKeyId);
+    expect(verifyHistoricalUserPartialObservation({ ...f.expected, observation: proof })).toBe(true);
+    expect(
+      verifyHistoricalUserPartialObservation({
+        ...f.expected,
+        observation: proof,
+        trustedPublicKey: other.publicKey,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not switch to a different DB, root or signing key after physical ZIP read", async () => {
+    const f = fixture();
+    const originalDb = f.db;
+    const originalRoot = f.archiveRoot;
+    const originalKeyId = f.keyId;
+    const other = generateKeyPairSync("ed25519");
+    verifiedRead.mockImplementationOnce(async () => {
+      f.db = { query: vi.fn(), withTransaction: vi.fn() } as never;
+      f.archiveRoot = "/late-untrusted/archive-root";
+      f.keyId = "other-key-after-io";
+      f.privateKey = other.privateKey;
+      return {
+        sha256: f.binding.sha256,
+        byteLength: f.binding.byteLength,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+      };
+    });
+    const proof = await signHistoricalUserPartialObservation(f);
+    expect(scopeCheck).toHaveBeenCalledTimes(2);
+    for (const [db] of scopeCheck.mock.calls) expect(db).toBe(originalDb);
+    expect(verifiedRead.mock.calls[0]?.[0].archiveRoot).toBe(originalRoot);
+    expect(proof?.keyId).toBe(originalKeyId);
+    expect(verifyHistoricalUserPartialObservation({ ...f.expected, observation: proof })).toBe(true);
+    expect(
+      verifyHistoricalUserPartialObservation({ ...f.expected, observation: proof, trustedPublicKey: other.publicKey }),
+    ).toBe(false);
+  });
+
+  it("rejects missing source DB before reading the private ZIP", async () => {
+    const f = fixture();
+    expect(await signHistoricalUserPartialObservation({ ...f, db: null as never })).toBeNull();
+    expect(await signHistoricalUserPartialObservation({ ...f, db: { query: vi.fn() } as never })).toBeNull();
+    expect(scopeCheck).not.toHaveBeenCalled();
+    expect(verifiedRead).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["no committed read", null],
     [

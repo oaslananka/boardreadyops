@@ -156,6 +156,19 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
 - No historical customer ZIP endpoint, bearer capability or release status
   exists. Every diagnostic returns customer-ready false / NO_GO.
 
+The private source-only Ed25519 observation **signer** now freezes its
+trusted database executor, local archive root, key identifier and private
+signing KeyObject alongside the original numeric USER/export/ZIP binding
+**before the first asynchronous source read**. Mutating a caller-owned
+input object during source scope sampling or after reserved physical ZIP
+verification cannot redirect later checks to another DB or path, or
+substitute a different signing key/identifier. Missing database
+transaction capability rejects before any physical read. Regression
+tests exercise both mutation windows, verify the original trusted key
+and original storage/DB are used, and reject the substituted key.
+This is an integrity-only guard for the existing **partial** observation,
+not atomic DB/filesystem sealing or customer permission.
+
 **SOURCE-ONLY Ed25519 partial-integrity observation v2 (NOT a customer signature):**
 After a durable private ZIP reader reservation, independent original numeric
 GitHub USER/preflight/physical-object revalidation and successful reader

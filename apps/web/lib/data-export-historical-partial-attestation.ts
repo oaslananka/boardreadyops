@@ -153,12 +153,21 @@ export async function signHistoricalUserPartialObservation(input: {
   if (
     !validBinding(input?.binding) ||
     !validKeyId(input?.keyId) ||
+    !input?.db?.withTransaction ||
+    !input.db.query ||
+    typeof input.archiveRoot !== "string" ||
     input?.privateKey?.type !== "private" ||
     input.privateKey.asymmetricKeyType !== "ed25519"
   )
     return null;
 
-  // Freeze all original USER/file identity before the asynchronous read.
+  // Freeze EVERY trust-bearing dependency, not just the original USER
+  // identity. An async verifier must never retarget the DB, storage root or
+  // Ed25519 key after its first source-only scope check has started.
+  const db = input.db;
+  const archiveRoot = input.archiveRoot;
+  const keyId = input.keyId;
+  const privateKey = input.privateKey;
   const binding: OriginalUserBinding = {
     exportId: input.binding.exportId,
     verifiedGitHubUserId: input.binding.verifiedGitHubUserId,
@@ -171,12 +180,12 @@ export async function signHistoricalUserPartialObservation(input: {
     // epochs BEFORE physical ZIP verification. The second check below must
     // match this exact digest or the signer refuses the observation.
     const authority = { exportId: binding.exportId, verifiedGitHubUserId: binding.verifiedGitHubUserId };
-    const initialScope = await assessHistoricalUserSourceScope(input.db, authority);
+    const initialScope = await assessHistoricalUserSourceScope(db, authority);
     if (!validPrivateScope(initialScope)) return null;
 
     const receipt = await verifyReservedHistoricalUserPrivatePartial({
-      db: input.db,
-      archiveRoot: input.archiveRoot,
+      db,
+      archiveRoot,
       authority,
       preflightId: binding.preflightId,
       sha256: binding.sha256,
@@ -193,7 +202,7 @@ export async function signHistoricalUserPartialObservation(input: {
     // Fail closed on original-USER schema, hardware-count or tracked ABA
     // epoch changes while IO was in progress; do NOT assert this guards
     // untracked row edits or supplies a DB/FS atomic materialization.
-    const scope = await assessHistoricalUserSourceScope(input.db, authority);
+    const scope = await assessHistoricalUserSourceScope(db, authority);
     if (!validPrivateScope(scope) || scope.scopeFingerprintSha256 !== initialScope.scopeFingerprintSha256) return null;
     // Never accept an externally selected signing time.
     const issuedAtMs = Date.now();
@@ -205,7 +214,7 @@ export async function signHistoricalUserPartialObservation(input: {
       sourceScopeSha256: scope.scopeFingerprintSha256,
       completeCustomerExport: false,
       customerDeliveryAllowed: false,
-      keyId: input.keyId,
+      keyId,
       ...binding,
       issuedAtMs,
       expiresAtMs: issuedAtMs + lifetimeMs,
@@ -213,7 +222,7 @@ export async function signHistoricalUserPartialObservation(input: {
     if (!validClock(payload.expiresAtMs)) return null;
     const message = observationBytes(payload);
     try {
-      const signature = sign(null, message, input.privateKey).toString("base64url");
+      const signature = sign(null, message, privateKey).toString("base64url");
       return { ...payload, signature };
     } finally {
       // The observation contains the original numeric USER; clear the
