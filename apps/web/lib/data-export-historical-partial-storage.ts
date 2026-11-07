@@ -120,15 +120,22 @@ export async function readSealedHistoricalUserPartial(input: {
     )
       return null;
     if (!verifyHistoricalUserPartialArchive(bytes, input.sha256, input.exportId)) return null;
-    accepted = true; // Ownership of the verified buffer transfers to the caller.
-    return bytes;
+    // Verification alone does not transfer buffer ownership: the descriptor
+    // must also close cleanly before the private bytes may leave this function.
+    accepted = true;
   } catch {
     return null;
   } finally {
-    // Failed integrity validation must not retain private ZIP bytes in memory.
+    try {
+      await handle.close();
+    } catch {
+      accepted = false;
+    }
+    // Failed integrity checks, IO errors and failed descriptor close all
+    // deny the read and zeroize the allocated private ZIP contents.
     if (!accepted) bytes?.fill(0);
-    await handle.close();
   }
+  return accepted ? bytes : null;
 }
 
 /** Private partial-only persistence: 0700 owner-private root, 0600

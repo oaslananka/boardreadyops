@@ -104,6 +104,28 @@ describe("source-only historical private ZIP bounded file-descriptor reads", () 
     expect(captured?.every((byte) => byte === 0)).toBe(true);
   });
 
+  it("does not release verified ZIP bytes when the file descriptor fails to close", async () => {
+    const { input } = await privateFixture();
+    const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    vi.mocked(open).mockImplementationOnce(async (...args) => {
+      const handle = await actual.open(...args);
+      const close = handle.close.bind(handle);
+      handle.close = (async () => {
+        await close();
+        throw new Error("Simulated unsafe descriptor close");
+      }) as FileHandle["close"];
+      return handle;
+    });
+    let captured: Buffer | null = null;
+    vi.mocked(verifyHistoricalUserPartialArchive).mockImplementationOnce((bytes) => {
+      captured = bytes;
+      return true;
+    });
+    expect(await readSealedHistoricalUserPartial(input)).toBeNull();
+    expect(captured).not.toBeNull();
+    expect((captured as Buffer | null)?.every((byte: number) => byte === 0)).toBe(true);
+  });
+
   it("rejects forged sizes outside the 64 MiB budget before opening any ZIP", async () => {
     const { input } = await privateFixture();
     for (const byteLength of [0, -1, Number.NaN, 64 * 1024 * 1024 + 1]) {

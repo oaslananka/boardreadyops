@@ -53,9 +53,14 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   the partial-ZIP v3 receipt. The SOURCE-ONLY direct reader allocates
   only the exact preflight byte length (at most 64 MiB), reads by
   explicit descriptor offsets and probes one extra byte; concurrent
-  growth, truncation, changed file metadata or a failed digest rejects
-  and zeroes the private read buffer instead of allowing unbounded
-  readFile allocation. This is still NOT customer streaming. A separate
+  growth, truncation, changed file metadata, failed descriptor close
+  or a failed digest rejects and zeroes the private read buffer instead
+  of allowing unbounded readFile allocation or releasing bytes after
+  an unsuccessful close. The higher-level SOURCE-ONLY reserved reader
+  returns no receipt without its committed reader reservation,
+  independent original USER preflight revalidation, successful
+  zeroization and durable reservation release. This is still NOT
+  customer streaming. A separate
   private orchestration path
   performs a SECOND original numeric USER DB and physical object/
   hold/retention verification AFTER fsync. Wrong user, changed bytes,
