@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   signHistoricalUserPartialObservation,
   verifyHistoricalUserPartialObservation,
+  verifyHistoricalUserPartialObservationCurrent,
 } from "../../../apps/web/lib/data-export-historical-partial-attestation.js";
 import { verifyReservedHistoricalUserPrivatePartial } from "../../../apps/web/lib/data-export-historical-partial-read.js";
 import { assessHistoricalUserSourceScope } from "../../../packages/db/src/data-export-historical-source-scope.js";
@@ -33,7 +34,7 @@ function fixture() {
     db: { query: vi.fn(), withTransaction: vi.fn() } as never,
     archiveRoot: "/owner-private/.private-export-archives",
     binding,
-    keyId: "historical-source-only-ed25519-v1",
+    keyId: "historical-source-only-ed25519-v2",
     privateKey,
   };
   return {
@@ -43,6 +44,7 @@ function fixture() {
       trustedPublicKey: publicKey,
       expectedKeyId: input.keyId,
       expectedBinding: binding,
+      expectedSourceScopeSha256: "a".repeat(64),
       nowMs: now,
     },
   };
@@ -81,7 +83,8 @@ describe("source-only original USER signed partial integrity observations", () =
     expect(proof).toMatchObject({
       kind: "boardreadyops.historical-user-source-only-partial-observation",
       scope: "partial-integrity-only-not-customer-delivery",
-      formatVersion: 1,
+      formatVersion: 2,
+      sourceScopeSha256: "a".repeat(64),
       completeCustomerExport: false,
       customerDeliveryAllowed: false,
       ...f.binding,
@@ -178,6 +181,7 @@ describe("source-only original USER signed partial integrity observations", () =
       "other archive byte length",
       (f: ReturnType<typeof fixture>) => ({ expectedBinding: { ...f.binding, byteLength: 1023 } }),
     ],
+    ["different source scope", () => ({ expectedSourceScopeSha256: "b".repeat(64) })],
     ["different key ID", () => ({ expectedKeyId: "rotated-key" })],
     ["expired", () => ({ nowMs: now + lifetime })],
     ["before observation issued", () => ({ nowMs: now - 1 })],
@@ -200,6 +204,8 @@ describe("source-only original USER signed partial integrity observations", () =
     ["purpose promoted to customer", { scope: "customer-delivery-ready" }],
     ["customer ready flag", { customerDeliveryAllowed: true }],
     ["complete archive lie", { completeCustomerExport: true }],
+    ["source scope digest changed", { sourceScopeSha256: "b".repeat(64) }],
+    ["legacy v1 downgrade", { formatVersion: 1 }],
     ["additional unapproved field", { downloadUrl: "https://example.test/file" }],
     ["altered signing time", { issuedAtMs: now + 1 }],
     ["altered expiry", { expiresAtMs: now + lifetime + 1 }],
@@ -210,6 +216,102 @@ describe("source-only original USER signed partial integrity observations", () =
     expect(verifyHistoricalUserPartialObservation({ ...f.expected, observation: { ...proof, ...changed } })).toBe(
       false,
     );
+  });
+
+  it("rejects a cryptographically valid but stale observation after original USER source-count drift", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      true,
+    );
+    scopeCheck.mockResolvedValueOnce({
+      status: "known-relational-source-scope-unapproved",
+      releaseDecision: "NO_GO",
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      sourceRightsVerified: false,
+      thirdPartyDisclosureRightsVerified: false,
+      tableCount: 92,
+      sourceClassCount: 19,
+      scopeFingerprintSha256: "b".repeat(64),
+    });
+    expect(verifyHistoricalUserPartialObservation({ ...f.expected, observation: proof })).toBe(true);
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      false,
+    );
+  });
+
+  it("rejects stale, unavailable or promoted-source observations before customer delivery", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    scopeCheck.mockResolvedValueOnce(null);
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      false,
+    );
+    scopeCheck.mockRejectedValueOnce(new Error("Snapshot read failed"));
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      false,
+    );
+    scopeCheck.mockResolvedValueOnce({
+      status: "known-relational-source-scope-unapproved",
+      releaseDecision: "NO_GO",
+      completeCustomerExport: false,
+      customerDeliveryAllowed: true,
+      sourceRightsVerified: false,
+      thirdPartyDisclosureRightsVerified: false,
+      tableCount: 92,
+      sourceClassCount: 19,
+      scopeFingerprintSha256: "a".repeat(64),
+    } as never);
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      false,
+    );
+  });
+
+  it("does not query the DB for tampered signatures, legacy v1 or wrong original USER identity", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    scopeCheck.mockClear();
+    for (const observation of [
+      { ...proof, formatVersion: 1 },
+      { ...proof, sourceScopeSha256: "b".repeat(64) },
+      { ...proof, customerDeliveryAllowed: true },
+    ]) {
+      expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation })).toBe(false);
+    }
+    expect(
+      await verifyHistoricalUserPartialObservationCurrent({
+        ...f.expected,
+        db: f.db,
+        observation: proof,
+        expectedBinding: { ...f.binding, verifiedGitHubUserId: f.binding.verifiedGitHubUserId + 1 },
+      }),
+    ).toBe(false);
+    expect(scopeCheck).not.toHaveBeenCalled();
+  });
+
+  it("never signs a malformed, missing or delivery-promoted source-scope observation", async () => {
+    const f = fixture();
+    for (const change of [
+      { scopeFingerprintSha256: "b" },
+      { sourceClassCount: 18 },
+      { customerDeliveryAllowed: true },
+      { sourceRightsVerified: true },
+    ]) {
+      scopeCheck.mockResolvedValueOnce({
+        status: "known-relational-source-scope-unapproved",
+        releaseDecision: "NO_GO",
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+        sourceRightsVerified: false,
+        thirdPartyDisclosureRightsVerified: false,
+        tableCount: 92,
+        sourceClassCount: 19,
+        scopeFingerprintSha256: "a".repeat(64),
+        ...change,
+      } as never);
+      expect(await signHistoricalUserPartialObservation(f)).toBeNull();
+    }
   });
 
   it("rejects missing/invalid canonical signatures and an unsupported public key type", async () => {

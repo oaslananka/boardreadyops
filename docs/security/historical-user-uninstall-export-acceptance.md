@@ -136,17 +136,28 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
 - No historical customer ZIP endpoint, bearer capability or release status
   exists. Every diagnostic returns customer-ready false / NO_GO.
 
-**SOURCE-ONLY Ed25519 partial-integrity observation (NOT a customer signature):**
+**SOURCE-ONLY Ed25519 partial-integrity observation v2 (NOT a customer signature):**
 After a durable private ZIP reader reservation, independent original numeric
 GitHub USER/preflight/physical-object revalidation and successful reader
 release, an internal helper can sign a **five-minute** domain-separated
-observation. Its canonical message pins the original numeric USER, exact
-export UUID, private preflight UUID, ZIP SHA-256 and byte length, signing-key
-identifier and immutable `completeCustomerExport=false` /
-`customerDeliveryAllowed=false` flags. Verification requires an explicitly
-trusted, pinned Ed25519 public key and the exact expected binding; changing
-identity, archive, expiry, key or flags invalidates the signature. The
-signing timestamp comes from the server clock, not a request parameter.
+**format-v2** observation. The v2 canonical message pins the original numeric
+USER, export UUID, private preflight UUID, ZIP SHA-256/byte length,
+**the private USER/export-bound source-scope SHA-256** covering the known
+PostgreSQL catalog and 19 bounded hardware source-class counts, signing-key
+identifier, and immutable `completeCustomerExport=false` /
+`customerDeliveryAllowed=false` flags. The v2 domain and field allowlist
+reject legacy v1 signatures rather than silently upgrading old observations.
+Cryptographic verification requires a pinned Ed25519 public key, exact
+expected binding AND independently expected source-scope digest.
+An additional internal *live* verifier first authenticates the v2
+signature, then independently re-reads the original numeric USER's current
+source-scope digest and all NO_GO invariants. A changed schema, bounded
+source-count digest, legal hold, real erasure or denied owner scope blocks
+the private observation even within five minutes.
+**Count-preserving row edits, unlinkable legacy rows, cross-DB/FS races and
+third-party rights remain unproven; a live digest match is NOT archival
+completeness, no-mutation evidence or customer delivery authorization.**
+The signing timestamp comes from the server clock, not a request parameter.
 The private signing key is injected by the trusted server caller, never
 generated, logged, persisted or read from a user-provided field here.
 There is **no production key configuration, signer deployment, customer

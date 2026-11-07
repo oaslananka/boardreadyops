@@ -3,7 +3,7 @@ import { assessHistoricalUserSourceScope } from "../../../packages/db/src/data-e
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
 import { verifyReservedHistoricalUserPrivatePartial } from "./data-export-historical-partial-read.js";
 
-const domain = Buffer.from("boardreadyops:historical-user:source-only-partial-observation:v1\0", "utf8");
+const domain = Buffer.from("boardreadyops:historical-user:source-only-partial-observation:v2\0", "utf8");
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
 const sha256 = /^[0-9a-f]{64}$/u;
 const keyIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
@@ -20,8 +20,9 @@ type OriginalUserBinding = {
 
 export type HistoricalUserPartialObservation = OriginalUserBinding & {
   kind: "boardreadyops.historical-user-source-only-partial-observation";
-  formatVersion: 1;
+  formatVersion: 2;
   scope: "partial-integrity-only-not-customer-delivery";
+  sourceScopeSha256: string;
   completeCustomerExport: false;
   customerDeliveryAllowed: false;
   keyId: string;
@@ -42,6 +43,7 @@ const payloadFields = [
   "preflightId",
   "sha256",
   "byteLength",
+  "sourceScopeSha256",
   "issuedAtMs",
   "expiresAtMs",
 ] as const;
@@ -88,8 +90,10 @@ function isValidObservation(value: unknown, nowMs: number): value is HistoricalU
     ![...payloadFields, "signature"].every((key) => Object.hasOwn(row, key)) ||
     !validKeyId(row.keyId) ||
     row.kind !== "boardreadyops.historical-user-source-only-partial-observation" ||
-    row.formatVersion !== 1 ||
+    row.formatVersion !== 2 ||
     row.scope !== "partial-integrity-only-not-customer-delivery" ||
+    typeof row.sourceScopeSha256 !== "string" ||
+    !sha256.test(row.sourceScopeSha256) ||
     row.completeCustomerExport !== false ||
     row.customerDeliveryAllowed !== false ||
     !validClock(row.issuedAtMs) ||
@@ -161,14 +165,26 @@ export async function signHistoricalUserPartialObservation(input: {
       exportId: binding.exportId,
       verifiedGitHubUserId: binding.verifiedGitHubUserId,
     });
-    if (scope?.status !== "known-relational-source-scope-unapproved") return null;
+    if (
+      scope?.status !== "known-relational-source-scope-unapproved" ||
+      scope.releaseDecision !== "NO_GO" ||
+      scope.completeCustomerExport !== false ||
+      scope.customerDeliveryAllowed !== false ||
+      scope.sourceRightsVerified !== false ||
+      scope.thirdPartyDisclosureRightsVerified !== false ||
+      scope.tableCount !== 92 ||
+      scope.sourceClassCount !== 19 ||
+      !sha256.test(scope.scopeFingerprintSha256)
+    )
+      return null;
     // Never accept an externally selected signing time.
     const issuedAtMs = Date.now();
     if (!validClock(issuedAtMs)) return null;
     const payload: Omit<HistoricalUserPartialObservation, "signature"> = {
       kind: "boardreadyops.historical-user-source-only-partial-observation",
-      formatVersion: 1,
+      formatVersion: 2,
       scope: "partial-integrity-only-not-customer-delivery",
+      sourceScopeSha256: scope.scopeFingerprintSha256,
       completeCustomerExport: false,
       customerDeliveryAllowed: false,
       keyId: input.keyId,
@@ -198,6 +214,7 @@ export function verifyHistoricalUserPartialObservation(input: {
   trustedPublicKey: KeyObject;
   expectedKeyId: string;
   expectedBinding: OriginalUserBinding;
+  expectedSourceScopeSha256: string;
   nowMs?: number;
 }): boolean {
   const nowMs = input?.nowMs ?? Date.now();
@@ -205,6 +222,8 @@ export function verifyHistoricalUserPartialObservation(input: {
   if (
     !isValidObservation(proof, nowMs) ||
     !validBinding(input.expectedBinding) ||
+    typeof input.expectedSourceScopeSha256 !== "string" ||
+    !sha256.test(input.expectedSourceScopeSha256) ||
     !validKeyId(input.expectedKeyId) ||
     input?.trustedPublicKey?.type !== "public" ||
     input.trustedPublicKey.asymmetricKeyType !== "ed25519" ||
@@ -213,7 +232,8 @@ export function verifyHistoricalUserPartialObservation(input: {
     proof.verifiedGitHubUserId !== input.expectedBinding.verifiedGitHubUserId ||
     proof.preflightId !== input.expectedBinding.preflightId ||
     proof.sha256 !== input.expectedBinding.sha256 ||
-    proof.byteLength !== input.expectedBinding.byteLength
+    proof.byteLength !== input.expectedBinding.byteLength ||
+    proof.sourceScopeSha256 !== input.expectedSourceScopeSha256
   )
     return false;
   try {
@@ -224,6 +244,53 @@ export function verifyHistoricalUserPartialObservation(input: {
     } finally {
       message.fill(0);
     }
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * INTERNAL live re-verification. A matching historical Ed25519 signature
+ * alone is not a fresh entitlement: recompute the current original numeric
+ * USER scope under a NEW read-only snapshot and compare its exact digest.
+ * Deny after schema, bounded source-COUNT, legal hold, erasure or ownership drift.
+ * Still never authorizes customer bytes or complete DB+physical export.
+ */
+export async function verifyHistoricalUserPartialObservationCurrent(input: {
+  db: Pick<PgQueryExecutor, "withTransaction">;
+  observation: unknown;
+  trustedPublicKey: KeyObject;
+  expectedKeyId: string;
+  expectedBinding: OriginalUserBinding;
+  nowMs?: number;
+}): Promise<boolean> {
+  const proof = input?.observation;
+  if (!proof || typeof proof !== "object" || Array.isArray(proof)) return false;
+  const candidate = proof as Record<string, unknown>;
+  const expectedSourceScopeSha256 = candidate.sourceScopeSha256;
+  if (
+    typeof expectedSourceScopeSha256 !== "string" ||
+    !verifyHistoricalUserPartialObservation({ ...input, expectedSourceScopeSha256 })
+  )
+    return false;
+  // Verify the CURRENT source scope, not caller-selected or stale signature
+  // claims. The cryptographic check above never substitutes for DB policy.
+  try {
+    const scope = await assessHistoricalUserSourceScope(input.db, {
+      exportId: input.expectedBinding.exportId,
+      verifiedGitHubUserId: input.expectedBinding.verifiedGitHubUserId,
+    });
+    return (
+      scope?.status === "known-relational-source-scope-unapproved" &&
+      scope.releaseDecision === "NO_GO" &&
+      scope.completeCustomerExport === false &&
+      scope.customerDeliveryAllowed === false &&
+      scope.sourceRightsVerified === false &&
+      scope.thirdPartyDisclosureRightsVerified === false &&
+      scope.tableCount === 92 &&
+      scope.sourceClassCount === 19 &&
+      scope.scopeFingerprintSha256 === expectedSourceScopeSha256
+    );
   } catch {
     return false;
   }
