@@ -151,9 +151,16 @@ Cryptographic verification requires a pinned Ed25519 public key, exact
 expected binding AND independently expected source-scope digest.
 An additional internal *live* verifier first authenticates the v2
 signature, then independently re-reads the original numeric USER's current
-source-scope digest and all NO_GO invariants. A changed schema, bounded
-source-count digest, legal hold, real erasure or denied owner scope blocks
-the private observation even within five minutes.
+source-scope digest and all NO_GO invariants. It MUST also acquire a fresh
+committed private reader reservation, reopen and independently verify the
+still-present local ZIP, revalidate the current private DB/physical-object
+preflight and durably release the reservation. The signed source fingerprint
+must match both before AND after this physical re-read; a deleted/replaced
+ZIP, failed reservation/settlement, changed schema, bounded source-count
+digest, tracked mutation epoch, legal hold, real erasure or denied owner
+scope blocks the private observation even within five minutes.
+The archive root is a trusted server-injected private path, NOT a user-supplied
+URL, and no bytes or download capability are returned.
 For existing historical mutation epoch triggers from migrations 0118–0120
 (core repository/run/finding/artifact rows, supported review/collaboration,
 private visual and audit classes), the private source-scope digest now

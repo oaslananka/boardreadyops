@@ -268,14 +268,19 @@ export function verifyHistoricalUserPartialObservation(input: {
 }
 
 /**
- * INTERNAL live re-verification. A matching historical Ed25519 signature
- * alone is not a fresh entitlement: recompute the current original numeric
- * USER scope under a NEW read-only snapshot and compare its exact digest.
- * Deny after schema, bounded source-COUNT, legal hold, erasure or ownership drift.
- * Still never authorizes customer bytes or complete DB+physical export.
+ * INTERNAL physical+source LIVE re-verification. An authentic signature
+ * only describes a past PRIVATE partial ZIP observation, never an active
+ * entitlement or a customer delivery grant. Before and after an independently
+ * reserved/committed private ZIP read, scope must match the signed digest.
+ * Missing/deleted/corrupt ZIP, revoked preflight, failed durable release,
+ * source count/catalog/tracked epoch drift or DB outages FAIL CLOSED.
+ *
+ * Independent read-only DB snapshots and physical I/O are NOT a full
+ * DB/filesystem atomic snapshot; no rights, export completeness or delivery.
  */
 export async function verifyHistoricalUserPartialObservationCurrent(input: {
-  db: Pick<PgQueryExecutor, "withTransaction">;
+  db: PgQueryExecutor;
+  archiveRoot: string;
   observation: unknown;
   trustedPublicKey: KeyObject;
   expectedKeyId: string;
@@ -288,17 +293,48 @@ export async function verifyHistoricalUserPartialObservationCurrent(input: {
   const expectedSourceScopeSha256 = candidate.sourceScopeSha256;
   if (
     typeof expectedSourceScopeSha256 !== "string" ||
-    !verifyHistoricalUserPartialObservation({ ...input, expectedSourceScopeSha256 })
+    !verifyHistoricalUserPartialObservation({ ...input, expectedSourceScopeSha256 }) ||
+    !input?.db?.withTransaction ||
+    !input.db.query ||
+    typeof input.archiveRoot !== "string"
   )
     return false;
-  // Verify the CURRENT source scope, not caller-selected or stale signature
-  // claims. The cryptographic check above never substitutes for DB policy.
+
+  // Freeze all identifiers before any independent DB/physical asynchronous
+  // re-verification; never permit a mutable caller to switch identities.
+  const binding: OriginalUserBinding = {
+    exportId: input.expectedBinding.exportId,
+    verifiedGitHubUserId: input.expectedBinding.verifiedGitHubUserId,
+    preflightId: input.expectedBinding.preflightId,
+    sha256: input.expectedBinding.sha256,
+    byteLength: input.expectedBinding.byteLength,
+  };
+  const authority = { exportId: binding.exportId, verifiedGitHubUserId: binding.verifiedGitHubUserId };
   try {
-    const scope = await assessHistoricalUserSourceScope(input.db, {
-      exportId: input.expectedBinding.exportId,
-      verifiedGitHubUserId: input.expectedBinding.verifiedGitHubUserId,
+    const initial = await assessHistoricalUserSourceScope(input.db, authority);
+    if (!validPrivateScope(initial) || initial.scopeFingerprintSha256 !== expectedSourceScopeSha256) return false;
+
+    // A signature is never proof that the underlying ZIP still exists:
+    // independently reserve, physically hash/revalidate, recheck preflight
+    // and durably release before accepting any current private observation.
+    const receipt = await verifyReservedHistoricalUserPrivatePartial({
+      db: input.db,
+      archiveRoot: input.archiveRoot,
+      authority,
+      preflightId: binding.preflightId,
+      sha256: binding.sha256,
+      byteLength: binding.byteLength,
     });
-    return validPrivateScope(scope) && scope.scopeFingerprintSha256 === expectedSourceScopeSha256;
+    if (
+      receipt?.sha256 !== binding.sha256 ||
+      receipt.byteLength !== binding.byteLength ||
+      receipt.completeCustomerExport !== false ||
+      receipt.customerDeliveryAllowed !== false
+    )
+      return false;
+
+    const final = await assessHistoricalUserSourceScope(input.db, authority);
+    return validPrivateScope(final) && final.scopeFingerprintSha256 === expectedSourceScopeSha256;
   } catch {
     return false;
   }

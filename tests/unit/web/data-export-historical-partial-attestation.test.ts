@@ -44,6 +44,7 @@ function fixture() {
       trustedPublicKey: publicKey,
       expectedKeyId: input.keyId,
       expectedBinding: binding,
+      archiveRoot: input.archiveRoot,
       expectedSourceScopeSha256: "a".repeat(64),
       nowMs: now,
     },
@@ -352,6 +353,127 @@ describe("source-only original USER signed partial integrity observations", () =
     );
   });
 
+  it("rechecks the ACTUAL reserved private ZIP before accepting a current signed observation", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    verifiedRead.mockClear();
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      true,
+    );
+    expect(verifiedRead).toHaveBeenCalledExactlyOnceWith({
+      db: f.db,
+      archiveRoot: f.archiveRoot,
+      authority: { exportId: f.binding.exportId, verifiedGitHubUserId: f.binding.verifiedGitHubUserId },
+      preflightId: f.binding.preflightId,
+      sha256: f.binding.sha256,
+      byteLength: f.binding.byteLength,
+    });
+    expect(scopeCheck).toHaveBeenCalledTimes(4);
+  });
+
+  it("rejects a still cryptographically valid signature when the private ZIP vanishes or reservation release fails", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    verifiedRead.mockClear();
+    verifiedRead.mockResolvedValueOnce(null);
+    expect(verifyHistoricalUserPartialObservation({ ...f.expected, observation: proof })).toBe(true);
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      false,
+    );
+    expect(verifiedRead).toHaveBeenCalledOnce();
+    verifiedRead.mockRejectedValueOnce(new Error("private ZIP unavailable or reader release refused"));
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      false,
+    );
+    expect(verifiedRead).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a private ZIP replacement, invalid flags or metadata even with a matching source digest", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    for (const result of [
+      {
+        sha256: "b".repeat(64),
+        byteLength: f.binding.byteLength,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+      },
+      {
+        sha256: f.binding.sha256,
+        byteLength: f.binding.byteLength + 1,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+      },
+      {
+        sha256: f.binding.sha256,
+        byteLength: f.binding.byteLength,
+        completeCustomerExport: true,
+        customerDeliveryAllowed: false,
+      },
+      {
+        sha256: f.binding.sha256,
+        byteLength: f.binding.byteLength,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: true,
+      },
+    ]) {
+      verifiedRead.mockResolvedValueOnce(result as never);
+      expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+        false,
+      );
+    }
+  });
+
+  it("rejects owner-bound source drift DURING the re-read of a signed private ZIP", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    verifiedRead.mockImplementationOnce(async () => {
+      scopeCheck.mockResolvedValueOnce({
+        status: "known-relational-source-scope-unapproved",
+        releaseDecision: "NO_GO",
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+        sourceRightsVerified: false,
+        thirdPartyDisclosureRightsVerified: false,
+        tableCount: 92,
+        sourceClassCount: 19,
+        scopeFingerprintSha256: "b".repeat(64),
+      });
+      return {
+        sha256: f.binding.sha256,
+        byteLength: f.binding.byteLength,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+      };
+    });
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      false,
+    );
+  });
+
+  it("freezes signed original USER authority across the asynchronous physical re-read", async () => {
+    const f = fixture();
+    const proof = await signHistoricalUserPartialObservation(f);
+    const binding = { ...f.expected.expectedBinding };
+    verifiedRead.mockImplementationOnce(async () => {
+      // Mutate the SAME object passed to the verifier AFTER it froze the
+      // original numeric USER and ZIP identity, not an unused copy.
+      f.expected.expectedBinding.verifiedGitHubUserId += 1;
+      return {
+        sha256: binding.sha256,
+        byteLength: binding.byteLength,
+        completeCustomerExport: false,
+        customerDeliveryAllowed: false,
+      };
+    });
+    expect(await verifyHistoricalUserPartialObservationCurrent({ ...f.expected, db: f.db, observation: proof })).toBe(
+      true,
+    );
+    for (const call of scopeCheck.mock.calls.slice(2)) {
+      expect(call[1]).toEqual({ exportId: binding.exportId, verifiedGitHubUserId: binding.verifiedGitHubUserId });
+    }
+  });
+
   it("rejects stale, unavailable or promoted-source observations before customer delivery", async () => {
     const f = fixture();
     const proof = await signHistoricalUserPartialObservation(f);
@@ -379,10 +501,11 @@ describe("source-only original USER signed partial integrity observations", () =
     );
   });
 
-  it("does not query the DB for tampered signatures, legacy v1 or wrong original USER identity", async () => {
+  it("does not query the DB or read the ZIP for tampered signatures, legacy v1 or wrong original USER identity", async () => {
     const f = fixture();
     const proof = await signHistoricalUserPartialObservation(f);
     scopeCheck.mockClear();
+    verifiedRead.mockClear();
     for (const observation of [
       { ...proof, formatVersion: 1 },
       { ...proof, sourceScopeSha256: "b".repeat(64) },
@@ -399,6 +522,7 @@ describe("source-only original USER signed partial integrity observations", () =
       }),
     ).toBe(false);
     expect(scopeCheck).not.toHaveBeenCalled();
+    expect(verifiedRead).not.toHaveBeenCalled();
   });
 
   it("never signs a malformed, missing or delivery-promoted source-scope observation", async () => {
