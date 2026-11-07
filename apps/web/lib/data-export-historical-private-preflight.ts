@@ -147,13 +147,27 @@ export async function stageVerifiedHistoricalUserPrivateArchivePreflight(input: 
 }): Promise<{ id: string } | null> {
   if (!input?.db?.withTransaction || !input?.authority || !Number.isSafeInteger(input.authority.verifiedGitHubUserId))
     return null;
-  const fingerprint = verifiedPrivatePartialZipFingerprint(input.archiveBytes, input.authority.exportId);
-  if (!fingerprint || !(await privatePartialManifestCurrent(input.db, input.authority, fingerprint))) return null;
+  // Freeze the exact original numeric USER, export, DB and ZIP reference
+  // BEFORE the first await. A caller mutation cannot shift a later DB gate
+  // to another tenant while the physical archive is being inspected.
+  const db = input.db;
+  const authority: OriginalUserAuthority = {
+    exportId: input.authority.exportId,
+    verifiedGitHubUserId: input.authority.verifiedGitHubUserId,
+  };
+  const archiveBytes = input.archiveBytes;
+  const ttlSeconds = input.ttlSeconds;
+  const fingerprint = verifiedPrivatePartialZipFingerprint(archiveBytes, authority.exportId);
+  if (!fingerprint || !(await privatePartialManifestCurrent(db, authority, fingerprint))) return null;
+  // Archive bytes are CALLER-owned and mutable. The DB check may have
+  // yielded: refuse staging any receipt after a changed original ZIP.
+  if (archiveBytes.length !== fingerprint.archiveByteLength || sha256(archiveBytes) !== fingerprint.archiveSha256)
+    return null;
   return stageHistoricalUserPrivateDeliveryPreflight({
-    db: input.db,
-    authority: input.authority,
+    db,
+    authority,
     fingerprint,
-    ttlSeconds: input.ttlSeconds,
+    ttlSeconds,
   });
 }
 
@@ -166,12 +180,21 @@ export async function inspectVerifiedHistoricalUserPrivateArchivePreflight(input
 }): Promise<"current" | "stale"> {
   if (!input?.db?.withTransaction || !input?.authority || !Number.isSafeInteger(input.authority.verifiedGitHubUserId))
     return "stale";
-  const fingerprint = verifiedPrivatePartialZipFingerprint(input.archiveBytes, input.authority.exportId);
-  if (!fingerprint || !(await privatePartialManifestCurrent(input.db, input.authority, fingerprint))) return "stale";
+  const db = input.db;
+  const authority: OriginalUserAuthority = {
+    exportId: input.authority.exportId,
+    verifiedGitHubUserId: input.authority.verifiedGitHubUserId,
+  };
+  const archiveBytes = input.archiveBytes;
+  const id = input.id;
+  const fingerprint = verifiedPrivatePartialZipFingerprint(archiveBytes, authority.exportId);
+  if (!fingerprint || !(await privatePartialManifestCurrent(db, authority, fingerprint))) return "stale";
+  if (archiveBytes.length !== fingerprint.archiveByteLength || sha256(archiveBytes) !== fingerprint.archiveSha256)
+    return "stale";
   return inspectHistoricalUserPrivateDeliveryPreflight({
-    db: input.db,
-    authority: input.authority,
-    id: input.id,
+    db,
+    authority,
+    id,
     fingerprint,
   });
 }

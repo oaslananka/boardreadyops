@@ -132,6 +132,17 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   its response. The table does NOT hold verifiable worker identity:
   age and revocation cannot prove that a reader process is dead.
   This helper never releases any reservation or changes cleanup state.
+  The original USER source-only private preflight stage and inspect
+  helpers now freeze the exact numeric USER, export UUID, DB executor,
+  archive Buffer reference, request TTL/preflight ID before any
+  asynchronous physical-owner/source check. They independently hash
+  the caller-owned ZIP again after its original-user prepublication DB
+  inspection; mutation of its bytes while the DB check is running
+  fails closed rather than staging/accepting an out-of-date diagnostic.
+  Extracted metadata and physical-object copies remain zeroized; the
+  caller-owned ZIP is not mutated by the verifier. These are private
+  observation controls, **not** a coherent atomic DB/FS snapshot or
+  a proof that the caller cannot mutate the ZIP after final verification.
   The old direct low-level disk reader is not automatically wrapped,
   and no customer delivery reader/stream contract or DB+filesystem
   atomic commit exists. This cleanup MUST remain source-only, explicit

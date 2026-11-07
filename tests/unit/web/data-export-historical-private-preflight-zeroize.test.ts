@@ -134,6 +134,101 @@ describe("original GitHub USER private partial ZIP extracted-memory zeroization"
     expect(inspect).toHaveBeenCalledOnce();
   });
 
+  it("pins original USER, database, ZIP reference and TTL when a caller retargets the staging request mid-check", async () => {
+    const f = fixture();
+    const expectedAuthority = { ...f.authority };
+    const originalDb = f.db;
+    const originalBytes = f.archiveBytes;
+    const request = { db: f.db, authority: f.authority, archiveBytes: f.archiveBytes, ttlSeconds: 120 };
+    prepublication.mockImplementationOnce(async () => {
+      f.authority.exportId = randomUUID();
+      f.authority.verifiedGitHubUserId += 1;
+      request.db = { withTransaction: vi.fn() } as never;
+      request.archiveBytes = Buffer.from("substituted customer file");
+      request.ttlSeconds = 9876;
+      return "eligible";
+    });
+    expect(await stageVerifiedHistoricalUserPrivateArchivePreflight(request)).toEqual({ id: expect.any(String) });
+    expect(stage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db: originalDb,
+        authority: expectedAuthority,
+        ttlSeconds: 120,
+        fingerprint: expect.objectContaining({
+          archiveSha256: createHash("sha256").update(originalBytes).digest("hex"),
+          archiveByteLength: originalBytes.length,
+        }),
+      }),
+    );
+    for (const copy of f.copies) expect(copy.data.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("pins exact original USER, DB and private preflight ID while inspecting a previously verified ZIP", async () => {
+    const f = fixture();
+    const expectedAuthority = { ...f.authority };
+    const originalDb = f.db;
+    const preflightId = randomUUID();
+    const request = { db: f.db, authority: f.authority, id: preflightId, archiveBytes: f.archiveBytes };
+    prepublication.mockImplementationOnce(async () => {
+      f.authority.exportId = randomUUID();
+      f.authority.verifiedGitHubUserId += 1;
+      request.db = { withTransaction: vi.fn() } as never;
+      request.id = randomUUID();
+      request.archiveBytes = Buffer.from("substituted customer file");
+      return "eligible";
+    });
+    expect(await inspectVerifiedHistoricalUserPrivateArchivePreflight(request)).toBe("current");
+    expect(inspect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db: originalDb,
+        authority: expectedAuthority,
+        id: preflightId,
+        fingerprint: expect.objectContaining({
+          archiveSha256: createHash("sha256").update(f.archiveBytes).digest("hex"),
+        }),
+      }),
+    );
+    for (const copy of f.copies) expect(copy.data.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("rejects staging when caller MUTATES the original ZIP bytes during the owner-bound DB check", async () => {
+    const f = fixture();
+    const starting = Buffer.from(f.archiveBytes);
+    prepublication.mockImplementationOnce(async () => {
+      f.archiveBytes[0] ^= 1;
+      return "eligible";
+    });
+    expect(
+      await stageVerifiedHistoricalUserPrivateArchivePreflight({
+        db: f.db,
+        authority: f.authority,
+        archiveBytes: f.archiveBytes,
+        ttlSeconds: 120,
+      }),
+    ).toBeNull();
+    expect(stage).not.toHaveBeenCalled();
+    expect(f.archiveBytes).not.toEqual(starting);
+    for (const copy of f.copies) expect(copy.data.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("rejects current-state inspection if the caller changes ZIP bytes during source prepublication checks", async () => {
+    const f = fixture();
+    prepublication.mockImplementationOnce(async () => {
+      f.archiveBytes[f.archiveBytes.length - 1] ^= 1;
+      return "eligible";
+    });
+    expect(
+      await inspectVerifiedHistoricalUserPrivateArchivePreflight({
+        db: f.db,
+        authority: f.authority,
+        archiveBytes: f.archiveBytes,
+        id: randomUUID(),
+      }),
+    ).toBe("stale");
+    expect(inspect).not.toHaveBeenCalled();
+    for (const copy of f.copies) expect(copy.data.every((byte) => byte === 0)).toBe(true);
+  });
+
   it("leaves caller ZIP untouched and never extracts it if independent signature verification refuses it", async () => {
     const input = fixture();
     verify.mockReturnValueOnce(false);
