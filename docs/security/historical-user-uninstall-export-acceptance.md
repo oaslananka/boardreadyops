@@ -344,6 +344,14 @@ nineteen-class source-only hardware row-attribution preflight uses original nume
 GitHub USER/suspended-installation repository/run joins only to
 produce bounded private row COUNTS, including strictly cross-checked
 manufacturing share/run/attempt/artifact/signed-evidence candidates.
+A separate read-only PostgreSQL foreign-key *metadata* audit now
+identifies **34/63** unresolved classes with a structural path to an
+installation and **29/63** without that FK path. Its exact table-level
+review inventory is in the source-class register linked above; it does
+not read customer rows or establish any original numeric USER ownership,
+redistribution right or ZIP entitlement. The 29 disconnected classes
+require separate historical linkage evidence, and 34 structurally
+connected classes still need independent rights and content validation.
 The internal source-only partial-integrity observation additionally
 requires the schema fingerprint and all nineteen bounded hardware
 class counts to pass under a **single PostgreSQL REPEATABLE READ READ

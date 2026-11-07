@@ -108,6 +108,9 @@ const knownTables = [
   "workspaces",
 ] as const;
 
+// Reuse this exact catalog in metadata-only orphan/owner-link review, not as an export allowlist.
+export const historicalUserKnownPublicTables: readonly string[] = knownTables;
+
 const partialPrivateMetadata = new Set<string>([
   "repositories",
   "release_runs",
