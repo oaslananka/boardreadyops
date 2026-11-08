@@ -32,6 +32,7 @@ ARG GH_VERSION=2.103.3
 # The existing source-export verifier delegates Sigstore cryptographic verification
 # to GitHub CLI. Pin the official immutable release archive by architecture digest
 # so production verification uses the same reviewed verifier as local acceptance.
+# Fetch the same version from the official Releases API if the direct download endpoint returns 504.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ca-certificates curl openssl; \
@@ -42,7 +43,15 @@ RUN set -eux; \
       *) echo "Unsupported GitHub CLI architecture." >&2; exit 1 ;; \
     esac; \
     archive="gh_""$GH_VERSION""_linux_""$gh_arch"".tar.gz"; \
-    curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSLo "/tmp/$archive" "https://github.com/cli/cli/releases/download/v$GH_VERSION/$archive"; \
+    release_api="https://api.github.com/repos/cli/cli/releases"; \
+    curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --retry 3 --retry-delay 2 --max-time 90 \
+      -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' \
+      -o /tmp/gh-release.json "$release_api/tags/v$GH_VERSION"; \
+    asset_id="$(node -e 'const fs=require("node:fs");const r=JSON.parse(fs.readFileSync("/tmp/gh-release.json","utf8"));const a=r.assets?.find(x=>x.name===process.argv[1]);if(r.tag_name!==process.argv[2]||!Number.isInteger(a?.id))process.exit(1);process.stdout.write(String(a.id))' "$archive" "v$GH_VERSION")"; \
+    curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --retry 3 --retry-delay 2 --max-time 120 \
+      -H 'Accept: application/octet-stream' -H 'X-GitHub-Api-Version: 2022-11-28' \
+      -o "/tmp/$archive" "$release_api/assets/$asset_id"; \
+    rm -f /tmp/gh-release.json; \
     printf '%s  %s\n' "$gh_sha256" "/tmp/$archive" | sha256sum --check --strict; \
     mkdir -p /tmp/gh-cli; \
     tar -xzf "/tmp/$archive" -C /tmp/gh-cli; \

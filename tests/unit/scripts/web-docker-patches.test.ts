@@ -11,6 +11,15 @@ describe("web Docker dependency layer", () => {
     expect(dockerfile).toContain("4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d");
     expect(dockerfile).toContain("ee32df2323c8847f5fac6cb6b4b69ca75828e9329a8f22f677021f7b3306ce63");
     expect(dockerfile).toContain("sha256sum --check --strict");
+    // The official release API survives github.com/download 504 responses;
+    // preserve fixed version, architecture digest and fail-closed verification.
+    expect(dockerfile).toContain("api.github.com/repos/cli/cli/releases");
+    expect(dockerfile).toContain('"$release_api/tags/v$GH_VERSION"');
+    expect(dockerfile).toContain("'Accept: application/octet-stream'");
+    expect(dockerfile).toContain("r.tag_name!==process.argv[2]");
+    expect(dockerfile).toContain("Number.isInteger(a?.id)");
+    expect(dockerfile).toContain('"$release_api/assets/$asset_id"');
+    expect(dockerfile).not.toContain("https://github.com/cli/cli/releases/download/");
     expect(dockerfile).toContain('gh --version | grep -F "gh version $GH_VERSION"');
     expect(dockerfile).toContain("ca-certificates curl openssl");
   });
