@@ -202,6 +202,36 @@ describeDb("historical original-USER physical artifact preflight", () => {
     ).toBeNull();
   });
 
+  it("pins metadata-only original USER and database across asynchronous source reads", async () => {
+    const actual = executor();
+    const rejectedQuery = vi.fn();
+    const rejectedTransaction = vi.fn();
+    const replacedDb = { query: rejectedQuery, withTransaction: rejectedTransaction } as never;
+    let snapshots = 0;
+    let request: Parameters<typeof prepareVerifiedHistoricalUserMetadataOnlyArchive>[0];
+    const intercepted = {
+      ...actual,
+      async withTransaction<T>(
+        work: Parameters<typeof actual.withTransaction<T>>[0],
+        options?: Parameters<typeof actual.withTransaction<T>>[1],
+      ): Promise<T> {
+        if (++snapshots === 1) {
+          request.authority.exportId = randomUUID();
+          request.authority.verifiedGitHubUserId = githubUserId + 1;
+          request.db = replacedDb;
+        }
+        return actual.withTransaction(work, options);
+      },
+    };
+    request = { db: intercepted, authority: { ...authority } };
+    const archive = await prepareVerifiedHistoricalUserMetadataOnlyArchive(request);
+    expect(archive).not.toBeNull();
+    expect(archive && verifyHistoricalUserMetadataOnlyArchive(archive.bytes, archive.sha256, exportId)).toBe(true);
+    expect(snapshots).toBeGreaterThanOrEqual(2);
+    expect(rejectedQuery).not.toHaveBeenCalled();
+    expect(rejectedTransaction).not.toHaveBeenCalled();
+  });
+
   it("denies private metadata-only archive under active hold, revoked export, erasure or expiring retention", async () => {
     const holdId = randomUUID();
     const erasureId = randomUUID();
@@ -295,6 +325,43 @@ describeDb("historical original-USER physical artifact preflight", () => {
         storageDriver: "r2",
       }),
     ).toBeNull();
+  });
+
+  it("pins physical ZIP original USER, database and storage root through reservation settlement", async () => {
+    const actual = executor();
+    const rejectedQuery = vi.fn();
+    const rejectedTransaction = vi.fn();
+    const replacedDb = { query: rejectedQuery, withTransaction: rejectedTransaction } as never;
+    let snapshots = 0;
+    let request: Parameters<typeof prepareVerifiedHistoricalUserPartialArchive>[0];
+    const intercepted = {
+      ...actual,
+      async withTransaction<T>(
+        work: Parameters<typeof actual.withTransaction<T>>[0],
+        options?: Parameters<typeof actual.withTransaction<T>>[1],
+      ): Promise<T> {
+        if (++snapshots === 1) {
+          request.authority.exportId = randomUUID();
+          request.authority.verifiedGitHubUserId = githubUserId + 1;
+          request.storageRoot = "/not-original-user-storage";
+          request.storageDriver = "s3";
+          request.db = replacedDb;
+        }
+        return actual.withTransaction(work, options);
+      },
+    };
+    request = { db: intercepted, authority: { ...authority }, storageRoot, storageDriver: "local" };
+    const archive = await prepareVerifiedHistoricalUserPartialArchive(request);
+    expect(archive).not.toBeNull();
+    expect(archive && verifyHistoricalUserPartialArchive(archive.bytes, archive.sha256, exportId)).toBe(true);
+    expect(snapshots).toBeGreaterThanOrEqual(2);
+    expect(rejectedQuery).not.toHaveBeenCalled();
+    expect(rejectedTransaction).not.toHaveBeenCalled();
+    const reservations = await rows(
+      "SELECT count(*)::integer AS total FROM artifact_export_copy_reservations WHERE export_id=$1 AND released_at IS NULL",
+      [exportId],
+    );
+    expect(reservations[0]?.total).toBe(0);
   });
 
   it("fsync-seals exact original USER physical ZIP privately, survives reopen and NEVER grants customer delivery", async () => {

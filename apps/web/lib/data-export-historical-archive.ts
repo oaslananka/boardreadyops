@@ -1285,28 +1285,36 @@ export async function prepareVerifiedHistoricalUserMetadataOnlyArchive(input: {
     input.authority.verifiedGitHubUserId <= 0
   )
     return null;
-  const first = await prepareVerifiedHistoricalUserCompositePreflight(input.db, input.authority);
+  // Pin original USER and database before the first asynchronous source read.
+  const pinned = Object.freeze({
+    db: input.db,
+    authority: Object.freeze({
+      exportId: input.authority.exportId,
+      verifiedGitHubUserId: input.authority.verifiedGitHubUserId,
+    }),
+  });
+  const first = await prepareVerifiedHistoricalUserCompositePreflight(pinned.db, pinned.authority);
   if (!first) return null;
-  const second = await prepareVerifiedHistoricalUserCompositePreflight(input.db, input.authority);
+  const second = await prepareVerifiedHistoricalUserCompositePreflight(pinned.db, pinned.authority);
   if (!second || !sameHistoricalCompositeClaim(first, second)) return null;
   // A ZIP without physical bytes still refers to managed artifact rows:
   // compare EVERY current original-USER artifact locator against the core.
   // We never read storage files or create copy reservations here.
   const snapshot = parseSnapshot(second.core);
-  const objects = await metadataOnlyObjectLocators(input, snapshot);
+  const objects = await metadataOnlyObjectLocators(pinned, snapshot);
   if (!objects) return null;
   const archive = prepareHistoricalUserMetadataOnlyArchive({
     snapshot: second.core,
     visualEvidence: second.visual,
     mutationEpochSha256: second.mutationEpochSha256,
   });
-  if (!verifyHistoricalUserMetadataOnlyArchive(archive.bytes, archive.sha256, input.authority.exportId)) return null;
+  if (!verifyHistoricalUserMetadataOnlyArchive(archive.bytes, archive.sha256, pinned.authority.exportId)) return null;
   // Even the metadata-only private ZIP must fail closed if an intervening
   // hold/erasure, imminent retention, changed manifest or scoped ABA makes
   // the previously verified owner snapshot stale. No customer entitlement.
   const gate = await checkHistoricalUserArchivePrepublication({
-    db: input.db,
-    authority: input.authority,
+    db: pinned.db,
+    authority: pinned.authority,
     objects,
     expectedCore: { sha256: first.core.sha256, byteLength: first.core.byteLength },
     expectedVisual: {
@@ -1334,24 +1342,35 @@ export async function prepareVerifiedHistoricalUserPartialArchive(input: {
   storageRoot: string;
   storageDriver: string;
 }): Promise<ReturnType<typeof prepareHistoricalUserPartialArchive> | null> {
-  if (input?.storageDriver !== "local") return null;
-  const originalPair = await prepareVerifiedHistoricalUserCompositePreflight(input.db, input.authority);
+  if (input?.storageDriver !== "local" || !input?.authority) return null;
+  // Bind every owner/DB/volume argument once. Caller mutation must never
+  // retarget later queries, physical reads or reservation settlement.
+  const pinned = Object.freeze({
+    db: input.db,
+    authority: Object.freeze({
+      exportId: input.authority.exportId,
+      verifiedGitHubUserId: input.authority.verifiedGitHubUserId,
+    }),
+    storageRoot: input.storageRoot,
+    storageDriver: "local" as const,
+  });
+  const originalPair = await prepareVerifiedHistoricalUserCompositePreflight(pinned.db, pinned.authority);
   if (!originalPair) return null;
   const { core: initial, visual: initialVisual, mutationEpochSha256: originalEpoch } = originalPair;
   const parsed = parseSnapshot(initial);
   checkedVisualEvidence(parsed, initialVisual);
-  const objects = await physicalObjectLocators(input, parsed, initial.byteLength);
+  const objects = await physicalObjectLocators(pinned, parsed, initial.byteLength);
 
   // All-or-nothing reservation admission occurs before even the first file
   // read. Every artifact's physical path stays fenced through ZIP assembly.
-  const admitted = await reserveHistoricalUserObjectBatch(input.db, input.authority, objects);
+  const admitted = await reserveHistoricalUserObjectBatch(pinned.db, pinned.authority, objects);
   if (!admitted) throw new HistoricalUserArchivePreflightError();
   let verifiedObjects: VerifiedHistoricalArchiveObject[] = [];
   let preparedZip: Buffer | null = null;
   let accepted = false;
   try {
-    verifiedObjects = await readReservedHistoricalObjects(input, admitted);
-    const finalPair = await prepareVerifiedHistoricalUserCompositePreflight(input.db, input.authority);
+    verifiedObjects = await readReservedHistoricalObjects(pinned, admitted);
+    const finalPair = await prepareVerifiedHistoricalUserCompositePreflight(pinned.db, pinned.authority);
     if (!finalPair) throw new HistoricalUserArchivePreflightError();
     const { core: final, visual: finalVisual } = finalPair;
     if (!sameHistoricalPhysicalClaim(originalPair, finalPair)) {
@@ -1368,8 +1387,8 @@ export async function prepareVerifiedHistoricalUserPartialArchive(input: {
     // request status, pending physical deletion, retention and legal hold.
     // No durable publication right survives this transaction.
     const gate = await checkHistoricalUserArchivePrepublication({
-      db: input.db,
-      authority: input.authority,
+      db: pinned.db,
+      authority: pinned.authority,
       objects,
       expectedCore: { sha256: initial.sha256, byteLength: initial.byteLength },
       expectedVisual: {
@@ -1391,7 +1410,7 @@ export async function prepareVerifiedHistoricalUserPartialArchive(input: {
     try {
       // This must settle only AFTER all filesystem reads, snapshot recheck,
       // and in-memory ZIP production. Uncertain settlement fails closed.
-      await releaseHistoricalUserObjectBatch(input.db, input.authority, admitted);
+      await releaseHistoricalUserObjectBatch(pinned.db, pinned.authority, admitted);
       settled = true;
     } finally {
       // A pending return is not permission to retain bytes if durable

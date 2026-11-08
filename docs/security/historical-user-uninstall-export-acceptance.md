@@ -95,6 +95,12 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   partial archive retains its returned bytes; the untrusted caller cannot
   turn a failed gate into a usable ZIP. A disposable PostgreSQL 17 regression
   explicitly captures and inspects the rejected ZIP after both failure modes.
+  Direct physical-ZIP and metadata-only coordinators now pin the original
+  numeric USER, export UUID and database before their first asynchronous read.
+  The physical coordinator additionally pins the storage root and local
+  driver until all object reads and reservation settlement complete. Two real
+  PostgreSQL regressions mutate the caller-owned request mid-flight and prove
+  the original source remains bound and every reservation is settled.
   No new DB/filesystem atomicity, physical archive completeness or customer
   disclosure permission is implied. This is still NOT customer streaming.
   A separate private orchestration path
