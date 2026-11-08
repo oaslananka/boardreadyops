@@ -8,6 +8,27 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.71.0](https://github.com/oaslananka/boardreadyops/compare/v1.70.0...v1.71.0) (2026-11-08)
+
+
+### Features
+
+* **web:** surface authorized recorded design evidence on dashboard ([#1161](https://github.com/oaslananka/boardreadyops/issues/1161)) ([#1412](https://github.com/oaslananka/boardreadyops/issues/1412)) ([6072724](https://github.com/oaslananka/boardreadyops/commit/6072724be6b808e51004cc4d76a1b463b7d9df9d))
+
+
+### Bug Fixes
+
+* **ci:** verify npm tarball before container release ([#1406](https://github.com/oaslananka/boardreadyops/issues/1406)) ([760cf2b](https://github.com/oaslananka/boardreadyops/commit/760cf2b6efc9809bcf549312c77d61df7c486777))
+* **export:** revalidate archive authority after ZIP packaging ([#1403](https://github.com/oaslananka/boardreadyops/issues/1403)) ([8d9e979](https://github.com/oaslananka/boardreadyops/commit/8d9e97992f8597d11d8fd408bc419e2c19b1df43))
+* **export:** revalidate metadata preview before response ([#1404](https://github.com/oaslananka/boardreadyops/issues/1404)) ([d727aea](https://github.com/oaslananka/boardreadyops/commit/d727aeae7755edb18e32564b8d21454cb509adf1))
+* **onboarding:** explain rollout gate before first readiness run ([#446](https://github.com/oaslananka/boardreadyops/issues/446)) ([#1411](https://github.com/oaslananka/boardreadyops/issues/1411)) ([933387f](https://github.com/oaslananka/boardreadyops/commit/933387f2e39a86adb8662cb7827945470f1d3fa7))
+* **onboarding:** scope setup permissions to selected installation ([#1407](https://github.com/oaslananka/boardreadyops/issues/1407)) ([7e4fc88](https://github.com/oaslananka/boardreadyops/commit/7e4fc883131fd6d54da4acfb97daabbb475bee00))
+* **review:** scope run canvas markers to recorded findings ([#1409](https://github.com/oaslananka/boardreadyops/issues/1409)) ([2c17ed3](https://github.com/oaslananka/boardreadyops/commit/2c17ed3ba8100817c3fb566a0e9357d2678d7165))
+* **review:** show available base visuals when run has no head artwork ([#1410](https://github.com/oaslananka/boardreadyops/issues/1410)) ([763a05b](https://github.com/oaslananka/boardreadyops/commit/763a05bacef640e676c8c82581c094fde918a2db))
+* **review:** show base-only PCB layers without inventing removal ([#1408](https://github.com/oaslananka/boardreadyops/issues/1408)) ([999d002](https://github.com/oaslananka/boardreadyops/commit/999d0025141066b297cb8e2198794c9ee3ae73b6))
+* **web:** install pinned GitHub CLI from official Debian packages ([#1161](https://github.com/oaslananka/boardreadyops/issues/1161)) ([#1415](https://github.com/oaslananka/boardreadyops/issues/1415)) ([ef9fc18](https://github.com/oaslananka/boardreadyops/commit/ef9fc181056547ba2827cd0ff0aeacd9879f684f))
+* **web:** use official GitHub asset API in production build ([#1161](https://github.com/oaslananka/boardreadyops/issues/1161)) ([#1413](https://github.com/oaslananka/boardreadyops/issues/1413)) ([6bc8210](https://github.com/oaslananka/boardreadyops/commit/6bc8210fd613773e6c07f6f317f369b6be444b27))
+
 ## [1.70.0](https://github.com/oaslananka/boardreadyops/compare/v1.69.0...v1.70.0) (2026-11-04)
 
 

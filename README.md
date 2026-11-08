@@ -43,7 +43,7 @@ Generate → Validate → Decide → Package → Optional Attestation → Review
 npm i -g boardreadyops
 ```
 
-**Repository-prepared version:** `boardreadyops@1.70.0`. This is the package version
+**Repository-prepared version:** `boardreadyops@1.71.0`. This is the package version
 in this source revision, **not evidence that it has been published**.
 Check [npm](https://www.npmjs.com/package/boardreadyops) and
 [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) for the
