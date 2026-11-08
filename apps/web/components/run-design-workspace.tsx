@@ -73,15 +73,38 @@ export function RunDesignWorkspace({
 }>) {
   const [selectedId, setSelectedId] = useState<string | undefined>(findings[0]?.id);
   const selected = findings.find((finding) => finding.id === selectedId);
-  // Fingerprints are published by the runner; the database generates unrelated row IDs.
-  // Fail closed on missing or ambiguous fingerprints so a marker cannot select a different finding.
+  // A run snapshot may contain findings from another results page, or stale
+  // fingerprints. Do not display clickable locations without exactly one
+  // matching finding on the page currently visible to this viewer.
+  const fingerprintCounts = new Map<string, number>();
+  for (const finding of findings) {
+    if (finding.fingerprint) {
+      fingerprintCounts.set(finding.fingerprint, (fingerprintCounts.get(finding.fingerprint) ?? 0) + 1);
+    }
+  }
+  const visibleFingerprints = new Set(
+    [...fingerprintCounts].filter(([, count]) => count === 1).map(([fingerprint]) => fingerprint),
+  );
+  const visibleSnapshots = snapshots.map((snapshot) => ({
+    ...snapshot,
+    anchors: snapshot.anchors.filter(
+      (anchor) =>
+        anchor.kind !== "finding" ||
+        (typeof anchor.metadata?.fingerprint === "string" &&
+          visibleFingerprints.has(anchor.metadata.fingerprint) &&
+          Number.isFinite(anchor.x) &&
+          Number.isFinite(anchor.y) &&
+          anchor.x >= 0 &&
+          anchor.x <= 1 &&
+          anchor.y >= 0 &&
+          anchor.y <= 1),
+    ),
+  }));
   const selectedFingerprint =
-    selected?.fingerprint && findings.filter((finding) => finding.fingerprint === selected.fingerprint).length === 1
-      ? selected.fingerprint
-      : undefined;
+    selected?.fingerprint && visibleFingerprints.has(selected.fingerprint) ? selected.fingerprint : undefined;
   const recordedAnchor = Boolean(
     selectedFingerprint &&
-      snapshots.some((snapshot) =>
+      visibleSnapshots.some((snapshot) =>
         snapshot.anchors.some(
           (anchor) => anchor.kind === "finding" && anchor.metadata?.fingerprint === selectedFingerprint,
         ),
@@ -156,7 +179,7 @@ export function RunDesignWorkspace({
 
       <div className="order-1 min-w-0 xl:order-2">
         <ReviewCanvas
-          headSnapshots={snapshots}
+          headSnapshots={visibleSnapshots}
           baseSnapshots={baseSnapshots}
           compactMobile
           {...(recordedAnchor ? { selectedFindingFingerprint: selectedFingerprint } : {})}
@@ -168,8 +191,8 @@ export function RunDesignWorkspace({
           }}
         />
         <p className="mt-2 text-xs text-muted-foreground">
-          Artwork belongs to this run. A highlighted location requires an explicit, matching recorded anchor; never
-          infer a physical defect location from a finding message.
+          Artwork belongs to this run. Only markers linked to a unique finding on this page are shown. Never infer a
+          physical defect location from a finding message.
         </p>
       </div>
 

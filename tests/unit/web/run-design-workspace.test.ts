@@ -101,6 +101,54 @@ describe("recorded run design workspace", () => {
     expect(html).toContain("ring-2 ring-primary");
   });
 
+  it("does not display stale, missing-page, or invalid-position markers that cannot open a recorded finding", () => {
+    const anchor = (id: string, fingerprint: string, x = 0.4, y = 0.3) => ({
+      id,
+      kind: "finding" as const,
+      targetRef: id,
+      x,
+      y,
+      metadata: { fingerprint, ruleId: "design.board-outline", severity: "high" },
+    });
+    const html = render([
+      anchor("VALID_VISIBLE", "published-fingerprint-2"),
+      anchor("STALE_ANCHOR", "missing-finding-on-page"),
+      anchor("OTHER_PAGE", "fingerprint-from-page-2"),
+      anchor("WRONG_ROW_KEY", "db-row-2"),
+      anchor("INVALID_POSITION", "published-fingerprint-1", 1.5, 0.3),
+      anchor("INVALID_NAN", "published-fingerprint-1", Number.NaN, 0.3),
+    ]);
+    expect(html).toContain("VALID_VISIBLE");
+    expect(html).not.toContain("STALE_ANCHOR");
+    expect(html).not.toContain("OTHER_PAGE");
+    expect(html).not.toContain("WRONG_ROW_KEY");
+    expect(html).not.toContain("INVALID_POSITION");
+    expect(html).not.toContain("INVALID_NAN");
+    expect(html).toContain("Only markers linked to a unique finding on this page are shown");
+  });
+
+  it("hides all ambiguous fingerprint markers while preserving the original artwork", () => {
+    const first = findings[0];
+    const second = findings[1];
+    if (!first || !second) throw new Error("missing findings");
+    const html = render(
+      [
+        {
+          id: "DUPLICATE_ANCHOR",
+          kind: "finding" as const,
+          targetRef: "DUPLICATE_ANCHOR",
+          x: 0.1,
+          y: 0.3,
+          metadata: { fingerprint: "published-fingerprint-1", ruleId: "design.board-outline" },
+        },
+      ],
+      [first, { ...second, fingerprint: first.fingerprint }],
+    );
+    expect(html).toContain("source-pcb");
+    expect(html).not.toContain("DUPLICATE_ANCHOR");
+    expect(html).toContain("No verified image coordinate is linked");
+  });
+
   it("never links a marker whose metadata incorrectly contains a database row ID", () => {
     const html = render([
       {
