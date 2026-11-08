@@ -26,25 +26,55 @@ export function RunDesignView({
   commitSha?: string;
 }>) {
   const native = snapshots.filter((item) => item.name.startsWith("kicad_native_")).length;
+  const baseNative = baseSnapshots.filter((item) => item.name.startsWith("kicad_native_")).length;
+  const hasHeadArtwork = snapshots.length > 0;
+  const hasBaseArtwork = baseSnapshots.length > 0;
   return (
     <section aria-label="Run design inspection" className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">PCB & schematic inspection</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Visual evidence published for this exact run, not a generic product illustration.
+            {hasHeadArtwork
+              ? "Visual evidence published for this exact run, not a generic product illustration."
+              : hasBaseArtwork
+                ? "Only the recorded base revision has design artwork; this run has no published head views."
+                : "No visual evidence was published for this run."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="rounded-md border border-border px-2 py-1">{snapshots.length} published views</span>
           <span className="rounded-md border border-border px-2 py-1">{native} KiCad-native</span>
-          {baseSnapshots.length > 0 ? (
-            <span className="rounded-md border border-border px-2 py-1">{baseSnapshots.length} base views</span>
+          {hasBaseArtwork ? (
+            <>
+              <span className="rounded-md border border-border px-2 py-1">{baseSnapshots.length} base views</span>
+              {baseNative > 0 ? (
+                <span className="rounded-md border border-border px-2 py-1">{baseNative} base KiCad-native</span>
+              ) : null}
+            </>
           ) : null}
         </div>
       </div>
-      {snapshots.length ? (
+      {hasHeadArtwork || hasBaseArtwork ? (
         <>
+          {!hasHeadArtwork ? (
+            <div
+              role="status"
+              className="rounded-lg border border-warning/40 bg-warning-surface p-4 text-sm text-foreground"
+            >
+              <p className="font-semibold">No head-revision PCB or schematic snapshot was published for this run.</p>
+              <p className="mt-1 text-muted-foreground">
+                Showing recorded base-revision artwork only. This does not show the board at the current run commit,
+                prove that any layer was deleted, or enable a trustworthy base/head comparison.
+              </p>
+              <Link
+                href="/reviews#publish-review"
+                className="mt-2 inline-flex min-h-10 items-center text-primary underline"
+              >
+                How to publish current-run visuals →
+              </Link>
+            </div>
+          ) : null}
           <RunDesignWorkspace
             // A new findings page must reset the selected row and its marker.
             key={findingsPage?.page ?? 1}
@@ -71,12 +101,16 @@ export function RunDesignView({
             </div>
           ) : null}
           <p className="text-xs text-muted-foreground">
-            {native
-              ? "KiCad-native artwork shows source-derived design geometry. Other views may be summary diagrams."
-              : "These are schematic/PCB summaries, not complete native KiCad design geometry."}{" "}
-            {baseSnapshots.length > 0
+            {hasHeadArtwork
+              ? native
+                ? "KiCad-native artwork shows source-derived design geometry. Other views may be summary diagrams."
+                : "These are schematic/PCB summaries, not complete native KiCad design geometry."
+              : "These images belong only to the recorded base revision, not the current run."}{" "}
+            {hasHeadArtwork && hasBaseArtwork
               ? "Base/head comparison is a visual overlay only where both revisions publish matching layer artwork; it is not a dimensional or electrical verification. "
-              : "No exact-commit base images are available for comparison. "}
+              : hasBaseArtwork
+                ? "No head artwork is available for visual comparison. "
+                : "No exact-commit base images are available for comparison. "}
             Finding coordinates are not inferred from these pictures and the drawings do not certify manufacturing
             readiness.
           </p>
