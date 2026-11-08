@@ -8,6 +8,7 @@ import {
   prepareVerifiedHistoricalUserRepositoryInventory,
   prepareVerifiedHistoricalUserRunFindingSnapshot,
 } from "../../packages/db/src/data-export-historical-inventory.js";
+import { assessHistoricalUserUnresolvedOwnerRows } from "../../packages/db/src/data-export-historical-unresolved-owner-rows.js";
 import { DataLifecycleStore } from "../../packages/db/src/data-lifecycle-store.js";
 import { createSqlGitHubAppMetadataStore } from "../../packages/db/src/lifecycle-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
@@ -847,6 +848,50 @@ describeDatabase("immutable GitHub original-account evidence after user App unin
     ).toBeNull();
   });
 
+  it("bounds real FK-linked historical original USER source rows without returning private content", async () => {
+    const exportRow = rows(
+      await executor().query("SELECT id FROM data_exports WHERE tenant_id=$1 AND original_github_user_id=$2 LIMIT 1", [
+        login,
+        accountUserId,
+      ]),
+    )[0];
+    const exportId = String(exportRow?.id);
+    const review = await assessHistoricalUserUnresolvedOwnerRows(executor(), {
+      exportId,
+      verifiedGitHubUserId: accountUserId,
+    });
+    expect(review).toMatchObject({
+      status: "bounded-source-row-fk-candidates-unapproved",
+      releaseDecision: "NO_GO",
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      originalUserOwnershipVerified: false,
+      thirdPartyDisclosureRightsVerified: false,
+      reviewedClasses: 63,
+    });
+    expect((review?.linkedRowCounts.length ?? 0) + (review?.ambiguousFkPathClasses.length ?? 0)).toBe(34);
+    // Parallel FKs can be bypassed by a stronger unambiguous required path;
+    // only paths ACTUALLY selected by the catalog walk are marked ambiguous.
+    expect(new Set(review?.linkedRowCounts.map((item) => item.table)).size).toBe(review?.linkedRowCounts.length);
+    expect(review?.noInstallationPath).toHaveLength(29);
+    expect(review?.noInstallationPath).toContain("data_exports");
+    expect(review?.linkedRowCounts.find((item) => item.table === "installations")?.boundedLinkedRows).toBeGreaterThan(
+      0,
+    );
+    expect(review?.linkedRowCounts.every((item) => item.boundedLinkedRows <= 100)).toBe(true);
+    expect(JSON.stringify(review)).not.toContain(login);
+    expect(JSON.stringify(review)).not.toContain(exportId);
+
+    // An unknown numeric USER cannot borrow the original one's installation
+    // simply by supplying the right export ID.
+    expect(
+      await assessHistoricalUserUnresolvedOwnerRows(executor(), {
+        exportId,
+        verifiedGitHubUserId: accountUserId + 1,
+      }),
+    ).toBeNull();
+  });
+
   it("stops all historical original-user source reads on expiry, active hold and non-dry-run erasure", async () => {
     const exportRow = rows(
       await executor().query(
@@ -866,9 +911,10 @@ describeDatabase("immutable GitHub original-account evidence after user App unin
         prepareVerifiedHistoricalUserConsistentCorePreflight(executor(), input),
         prepareVerifiedHistoricalUserPrivateVisualEvidence(executor(), input),
         prepareVerifiedHistoricalUserCompositePreflight(executor(), input),
+        assessHistoricalUserUnresolvedOwnerRows(executor(), input),
       ]);
     const denyAll = async () => {
-      expect(await readAll()).toEqual([null, null, null, null, null]);
+      expect(await readAll()).toEqual([null, null, null, null, null, null]);
     };
     try {
       // A pending record is not enough authority once its deadline passed.

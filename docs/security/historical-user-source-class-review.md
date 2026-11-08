@@ -48,6 +48,22 @@ customer export manifest. The standalone diagnostic is
 | \`platform_operations\` | 9 | **3** | DENY |
 | **Total** | **34** | **29** | **DENY for all 63** |
 
+### Additional bounded PostgreSQL row-link candidate diagnostic
+
+\`assessHistoricalUserUnresolvedOwnerRows\` is a separate SOURCE-ONLY,
+default-off read-only diagnostic over the same catalog and one original
+numeric GitHub USER / suspended-installation REPEATABLE READ snapshot. It
+uses the validated PostgreSQL FK column mappings to build bounded (at most
+100 rows per class) counts for FK-linked source classes, while preserving
+the other classes explicitly as **unlinked and unreviewed**. Ambiguous
+parallel FK meanings are explicitly reported WITHOUT row counts. Missing
+validated mappings, catalog drift, changed identity, absent original
+installation, current hold/erasure/expiry and oversized rows deny the
+entire observation; no raw database rows, IP or collaborator identifiers
+leave PostgreSQL. This diagnostic is not connected to any customer route
+or ZIP. **Even a positive row count is not ownership or lawful disclosure
+evidence**, and none of the 63 classes is customer-approved.
+
 The following **29** classes have **no FK path** to an installation in
 the pinned database schema and therefore need an *independent, historical,
 immutable owner-linkage review* before completeness can even be evaluated.
