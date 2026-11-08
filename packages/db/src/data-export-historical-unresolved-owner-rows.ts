@@ -88,6 +88,37 @@ function validMappedFk(raw: unknown): raw is Fk {
   );
 }
 
+/** A chosen FK chain is not unique if another valid structural route could
+ * lead to a different installation. Check all simple catalog routes, counting
+ * parallel constraints independently. A bounded traversal budget denies the
+ * observation instead of silently treating unusually dense schemas as safe.
+ */
+function hasCompetingInstallationPaths(table: string, fks: readonly Fk[]): boolean {
+  const outgoing = new Map<string, string[]>();
+  for (const fk of fks) {
+    const targets = outgoing.get(fk.source_table) ?? [];
+    targets.push(fk.target_table);
+    outgoing.set(fk.source_table, targets);
+  }
+  const pending = [{ table, visited: new Set([table]) }];
+  let routes = 0;
+  let examined = 0;
+  while (pending.length > 0) {
+    if (++examined > 4096) return true;
+    const next = pending.pop();
+    if (!next) return true;
+    if (next.table === "installations") {
+      if (++routes > 1) return true;
+      continue;
+    }
+    for (const target of outgoing.get(next.table) ?? []) {
+      if (next.visited.has(target)) continue;
+      pending.push({ table: target, visited: new Set([...next.visited, target]) });
+    }
+  }
+  return false;
+}
+
 /** Catalog-derived column names are strictly validated before SQL assembly.
  * Ambiguous parallel FKs deny this diagnostic instead of choosing silently.
  */
@@ -187,6 +218,12 @@ export async function assessHistoricalUserUnresolvedOwnerRows(
         const selected: typeof linked = [];
         const ambiguousFkPathClasses: string[] = [];
         for (const entry of linked) {
+          // Never assign a single owner-linked digest when an independent FK
+          // chain could describe a different original installation.
+          if (hasCompetingInstallationPaths(entry.table, fks)) {
+            ambiguousFkPathClasses.push(entry.table);
+            continue;
+          }
           const expression = boundedRowSql(
             entry.table,
             entry.installationPath ?? [],

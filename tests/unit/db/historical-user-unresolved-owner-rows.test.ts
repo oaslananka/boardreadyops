@@ -145,6 +145,33 @@ describe("63-class original-numeric-user bounded FK row candidates remain source
     expect(report?.customerDeliveryAllowed).toBe(false);
   });
 
+  it("quarantines independent FK chains that could attribute the same source class to different installations", async () => {
+    const competingPaths = [
+      {
+        ...edges[2],
+        source_table: "boards",
+        target_table: "installations",
+        constraint_name: "board_direct_install",
+        source_columns: ["installation_id"],
+      },
+      {
+        ...edges[2],
+        source_table: "boards",
+        target_table: "release_runs",
+        constraint_name: "board_run_owner",
+        source_columns: ["run_id"],
+      },
+    ];
+    for (const additional of competingPaths) {
+      const f = fixture({ edges: [...edges, additional], counts: { installations: 1 } });
+      const report = await assessHistoricalUserUnresolvedOwnerRows(f.db, f.identity);
+      expect(report?.ambiguousFkPathClasses).toContain("boards");
+      expect(report?.linkedRowCounts.map((item) => item.table)).not.toContain("boards");
+      expect(report?.releaseDecision).toBe("NO_GO");
+      expect(report?.customerDeliveryAllowed).toBe(false);
+    }
+  });
+
   it("denies invalid input before reading PostgreSQL", async () => {
     const f = fixture();
     expect(

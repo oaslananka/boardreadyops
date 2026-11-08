@@ -870,8 +870,8 @@ describeDatabase("immutable GitHub original-account evidence after user App unin
       reviewedClasses: 63,
     });
     expect((review?.linkedRowCounts.length ?? 0) + (review?.ambiguousFkPathClasses.length ?? 0)).toBe(34);
-    // Parallel FKs can be bypassed by a stronger unambiguous required path;
-    // only paths ACTUALLY selected by the catalog walk are marked ambiguous.
+    // Alternate routes to an installation, including independent or parallel
+    // FK chains, remain ambiguous rather than being assigned one owner.
     expect(new Set(review?.linkedRowCounts.map((item) => item.table)).size).toBe(review?.linkedRowCounts.length);
     expect(review?.noInstallationPath).toHaveLength(29);
     expect(review?.noInstallationPath).toContain("data_exports");
