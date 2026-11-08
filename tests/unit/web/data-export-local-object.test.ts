@@ -148,6 +148,81 @@ describe("bounded, read-only physical export object verification", () => {
     expect(fakeHandle.close).toHaveBeenCalledTimes(1);
   });
 
+  it("zeroes a partially read private buffer on unexpected EOF", async () => {
+    const f = await fixture();
+    let allocated: Buffer | undefined;
+    let calls = 0;
+    const fakeHandle = {
+      stat: vi.fn(async () => ({ isFile: () => true, size: f.bytes.length })),
+      read: vi.fn(async (target: Buffer, offset: number) => {
+        allocated = target;
+        calls++;
+        if (calls > 1) return { bytesRead: 0 };
+        f.bytes.copy(target, offset, 0, 5);
+        return { bytesRead: 5 };
+      }),
+      close: vi.fn(async () => undefined),
+    };
+    vi.mocked(filesystem.open).mockResolvedValueOnce(fakeHandle as never);
+    const result = await readVerifiedLocalExportObject({
+      storageDriver: "local",
+      storageRoot: f.root,
+      object: f.object,
+    });
+    expect(result).toBeNull();
+    expect(allocated?.length).toBe(f.bytes.length);
+    expect(allocated?.every((byte) => byte === 0)).toBe(true);
+    expect(fakeHandle.close).toHaveBeenCalledOnce();
+  });
+
+  it("zeroes read bytes when a full read has a bad digest", async () => {
+    const f = await fixture();
+    let allocated: Buffer | undefined;
+    const stable = { isFile: () => true, size: f.bytes.length, dev: 1, ino: 2, mtimeMs: 10, ctimeMs: 20 };
+    const fakeHandle = {
+      stat: vi.fn(async () => stable),
+      read: vi.fn(async (target: Buffer) => {
+        allocated = target;
+        return { bytesRead: f.bytes.copy(target) };
+      }),
+      close: vi.fn(async () => undefined),
+    };
+    vi.mocked(filesystem.open).mockResolvedValueOnce(fakeHandle as never);
+    const result = await readVerifiedLocalExportObject({
+      storageDriver: "local",
+      storageRoot: f.root,
+      object: { ...f.object, sha256: "0".repeat(64) },
+    });
+    expect(result).toBeNull();
+    expect(allocated?.every((byte) => byte === 0)).toBe(true);
+    expect(fakeHandle.close).toHaveBeenCalledOnce();
+  });
+
+  it("refuses and wipes a fully verified object if descriptor closure fails", async () => {
+    const f = await fixture();
+    let allocated: Buffer | undefined;
+    const stable = { isFile: () => true, size: f.bytes.length, dev: 1, ino: 2, mtimeMs: 10, ctimeMs: 20 };
+    const fakeHandle = {
+      stat: vi.fn(async () => stable),
+      read: vi.fn(async (target: Buffer) => {
+        allocated = target;
+        return { bytesRead: f.bytes.copy(target) };
+      }),
+      close: vi.fn(async () => {
+        throw new Error("Synthetic failed descriptor close");
+      }),
+    };
+    vi.mocked(filesystem.open).mockResolvedValueOnce(fakeHandle as never);
+    const result = await readVerifiedLocalExportObject({
+      storageDriver: "local",
+      storageRoot: f.root,
+      object: f.object,
+    });
+    expect(result).toBeNull();
+    expect(allocated?.every((byte) => byte === 0)).toBe(true);
+    expect(fakeHandle.close).toHaveBeenCalledOnce();
+  });
+
   it("rejects unsupported storage drivers, oversized inputs and malformed hash/metadata", async () => {
     const f = await fixture();
     const ref = { storageDriver: "local", storageRoot: f.root, object: f.object };

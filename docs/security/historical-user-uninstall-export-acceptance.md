@@ -82,8 +82,16 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   original USER artifact file reader similarly pins the original
   user/export/artifact and trusted local storage root before the first
   asynchronous lookup; a failed durable object release already throws,
-  wiping transient private bytes before any return. This is still NOT
-  customer streaming. A separate
+  wiping transient private bytes before any return. The lower-level local
+  physical-object reader now also wipes partial-read bytes after unexpected
+  EOF, full bytes after a wrong digest or changing file metadata, and
+  otherwise valid bytes if closing the descriptor fails. For the bounded
+  original-USER partial archive, an Nth-object failure wipes all previously
+  read physical-object buffers; every successful or rejected ZIP assembly
+  wipes those temporary read buffers before reservation settlement. The
+  caller-owned ZIP is preserved, and no new DB/filesystem atomicity, physical
+  archive completeness or customer disclosure permission is implied. This is
+  still NOT customer streaming. A separate
   private orchestration path
   performs a SECOND original numeric USER DB and physical object/
   hold/retention verification AFTER fsync. Wrong user, changed bytes,

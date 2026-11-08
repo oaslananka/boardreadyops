@@ -1228,31 +1228,43 @@ async function readReservedHistoricalObjects(
   admitted: HistoricalReservedObjects,
 ): Promise<VerifiedHistoricalArchiveObject[]> {
   const verifiedObjects: VerifiedHistoricalArchiveObject[] = [];
-  for (const { object } of admitted) {
-    const before = await lookupHistoricalUserExportObject(input.db, input.authority, object.artifactId);
-    if (!before || JSON.stringify(before) !== JSON.stringify(object)) {
-      throw new HistoricalUserArchivePreflightError();
+  try {
+    for (const { object } of admitted) {
+      const before = await lookupHistoricalUserExportObject(input.db, input.authority, object.artifactId);
+      if (!before || JSON.stringify(before) !== JSON.stringify(object)) {
+        throw new HistoricalUserArchivePreflightError();
+      }
+      let bytes: Buffer | null = null;
+      try {
+        bytes = await readVerifiedLocalExportObject({
+          storageRoot: input.storageRoot,
+          storageDriver: input.storageDriver,
+          object,
+        });
+        if (!bytes) throw new HistoricalUserArchivePreflightError();
+        const after = await lookupHistoricalUserExportObject(input.db, input.authority, object.artifactId);
+        if (!after || JSON.stringify(after) !== JSON.stringify(object)) {
+          throw new HistoricalUserArchivePreflightError();
+        }
+        verifiedObjects.push({
+          bytes,
+          artifactId: object.artifactId,
+          exportId: input.authority.exportId,
+          repositoryId: object.repositoryId,
+          runId: object.runId,
+          sha256: object.sha256,
+        });
+        bytes = null; // The batch now owns this buffer until archive assembly settles.
+      } finally {
+        bytes?.fill(0); // Wipe the current physical read on any failed recheck.
+      }
     }
-    const bytes = await readVerifiedLocalExportObject({
-      storageRoot: input.storageRoot,
-      storageDriver: input.storageDriver,
-      object,
-    });
-    if (!bytes) throw new HistoricalUserArchivePreflightError();
-    const after = await lookupHistoricalUserExportObject(input.db, input.authority, object.artifactId);
-    if (!after || JSON.stringify(after) !== JSON.stringify(object)) {
-      throw new HistoricalUserArchivePreflightError();
-    }
-    verifiedObjects.push({
-      bytes,
-      artifactId: object.artifactId,
-      exportId: input.authority.exportId,
-      repositoryId: object.repositoryId,
-      runId: object.runId,
-      sha256: object.sha256,
-    });
+    return verifiedObjects;
+  } catch (error) {
+    // An Nth-object failure must wipe bytes already verified for objects 1..N-1.
+    for (const object of verifiedObjects) object.bytes.fill(0);
+    throw error;
   }
-  return verifiedObjects;
 }
 
 /**
@@ -1334,8 +1346,9 @@ export async function prepareVerifiedHistoricalUserPartialArchive(input: {
   // read. Every artifact's physical path stays fenced through ZIP assembly.
   const admitted = await reserveHistoricalUserObjectBatch(input.db, input.authority, objects);
   if (!admitted) throw new HistoricalUserArchivePreflightError();
+  let verifiedObjects: VerifiedHistoricalArchiveObject[] = [];
   try {
-    const verifiedObjects = await readReservedHistoricalObjects(input, admitted);
+    verifiedObjects = await readReservedHistoricalObjects(input, admitted);
     const finalPair = await prepareVerifiedHistoricalUserCompositePreflight(input.db, input.authority);
     if (!finalPair) throw new HistoricalUserArchivePreflightError();
     const { core: final, visual: finalVisual } = finalPair;
@@ -1366,6 +1379,10 @@ export async function prepareVerifiedHistoricalUserPartialArchive(input: {
     if (gate !== "eligible") throw new HistoricalUserArchivePreflightError();
     return archive;
   } finally {
+    // The ZIP builder copies each verified file into its own immutable ZIP
+    // representation. Its original physical read buffers are temporary and
+    // must be cleared on success AND on failed prepublication or settlement.
+    for (const object of verifiedObjects) object.bytes.fill(0);
     // This must settle only AFTER all filesystem reads, the snapshot recheck,
     // and in-memory ZIP production. Uncertain settlement fails closed.
     await releaseHistoricalUserObjectBatch(input.db, input.authority, admitted);
