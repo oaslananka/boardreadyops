@@ -75,7 +75,7 @@ export function RunDesignView({
               ? "KiCad-native artwork shows source-derived design geometry. Other views may be summary diagrams."
               : "These are schematic/PCB summaries, not complete native KiCad design geometry."}{" "}
             {baseSnapshots.length > 0
-              ? "Base/head comparison is a visual overlay, not a dimensional or electrical verification. "
+              ? "Base/head comparison is a visual overlay only where both revisions publish matching layer artwork; it is not a dimensional or electrical verification. "
               : "No exact-commit base images are available for comparison. "}
             Finding coordinates are not inferred from these pictures and the drawings do not certify manufacturing
             readiness.

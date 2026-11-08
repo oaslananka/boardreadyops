@@ -107,7 +107,9 @@ describe("run design visual inspection", () => {
       }),
     );
     expect(html).toContain("1 base views");
-    expect(html).toContain("Base/head comparison is a visual overlay");
+    expect(html).toContain(
+      "Base/head comparison is a visual overlay only where both revisions publish matching layer artwork",
+    );
     expect(html).toContain("not a dimensional or electrical verification");
     expect(html).toContain('title="Overlay with opacity slider"');
     const overlay = html.match(/<button[^>]+title="Overlay with opacity slider"[^>]*>/u)?.[0] ?? "";
