@@ -10,6 +10,7 @@ import { RepositorySetupInteractive } from "../../components/repository-setup-in
 import { Alert, AppShell, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { loadInstallationCapabilities } from "../../lib/installation-capabilities.js";
+import { releaseRepositoryDispatchAvailability } from "../../lib/release-rollout.js";
 import { loadViewerRepositories } from "../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
@@ -65,7 +66,14 @@ async function setupTargets() {
   );
   const scopedRepositories = repositories.map((repository) => {
     const grants = grantsByInstallation.get(repository.githubInstallationId);
-    if (!grants) return repository;
+    // A setup probe can succeed even when production cloud runs are gated.
+    // Derive this per authorized repository; never expose the rollout allowlist.
+    const dispatch = releaseRepositoryDispatchAvailability(repository.fullName);
+    const target = {
+      ...repository,
+      ...(!dispatch.enabled ? { readinessRunBlockedReason: dispatch.reason } : {}),
+    };
+    if (!grants) return target;
     const setupBlockedReason = grants.actions.find(
       (action) => action.id === "setup" && !action.satisfied,
     )?.userExplanation;
@@ -73,7 +81,7 @@ async function setupTargets() {
       (action) => action.id === "validate-setup" && !action.satisfied,
     )?.userExplanation;
     return {
-      ...repository,
+      ...target,
       installationGrants: { permissions: grants.permissions, missing: grants.missing, manageUrl: grants.manageUrl },
       ...(setupBlockedReason ? { setupBlockedReason } : {}),
       ...(readinessBlockedReason ? { readinessBlockedReason } : {}),

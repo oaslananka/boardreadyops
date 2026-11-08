@@ -66,6 +66,35 @@ describe("repository setup readiness controls", () => {
     delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
   });
 
+  it("explains rollout-gated first runs per selected repository without claiming a setup probe is a result", async () => {
+    const repositories: SetupTargetRepository[] = [
+      {
+        ...readyForProbe,
+        id: "repo-blocked",
+        fullName: "alpha/board-a",
+        readinessRunBlockedReason: "Cloud readiness runs are not enabled for this repository yet.",
+      },
+      { ...readyForProbe, id: "repo-enabled", fullName: "beta/board-b" },
+    ];
+    await act(async () => {
+      root.render(createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories }));
+    });
+    expect(container.textContent).toContain("After validation: run a real hardware check");
+    expect(container.textContent).toContain("It does not produce hardware findings");
+    expect(container.textContent).toContain("Cloud readiness runs are not enabled for this repository yet.");
+    expect(container.textContent).not.toContain("open a pull request changing your hardware project");
+    const selector = container.querySelector<HTMLSelectElement>("select");
+    if (!selector) throw new Error("repository selector not found");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(selector, "repo-enabled");
+      selector.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.textContent).not.toContain("Cloud readiness runs are not enabled for this repository yet.");
+    expect(container.textContent).toContain("open a pull request changing your");
+    expect(container.textContent).toContain("an empty or queued result is not a first useful finding");
+  });
+
   it("switches setup, probe and live permissions with the selected GitHub installation", async () => {
     const fullPermissions = Object.fromEntries(githubAppPermissionProfile.map((p) => [p.key, p.level]));
     const blockedPermissions = { ...fullPermissions, actions: "read", pull_requests: "read" };

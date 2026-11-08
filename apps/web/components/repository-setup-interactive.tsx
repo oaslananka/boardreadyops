@@ -27,6 +27,8 @@ export type SetupTargetRepository = {
   installationGrants?: Pick<InstallationCapabilities, "permissions" | "missing" | "manageUrl">;
   setupBlockedReason?: string;
   readinessBlockedReason?: string;
+  /** Full readiness execution is distinct from setup validation and may be rollout-gated. */
+  readinessRunBlockedReason?: string;
 };
 
 export type RepositorySetupInteractiveProps = {
@@ -653,6 +655,26 @@ function SetupReadiness(props: Readonly<SetupReadinessProps>) {
           blockedReason={props.blockedReason}
         />
         {props.result ? <SetupProbeResultOutput result={props.result} /> : null}
+        <Alert
+          title="After validation: run a real hardware check"
+          tone={props.repository?.readinessRunBlockedReason ? "warning" : "info"}
+        >
+          <p>
+            A setup probe verifies workflow configuration. It does not produce hardware findings, a signed readiness
+            result, or manufacturing approval.
+          </p>
+          {props.repository?.readinessRunBlockedReason ? (
+            <p>{props.repository.readinessRunBlockedReason}</p>
+          ) : props.repository ? (
+            <p>
+              After the reviewed setup pull request is merged and the probe succeeds, open a pull request changing your
+              hardware project. Inspect the resulting GitHub Check Run for an actionable finding and its hosted run; an
+              empty or queued result is not a first useful finding.
+            </p>
+          ) : (
+            <p>Connect and select a repository to see whether full readiness runs are enabled for it.</p>
+          )}
+        </Alert>
         <SetupReadinessTroubleshooting />
       </div>
     </Panel>
