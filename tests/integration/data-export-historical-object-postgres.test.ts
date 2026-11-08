@@ -31,6 +31,7 @@ import {
   prepareVerifiedHistoricalUserCompositePreflight,
   prepareVerifiedHistoricalUserConsistentCorePreflight,
 } from "../../packages/db/src/data-export-historical-inventory.js";
+import * as historicalObjectAuthorization from "../../packages/db/src/data-export-historical-object-authorization.js";
 import {
   checkHistoricalUserArchivePrepublication,
   lookupHistoricalUserExportObject,
@@ -41,6 +42,7 @@ import {
 } from "../../packages/db/src/data-export-historical-object-authorization.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
+import * as zipEncoder from "../../src/util/zip.js";
 
 const connectionString = getPostgresTestConnectionString();
 const describeDb = connectionString ? describe : describe.skip;
@@ -1119,6 +1121,82 @@ describeDb("historical original-USER physical artifact preflight", () => {
       expect(reservations[0]?.total).toBe(0);
     } finally {
       await actual.query("DELETE FROM run_snapshots WHERE id=$1", [visualId]);
+    }
+  });
+
+  it("wipes a freshly assembled private ZIP when final original-USER prepublication denies it", async () => {
+    const encode = zipEncoder.createZipBuffer;
+    const capturedZips: Buffer[] = [];
+    const zipSpy = vi.spyOn(zipEncoder, "createZipBuffer").mockImplementation((entries, date) => {
+      const result = encode(entries, date);
+      capturedZips.push(result);
+      return result;
+    });
+    const gateSpy = vi
+      .spyOn(historicalObjectAuthorization, "checkHistoricalUserArchivePrepublication")
+      .mockResolvedValueOnce("held");
+    try {
+      await expect(
+        prepareVerifiedHistoricalUserPartialArchive({
+          db: executor(),
+          authority,
+          storageRoot,
+          storageDriver: "local",
+        }),
+      ).rejects.toBeInstanceOf(HistoricalUserArchivePreflightError);
+      expect(gateSpy).toHaveBeenCalledOnce();
+      expect(zipSpy).toHaveBeenCalledOnce();
+      expect(capturedZips).toHaveLength(1);
+      expect(capturedZips[0]?.length).toBeGreaterThan(0);
+      expect(capturedZips[0]?.every((byte) => byte === 0)).toBe(true);
+      const reservations = await rows(
+        "SELECT count(*)::integer AS total FROM artifact_export_copy_reservations WHERE export_id=$1 AND released_at IS NULL",
+        [exportId],
+      );
+      expect(reservations[0]?.total).toBe(0);
+    } finally {
+      gateSpy.mockRestore();
+      zipSpy.mockRestore();
+    }
+  });
+
+  it("wipes a private ZIP when its final DB reservation releases then reports a settlement error", async () => {
+    const encode = zipEncoder.createZipBuffer;
+    const release = historicalObjectAuthorization.releaseHistoricalUserObjectBatch;
+    const capturedZips: Buffer[] = [];
+    const zipSpy = vi.spyOn(zipEncoder, "createZipBuffer").mockImplementation((entries, date) => {
+      const result = encode(entries, date);
+      capturedZips.push(result);
+      return result;
+    });
+    const releaseSpy = vi
+      .spyOn(historicalObjectAuthorization, "releaseHistoricalUserObjectBatch")
+      .mockImplementationOnce(async (...args) => {
+        await release(...args); // release the disposable DB fence before injecting failure
+        throw new Error("Synthetic uncertain historical archive reservation settlement");
+      });
+    try {
+      await expect(
+        prepareVerifiedHistoricalUserPartialArchive({
+          db: executor(),
+          authority,
+          storageRoot,
+          storageDriver: "local",
+        }),
+      ).rejects.toThrow("Synthetic uncertain historical archive reservation settlement");
+      expect(releaseSpy).toHaveBeenCalledOnce();
+      expect(zipSpy).toHaveBeenCalledOnce();
+      expect(capturedZips).toHaveLength(1);
+      expect(capturedZips[0]?.length).toBeGreaterThan(0);
+      expect(capturedZips[0]?.every((byte) => byte === 0)).toBe(true);
+      const reservations = await rows(
+        "SELECT count(*)::integer AS total FROM artifact_export_copy_reservations WHERE export_id=$1 AND released_at IS NULL",
+        [exportId],
+      );
+      expect(reservations[0]?.total).toBe(0);
+    } finally {
+      releaseSpy.mockRestore();
+      zipSpy.mockRestore();
     }
   });
 

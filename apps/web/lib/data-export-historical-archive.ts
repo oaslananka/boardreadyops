@@ -1347,6 +1347,8 @@ export async function prepareVerifiedHistoricalUserPartialArchive(input: {
   const admitted = await reserveHistoricalUserObjectBatch(input.db, input.authority, objects);
   if (!admitted) throw new HistoricalUserArchivePreflightError();
   let verifiedObjects: VerifiedHistoricalArchiveObject[] = [];
+  let preparedZip: Buffer | null = null;
+  let accepted = false;
   try {
     verifiedObjects = await readReservedHistoricalObjects(input, admitted);
     const finalPair = await prepareVerifiedHistoricalUserCompositePreflight(input.db, input.authority);
@@ -1361,6 +1363,7 @@ export async function prepareVerifiedHistoricalUserPartialArchive(input: {
       visualEvidence: finalVisual,
       mutationEpochSha256: originalEpoch,
     });
+    preparedZip = archive.bytes;
     // One short transaction rechecks every retained original-USER artifact,
     // request status, pending physical deletion, retention and legal hold.
     // No durable publication right survives this transaction.
@@ -1377,14 +1380,23 @@ export async function prepareVerifiedHistoricalUserPartialArchive(input: {
       expectedMutationEpochSha256: originalEpoch,
     });
     if (gate !== "eligible") throw new HistoricalUserArchivePreflightError();
+    accepted = true;
     return archive;
   } finally {
     // The ZIP builder copies each verified file into its own immutable ZIP
     // representation. Its original physical read buffers are temporary and
     // must be cleared on success AND on failed prepublication or settlement.
     for (const object of verifiedObjects) object.bytes.fill(0);
-    // This must settle only AFTER all filesystem reads, the snapshot recheck,
-    // and in-memory ZIP production. Uncertain settlement fails closed.
-    await releaseHistoricalUserObjectBatch(input.db, input.authority, admitted);
+    let settled = false;
+    try {
+      // This must settle only AFTER all filesystem reads, snapshot recheck,
+      // and in-memory ZIP production. Uncertain settlement fails closed.
+      await releaseHistoricalUserObjectBatch(input.db, input.authority, admitted);
+      settled = true;
+    } finally {
+      // A pending return is not permission to retain bytes if durable
+      // reservation settlement fails. Also wipe ZIPs rejected by final checks.
+      if (!accepted || !settled) preparedZip?.fill(0);
+    }
   }
 }

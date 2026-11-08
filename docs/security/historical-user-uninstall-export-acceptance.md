@@ -88,11 +88,16 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   otherwise valid bytes if closing the descriptor fails. For the bounded
   original-USER partial archive, an Nth-object failure wipes all previously
   read physical-object buffers; every successful or rejected ZIP assembly
-  wipes those temporary read buffers before reservation settlement. The
-  caller-owned ZIP is preserved, and no new DB/filesystem atomicity, physical
-  archive completeness or customer disclosure permission is implied. This is
-  still NOT customer streaming. A separate
-  private orchestration path
+  wipes those temporary read buffers before reservation settlement. After
+  ZIP assembly, a late prepublication hold/erasure or failed durable
+  reservation settlement now also wipes the newly prepared ZIP buffer
+  itself before rejection. Only a successfully rechecked AND settled private
+  partial archive retains its returned bytes; the untrusted caller cannot
+  turn a failed gate into a usable ZIP. A disposable PostgreSQL 17 regression
+  explicitly captures and inspects the rejected ZIP after both failure modes.
+  No new DB/filesystem atomicity, physical archive completeness or customer
+  disclosure permission is implied. This is still NOT customer streaming.
+  A separate private orchestration path
   performs a SECOND original numeric USER DB and physical object/
   hold/retention verification AFTER fsync. Wrong user, changed bytes,
   unsafe directory permissions or symlinks fail closed. An existing
