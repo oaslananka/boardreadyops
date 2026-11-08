@@ -4,7 +4,9 @@ import type { RepositorySetupPreset } from "@boardreadyops/cloud-core/repository
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { customerStatusLabel } from "../lib/customer-nomenclature.js";
+import type { InstallationCapabilities } from "../lib/installation-capabilities.js";
 import { deriveRepositorySetupState } from "../lib/repository-setup-state.js";
+import { AppPermissionProfile } from "./app-permission-profile.js";
 import { Alert, Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
 import { YamlSyntaxHighlighter } from "./yaml-syntax-highlighter.js";
 
@@ -21,6 +23,10 @@ export type SetupTargetRepository = {
   setupProbeStatus?: string;
   setupProbeWorkflowRunId?: string;
   setupProbeExpiresAt?: string;
+  /** Scoped to this repository's actual GitHub App installation, not the first selector entry. */
+  installationGrants?: Pick<InstallationCapabilities, "permissions" | "missing" | "manageUrl">;
+  setupBlockedReason?: string;
+  readinessBlockedReason?: string;
 };
 
 export type RepositorySetupInteractiveProps = {
@@ -34,9 +40,6 @@ export type RepositorySetupInteractiveProps = {
   repositories?: readonly SetupTargetRepository[];
   signedIn?: boolean;
   /** Why the one-click path is unavailable for this installation, when it is. */
-  blockedReason?: string;
-  /** Why setup readiness validation is unavailable for this installation, when it is. */
-  readinessBlockedReason?: string;
 };
 
 type SetupPrResult = {
@@ -190,8 +193,6 @@ export function RepositorySetupInteractive({
   workflowSource,
   repositories = [],
   signedIn = false,
-  blockedReason,
-  readinessBlockedReason,
 }: Readonly<RepositorySetupInteractiveProps>) {
   const [selectedId, setSelectedId] = useState(initialPresetId);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
@@ -412,7 +413,9 @@ export function RepositorySetupInteractive({
           isCreating={isCreatingPr}
           selectionDisabled={isCreatingPr || isValidating}
           workflowPath={workflowPath}
-          {...(blockedReason ? { blockedReason } : {})}
+          {...(displayedRepository?.setupBlockedReason
+            ? { blockedReason: displayedRepository.setupBlockedReason }
+            : {})}
           {...(prResult ? { result: prResult } : {})}
         />
       </Panel>
@@ -422,8 +425,19 @@ export function RepositorySetupInteractive({
         {...(displayedRepository ? { repository: displayedRepository } : {})}
         isValidating={isValidating}
         onValidate={handleValidateReadiness}
-        {...(readinessBlockedReason ? { blockedReason: readinessBlockedReason } : {})}
+        {...(displayedRepository?.readinessBlockedReason
+          ? { blockedReason: displayedRepository.readinessBlockedReason }
+          : {})}
         {...(probeResult ? { result: probeResult } : {})}
+      />
+      <AppPermissionProfile
+        {...(displayedRepository?.installationGrants
+          ? {
+              granted: displayedRepository.installationGrants.permissions,
+              missing: displayedRepository.installationGrants.missing,
+              manageUrl: displayedRepository.installationGrants.manageUrl,
+            }
+          : {})}
       />
     </>
   );

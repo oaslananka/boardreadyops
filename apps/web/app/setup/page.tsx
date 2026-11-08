@@ -6,7 +6,6 @@ import {
   repositorySetupWorkflowContractVersion,
   repositorySetupWorkflowPath,
 } from "@boardreadyops/cloud-core/repository-setup";
-import { AppPermissionProfile } from "../../components/app-permission-profile.js";
 import { RepositorySetupInteractive } from "../../components/repository-setup-interactive.js";
 import { Alert, AppShell, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
@@ -36,7 +35,7 @@ function first(value: string | string[] | undefined): string | undefined {
  */
 async function setupTargets() {
   const viewer = await viewerAuthorization();
-  if (!viewer.session) return { signedIn: false, repositories: [] as const, capabilities: undefined };
+  if (!viewer.session) return { signedIn: false, repositories: [] as const };
 
   const groups = await loadViewerRepositories(viewer.session);
   const repositories = groups.flatMap((group) =>
@@ -57,11 +56,30 @@ async function setupTargets() {
     })),
   );
 
-  // Every repository in one installation shares its grants, and nearly every workspace has a
-  // single installation, so one reading answers the page. A mixed-installation viewer sees the
-  // first installation's grants and the server still refuses per repository with the exact reason.
-  const capabilities = await loadInstallationCapabilities(repositories[0]?.githubInstallationId);
-  return { signedIn: true, repositories, capabilities };
+  // Resolve actual grants for EACH installation. First-repository grants may not
+  // represent another owner or installation in the selector. Share one lookup
+  // across repositories on the same installation, never across installations.
+  const installationIds = [...new Set(repositories.map((repository) => repository.githubInstallationId))];
+  const grantsByInstallation = new Map(
+    await Promise.all(installationIds.map(async (id) => [id, await loadInstallationCapabilities(id)] as const)),
+  );
+  const scopedRepositories = repositories.map((repository) => {
+    const grants = grantsByInstallation.get(repository.githubInstallationId);
+    if (!grants) return repository;
+    const setupBlockedReason = grants.actions.find(
+      (action) => action.id === "setup" && !action.satisfied,
+    )?.userExplanation;
+    const readinessBlockedReason = grants.actions.find(
+      (action) => action.id === "validate-setup" && !action.satisfied,
+    )?.userExplanation;
+    return {
+      ...repository,
+      installationGrants: { permissions: grants.permissions, missing: grants.missing, manageUrl: grants.manageUrl },
+      ...(setupBlockedReason ? { setupBlockedReason } : {}),
+      ...(readinessBlockedReason ? { readinessBlockedReason } : {}),
+    };
+  });
+  return { signedIn: true, repositories: scopedRepositories };
 }
 
 export default async function SetupPage({ searchParams }: Readonly<SetupPageProps>) {
@@ -69,15 +87,6 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
   const selectedValue = first(parameters.preset);
   const hasInstallationHandoff = first(parameters.installation_id) !== undefined;
   const targets = await setupTargets();
-  const installationGrants = targets.capabilities;
-  // When the grants are readable and the capability is absent, say so on the button rather than
-  // hiding it: a missing permission is a fixable state, and a button that vanished teaches nothing.
-  const setupBlockedReason = installationGrants?.actions.find(
-    (action) => action.id === "setup" && !action.satisfied,
-  )?.userExplanation;
-  const readinessBlockedReason = installationGrants?.actions.find(
-    (action) => action.id === "validate-setup" && !action.satisfied,
-  )?.userExplanation;
   const defaultPreset = repositorySetupPreset("prototype");
   if (!defaultPreset) throw new Error("prototype setup preset is unavailable");
   const selected =
@@ -150,14 +159,6 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
           workflowSource={workflowSource}
           repositories={targets.repositories}
           signedIn={targets.signedIn}
-          {...(setupBlockedReason ? { blockedReason: setupBlockedReason } : {})}
-          {...(readinessBlockedReason ? { readinessBlockedReason } : {})}
-        />
-
-        <AppPermissionProfile
-          {...(installationGrants ? { granted: installationGrants.permissions } : {})}
-          {...(installationGrants ? { missing: installationGrants.missing } : {})}
-          {...(installationGrants?.manageUrl ? { manageUrl: installationGrants.manageUrl } : {})}
         />
       </main>
     </AppShell>

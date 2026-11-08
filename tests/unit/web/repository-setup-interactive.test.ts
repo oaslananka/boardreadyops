@@ -2,6 +2,7 @@
  * @vitest-environment happy-dom
  */
 
+import { githubAppPermissionProfile, missingDeclaredPermissions } from "@boardreadyops/cloud-core/github-capabilities";
 import {
   repositorySetupPresets,
   repositorySetupPresetVersion,
@@ -63,6 +64,67 @@ describe("repository setup readiness controls", () => {
     container.remove();
     vi.unstubAllGlobals();
     delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+  });
+
+  it("switches setup, probe and live permissions with the selected GitHub installation", async () => {
+    const fullPermissions = Object.fromEntries(githubAppPermissionProfile.map((p) => [p.key, p.level]));
+    const blockedPermissions = { ...fullPermissions, actions: "read", pull_requests: "read" };
+    const blocked = {
+      ...readyForProbe,
+      id: "repo-first",
+      fullName: "first-org/board",
+      setupBlockedReason: "First installation cannot open setup pull requests.",
+      readinessBlockedReason: "First installation cannot dispatch Actions.",
+      installationGrants: {
+        permissions: blockedPermissions,
+        missing: missingDeclaredPermissions(blockedPermissions),
+        manageUrl: "https://github.com/settings/installations/101",
+      },
+    };
+    const allowed = {
+      ...readyForProbe,
+      id: "repo-second",
+      fullName: "second-org/board",
+      installationGrants: {
+        permissions: fullPermissions,
+        missing: missingDeclaredPermissions(fullPermissions),
+        manageUrl: "https://github.com/settings/installations/202",
+      },
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [blocked, allowed] }),
+      );
+    });
+    expect(button(container, "Open setup pull request").disabled).toBe(true);
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+    expect(container.textContent).toContain("First installation cannot open setup pull requests.");
+    expect(container.textContent).toContain("First installation cannot dispatch Actions.");
+    expect(container.textContent).toContain("This installation is missing a required permission");
+    expect(container.querySelector('a[href="https://github.com/settings/installations/101"]')).not.toBeNull();
+
+    const select = container.querySelector("select");
+    if (!(select instanceof HTMLSelectElement)) throw new Error("repository selector not found");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(select, "repo-second");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+    expect(button(container, "Validate readiness").disabled).toBe(false);
+    expect(container.textContent).not.toContain("First installation cannot");
+    expect(container.textContent).toContain("second-org/board");
+    expect(container.textContent).toContain("Every declared permission is granted");
+    expect(container.querySelector('a[href="https://github.com/settings/installations/101"]')).toBeNull();
+
+    await act(async () => {
+      setter?.call(select, "repo-first");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(button(container, "Open setup pull request").disabled).toBe(true);
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+    expect(container.textContent).toContain("First installation cannot open setup pull requests.");
+    expect(container.querySelector('a[href="https://github.com/settings/installations/101"]')).not.toBeNull();
   });
 
   it("disables readiness validation when the viewer is signed out", async () => {
