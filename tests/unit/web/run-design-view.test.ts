@@ -131,6 +131,46 @@ describe("run design visual inspection", () => {
     expect(html).toContain("B.Cu");
   });
 
+  it("shows recorded base-only KiCad artwork without claiming that the head run published it", () => {
+    const html = renderToStaticMarkup(
+      createElement(RunDesignView, {
+        runId: "run-1",
+        snapshots: [],
+        baseSnapshots: [{ ...visual, id: "recorded-base", sha256: "b".repeat(64) }],
+        findings: [
+          {
+            id: "head-finding",
+            ruleId: "design.board-outline",
+            severity: "high",
+            message: "Current run has an open PCB outline",
+            path: "board.kicad_pcb",
+          },
+        ],
+        totalFindings: 1,
+        repository: "example/hardware",
+        commitSha: "a".repeat(40),
+      }),
+    );
+    expect(html).toContain("0 published views");
+    expect(html).toContain("1 base views");
+    expect(html).toContain("1 base KiCad-native");
+    expect(html).toContain("Only the recorded base revision has design artwork");
+    expect(html).toContain('role="status"');
+    expect(html).toContain("No head-revision PCB or schematic snapshot was published");
+    expect(html).toContain("This does not show the board at the current run commit");
+    expect(html).toContain("No head artwork is available for visual comparison");
+    expect(html).toContain('href="/reviews#publish-review"');
+    expect(html).toContain("pcb-copper");
+    expect(html).toContain("Current run has an open PCB outline");
+    expect(html).not.toContain("No PCB or schematic preview published for this run");
+    const baseMode = html.match(/<button[^>]+title="Base revision only"[^>]*>/u)?.[0] ?? "";
+    const headMode = html.match(/<button[^>]+title="Head revision only"[^>]*>/u)?.[0] ?? "";
+    const overlayMode = html.match(/<button[^>]+title="Overlay with opacity slider"[^>]*>/u)?.[0] ?? "";
+    expect(baseMode).toContain('aria-pressed="true"');
+    expect(headMode).toContain("disabled");
+    expect(overlayMode).toContain("disabled");
+  });
+
   it("does not misrepresent a run with no published design IP", () => {
     const html = renderToStaticMarkup(createElement(RunDesignView, { runId: "run-1", snapshots: [] }));
     expect(html).toContain("No PCB or schematic preview published for this run");
