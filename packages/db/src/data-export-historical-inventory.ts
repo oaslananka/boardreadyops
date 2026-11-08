@@ -14,6 +14,16 @@ export class HistoricalUserInventoryUnavailableError extends Error {
   }
 }
 
+// Caller-owned objects can mutate while PostgreSQL waits. Every independent
+// private preflight and the composite source-only snapshot must use the same
+// original numeric USER/export values for queries and serialized evidence.
+function pinOriginalUserAuthority(authority: { exportId: string; verifiedGitHubUserId: number }) {
+  return Object.freeze({
+    exportId: authority.exportId,
+    verifiedGitHubUserId: authority.verifiedGitHubUserId,
+  });
+}
+
 // Shared, immutable account authority: do not drift between independent
 // historical preflights. Never infer ownership from a recycled login alone.
 export const historicalOwnerCtes = `owner_export AS MATERIALIZED (
@@ -103,6 +113,8 @@ export async function prepareVerifiedHistoricalUserRepositoryInventory(
   )
     return null;
 
+  const originalUser = pinOriginalUserAuthority(input);
+
   return db.withTransaction(
     async (tx) => {
       const query = await tx.query(
@@ -128,12 +140,12 @@ export async function prepareVerifiedHistoricalUserRepositoryInventory(
             FROM bounded_repositories
           ), '[]'::jsonb) AS repositories
           FROM owner_export LIMIT 1`,
-        [input.exportId, input.verifiedGitHubUserId],
+        [originalUser.exportId, originalUser.verifiedGitHubUserId],
       );
       const row = (query as { rows?: Array<Record<string, unknown>> }).rows?.[0];
       if (!row) return null;
       if (
-        row.id !== input.exportId ||
+        row.id !== originalUser.exportId ||
         !Array.isArray(row.repositories) ||
         row.repositories.length > maxRepositories ||
         !row.repositories.every(validRepository)
@@ -149,7 +161,7 @@ export async function prepareVerifiedHistoricalUserRepositoryInventory(
           kind: "boardreadyops.historical-user-repository-preflight",
           coverage: "retained-suspended-user-installation-repositories-only",
           completeCustomerExport: false,
-          exportId: input.exportId,
+          exportId: originalUser.exportId,
           exclusions: ["runs", "findings", "artifacts", "reviews", "comments", "audit", "platform-storage"],
           repositories,
         }),
@@ -277,6 +289,8 @@ export async function prepareVerifiedHistoricalUserRunFindingSnapshot(
   )
     return null;
 
+  const originalUser = pinOriginalUserAuthority(input);
+
   return db.withTransaction(
     async (tx) => {
       const result = await tx.query(
@@ -308,12 +322,12 @@ export async function prepareVerifiedHistoricalUserRunFindingSnapshot(
               COALESCE((SELECT jsonb_agg(to_jsonb(finding_rows) ORDER BY finding_rows.id)
                         FROM finding_rows), '[]'::jsonb) AS findings
          FROM owner_export LIMIT 1`,
-        [input.exportId, input.verifiedGitHubUserId],
+        [originalUser.exportId, originalUser.verifiedGitHubUserId],
       );
       const record = (result as { rows?: Array<Record<string, unknown>> }).rows?.[0];
       if (!record) return null;
       if (
-        record.id !== input.exportId ||
+        record.id !== originalUser.exportId ||
         !Number.isInteger(record.repository_count) ||
         (record.repository_count as number) > maxRepositories ||
         !Array.isArray(record.runs) ||
@@ -363,7 +377,7 @@ export async function prepareVerifiedHistoricalUserRunFindingSnapshot(
           kind: "boardreadyops.historical-user-run-finding-preflight",
           coverage: "retained-suspended-user-installation-runs-and-findings-only",
           completeCustomerExport: false,
-          exportId: input.exportId,
+          exportId: originalUser.exportId,
           exclusions: ["artifact-bytes", "reviews", "comments", "audit", "platform-storage"],
           runs: runRows.map((run) => ({
             id: run.id,
@@ -1336,12 +1350,17 @@ export async function prepareVerifiedHistoricalUserConsistentCorePreflight(
   )
     return null;
 
+  const originalUser = pinOriginalUserAuthority(input);
+
   return db.withTransaction(
     async (tx) => {
-      const result = await tx.query(historicalUserConsistentCoreSql, [input.exportId, input.verifiedGitHubUserId]);
+      const result = await tx.query(historicalUserConsistentCoreSql, [
+        originalUser.exportId,
+        originalUser.verifiedGitHubUserId,
+      ]);
       const record = (result as { rows?: Array<Record<string, unknown>> }).rows?.[0];
       if (!record) return null;
-      assertHistoricalCoreRecordLayout(record, input.exportId);
+      assertHistoricalCoreRecordLayout(record, originalUser.exportId);
 
       const repositories = record.repositories as HistoricalRepository[];
       const runs = record.runs as HistoricalRunRow[];
@@ -1383,7 +1402,7 @@ export async function prepareVerifiedHistoricalUserConsistentCorePreflight(
 
       assertHistoricalCoreRelationships(sourceRows);
 
-      return serializeHistoricalCoreSnapshot(input, sourceRows);
+      return serializeHistoricalCoreSnapshot(originalUser, sourceRows);
     },
     { consistentRead: true, statementTimeoutMs: 5_000 },
   );
@@ -1411,6 +1430,8 @@ export async function prepareVerifiedHistoricalUserPrivateVisualEvidence(
     input.verifiedGitHubUserId <= 0
   )
     return null;
+
+  const originalUser = pinOriginalUserAuthority(input);
 
   return db.withTransaction(
     async (tx) => {
@@ -1443,7 +1464,7 @@ export async function prepareVerifiedHistoricalUserPrivateVisualEvidence(
             AND (active.expires_at IS NULL OR active.expires_at>clock_timestamp())
        )
        ORDER BY visual.id`,
-        [input.exportId, input.verifiedGitHubUserId],
+        [originalUser.exportId, originalUser.verifiedGitHubUserId],
       );
       const rows = (result as { rows?: Array<Record<string, unknown>> }).rows;
       if (!Array.isArray(rows) || rows.length === 0) return null;
@@ -1460,7 +1481,7 @@ export async function prepareVerifiedHistoricalUserPrivateVisualEvidence(
       const seen = new Set<string>();
       let totalVisualBytes = 0;
       for (const row of rows) {
-        if (row.export_id !== input.exportId) throw new HistoricalUserInventoryUnavailableError();
+        if (row.export_id !== originalUser.exportId) throw new HistoricalUserInventoryUnavailableError();
         if (row.id === null) continue;
         if (
           !isUuid(row.id) ||
@@ -1498,7 +1519,7 @@ export async function prepareVerifiedHistoricalUserPrivateVisualEvidence(
         JSON.stringify({
           kind: "boardreadyops.historical-user-private-visual-evidence-preflight",
           formatVersion: 1,
-          exportId: input.exportId,
+          exportId: originalUser.exportId,
           completeCustomerExport: false,
           contentIncluded: false,
           exclusions: [
@@ -1579,7 +1600,15 @@ export async function prepareVerifiedHistoricalUserCompositePreflight(
   /** Scoped counter fingerprint, never installation identifiers or private content. */
   mutationEpochSha256: string;
 } | null> {
-  if (!db?.withTransaction) return null;
+  if (
+    !db?.withTransaction ||
+    !isUuid(authority?.exportId) ||
+    !Number.isSafeInteger(authority?.verifiedGitHubUserId) ||
+    authority.verifiedGitHubUserId <= 0
+  )
+    return null;
+  // Freeze once BEFORE the outer transaction: core, SVG and epoch share one USER.
+  const originalUser = pinOriginalUserAuthority(authority);
   return db.withTransaction(
     async (tx) => {
       // Both calls operate on this SAME read-only snapshot, not a new client.
@@ -1594,13 +1623,13 @@ export async function prepareVerifiedHistoricalUserCompositePreflight(
           return work(tx);
         },
       };
-      const core = await prepareVerifiedHistoricalUserConsistentCorePreflight(bound, authority);
+      const core = await prepareVerifiedHistoricalUserConsistentCorePreflight(bound, originalUser);
       if (!core) return null;
-      const visual = await prepareVerifiedHistoricalUserPrivateVisualEvidence(bound, authority);
+      const visual = await prepareVerifiedHistoricalUserPrivateVisualEvidence(bound, originalUser);
       if (!visual) throw new HistoricalUserInventoryUnavailableError();
       // Share the same bound epoch digest across the core/visual and
       // source-only checks without opening another database snapshot.
-      const mutationEpochSha256 = await prepareVerifiedHistoricalUserMutationEpochSha256(tx, authority);
+      const mutationEpochSha256 = await prepareVerifiedHistoricalUserMutationEpochSha256(tx, originalUser);
       return { core, visual, mutationEpochSha256 };
     },
     { consistentRead: true, statementTimeoutMs: 10_000 },

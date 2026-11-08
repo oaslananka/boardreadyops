@@ -41,6 +41,16 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
 
 ## Existing private evidence is not customer delivery
 
+- Four original numeric USER inventory readers (repository, run/finding,
+  consistent core, private visual) and their single-transaction composite now
+  bind the exact export UUID and immutable GitHub numeric USER before any
+  asynchronous SQL or transaction admission. They use that same pair in SQL
+  predicates, returned row checks and serialized private evidence; the
+  composite uses it for core, visual and mutation epochs without mixing
+  owners. Five synthetic adversarial regressions reproduce caller-side
+  mid-query or outer-transaction identity substitution on old code and pass
+  with the pinned identity. This does not prove ownership of other source
+  classes, snapshot completeness or lawful customer disclosure.
 - A numeric original-user, suspended-installation and pending-export gate
   rejects expiry, active hold and real erasure before source/locator reads.
   Locked manifest checks still guard retention, deletion, epoch and races.

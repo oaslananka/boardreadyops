@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
   HistoricalUserInventoryUnavailableError,
+  prepareVerifiedHistoricalUserCompositePreflight,
   prepareVerifiedHistoricalUserConsistentCorePreflight,
+  prepareVerifiedHistoricalUserPrivateVisualEvidence,
+  prepareVerifiedHistoricalUserRepositoryInventory,
+  prepareVerifiedHistoricalUserRunFindingSnapshot,
 } from "../../../packages/db/src/data-export-historical-inventory.js";
 
 const exportId = randomUUID();
@@ -277,5 +281,80 @@ describe("historical original-user bounded core validation", () => {
     first.parent_id = second.id;
     comments.push(second);
     await expect(read(record)).rejects.toThrow(HistoricalUserInventoryUnavailableError);
+  });
+});
+
+describe("historical original numeric USER immutable ownership across awaited source snapshots", () => {
+  const sourceCases = ["repository", "run-finding", "core", "visual"] as const;
+
+  it.each(sourceCases)("never changes %s source identity after an awaited query", async (name) => {
+    const authority = { exportId, verifiedGitHubUserId: 42 };
+    const expected = { ...authority };
+    const record = retainedOriginalUserFixture();
+    const query = vi.fn(async (_sql: string, args?: unknown[]) => {
+      expect(args).toEqual([expected.exportId, expected.verifiedGitHubUserId]);
+      authority.exportId = randomUUID();
+      authority.verifiedGitHubUserId++;
+      if (name === "repository") return { rows: [{ id: expected.exportId, repositories: record.repositories }] };
+      if (name === "run-finding")
+        return {
+          rows: [
+            {
+              id: expected.exportId,
+              repository_count: 1,
+              runs: record.runs,
+              findings: record.findings,
+            },
+          ],
+        };
+      if (name === "visual") return { rows: [{ export_id: expected.exportId, id: null }] };
+      return { rows: [record] };
+    });
+    const db = {
+      withTransaction: vi.fn(async (fn: (tx: { query: typeof query }) => Promise<unknown>) => fn({ query })),
+    } as never;
+    const functions = {
+      repository: prepareVerifiedHistoricalUserRepositoryInventory,
+      "run-finding": prepareVerifiedHistoricalUserRunFindingSnapshot,
+      core: prepareVerifiedHistoricalUserConsistentCorePreflight,
+      visual: prepareVerifiedHistoricalUserPrivateVisualEvidence,
+    };
+    const result = await functions[name](db, authority);
+    expect(result).not.toBeNull();
+    expect(JSON.parse(result?.bytes.toString("utf8") ?? "null").exportId).toBe(expected.exportId);
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the exact original user bound from outer transaction entrance through core, visual and epoch", async () => {
+    const authority = { exportId, verifiedGitHubUserId: 42 };
+    const expected = { ...authority };
+    const record = retainedOriginalUserFixture();
+    const sourceInstallationId = randomUUID();
+    const query = vi.fn(async (sql: string, args?: unknown[]) => {
+      expect(args).toEqual([expected.exportId, expected.verifiedGitHubUserId]);
+      if (sql.includes("scoped_visual_rows")) {
+        return { rows: [{ export_id: expected.exportId, id: null }] };
+      }
+      if (sql.includes("SELECT fi.id,COALESCE(epoch.revision")) {
+        return { rows: [{ id: sourceInstallationId, revision: "0" }] };
+      }
+      return { rows: [record] };
+    });
+    const db = {
+      withTransaction: vi.fn(async (fn: (tx: { query: typeof query }) => Promise<unknown>) => {
+        // The caller-owned authority is replaced as the outer snapshot
+        // is admitted, before its first source read. All three SQL reads
+        // must retain the SAME original numeric USER, not the replacement.
+        authority.exportId = randomUUID();
+        authority.verifiedGitHubUserId++;
+        return fn({ query });
+      }),
+    } as never;
+    const result = await prepareVerifiedHistoricalUserCompositePreflight(db, authority);
+    expect(result).not.toBeNull();
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(result?.core.bytes.toString("utf8") ?? "null").exportId).toBe(expected.exportId);
+    expect(JSON.parse(result?.visual.bytes.toString("utf8") ?? "null").exportId).toBe(expected.exportId);
+    expect(result?.mutationEpochSha256).toMatch(/^[0-9a-f]{64}$/u);
   });
 });
