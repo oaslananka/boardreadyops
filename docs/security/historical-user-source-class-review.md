@@ -349,6 +349,30 @@ numeric OAuth identity, active hold/erasure, and over-100 fences.
 No schema migration, new service, public endpoint, feature flag,
 external provider call, or paid infrastructure was introduced.
 
+### Same-snapshot evidence across the 29 FK-unlinked classes
+
+The private `assessHistoricalUserUnlinkedSnapshot` now composes the existing
+five bounded source-candidate reviews **inside one PostgreSQL repeatable-read,
+read-only transaction**. It first verifies the exact 92-table schema and the
+63-class FK lineage catalogue, including that precisely the expected 29
+classes lack an FK route to `installations`. The individual reviews then
+repeat the original numeric GitHub USER, pending uninstall export, suspended
+installation, expiry, hold and destructive-erasure guards **on that same
+snapshot**. A missing review, drifted catalogue, contradictory delivery flag
+or read outside the pinned snapshot invalidates the whole observation.
+
+The result contains **only a domain-separated SHA-256 of internal bounded
+count/ambiguity evidence**, plus constant `26` candidate/`3` platform-only
+classification and explicit `NO_GO` flags. Neither raw records, installation
+identifiers, billing data, source text, artifact paths nor OAuth material is
+returned. Adding/removing a candidate changes the private count fingerprint,
+but **count-preserving edits, ABA mutations and filesystem objects are NOT
+covered** by this digest. It neither certifies original ownership or third-
+party rights, nor creates a customer ZIP, download entitlement, delivery
+endpoint or new migration. Disposable PostgreSQL 17 tests verify all 29
+classes in one snapshot, candidate changes and hold/expiry denial; the
+production database and customer delivery remain unchanged.
+
 ## Individual table review queue
 
 ### Privacy, export lifecycle and installation authority — 17 tables
