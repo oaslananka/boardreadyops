@@ -1,10 +1,11 @@
 import { isValidElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { viewerMock, repositoriesMock, capabilitiesMock } = vi.hoisted(() => ({
+const { viewerMock, repositoriesMock, capabilitiesMock, rolloutMock } = vi.hoisted(() => ({
   viewerMock: vi.fn(),
   repositoriesMock: vi.fn(),
   capabilitiesMock: vi.fn(),
+  rolloutMock: vi.fn(),
 }));
 
 vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({ viewerAuthorization: viewerMock }));
@@ -14,6 +15,9 @@ vi.mock("../../../apps/web/lib/repository-dashboard.js", async (importOriginal) 
 }));
 vi.mock("../../../apps/web/lib/installation-capabilities.js", () => ({
   loadInstallationCapabilities: capabilitiesMock,
+}));
+vi.mock("../../../apps/web/lib/release-rollout.js", () => ({
+  releaseRepositoryDispatchAvailability: rolloutMock,
 }));
 
 import SetupPage from "../../../apps/web/app/setup/page.js";
@@ -36,6 +40,11 @@ function findSetup(node: ReactNode): { repositories: readonly Record<string, unk
 describe("repository setup installation grant scope", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    rolloutMock.mockImplementation((name: string) =>
+      name.startsWith("alpha/")
+        ? { enabled: false, reason: "Full readiness runs are not enabled for alpha yet." }
+        : { enabled: true },
+    );
     viewerMock.mockResolvedValue({ session: { userId: "user-1", login: "engineer" } });
     repositoriesMock.mockResolvedValue([
       {
@@ -80,6 +89,10 @@ describe("repository setup installation grant scope", () => {
       manageUrl: "https://github.com/settings/installations/101",
     });
     expect(second?.installationGrants).toEqual(first?.installationGrants);
+    expect(first?.readinessRunBlockedReason).toBe("Full readiness runs are not enabled for alpha yet.");
+    expect(second?.readinessRunBlockedReason).toBe(first?.readinessRunBlockedReason);
+    expect(otherOwner?.readinessRunBlockedReason).toBeUndefined();
+    expect(rolloutMock.mock.calls.map(([name]) => name)).toEqual(["alpha/board-a", "alpha/board-b", "beta/board-c"]);
     expect(otherOwner?.setupBlockedReason).toBeUndefined();
     expect(otherOwner?.readinessBlockedReason).toBeUndefined();
     expect(otherOwner?.installationGrants).toMatchObject({
@@ -104,5 +117,9 @@ describe("repository setup installation grant scope", () => {
     expect(setup?.repositories[0]?.setupBlockedReason).toBe("Missing permission.");
     expect(setup?.repositories[2]?.installationGrants).toBeUndefined();
     expect(setup?.repositories[2]?.setupBlockedReason).toBeUndefined();
+    // Unavailable GitHub grants must not suppress independently known rollout status.
+    expect(setup?.repositories[0]?.readinessRunBlockedReason).toBe(
+      "Full readiness runs are not enabled for alpha yet.",
+    );
   });
 });
