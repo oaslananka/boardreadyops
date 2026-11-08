@@ -143,6 +143,17 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   caller-owned ZIP is not mutated by the verifier. These are private
   observation controls, **not** a coherent atomic DB/FS snapshot or
   a proof that the caller cannot mutate the ZIP after final verification.
+  The source-only durable partial ZIP staging coordinator now also
+  freezes its exact original numeric USER/export UUID, trusted DB
+  executor, local storage root and driver before asynchronous private
+  directory creation. Both before/after original-user source reads,
+  physical ZIP seal and final disk read use that same pinned binding.
+  Mutating a caller-owned request during directory setup or source
+  preparation can no longer retarget a second owner/DB or persist under
+  a different export UUID. Synthetic source receipts are tested against
+  real 0700/0600 temporary filesystem writes for both mutation windows.
+  This is a local identity/IO integrity guard, NOT a DB+filesystem
+  atomic commit, legal content clearance or public customer capability.
   The old direct low-level disk reader is not automatically wrapped,
   and no customer delivery reader/stream contract or DB+filesystem
   atomic commit exists. This cleanup MUST remain source-only, explicit

@@ -232,11 +232,33 @@ export async function prepareSealedHistoricalUserPrivatePartial(input: {
   storageRoot: string;
   storageDriver: string;
 }): Promise<SealedHistoricalUserPartial | null> {
-  if (input?.storageDriver !== "local") return null;
-  const root = path.join(input.storageRoot, ".private-export-archives");
+  if (
+    input?.storageDriver !== "local" ||
+    typeof input.storageRoot !== "string" ||
+    !input.db?.withTransaction ||
+    !input.db.query ||
+    !uuid.test(input.authority?.exportId) ||
+    !Number.isSafeInteger(input.authority?.verifiedGitHubUserId) ||
+    input.authority.verifiedGitHubUserId <= 0
+  )
+    return null;
+  // Freeze the trusted original USER, database and private volume BEFORE
+  // async directory setup, source reads or fsync. A mutable caller request
+  // must not redirect the second source check to a different owner/DB, or
+  // seal a partial ZIP under another original user's export UUID.
+  const pinned = Object.freeze({
+    db: input.db,
+    authority: Object.freeze({
+      exportId: input.authority.exportId,
+      verifiedGitHubUserId: input.authority.verifiedGitHubUserId,
+    }),
+    storageRoot: input.storageRoot,
+    storageDriver: "local" as const,
+  });
+  const root = path.join(pinned.storageRoot, ".private-export-archives");
   if (
     !(await ensurePrivateLocalExportArchiveDirectory({
-      storageRoot: input.storageRoot,
+      storageRoot: pinned.storageRoot,
       privateArchiveRoot: root,
     }))
   )
@@ -245,11 +267,11 @@ export async function prepareSealedHistoricalUserPrivatePartial(input: {
   let confirmed: Awaited<ReturnType<typeof prepareVerifiedHistoricalUserPartialArchive>> = null;
   let disk: Buffer | null = null;
   try {
-    initial = await prepareVerifiedHistoricalUserPartialArchive(input);
+    initial = await prepareVerifiedHistoricalUserPartialArchive(pinned);
     if (!initial) return null;
     const persisted = await sealHistoricalUserPrivatePartial({
       archiveRoot: root,
-      exportId: input.authority.exportId,
+      exportId: pinned.authority.exportId,
       archive: initial,
     });
     if (!persisted) return null;
@@ -257,7 +279,7 @@ export async function prepareSealedHistoricalUserPrivatePartial(input: {
     // A second complete original-USER/physical-object read is intentionally
     // bounded and refuses any stale source after disk fsync. There is STILL
     // no durable DB/FS atomic claim after this short-lived check.
-    confirmed = await prepareVerifiedHistoricalUserPartialArchive(input);
+    confirmed = await prepareVerifiedHistoricalUserPartialArchive(pinned);
     if (
       confirmed?.byteLength !== initial.byteLength ||
       confirmed.sha256 !== initial.sha256 ||
@@ -266,7 +288,7 @@ export async function prepareSealedHistoricalUserPrivatePartial(input: {
       return null;
     disk = await readSealedHistoricalUserPartial({
       archiveRoot: root,
-      exportId: input.authority.exportId,
+      exportId: pinned.authority.exportId,
       sha256: initial.sha256,
       byteLength: initial.byteLength,
     });
