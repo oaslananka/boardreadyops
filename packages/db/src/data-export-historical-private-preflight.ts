@@ -37,6 +37,35 @@ function validFingerprint(f: PrivateArchiveFingerprint): boolean {
     f.archiveByteLength <= 64 * 1024 * 1024
   );
 }
+/** Freeze the complete original-user/archive binding before the first await.
+ * Source-sampling providers and admission queries must never reread caller-
+ * mutable authority or digest fields inside later transactions.
+ */
+function pinnedPrivatePreflight(input: {
+  db: PreflightDb;
+  authority: HistoricalUserAuthority;
+  fingerprint: PrivateArchiveFingerprint;
+}): {
+  db: PreflightDb;
+  authority: Readonly<HistoricalUserAuthority>;
+  fingerprint: Readonly<PrivateArchiveFingerprint>;
+} {
+  return {
+    db: input.db,
+    authority: Object.freeze({
+      exportId: input.authority.exportId,
+      verifiedGitHubUserId: input.authority.verifiedGitHubUserId,
+    }),
+    fingerprint: Object.freeze({
+      archiveSha256: input.fingerprint.archiveSha256,
+      archiveByteLength: input.fingerprint.archiveByteLength,
+      coreSha256: input.fingerprint.coreSha256,
+      visualSha256: input.fingerprint.visualSha256,
+      mutationEpochSha256: input.fingerprint.mutationEpochSha256,
+    }),
+  };
+}
+
 // These digests must describe the CURRENT original numeric USER snapshot.
 // The archive-byte SHA is still a private candidate value, not attested
 // customer-export content and never a bearer/download capability.
@@ -128,13 +157,14 @@ export async function stageHistoricalUserPrivateDeliveryPreflight(input: {
     input.ttlSeconds > 600
   )
     return null;
+  const { db, authority, fingerprint: f } = pinnedPrivatePreflight(input);
+  const ttlSeconds = input.ttlSeconds;
   const id = randomUUID();
-  const f = input.fingerprint;
-  if (!(await currentOriginalUserSnapshotMatches(input.db, input.authority, f))) return null;
+  if (!(await currentOriginalUserSnapshotMatches(db, authority, f))) return null;
   try {
-    return await input.db.withTransaction(
+    return await db.withTransaction(
       async (tx) => {
-        if (!(await authorizeSuspendedOriginalUser(tx, input.authority))) return null;
+        if (!(await authorizeSuspendedOriginalUser(tx, authority))) return null;
         const result: unknown = await tx.query(
           `INSERT INTO public.historical_user_private_delivery_preflights (
             id,export_id,original_github_user_id,
@@ -149,14 +179,14 @@ export async function stageHistoricalUserPrivateDeliveryPreflight(input: {
           RETURNING id::text AS id`,
           [
             id,
-            input.authority.exportId,
-            input.authority.verifiedGitHubUserId,
+            authority.exportId,
+            authority.verifiedGitHubUserId,
             f.archiveSha256,
             f.archiveByteLength,
             f.coreSha256,
             f.visualSha256,
             f.mutationEpochSha256,
-            input.ttlSeconds,
+            ttlSeconds,
           ],
         );
         if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows)) {
@@ -202,12 +232,13 @@ export async function inspectHistoricalUserPrivateDeliveryPreflight(input: {
     !validFingerprint(input.fingerprint)
   )
     return "stale";
-  const f = input.fingerprint;
-  if (!(await currentOriginalUserSnapshotMatches(input.db, input.authority, f))) return "stale";
+  const { db, authority, fingerprint: f } = pinnedPrivatePreflight(input);
+  const id = input.id;
+  if (!(await currentOriginalUserSnapshotMatches(db, authority, f))) return "stale";
   try {
-    return await input.db.withTransaction(
+    return await db.withTransaction(
       async (tx) => {
-        if (!(await authorizeSuspendedOriginalUser(tx, input.authority))) return "stale";
+        if (!(await authorizeSuspendedOriginalUser(tx, authority))) return "stale";
         const result = (await tx.query(
           `SELECT 1 FROM public.historical_user_private_delivery_preflights p
           WHERE p.id=$1::uuid AND p.export_id=$2 AND p.original_github_user_id=$3::bigint
@@ -220,9 +251,9 @@ export async function inspectHistoricalUserPrivateDeliveryPreflight(input: {
             AND p.purpose='private-source-only-preflight'
           FOR SHARE OF p NOWAIT`,
           [
-            input.id,
-            input.authority.exportId,
-            input.authority.verifiedGitHubUserId,
+            id,
+            authority.exportId,
+            authority.verifiedGitHubUserId,
             f.archiveSha256,
             f.archiveByteLength,
             f.coreSha256,
@@ -252,7 +283,10 @@ export async function revokeHistoricalUserPrivateDeliveryPreflight(input: {
   id: string;
 }): Promise<"revoked" | "stale"> {
   if (!input?.db?.query || !validAuthority(input.authority) || !isHistoricalUserUuid(input.id)) return "stale";
-  const result: unknown = await input.db.query(
+  const db = input.db;
+  const authority = { exportId: input.authority.exportId, verifiedGitHubUserId: input.authority.verifiedGitHubUserId };
+  const id = input.id;
+  const result: unknown = await db.query(
     `UPDATE public.historical_user_private_delivery_preflights AS p
           SET revoked_at=clock_timestamp()
          FROM public.data_exports AS e
@@ -261,12 +295,12 @@ export async function revokeHistoricalUserPrivateDeliveryPreflight(input: {
           AND e.id=p.export_id AND e.original_github_user_id=$3::bigint
           AND e.scope='user' AND e.requested_by='github_app_uninstall'
        RETURNING p.id`,
-    [input.id, input.authority.exportId, input.authority.verifiedGitHubUserId],
+    [id, authority.exportId, authority.verifiedGitHubUserId],
   );
   if (result === null || typeof result !== "object" || !("rows" in result) || !Array.isArray(result.rows))
     return "stale";
   if (result.rows.length !== 1) return "stale";
   const row: unknown = result.rows[0];
   // Only the exact original USER preflight may acknowledge this revocation.
-  return row !== null && typeof row === "object" && "id" in row && row.id === input.id ? "revoked" : "stale";
+  return row !== null && typeof row === "object" && "id" in row && row.id === id ? "revoked" : "stale";
 }

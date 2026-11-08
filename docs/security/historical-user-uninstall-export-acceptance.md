@@ -139,6 +139,16 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   the caller-owned ZIP again after its original-user prepublication DB
   inspection; mutation of its bytes while the DB check is running
   fails closed rather than staging/accepting an out-of-date diagnostic.
+  The lower source-only PostgreSQL preflight lifecycle now also pins
+  the numeric original USER/export, trusted DB executor, exact ZIP/core/
+  visual/mutation SHA and byte length, TTL and preflight UUID before
+  asynchronous source sampling or row locks. Both CREATE and INSPECT
+  use the pinned binding in authorization and their SQL parameters;
+  revocation checks its acknowledgement against the originally
+  requested ID rather than a mutable caller object. Adversarial
+  tests reject DB/USER/digest substitution between the source read
+  and locked INSERT/SELECT and forged revocation acknowledgements.
+  These controls are internal only and cannot grant ZIP delivery.
   Extracted metadata and physical-object copies remain zeroized; the
   caller-owned ZIP is not mutated by the verifier. These are private
   observation controls, **not** a coherent atomic DB/FS snapshot or
