@@ -122,6 +122,19 @@ describe("IPC-2581 XML Ingestion & Normalization", () => {
     expect(() => parseIpc2581Package(maliciousXml)).toThrow(/security|entity|malformed|doctype/i);
   });
 
+  it("does not scan across repeated malformed opening component tags", () => {
+    const malformed = (n: number) =>
+      '<IPC-2581 revision="B"><Ecad><CadData><Step name="PRIMARY">' +
+      '<Component refDes="U1">'.repeat(n) +
+      "</Step></CadData></Ecad></IPC-2581>";
+    // Each unclosed body must stop at the NEXT malformed component rather
+    // than searching the rest of the document for a nonexistent closing tag.
+    const start = performance.now();
+    const result = parseIpc2581Package(malformed(10_000));
+    expect(result.components).toEqual([]);
+    expect(performance.now() - start).toBeLessThan(5_000);
+  });
+
   it("stays roughly linear time on many unclosed <Layer>/<Component> tags (ReDoS guard)", () => {
     const hostileOfSize = (n: number) =>
       `<IPC-2581 revision="B"><Content units="MILLIMETER"/><Ecad name="hostile"><CadData><Step name="PRIMARY">${"<Layer name=".repeat(

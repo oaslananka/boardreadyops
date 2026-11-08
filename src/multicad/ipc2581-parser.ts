@@ -142,9 +142,10 @@ function extractBoardProfile(xml: string, unitFactor: number): NormalizedBoardMe
 
 function extractLayers(xml: string, filename: string): NormalizedLayer[] {
   const layers: NormalizedLayer[] = [];
-  // Attribute run is bounded (real IPC-2581 <Layer> tags never approach this) so a crafted
-  // file with many unclosed "<Layer " occurrences can't force quadratic backtracking.
-  const layerRegex = /<Layer\s+([^>]{1,4096})>/gi;
+  // Raw '<' is illegal inside XML attributes (use &lt; instead). Stop at
+  // the next tag rather than scanning up to 4096 bytes across thousands of
+  // malformed nested '<Layer' starts. Keep the existing size ceiling.
+  const layerRegex = /<Layer\s+([^<>]{1,4096})>/gi;
   let match: RegExpExecArray | null = layerRegex.exec(xml);
 
   while (match !== null) {
@@ -288,12 +289,11 @@ function extractComponents(
   sourceFile: string,
 ): NormalizedComponent[] {
   const components: NormalizedComponent[] = [];
-  // The attribute run is bounded for the same reason as extractLayers's layerRegex above: on
-  // a crafted file with many unclosed "<Component " occurrences, an unbounded attribute group
-  // makes every failed attempt scan to end-of-string, which is quadratic under the global exec
-  // loop. Bounding it makes a failed attempt fail fast instead, without limiting how large a
-  // real (well-formed) component's own body content can be -- that group stays unbounded.
-  const compRegex = /<Component\s+([^>]{1,4096})(?:\/>|>([\s\S]*?)<\/Component>)/gi;
+  // No raw '<' is permitted in XML attributes. Bound attribute length
+  // AND stop at a new opening tag so malformed nested starts cannot cause
+  // overlapping quadratic scans. The body still accepts valid nested
+  // <Xform> and other component children, but not another <Component>.
+  const compRegex = /<Component\s+([^<>]{1,4096})(?:\/>|>((?:(?!<Component(?:\s|>)|<\/Step>)[\s\S])*?)<\/Component>)/gi;
 
   let match = compRegex.exec(xml);
   while (match !== null) {
