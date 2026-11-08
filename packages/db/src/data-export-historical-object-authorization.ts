@@ -441,6 +441,20 @@ export async function checkHistoricalUserArchivePrepublication(input: {
   underLock?: () => Promise<void>;
 }): Promise<"eligible" | "held" | "stale" | "busy"> {
   const { db, authority, objects } = input ?? {};
+  // Pin ALL evidence and the bounded physical transfer callback before the
+  // first DB await. A mutable caller's expected SHA or transfer function
+  // cannot be replaced between snapshot checks to manufacture "eligible".
+  const stableExpectedCore = input?.expectedCore && { ...input.expectedCore };
+  const stableExpectedVisual = input?.expectedVisual && { ...input.expectedVisual };
+  const stableExpectedMutationEpochSha256 = input?.expectedMutationEpochSha256;
+  const underLock = input?.underLock;
+  const stableEvidence: ExpectedPrepublicationEvidence = {
+    ...(stableExpectedCore !== undefined ? { expectedCore: stableExpectedCore } : {}),
+    ...(stableExpectedVisual !== undefined ? { expectedVisual: stableExpectedVisual } : {}),
+    ...(stableExpectedMutationEpochSha256 !== undefined
+      ? { expectedMutationEpochSha256: stableExpectedMutationEpochSha256 }
+      : {}),
+  };
   // Snapshot each physical object's scalar properties BEFORE any transaction
   // await. An incoming readonly array is not proof its members are immutable.
   const stableObjects = Array.isArray(objects) ? objects.map((item) => ({ ...item })) : null;
@@ -448,7 +462,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
   if (
     stableAuthority === null ||
     stableObjects === null ||
-    !validExpectedPrepublicationEvidence(input) ||
+    !validExpectedPrepublicationEvidence(stableEvidence) ||
     !validPrepublicationSource(db, stableAuthority, stableObjects)
   )
     return "stale";
@@ -545,36 +559,36 @@ export async function checkHistoricalUserArchivePrepublication(input: {
         // fences cover original-user audit/review inserts until commit.
         // Other review-content edits can still race, hence recheck after IO.
         const coreMatches = async (): Promise<boolean> => {
-          if (!input.expectedCore) return true;
+          if (!stableExpectedCore) return true;
           const core = await prepareVerifiedHistoricalUserConsistentCorePreflight(db, stableAuthority);
           return (
             core !== null &&
-            core.sha256 === input.expectedCore.sha256 &&
-            core.byteLength === input.expectedCore.byteLength
+            core.sha256 === stableExpectedCore.sha256 &&
+            core.byteLength === stableExpectedCore.byteLength
           );
         };
         const visualMatches = async (): Promise<boolean> => {
-          if (!input.expectedVisual) return true;
+          if (!stableExpectedVisual) return true;
           const evidence = await prepareVerifiedHistoricalUserPrivateVisualEvidence(db, stableAuthority);
           return (
             evidence !== null &&
-            evidence.sha256 === input.expectedVisual.sha256 &&
-            evidence.byteLength === input.expectedVisual.byteLength &&
-            evidence.visualCount === input.expectedVisual.visualCount
+            evidence.sha256 === stableExpectedVisual.sha256 &&
+            evidence.byteLength === stableExpectedVisual.byteLength &&
+            evidence.visualCount === stableExpectedVisual.visualCount
           );
         };
         const allMatches = async (): Promise<boolean> => {
-          if (input.expectedCore && input.expectedVisual) {
+          if (stableExpectedCore && stableExpectedVisual) {
             const pair = await prepareVerifiedHistoricalUserCompositePreflight(db, stableAuthority);
             return (
               pair !== null &&
-              pair.core.sha256 === input.expectedCore.sha256 &&
-              pair.core.byteLength === input.expectedCore.byteLength &&
-              pair.visual.sha256 === input.expectedVisual.sha256 &&
-              pair.visual.byteLength === input.expectedVisual.byteLength &&
-              pair.visual.visualCount === input.expectedVisual.visualCount &&
-              (input.expectedMutationEpochSha256 === undefined ||
-                pair.mutationEpochSha256 === input.expectedMutationEpochSha256)
+              pair.core.sha256 === stableExpectedCore.sha256 &&
+              pair.core.byteLength === stableExpectedCore.byteLength &&
+              pair.visual.sha256 === stableExpectedVisual.sha256 &&
+              pair.visual.byteLength === stableExpectedVisual.byteLength &&
+              pair.visual.visualCount === stableExpectedVisual.visualCount &&
+              (stableExpectedMutationEpochSha256 === undefined ||
+                pair.mutationEpochSha256 === stableExpectedMutationEpochSha256)
             );
           }
           return (await coreMatches()) && (await visualMatches());
@@ -582,7 +596,7 @@ export async function checkHistoricalUserArchivePrepublication(input: {
         if (!(await allMatches())) return "stale";
         // The caller cannot send a byte before the entire manifest is checked.
         // Row and hold locks survive this awaited operation until COMMIT.
-        if (input.underLock) await input.underLock();
+        if (underLock) await underLock();
         // A metadata edit committed during the callback can make the already
         // handed-off bytes unverifiable. Fail closed rather than report success;
         // OS-accepted bytes cannot be recalled, so this is NOT delivery auth.

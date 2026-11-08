@@ -245,6 +245,17 @@ between independent reads remains unobservable for untracked tables.
 These DB-only hashes do not prove physical file bytes or disclosure rights.
 The v3 internal scope domain separates the earlier v2 count-plus-epoch
 digest; the source-only Ed25519 partial observation format remains v2.
+**Locked source-only prepublication evidence binding:** The short-lived
+original USER prepublication gate now pins the expected core/visual SHA-256,
+byte lengths, visual count, mutation epoch, and bounded under-lock physical
+operation before acquiring any database lock. It compares both independent
+source snapshots against those SAME initial values. Changing the caller's
+expected receipt after an owner lookup or during physical IO cannot
+reinterpret a changed source as eligible, and a replacement callback
+cannot run in place of the original locked operation. Three adversarial
+red/green tests cover both digest-swap windows and the callback swap.
+This is still not a durable atomic DB/filesystem commitment, legal/IP
+clearance, a customer export or an HTTP publication capability.
 **Internal partial signer pre/post source-scope guard:** Before initiating
 any reserved physical ZIP read, the original numeric USER source scope is
 checked using a fresh read-only repeatable-read PostgreSQL snapshot; after
