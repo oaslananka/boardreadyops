@@ -879,6 +879,7 @@ describeDatabase("immutable GitHub original-account evidence after user App unin
       0,
     );
     expect(review?.linkedRowCounts.every((item) => item.boundedLinkedRows <= 100)).toBe(true);
+    expect(review?.linkedRowCounts.every((item) => /^[0-9a-f]{64}$/u.test(item.rowMultisetSha256))).toBe(true);
     expect(JSON.stringify(review)).not.toContain(login);
     expect(JSON.stringify(review)).not.toContain(exportId);
 
@@ -890,6 +891,45 @@ describeDatabase("immutable GitHub original-account evidence after user App unin
         verifiedGitHubUserId: accountUserId + 1,
       }),
     ).toBeNull();
+  });
+
+  it("changes its private source-row multiset commitment for count-preserving row edits", async () => {
+    const originalInstallation = rows(
+      await executor().query("SELECT id,account_login FROM installations WHERE github_installation_id=$1", [
+        externalInstallationId,
+      ]),
+    )[0];
+    const installationId = String(originalInstallation?.id);
+    const originalLogin = String(originalInstallation?.account_login);
+    expect(installationId).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(originalLogin).toBe(login);
+    const exportRow = rows(
+      await executor().query("SELECT id FROM data_exports WHERE tenant_id=$1 AND original_github_user_id=$2 LIMIT 1", [
+        login,
+        accountUserId,
+      ]),
+    )[0];
+    const binding = { exportId: String(exportRow?.id), verifiedGitHubUserId: accountUserId };
+    const before = await assessHistoricalUserUnresolvedOwnerRows(executor(), binding);
+    expect(before).not.toBeNull();
+    try {
+      // Case-only edit preserves account linkage under lower(...) and
+      // leaves every row count unchanged, but must alter its source digest.
+      await executor().query("UPDATE installations SET account_login=UPPER(account_login) WHERE id=$1", [
+        installationId,
+      ]);
+      const after = await assessHistoricalUserUnresolvedOwnerRows(executor(), binding);
+      expect(after).not.toBeNull();
+      const oldInstallation = before?.linkedRowCounts.find((item) => item.table === "installations");
+      const newInstallation = after?.linkedRowCounts.find((item) => item.table === "installations");
+      expect(oldInstallation?.boundedLinkedRows).toBe(newInstallation?.boundedLinkedRows);
+      expect(oldInstallation?.rowMultisetSha256).toMatch(/^[0-9a-f]{64}$/u);
+      expect(newInstallation?.rowMultisetSha256).toMatch(/^[0-9a-f]{64}$/u);
+      expect(newInstallation?.rowMultisetSha256).not.toBe(oldInstallation?.rowMultisetSha256);
+      expect(after?.customerDeliveryAllowed).toBe(false);
+    } finally {
+      await executor().query("UPDATE installations SET account_login=$2 WHERE id=$1", [installationId, originalLogin]);
+    }
   });
 
   it("stops all historical original-user source reads on expiry, active hold and non-dry-run erasure", async () => {

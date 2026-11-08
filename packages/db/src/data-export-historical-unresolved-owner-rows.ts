@@ -11,6 +11,7 @@ import type { PgQueryExecutor } from "./pg-executor.js";
  */
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
 const identifier = /^[a-z][a-z0-9_]{0,127}$/u;
+const sha256 = /^[0-9a-f]{64}$/u;
 const known = new Set<string>(historicalUserKnownPublicTables);
 const limit = 101;
 
@@ -28,6 +29,8 @@ type LinkedRowCount = {
   table: string;
   installationPath: string[];
   boundedLinkedRows: number;
+  /** Private DB-only row multiset digest; never a customer permission. */
+  rowMultisetSha256: string;
   requiredFkPath: boolean;
 };
 
@@ -113,7 +116,16 @@ function boundedRowSql(table: string, path: string[], required: boolean, fks: Fk
     " JOIN former_installations AS original_user_installation ON original_user_installation.id=r" +
     (path.length - 1) +
     ".id";
-  return "(SELECT count(*)::integer FROM (SELECT 1 FROM " + from + " LIMIT " + limit + ") AS bounded_rows)";
+  // PostgreSQL hashes each source row, sorts hashes as a multiset and
+  // returns ONLY bounded count+digest metadata. Count-preserving edits
+  // change the digest. ABA restoration needs independent mutation epochs.
+  return `(SELECT jsonb_build_object(
+    'count',count(*)::integer,
+    'sha256',encode(digest(COALESCE(string_agg(row_hash, ':' ORDER BY row_hash), ''), 'sha256'),'hex')
+  ) FROM (
+    SELECT encode(digest(to_jsonb(r0)::text,'sha256'),'hex') AS row_hash
+    FROM ${from} LIMIT ${limit}
+  ) AS bounded_rows)`;
 }
 
 export async function assessHistoricalUserUnresolvedOwnerRows(
@@ -215,15 +227,22 @@ export async function assessHistoricalUserUnresolvedOwnerRows(
         if (row.export_id !== original.exportId || !counts || typeof counts !== "object" || Array.isArray(counts))
           return null;
         const values = counts as Record<string, unknown>;
+        const validCountAndDigest = (value: unknown): value is { count: number; sha256: string } => {
+          if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+          const v = value as Record<string, unknown>;
+          return (
+            Object.keys(v).length === 2 &&
+            typeof v.count === "number" &&
+            Number.isSafeInteger(v.count) &&
+            v.count >= 0 &&
+            v.count < limit &&
+            typeof v.sha256 === "string" &&
+            sha256.test(v.sha256)
+          );
+        };
         if (
           Object.keys(values).length !== selected.length ||
-          selected.some(
-            (entry) =>
-              typeof values[entry.table] !== "number" ||
-              !Number.isSafeInteger(values[entry.table]) ||
-              (values[entry.table] as number) < 0 ||
-              (values[entry.table] as number) >= limit,
-          )
+          selected.some((entry) => !validCountAndDigest(values[entry.table]))
         )
           return null;
         return {
@@ -237,7 +256,8 @@ export async function assessHistoricalUserUnresolvedOwnerRows(
           linkedRowCounts: selected.map((entry) => ({
             table: entry.table,
             installationPath: entry.installationPath ?? [],
-            boundedLinkedRows: values[entry.table] as number,
+            boundedLinkedRows: (values[entry.table] as { count: number; sha256: string }).count,
+            rowMultisetSha256: (values[entry.table] as { count: number; sha256: string }).sha256,
             requiredFkPath: entry.reportedPathUsesNonNullableFKs,
           })),
           ambiguousFkPathClasses,

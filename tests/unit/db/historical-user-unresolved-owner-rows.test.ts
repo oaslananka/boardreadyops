@@ -3,6 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import { historicalUserKnownPublicTables } from "../../../packages/db/src/data-export-historical-schema-coverage.js";
 import { assessHistoricalUserUnresolvedOwnerRows } from "../../../packages/db/src/data-export-historical-unresolved-owner-rows.js";
 
+const rowDigest = "a".repeat(64);
+function normalizeMockCounts(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([name, count]) => [
+      name,
+      typeof count === "number" ? { count, sha256: rowDigest } : count,
+    ]),
+  );
+}
+
 const edges = [
   {
     source_table: "repositories",
@@ -51,7 +62,7 @@ function fixture(overrides?: { edges?: unknown[]; counts?: unknown; responseId?:
       rows: [
         {
           export_id: overrides?.responseId ?? initial.exportId,
-          linked_counts: overrides?.counts ?? { installations: 1, boards: 3 },
+          linked_counts: normalizeMockCounts(overrides?.counts ?? { installations: 1, boards: 3 }),
         },
       ],
     };
@@ -87,6 +98,7 @@ describe("63-class original-numeric-user bounded FK row candidates remain source
         expect.objectContaining({ table: "installations", boundedLinkedRows: 1 }),
       ]),
     );
+    expect(observation?.linkedRowCounts.every((entry) => entry.rowMultisetSha256 === rowDigest)).toBe(true);
     expect(observation?.noInstallationPath).toContain("data_exports");
     expect((observation?.linkedRowCounts.length ?? 0) + (observation?.noInstallationPath.length ?? 0)).toBe(63);
     expect(f.query).toHaveBeenCalledTimes(4);
@@ -112,6 +124,8 @@ describe("63-class original-numeric-user bounded FK row candidates remain source
       { counts: { installations: 1 } },
       { counts: { installations: 1, boards: 2, foreign: 1 } },
       { responseId: randomUUID() },
+      { counts: { installations: { count: 1, sha256: "not-a-digest" }, boards: 3 } },
+      { counts: { installations: { count: 1, sha256: rowDigest, private: "leak" }, boards: 3 } },
       { edges: edges.map((e, i) => (i === 2 ? { ...e, source_columns: ["id;DROP TABLE"] } : e)) },
       { edges: edges.map((e, i) => (i === 1 ? { ...e, validated: false } : e)) },
     ]) {

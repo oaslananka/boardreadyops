@@ -53,9 +53,14 @@ customer export manifest. The standalone diagnostic is
 \`assessHistoricalUserUnresolvedOwnerRows\` is a separate SOURCE-ONLY,
 default-off read-only diagnostic over the same catalog and one original
 numeric GitHub USER / suspended-installation REPEATABLE READ snapshot. It
-uses the validated PostgreSQL FK column mappings to build bounded (at most
-100 rows per class) counts for FK-linked source classes, while preserving
-the other classes explicitly as **unlinked and unreviewed**. Ambiguous
+uses validated PostgreSQL FK columns to build bounded (at most 100 rows
+per class) counts **and SHA-256 multiset digests of the matching complete
+source rows** inside PostgreSQL in one repeatable-read snapshot. Only
+count and digest leave the database; no source row bytes do. A digest
+changes for count-preserving edits, but cannot detect an ABA change
+that later restores identical bytes without an independent mutation
+epoch; it is NOT a DB+FS atomic or legal ownership proof. The other
+classes remain explicitly **unlinked and unreviewed**. Ambiguous
 parallel FK meanings are explicitly reported WITHOUT row counts. Missing
 validated mappings, catalog drift, changed identity, absent original
 installation, current hold/erasure/expiry and oversized rows deny the
