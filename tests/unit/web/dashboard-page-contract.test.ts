@@ -5,6 +5,7 @@ vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
   viewerAuthorization: vi.fn(async () => ({ session: { login: "octocat", installationIds: [123] } })),
 }));
 vi.mock("../../../apps/web/lib/repository-dashboard.js", () => ({
+  loadViewerDesignEvidence: vi.fn(async () => undefined),
   loadViewerRepositories: vi.fn(async () => [
     {
       accountLogin: "octocat",
@@ -35,7 +36,7 @@ vi.mock("../../../apps/web/lib/repository-dashboard.js", () => ({
 }));
 
 const { default: DashboardPage } = await import("../../../apps/web/app/dashboard/page.js");
-const { loadViewerRepositories, summarizeViewerRepositories } = await import(
+const { loadViewerDesignEvidence, loadViewerRepositories, summarizeViewerRepositories } = await import(
   "../../../apps/web/lib/repository-dashboard.js"
 );
 const { viewerAuthorization } = await import("../../../apps/web/lib/viewer-authorization.js");
@@ -196,6 +197,41 @@ describe("dashboard operational hierarchy", () => {
     expect(markup).toContain("1 repository has no recorded readiness run yet.");
     expect(markup.indexOf("Review supply alerts")).toBeLessThan(markup.indexOf("First readiness check needed"));
     expect(markup).toContain('href="/setup"');
+  });
+
+  it("leads with actual authorized source artwork when a published PCB and schematic exist", async () => {
+    vi.mocked(loadViewerDesignEvidence).mockResolvedValueOnce({
+      runId: "run-1",
+      repositoryId: "repo-1",
+      repository: "octocat/widgets",
+      hasPcb: true,
+      hasSchematic: true,
+    });
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 37,
+      repositoriesWithOpenFindings: 1,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 36,
+      watchedBoards: 0,
+    });
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("Real recorded design evidence");
+    expect(markup).toContain("PCB layer published");
+    expect(markup).toContain("Schematic published");
+    expect(markup).toContain('href="/runs/run-1/design"');
+    expect(markup.indexOf("Real recorded design evidence")).toBeLessThan(markup.indexOf("Attention required"));
+    expect(markup.indexOf("Real recorded design evidence")).toBeLessThan(markup.indexOf("Example only"));
+    expect(markup).toContain("not a sample or a signed manufacturing clearance");
+    expect(vi.mocked(loadViewerDesignEvidence)).toHaveBeenCalledWith(
+      expect.objectContaining({ installationIds: [123] }),
+      expect.any(Array),
+    );
+  });
+
+  it("does not claim a real PCB or schematic when no published views are available", async () => {
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).not.toContain("Real recorded design evidence");
+    expect(markup).not.toContain("Inspect real design");
   });
 
   it("prioritizes verified repository work above sample artwork without inventing a risk score", async () => {

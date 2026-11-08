@@ -7,9 +7,11 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { repositoriesRequiringReview } from "../../lib/dashboard-next-action.js";
 import {
   type DashboardRepositorySummary,
+  loadViewerDesignEvidence,
   loadViewerRepositories,
   type RepositoryGroup,
   summarizeViewerRepositories,
+  type ViewerDesignEvidence,
 } from "../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
@@ -181,6 +183,41 @@ function FindingsAttentionBanner({
           </Link>
         </p>
       ) : null}
+    </section>
+  );
+}
+
+function RealDesignEvidencePanel({ evidence }: Readonly<{ evidence: ViewerDesignEvidence }>) {
+  return (
+    <section
+      aria-labelledby="real-design-evidence-heading"
+      className="flex flex-col gap-4 rounded-xl border border-primary/30 bg-card p-5 shadow-e1 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="min-w-0 space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Real recorded design evidence</p>
+        <h2 id="real-design-evidence-heading" className="font-display text-xl font-semibold text-foreground">
+          Explore your actual PCB and schematic evidence
+        </h2>
+        <p className="break-words text-sm font-medium text-foreground">{evidence.repository}</p>
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {evidence.hasPcb ? (
+            <span className="rounded-md border border-border px-2 py-1">PCB layer published</span>
+          ) : null}
+          {evidence.hasSchematic ? (
+            <span className="rounded-md border border-border px-2 py-1">Schematic published</span>
+          ) : null}
+        </div>
+        <p className="max-w-2xl text-xs text-muted-foreground">
+          Published artwork from the latest recorded run for this repository, not a sample or a signed manufacturing
+          clearance. Open the evidence to inspect the source revision and any missing or unverified results.
+        </p>
+      </div>
+      <Link
+        href={`/runs/${evidence.runId}/design`}
+        className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        Inspect real design →
+      </Link>
     </section>
   );
 }
@@ -395,11 +432,13 @@ function DashboardBody({
   hasInstallation,
   groups,
   summary,
+  designEvidence,
 }: Readonly<{
   hasSession: boolean;
   hasInstallation: boolean;
   groups: RepositoryGroup[];
   summary: DashboardRepositorySummary;
+  designEvidence?: ViewerDesignEvidence;
 }>) {
   if (!hasSession) {
     return (
@@ -428,6 +467,7 @@ function DashboardBody({
 
   return (
     <div className="flex flex-col gap-5">
+      {designEvidence ? <RealDesignEvidencePanel evidence={designEvidence} /> : null}
       <AttentionBanner summary={summary} groups={groups} />
       <RecordedHardwareWork groups={groups} />
       {summary.repositoriesWithoutRuns > summary.repositories / 2 ? (
@@ -472,6 +512,7 @@ export default async function DashboardPage() {
   const viewer = await viewerAuthorization();
   const groups = await loadViewerRepositories(viewer.session);
   const summary = summarizeViewerRepositories(groups);
+  const designEvidence = await loadViewerDesignEvidence(viewer.session, groups);
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Dashboard" }]}>
@@ -487,6 +528,7 @@ export default async function DashboardPage() {
           hasInstallation={Boolean(viewer.session?.installationIds?.length)}
           groups={groups}
           summary={summary}
+          {...(designEvidence ? { designEvidence } : {})}
         />
       </main>
     </AppShell>

@@ -68,6 +68,74 @@ export function summarizeViewerRepositories(groups: readonly RepositoryGroup[]):
   };
 }
 
+export type ViewerDesignEvidence = {
+  runId: string;
+  repositoryId: string;
+  repository: string;
+  hasPcb: boolean;
+  hasSchematic: boolean;
+};
+
+/**
+ * Select actual published design evidence from a run the session could already
+ * see on Dashboard. Fetch ONLY booleans, never SVG content or finding anchors:
+ * those belong on the separately authorized run-design route.
+ */
+export async function loadViewerDesignEvidence(
+  session: UserSession | undefined,
+  groups: readonly RepositoryGroup[],
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Promise<ViewerDesignEvidence | undefined> {
+  if (!session?.installationIds?.length || !environment.DATABASE_URL) return undefined;
+  const candidates = groups
+    .flatMap((group) => group.repositories)
+    .filter((repository) => Boolean(repository.latestRunId));
+  if (!candidates.length) return undefined;
+  const { createPgQueryExecutor } = await import("@boardreadyops/db/pg-executor");
+  const executor = createPgQueryExecutor({ connectionString: environment.DATABASE_URL, max: 1 });
+  try {
+    // Zip exact (run, repo) pairs; do not permit a run ID from one repo to be
+    // combined with a different repository ID in a multi-installation viewer.
+    const result = await executor.query(
+      `select release_runs.id as run_id,
+              release_runs.repository_id,
+              bool_or(s.kind = 'pcb_layer') as has_pcb,
+              bool_or(s.kind = 'schematic') as has_schematic
+         from unnest($1::text[], $2::text[]) as candidate(run_id, repository_id)
+         join release_runs on release_runs.id = candidate.run_id
+                          and release_runs.repository_id = candidate.repository_id
+         join repositories on repositories.id = release_runs.repository_id
+         join installations on installations.id = repositories.installation_id
+         join run_snapshots as s on s.run_id = release_runs.id
+        where installations.github_installation_id = any($3::bigint[])
+          and installations.suspended_at is null
+          and repositories.disabled_at is null
+          and ${notCancelledSubscription}
+          and s.kind in ('pcb_layer', 'schematic')
+        group by release_runs.id, release_runs.repository_id
+        order by max(release_runs.started_at) desc, release_runs.id desc
+        limit 1`,
+      [candidates.map((item) => item.latestRunId), candidates.map((item) => item.id), session.installationIds],
+    );
+    const row = ((result as { rows?: readonly Record<string, unknown>[] }).rows ?? [])[0];
+    if (!row) return undefined;
+    const runId = text(row, "run_id");
+    const repositoryId = text(row, "repository_id");
+    const matching = candidates.find((candidate) => candidate.id === repositoryId && candidate.latestRunId === runId);
+    if (!matching || !runId || !repositoryId) return undefined;
+    if (row.has_pcb !== true && row.has_schematic !== true) return undefined;
+    return {
+      runId,
+      repositoryId,
+      repository: `${matching.owner}/${matching.name}`,
+      hasPcb: row.has_pcb === true,
+      hasSchematic: row.has_schematic === true,
+    };
+  } finally {
+    await executor.close();
+  }
+}
+
 function text(row: Record<string, unknown>, name: string): string | undefined {
   const value = row[name];
   if (typeof value === "string") return value;
