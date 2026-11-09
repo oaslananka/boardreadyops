@@ -859,12 +859,6 @@ export default function HomePage() {
                       <span>Install on GitHub</span>
                       <span aria-hidden="true">↗</span>
                     </a>
-                    <a
-                      className={buttonVariants({ variant: "secondary", size: "lg" })}
-                      href={applicationHref("/setup")}
-                    >
-                      Review setup first
-                    </a>
                   </>
                 }
               >
