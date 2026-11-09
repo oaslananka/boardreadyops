@@ -8,6 +8,19 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.71.1](https://github.com/oaslananka/boardreadyops/compare/v1.71.0...v1.71.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **web:** avoid claiming unrecorded workflow evidence ([#1427](https://github.com/oaslananka/boardreadyops/issues/1427)) ([cf02668](https://github.com/oaslananka/boardreadyops/commit/cf02668a38ed8a1145e0b02c3da6cab442b65126))
+* **web:** give rollout-gated repositories a useful next step ([#1424](https://github.com/oaslananka/boardreadyops/issues/1424)) ([149fcc9](https://github.com/oaslananka/boardreadyops/commit/149fcc9b549b81e1bf48c6615137676c63fd9c80))
+* **web:** keep partial-run workflow guidance evidence-bound ([#1426](https://github.com/oaslananka/boardreadyops/issues/1426)) ([6a819df](https://github.com/oaslananka/boardreadyops/commit/6a819df222f3fef752e27b29201b5e21b225fdb8))
+* **web:** keep repository context in setup journey ([#1422](https://github.com/oaslananka/boardreadyops/issues/1422)) ([930d3a6](https://github.com/oaslananka/boardreadyops/commit/930d3a622e22ee779698444b8423ac2bdb651c7b))
+* **web:** lead empty Projects with authorized source evidence ([#1423](https://github.com/oaslananka/boardreadyops/issues/1423)) ([195db2e](https://github.com/oaslananka/boardreadyops/commit/195db2e9cf3d902bd3be5b1bef40414ad9015167))
+* **web:** stop inventing Check Runs for unsigned publication records ([#1425](https://github.com/oaslananka/boardreadyops/issues/1425)) ([80a6c9b](https://github.com/oaslananka/boardreadyops/commit/80a6c9b9aff8363959122425765511fd828ee695))
+* **web:** take returning visitors to dashboard from final CTA ([#1428](https://github.com/oaslananka/boardreadyops/issues/1428)) ([26e52f6](https://github.com/oaslananka/boardreadyops/commit/26e52f6bfbc1ce256e43594e5163f90a0bf7b00e))
+
 ## [1.71.0](https://github.com/oaslananka/boardreadyops/compare/v1.70.0...v1.71.0) (2026-11-08)
 
 
