@@ -59,7 +59,10 @@ export async function LandingNavActions() {
   );
 }
 
-export async function LandingHeroActions() {
+export async function LandingHeroActions({
+  placement = "hero",
+}: Readonly<{ placement?: "hero" | "next-release" }> = {}) {
+  const setupLabel = placement === "next-release" ? "Review setup first" : "Preview repository setup";
   if (isMarketingSurface()) {
     return (
       <>
@@ -67,7 +70,7 @@ export async function LandingHeroActions() {
           Install on GitHub
         </a>
         <a className={secondaryClass} href={applicationHref("/setup")}>
-          Preview repository setup
+          {setupLabel}
         </a>
       </>
     );
@@ -82,7 +85,7 @@ export async function LandingHeroActions() {
           <span aria-hidden="true">↗</span>
         </a>
         <Link className={secondaryClass} href="/setup">
-          Preview repository setup
+          {setupLabel}
         </Link>
       </>
     );
@@ -94,9 +97,15 @@ export async function LandingHeroActions() {
         <span>Open dashboard</span>
         <span aria-hidden="true">→</span>
       </Link>
-      <a className={secondaryClass} href={installUrl}>
-        Add another repository
-      </a>
+      {placement === "next-release" ? (
+        <Link className={secondaryClass} href="/setup">
+          Review setup first
+        </Link>
+      ) : (
+        <a className={secondaryClass} href={installUrl}>
+          Add another repository
+        </a>
+      )}
     </>
   );
 }
