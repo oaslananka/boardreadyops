@@ -162,6 +162,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0110_artifact_export_copy_unlink_fence.sql",
       "0111_review_policy_run_ingestion_snapshot.sql",
       "0112_signed_manufacturing_export_evidence.sql",
+      "0113_workflow_reconciliation_pending_poll_budget.sql",
     ]);
   });
 
