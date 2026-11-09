@@ -1,11 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authMock, repositoriesMock, summaryMock, projectsMock } = vi.hoisted(() => ({
+const { authMock, repositoriesMock, summaryMock, projectsMock, designEvidenceMock } = vi.hoisted(() => ({
   authMock: vi.fn(),
   repositoriesMock: vi.fn(),
   summaryMock: vi.fn(),
   projectsMock: vi.fn(),
+  designEvidenceMock: vi.fn(),
 }));
 
 vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
@@ -13,7 +14,12 @@ vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
 }));
 vi.mock("../../../apps/web/lib/repository-dashboard.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../../apps/web/lib/repository-dashboard.js")>();
-  return { ...original, loadViewerRepositories: repositoriesMock, summarizeViewerRepositories: summaryMock };
+  return {
+    ...original,
+    loadViewerRepositories: repositoriesMock,
+    summarizeViewerRepositories: summaryMock,
+    loadViewerDesignEvidence: designEvidenceMock,
+  };
 });
 vi.mock("../../../apps/web/lib/project-listing.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../../apps/web/lib/project-listing.js")>();
@@ -38,6 +44,7 @@ describe("first-use visual-first routes", () => {
     repositoriesMock.mockResolvedValue([]);
     summaryMock.mockReturnValue(emptySummary);
     projectsMock.mockResolvedValue({ state: "signed-out" });
+    designEvidenceMock.mockResolvedValue(undefined);
   });
 
   it("shows public attributed PCB/schematic ahead of the sign-in explanation on Dashboard", async () => {
@@ -110,6 +117,124 @@ describe("first-use visual-first routes", () => {
     expect(html).not.toContain('href="/projects/new"');
   });
 
+  it("shows the viewer's actual authorized run before CAD forms on an empty workspace", async () => {
+    const session = { userId: "123", login: "tester", installationIds: [4321] };
+    const groups = [
+      {
+        accountLogin: "tester",
+        repositories: [{ id: "repo-z", owner: "tester", name: "pcb-source", latestRunId: "run-z" }],
+      },
+    ];
+    authMock.mockResolvedValue({ session });
+    repositoriesMock.mockResolvedValue(groups);
+    designEvidenceMock.mockResolvedValue({
+      runId: "run-z",
+      repositoryId: "repo-z",
+      repository: "tester/pcb-source",
+      hasPcb: true,
+      hasSchematic: true,
+    });
+    projectsMock.mockResolvedValue({
+      state: "ok",
+      selected: { id: "workspace-1", name: "Hardware team", role: "owner", planTier: "free" },
+      workspaces: [{ id: "workspace-1", name: "Hardware team", role: "owner", planTier: "free" }],
+      projects: [],
+      impact: { workspace: { projects: 0, revisions: 0, deliveries: 0 }, byProject: {} },
+      total: 0,
+      page: 1,
+      totalPages: 1,
+    });
+    const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("Real recorded design evidence");
+    expect(html).toContain("tester/pcb-source");
+    expect(html).toContain("PCB layer published");
+    expect(html).toContain("Schematic published");
+    expect(html).toContain('href="/runs/run-z/design"');
+    expect(html).toContain("not a sample or a signed manufacturing clearance");
+    expect(html).not.toContain('aria-label="Example PCB and schematic design views"');
+    expect(html.indexOf("Real recorded design evidence")).toBeLessThan(
+      html.indexOf("No projects in this workspace yet"),
+    );
+    expect(html.indexOf("Real recorded design evidence")).toBeLessThan(html.indexOf("Add a project</"));
+    expect(repositoriesMock).toHaveBeenCalledWith(session);
+    expect(designEvidenceMock).toHaveBeenCalledWith(session, groups);
+  });
+
+  it("keeps real source evidence first and optional CAD workspace separate when none exists", async () => {
+    const session = { userId: "123", login: "tester", installationIds: [4321] };
+    authMock.mockResolvedValue({ session });
+    projectsMock.mockResolvedValue({ state: "no-workspaces" });
+    designEvidenceMock.mockResolvedValue({
+      runId: "run-z",
+      repositoryId: "repo-z",
+      repository: "tester/pcb-source",
+      hasPcb: true,
+      hasSchematic: true,
+    });
+    const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
+    expect(html.indexOf("Real recorded design evidence")).toBeLessThan(
+      html.indexOf("Continue with GitHub repositories"),
+    );
+    expect(html).toContain('href="/runs/run-z/design"');
+    expect(html).not.toContain('aria-label="Example PCB and schematic design views"');
+    expect(html).toContain('aria-label="Optional CAD workspace setup"');
+  });
+
+  it("describes a PCB-only recorded run accurately without inventing a schematic", async () => {
+    const session = { userId: "123", login: "tester", installationIds: [4321] };
+    authMock.mockResolvedValue({ session });
+    projectsMock.mockResolvedValue({ state: "no-workspaces" });
+    designEvidenceMock.mockResolvedValue({
+      runId: "run-z",
+      repositoryId: "repo-z",
+      repository: "tester/pcb-source",
+      hasPcb: true,
+      hasSchematic: false,
+    });
+    const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("Explore your recorded PCB evidence");
+    expect(html).not.toContain("Explore your actual PCB and schematic evidence");
+    expect(html).toContain("PCB layer published");
+    expect(html).not.toContain("Schematic published");
+  });
+
+  it("never queries private repository evidence without an authorized GitHub App installation", async () => {
+    authMock.mockResolvedValue({ session: { userId: "123", login: "tester", installationIds: [] } });
+    projectsMock.mockResolvedValue({
+      state: "ok",
+      selected: { id: "workspace-1", name: "Hardware team", role: "viewer", planTier: "free" },
+      workspaces: [{ id: "workspace-1", name: "Hardware team", role: "viewer", planTier: "free" }],
+      projects: [],
+      impact: { workspace: { projects: 0, revisions: 0, deliveries: 0 }, byProject: {} },
+      total: 0,
+      page: 1,
+      totalPages: 1,
+    });
+    const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
+    expect(html).not.toContain("Real recorded design evidence");
+    expect(html).toContain("Example only");
+    expect(repositoriesMock).not.toHaveBeenCalled();
+    expect(designEvidenceMock).not.toHaveBeenCalled();
+  });
+
+  it("takes an owner directly to GitHub setup without an unnecessary project creation wizard", async () => {
+    authMock.mockResolvedValue({ session: { userId: "123", login: "tester" } });
+    projectsMock.mockResolvedValue({
+      state: "ok",
+      selected: { id: "workspace-1", name: "Hardware team", role: "owner", planTier: "free" },
+      workspaces: [{ id: "workspace-1", name: "Hardware team", role: "owner", planTier: "free" }],
+      projects: [],
+      impact: { workspace: { projects: 0, revisions: 0, deliveries: 0 }, byProject: {} },
+      total: 0,
+      page: 1,
+      totalPages: 1,
+    });
+    const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("Review repository setup");
+    expect(html).toContain('href="/setup"');
+    expect(html).toContain("Example only");
+  });
+
   it("shows a source-attributed example before the table when existing projects have no linked repository", async () => {
     authMock.mockResolvedValue({ session: { userId: "123", login: "tester" } });
     projectsMock.mockResolvedValue({
@@ -166,6 +291,7 @@ describe("first-use visual-first routes", () => {
     const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
     expect(html).not.toContain("Your next hardware review starts with the board");
     expect(html).toContain("Real board");
+    expect(designEvidenceMock).not.toHaveBeenCalled();
   });
 
   it("leads with an example when connected repositories have no runs yet", async () => {

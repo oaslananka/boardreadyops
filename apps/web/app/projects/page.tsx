@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AppShell } from "../../components/app-shell.js";
 import { ProjectRowActions, WorkspaceDangerZone } from "../../components/projects/teardown-forms.js";
 import { CreateProjectForm, CreateWorkspaceForm } from "../../components/projects/workspace-forms.js";
+import { RealDesignEvidencePanel } from "../../components/real-design-evidence-panel.js";
 import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
 import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
@@ -12,6 +13,11 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { customerPlanLabel, customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import { loadWorkspaceProjects, type WorkspaceProjectsImpact } from "../../lib/project-listing.js";
+import {
+  loadViewerDesignEvidence,
+  loadViewerRepositories,
+  type ViewerDesignEvidence,
+} from "../../lib/repository-dashboard.js";
 import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 import {
@@ -158,13 +164,7 @@ function ProjectOnboardingPreview({
     return <ReviewEmptyVisualPreview mode="onboarding" actionHref="/reviews" actionLabel="Browse hardware reviews" />;
   }
   if (total === 0) {
-    return (
-      <ReviewEmptyVisualPreview
-        mode="onboarding"
-        actionHref="/projects/new"
-        actionLabel="Add your first project source"
-      />
-    );
+    return <ReviewEmptyVisualPreview mode="onboarding" actionHref="/setup" actionLabel="Review repository setup" />;
   }
   return <ReviewEmptyVisualPreview mode="onboarding" actionHref="/setup" actionLabel="Connect your board repository" />;
 }
@@ -173,6 +173,18 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
   const result = await loadWorkspaceProjects(viewer.session, first(parameters.workspace), process.env, parameters.page);
+  // GitHub runs and CAD workspaces have distinct authorization. Only look up a
+  // real recorded run for a viewer with an App installation and a first-use workspace.
+  // Reuse the Dashboard's scoped, metadata-only selection; full artifacts are
+  // fetched only when the viewer enters the separately authorized Run route.
+  const firstUseWorkspace =
+    result.state === "no-workspaces" ||
+    (result.state === "ok" &&
+      (result.total === 0 || (result.projects.length > 0 && result.projects.every((p) => !p.githubRepoFullName))));
+  const designEvidence =
+    firstUseWorkspace && viewer.session?.installationIds?.length
+      ? await loadViewerDesignEvidence(viewer.session, await loadViewerRepositories(viewer.session))
+      : undefined;
 
   return (
     <AppShell
@@ -222,7 +234,11 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
               </div>
             </section>
 
-            <ProjectOnboardingPreview projects={result.projects} total={result.total} role={result.selected.role} />
+            {designEvidence ? (
+              <RealDesignEvidencePanel evidence={designEvidence} />
+            ) : (
+              <ProjectOnboardingPreview projects={result.projects} total={result.total} role={result.selected.role} />
+            )}
             <Panel
               title={result.selected.name}
               description={`You are ${customerStatusLabel(result.selected.role)} of this workspace · ${customerPlanLabel(result.selected.planTier)} plan`}
@@ -279,14 +295,17 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
             ) : null}
           </>
         ) : (
-          <ProjectsUnavailable state={result.state} />
+          <ProjectsUnavailable state={result.state} {...(designEvidence ? { designEvidence } : {})} />
         )}
       </main>
     </AppShell>
   );
 }
 
-function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-configured" | "no-workspaces" }>) {
+function ProjectsUnavailable({
+  state,
+  designEvidence,
+}: Readonly<{ state: "signed-out" | "not-configured" | "no-workspaces"; designEvidence?: ViewerDesignEvidence }>) {
   if (state === "signed-out") {
     return (
       <>
@@ -330,6 +349,7 @@ function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-co
   // GitHub review path is first; optional CAD workspace setup stays second.
   return (
     <>
+      {designEvidence ? <RealDesignEvidencePanel evidence={designEvidence} /> : null}
       <section
         className="rounded-xl border border-border bg-card p-5 shadow-e1 sm:p-6"
         aria-labelledby="github-first-projects-heading"
@@ -358,11 +378,13 @@ function ProjectsUnavailable({ state }: Readonly<{ state: "signed-out" | "not-co
           </Button>
         </div>
       </section>
-      <ReviewEmptyVisualPreview
-        mode="onboarding"
-        actionHref="/dashboard"
-        actionLabel="Explore your GitHub repositories"
-      />
+      {designEvidence ? null : (
+        <ReviewEmptyVisualPreview
+          mode="onboarding"
+          actionHref="/dashboard"
+          actionLabel="Explore your GitHub repositories"
+        />
+      )}
       <details className="rounded-xl border border-border bg-card" aria-label="Optional CAD workspace setup">
         <summary className="min-h-14 cursor-pointer px-5 py-4 text-sm font-semibold text-foreground hover:bg-muted/35">
           <span className="block">Optional: Create your first workspace</span>
