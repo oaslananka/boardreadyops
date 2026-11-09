@@ -238,6 +238,142 @@ describe("production soak monitor orchestration", () => {
   });
 });
 
+describe("strict deployment cutover witness", () => {
+  it("uses an opt-in bounded one-second sample and zero tolerance for failed customer requests", () => {
+    const options = readProductionSoakOptions(
+      configuredEnvironment({
+        BOARDREADYOPS_SOAK_CUTOVER: "1",
+        BOARDREADYOPS_SOAK_PATH: "/setup",
+      }),
+    );
+
+    expect(options).toMatchObject({
+      origin: "https://boardreadyops.oaslananka.dev",
+      readyPath: "/setup",
+      cutover: true,
+      durationMinutes: 5,
+      intervalSeconds: 1,
+      requestTimeoutMs: 2_000,
+      maxConsecutiveFailures: 1,
+      thresholds: { minimumAvailabilityPercent: 100 },
+    });
+  });
+
+  it("rejects weak cutover thresholds and unsafe/unintended probe paths", () => {
+    expect(() =>
+      readProductionSoakOptions(
+        configuredEnvironment({
+          BOARDREADYOPS_SOAK_CUTOVER: "1",
+          BOARDREADYOPS_SOAK_MAX_CONSECUTIVE_FAILURES: "3",
+        }),
+      ),
+    ).toThrow();
+    expect(() =>
+      readProductionSoakOptions(
+        configuredEnvironment({
+          BOARDREADYOPS_SOAK_CUTOVER: "1",
+          BOARDREADYOPS_SOAK_MINIMUM_AVAILABILITY_PERCENT: "99",
+        }),
+      ),
+    ).toThrow();
+    expect(() =>
+      readProductionSoakOptions(
+        configuredEnvironment({
+          BOARDREADYOPS_SOAK_CUTOVER: "1",
+          BOARDREADYOPS_SOAK_PATH: "/api/cleanup?confirm=true",
+        }),
+      ),
+    ).toThrow();
+    expect(() =>
+      readProductionSoakOptions(
+        configuredEnvironment({
+          BOARDREADYOPS_SOAK_CUTOVER: "1",
+          BOARDREADYOPS_SOAK_INTERVAL_SECONDS: "0",
+        }),
+      ),
+    ).toThrow();
+  });
+
+  it("records HTTP 530 precisely and fails the cutover after one unsuccessful request", async () => {
+    const options = readProductionSoakOptions(
+      configuredEnvironment({
+        BOARDREADYOPS_SOAK_CUTOVER: "1",
+        BOARDREADYOPS_SOAK_PATH: "/dashboard",
+      }),
+    );
+    let clock = 0;
+    let calls = 0;
+    const report = await runProductionSoakMonitor(options, {
+      now: () => clock,
+      sleep: async (ms: number) => {
+        clock += ms;
+      },
+      request: async (url) => {
+        expect(String(url)).toBe("https://boardreadyops.oaslananka.dev/dashboard");
+        calls++;
+        clock += 10;
+        return new Response(null, { status: calls === 2 ? 530 : 200 });
+      },
+    });
+
+    expect(report.event).toBe("control_plane_cutover_observation");
+    expect(report.scenario).toMatchObject({ mode: "cutover", probePath: "/dashboard" });
+    expect(report.startedAtUtc).toBe("1970-01-01T00:00:00.000Z");
+    expect(report.finishedAtUtc).toBe("1970-01-01T00:00:01.020Z");
+    expect(report.samplesTaken).toBe(2);
+    expect(report.availability.successCount).toBe(1);
+    expect(report.terminatedEarly).toBe(true);
+    expect(report.failedSamples).toEqual([
+      { sample: 2, statusCode: 530, path: "/dashboard", atUtc: "1970-01-01T00:00:01.020Z" },
+    ]);
+    expect(evaluateProductionSoakReport(report, options.thresholds)).toContain("cutover_request_failed");
+  });
+
+  it("rejects connection errors without leaking transport errors or request credentials", async () => {
+    const options = readProductionSoakOptions(
+      configuredEnvironment({
+        BOARDREADYOPS_SOAK_CUTOVER: "1",
+      }),
+    );
+    const report = await runProductionSoakMonitor(options, {
+      now: () => 0,
+      request: async () => {
+        throw new Error("secret-bearing-internal-transport-error");
+      },
+    });
+
+    expect(report.failedSamples).toEqual([
+      { sample: 1, statusCode: null, path: "/api/health/ready", atUtc: "1970-01-01T00:00:00.000Z" },
+    ]);
+    expect(JSON.stringify(report)).not.toContain("secret-bearing");
+    expect(evaluateProductionSoakReport(report, options.thresholds)).toContain("cutover_request_failed");
+  });
+
+  it("passes only after a complete failure-free observation window", async () => {
+    const options = readProductionSoakOptions(
+      configuredEnvironment({
+        BOARDREADYOPS_SOAK_CUTOVER: "1",
+      }),
+    );
+    let clock = 0;
+    const report = await runProductionSoakMonitor(options, {
+      now: () => clock,
+      sleep: async (ms: number) => {
+        clock += ms;
+      },
+      request: async () => {
+        clock += 10;
+        return new Response(null, { status: 200 });
+      },
+    });
+
+    expect(report.samplesTaken).toBeGreaterThan(200);
+    expect(report.failedSamples).toEqual([]);
+    expect(report.terminatedEarly).toBe(false);
+    expect(evaluateProductionSoakReport(report, options.thresholds)).toEqual([]);
+  });
+});
+
 describe("ProductionSoakError", () => {
   it("carries a stable reason and structured details", () => {
     const error = new ProductionSoakError("soak_configuration_invalid", "boom", { field: "origin" });

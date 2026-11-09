@@ -6,6 +6,7 @@ export type ProductionSoakThresholds = {
 export type ProductionSoakOptions = {
   origin: string;
   readyPath: string;
+  cutover?: boolean;
   durationMinutes: number;
   intervalSeconds: number;
   requestTimeoutMs: number;
@@ -25,12 +26,17 @@ export type ProductionSoakMeasurement = {
 };
 
 export type ProductionSoakReport = {
-  event: "control_plane_production_soak_verified";
+  event: "control_plane_production_soak_verified" | "control_plane_cutover_observation";
+  startedAtUtc?: string;
+  finishedAtUtc?: string;
+  failedSamples?: Array<{ sample: number; statusCode: number | null; path: string; atUtc: string }>;
   scenario: {
     origin: string;
     durationRequestedMinutes: number;
     intervalSeconds: number;
     maxConsecutiveFailures: number;
+    mode?: "cutover";
+    probePath?: string;
   };
   samplesTaken: number;
   elapsedMinutes: number;
