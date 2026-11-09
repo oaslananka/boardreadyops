@@ -27,7 +27,7 @@ export type CloudReadinessResult =
       ok: false;
       service: typeof service;
       check: "readiness";
-      reason: "missing-configuration" | "database-unavailable" | "database-timeout";
+      reason: "missing-configuration" | "database-unavailable" | "database-timeout" | "shutting-down";
       missing?: string[];
     };
 
@@ -70,6 +70,9 @@ export async function checkCloudReadiness(
   options: { environment?: NodeJS.ProcessEnv; query?: Query; timeoutMs?: number } = {},
 ): Promise<CloudReadinessResult> {
   const environment = options.environment ?? process.env;
+  if (environment.BOARDREADYOPS_SHUTTING_DOWN === "1") {
+    return { ok: false, service, check: "readiness", reason: "shutting-down" };
+  }
   const missing = missingRequiredConfiguration(environment);
 
   if (missing.length > 0) {
