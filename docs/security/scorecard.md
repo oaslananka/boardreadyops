@@ -62,7 +62,7 @@ is the BoardReadyOps maintainer.
 | `CII-Best-Practices` | Accepted until the operator completes the external OpenSSF Best Practices questionnaire. | Stable release readiness review or maintainer completes the questionnaire. |
 | `Maintained` | Accepted as time-bound because GitHub reports repositories created within the first 90 days as young. | Repository age exceeds 90 days and Scorecard still reports the finding. |
 | `SAST` recent-commit coverage | Accepted as time-bound while the recent-commit window catches up to the current CodeQL and Scorecard workflows. | Scorecard still reports incomplete SAST coverage after 30 new commits with CodeQL checks. |
-| release workflow `contents: write` | Accepted where required to create release PRs, upload release assets, or update floating release tags. Publishing and tag-moving are isolated from npm provenance publishing where practical. | GitHub provides narrower release/tag permissions or the release process stops moving floating tags. |
+| release workflow `contents: write` | Accepted where required to create release PRs and upload release assets; protected Git release tags are never moved. Publishing uses a separate OIDC job with minimal permissions. | GitHub provides narrower release/tag permissions without affecting reviewed releases. |
 | self-smoke `security-events: write` | Accepted only for the SARIF upload smoke job. GitHub requires `security-events: write` to upload SARIF. | The SARIF upload path moves to a dedicated nightly/manual workflow or GitHub provides a narrower permission. |
 
 ## Required Follow-Up

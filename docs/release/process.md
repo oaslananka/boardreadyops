@@ -5,9 +5,10 @@ Release Please manages routine version bumps and reviewable release PRs. GitHub 
 Release Please reads `release-please-config.json` and
 `.release-please-manifest.json`. The manifest package uses standard semver tags
 such as `v1.2.0`; component-prefixed tags are disabled so GitHub Release notes,
-floating tags, binary assets, and npm publishing all point at the same release
-identity. Release notes must come from real changelog changes, not placeholder
-sentences.
+binary assets, and npm publishing all point at the same immutable release
+identity. Historical Git tags such as `v1` and `v1.71` are protected by the
+`release-tags` ruleset and are not maintained as moving aliases. Use full
+`vMAJOR.MINOR.PATCH` tags for release-critical GitHub Action references. Release notes must come from real changelog changes, not placeholder sentences.
 
 `corepack pnpm run docs` regenerates compatibility docs, rule docs, Action
 input docs, plugin SDK API docs, and the release history page before building
@@ -104,16 +105,14 @@ gh workflow run publish-npm.yml --ref main -f tag=v1.0.0 -f prerelease=false
 
 The workflow checks out the release tag with full history, verifies the tag version matches `package.json`, requires the tag commit to be an ancestor of current `origin/main`, and publishes the package with npm provenance. Release automation and maintainer recovery use the same dispatch contract, so already-created release tags can be backfilled after workflow-only fixes without weakening tag ancestry or version checks. Historical backfills validate the immutable package snapshot without rebuilding committed `dist/` bundles, because the selected release tag may predate the current reproducible-build workflow fixes.
 
-Manual historical backfills do not move `vMAJOR` or `vMAJOR.MINOR` floating
-release tags unless `update_floating_tags=true` is passed explicitly. GitHub
-rejects default `GITHUB_TOKEN` ref updates when the target commit contains
-workflow-file changes and the token lacks workflow-file write permission. If a
-historical release also needs floating Action tags repaired, run
-`scripts/update-floating-tags.sh <tag>` with maintainer credentials that can
-update workflow-containing refs. The publish job is idempotent for
-already-published versions. Binary and container release workflows trigger only
-on full semver tags like `v1.1.0`; floating tags such as `v1` and `v1.1` must not
-create separate release artifacts.
+The release workflow does not move shortened Git tags. The active
+`release-tags` ruleset prevents updates to existing `v*` refs, including
+historical `vMAJOR` and `vMAJOR.MINOR` aliases. Changing those refs would
+break immutable release references. Older aliases remain at their original
+commits; downstream consumers should use full version tags or pinned SHAs.
+The `publish-npm` workflow remains idempotent for already-published versions.
+GHCR image aliases (`vMAJOR` and `latest`) are a separate container registry
+contract and remain managed by `container-build`.
 
 If the semver tag is already published but the container image needs to be
 repaired with the current container packaging from `main`, manually dispatch the

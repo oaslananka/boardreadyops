@@ -59,4 +59,4 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          gh workflow run publish-npm.yml --repo "${REPOSITORY}" --ref main -f tag="${RELEASE_TAG}" -f prerelease=false -f update_floating_tags=true
+          gh workflow run publish-npm.yml --repo "${REPOSITORY}" --ref main -f tag="${RELEASE_TAG}" -f prerelease=false
