@@ -49,7 +49,7 @@ describe("repository setup installation grant scope", () => {
     repositoriesMock.mockResolvedValue([
       {
         repositories: [
-          { id: "repo-a", owner: "alpha", name: "board-a", githubInstallationId: 101 },
+          { id: "repo-a", owner: "alpha", name: "board-a", githubInstallationId: 101, latestRunId: "alpha-run" },
           { id: "repo-b", owner: "alpha", name: "board-b", githubInstallationId: 101 },
         ],
       },
@@ -82,6 +82,11 @@ describe("repository setup installation grant scope", () => {
     const first = setup?.repositories[0];
     const second = setup?.repositories[1];
     const otherOwner = setup?.repositories[2];
+    // Read-only previous-run navigation is derived from the same viewer-scoped
+    // installation lookup, not a client-provided repository or run identifier.
+    expect(first?.latestRunId).toBe("alpha-run");
+    expect(second?.latestRunId).toBeUndefined();
+    expect(otherOwner?.latestRunId).toBeUndefined();
     expect(first?.setupBlockedReason).toBe("Only alpha lacks setup grants.");
     expect(first?.readinessBlockedReason).toBe("Only alpha lacks Actions grants.");
     expect(first?.installationGrants).toMatchObject({

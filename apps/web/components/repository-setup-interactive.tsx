@@ -23,6 +23,8 @@ export type SetupTargetRepository = {
   setupProbeStatus?: string;
   setupProbeWorkflowRunId?: string;
   setupProbeExpiresAt?: string;
+  /** Most recent run visible to the selected installation. The Run route reauthorizes access. */
+  latestRunId?: string;
   /** Scoped to this repository's actual GitHub App installation, not the first selector entry. */
   installationGrants?: Pick<InstallationCapabilities, "permissions" | "missing" | "manageUrl">;
   setupBlockedReason?: string;
@@ -679,7 +681,37 @@ function SetupReadiness(props: Readonly<SetupReadinessProps>) {
             result, or manufacturing approval.
           </p>
           {props.repository?.readinessRunBlockedReason ? (
-            <p>{props.repository.readinessRunBlockedReason}</p>
+            <>
+              <p>{props.repository.readinessRunBlockedReason}</p>
+              <p>
+                You can still investigate your hardware while hosted runs are unavailable. A recorded run may be
+                incomplete or unsigned, and it does not prove your current design is ready.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                {props.repository.latestRunId ? (
+                  <Link
+                    href={`/runs/${encodeURIComponent(props.repository.latestRunId)}`}
+                    className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
+                  >
+                    Inspect latest recorded run →
+                  </Link>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No earlier run is recorded for this repository yet.</p>
+                )}
+                <a
+                  href="https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
+                >
+                  Run a local first check →
+                </a>
+              </div>
+              <p>
+                A local check can identify issues on the files you have, but it does not enable hosted runs, create an
+                OIDC-signed Check Run, or approve fabrication.
+              </p>
+            </>
           ) : props.repository ? (
             <p>
               After the reviewed setup pull request is merged and the probe succeeds, open a pull request changing your

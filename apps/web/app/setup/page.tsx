@@ -54,6 +54,9 @@ async function setupTargets() {
       ...(repository.setupProbeStatus ? { setupProbeStatus: repository.setupProbeStatus } : {}),
       ...(repository.setupProbeWorkflowRunId ? { setupProbeWorkflowRunId: repository.setupProbeWorkflowRunId } : {}),
       ...(repository.setupProbeExpiresAt ? { setupProbeExpiresAt: repository.setupProbeExpiresAt } : {}),
+      // A viewer-scoped run ID is navigation only, not permission to read the run.
+      // The Run detail route independently re-checks installation/repository access.
+      ...(repository.latestRunId ? { latestRunId: repository.latestRunId } : {}),
     })),
   );
 

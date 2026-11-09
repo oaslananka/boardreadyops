@@ -110,6 +110,7 @@ describe("repository setup readiness controls", () => {
         id: "repo-blocked",
         fullName: "alpha/board-a",
         readinessRunBlockedReason: "Cloud readiness runs are not enabled for this repository yet.",
+        latestRunId: "run-a",
       },
       { ...readyForProbe, id: "repo-enabled", fullName: "beta/board-b" },
     ];
@@ -120,6 +121,9 @@ describe("repository setup readiness controls", () => {
     expect(container.textContent).toContain("It does not produce hardware findings");
     expect(container.textContent).toContain("Cloud readiness runs are not enabled for this repository yet.");
     expect(container.textContent).not.toContain("open a pull request changing your hardware project");
+    expect(container.querySelector('a[href="/runs/run-a"]')?.textContent).toContain("Inspect latest recorded run");
+    expect(container.querySelector('a[href*="/docs/quickstart.md"]')?.textContent).toContain("Run a local first check");
+    expect(container.textContent).toContain("does not enable hosted runs, create");
     const selector = container.querySelector<HTMLSelectElement>("select");
     if (!selector) throw new Error("repository selector not found");
     const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
@@ -128,8 +132,66 @@ describe("repository setup readiness controls", () => {
       selector.dispatchEvent(new Event("change", { bubbles: true }));
     });
     expect(container.textContent).not.toContain("Cloud readiness runs are not enabled for this repository yet.");
+    expect(container.querySelector('a[href="/runs/run-a"]')).toBeNull();
+    expect(container.querySelector('a[href*="/docs/quickstart.md"]')).toBeNull();
     expect(container.textContent).toContain("open a pull request changing your");
     expect(container.textContent).toContain("an empty or queued result is not a first useful finding");
+  });
+
+  it("provides an honest local-first alternative without inventing a run for a blocked new repository", async () => {
+    const repo = {
+      ...readyForProbe,
+      id: "new-repo",
+      fullName: "octo/new-board",
+      readinessRunBlockedReason: "Hosted runs are unavailable for this repository.",
+    };
+    await act(async () => {
+      root.render(createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [repo] }));
+    });
+    expect(container.textContent).toContain("No earlier run is recorded for this repository yet.");
+    expect(container.querySelector('a[href^="/runs/"]')).toBeNull();
+    expect(container.textContent).toContain("A local check can identify issues");
+    expect(container.textContent).toContain("or approve fabrication");
+    expect(container.querySelector('a[href*="/docs/quickstart.md"]')).not.toBeNull();
+  });
+
+  it("keeps previous-run links scoped to the selected authorized repository", async () => {
+    const first = {
+      ...readyForProbe,
+      id: "repo-first",
+      fullName: "first/pcb",
+      latestRunId: "first-run",
+      readinessRunBlockedReason: "Hosted runs unavailable.",
+    };
+    const second = {
+      ...readyForProbe,
+      id: "repo-second",
+      fullName: "second/pcb",
+      latestRunId: "second-run",
+      readinessRunBlockedReason: "Hosted runs unavailable.",
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [first, second],
+          initialRepositoryId: "repo-second",
+        }),
+      );
+    });
+    expect(container.querySelector('a[href="/runs/second-run"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/runs/first-run"]')).toBeNull();
+
+    const select = container.querySelector("select");
+    if (!(select instanceof HTMLSelectElement)) throw new Error("repository selector not found");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(select, "repo-first");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.querySelector('a[href="/runs/first-run"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/runs/second-run"]')).toBeNull();
   });
 
   it("switches setup, probe and live permissions with the selected GitHub installation", async () => {
