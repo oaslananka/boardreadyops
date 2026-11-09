@@ -269,6 +269,10 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain('href="/runs/run-accessible/attempts"');
     expect(markup).toContain("Inspect recorded attempts");
     expect(markup).not.toContain("The Check Run and the workflow logs in your repository have the full detail.");
+    expect(markup).not.toContain("workflow logs in GitHub are the record to trust");
+    expect(markup).toContain(
+      "No GitHub Actions run is linked to this record, so workflow logs cannot be assumed to exist.",
+    );
     expect(markup).not.toContain("Open linked GitHub Actions run");
     expect(await axeViolations(markup, "/runs/run-accessible/publication")).toEqual([]);
   });
@@ -302,6 +306,11 @@ describe("run investigation accessibility", () => {
     const markup = renderToStaticMarkup(createElement(PublicationView, { run }));
 
     expect(markup).toContain("A GitHub Actions run is linked to this record");
+    const summary = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "summary" }, createElement(SummaryView, { run })),
+    );
+    expect(summary).toContain("workflow logs do not replace a signed result");
+    expect(summary).not.toContain("workflow logs in GitHub are the record to trust");
     expect(markup).toContain('href="https://github.com/oaslananka/boardreadyops/actions/runs/456789"');
     expect(markup).toContain("Open linked GitHub Actions run");
     expect(markup).toContain("No published Check Run is recorded");

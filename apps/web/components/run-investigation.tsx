@@ -266,9 +266,11 @@ export function RunStateNotice({ run }: Readonly<{ run: RunDetail }>) {
   if (run.investigationState === "partial_data") {
     return (
       <Alert title="This run has partial data" tone="warning">
+        <p>This run finished without an accepted signed result. Readiness is not verified.</p>
         <p>
-          This run finished, but no signed result ever arrived. Until that gap is explained, the workflow logs in GitHub
-          are the record to trust.
+          {run.attempts.some((attempt) => attempt.workflowRunUrl)
+            ? "A GitHub Actions run is linked to this record. Inspect its recorded attempt for details; workflow logs do not replace a signed result."
+            : "No GitHub Actions run is linked to this record, so workflow logs cannot be assumed to exist."}
         </p>
         <Link href={`/runs/${run.id}/publication`}>Review publication state</Link>
       </Alert>
