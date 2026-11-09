@@ -1558,6 +1558,9 @@ function ArtifactRow({ artifact }: Readonly<{ artifact: ArtifactDetail }>) {
 }
 
 export function PublicationView({ run }: Readonly<{ run: RunDetail }>) {
+  const missingSignedResult = run.investigationState === "partial_data";
+  const recordedWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
+  const hasPublishedCheckRun = Boolean(run.githubCheckRunId && run.githubCheckPublishedAt);
   return (
     <>
       <Panel title="Publication status" description="When these results were posted back to GitHub." id="publication">
@@ -1580,7 +1583,11 @@ export function PublicationView({ run }: Readonly<{ run: RunDetail }>) {
       <Panel title="Metrics" description="Numeric metrics accepted by the versioned result contract." id="metrics">
         {Object.keys(run.metrics).length === 0 ? (
           <EmptyState title="No metrics">
-            <p>The runner did not report numeric metrics for this result.</p>
+            <p>
+              {missingSignedResult
+                ? "No signed result arrived, so numeric metrics cannot be verified for this run."
+                : "No numeric metrics were recorded for this run."}
+            </p>
           </EmptyState>
         ) : (
           <DefinitionGrid>
@@ -1597,7 +1604,42 @@ export function PublicationView({ run }: Readonly<{ run: RunDetail }>) {
       <Panel title="Reports" description="HTTPS links supplied by the accepted runner result." id="reports">
         {run.reportLinks.length === 0 ? (
           <EmptyState title="No report links">
-            <p>The Check Run and the workflow logs in your repository have the full detail.</p>
+            {missingSignedResult ? (
+              <p>
+                No signed result or report links were received for this run.
+                {hasPublishedCheckRun
+                  ? " A published Check Run is recorded, but it cannot replace the missing signed result."
+                  : " No published Check Run is recorded."}
+              </p>
+            ) : (
+              <p>
+                No report links were recorded for this run.
+                {hasPublishedCheckRun ? " A published Check Run is recorded." : " No published Check Run is recorded."}
+              </p>
+            )}
+            <p>
+              {recordedWorkflowRunUrl
+                ? "A GitHub Actions run is linked to this record; inspect its execution to diagnose missing evidence."
+                : "No GitHub Actions run is linked to this record, so workflow logs cannot be assumed to exist."}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <Link
+                href={`/runs/${run.id}/attempts`}
+                className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-2"
+              >
+                Inspect recorded attempts
+              </Link>
+              {recordedWorkflowRunUrl ? (
+                <a
+                  href={recordedWorkflowRunUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-2"
+                >
+                  Open linked GitHub Actions run
+                </a>
+              ) : null}
+            </div>
           </EmptyState>
         ) : (
           <ul className="flex flex-col gap-2">
