@@ -128,6 +128,18 @@ The disposable-database profiles above are bounded engineering regression eviden
 
 The manual `control-plane-production-soak` GitHub Actions workflow runs this monitor and uploads a mode `0600`, aggregate-only `control-plane-production-soak-report.json` artifact (sample count, elapsed duration, p50/p95/p99/maximum readiness latency, and availability percentage only; no response bodies, headers, or tenant data). It requires an explicit `origin` input and is not scheduled, so it only runs when a maintainer deliberately points it at a commissioned deployment. A run that exceeds the configured consecutive-failure limit stops early and is reported as `soak_terminated_early` rather than silently completing the requested duration.
 
+## Manual cutover witness (issue #1433)
+
+The hours-long aggregate soak intentionally allows a configurable failure budget and minimum 5-second sampling. That is **not** adequate proof that an actual deployment never interrupted user access. For a bounded, **read-only**, fail-on-first-error cutover witness, use the same script with explicit opt-in:
+
+~~~bash
+BOARDREADYOPS_SOAK_ORIGIN=https://boardreadyops.com BOARDREADYOPS_SOAK_CUTOVER=1 BOARDREADYOPS_SOAK_PATH=/setup node scripts/control-plane-production-soak.mjs
+~~~
+
+Start the witness **before** the cutover, keep it running through the entire deployment and recovery, and verify the requested Git SHA became the live SHA **within** the reported start/finish window. Do not deploy just to produce a passing monitor report. The cutover mode probes one approved public GET endpoint every approximately one second for five minutes by default (bounded five to thirty minutes), with a two-second request timeout (max five seconds); the first response other than HTTP 200 or a transport failure stops the run and makes the command fail. A JSON report includes start/end UTC times and at most one failed sample's public path, HTTP status or null for transport failure, and UTC timestamp; no headers, request bodies, cookies, tokens, or provider exception text. Only /api/health/ready, /, /setup, /dashboard, /reviews and /evidence are allowed as probe paths. Default hours-long soak and its existing manual GitHub workflow are unchanged.
+
+A report showing 100% sampled public requests is **necessary but not sufficient** for issue #1433: one-second sampling cannot detect arbitrarily short gaps, single-page HTTP 200 does not verify authenticated workflows or content correctness, and the monitor does not verify a deployment actually occurred. Check real signed-in user actions, session continuity, production logs, immutable deployed SHA, stable tunnel and database, and tested rollback separately. Run an independent witness against /api/health/ready alongside a public page if both matter; keep each monitor bounded and do not schedule continuous 1-Hz polling.
+
 This tool still does not by itself prove host/availability-zone loss, whole-service or regional PostgreSQL outage, or real GitHub production/shared-rate-limit behavior; those remain separate GA evidence items for issue #222.
 
 ## Run-listing pagination benchmark
