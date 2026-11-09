@@ -854,12 +854,10 @@ export default function HomePage() {
             <div className="flex flex-wrap items-center gap-3">
               <Suspense
                 fallback={
-                  <>
-                    <a className={`${buttonVariants({ variant: "default", size: "lg" })} gap-2`} href={installUrl}>
-                      <span>Install on GitHub</span>
-                      <span aria-hidden="true">↗</span>
-                    </a>
-                  </>
+                  <a className={`${buttonVariants({ variant: "default", size: "lg" })} gap-2`} href={installUrl}>
+                    <span>Install on GitHub</span>
+                    <span aria-hidden="true">↗</span>
+                  </a>
                 }
               >
                 <LandingHeroActions placement="next-release" />
