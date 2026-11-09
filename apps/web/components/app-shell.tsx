@@ -36,8 +36,8 @@ export function AppShell({
           {children}
           <footer className="mt-auto border-t border-border px-6 py-4 text-sm text-muted-foreground">
             <p>
-              BoardReadyOps checks whether a board is ready to fabricate. Your repository and its full workflow logs
-              stay the source of truth.
+              BoardReadyOps helps review readiness evidence. A missing signed result or workflow link is not fabrication
+              approval.
             </p>
           </footer>
         </div>

@@ -414,7 +414,7 @@ export default function HomePage() {
                 requests below where the same thing happens on an actual board.
               */}
               <p className="mt-4 text-xs text-muted-foreground">
-                Illustrative sample — your repository and its workflow logs stay the source of truth.{" "}
+                Illustrative sample — not a readiness result from your repository.{" "}
                 <a href="#live-demos" className="text-primary underline underline-offset-2">
                   See it on a real pull request
                 </a>
@@ -871,8 +871,8 @@ export default function HomePage() {
             BoardReadyOps
           </span>
           <p className="text-sm text-muted-foreground">
-            Release readiness checks for hardware teams. Your repository and its full workflow logs stay the source of
-            truth.
+            Release readiness checks for hardware teams. Verify the exact source revision and evidence actually recorded
+            before fabrication.
           </p>
           <a href="https://docs.boardreadyops.com" className="text-sm text-primary hover:underline">
             Documentation

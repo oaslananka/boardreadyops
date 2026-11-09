@@ -25,6 +25,9 @@ describe("AppShell", () => {
     expect(markup).toContain("Get a board in");
     expect(markup).toContain("Work the findings");
     expect(markup).toContain("Ship it");
+    expect(markup).toContain("A missing signed result or workflow link is not");
+    expect(markup).toContain("fabrication approval.");
+    expect(markup).not.toContain("full workflow logs");
     // Settings points at Members, not Billing: landing on an invoice surprised people, and
     // members is what someone opening Settings is usually after.
     expect(markup.match(/href="\/settings\/workspace"/gu)).toHaveLength(1);
