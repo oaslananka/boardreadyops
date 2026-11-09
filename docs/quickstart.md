@@ -112,13 +112,14 @@ boardreadyops generate . --profile jlcpcb --output build/boardreadyops-generate
 boardreadyops handoff create build/boardreadyops-generate --profile jlcpcb
 ```
 
-### Path D: Private / Local-Only Execution
-For air-gapped or confidential hardware repositories where IP must stay strictly on-premise:
+### Path D: Private / Local-Only First Check
+You can inspect a private hardware project without connecting it to BoardReadyOps Cloud. In a checkout you control, run the supported local CLI command:
 
 ```bash
-# Safe mode disables network dispatch, remote notifiers, and untrusted plugin loads
-boardreadyops check . --safe-mode --fail-on high
+boardreadyops check . --fail-on never
 ```
+
+This non-blocking scan can report hardware issues even when hosted readiness runs are not enabled. The CLI check command does **not** accept a --safe-mode flag; runner safe-mode policy is a separate feature. If you require strict air-gap guarantees, isolate the execution environment from the network and review any enabled plugins or external tools. A local finding is **not** a GitHub Actions OIDC-signed hosted result or manufacturing approval.
 
 ---
 
