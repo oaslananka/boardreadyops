@@ -49,6 +49,12 @@ describe("revision comparison mode accessibility", () => {
       expect(mode("Visual Diff")?.getAttribute("aria-pressed")).toBe("true");
       expect(mode("Head Only")?.getAttribute("aria-pressed")).toBe("false");
       expect(selected()).toHaveLength(1);
+      const diffNotice = [...container.querySelectorAll('[role="status"]')].find((el) =>
+        el.textContent?.includes("Visual Diff shows color differences"),
+      );
+      expect(diffNotice?.textContent).toContain("Black areas have no visible pixel-color");
+      expect(diffNotice?.textContent).toContain("An all-black view is not proof of electrical");
+      expect(diffNotice?.textContent).toContain("Use Split to inspect both source images");
 
       await act(async () => {
         mode("Base Only")?.click();
@@ -56,6 +62,7 @@ describe("revision comparison mode accessibility", () => {
       expect(mode("Base Only")?.getAttribute("aria-pressed")).toBe("true");
       expect(mode("Visual Diff")?.getAttribute("aria-pressed")).toBe("false");
       expect(selected()).toHaveLength(1);
+      expect(container.textContent).not.toContain("Visual Diff shows color differences");
     } finally {
       await act(async () => root.unmount());
       container.remove();
