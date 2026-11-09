@@ -267,6 +267,12 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
             Supply-tracked boards are registered for component monitoring. This number does not count successful
             readiness runs; view the recent runs below to inspect release checks.
           </p>
+          <Link
+            href={`/setup?repositoryId=${encodeURIComponent(repository.id)}`}
+            className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
+          >
+            Review setup for this repository →
+          </Link>
           {/*
             "How do I stop watching this repository?" had no answer anywhere in the product. It
             is GitHub's to answer — the App's repository access is what connects it, and

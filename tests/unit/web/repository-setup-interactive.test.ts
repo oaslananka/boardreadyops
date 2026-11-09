@@ -66,6 +66,43 @@ describe("repository setup readiness controls", () => {
     delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
   });
 
+  it("opens a deep link on the intended authorized repository rather than the first installation entry", async () => {
+    const repositories = [
+      { ...readyForProbe, id: "repo-first", fullName: "first/board" },
+      { ...readyForProbe, id: "repo-second", fullName: "second/board" },
+    ];
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          repositories,
+          signedIn: true,
+          initialRepositoryId: "repo-second",
+        }),
+      );
+    });
+    expect(container.querySelector("select")?.value).toBe("repo-second");
+    expect(container.textContent).toContain("second/board");
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+  });
+
+  it("does not silently select another repository for an unauthorized or stale deep link", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          repositories: [readyForProbe],
+          signedIn: true,
+          initialRepositoryId: "other-installation-repository",
+        }),
+      );
+    });
+    expect(container.querySelector("select")?.value).toBe("");
+    expect(container.textContent).toContain("Choose an authorized repository");
+    expect(button(container, "Open setup pull request").disabled).toBe(true);
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+  });
+
   it("explains rollout-gated first runs per selected repository without claiming a setup probe is a result", async () => {
     const repositories: SetupTargetRepository[] = [
       {
