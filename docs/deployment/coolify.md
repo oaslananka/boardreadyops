@@ -20,6 +20,12 @@ This template is not itself deployment authorization. Host paths, tunnel identit
 6. For Coolify builds the project directory is the cloned repository root. The migrate service uses build.context: . with dockerfile: apps/web/Dockerfile. Do not use .., which resolves outside the cloned repository to a nonexistent /artifacts/apps path. Validate the build context using Coolify's actual --project-directory <repository-root> option.
 7. Review both the Coolify source and generated Compose, including volumes, healthchecks, network attachment, service start order and absence of published host ports. Mark the successful one-shot migrate service as excluded from continuous application health checks in Coolify; it is expected to stop after finishing.
 
+## Availability limitation and readiness behavior
+
+The Docker image healthcheck uses /api/health/ready (not dependency-free /api/health liveness), so it is healthy only when required configuration and PostgreSQL readiness are verified. On SIGTERM/SIGINT the web process marks readiness as unavailable while keeping Next.js's own graceful shutdown handler. Operators must still configure sufficient stop/drain time when transitioning to a rolling-capable deployment type.
+
+**This does not eliminate downtime in the current Git-sourced Docker Compose application.** Coolify stops and reconciles its Compose services, including the single tunnel and web. Production cutovers have returned Cloudflare HTTP 530 before the replacement tunnel connected. See issue #1433 for the independently required stable tunnel, rolling web, stable stateful services, and actual customer-traffic cutover acceptance. Do not describe a healthy Docker image or an unchanged postdeploy status as zero-downtime proof.
+
 ## Mandatory cutover prerequisites
 
 - Identify the running image SHA and preserve a known good rollback image, database snapshot, and artifact recovery path.

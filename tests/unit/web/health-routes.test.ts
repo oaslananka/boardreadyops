@@ -7,6 +7,7 @@ const trackedEnvironmentNames = [
   "DATABASE_URL",
   "GITHUB_WEBHOOK_SECRET",
   "BOARDREADYOPS_PERSISTENCE_MODE",
+  "BOARDREADYOPS_SHUTTING_DOWN",
   "BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION",
 ] as const;
 const originalEnvironment = new Map(trackedEnvironmentNames.map((name) => [name, process.env[name]]));
@@ -46,6 +47,23 @@ describe("cloud health routes", () => {
       service: "boardreadyops-cloud",
       check: "liveness",
     });
+  });
+
+  it("does not report ready when the web process is draining, even without DB configuration", async () => {
+    process.env.BOARDREADYOPS_SHUTTING_DOWN = "1";
+    delete process.env.DATABASE_URL;
+    delete process.env.GITHUB_WEBHOOK_SECRET;
+
+    const response = await getReady();
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      service: "boardreadyops-cloud",
+      check: "readiness",
+      reason: "shutting-down",
+    });
+    expect(getLive().status).toBe(200);
   });
 
   it("returns 503 readiness when required configuration is missing", async () => {
