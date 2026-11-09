@@ -7,6 +7,7 @@ import {
   AttemptsView,
   AuditView,
   FindingsView,
+  PublicationView,
   RunPageFrame,
   reviewPublishCommand,
   SummaryView,
@@ -246,6 +247,77 @@ describe("run investigation accessibility", () => {
     expect(filtered).toContain("No matching artifacts");
     expect(filtered).toContain("No current artifact metadata matches these filters");
     expect(filtered).not.toContain("No stored artifacts for this run");
+  });
+
+  it("does not pretend an unsigned historical run has a Check Run, metrics or GitHub workflow logs", async () => {
+    const run = sampleRun();
+    run.investigationState = "partial_data";
+    run.resultContractVersion = undefined;
+    run.metrics = {};
+    run.githubCheckRunId = undefined;
+    run.githubCheckPublishedAt = undefined;
+    run.lastPublicationAttemptAt = undefined;
+
+    const markup = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "publication" }, createElement(PublicationView, { run })),
+    );
+
+    expect(markup).toContain("No signed result arrived, so numeric metrics cannot be verified");
+    expect(markup).toContain("No signed result or report links were received");
+    expect(markup).toContain("No published Check Run is recorded");
+    expect(markup).toContain("No GitHub Actions run is linked to this record");
+    expect(markup).toContain('href="/runs/run-accessible/attempts"');
+    expect(markup).toContain("Inspect recorded attempts");
+    expect(markup).not.toContain("The Check Run and the workflow logs in your repository have the full detail.");
+    expect(markup).not.toContain("Open linked GitHub Actions run");
+    expect(await axeViolations(markup, "/runs/run-accessible/publication")).toEqual([]);
+  });
+
+  it("links a recorded workflow run without claiming its logs or report files are present", () => {
+    const run = sampleRun();
+    run.investigationState = "partial_data";
+    run.resultContractVersion = undefined;
+    run.githubCheckPublishedAt = undefined;
+    run.githubCheckRunId = undefined;
+    run.reportLinks = [];
+    run.attempts = [
+      {
+        id: "attempt-1",
+        attemptNumber: 1,
+        status: "failed",
+        createdAt: run.startedAt,
+        dispatchRequestedAt: run.startedAt,
+        dispatchedAt: run.startedAt,
+        startedAt: run.startedAt,
+        heartbeatAt: undefined,
+        completedAt: run.completedAt,
+        retryAfterAt: undefined,
+        workflowDispatchId: "456789",
+        workflowRunUrl: "https://github.com/oaslananka/boardreadyops/actions/runs/456789",
+        failureClass: "publication_missing",
+        failureMessage: undefined,
+        resultDigest: undefined,
+      },
+    ];
+    const markup = renderToStaticMarkup(createElement(PublicationView, { run }));
+
+    expect(markup).toContain("A GitHub Actions run is linked to this record");
+    expect(markup).toContain('href="https://github.com/oaslananka/boardreadyops/actions/runs/456789"');
+    expect(markup).toContain("Open linked GitHub Actions run");
+    expect(markup).toContain("No published Check Run is recorded");
+    expect(markup).not.toContain("have the full detail");
+  });
+
+  it("recognizes a published Check Run without inventing accepted report links", () => {
+    const run = sampleRun();
+    run.reportLinks = [];
+    run.attempts = [];
+    const markup = renderToStaticMarkup(createElement(PublicationView, { run }));
+
+    expect(markup).toContain("No report links were recorded for this run");
+    expect(markup).toContain("A published Check Run is recorded");
+    expect(markup).toContain("No GitHub Actions run is linked to this record");
+    expect(markup).not.toContain("Open linked GitHub Actions run");
   });
 
   it("links GitHub Actions logs and repository-owned artifacts from the authoritative workflow run", () => {
