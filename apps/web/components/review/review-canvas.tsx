@@ -753,6 +753,14 @@ export function ReviewCanvas({
         </p>
       ) : null}
 
+      {effectiveViewMode === "diff" ? (
+        <p className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground" role="status">
+          Visual Diff shows color differences between the two published images. Black areas have no visible pixel-color
+          change at this rendering scale; colored areas show changes. An all-black view is not proof of electrical
+          equivalence or fabrication readiness. Use Split to inspect both source images.
+        </p>
+      ) : null}
+
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
