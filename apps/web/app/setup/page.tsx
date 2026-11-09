@@ -95,6 +95,13 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
   const selectedValue = first(parameters.preset);
   const hasInstallationHandoff = first(parameters.installation_id) !== undefined;
   const targets = await setupTargets();
+  // A deep link can select only a repository in the authenticated viewer's installations.
+  // Unknown IDs leave the selector empty instead of silently targeting another repository.
+  const requestedRepositoryId = first(parameters.repositoryId);
+  const initialRepositoryId =
+    requestedRepositoryId === undefined
+      ? undefined
+      : (targets.repositories.find((repository) => repository.id === requestedRepositoryId)?.id ?? "");
   const defaultPreset = repositorySetupPreset("prototype");
   if (!defaultPreset) throw new Error("prototype setup preset is unavailable");
   const selected =
@@ -161,6 +168,7 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
         <RepositorySetupInteractive
           presets={repositorySetupPresets}
           initialPresetId={selected.id}
+          {...(initialRepositoryId === undefined ? {} : { initialRepositoryId })}
           presetVersion={repositorySetupPresetVersion}
           workflowPath={repositorySetupWorkflowPath}
           workflowContractVersion={repositorySetupWorkflowContractVersion}

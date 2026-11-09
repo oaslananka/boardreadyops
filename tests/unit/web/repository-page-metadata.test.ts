@@ -51,6 +51,13 @@ describe("Repository page metadata", () => {
     expect(source).toContain("customerStatusLabel(finding.source)");
   });
 
+  it("deep-links setup to the same authorized repository instead of defaulting to the first installation entry", () => {
+    const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
+    expect(source).toContain("Review setup for this repository");
+    expect(source).toContain("repositoryId=");
+    expect(source).toContain("encodeURIComponent(repository.id)");
+  });
+
   it("does not promise a first readiness run when deployment rollout excludes the repository", () => {
     const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
     expect(source).toContain("releaseRepositoryDispatchAvailability");

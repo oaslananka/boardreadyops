@@ -34,6 +34,8 @@ export type SetupTargetRepository = {
 export type RepositorySetupInteractiveProps = {
   presets: readonly RepositorySetupPreset[];
   initialPresetId: string;
+  /** Server-validated repository deep link; empty means the requested repository is unavailable. */
+  initialRepositoryId?: string;
   presetVersion: number;
   workflowPath: string;
   workflowContractVersion: number;
@@ -189,6 +191,7 @@ function SetupPrResultOutput({ result }: Readonly<{ result: SetupPrResult }>) {
 export function RepositorySetupInteractive({
   presets,
   initialPresetId,
+  initialRepositoryId,
   presetVersion,
   workflowPath,
   workflowContractVersion,
@@ -201,7 +204,13 @@ export function RepositorySetupInteractive({
   const [prResult, setPrResult] = useState<SetupPrResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [probeResult, setProbeResult] = useState<SetupProbeResult | null>(null);
-  const [repositoryId, setRepositoryId] = useState(repositories[0]?.id ?? "");
+  const [repositoryId, setRepositoryId] = useState(() =>
+    initialRepositoryId === undefined
+      ? (repositories[0]?.id ?? "")
+      : repositories.some((repository) => repository.id === initialRepositoryId)
+        ? initialRepositoryId
+        : "",
+  );
   const [setupOverrides, setSetupOverrides] = useState<
     Record<
       string,
@@ -261,6 +270,12 @@ export function RepositorySetupInteractive({
     setRepositoryId(id);
     setPrResult(null);
     setProbeResult(null);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (id) url.searchParams.set("repositoryId", id);
+      else url.searchParams.delete("repositoryId");
+      window.history.replaceState({}, "", url.toString());
+    }
   }, []);
 
   const selectedRepository = repositories.find((repository) => repository.id === repositoryId);
@@ -930,6 +945,9 @@ function OneClickSetup({
             onChange={(event) => onSelectRepository(event.currentTarget.value)}
             className="mt-1 min-h-11 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
+            <option value="" disabled>
+              Choose an authorized repository
+            </option>
             {repositories.map((repository) => (
               <option key={repository.id} value={repository.id}>
                 {repository.fullName}
