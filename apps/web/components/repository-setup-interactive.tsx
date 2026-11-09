@@ -208,7 +208,9 @@ export function RepositorySetupInteractive({
   const [probeResult, setProbeResult] = useState<SetupProbeResult | null>(null);
   const [repositoryId, setRepositoryId] = useState(() =>
     initialRepositoryId === undefined
-      ? (repositories[0]?.id ?? "")
+      ? repositories.length === 1
+        ? (repositories[0]?.id ?? "")
+        : ""
       : repositories.some((repository) => repository.id === initialRepositoryId)
         ? initialRepositoryId
         : "",
