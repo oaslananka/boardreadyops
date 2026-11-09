@@ -206,13 +206,14 @@ export function RepositorySetupInteractive({
   const [prResult, setPrResult] = useState<SetupPrResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [probeResult, setProbeResult] = useState<SetupProbeResult | null>(null);
-  const [repositoryId, setRepositoryId] = useState(() =>
-    initialRepositoryId === undefined
-      ? (repositories[0]?.id ?? "")
-      : repositories.some((repository) => repository.id === initialRepositoryId)
-        ? initialRepositoryId
-        : "",
-  );
+  const [repositoryId, setRepositoryId] = useState(() => {
+    if (initialRepositoryId !== undefined) {
+      if (repositories.some((repository) => repository.id === initialRepositoryId)) return initialRepositoryId;
+      return "";
+    }
+    if (repositories.length === 1) return repositories[0]?.id ?? "";
+    return "";
+  });
   const [setupOverrides, setSetupOverrides] = useState<
     Record<
       string,
