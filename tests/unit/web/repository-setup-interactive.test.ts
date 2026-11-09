@@ -86,6 +86,46 @@ describe("repository setup readiness controls", () => {
     expect(button(container, "Open setup pull request").disabled).toBe(false);
   });
 
+  it("requires an explicit repository target when several installations are available", async () => {
+    const repositories = [
+      { ...readyForProbe, id: "repo-first", fullName: "first/board" },
+      { ...readyForProbe, id: "repo-second", fullName: "second/board" },
+    ];
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await act(async () => {
+      root.render(createElement(RepositorySetupInteractive, { ...baseProps, repositories, signedIn: true }));
+    });
+    const selector = container.querySelector("select");
+    if (!(selector instanceof HTMLSelectElement)) throw new Error("repository selector not found");
+    expect(selector.value).toBe("");
+    expect(container.textContent).toContain("Choose a repository to persist setup progress");
+    expect(button(container, "Open setup pull request").disabled).toBe(true);
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(selector, "repo-second");
+      selector.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(selector.value).toBe("repo-second");
+    expect(container.textContent).toContain("second/board");
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+    expect(button(container, "Validate readiness").disabled).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("selects the only authorized repository without making that customer click twice", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, { ...baseProps, repositories: [readyForProbe], signedIn: true }),
+      );
+    });
+    expect(container.querySelector("select")?.value).toBe("repo-1");
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+  });
+
   it("does not silently select another repository for an unauthorized or stale deep link", async () => {
     await act(async () => {
       root.render(
@@ -115,7 +155,14 @@ describe("repository setup readiness controls", () => {
       { ...readyForProbe, id: "repo-enabled", fullName: "beta/board-b" },
     ];
     await act(async () => {
-      root.render(createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories }));
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories,
+          initialRepositoryId: "repo-blocked",
+        }),
+      );
     });
     expect(container.textContent).toContain("After validation: run a real hardware check");
     expect(container.textContent).toContain("It does not produce hardware findings");
@@ -221,7 +268,12 @@ describe("repository setup readiness controls", () => {
     };
     await act(async () => {
       root.render(
-        createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [blocked, allowed] }),
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [blocked, allowed],
+          initialRepositoryId: "repo-first",
+        }),
       );
     });
     expect(button(container, "Open setup pull request").disabled).toBe(true);
@@ -414,7 +466,14 @@ describe("repository setup readiness controls", () => {
     );
 
     await act(async () => {
-      root.render(createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories }));
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories,
+          initialRepositoryId: "repo-1",
+        }),
+      );
     });
     await act(async () => {
       button(container, "Open setup pull request").click();
