@@ -83,7 +83,7 @@ overrides:
   diff@>=6.0.0 <8.0.3: '>=8.0.3'
   esbuild@<=0.24.2: '>=0.25.0'
   # Oct 29 OSV DoS advisories: avoid the vulnerable glob 13/minimatch 10 tree.
-  glob@>=10.0.0 <14.0.2: 14.0.2
+  glob@>=10.0.0 <14.0.2: 14.0.3
   minimatch@>=10.0.0 <11.0.1: 11.0.1
   'qs@>=6.7.0 <6.16.1': 6.16.1
   'undici@>=8.0.0 <8.11.0': 8.12.3
