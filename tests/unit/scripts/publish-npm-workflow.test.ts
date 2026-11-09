@@ -61,12 +61,9 @@ describe("publish-npm workflow contract", () => {
     expect(publishBlock).toContain("npm publish --access public --tag next");
   });
 
-  it("keeps publish idempotency and stable floating-tag gating", async () => {
+  it("keeps publish idempotency without moving protected Git tags", async () => {
     const workflow = await readFile(workflowPath, "utf8");
-    const publishBlock = workflow.slice(
-      workflow.indexOf("- name: Publish npm package"),
-      workflow.indexOf("floating-release-tags:"),
-    );
+    const publishBlock = workflow.slice(workflow.indexOf("- name: Publish npm package"));
 
     expect(publishBlock).toContain("is already published; skipping npm publish");
     expect(publishBlock).toContain('published_http_code="$(curl --silent --show-error');
@@ -75,7 +72,8 @@ describe("publish-npm workflow contract", () => {
     expect(publishBlock).toContain("Could not check npm registry");
     expect(publishBlock).not.toContain(['npm view "boardreadyops@$', '{package_version}" version'].join(""));
     expect(publishBlock).not.toContain("|| true");
-    expect(workflow).toContain("release_allows_floating_tags == 'true'");
-    expect(workflow).toContain("release_is_prerelease == 'false'");
+    expect(workflow).not.toContain("floating-release-tags:");
+    expect(workflow).not.toContain("update_floating_tags");
+    expect(workflow).not.toContain("update-floating-tags.sh");
   });
 });

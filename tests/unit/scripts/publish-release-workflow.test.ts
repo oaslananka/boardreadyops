@@ -37,7 +37,8 @@ describe("reviewed one-click release publication", () => {
     expect(workflow).toContain("token: $" + "{{ secrets.RELEASE_PLEASE_TOKEN }}");
     expect(workflow).toContain("googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7");
     expect(workflow).toContain("gh workflow run publish-npm.yml");
-    expect(workflow).toContain("-f prerelease=false -f update_floating_tags=true");
+    expect(workflow).toContain("-f prerelease=false");
+    expect(workflow).not.toContain("update_floating_tags");
     expect(workflow).not.toContain("npm publish --");
     expect(workflow).not.toContain("continue-on-error: true");
   });
