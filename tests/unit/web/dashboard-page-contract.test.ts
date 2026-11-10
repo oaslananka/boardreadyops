@@ -123,6 +123,39 @@ describe("dashboard operational hierarchy", () => {
     );
   });
 
+  it("preserves the chosen repository when entering setup from a no-run Dashboard row", async () => {
+    vi.mocked(loadViewerRepositories).mockResolvedValueOnce([
+      {
+        accountLogin: "octocat",
+        repositories: [
+          {
+            id: "repo-just-connected",
+            owner: "octocat",
+            name: "sensor-board",
+            private: true,
+            latestRunId: undefined,
+            latestRunStatus: undefined,
+            latestRunAt: undefined,
+            openFindings: 0,
+            watchedBoards: 0,
+            openSupplyFindings: 0,
+          },
+        ],
+      },
+    ]);
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 1,
+      repositoriesWithOpenFindings: 0,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 1,
+      watchedBoards: 0,
+    });
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("octocat/sensor-board");
+    expect(markup).toContain('href="/setup?repositoryId=repo-just-connected"');
+    expect(markup).toContain("no runs yet");
+  });
+
   it("keeps first-run setup visible beside an existing repository finding", async () => {
     vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
       repositories: 37,
