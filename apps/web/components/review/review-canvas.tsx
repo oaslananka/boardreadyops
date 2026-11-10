@@ -2,7 +2,7 @@
 
 import type { CanvasAnchor, SnapshotArtifact } from "@boardreadyops/contracts";
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
-import type { DemoComment, DemoFinding } from "../../lib/demo-data.js";
+import type { DemoFinding } from "../../lib/demo-data.js";
 
 export interface ReviewCanvasProps {
   headSnapshots: SnapshotArtifact[];
@@ -16,12 +16,10 @@ export interface ReviewCanvasProps {
   /** Start on the first actual PCB layer when used as a review overview teaser. */
   preferPcbLayer?: boolean;
   findings?: DemoFinding[];
-  comments?: DemoComment[];
   selectedFindingFingerprint?: string | undefined;
   /** A user-clicked finding may request its exact published schematic sheet, never a guessed position. */
   sourceSheetRequest?: { sheetOrLayer: string } | undefined;
   onSelectFinding?: ((fingerprint: string) => void) | undefined;
-  onSelectComment?: ((commentId: string) => void) | undefined;
   onAddCommentAtPoint?: (point: { x: number; y: number; sheetOrLayer: string }) => void;
 }
 
@@ -143,21 +141,17 @@ function nativeAnchorKey(anchor: CanvasAnchor): string | undefined {
 interface CanvasMarkersProps {
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
-  comments: DemoComment[];
   markerCanvas?: { canvasWidth: number; canvasHeight: number; imageWidth: number; imageHeight: number } | undefined;
   selectedFindingFingerprint?: string | undefined;
   onSelectFinding?: ((fingerprint: string) => void) | undefined;
-  onSelectComment?: ((commentId: string) => void) | undefined;
 }
 
 function CanvasMarkersLayer({
   sheetAnchors,
   relevantFindings,
-  comments,
   markerCanvas,
   selectedFindingFingerprint,
   onSelectFinding,
-  onSelectComment,
 }: Readonly<CanvasMarkersProps>) {
   const markerPosition = (anchor: CanvasAnchor) =>
     markerCanvas
@@ -243,23 +237,6 @@ function CanvasMarkersLayer({
 
         return null;
       })}
-
-      {comments
-        .filter((c) => c.findingFingerprint)
-        .map((comment) => (
-          <button
-            type="button"
-            key={comment.id}
-            className="pointer-events-auto absolute min-h-11 min-w-11 inline-flex items-center justify-center rounded-full border border-border bg-card p-1 text-foreground shadow-e2"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectComment?.(comment.id);
-            }}
-            title={`Comment by ${comment.authorId}: ${comment.content}`}
-          >
-            <span aria-hidden="true">💬</span>
-          </button>
-        ))}
     </div>
   );
 }
@@ -283,10 +260,8 @@ export function SplitViewport(props: Readonly<SplitViewportProps>) {
     imageHeight,
     sheetAnchors,
     relevantFindings,
-    comments,
     selectedFindingFingerprint,
     onSelectFinding,
-    onSelectComment,
   } = props;
   const headPaneRef = useRef<HTMLDivElement | null>(null);
   const [headPaneSize, setHeadPaneSize] = useState({ width: 0, height: 0 });
@@ -343,11 +318,9 @@ export function SplitViewport(props: Readonly<SplitViewportProps>) {
             <CanvasMarkersLayer
               sheetAnchors={sheetAnchors}
               relevantFindings={relevantFindings}
-              comments={comments}
               markerCanvas={markerCanvas}
               selectedFindingFingerprint={selectedFindingFingerprint}
               onSelectFinding={onSelectFinding}
-              onSelectComment={onSelectComment}
             />
           ) : null}
         </section>
@@ -363,11 +336,9 @@ function StackedLayersView({
   opacity,
   sheetAnchors,
   relevantFindings,
-  comments,
   markerCanvas,
   selectedFindingFingerprint,
   onSelectFinding,
-  onSelectComment,
 }: Readonly<{
   viewMode: ViewMode;
   baseSrc: string;
@@ -375,11 +346,9 @@ function StackedLayersView({
   opacity: number;
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
-  comments: DemoComment[];
   markerCanvas?: { canvasWidth: number; canvasHeight: number; imageWidth: number; imageHeight: number } | undefined;
   selectedFindingFingerprint?: string | undefined;
   onSelectFinding?: ((fingerprint: string) => void) | undefined;
-  onSelectComment?: ((commentId: string) => void) | undefined;
 }>) {
   return (
     <div className="relative h-full w-full">
@@ -414,11 +383,9 @@ function StackedLayersView({
       <CanvasMarkersLayer
         sheetAnchors={viewMode === "base" ? [] : sheetAnchors}
         relevantFindings={relevantFindings}
-        comments={comments}
         markerCanvas={markerCanvas}
         selectedFindingFingerprint={selectedFindingFingerprint}
         onSelectFinding={onSelectFinding}
-        onSelectComment={onSelectComment}
       />
     </div>
   );
@@ -432,11 +399,9 @@ export function ReviewCanvas({
   previewMobileControls = false,
   preferPcbLayer = false,
   findings = [],
-  comments = [],
   selectedFindingFingerprint,
   sourceSheetRequest,
   onSelectFinding,
-  onSelectComment,
   onAddCommentAtPoint,
 }: Readonly<ReviewCanvasProps>) {
   const [selectedSheetOrLayer, setSelectedSheetOrLayer] = useState<string>(
@@ -804,10 +769,8 @@ export function ReviewCanvas({
               imageHeight={imageHeight}
               sheetAnchors={sheetAnchors}
               relevantFindings={relevantFindings}
-              comments={comments}
               selectedFindingFingerprint={selectedFindingFingerprint}
               onSelectFinding={onSelectFinding}
-              onSelectComment={onSelectComment}
             />
           ) : (
             <StackedLayersView
@@ -817,11 +780,9 @@ export function ReviewCanvas({
               opacity={opacity}
               sheetAnchors={sheetAnchors}
               relevantFindings={relevantFindings}
-              comments={comments}
               markerCanvas={markerCanvas}
               selectedFindingFingerprint={selectedFindingFingerprint}
               onSelectFinding={onSelectFinding}
-              onSelectComment={onSelectComment}
             />
           )}
         </div>
