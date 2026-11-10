@@ -33,6 +33,22 @@ describe("run design visual inspection", () => {
     expect(html).toContain("/runs/run-1/findings");
     expect(html).toContain("/reviews/review-1");
   });
+  it("puts source artwork ahead of the secondary inventory on a visual-first investigation", () => {
+    const html = renderToStaticMarkup(
+      createElement(RunDesignView, {
+        runId: "run-1",
+        snapshots: [visual],
+        baseSnapshots: [{ ...visual, id: "base", sha256: "b".repeat(64) }],
+      }),
+    );
+    expect(html).toContain('aria-label="Published artwork inventory"');
+    expect(html.indexOf('aria-label="Run design investigation workspace"')).toBeLessThan(
+      html.indexOf('aria-label="Published artwork inventory"'),
+    );
+    expect(html).toContain("1 KiCad-native");
+    expect(html).toContain("1 base views");
+  });
+
   it("shows real recorded findings alongside the source artwork in the Run view", () => {
     const html = renderToStaticMarkup(
       createElement(RunDesignView, {

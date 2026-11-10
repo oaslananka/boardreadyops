@@ -42,18 +42,6 @@ export function RunDesignView({
                 : "No visual evidence was published for this run."}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span className="rounded-md border border-border px-2 py-1">{snapshots.length} published views</span>
-          <span className="rounded-md border border-border px-2 py-1">{native} KiCad-native</span>
-          {hasBaseArtwork ? (
-            <>
-              <span className="rounded-md border border-border px-2 py-1">{baseSnapshots.length} base views</span>
-              {baseNative > 0 ? (
-                <span className="rounded-md border border-border px-2 py-1">{baseNative} base KiCad-native</span>
-              ) : null}
-            </>
-          ) : null}
-        </div>
       </div>
       {hasHeadArtwork || hasBaseArtwork ? (
         <>
@@ -131,6 +119,21 @@ export function RunDesignView({
           </Link>
         </div>
       )}
+      <section
+        aria-label="Published artwork inventory"
+        className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+      >
+        <span className="rounded-md border border-border px-2 py-1">{snapshots.length} published views</span>
+        <span className="rounded-md border border-border px-2 py-1">{native} KiCad-native</span>
+        {hasBaseArtwork ? (
+          <>
+            <span className="rounded-md border border-border px-2 py-1">{baseSnapshots.length} base views</span>
+            {baseNative > 0 ? (
+              <span className="rounded-md border border-border px-2 py-1">{baseNative} base KiCad-native</span>
+            ) : null}
+          </>
+        ) : null}
+      </section>
       <div className="flex flex-wrap gap-3 text-sm">
         <Link
           href={`/runs/${encodeURIComponent(runId)}/findings`}
