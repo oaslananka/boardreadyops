@@ -6,9 +6,11 @@ import { ReviewDesignWorkspace } from "./review-design-workspace.js";
 export function ChangesTab({
   review,
   initialFindingFingerprint,
+  onOpenDiscussion,
 }: {
   readonly review: DemoReview;
   readonly initialFindingFingerprint?: string | undefined;
+  readonly onOpenDiscussion?: (() => void) | undefined;
 }) {
   const pcbs = review.changedFiles?.filter((f) => f.path.endsWith(".kicad_pcb")) ?? [];
 
@@ -131,7 +133,11 @@ export function ChangesTab({
         </section>
       ) : null}
 
-      <ReviewDesignWorkspace review={review} initialFindingFingerprint={initialFindingFingerprint} />
+      <ReviewDesignWorkspace
+        review={review}
+        initialFindingFingerprint={initialFindingFingerprint}
+        onOpenDiscussion={onOpenDiscussion}
+      />
 
       <details className="rounded-lg border border-border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-primary">

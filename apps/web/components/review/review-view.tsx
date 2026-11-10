@@ -698,7 +698,11 @@ export function ReviewView({
           />
         ) : null}
         {rawActiveTab === "changes" ? (
-          <ChangesTab review={review} initialFindingFingerprint={overviewMarkerFingerprint} />
+          <ChangesTab
+            review={review}
+            initialFindingFingerprint={overviewMarkerFingerprint}
+            onOpenDiscussion={() => setActiveTab("discussion")}
+          />
         ) : null}
         {rawActiveTab === "findings" ? (
           <FindingsTab

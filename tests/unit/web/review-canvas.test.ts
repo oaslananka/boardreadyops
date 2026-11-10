@@ -26,7 +26,7 @@ describe("ReviewCanvas", () => {
   const headSnapshots = buildDemoSnapshots(review.changedFiles, review.findings);
 
   it("renders a data-uri image per sheet/layer snapshot, not raw inline SVG", () => {
-    const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
+    const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [] }));
     expect(markup).toContain("Schematic and PCB Review Canvas");
     expect(markup).toContain('aria-label="Canvas instruments"');
     expect(markup).toContain("data:image/svg+xml");
@@ -34,7 +34,7 @@ describe("ReviewCanvas", () => {
   });
 
   it("lets the viewer switch between the changed sheets and layers", () => {
-    const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
+    const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [] }));
     for (const snapshot of headSnapshots) {
       expect(markup).toContain(snapshot.sheetOrLayer);
     }
@@ -55,7 +55,7 @@ describe("ReviewCanvas", () => {
   });
 
   it("keeps long native sheet names inside the viewport on narrow screens", () => {
-    const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
+    const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [] }));
     expect(markup).toContain(
       'class="flex min-w-0 max-w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3"',
     );
@@ -181,7 +181,6 @@ describe("ReviewCanvas", () => {
         imageHeight: 25.4,
         sheetAnchors: [sourceAnchor],
         relevantFindings: [],
-        comments: [],
       }),
     );
     expect(markup).toContain('alt="Base Revision Snapshot"');
@@ -197,7 +196,7 @@ describe("ReviewCanvas", () => {
   });
 
   it("renders a finding marker for each anchor linked to a finding", () => {
-    const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
+    const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [] }));
     const findingAnchorCount = headSnapshots[0]?.anchors.filter((a) => a.kind === "finding").length ?? 0;
     if (findingAnchorCount > 0) {
       expect(markup).toContain(headSnapshots[0]?.anchors.find((a) => a.kind === "finding")?.targetRef);
