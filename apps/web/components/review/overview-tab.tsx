@@ -205,10 +205,13 @@ export function ReviewRevisionEvidence({ review }: Readonly<{ review: DemoReview
 export function OverviewTab({
   review,
   onOpenChanges,
+  onInspectFinding,
 }: {
   readonly review: DemoReview;
   /** Switches to the Changes tab, where the schematic and PCB canvas lives. */
   readonly onOpenChanges?: (() => void) | undefined;
+  /** Opens the full Changes inspector for the marker's exact recorded finding. */
+  readonly onInspectFinding?: ((fingerprint: string) => void) | undefined;
 }) {
   const blockingFindings = review.findings.filter(
     (f) => (f.severity === "error" || f.severity === "critical") && f.disposition === "open",
@@ -317,6 +320,8 @@ export function OverviewTab({
             preferPcbLayer
             headSnapshots={review.headSnapshots ?? []}
             {...optionalBaseSnapshots}
+            findings={review.findings}
+            onSelectFinding={onInspectFinding}
           />
         </section>
       ) : null}

@@ -67,15 +67,21 @@ function hasNativeObjectPosition(review: DemoReview, fingerprint: string): boole
  * Zaptrace's three-pane engineering review adapted to BoardReadyOps's published
  * snapshots and findings. A summary SVG is not exact native KiCad geometry.
  */
-export function ReviewDesignWorkspace({ review }: Readonly<{ review: DemoReview }>) {
+export function ReviewDesignWorkspace({
+  review,
+  initialFindingFingerprint,
+}: Readonly<{ review: DemoReview; initialFindingFingerprint?: string | undefined }>) {
   const findings = [...review.findings].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
   const blocking = findings.filter(isBlocking).length;
-  const [filter, setFilter] = useState<FindingFilter>(blocking > 0 ? "blocking" : "all");
+  const requested = findings.find((finding) => finding.fingerprint === initialFindingFingerprint);
+  const [filter, setFilter] = useState<FindingFilter>(
+    requested && !isBlocking(requested) ? "all" : blocking > 0 ? "blocking" : "all",
+  );
   const [query, setQuery] = useState("");
   const [focusCanvas, setFocusCanvas] = useState(false);
   const visibleFindings = visibleReviewFindings(findings, filter, query);
   const [selectedFingerprint, setSelectedFingerprint] = useState<string | undefined>(
-    findings.find(isBlocking)?.fingerprint ?? findings[0]?.fingerprint,
+    requested?.fingerprint ?? findings.find(isBlocking)?.fingerprint ?? findings[0]?.fingerprint,
   );
   const selected = visibleFindings.find((finding) => finding.fingerprint === selectedFingerprint) ?? visibleFindings[0];
   // Filter changes can hide the stored fingerprint; the inspector, row and canvas

@@ -184,6 +184,7 @@ export function ReviewView({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [rawActiveTab, setRawActiveTab] = useState<ReviewTabKey>(() => tabFromSearchParam(searchParams.get("tab")));
+  const [overviewMarkerFingerprint, setOverviewMarkerFingerprint] = useState<string | undefined>();
 
   // The URL is the single source of truth for which tab is open: this keeps
   // browser Back/Forward and a shared/reloaded ?tab= link in sync with what
@@ -665,9 +666,22 @@ export function ReviewView({
 
       <main id={`panel-${rawActiveTab}`} role="tabpanel" aria-labelledby={`tab-${rawActiveTab}`} className="pt-4">
         {rawActiveTab === "overview" ? (
-          <OverviewTab review={review} onOpenChanges={() => setActiveTab("changes")} />
+          <OverviewTab
+            review={review}
+            onOpenChanges={() => {
+              setOverviewMarkerFingerprint(undefined);
+              setActiveTab("changes");
+            }}
+            onInspectFinding={(fingerprint) => {
+              if (!review.findings.some((finding) => finding.fingerprint === fingerprint)) return;
+              setOverviewMarkerFingerprint(fingerprint);
+              setActiveTab("changes");
+            }}
+          />
         ) : null}
-        {rawActiveTab === "changes" ? <ChangesTab review={review} /> : null}
+        {rawActiveTab === "changes" ? (
+          <ChangesTab review={review} initialFindingFingerprint={overviewMarkerFingerprint} />
+        ) : null}
         {rawActiveTab === "findings" ? (
           <FindingsTab
             findings={review.findings}
