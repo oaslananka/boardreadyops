@@ -1,6 +1,6 @@
 # Renovate tracks Fedora 45 by version + immutable multiarch digest; no tag@digest syntax.
 # renovate: datasource=docker depName=fedora currentValue=45
-FROM fedora@sha256:aacbc26b38361ba0cb3d10f268da40b61b36aed6ed6fe5831a35871636bedb06
+FROM fedora@sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c
 
 RUN dnf -y upgrade --refresh \
     && dnf -y install --setopt=install_weak_deps=False kicad \
