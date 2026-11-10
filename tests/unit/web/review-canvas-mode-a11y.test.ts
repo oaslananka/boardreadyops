@@ -21,6 +21,51 @@ const head = {
 const base = { ...head, id: "base", sha256: "b".repeat(64) };
 
 describe("revision comparison mode accessibility", () => {
+  it("keeps narrow run comparison optional while exposing all recorded comparison modes on demand", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    try {
+      await act(async () => {
+        root.render(
+          createElement(ReviewCanvas, {
+            headSnapshots: [head],
+            baseSnapshots: [base],
+            compactMobile: true,
+            compactComparisonOnNarrowScreens: true,
+          }),
+        );
+      });
+      const toggle = container.querySelector<HTMLButtonElement>("button[aria-expanded][aria-controls]");
+      const modes = container.querySelector<HTMLFieldSetElement>('fieldset[aria-label="Revision comparison modes"]');
+      expect(toggle?.textContent).toContain("Compare revisions");
+      expect(toggle?.textContent).toContain("Head Only");
+      expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+      expect(modes?.id).toBe(toggle?.getAttribute("aria-controls"));
+      expect(modes?.className).toContain("hidden min-[360px]:grid");
+      expect(modes?.querySelectorAll("button")).toHaveLength(5);
+
+      await act(async () => toggle?.click());
+      expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+      expect(modes?.className).not.toContain("hidden min-[360px]:grid");
+      const split = [...(modes?.querySelectorAll("button") ?? [])].find(
+        (button) => button.textContent?.trim() === "Split",
+      );
+      await act(async () => split?.click());
+      expect(split?.getAttribute("aria-pressed")).toBe("true");
+      expect(toggle?.textContent).toContain("Split");
+      await act(async () => toggle?.click());
+      expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+      expect(modes?.className).toContain("hidden min-[360px]:grid");
+      expect(container.querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]')).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+    }
+  });
+
   it("exposes a single selected mode and updates it on interaction", async () => {
     const container = document.createElement("div");
     document.body.append(container);

@@ -1,7 +1,7 @@
 "use client";
 
 import type { CanvasAnchor, SnapshotArtifact } from "@boardreadyops/contracts";
-import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react";
 import type { DemoComment, DemoFinding } from "../../lib/demo-data.js";
 
 export interface ReviewCanvasProps {
@@ -9,6 +9,8 @@ export interface ReviewCanvasProps {
   baseSnapshots?: SnapshotArtifact[];
   /** Use a shorter preview before the finding list on narrow run-inspection screens. */
   compactMobile?: boolean;
+  /** Keep full comparison modes available on narrow run pages without delaying the first board view. */
+  compactComparisonOnNarrowScreens?: boolean;
   /** Enlarged evidence viewport while secondary triage panels are hidden. */
   immersive?: boolean;
   /** Hide optional inspection chrome only in the initial Overview preview on small screens. */
@@ -426,6 +428,7 @@ export function ReviewCanvas({
   headSnapshots,
   baseSnapshots = [],
   compactMobile = false,
+  compactComparisonOnNarrowScreens = false,
   immersive = false,
   previewMobileControls = false,
   preferPcbLayer = false,
@@ -444,6 +447,8 @@ export function ReviewCanvas({
       "Main",
   );
   const [viewMode, setViewMode] = useState<ViewMode>("head");
+  const [mobileComparisonOpen, setMobileComparisonOpen] = useState(false);
+  const comparisonModesId = useId();
   const [opacity, setOpacity] = useState<number>(0.5);
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -624,8 +629,37 @@ export function ReviewCanvas({
             ))}
           </select>
 
+          {compactComparisonOnNarrowScreens && !previewMobileControls ? (
+            <button
+              type="button"
+              aria-controls={comparisonModesId}
+              aria-expanded={mobileComparisonOpen}
+              onClick={() => setMobileComparisonOpen((open) => !open)}
+              className="flex min-h-11 w-full items-center justify-between gap-2 rounded-sm border border-border bg-background px-3 text-sm font-semibold text-foreground hover:bg-muted/40 min-[360px]:hidden"
+            >
+              <span>Compare revisions</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {effectiveViewMode === "head"
+                  ? "Head Only"
+                  : effectiveViewMode === "base"
+                    ? "Base Only"
+                    : effectiveViewMode === "diff"
+                      ? "Visual Diff"
+                      : effectiveViewMode === "split"
+                        ? "Split"
+                        : "Overlay"}
+              </span>
+            </button>
+          ) : null}
           <fieldset
-            className={`${previewMobileControls ? "hidden" : "grid"} w-full min-w-0 grid-cols-2 gap-1 pb-1 min-[360px]:grid-cols-3 sm:flex sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0`}
+            id={comparisonModesId}
+            className={`${
+              previewMobileControls
+                ? "hidden"
+                : compactComparisonOnNarrowScreens && !mobileComparisonOpen
+                  ? "hidden min-[360px]:grid"
+                  : "grid"
+            } w-full min-w-0 grid-cols-2 gap-1 pb-1 min-[360px]:grid-cols-3 sm:flex sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0`}
             aria-label="Revision comparison modes"
           >
             <button

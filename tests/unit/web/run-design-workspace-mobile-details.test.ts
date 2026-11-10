@@ -41,6 +41,43 @@ const findings = [
 ];
 
 describe("mobile run design finding investigation", () => {
+  it("opens the real PCB layer before a schematic when both are published for this run", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    try {
+      const pcb = snapshots[0];
+      if (!pcb) throw new Error("PCB snapshot missing");
+      const schematic = {
+        ...pcb,
+        id: "schematic",
+        name: "kicad_native_main_sch.svg",
+        kind: "schematic" as const,
+        sheetOrLayer: "Main schematic",
+      };
+      await act(async () => {
+        root.render(
+          createElement(RunDesignWorkspace, {
+            snapshots: [schematic, pcb],
+            findings,
+            totalFindings: 14,
+            repository: "example/hardware",
+            commitSha,
+          }),
+        );
+      });
+      const layerPicker = container.querySelector<HTMLSelectElement>("#sheet-select");
+      expect(layerPicker?.value).toBe("F.Cu");
+      expect([...(layerPicker?.options ?? [])].map((option) => option.value)).toEqual(["Main schematic", "F.Cu"]);
+      expect(container.querySelector('[aria-label="Schematic and PCB Review Canvas"]')).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+    }
+  });
+
   it("opens the matching persisted finding from its canvas marker but never renders an out-of-page marker", async () => {
     const container = document.createElement("div");
     document.body.append(container);

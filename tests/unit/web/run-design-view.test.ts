@@ -28,6 +28,9 @@ describe("run design visual inspection", () => {
     expect(html).toContain('aria-label="Run design inspection"');
     expect(html).toContain("PCB &amp; schematic inspection");
     expect(html).toContain("1 KiCad-native");
+    expect(html).toContain("Real run artwork · not fabrication approval.");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("min-[360px]:grid");
     expect(html).toContain("pcb-copper");
     expect(html).toContain("Finding coordinates are not inferred");
     expect(html).toContain("/runs/run-1/findings");

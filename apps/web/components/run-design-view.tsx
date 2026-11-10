@@ -34,9 +34,13 @@ export function RunDesignView({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">PCB & schematic inspection</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p
+            className={
+              hasHeadArtwork ? "mt-1 text-xs text-muted-foreground sm:text-sm" : "mt-1 text-sm text-muted-foreground"
+            }
+          >
             {hasHeadArtwork
-              ? "Visual evidence published for this exact run, not a generic product illustration."
+              ? "Real run artwork · not fabrication approval."
               : hasBaseArtwork
                 ? "Only the recorded base revision has design artwork; this run has no published head views."
                 : "No visual evidence was published for this run."}
