@@ -1,16 +1,24 @@
 # Coolify: single-production self-hosted deployment
 
-This is a Git-sourced Docker Compose application for a BoardReadyOps installation that already runs on the same Docker host. It is not a second environment or second live control plane. Source: deploy/docker-compose.coolify.yml.
+This runbook retains the Git-sourced all-in-one Docker Compose provisioning template at deploy/docker-compose.coolify.yml. It is **not** the commissioned rolling-web deployment topology. Never run the legacy template against an active production stack or use it to recreate running stateful services.
 
-## Deployment topology
+## Current commissioned production topology (verified 10 November 2026)
 
-The stack contains web, control-plane worker, one-shot database migration, PostgreSQL, Redis and Cloudflare Tunnel. It does not publish host ports 80/443 or start another Caddy reverse proxy. The tunnel routes to web:3000 on its private Compose network. The application's public HTTPS origins remain assigned to the existing verified Cloudflare Tunnel.
+The existing single Cloudflare Tunnel connector runs **independently** of the web application and reaches **private Traefik ingress**. Traefik forwards to a Coolify **Dockerfile rolling web application**. The original worker, PostgreSQL 17 and Redis 8 remain separately managed stateful services. Web has no published host port; the private-network source allowlist protects both HTTP and HTTPS routes. Actual origin selection, authentication, credentials and recovery routing are operator-controlled, not copied into this public template.
+
+For a same-source rolling web release, preserve the pinned web commit, single connector, stateful services, existing rollback image and private routing. Start external HTTPS/transport and independently authenticated customer-path witnesses **before** the release. Sample through new-web readiness, old/new overlap, drain, retirement and post-release stability. Verify terminal deployment status and immutable image/source identity. Previous request-level witnesses or successful healthcheck spot checks do not establish zero failure for another release.
+
+Track the rolling-web and rollback acceptance in [issue #1433](https://github.com/oaslananka/boardreadyops/issues/1433). Keep this issue open until **the applicable** production cutover has the required authenticated-session and supported long-lived request evidence. A first useful signed PCB result is a separate product acceptance gate. Do not commit release-policy files, tunnel credentials, origin addresses or private operator procedures to this repository.
+
+## Legacy all-in-one Compose template topology
+
+The **template** contains web, control-plane worker, one-shot database migration, PostgreSQL, Redis and Cloudflare Tunnel. It does not publish host ports 80/443 or start another Caddy reverse proxy. In this legacy template, the tunnel routes to web:3000 on its private Compose network. This is not the live independent-connector / rolling-web route.
 
 The PostgreSQL, Redis and local artifact volumes use external: true. Coolify must reuse the existing verified volumes, and must never access them concurrently with the old deployment. Web and worker share exactly one artifact volume and both mount the read-only release-repository policy.
 
 This template is not itself deployment authorization. Host paths, tunnel identity, secrets, production image and recovery are operator-controlled.
 
-## Configure one production application
+## Configure a legacy Compose installation (not the current rolling web)
 
 1. In Coolify use one project with one production environment. Choose a GitHub App-backed Application with Docker Compose from main, file deploy/docker-compose.coolify.yml. Leave automatic deploy and pull-request previews disabled until cutover is accepted. Do not add another environment.
 2. Verify that Coolify provides SOURCE_COMMIT for the selected immutable Git commit and enables source-commit availability during Docker builds. This pins the web, worker and migration image to one revision without manually changing tags on every GitHub deployment. Configure the normal runtime values through the approved secrets provider, using Doppler where supported by the installed Coolify version. The Compose application must receive a generated .env file containing runtime values used by web, worker and migrate. Never commit the file or log credentials.
@@ -24,7 +32,7 @@ This template is not itself deployment authorization. Host paths, tunnel identit
 
 The Docker image healthcheck uses /api/health/ready (not dependency-free /api/health liveness), so it is healthy only when required configuration and PostgreSQL readiness are verified. On SIGTERM/SIGINT the web process marks readiness as unavailable while keeping Next.js's own graceful shutdown handler. Operators must still configure sufficient stop/drain time when transitioning to a rolling-capable deployment type.
 
-**This does not eliminate downtime in the current Git-sourced Docker Compose application.** Coolify stops and reconciles its Compose services, including the single tunnel and web. Production cutovers have returned Cloudflare HTTP 530 before the replacement tunnel connected. See issue #1433 for the independently required stable tunnel, rolling web, stable stateful services, and actual customer-traffic cutover acceptance. Do not describe a healthy Docker image or an unchanged postdeploy status as zero-downtime proof.
+**This does not eliminate downtime in a Git-sourced all-in-one Docker Compose deployment.** Coolify can stop and reconcile the template's tunnel, web and stateful services. An earlier production Compose cutover returned Cloudflare HTTP 530 before the replacement tunnel connected; production has since migrated to an independent connector and rolling web. Retaining this template is not permission to revert that topology. See #1433 for the current continuity acceptance contract.
 
 ## Web readiness drain prerequisite (not a Compose zero-downtime fix)
 
@@ -32,7 +40,7 @@ The Dockerfile web runner now uses a small Node parent process. On SIGTERM/SIGIN
 
 **Required for a future rolling-eligible Dockerfile deployment:** stop-grace duration of at least **30 seconds** (parent drain plus child shutdown), simultaneous old/new web readiness and Traefik routing, **stable** database/Redis/worker and a separately persistent **single** existing Cloudflare Tunnel. The private origin must stay private and deny direct-public-host and untrusted Docker network requests on **both HTTP and HTTPS** routers; do not publish a direct web port. Do not enable these changes solely based on a synthetic test: verify real Next.js/SSE/long-lived requests, authenticated session continuity, migration compatibility, rollback and a complete public cutover witness. A 3-second healthcheck and 12-second drain delay mitigate a tested routing race; they do not by themselves guarantee all requests survive.
 
-**Current production still uses stop-then-start Docker Compose**. It still recreates web, tunnel and stateful services and may return HTTP 530/502 during a redeploy. The readiness/drain code must not be represented as a completed zero-downtime migration. Issue #1433 remains OPEN until the production topology is transitioned reversibly and customer-path acceptance passes.
+**The legacy template still uses stop-then-start Docker Compose** and must not be confused with the commissioned production topology described above. The current Dockerfile web application uses rolling replacement and a separately persistent connector, while the original stateful services remain running. Neither a drain delay nor a passing HTTP200 spot check proves session preservation or zero failed requests during every release. Keep #1433 open until the real customer-path acceptance is recorded for the applicable cutover.
 
 ## Mandatory cutover prerequisites
 
@@ -43,7 +51,7 @@ The Dockerfile web runner now uses a small Node parent process. On SIGTERM/SIGIN
 - Preserve authorization, trusted client-IP ingress, session cookies, GitHub webhook signatures, remote MCP, artifact ownership and release-policy mount checks.
 - A missing required secret, unverified volume, unverified OAuth ingress contract or unprotected rollback is a stop condition.
 
-## Single-stack production cutover
+## Legacy one-time Compose cutover (not for the current live stack)
 
 1. Fence inbound writes and workers using the existing operations procedure, then stop the previous Compose services without -v. Keep the previous container image and the volumes. Never run old and new against the same volumes.
 2. Configure verified runtime secrets and mount paths in Coolify, then deploy the single production application. Migration must succeed before web and worker start. Check that exactly one web, worker, PostgreSQL, Redis and Cloudflare Tunnel are active for this installation.
