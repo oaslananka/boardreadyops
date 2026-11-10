@@ -66,6 +66,54 @@ describe("repository setup readiness controls", () => {
     delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
   });
 
+  it("asks which authorized repository to check before showing policy presets or YAML", async () => {
+    const repositories = [
+      { ...readyForProbe, id: "repo-first", fullName: "first/board" },
+      { ...readyForProbe, id: "repo-second", fullName: "second/board" },
+    ];
+    await act(async () => {
+      root.render(createElement(RepositorySetupInteractive, { ...baseProps, repositories, signedIn: true }));
+    });
+    const picker = container.querySelector<HTMLSelectElement>("#one-click-setup-repository");
+    const policy = container.querySelector("#policy-preset");
+    const proposedFiles = container.querySelector("#proposed-files");
+    const automated = container.querySelector("#automated-setup");
+    if (!picker || !policy || !proposedFiles || !automated) throw new Error("setup flow incomplete");
+    expect(container.querySelectorAll("select")).toHaveLength(1);
+    expect(container.querySelector('label[for="one-click-setup-repository"]')?.textContent).toContain("Repository");
+    expect(Boolean(picker.compareDocumentPosition(policy) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(picker.compareDocumentPosition(proposedFiles) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(automated.querySelector("select")).toBeNull();
+    expect(picker.value).toBe("");
+    expect(button(container, "Open setup pull request").disabled).toBe(true);
+  });
+
+  it("puts GitHub sign-in or installation ahead of policy details without repeating action links", async () => {
+    await act(async () => {
+      root.render(createElement(RepositorySetupInteractive, { ...baseProps, signedIn: false, repositories: [] }));
+    });
+    const signIn = container.querySelector<HTMLAnchorElement>('a[href="/api/auth/github/login"]');
+    const policy = container.querySelector("#policy-preset");
+    expect(signIn).not.toBeNull();
+    expect(policy).not.toBeNull();
+    expect(Boolean(signIn?.compareDocumentPosition(policy) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(container.querySelectorAll('a[href="/api/auth/github/login"]')).toHaveLength(1);
+
+    await act(async () => {
+      root.render(createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [] }));
+    });
+    const install = container.querySelector<HTMLAnchorElement>(
+      'a[href="https://github.com/apps/boardreadyops/installations/new"]',
+    );
+    expect(install).not.toBeNull();
+    expect(Boolean(install?.compareDocumentPosition(policy) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(
+      container.querySelectorAll('a[href="https://github.com/apps/boardreadyops/installations/new"]'),
+    ).toHaveLength(1);
+    expect(container.querySelector("select")).toBeNull();
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+  });
+
   it("opens a deep link on the intended authorized repository rather than the first installation entry", async () => {
     const repositories = [
       { ...readyForProbe, id: "repo-first", fullName: "first/board" },

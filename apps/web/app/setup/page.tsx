@@ -120,8 +120,8 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
             <p className="text-xs uppercase text-muted-foreground">Repository setup</p>
             <h1 className="text-2xl font-bold text-foreground">Connect or check your repository</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              See its current setup status first. GitHub repositories and readiness runs are separate from CAD workspace
-              projects and revisions; connecting one does not automatically create the other.
+              Select a GitHub repository to check its readiness. CAD workspaces are separate and are not created by
+              setup.
             </p>
           </div>
           <StatusBadge value="preview" label="Nothing changes until you choose" />
@@ -129,12 +129,15 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
 
         <section aria-label="Repository write safety" className="rounded-md border border-border bg-card p-4 text-sm">
           <p className="font-medium text-foreground">
-            BoardReadyOps setup writes go to a new branch and open a pull request for review. BoardReadyOps never
-            commits to your default branch or bypasses its protections. Files you copy manually are outside this
-            guarantee.
+            Setup changes are proposed in a reviewable GitHub pull request. Your default branch and its protections stay
+            untouched until you approve and merge it.
           </p>
           <details className="mt-2">
             <summary className="cursor-pointer font-medium text-primary">How setup and permissions work</summary>
+            <p className="mt-2 text-muted-foreground">
+              BoardReadyOps never commits directly to your default branch or bypasses its protections. Files you copy
+              manually are outside this guarantee.
+            </p>
             <p className="mt-2 text-muted-foreground">
               Read the files before you decide. You can copy the proposed policy/workflow files to your own branch or
               ask BoardReadyOps to open a reviewable setup pull request. The exact files and the permission profile
