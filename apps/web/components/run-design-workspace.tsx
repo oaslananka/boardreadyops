@@ -8,6 +8,35 @@ import { ReviewCanvas } from "./review/review-canvas.js";
 
 type RunFinding = RunDetail["findings"][number];
 
+/**
+ * Link a persisted KiCad schematic source file to a published sheet by its
+ * exact basename, not by a fuzzy component name or a guessed image position.
+ * Ambiguous, foreign or unsafe source paths must not move the canvas.
+ */
+export function matchingRecordedSchematicSheet(
+  sourcePath: string,
+  snapshots: readonly SnapshotArtifact[],
+): string | undefined {
+  const normalizedPath = sourcePath.replaceAll("\\", "/");
+  const segments = normalizedPath.split("/");
+  if (
+    normalizedPath.startsWith("/") ||
+    /^[a-z]:/iu.test(normalizedPath) ||
+    segments.some((segment) => !segment || segment === "." || segment === "..")
+  ) {
+    return undefined;
+  }
+  const filename = segments.at(-1);
+  if (!filename?.toLowerCase().endsWith(".kicad_sch")) return undefined;
+  const stem = filename.slice(0, -".kicad_sch".length).toLowerCase();
+  if (!stem) return undefined;
+  const matched = snapshots.filter(
+    (snapshot) =>
+      snapshot.kind === "schematic" && snapshot.sheetOrLayer.split("/").at(-1)?.trim().toLowerCase() === stem,
+  );
+  return matched.length === 1 ? matched[0]?.sheetOrLayer : undefined;
+}
+
 /** Presentation priority only: never suppress or rewrite historical findings. */
 function findingReviewPriority(finding: RunFinding, linkedFingerprints: ReadonlySet<string>): number {
   if (finding.fingerprint && linkedFingerprints.has(finding.fingerprint)) return 0;
@@ -79,6 +108,9 @@ export function RunDesignWorkspace({
   commitSha: string;
 }>) {
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  // Explicit finding clicks may select an exact published schematic sheet.
+  // A new object also reselects it when a viewer clicked the same finding twice.
+  const [sourceSheetRequest, setSourceSheetRequest] = useState<{ sheetOrLayer: string } | undefined>();
   // A run snapshot may contain findings from another results page, or stale
   // fingerprints. Do not display clickable locations without exactly one
   // matching finding on the page currently visible to this viewer.
@@ -157,7 +189,16 @@ export function RunDesignWorkspace({
                 <button
                   type="button"
                   aria-pressed={activeSelectedId === finding.id}
-                  onClick={() => setSelectedId(finding.id)}
+                  onClick={() => {
+                    setSelectedId(finding.id);
+                    const sheet = matchingRecordedSchematicSheet(finding.path ?? "", visibleSnapshots);
+                    const anchored = finding.fingerprint && linkedFingerprints.has(finding.fingerprint);
+                    setSourceSheetRequest(
+                      sheet && !anchored && githubFindingSourceUrl(repository, commitSha, finding.path)
+                        ? { sheetOrLayer: sheet }
+                        : undefined,
+                    );
+                  }}
                   className={
                     "w-full rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
                     (activeSelectedId === finding.id
@@ -208,12 +249,16 @@ export function RunDesignWorkspace({
           compactMobile
           compactComparisonOnNarrowScreens
           preferPcbLayer
+          sourceSheetRequest={sourceSheetRequest}
           {...(recordedAnchor ? { selectedFindingFingerprint: selectedFingerprint } : {})}
           onSelectFinding={(fingerprint) => {
             // A snapshot may contain anchors outside the current findings page. Only
             // one exact persisted fingerprint may select a finding; otherwise ignore.
             const matching = findings.filter((finding) => finding.fingerprint && finding.fingerprint === fingerprint);
-            if (matching.length === 1 && matching[0]) setSelectedId(matching[0].id);
+            if (matching.length === 1 && matching[0]) {
+              setSelectedId(matching[0].id);
+              setSourceSheetRequest(undefined);
+            }
           }}
         />
         <p className="mt-2 text-xs text-muted-foreground">

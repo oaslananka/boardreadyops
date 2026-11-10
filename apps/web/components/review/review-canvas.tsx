@@ -20,6 +20,8 @@ export interface ReviewCanvasProps {
   findings?: DemoFinding[];
   comments?: DemoComment[];
   selectedFindingFingerprint?: string | undefined;
+  /** A user-clicked finding may request its exact published schematic sheet, never a guessed position. */
+  sourceSheetRequest?: { sheetOrLayer: string } | undefined;
   onSelectFinding?: ((fingerprint: string) => void) | undefined;
   onSelectComment?: ((commentId: string) => void) | undefined;
   onAddCommentAtPoint?: (point: { x: number; y: number; sheetOrLayer: string }) => void;
@@ -435,6 +437,7 @@ export function ReviewCanvas({
   findings = [],
   comments = [],
   selectedFindingFingerprint,
+  sourceSheetRequest,
   onSelectFinding,
   onSelectComment,
   onAddCommentAtPoint,
@@ -474,6 +477,19 @@ export function ReviewCanvas({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
+
+  // An explicit finding click may navigate to a matching source SCHEMATIC sheet.
+  // This never supplies an image coordinate or overrides marker-linked selection.
+  useEffect(() => {
+    if (
+      sourceSheetRequest &&
+      headSnapshots.some(
+        (snapshot) => snapshot.kind === "schematic" && snapshot.sheetOrLayer === sourceSheetRequest.sheetOrLayer,
+      )
+    ) {
+      setSelectedSheetOrLayer(sourceSheetRequest.sheetOrLayer);
+    }
+  }, [sourceSheetRequest, headSnapshots]);
 
   // Only a published finding anchor selects a sheet; never infer a location from a
   // rule message, source filename, or component label.
