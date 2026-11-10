@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Finding } from "../../../src/core/findings.js";
-import { categorizeFindings, clearRulesForTests, registerRule } from "../../../src/core/rule-registry.js";
+import {
+  categorizeFindings,
+  clearRulesForTests,
+  registerRule,
+  summarizeFindingEvidence,
+} from "../../../src/core/rule-registry.js";
 
 function fakeRule(id: string, category: "electrical" | "sourcing" | "assembly") {
   return {
@@ -71,6 +76,51 @@ describe("categorizeFindings", () => {
 
     const unclassified = breakdown.find((b) => b.category === "unclassified");
     expect(unclassified).toMatchObject({ total: 1, low: 1 });
+  });
+
+  it("places native KiCad DRC and ERC diagnostics in the electrical domain instead of Other", () => {
+    const findings = [
+      finding("drc.copper_edge_clearance", "high"),
+      finding("drc.lib_footprint_mismatch", "medium"),
+      finding("erc.power_pin_not_driven", "high"),
+      finding("erc.lib_symbol_mismatch", "medium"),
+    ];
+    const breakdown = categorizeFindings(findings);
+    expect(breakdown.find((group) => group.category === "electrical")).toMatchObject({
+      total: 4,
+      high: 2,
+      medium: 2,
+    });
+    expect(breakdown.some((group) => group.category === "unclassified")).toBe(false);
+    expect(breakdown.reduce((sum, group) => sum + group.total, 0)).toBe(4);
+    expect(findings[0]?.severity).toBe("high");
+  });
+
+  it("leaves unknown plugin rules unclassified", () => {
+    const breakdown = categorizeFindings([finding("plugin.custom-drc", "high")]);
+    expect(breakdown.find((group) => group.category === "unclassified")).toMatchObject({
+      total: 1,
+      high: 1,
+    });
+    expect(breakdown.find((group) => group.category === "electrical")).toMatchObject({ total: 0 });
+  });
+
+  it("does not invent measured evidence for unregistered KiCad diagnostic ids", () => {
+    const unregistered = finding("drc.copper_edge_clearance", "high");
+    const evidence = summarizeFindingEvidence([unregistered], "high");
+    expect(evidence).toMatchObject({
+      exact: 0,
+      heuristic: 0,
+      unclassified: 1,
+      blockingOnInference: ["drc.copper_edge_clearance"],
+    });
+  });
+
+  it("preserves explicit registered categories even when rule ids start with drc or erc", () => {
+    registerRule(fakeRule("drc.custom-assembly-rule", "assembly"));
+    const breakdown = categorizeFindings([finding("drc.custom-assembly-rule", "medium")]);
+    expect(breakdown.find((group) => group.category === "assembly")).toMatchObject({ total: 1, medium: 1 });
+    expect(breakdown.find((group) => group.category === "electrical")).toMatchObject({ total: 0 });
   });
 
   it("omits unclassified entirely when every finding maps to a known category", () => {
