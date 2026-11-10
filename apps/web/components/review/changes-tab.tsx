@@ -3,7 +3,13 @@ import type { DemoReview } from "../../lib/demo-data.js";
 import { Panel } from "../ui.js";
 import { ReviewDesignWorkspace } from "./review-design-workspace.js";
 
-export function ChangesTab({ review }: { readonly review: DemoReview }) {
+export function ChangesTab({
+  review,
+  initialFindingFingerprint,
+}: {
+  readonly review: DemoReview;
+  readonly initialFindingFingerprint?: string | undefined;
+}) {
   const pcbs = review.changedFiles?.filter((f) => f.path.endsWith(".kicad_pcb")) ?? [];
 
   let pcbContent: React.ReactNode;
@@ -125,7 +131,7 @@ export function ChangesTab({ review }: { readonly review: DemoReview }) {
         </section>
       ) : null}
 
-      <ReviewDesignWorkspace review={review} />
+      <ReviewDesignWorkspace review={review} initialFindingFingerprint={initialFindingFingerprint} />
 
       <details className="rounded-lg border border-border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-primary">
