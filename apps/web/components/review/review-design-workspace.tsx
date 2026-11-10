@@ -70,7 +70,12 @@ function hasNativeObjectPosition(review: DemoReview, fingerprint: string): boole
 export function ReviewDesignWorkspace({
   review,
   initialFindingFingerprint,
-}: Readonly<{ review: DemoReview; initialFindingFingerprint?: string | undefined }>) {
+  onOpenDiscussion,
+}: Readonly<{
+  review: DemoReview;
+  initialFindingFingerprint?: string | undefined;
+  onOpenDiscussion?: (() => void) | undefined;
+}>) {
   const findings = [...review.findings].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
   const blocking = findings.filter(isBlocking).length;
   const requested = findings.find((finding) => finding.fingerprint === initialFindingFingerprint);
@@ -268,7 +273,6 @@ export function ReviewDesignWorkspace({
                 headSnapshots={snapshots}
                 {...optionalBaseSnapshots}
                 findings={review.findings}
-                comments={review.comments}
                 selectedFindingFingerprint={activeFingerprint}
                 onSelectFinding={selectCanvasFinding}
               />
@@ -281,6 +285,22 @@ export function ReviewDesignWorkspace({
                   setFocusCanvas(false);
                 }}
               />
+              {review.comments.length > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Review comments belong to Discussion; a finding link does not provide a verified drawing position.
+                  </p>
+                  {onOpenDiscussion ? (
+                    <button
+                      type="button"
+                      onClick={onOpenDiscussion}
+                      className="inline-flex min-h-11 items-center rounded-sm border border-border bg-background px-3 text-sm font-medium text-foreground hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary"
+                    >
+                      Open Discussion ({review.comments.length}) →
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 {nativeViews > 0
                   ? String(nativeViews) +
