@@ -18,12 +18,14 @@ export function ChecklistApprovalsTab({
   evidenceDigest,
   onToggleChecklist,
   onAddChecklist,
+  readOnly = false,
 }: Readonly<{
   checklist: DemoChecklistItem[];
   approvals: DemoApproval[];
   evidenceDigest: string;
   onToggleChecklist?: (id: string, completed: boolean) => void;
   onAddChecklist?: (title: string) => void;
+  readOnly?: boolean | undefined;
 }>) {
   const [newItemTitle, setNewItemTitle] = useState("");
   const newItemFieldId = useId();
@@ -67,6 +69,7 @@ export function ChecklistApprovalsTab({
                 type="checkbox"
                 checked={item.completed}
                 onChange={() => handleToggle(item.id)}
+                disabled={readOnly}
                 className="mt-0.5"
               />
               <div>
@@ -85,23 +88,25 @@ export function ChecklistApprovalsTab({
           ))}
         </div>
 
-        <form onSubmit={handleAdd} className="mt-4 flex gap-2">
-          <label htmlFor={newItemFieldId} className="sr-only">
-            Add custom verification check
-          </label>
-          <input
-            id={newItemFieldId}
-            type="text"
-            placeholder="Add custom verification check (e.g. 'Validate high-speed differential pairs match within 0.1mm')..."
-            value={newItemTitle}
-            onChange={(e) => setNewItemTitle(e.currentTarget.value)}
-            className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            required
-          />
-          <Button type="submit" variant="secondary">
-            + Add Check
-          </Button>
-        </form>
+        {!readOnly ? (
+          <form onSubmit={handleAdd} className="mt-4 flex gap-2">
+            <label htmlFor={newItemFieldId} className="sr-only">
+              Add custom verification check
+            </label>
+            <input
+              id={newItemFieldId}
+              type="text"
+              placeholder="Add custom verification check (e.g. 'Validate high-speed differential pairs match within 0.1mm')..."
+              value={newItemTitle}
+              onChange={(e) => setNewItemTitle(e.currentTarget.value)}
+              className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              required
+            />
+            <Button type="submit" variant="secondary">
+              + Add Check
+            </Button>
+          </form>
+        ) : null}
       </Panel>
 
       <Panel

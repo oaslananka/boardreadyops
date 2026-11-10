@@ -555,6 +555,7 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       id: row.id,
       repositoryId: row.repository_id,
       repositoryName: `${row.owner}/${row.name}`,
+      viewerCanEdit: Boolean(session?.installationIds?.includes(safeInstallationId(row.github_installation_id) ?? -1)),
       pullRequestNumber: row.pull_request_number ?? 0,
       title: resolvedReviewTitle(row.title, revision.head_commit_sha),
       status: row.status,

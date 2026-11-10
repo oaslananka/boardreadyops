@@ -175,9 +175,11 @@ function ReviewNavigationTabs({
 export function ReviewView({
   initialReview,
   viewerLogin,
+  readOnly = false,
 }: {
   readonly initialReview: DemoReview;
   readonly viewerLogin?: string | undefined;
+  readonly readOnly?: boolean | undefined;
 }) {
   const [review, setReview] = useState<DemoReview>(initialReview);
   const router = useRouter();
@@ -606,7 +608,23 @@ export function ReviewView({
         evidenceState={review.evidenceState}
         onApprove={() => setApprovalModalType("approve")}
         onRequestChanges={() => setApprovalModalType("request_changes")}
+        readOnly={readOnly}
       />
+
+      {readOnly ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground"
+        >
+          <strong className="text-foreground">Read-only review.</strong>
+          <span>You can inspect published findings and source evidence, but cannot change review decisions.</span>
+          {!viewerLogin ? (
+            <a href="/api/auth/github/login" className="font-medium text-primary underline underline-offset-2">
+              Sign in to manage an authorized review
+            </a>
+          ) : null}
+        </div>
+      ) : null}
 
       {mutationError ? (
         <div
@@ -623,7 +641,7 @@ export function ReviewView({
         </output>
       ) : null}
 
-      {waiverOffer ? (
+      {!readOnly && waiverOffer ? (
         <section
           className="flex flex-col gap-3 rounded-md border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
           aria-labelledby="waiver-offer-heading"
@@ -687,6 +705,7 @@ export function ReviewView({
             findings={review.findings}
             onUpdateDisposition={handleUpdateDisposition}
             onAssign={handleAssign}
+            readOnly={readOnly}
           />
         ) : null}
         {rawActiveTab === "discussion" ? (
@@ -695,6 +714,7 @@ export function ReviewView({
             viewerLogin={viewerLogin}
             onAddComment={handleAddComment}
             onToggleStatus={handleToggleCommentStatus}
+            readOnly={readOnly}
           />
         ) : null}
         {rawActiveTab === "checklist" ? (
@@ -704,12 +724,13 @@ export function ReviewView({
             evidenceDigest={review.evidenceDigest}
             onToggleChecklist={handleToggleChecklist}
             onAddChecklist={handleAddChecklist}
+            readOnly={readOnly}
           />
         ) : null}
         {rawActiveTab === "evidence" ? <EvidenceTab review={review} /> : null}
       </main>
 
-      {approvalModalType ? (
+      {!readOnly && approvalModalType ? (
         <ApprovalModal
           type={approvalModalType}
           evidenceDigest={review.evidenceDigest}

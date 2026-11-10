@@ -11,6 +11,7 @@ export interface FindingsTabProps {
   findings: DemoFinding[];
   onUpdateDisposition?: (fingerprint: string, disposition: FindingDisposition, reason?: string, owner?: string) => void;
   onAssign?: (fingerprint: string, assignee: string) => void;
+  readOnly?: boolean | undefined;
 }
 
 const diffStateOrder = ["all", "new", "persistent", "regressed", "resolved"] as const;
@@ -38,7 +39,7 @@ function getDiffStateBadgeClass(diffState: string): string {
   }
 }
 
-export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonly<FindingsTabProps>) {
+export function FindingsTab({ findings, onUpdateDisposition, onAssign, readOnly = false }: Readonly<FindingsTabProps>) {
   const [selectedDiffState, setSelectedDiffState] = useState<string>("all");
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -114,19 +115,19 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
       } else if (e.key === "k" || e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedIndex((prev) => Math.max(0, prev - 1));
-      } else if (e.key === "e") {
+      } else if (e.key === "e" && !readOnly) {
         const current = filteredFindings[selectedIndex];
         if (current) {
           e.preventDefault();
           setModalFinding({ finding: current, targetDisposition: "accepted_risk" });
         }
-      } else if (e.key === "f") {
+      } else if (e.key === "f" && !readOnly) {
         const current = filteredFindings[selectedIndex];
         if (current) {
           e.preventDefault();
           setModalFinding({ finding: current, targetDisposition: "false_positive" });
         }
-      } else if (e.key === "o") {
+      } else if (e.key === "o" && !readOnly) {
         const current = filteredFindings[selectedIndex];
         if (current) {
           e.preventDefault();
@@ -144,7 +145,7 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
     };
     win.addEventListener?.("keydown", handleKeyDown);
     return () => win.removeEventListener?.("keydown", handleKeyDown);
-  }, [filteredFindings, selectedIndex, modalFinding, handleDirectDisposition]);
+  }, [filteredFindings, selectedIndex, modalFinding, handleDirectDisposition, readOnly]);
 
   function handleModalConfirm(data: { reason: string; owner: string; expiresAt?: string }) {
     if (!modalFinding) return;
@@ -283,12 +284,16 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
             {" / "}
             <kbd className="rounded-sm border border-border bg-muted px-1">k</kbd>
             {" navigate "}
-            <kbd className="rounded-sm border border-border bg-muted px-1">e</kbd>
-            {" accept risk "}
-            <kbd className="rounded-sm border border-border bg-muted px-1">f</kbd>
-            {" false positive "}
-            <kbd className="rounded-sm border border-border bg-muted px-1">o</kbd>
-            {" open"}
+            {!readOnly ? (
+              <>
+                <kbd className="rounded-sm border border-border bg-muted px-1">e</kbd>
+                {" accept risk "}
+                <kbd className="rounded-sm border border-border bg-muted px-1">f</kbd>
+                {" false positive "}
+                <kbd className="rounded-sm border border-border bg-muted px-1">o</kbd>
+                {" open"}
+              </>
+            ) : null}
           </div>
         </div>
       </div>
@@ -342,26 +347,32 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
                   {/* `disposition-select` carries no styling any more -- kept as a stable
                       selector hook for tests/unit/web/findings-tab.test.ts,
                       tests/e2e/review-lifecycle.spec.ts, and tests/e2e/modal-contract.spec.ts. */}
-                  <select
-                    aria-label={`Disposition for finding ${finding.ruleId}`}
-                    value={finding.disposition}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => {
-                      const newDisp = e.currentTarget.value as FindingDisposition;
-                      if (newDisp === "accepted_risk" || newDisp === "false_positive") {
-                        setModalFinding({ finding, targetDisposition: newDisp });
-                      } else {
-                        handleDirectDisposition(finding.fingerprint, newDisp);
-                      }
-                    }}
-                    className="disposition-select rounded-sm border border-border bg-background px-2 py-1 text-xs text-foreground"
-                  >
-                    <option value="open">Open (Fix Required)</option>
-                    <option value="fixed">Fixed</option>
-                    <option value="accepted_risk">Accepted Risk (Waived)</option>
-                    <option value="false_positive">False Positive</option>
-                    <option value="not_applicable">Not Applicable</option>
-                  </select>
+                  {readOnly ? (
+                    <span className="rounded-sm border border-border px-2 py-1 text-xs text-muted-foreground">
+                      {finding.disposition.replaceAll("_", " ")}
+                    </span>
+                  ) : (
+                    <select
+                      aria-label={`Disposition for finding ${finding.ruleId}`}
+                      value={finding.disposition}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        const newDisp = e.currentTarget.value as FindingDisposition;
+                        if (newDisp === "accepted_risk" || newDisp === "false_positive") {
+                          setModalFinding({ finding, targetDisposition: newDisp });
+                        } else {
+                          handleDirectDisposition(finding.fingerprint, newDisp);
+                        }
+                      }}
+                      className="disposition-select rounded-sm border border-border bg-background px-2 py-1 text-xs text-foreground"
+                    >
+                      <option value="open">Open (Fix Required)</option>
+                      <option value="fixed">Fixed</option>
+                      <option value="accepted_risk">Accepted Risk (Waived)</option>
+                      <option value="false_positive">False Positive</option>
+                      <option value="not_applicable">Not Applicable</option>
+                    </select>
+                  )}
                 </div>
 
                 <p className="mt-2 text-sm text-foreground">{finding.message}</p>
@@ -393,34 +404,38 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
                     {/* `assignee-input` and `assignee-add-btn` carry no styling any more --
                         kept as stable selector hooks for tests/unit/web/findings-tab.test.ts
                         and tests/e2e/review-lifecycle.spec.ts. */}
-                    <input
-                      type="text"
-                      aria-label={`Add assignee for finding ${finding.ruleId}`}
-                      placeholder="Add assignee…"
-                      value={assigneeDraft[finding.fingerprint] ?? ""}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        const value = e.currentTarget.value;
-                        setAssigneeDraft((prev) => ({ ...prev, [finding.fingerprint]: value }));
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAssign(finding.fingerprint, assigneeDraft[finding.fingerprint] ?? "");
-                        }
-                      }}
-                      className="assignee-input rounded-sm border border-border bg-background px-2 py-1 text-xs text-foreground"
-                    />
-                    <button
-                      type="button"
-                      className="assignee-add-btn rounded-sm border border-border px-2 py-1 text-xs hover:bg-accent"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAssign(finding.fingerprint, assigneeDraft[finding.fingerprint] ?? "");
-                      }}
-                    >
-                      Assign
-                    </button>
+                    {!readOnly ? (
+                      <>
+                        <input
+                          type="text"
+                          aria-label={`Add assignee for finding ${finding.ruleId}`}
+                          placeholder="Add assignee…"
+                          value={assigneeDraft[finding.fingerprint] ?? ""}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const value = e.currentTarget.value;
+                            setAssigneeDraft((prev) => ({ ...prev, [finding.fingerprint]: value }));
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAssign(finding.fingerprint, assigneeDraft[finding.fingerprint] ?? "");
+                            }
+                          }}
+                          className="assignee-input rounded-sm border border-border bg-background px-2 py-1 text-xs text-foreground"
+                        />
+                        <button
+                          type="button"
+                          className="assignee-add-btn rounded-sm border border-border px-2 py-1 text-xs hover:bg-accent"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAssign(finding.fingerprint, assigneeDraft[finding.fingerprint] ?? "");
+                          }}
+                        >
+                          Assign
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               </article>
@@ -429,7 +444,7 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
         )}
       </div>
 
-      {modalFinding ? (
+      {!readOnly && modalFinding ? (
         <DecisionModal
           finding={modalFinding.finding}
           targetDisposition={modalFinding.targetDisposition}
