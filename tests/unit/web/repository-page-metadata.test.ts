@@ -58,12 +58,73 @@ describe("Repository page metadata", () => {
     expect(source).toContain("encodeURIComponent(repository.id)");
   });
 
-  it("does not promise a first readiness run when deployment rollout excludes the repository", () => {
+  it("makes the first-run setup action visible before engineering tables and preserves repository selection", async () => {
+    vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
+      status: "authenticated",
+      session: { login: "acme", installationIds: [12345] },
+    } as viewerAuth.ViewerAuthorizationResult);
+    vi.spyOn(repositoryDashboard, "loadRepositoryDetail").mockResolvedValue({
+      repository: {
+        id: "repo-1",
+        owner: "acme",
+        name: "gateway",
+        private: true,
+        githubInstallationId: 12345,
+        latestRunId: undefined,
+        watchedBoards: 0,
+        openFindings: 0,
+      },
+      runs: [],
+      boards: [],
+      supplyFindings: [],
+    } as unknown as Awaited<ReturnType<typeof repositoryDashboard.loadRepositoryDetail>>);
+
+    const html = renderToStaticMarkup(await RepositoryPage({ params: Promise.resolve({ repositoryId: "repo-1" }) }));
+    const firstRun = html.indexOf("Get the first readiness check for acme/gateway");
+    expect(firstRun).toBeGreaterThan(-1);
+    expect(firstRun).toBeLessThan(html.indexOf("Current state"));
+    expect(firstRun).toBeLessThan(html.indexOf("Recorded boards and BOM history"));
+    expect(html).toContain('href="/setup?repositoryId=repo-1"');
+    expect(html).toContain("Review workflow setup");
+    expect(html).toContain("No readiness runs recorded yet");
+    // Only actual user actions may open a setup PR and later trigger a first run.
+    expect(html).not.toContain("First run queued");
+  });
+
+  it("never labels a repository as first-run when its latest run exists but the recent run list is empty", async () => {
+    vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
+      status: "authenticated",
+      session: { login: "acme", installationIds: [12345] },
+    } as viewerAuth.ViewerAuthorizationResult);
+    vi.spyOn(repositoryDashboard, "loadRepositoryDetail").mockResolvedValue({
+      repository: {
+        id: "repo-1",
+        owner: "acme",
+        name: "gateway",
+        private: true,
+        githubInstallationId: 12345,
+        latestRunId: "run-previously-recorded",
+        latestRunDecision: "unknown",
+        watchedBoards: 0,
+        openFindings: 0,
+      },
+      runs: [],
+      boards: [],
+      supplyFindings: [],
+    } as unknown as Awaited<ReturnType<typeof repositoryDashboard.loadRepositoryDetail>>);
+    const html = renderToStaticMarkup(await RepositoryPage({ params: Promise.resolve({ repositoryId: "repo-1" }) }));
+    expect(html).not.toContain("Get the first readiness check for acme/gateway");
+    expect(html).toContain("No recent runs available");
+    expect(html).not.toContain("No readiness runs recorded yet");
+  });
+
+  it("keeps disabled-rollout reason visible before promising a first readiness run", () => {
     const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
     expect(source).toContain("releaseRepositoryDispatchAvailability");
-    expect(source).toContain("dispatch.enabled ? (");
-    expect(source).toContain('title="Readiness runs are not enabled yet"');
-    expect(source).toContain("<p>{dispatch.reason}</p>");
+    expect(source).toContain("Once rollout is enabled, open a pull request");
+    expect(source).toContain('role="status"');
+    expect(source).toContain("{dispatch.reason}");
+    expect(source).toContain("No readiness runs recorded yet");
   });
 
   it("renders distinct persisted board IDs and exact source evidence without inventing release authorization", async () => {

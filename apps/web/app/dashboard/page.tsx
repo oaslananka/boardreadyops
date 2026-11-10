@@ -338,7 +338,10 @@ const repositoryColumns: readonly DataColumn<RepositoryRow>[] = [
       ) : (
         <span className="text-meta text-muted-foreground">
           no runs yet ·{" "}
-          <Link href="/setup" className="text-primary hover:underline">
+          <Link
+            href={`/setup?repositoryId=${encodeURIComponent(repository.id)}`}
+            className="text-primary hover:underline"
+          >
             setup
           </Link>
         </span>

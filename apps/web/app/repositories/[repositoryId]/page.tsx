@@ -229,7 +229,9 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
   if (!detail) return notFound();
 
   const { repository, runs, boards, supplyFindings } = detail;
+  const hasRecordedRun = Boolean(repository.latestRunId) || runs.length > 0;
   const dispatch = releaseRepositoryDispatchAvailability(`${repository.owner}/${repository.name}`);
+  const setupHref = `/setup?repositoryId=${encodeURIComponent(repository.id)}`;
 
   return (
     <AppShell
@@ -250,6 +252,40 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
           </p>
         </header>
 
+        {!hasRecordedRun ? (
+          <section aria-label="First readiness check" className="space-y-3">
+            <GuidedChecklist
+              heading={`Get the first readiness check for ${repository.owner}/${repository.name}`}
+              steps={[
+                {
+                  id: "connected",
+                  label: "GitHub repository connected",
+                  status: "done",
+                },
+                {
+                  id: "workflow",
+                  label: "Review the workflow setup and any proposed setup pull request",
+                  status: "current",
+                  href: setupHref,
+                  actionLabel: "Review workflow setup",
+                },
+                {
+                  id: "first-pr",
+                  label: dispatch.enabled
+                    ? "Once setup is merged, open a pull request changing your hardware project"
+                    : "Once rollout is enabled, open a pull request changing your hardware project",
+                  status: "upcoming",
+                },
+              ]}
+            />
+            {!dispatch.enabled ? (
+              <p role="status" className="rounded-md border border-warning/40 bg-warning-surface px-4 py-3 text-sm">
+                {dispatch.reason}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
         <Panel title="Current state">
           <DefinitionGrid>
             <Definition label="Visibility">{repository.private ? "Private" : "Public"}</Definition>
@@ -268,7 +304,7 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
             readiness runs; view the recent runs below to inspect release checks.
           </p>
           <Link
-            href={`/setup?repositoryId=${encodeURIComponent(repository.id)}`}
+            href={setupHref}
             className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
           >
             Review setup for this repository →
@@ -322,27 +358,29 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
 
         <Panel title="Recent runs">
           {runs.length === 0 ? (
-            dispatch.enabled ? (
-              <GuidedChecklist
-                heading="Trigger your first run on this repository"
-                steps={[
-                  {
-                    id: "connected",
-                    label: `Repository ${repository.owner}/${repository.name} connected`,
-                    status: "done",
-                  },
-                  {
-                    id: "pr",
-                    label: "Open a pull request touching the hardware project to produce the first run",
-                    status: "current",
-                  },
-                ]}
-              />
-            ) : (
-              <EmptyState title="Readiness runs are not enabled yet">
-                <p>{dispatch.reason}</p>
-              </EmptyState>
-            )
+            <EmptyState title={hasRecordedRun ? "No recent runs available" : "No readiness runs recorded yet"}>
+              {hasRecordedRun ? (
+                <>
+                  <p>
+                    A latest run is recorded, but its detailed history is not in this list. This does not mean
+                    repository setup or the first check must be repeated.
+                  </p>
+                  {repository.latestRunId ? (
+                    <Link
+                      href={`/runs/${encodeURIComponent(repository.latestRunId)}`}
+                      className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-2"
+                    >
+                      Inspect latest recorded run
+                    </Link>
+                  ) : null}
+                </>
+              ) : (
+                <p>
+                  Once the repository workflow is reviewed and a GitHub pull request produces a run, its recorded
+                  findings and status will appear here. No run or readiness verdict is inferred from setup alone.
+                </p>
+              )}
+            </EmptyState>
           ) : (
             <DataTable
               caption="Recent runs for this repository"
