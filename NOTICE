@@ -885,7 +885,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@next/env@16.4.1`
   - Description: Next.js dotenv file loading
   - Homepage: https://github.com/vercel/next.js#readme
-- `@nodable/entities@2.1.0`
+- `@nodable/entities@3.1.0`
   - Description: Entity parser for XML, HTML, External entites with security and NCR control
   - Homepage: https://github.com/nodable/val-parsers#readme
 - `@octokit/auth-app@8.2.0`
@@ -1365,6 +1365,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `ansi-styles@4.3.0`, `ansi-styles@6.2.3`
   - Description: ANSI escape codes for styling strings in the terminal
   - Homepage: https://github.com/chalk/ansi-styles#readme
+- `anynum@1.0.1`
+  - Description: Normalize all Unicode decimal digits (Devanagari, Arabic, Thai, etc.) to ASCII numerals. Zero dependencies, performance-first.
+  - Homepage: https://github.com/NaturalIntelligence/anynum#readme
 - `archiver@7.0.1`
   - Description: a streaming interface for archive generation
   - Homepage: https://github.com/archiverjs/node-archiver
@@ -1673,10 +1676,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `fast-wrap-ansi@0.2.0`
   - Description: A tiny and fast text wrap library which takes ANSI escapes into account.
   - Homepage: https://github.com/43081j/fast-wrap-ansi#readme
-- `fast-xml-builder@1.1.9`
+- `fast-xml-builder@1.3.1`
   - Description: Build XML from JSON without C/C++ based libraries
   - Homepage: https://github.com/NaturalIntelligence/fast-xml-builder#readme
-- `fast-xml-parser@5.7.3`
+- `fast-xml-parser@5.12.0`
   - Description: Validate XML, Parse XML, Build XML without C/C++ based libraries
   - Homepage: https://github.com/NaturalIntelligence/fast-xml-parser#readme
 - `fd-package-json@2.0.0`
@@ -1835,6 +1838,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `is-unicode-supported@2.1.0`
   - Description: Detect whether the terminal supports Unicode
   - Homepage: https://github.com/sindresorhus/is-unicode-supported#readme
+- `is-unsafe@2.0.3`
+  - Description: Zero-dependency, DOM-free, pure predicate for detecting unsafe strings across HTML, XML, SVG, SQL, SHELL, and REGEX contexts
+  - Homepage: https://github.com/NaturalIntelligence/is-unsafe#readme
 - `is-wsl@2.2.0`
   - Description: Check if the process is running inside Windows Subsystem for Linux (Bash on Windows)
   - Homepage: https://github.com/sindresorhus/is-wsl#readme
@@ -2055,7 +2061,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `path-exists@4.0.0`
   - Description: Check if a path exists
   - Homepage: https://github.com/sindresorhus/path-exists#readme
-- `path-expression-matcher@1.5.0`
+- `path-expression-matcher@1.6.2`
   - Description: Efficient path tracking and pattern matching for XML/JSON parsers
   - Homepage: https://github.com/NaturalIntelligence/path-expression-matcher#readme
 - `path-key@3.1.1`, `path-key@4.0.0`
@@ -2299,7 +2305,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `stripe@22.6.0`
   - Description: Stripe API wrapper
   - Homepage: https://github.com/stripe/stripe-node
-- `strnum@2.2.3`
+- `strnum@2.5.1`
   - Description: Parse String to Number based on configuration
   - Homepage: https://github.com/NaturalIntelligence/strnum#readme
 - `stubborn-fs@2.0.0`
@@ -2465,6 +2471,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `xdg-basedir@5.1.0`
   - Description: Get XDG Base Directory paths
   - Homepage: https://github.com/sindresorhus/xdg-basedir#readme
+- `xml-naming@0.3.0`
+  - Description: Validates XML name productions — Name, NCName, QName, NMToken, NMTokens — for XML 1.0 and 1.1
+  - Homepage: https://github.com/NaturalIntelligence/xml-naming#readme
 - `xtend@4.0.2`
   - Description: extend like a boss
   - Homepage: https://github.com/Raynos/xtend
