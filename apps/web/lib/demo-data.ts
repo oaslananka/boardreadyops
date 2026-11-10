@@ -83,6 +83,8 @@ export interface DemoReview {
   id: string;
   repositoryId: string;
   repositoryName: string;
+  /** Presentation hint from the server's real installation/session check; API mutations reauthorize independently. */
+  viewerCanEdit?: boolean | undefined;
   pullRequestNumber: number;
   title: string;
   status: ReviewStatus;

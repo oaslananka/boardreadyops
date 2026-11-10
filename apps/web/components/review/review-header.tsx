@@ -22,6 +22,7 @@ export interface ReviewHeaderProps {
   evidenceState: string;
   onApprove?: () => void;
   onRequestChanges?: () => void;
+  readOnly?: boolean | undefined;
 }
 
 function getDecisionMeta(decision: ReviewDecision): { label: string; tone: "passed" | "failed" | "warning" } {
@@ -46,6 +47,7 @@ export function ReviewHeader({
   evidenceState,
   onApprove,
   onRequestChanges,
+  readOnly = false,
 }: Readonly<ReviewHeaderProps>) {
   const { label: decisionLabel, tone: decisionTone } = getDecisionMeta(decision);
   const isApproved = decision === "approved";
@@ -125,14 +127,16 @@ export function ReviewHeader({
                 </Link>
               </nav>
             ) : null}
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant={isApproved ? "secondary" : "default"} onClick={() => onApprove?.()}>
-                {isApproved ? "✓ Approved" : "Approve review"}
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => onRequestChanges?.()}>
-                Request changes
-              </Button>
-            </div>
+            {!readOnly ? (
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant={isApproved ? "secondary" : "default"} onClick={() => onApprove?.()}>
+                  {isApproved ? "✓ Approved" : "Approve review"}
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => onRequestChanges?.()}>
+                  Request changes
+                </Button>
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <code>
                 {/^0+$/u.test(baseCommitSha) ? "No base" : baseCommitSha.slice(0, 7)} → {headCommitSha.slice(0, 7)}
@@ -159,14 +163,16 @@ export function ReviewHeader({
             </Link>
           </nav>
         ) : null}
-        <div className="flex max-w-full flex-wrap items-center gap-2">
-          <Button size="sm" variant={isApproved ? "secondary" : "default"} onClick={() => onApprove?.()}>
-            {isApproved ? "✓ Approved" : "Approve review"}
-          </Button>
-          <Button size="sm" variant="destructive" onClick={() => onRequestChanges?.()}>
-            Request changes
-          </Button>
-        </div>
+        {!readOnly ? (
+          <div className="flex max-w-full flex-wrap items-center gap-2">
+            <Button size="sm" variant={isApproved ? "secondary" : "default"} onClick={() => onApprove?.()}>
+              {isApproved ? "✓ Approved" : "Approve review"}
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => onRequestChanges?.()}>
+              Request changes
+            </Button>
+          </div>
+        ) : null}
 
         <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
           <code>{/^0+$/u.test(baseCommitSha) ? "No base" : baseCommitSha.slice(0, 7)}</code>

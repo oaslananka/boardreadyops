@@ -10,11 +10,13 @@ export function DiscussionTab({
   viewerLogin,
   onAddComment,
   onToggleStatus,
+  readOnly = false,
 }: Readonly<{
   comments: DemoComment[];
   viewerLogin?: string | undefined;
   onAddComment?: (content: string) => void;
   onToggleStatus?: (commentId: string, nextStatus: "open" | "resolved") => void;
+  readOnly?: boolean | undefined;
 }>) {
   const [newContent, setNewContent] = useState("");
   const commentFieldId = useId();
@@ -34,7 +36,7 @@ export function DiscussionTab({
             it is kept as a stable selector hook for tests/unit/web/keyboard-triage.test.ts. */}
         <div className="engineering-thread flex flex-col gap-3">
           {comments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No comments posted yet. Start the conversation below.</p>
+            <p className="text-sm text-muted-foreground">No comments posted yet.</p>
           ) : (
             comments.map((cmt) => (
               <div
@@ -56,16 +58,18 @@ export function DiscussionTab({
                   {/* `button-small` carries no styling any more -- kept as a stable selector hook
                       for tests/unit/web/discussion-tab.test.ts and
                       tests/e2e/regression-audit-findings.spec.ts. */}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={cmt.status === "resolved" ? "secondary" : "ghost"}
-                    className="button-small"
-                    onClick={() => onToggleStatus?.(cmt.id, cmt.status === "resolved" ? "open" : "resolved")}
-                    disabled={cmt.status === "outdated"}
-                  >
-                    {cmt.status === "resolved" ? "✓ Resolved" : "Mark Resolved"}
-                  </Button>
+                  {!readOnly ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={cmt.status === "resolved" ? "secondary" : "ghost"}
+                      className="button-small"
+                      onClick={() => onToggleStatus?.(cmt.id, cmt.status === "resolved" ? "open" : "resolved")}
+                      disabled={cmt.status === "outdated"}
+                    >
+                      {cmt.status === "resolved" ? "✓ Resolved" : "Mark Resolved"}
+                    </Button>
+                  ) : null}
                 </header>
 
                 <div className="mt-2 text-sm text-foreground">
@@ -83,25 +87,27 @@ export function DiscussionTab({
           )}
         </div>
 
-        <form onSubmit={handlePost} className="mt-4 rounded-md border border-border bg-card p-3">
-          <h4 className="text-sm font-bold text-foreground">Add to Discussion</h4>
-          <label htmlFor={commentFieldId} className="sr-only">
-            Comment
-          </label>
-          <textarea
-            id={commentFieldId}
-            rows={3}
-            value={newContent}
-            onChange={(e) => setNewContent(e.currentTarget.value)}
-            placeholder="Leave an engineering review note or question..."
-            className="mt-2 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            required
-          />
-          <footer className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Commenting as {viewerLogin ?? "you"}</span>
-            <Button type="submit">Post Comment</Button>
-          </footer>
-        </form>
+        {!readOnly ? (
+          <form onSubmit={handlePost} className="mt-4 rounded-md border border-border bg-card p-3">
+            <h4 className="text-sm font-bold text-foreground">Add to Discussion</h4>
+            <label htmlFor={commentFieldId} className="sr-only">
+              Comment
+            </label>
+            <textarea
+              id={commentFieldId}
+              rows={3}
+              value={newContent}
+              onChange={(e) => setNewContent(e.currentTarget.value)}
+              placeholder="Leave an engineering review note or question..."
+              className="mt-2 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              required
+            />
+            <footer className="mt-2 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Commenting as {viewerLogin ?? "you"}</span>
+              <Button type="submit">Post Comment</Button>
+            </footer>
+          </form>
+        ) : null}
       </Panel>
     </div>
   );
