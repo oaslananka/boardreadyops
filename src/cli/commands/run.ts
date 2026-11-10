@@ -180,9 +180,14 @@ export async function runCommand(
         const cliResult = withCliStatus(result, resultExitCode);
 
         if (spinner) {
-          spinner.stop(
-            resultExitCode === 0 ? "✨ \x1b[32mPreflight Passed!\x1b[0m" : "❌ \x1b[31mPreflight Failed!\x1b[0m",
-          );
+          const count = result.findings.length;
+          const message =
+            resultExitCode !== 0
+              ? "❌ \x1b[31mPreflight Failed!\x1b[0m"
+              : count > 0
+                ? `⚠️ \x1b[33mScan complete: ${count} ${count === 1 ? "finding requires" : "findings require"} review (non-blocking).\x1b[0m`
+                : "✨ \x1b[32mPreflight Passed!\x1b[0m";
+          spinner.stop(message);
         }
 
         await writeReports(cliResult, root, outputOptions(options), loaded, streams.stdout, locale);

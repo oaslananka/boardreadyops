@@ -58,7 +58,7 @@ boardreadyops doctor
 ## 4. Four Core Onboarding Paths
 
 ### Path A: Local First Check
-Run a non-blocking scan on your KiCad project directory to discover findings without failing your shell:
+Run a non-blocking scan on your KiCad project directory to discover findings without failing your shell. An exit code of 0 in this mode means the scan completed, **not** that the design passed release-readiness checks; review any reported findings before fabrication.
 
 ```bash
 cd /path/to/kicad/project
