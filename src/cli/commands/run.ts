@@ -134,6 +134,13 @@ async function prepareRun(
   return { loaded, exitCode: 3 };
 }
 
+function preflightStatusMessage(exitCode: number, findingCount: number): string {
+  if (exitCode !== 0) return "❌ \x1b[31mPreflight Failed!\x1b[0m";
+  if (findingCount === 0) return "✨ \x1b[32mPreflight Passed!\x1b[0m";
+  const findings = findingCount === 1 ? "finding requires" : "findings require";
+  return `⚠️ \x1b[33mScan complete: ${findingCount} ${findings} review (non-blocking).\x1b[0m`;
+}
+
 export async function runCommand(
   pathInput: string | undefined,
   options: CommonCliOptions,
@@ -180,14 +187,7 @@ export async function runCommand(
         const cliResult = withCliStatus(result, resultExitCode);
 
         if (spinner) {
-          const count = result.findings.length;
-          const message =
-            resultExitCode !== 0
-              ? "❌ \x1b[31mPreflight Failed!\x1b[0m"
-              : count > 0
-                ? `⚠️ \x1b[33mScan complete: ${count} ${count === 1 ? "finding requires" : "findings require"} review (non-blocking).\x1b[0m`
-                : "✨ \x1b[32mPreflight Passed!\x1b[0m";
-          spinner.stop(message);
+          spinner.stop(preflightStatusMessage(resultExitCode, result.findings.length));
         }
 
         await writeReports(cliResult, root, outputOptions(options), loaded, streams.stdout, locale);
