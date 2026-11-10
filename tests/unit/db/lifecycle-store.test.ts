@@ -127,6 +127,7 @@ describe("SQL GitHub App metadata store", () => {
       null,
       null,
       "{}",
+      null,
     ]);
   });
 
@@ -352,6 +353,7 @@ describe("SQL GitHub lifecycle audit writes", () => {
       "installation",
       "delivery-created",
       JSON.stringify({ action: "created", githubInstallationId: 12345 }),
+      null,
     ]);
   });
 
@@ -538,6 +540,7 @@ describe("SQL GitHub lifecycle audit writes", () => {
       null,
       null,
       "{}",
+      null,
     ]);
   });
 

@@ -1,0 +1,143 @@
+import { readFile } from "node:fs/promises";
+import { describe, expect, it, vi } from "vitest";
+import {
+  assessHistoricalUserSchemaCoverage,
+  historicalUserUnresolvedSourceReviewTracks,
+} from "../../../packages/db/src/data-export-historical-schema-coverage.js";
+
+const column = (
+  table_name: string,
+  column_name = "tenant_id",
+  data_type = "text",
+  is_nullable: "YES" | "NO" = "NO",
+) => ({ table_name, column_name, data_type, is_nullable });
+
+function adapter(rows: unknown, mutationEpochTriggers: unknown[] = [], mutationEpochFunctions: unknown[] = []) {
+  const query = vi.fn(async (sql: string) => {
+    if (sql.includes("pg_catalog.pg_trigger")) return { rows: mutationEpochTriggers };
+    if (sql.includes("pg_catalog.pg_proc")) return { rows: mutationEpochFunctions };
+    return { rows };
+  });
+  const withTransaction = vi.fn(async (fn: (tx: { query: typeof query }) => Promise<unknown>) => fn({ query }));
+  return { query, withTransaction, db: { withTransaction } as never };
+}
+
+describe("original numeric USER source schema coverage must never grant customer export", () => {
+  it("accounts for every unresolved source table in EXACTLY one five-track review queue, with no implicit grant", async () => {
+    const text = await readFile("docs/security/historical-user-source-class-review.md", "utf8");
+    const rows = [...text.matchAll(/^\| `([a-z_]+)` \| Not verified \| DENY \|$/gmu)].map((match) => match[1]);
+    const tracks = Object.entries(historicalUserUnresolvedSourceReviewTracks);
+    const names = tracks.flatMap(([, tables]) => tables);
+    expect(tracks).toHaveLength(5);
+    expect(names).toHaveLength(63);
+    expect(new Set(names).size).toBe(63);
+    expect(new Set(rows).size).toBe(63);
+    expect(rows.sort()).toEqual([...names].sort());
+    for (const [track, tables] of tracks) {
+      expect(text).toContain(`| \`${track}\` | ${tables.length} |`);
+      expect(tables.length).toBeGreaterThan(0);
+    }
+    expect(text).toContain("completeCustomerExport=false");
+    expect(text).toContain("customerDeliveryAllowed=false");
+    expect(text).toContain("original GitHub USER");
+  });
+
+  it("rejects missing database access without a catalog read", async () => {
+    expect(await assessHistoricalUserSchemaCoverage(null as never)).toMatchObject({
+      status: "unavailable",
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      releaseDecision: "NO_GO",
+    });
+  });
+
+  it("fails closed when any original-user mutation-epoch trigger or function is absent", async () => {
+    const fake = adapter([column("repositories"), column("release_runs")]);
+    const result = await assessHistoricalUserSchemaCoverage(fake.db);
+    expect(result).toMatchObject({
+      status: "schema_drift",
+      mutationEpochTriggerCount: 0,
+      mutationEpochFunctionCount: 0,
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      releaseDecision: "NO_GO",
+    });
+    expect(result.mutationEpochSha256).toMatch(/^[0-9a-f]{64}$/u);
+    const queries = fake.query.mock.calls.map(([sql]) => sql);
+    expect(queries.some((sql) => sql.includes("pg_catalog.pg_trigger"))).toBe(true);
+    expect(queries.some((sql) => sql.includes("pg_get_triggerdef"))).toBe(true);
+    expect(queries.some((sql) => sql.includes("pg_get_functiondef"))).toBe(true);
+  });
+
+  it("reports a newly added source table as schema drift, not customer completeness", async () => {
+    const fake = adapter([column("repositories"), column("unclassified_tenant_credentials")]);
+    const result = await assessHistoricalUserSchemaCoverage(fake.db);
+    expect(result).toMatchObject({
+      status: "schema_drift",
+      tableCount: 2,
+      columnCount: 2,
+      unrecognizedTableCount: 1,
+      completeCustomerExport: false,
+      customerDeliveryAllowed: false,
+      releaseDecision: "NO_GO",
+    });
+    expect(fake.withTransaction).toHaveBeenCalledWith(expect.any(Function), {
+      consistentRead: true,
+      statementTimeoutMs: 5000,
+    });
+    const sql = fake.query.mock.calls[0]?.[0] ?? "";
+    expect(sql).toContain("information_schema.columns");
+    expect(sql).toContain("table_type='BASE TABLE'");
+    expect(sql).toContain("ORDER BY c.table_name,c.ordinal_position");
+    expect(sql).toContain("LIMIT 1201");
+    expect(sql).not.toContain("SELECT *");
+  });
+
+  it("treats known source classes as only private partial metadata or withheld, not delivery rights", async () => {
+    const fake = adapter([column("repositories"), column("findings"), column("api_tokens"), column("data_exports")]);
+    const result = await assessHistoricalUserSchemaCoverage(fake.db);
+    expect(result).toMatchObject({
+      status: "schema_drift",
+      tableCount: 4,
+      partialPrivateMetadataTableCount: 2,
+      withheldSensitiveTableCount: 1,
+      otherTablesRequiringScopeReview: 1,
+      unrecognizedTableCount: 0,
+      customerDeliveryAllowed: false,
+    });
+  });
+
+  it.each([
+    ["missing rows", null],
+    ["empty catalog", []],
+    ["fake object", { length: 1 }],
+    ["ambiguous NULL", [null]],
+    ["unknown type", [column("repositories", "tenant_id", "")]],
+    ["untrusted identifier", [column("select * from secrets")]],
+    ["duplicate column identity", [column("repositories"), column("repositories")]],
+    ["unbounded catalog", Array.from({ length: 1201 }, (_, i) => column("table", `col_${i}`))],
+  ])("fails closed on %s", async (_, rows) => {
+    const fake = adapter(rows);
+    const result = await assessHistoricalUserSchemaCoverage(fake.db);
+    expect(result).toMatchObject({
+      status: "unavailable",
+      releaseDecision: "NO_GO",
+      customerDeliveryAllowed: false,
+      completeCustomerExport: false,
+    });
+  });
+
+  it("returns only NO_GO when catalog query throws or the transaction is unavailable", async () => {
+    const fake = adapter([]);
+    fake.query.mockRejectedValueOnce(new Error("catalog permission denied"));
+    expect(await assessHistoricalUserSchemaCoverage(fake.db)).toMatchObject({
+      status: "unavailable",
+      customerDeliveryAllowed: false,
+    });
+    const fail = { withTransaction: vi.fn().mockRejectedValue(new Error("database temporarily offline")) };
+    expect(await assessHistoricalUserSchemaCoverage(fail as never)).toMatchObject({
+      status: "unavailable",
+      releaseDecision: "NO_GO",
+    });
+  });
+});

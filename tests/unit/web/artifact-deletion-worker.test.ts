@@ -127,6 +127,20 @@ describe("artifact deletion worker", () => {
     });
   });
 
+  it("never unlinks an owner-private export through artifact deletion paths", async () => {
+    const root = await storageRoot();
+    const privateRoot = path.join(root, ".private-export-archives");
+    await mkdir(privateRoot, { mode: 0o700 });
+    const protectedZip = path.join(privateRoot, "sealed.zip");
+    await writeFile(protectedZip, "private export bytes");
+    await expect(deleteLocalArtifactObject(root, ".private-export-archives/sealed.zip")).rejects.toMatchObject({
+      name: "ArtifactObjectDeletionError",
+      retryable: false,
+      beforeUnlink: true,
+    });
+    expect(await readFile(protectedZip, "utf8")).toBe("private export bytes");
+  });
+
   it("classifies an unavailable storage root as retryable", async () => {
     const root = path.join(tmpdir(), "boardreadyops-missing-artifact-root");
     const localFilesystem = filesystem({

@@ -1,0 +1,357 @@
+import { createHash, randomUUID } from "node:crypto";
+import { isHistoricalUserUuid } from "./data-export-historical-uuid.js";
+import type { SqlQueryExecutor } from "./lifecycle-store.js";
+import type { PgQueryExecutor } from "./pg-executor.js";
+
+/** A 32-byte base64url nonce is exactly 43 ASCII chars; scan in linear time. */
+function validOAuthState(value: unknown): value is string {
+  if (typeof value !== "string" || value.length !== 43) return false;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.codePointAt(index) ?? -1;
+    if (
+      !(
+        (code >= 65 && code <= 90) ||
+        (code >= 97 && code <= 122) ||
+        (code >= 48 && code <= 57) ||
+        code === 45 ||
+        code === 95
+      )
+    )
+      return false;
+  }
+  return true;
+}
+const domain = "boardreadyops-original-user-oauth-state-v1";
+// Conservative, per-export quota; consumed/failed OAuth steps still count,
+// avoiding unbounded append-only audit growth from retries or repeated aborts.
+// The tenant advisory lock serializes each quota read plus INSERT.
+const maximumChallengesPerFiveMinutes = 24;
+const maximumChallengesPerExport = 128;
+
+type OriginalUserNonce = {
+  exportId: string;
+  verifiedGitHubUserId: number;
+  state: string;
+};
+
+function valid(input: unknown): input is OriginalUserNonce {
+  if (input === null || typeof input !== "object") return false;
+  const candidate = input as Record<string, unknown>;
+  return (
+    typeof candidate.exportId === "string" &&
+    isHistoricalUserUuid(candidate.exportId) &&
+    typeof candidate.verifiedGitHubUserId === "number" &&
+    Number.isSafeInteger(candidate.verifiedGitHubUserId) &&
+    candidate.verifiedGitHubUserId > 0 &&
+    validOAuthState(candidate.state)
+  );
+}
+
+function hasTransaction(db: unknown): db is NonceDb {
+  return db !== null && typeof db === "object" && "withTransaction" in db && typeof db.withTransaction === "function";
+}
+
+function digest(state: string): string {
+  return createHash("sha256").update(domain).update("\0").update(state).digest("hex");
+}
+
+function rows(result: unknown): readonly Record<string, unknown>[] {
+  if (result === null || typeof result !== "object" || !("rows" in result)) return [];
+  const values = result.rows;
+  if (
+    !Array.isArray(values) ||
+    !values.every((row: unknown) => row !== null && typeof row === "object" && !Array.isArray(row))
+  )
+    return [];
+  return values as Record<string, unknown>[];
+}
+
+function acknowledgedNonceDigest(result: unknown, expectedDigest: string): boolean {
+  const entries = rows(result);
+  // A malformed DB/adapter result cannot acknowledge a state change. The
+  // returned SHA-256 must refer to this exact original-user OAuth challenge.
+  return entries.length === 1 && entries[0]?.state_sha256 === expectedDigest;
+}
+
+type NonceDb = Pick<PgQueryExecutor, "withTransaction">;
+
+/**
+ * Align OAuth challenge lifecycle with the existing historical USER
+ * preflight's LOCK TABLE -> original-user row lock -> tenant advisory
+ * lock order. A legal-hold write cannot pass the gate mid-transaction,
+ * and real erasure writers share the advisory xact key (migration 0117).
+ * TRY-lock denies immediately if an erasure writer owns the tenant key.
+ * These locks are NEVER held during GitHub HTTP, redirect
+ * or callback response. Contention fails CLOSED; no customer capability.
+ */
+async function withOriginalUserNonceAdmission(
+  db: NonceDb,
+  input: OriginalUserNonce,
+  apply: (tx: SqlQueryExecutor) => Promise<boolean>,
+): Promise<boolean> {
+  if (!hasTransaction(db) || !valid(input)) return false;
+  try {
+    return await db.withTransaction(
+      async (tx) => {
+        await tx.query("LOCK TABLE public.legal_holds IN SHARE MODE NOWAIT");
+        const owner = rows(
+          await tx.query(
+            `SELECT e.tenant_id
+          FROM public.data_exports e
+          JOIN public.installations i
+            ON i.account_user_id=e.original_github_user_id
+           AND lower(i.account_login)=lower(e.tenant_id)
+           AND lower(i.account_type)='user' AND i.suspended_at IS NOT NULL
+         WHERE e.id=$1 AND e.original_github_user_id=$2::bigint
+           AND e.scope='user' AND e.installation_id IS NULL
+           AND e.requested_by='github_app_uninstall'
+           AND e.status='pending' AND lower(e.scope_id)=lower(e.tenant_id)
+           AND (e.expires_at IS NULL OR e.expires_at>clock_timestamp())
+         FOR SHARE OF e,i NOWAIT`,
+            [input.exportId, input.verifiedGitHubUserId],
+          ),
+        );
+        if (owner.length !== 1) return false;
+        const tenant = owner[0]?.tenant_id;
+        if (typeof tenant !== "string" || tenant.length === 0) return false;
+        const tenantLock = rows(
+          await tx.query(
+            "SELECT pg_try_advisory_xact_lock(boardreadyops_historical_transfer_tenant_lock_key($1)) AS acquired",
+            [tenant],
+          ),
+        );
+        if (tenantLock.length !== 1 || tenantLock[0]?.acquired !== true) return false;
+        const blockers = rows(
+          await tx.query(
+            `SELECT EXISTS(
+          SELECT 1 FROM public.legal_holds h
+           WHERE lower(h.tenant_id)=lower($1) AND h.active=TRUE
+        ) AS active_hold,
+        EXISTS(
+          SELECT 1 FROM public.erasure_requests er
+           WHERE lower(er.tenant_id)=lower($1)
+             AND er.dry_run=FALSE AND er.status IN ('running','completed')
+        ) AS active_erasure`,
+            [tenant],
+          ),
+        );
+        if (blockers.length !== 1 || blockers[0]?.active_hold !== false || blockers[0]?.active_erasure !== false)
+          return false;
+        return await apply(tx);
+      },
+      { statementTimeoutMs: 5000 },
+    );
+  } catch {
+    // Lock contention, timeout, missing schema or another transaction
+    // failure may not permit a nonce to be minted or consumed.
+    return false;
+  }
+}
+
+/** Stores only a fresh random nonce digest. Exact original USER, suspended
+ * installation and pending unexpired export must exist; holds and real
+ * erasure block issuance. The existing tenant transaction key serializes
+ * an append-only rolling and lifetime challenge quota across workers.
+ * No old or consumed audit records are deleted. This is NOT a customer
+ * export capability. */
+export async function registerHistoricalUserOAuthChallenge(db: NonceDb, input: OriginalUserNonce): Promise<boolean> {
+  return withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const stateDigest = digest(input.state);
+    const result = await tx.query(
+      `INSERT INTO public.historical_user_oauth_challenges(
+       state_sha256,export_id,original_github_user_id,created_at,expires_at
+     )
+     SELECT $3,e.id,e.original_github_user_id,
+            statement_timestamp(),statement_timestamp()+INTERVAL '5 minutes'
+       FROM public.data_exports e
+      WHERE e.id=$1 AND e.original_github_user_id=$2::bigint
+        AND e.scope='user' AND e.installation_id IS NULL
+        AND e.requested_by='github_app_uninstall' AND e.status='pending'
+        AND lower(e.scope_id)=lower(e.tenant_id)
+        AND (e.expires_at IS NULL OR e.expires_at>clock_timestamp())
+        AND EXISTS (
+          SELECT 1 FROM public.installations i
+           WHERE i.account_user_id=e.original_github_user_id
+             AND lower(i.account_login)=lower(e.tenant_id)
+             AND lower(i.account_type)='user' AND i.suspended_at IS NOT NULL
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM public.legal_holds h
+           WHERE lower(h.tenant_id)=lower(e.tenant_id) AND h.active=TRUE
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM public.erasure_requests er
+           WHERE lower(er.tenant_id)=lower(e.tenant_id)
+             AND er.dry_run=FALSE AND er.status IN ('running','completed')
+        )
+        AND (
+          SELECT COUNT(*) FROM public.historical_user_oauth_challenges recent
+           WHERE recent.export_id=e.id
+             AND recent.created_at > clock_timestamp()-INTERVAL '5 minutes'
+        ) < $4::integer
+        AND (
+          SELECT COUNT(*) FROM public.historical_user_oauth_challenges prior
+           WHERE prior.export_id=e.id
+        ) < $5::integer
+     ON CONFLICT(state_sha256) DO NOTHING
+     RETURNING state_sha256`,
+      [
+        input.exportId,
+        input.verifiedGitHubUserId,
+        stateDigest,
+        maximumChallengesPerFiveMinutes,
+        maximumChallengesPerExport,
+      ],
+    );
+    return acknowledgedNonceDigest(result, stateDigest);
+  });
+}
+
+/** Atomic compare-and-swap BEFORE GitHub code exchange. PostgreSQL row
+ * locks guarantee one winning callback under concurrency; a failed
+ * provider call cannot restore a consumed challenge. */
+export async function consumeHistoricalUserOAuthChallenge(db: NonceDb, input: OriginalUserNonce): Promise<boolean> {
+  return withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const stateDigest = digest(input.state);
+    const result = await tx.query(
+      `UPDATE public.historical_user_oauth_challenges challenge
+        SET consumed_at=clock_timestamp()
+       FROM public.data_exports e
+      WHERE challenge.state_sha256=$3
+        AND challenge.export_id=$1 AND challenge.original_github_user_id=$2::bigint
+        AND challenge.consumed_at IS NULL AND challenge.expires_at>clock_timestamp()
+        AND e.id=challenge.export_id
+        AND e.original_github_user_id=challenge.original_github_user_id
+        AND e.scope='user' AND e.installation_id IS NULL
+        AND e.requested_by='github_app_uninstall' AND e.status='pending'
+        AND lower(e.scope_id)=lower(e.tenant_id)
+        AND (e.expires_at IS NULL OR e.expires_at>clock_timestamp())
+        AND EXISTS (
+          SELECT 1 FROM public.installations i
+           WHERE i.account_user_id=e.original_github_user_id
+             AND lower(i.account_login)=lower(e.tenant_id)
+             AND lower(i.account_type)='user' AND i.suspended_at IS NOT NULL
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM public.legal_holds h
+           WHERE lower(h.tenant_id)=lower(e.tenant_id) AND h.active=TRUE
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM public.erasure_requests er
+           WHERE lower(er.tenant_id)=lower(e.tenant_id)
+             AND er.dry_run=FALSE AND er.status IN ('running','completed')
+        )
+     RETURNING challenge.state_sha256`,
+      [input.exportId, input.verifiedGitHubUserId, stateDigest],
+    );
+    return acknowledgedNonceDigest(result, stateDigest);
+  });
+}
+
+/**
+ * SOURCE-ONLY durable evidence that an already CONSUMED one-use nonce was
+ * followed by a successful fresh HTTPS GitHub /user numeric ID match.
+ * The trusted callback must call this ONLY AFTER verifying GitHub /user and
+ * rechecking the original export. No customer grant or bearer ID is returned.
+ * Explicit original USER, legal-hold and tenant advisory locks are reused.
+ */
+export async function confirmHistoricalUserLiveOAuthProof(db: NonceDb, input: OriginalUserNonce): Promise<boolean> {
+  return withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const id = randomUUID();
+    const stateDigest = digest(input.state);
+    const result = await tx.query(
+      `INSERT INTO public.historical_user_live_oauth_verified_proofs (
+         id,state_sha256,export_id,original_github_user_id,verified_at,expires_at
+       )
+       SELECT $4::uuid,c.state_sha256,e.id,e.original_github_user_id,
+              verified.tick, verified.tick + INTERVAL '5 minutes'
+         FROM public.historical_user_oauth_challenges c
+         JOIN public.data_exports e ON e.id=c.export_id
+         CROSS JOIN LATERAL (SELECT clock_timestamp() AS tick) AS verified
+        WHERE c.state_sha256=$3
+          AND c.export_id=$1 AND c.original_github_user_id=$2::bigint
+          AND c.consumed_at IS NOT NULL
+          AND c.consumed_at >= c.created_at
+          AND c.consumed_at <= verified.tick
+          AND c.consumed_at > verified.tick - INTERVAL '5 minutes'
+          AND c.expires_at>verified.tick
+          AND e.original_github_user_id=c.original_github_user_id
+          AND e.status='pending' AND e.scope='user'
+          AND e.installation_id IS NULL AND e.requested_by='github_app_uninstall'
+          AND lower(e.scope_id)=lower(e.tenant_id)
+          AND (e.expires_at IS NULL OR e.expires_at>verified.tick)
+       ON CONFLICT DO NOTHING
+       RETURNING id::text AS id`,
+      [input.exportId, input.verifiedGitHubUserId, stateDigest, id],
+    );
+    const acknowledged = rows(result);
+    if (acknowledged.length === 0) return false;
+    // A forged/ambiguous INSERT acknowledgement MUST roll back this
+    // transaction instead of silently committing an unverifiable proof.
+    if (acknowledged.length !== 1 || acknowledged[0]?.id !== id) {
+      throw new Error("Historical live OAuth proof acknowledgement mismatch");
+    }
+    return true;
+  });
+}
+
+/**
+ * Non-customer diagnostic only: a fresh OAuth proof is NOT a source right or
+ * an independent delivery entitlement. Read under the original USER/hold/
+ * erasure admission locks so a hold or revocation denies consistently.
+ */
+export async function inspectHistoricalUserLiveOAuthProof(
+  db: NonceDb,
+  input: OriginalUserNonce,
+): Promise<"current" | "stale"> {
+  let current = false;
+  const allowed = await withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const result = await tx.query(
+      `SELECT p.state_sha256
+         FROM public.historical_user_live_oauth_verified_proofs p
+         JOIN public.historical_user_oauth_challenges c ON c.state_sha256=p.state_sha256
+        WHERE p.state_sha256=$3 AND p.export_id=$1
+          AND p.original_github_user_id=$2::bigint
+          AND c.export_id=p.export_id AND c.original_github_user_id=p.original_github_user_id
+          AND c.consumed_at IS NOT NULL AND c.consumed_at<=p.verified_at
+          AND p.verified_at<=clock_timestamp()
+          AND p.expires_at>clock_timestamp()
+          AND p.revoked_at IS NULL
+          AND p.complete_customer_export=FALSE
+          AND p.customer_delivery_allowed=FALSE
+          AND p.purpose='private-original-user-live-oauth-proof'
+        FOR SHARE OF p,c NOWAIT`,
+      [input.exportId, input.verifiedGitHubUserId, digest(input.state)],
+    );
+    current = acknowledgedNonceDigest(result, digest(input.state));
+    return current;
+  });
+  return allowed && current ? "current" : "stale";
+}
+
+/**
+ * Irreversible explicit revocation of ONE original-user OAuth observation.
+ * This never unblocks a private reader or permits customer ZIP delivery.
+ */
+export async function revokeHistoricalUserLiveOAuthProof(db: NonceDb, input: OriginalUserNonce): Promise<boolean> {
+  return withOriginalUserNonceAdmission(db, input, async (tx) => {
+    const stateDigest = digest(input.state);
+    const result = await tx.query(
+      `UPDATE public.historical_user_live_oauth_verified_proofs p
+          SET revoked_at=clock_timestamp()
+        WHERE p.state_sha256=$3
+          AND p.export_id=$1 AND p.original_github_user_id=$2::bigint
+          AND p.revoked_at IS NULL
+          AND p.customer_delivery_allowed=FALSE
+        RETURNING p.state_sha256`,
+      [input.exportId, input.verifiedGitHubUserId, stateDigest],
+    );
+    const acknowledgement = rows(result);
+    if (acknowledgement.length === 0) return false;
+    if (!acknowledgedNonceDigest(result, stateDigest)) {
+      // Reject contradictory SQL acknowledgements before commit.
+      throw new Error("Historical live OAuth proof revocation acknowledgement mismatch");
+    }
+    return true;
+  });
+}

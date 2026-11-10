@@ -1,3 +1,4 @@
+import { DataExportArchiveCommitmentStore } from "../../../packages/db/src/data-export-archive-commitment-store.js";
 import { prepareClaimedConsistentMetadataSlices } from "../../../packages/db/src/data-export-consistent-snapshot.js";
 import { DataExportInventoryStore } from "../../../packages/db/src/data-export-inventory.js";
 import { prepareClaimedExportManifest } from "../../../packages/db/src/data-export-manifest.js";
@@ -8,7 +9,9 @@ import {
 import type { ExportRecordClaim } from "../../../packages/db/src/data-export-record-snapshot.js";
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
 import { ExportArchivePreflightError, type VerifiedArchiveObject } from "./data-export-archive-entries.js";
+import { verifyClaimedExportArchiveIntegrity } from "./data-export-archive-integrity.js";
 import { prepareClaimedArchiveZip } from "./data-export-archive-zip.js";
+import { readSealedLocalExportArchive, sealLocalExportArchive } from "./data-export-local-archive-storage.js";
 import { readClaimedVerifiedLocalExportObject } from "./data-export-verified-object.js";
 
 const maxArchiveSourceBytes = 64 * 1024 * 1024;
@@ -136,4 +139,173 @@ export async function prepareClaimedLocalArchiveZip(input: {
   const afterPackaging = await prepareClaimedExportManifest(new DataExportInventoryStore(input.db), input.claim);
   if (afterPackaging?.sha256 !== slices.repositories.sha256) return null;
   return archive;
+}
+
+/**
+ * INTERNAL prepare-and-stage path. Unlike a raw DB digest assertion, the
+ * commitment is made ONLY after the scoped ZIP was generated, independently
+ * verified against its full-byte digest, and its original claim survived all
+ * post-packaging checks. The one-way DB reservation does NOT persist ZIP bytes,
+ * mark a customer export completed, authorize publication or create a link.
+ */
+export async function stageClaimedLocalArchiveCommitment(
+  input: Parameters<typeof prepareClaimedLocalArchiveZip>[0],
+): Promise<{
+  archive: NonNullable<Awaited<ReturnType<typeof prepareClaimedLocalArchiveZip>>>;
+  expiresAt: string;
+} | null> {
+  const archive = await prepareClaimedLocalArchiveZip(input);
+  if (!archive) return null;
+  if (!verifyClaimedExportArchiveIntegrity(archive.bytes, archive.sha256, input.claim.exportId)) {
+    throw new ExportArchivePreflightError();
+  }
+  const staged = await new DataExportArchiveCommitmentStore(input.db).stage(input.claim, archive);
+  if (staged?.sha256 !== archive.sha256 || staged.byteLength !== archive.byteLength || staged.files !== archive.files) {
+    return null;
+  }
+  return { archive, expiresAt: staged.expiresAt };
+}
+
+/**
+ * Seals a local ZIP on a private, caller-provisioned 0700 filesystem BEFORE
+ * accepting its one-time database commitment. A crash before DB staging can
+ * leave private orphan bytes; no customer download or completed transition
+ * exists, and a later retention worker must reconcile these files.
+ *
+ * Do not expose this API as a customer route: retrieval needs fresh original
+ * requester authorization, revocation fencing and audited delivery.
+ */
+export async function stageClaimedDurableLocalArchiveCommitment(
+  input: Parameters<typeof prepareClaimedLocalArchiveZip>[0] & { privateArchiveRoot: string },
+): Promise<{ sha256: string; byteLength: number; files: number; expiresAt: string } | null> {
+  const archive = await prepareClaimedLocalArchiveZip(input);
+  if (!archive) return null;
+  const sealed = await sealLocalExportArchive({
+    archiveRoot: input.privateArchiveRoot,
+    exportId: input.claim.exportId,
+    archive,
+  });
+  if (sealed?.sha256 !== archive.sha256 || sealed.byteLength !== archive.byteLength) return null;
+  const staged = await new DataExportArchiveCommitmentStore(input.db).stage(input.claim, archive);
+  if (staged?.sha256 !== archive.sha256 || staged.byteLength !== archive.byteLength || staged.files !== archive.files)
+    return null;
+  return { ...staged };
+}
+
+/**
+ * INTERNAL source for a future audited HTTP retrieval edge. A file on disk,
+ * even with the correct hash, does not authorize a customer: check live
+ * original-requester/tenant/installation/lease/revocation before and after IO.
+ * The final read admission is atomically audited, but this method does not
+ * issue an HTTP response, audit a completed download, hold a revocation fence
+ * during streaming, or grant post-uninstall access.
+ */
+export async function readAuthorizedSealedLocalExportArchive(input: {
+  db: Pick<PgQueryExecutor, "query">;
+  archiveRoot: string;
+  exportId: string;
+  tenantId: string;
+  installationId: string;
+  actorLogin: string;
+}): Promise<Buffer | null> {
+  const store = new DataExportArchiveCommitmentStore(input.db);
+  const request = {
+    exportId: input.exportId,
+    tenantId: input.tenantId,
+    installationId: input.installationId,
+    actorLogin: input.actorLogin,
+  };
+  const first = await store.readForRequester(request);
+  if (!first) return null;
+  const bytes = await readSealedLocalExportArchive({
+    archiveRoot: input.archiveRoot,
+    exportId: input.exportId,
+    sha256: first.sha256,
+    byteLength: first.byteLength,
+  });
+  if (!bytes) return null;
+  const last = await store.auditVerifiedReadForRequester(request, first);
+  if (
+    last?.sha256 !== first.sha256 ||
+    last.byteLength !== first.byteLength ||
+    last.files !== first.files ||
+    last.expiresAt !== first.expiresAt
+  ) {
+    return null;
+  }
+  return bytes;
+}
+
+/**
+ * Internal chunked ZIP transport adapter (NOT a customer HTTP endpoint).
+ *
+ * Wait for each sink acknowledgement before sending the next bounded chunk,
+ * preserving backpressure and the existing PostgreSQL revocation fence.
+ * Abort and deadline are checked before/after every awaited write. Sink writes
+ * MUST settle on disconnect; never race an in-flight write against a timeout
+ * and release the DB lock while the sink might still deliver bytes.
+ *
+ * A future route must own the authenticated session, response cancellation,
+ * same-origin policy, storage configuration, and delivery receipt separately.
+ */
+export async function consumeAuthorizedSealedLocalExportArchiveChunks(
+  input: Parameters<typeof consumeAuthorizedSealedLocalExportArchive>[0] & {
+    signal?: AbortSignal;
+  },
+  writeChunk: (chunk: Uint8Array) => Promise<void>,
+  finishResponse?: () => Promise<void>,
+): Promise<boolean> {
+  if (!input?.db?.withTransaction || typeof writeChunk !== "function") return false;
+  const deadline = Date.now() + 25_000;
+  const checkTransfer = () => {
+    if (input.signal?.aborted) throw new Error("ZIP transfer aborted");
+    if (Date.now() >= deadline) throw new Error("ZIP transfer deadline exceeded");
+  };
+  checkTransfer();
+  return consumeAuthorizedSealedLocalExportArchive(input, async (bytes) => {
+    const chunkBytes = 16 * 1024;
+    for (let offset = 0; offset < bytes.length; offset += chunkBytes) {
+      checkTransfer();
+      // Own each bounded chunk; never pass a view of the full private buffer.
+      const chunk = Uint8Array.from(bytes.subarray(offset, offset + chunkBytes));
+      await writeChunk(chunk);
+      checkTransfer();
+    }
+    // The HTTP finish callback must settle while the DB revocation lock
+    // remains held; a rejected finish rolls back the verified-read audit.
+    if (finishResponse) {
+      await finishResponse();
+      checkTransfer();
+    }
+  });
+}
+
+/**
+ * Internal transactional transfer fence for a future bounded ZIP response.
+ *
+ * The final verified-read audit takes a PostgreSQL FOR SHARE lock on the
+ * commitment; keeping the SAME transaction open through the consumer callback
+ * makes concurrent requester revocation wait until the callback finishes.
+ * Exceptions roll back the read audit. A caller MUST complete its bounded
+ * consumption inside the callback, not capture bytes for later async use.
+ *
+ * No HTTP handler is wired here: session cancellation, delivery receipts and
+ * transport/backpressure must be reviewed separately before customer release.
+ */
+export async function consumeAuthorizedSealedLocalExportArchive(
+  input: Omit<Parameters<typeof readAuthorizedSealedLocalExportArchive>[0], "db"> & {
+    db: Pick<PgQueryExecutor, "withTransaction">;
+  },
+  consume: (bytes: Buffer) => Promise<void>,
+): Promise<boolean> {
+  if (!input?.db?.withTransaction || typeof consume !== "function") return false;
+  return input.db.withTransaction(
+    async (tx) => {
+      const bytes = await readAuthorizedSealedLocalExportArchive({ ...input, db: tx });
+      if (!bytes) return false;
+      await consume(bytes);
+      return true;
+    },
+    { statementTimeoutMs: 30_000 },
+  );
 }

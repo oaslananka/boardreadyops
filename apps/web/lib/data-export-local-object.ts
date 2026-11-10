@@ -45,13 +45,21 @@ function sameStableFile(before: Stats, after: Stats): boolean {
 
 async function readExactBytes(handle: FileHandle, length: number): Promise<Buffer | null> {
   const bytes = Buffer.alloc(length);
-  let offset = 0;
-  while (offset < bytes.length) {
-    const { bytesRead } = await handle.read(bytes, offset, Math.min(64 * 1024, bytes.length - offset), offset);
-    if (!bytesRead) return null;
-    offset += bytesRead;
+  let complete = false;
+  try {
+    let offset = 0;
+    while (offset < bytes.length) {
+      const { bytesRead } = await handle.read(bytes, offset, Math.min(64 * 1024, bytes.length - offset), offset);
+      if (!bytesRead) return null;
+      offset += bytesRead;
+    }
+    complete = true;
+    return bytes;
+  } finally {
+    // A short or failed read has already touched memory with private bytes.
+    // Never abandon that partially filled allocation without wiping it.
+    if (!complete) bytes.fill(0);
   }
-  return bytes;
 }
 
 /**
@@ -78,22 +86,28 @@ export async function readVerifiedLocalExportObject(input: {
   } catch {
     return null;
   }
+  let bytes: Buffer | null = null;
+  let verified = false;
   try {
     const before = await handle.stat();
     if (!before.isFile() || before.size !== object.byteLength) return null;
-    const bytes = await readExactBytes(handle, object.byteLength);
+    bytes = await readExactBytes(handle, object.byteLength);
     if (!bytes) return null;
     const after = await handle.stat();
     if (!sameStableFile(before, after)) return null;
     if (createHash("sha256").update(bytes).digest("hex") !== object.sha256) return null;
-    return bytes;
+    verified = true;
   } catch {
     return null;
   } finally {
     try {
       await handle.close();
     } catch {
-      // A failed close never turns an unsuccessful verification into authorization.
+      verified = false;
     }
+    // A digest, metadata or descriptor-close failure cannot leave a verified
+    // private artifact allocation readable by a later caller.
+    if (!verified) bytes?.fill(0);
   }
+  return verified ? bytes : null;
 }

@@ -120,6 +120,8 @@ export class DataExportPreparationStore {
           WHERE data_exports.installation_id = $1
             AND data_exports.status = 'pending'
             AND data_exports.prepared_manifest_bytes IS NULL
+            AND NOT EXISTS (SELECT 1 FROM data_export_archive_commitments
+                            WHERE export_id = data_exports.id)
             AND installations.suspended_at IS NULL
             AND lower(installations.account_login) = lower(data_exports.tenant_id)
             AND (
@@ -417,6 +419,8 @@ export class DataExportPreparationStore {
           AND preparation_token = $4
           AND preparation_lease_until > NOW()
           AND prepared_manifest_bytes IS NULL
+          AND NOT EXISTS (SELECT 1 FROM data_export_archive_commitments
+                          WHERE export_id = data_exports.id)
           AND EXISTS (
             SELECT 1 FROM installations
              WHERE installations.id = data_exports.installation_id

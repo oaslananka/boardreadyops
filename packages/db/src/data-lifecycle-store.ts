@@ -437,6 +437,64 @@ export class DataLifecycleStore {
     };
   }
 
+  /**
+   * READ-ONLY historical post-uninstall USER export status.
+   *
+   * The caller must supply the immutable GitHub user ID from independently
+   * verified OAuth/session identity, NOT from a query, tenant name, former
+   * installation permission, or request body. The only eligible records were
+   * bound to that same numeric owner ID at original signed-webhook creation.
+   * Login-only legacy requests and organization/repository scopes stay hidden.
+   * Never returns a historical signed download URL or archive capability.
+   */
+  async getVerifiedHistoricalUserExport(input: {
+    exportId: string;
+    verifiedGitHubUserId: number;
+  }): Promise<DataExport | null> {
+    if (
+      typeof input?.exportId !== "string" ||
+      !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(input.exportId) ||
+      !Number.isSafeInteger(input.verifiedGitHubUserId) ||
+      input.verifiedGitHubUserId <= 0
+    )
+      return null;
+    const result = await this.db.query(
+      `SELECT exports.id, exports.tenant_id, exports.requested_by,
+              exports.status, exports.scope, exports.scope_id,
+              exports.expires_at, exports.created_at
+         FROM data_exports AS exports
+        WHERE exports.id=$1
+          AND exports.original_github_user_id=$2::bigint
+          AND exports.installation_id IS NULL
+          AND exports.scope='user'
+          AND lower(exports.scope_id)=lower(exports.tenant_id)
+          AND exports.requested_by='github_app_uninstall'
+          AND NOT EXISTS (
+            SELECT 1 FROM erasure_requests AS erased
+             WHERE lower(erased.tenant_id)=lower(exports.tenant_id)
+               AND erased.status='completed'
+               AND erased.dry_run=FALSE
+               AND (erased.scope='organization'
+                 OR (erased.scope='user' AND lower(erased.scope_id)=lower(exports.scope_id)))
+          )
+        LIMIT 1`,
+      [input.exportId, input.verifiedGitHubUserId],
+    );
+    const row = (result as { rows?: Array<Record<string, unknown>> }).rows?.[0];
+    if (!row) return null;
+    return {
+      id: String(row.id),
+      tenantId: String(row.tenant_id),
+      requestedBy: String(row.requested_by),
+      status: String(row.status) as DataExport["status"],
+      scope: "user",
+      scopeId: String(row.scope_id),
+      downloadUrl: null,
+      expiresAt: row.expires_at ? new Date(row.expires_at as string).toISOString() : null,
+      createdAt: new Date(row.created_at as string).toISOString(),
+    };
+  }
+
   async createErasure(input: {
     tenantId: string;
     requestedBy: string;

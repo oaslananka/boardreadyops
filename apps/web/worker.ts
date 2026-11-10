@@ -50,6 +50,7 @@ import {
   workerScopeFromOutboxEffect,
   workerScopeFromReconciliationItem,
 } from "./lib/control-plane-worker-runtime.js";
+import { runOptInExportArchivePreparationPass } from "./lib/data-export-archive-worker.js";
 import { advisoryDedupeKey, composeFirmwareAdvisoryAnnouncement } from "./lib/firmware-advisory-announcement.js";
 import { createGitHubAppCheckRunClient } from "./lib/github-app-check-run-client.js";
 import { createProductionGitHubCommandLifecycleExecutor } from "./lib/github-command-executor.js";
@@ -286,6 +287,11 @@ const scopedConcurrency = createScopedConcurrencyGate({
 });
 const artifactStorageDriver = (process.env.ARTIFACT_STORAGE_DRIVER?.trim() || "local").toLowerCase();
 const artifactStorageRoot = process.env.ARTIFACT_STORAGE_ROOT?.trim();
+// Strict two-key opt-in for a single installation: no extra worker loop or
+// idle DB polling when disabled, and only one pending claim per minute when on.
+const exportArchivePreparationInstallation = process.env.BOARDREADYOPS_EXPORT_PREPARATION_INSTALLATION_ID?.trim();
+const privateExportArchiveRoot = process.env.BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT?.trim();
+let nextExportArchivePreparationAt = 0;
 const artifactDeletionConfigurationValid = artifactStorageDriver === "local" && Boolean(artifactStorageRoot);
 const artifactDeletionLoopEnabled = artifactStorageDriver !== "local" || artifactDeletionConfigurationValid;
 const runner = runnerModeSummary();
@@ -1170,6 +1176,28 @@ async function runGitHubReconciliationLoop(): Promise<void> {
   }
 }
 
+async function prepareOptInExportArchive(currentTime: number): Promise<void> {
+  if (!exportArchivePreparationInstallation && !privateExportArchiveRoot) return;
+  if (currentTime < nextExportArchivePreparationAt) return;
+  nextExportArchivePreparationAt = currentTime + 60_000;
+  try {
+    const outcome = await runOptInExportArchivePreparationPass({
+      db: executor,
+      installationId: exportArchivePreparationInstallation,
+      workerId,
+      storageDriver: artifactStorageDriver,
+      storageRoot: artifactStorageRoot,
+      privateArchiveRoot: privateExportArchiveRoot,
+    });
+    if (outcome !== "idle" && outcome !== "disabled") {
+      // Deliberately omit installation, export, token and filesystem paths.
+      log(outcome === "staged" ? "info" : "warn", "worker.export_archive_preparation", { outcome });
+    }
+  } catch (error) {
+    log("warn", "worker.export_archive_preparation_failed", { errorClass: errorClass(error) });
+  }
+}
+
 async function runMaintenanceLoop(): Promise<void> {
   while (!shuttingDown) {
     const currentTime = Date.now();
@@ -1182,6 +1210,7 @@ async function runMaintenanceLoop(): Promise<void> {
     await scanForTimeBasedNotifications(currentTime);
     await deliverNotifications(currentTime);
     await purgeExpiredRetentionData(currentTime);
+    await prepareOptInExportArchive(currentTime);
     await sleep(1000);
   }
 }

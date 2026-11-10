@@ -113,9 +113,181 @@
 | `/api/v1/runner/*` | POST | `available` | Self-hosted runner protocol (jobs, leases, results). | [`apps/web/app/api/v1/runner/jobs/claim/route.ts`](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/apps/web/app/api/v1/runner/jobs/claim/route.ts) |
 | `/api/v1/data-exports` | POST | `available` | Records an export request only for an explicitly authorized installation (`installationId` required); no archive is generated automatically. | [`apps/web/app/api/v1/data-exports/route.ts`](../../apps/web/app/api/v1/data-exports/route.ts) |
 | `/api/v1/data-exports/:exportId` | GET | `available` | Returns export request metadata (not a downloadable file); the required `installationId` query must select an installation authorized for the current session. | [`apps/web/app/api/v1/data-exports/[exportId]/route.ts`](../../apps/web/app/api/v1/data-exports/[exportId]/route.ts) |
+| `/api/v1/data-exports/:exportId?download=archive` | GET | `partial` | Disabled unless `BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT` provisions a separate, private 0700 shared directory. Original-requester/installation/repo authorization and ZIP bytes are checked before streaming. Worker can prepare one installation's ZIP into a reserved private directory on the existing artifact volume, strictly opt-in with a separate installation setting; an internal legal-hold-fenced explicit cleanup path exists but is not scheduled. Local Next.js standalone + signed-session/PostgreSQL 17 acceptance confirms ZIP digest, original requester authorization, tamper rejection, revocation and actual early client disconnect with audit rollback; no deployed customer transfer, production enablement or post-uninstall recovery yet. | [`apps/web/app/api/v1/data-exports/[exportId]/route.ts`](../../apps/web/app/api/v1/data-exports/[exportId]/route.ts) |
+| `/api/v1/data-exports/:exportId` | DELETE | `partial` | Same-origin authenticated original requester may revoke the short-lived metadata preview (default), or the separately staged internal ZIP commitment (`?revoke=archive`), without publishing a ZIP, deleting data, or completing the export. | [`apps/web/app/api/v1/data-exports/[exportId]/route.ts`](../../apps/web/app/api/v1/data-exports/[exportId]/route.ts) |
+| `/api/v1/historical-user-exports/:exportId` | GET | `partial` | Server-verified signed GitHub OAuth numeric identity returns bounded metadata-only post-uninstall user export status without a live installation; legacy login-only exports and completed erasures are denied; never returns ZIP bytes, signed URL or erasure authority. Source-only, not deployed. | `apps/web/app/api/v1/historical-user-exports/[exportId]/route.ts` |
+
 | `/api/v1/erasure-requests` | POST | `available` | Records a legal-hold-aware erasure request for an authorized `installationId`; submission does not delete records. | [`apps/web/app/api/v1/erasure-requests/route.ts`](../../apps/web/app/api/v1/erasure-requests/route.ts) |
 
+Internal source-only preflight: retained historical-USER local artifact bytes can be verified against stored SHA-256/size with original-owner reauthorization and a durable shared-path unlink fence. This is **not** an HTTP endpoint, ZIP publication, customer delivery, or enabled worker. A bounded **partial** ZIP preflight now checks that every original-user snapshot artifact has exactly one previously verified local object; its consistent core snapshot also includes bounded owner-scoped review comments, approval reasons, checklist titles, finding decision reasons, and finding assignment descriptors, but excludes individual decision owners, approvers, assignees, assigners, actor identities and arbitrary audit metadata. The consistent core additionally records only eight bounded counts of suppressed installation/repository audit actor, subject, request-ID and metadata values; unknown actor types are redacted, and the independent ZIP verifier rejects injected identity or metadata fields and foreign audit links. The core now also inventories *counts only* for five original numeric-user-bound excluded classes: proprietary run snapshot visuals, API token records, runner registrations, encrypted installation provider credentials and licensed per-installation component observations (hard cap 100 each, fail-closed on overflow). Login-only policy/billing audit records remain unverifiable and excluded; private content, token hashes and credentials are never copied. A separate source-only original numeric-USER private-visual preflight checks bounded stored SVG UTF-8 content against its SHA-256 and emits only ID/run/repository/digest/byte-count descriptors, never design SVG, sheet labels, anchors or URLs. The source-only partial ZIP v3 now includes a separate **content-free private visual evidence metadata entry** and an integrity receipt that cryptographically binds it, original-user core metadata and physical artifacts in one deterministic in-memory ZIP. Private visual hashes/counts are compared before and after file IO, and the checked-write gate can re-evaluate both core and visual evidence. Each core+visual pair now uses ONE original numeric-USER-scoped PostgreSQL REPEATABLE READ READ ONLY snapshot, so concurrent edits cannot split its core counts from the visual proof. The initial and final pairs, physical file IO and per-write transport checks still span DIFFERENT transactions. Source-only migration 0118 tracks original USER review rows, private visual snapshots and append-only audit INSERTs. Additive migration 0119 extends the same committed mutation revision to review revisions, comments, approvals, checklist items, finding decisions and assignments via actual review/repository ownership. The scoped fingerprint is bound to partial ZIP v3; edit-restore ABA for tracked classes is rejected even if content hashes return to previous values, and a different numeric GitHub user sharing the login cannot change the original user's fingerprint. Other data classes still lack mutation epochs: there is no complete durable immutable snapshot or customer delivery grant, SVG rendering safety is not established, and design IP is never disclosed. The original USER internal partial core now additionally suppresses
+repository owner/name, run ref, finding path, artifact name, review title
+and review-comment visual anchor; independent ZIP receipt validation
+rejects any reinsertion after hash recomputation. Source DB values remain
+untouched. The archive still contains separately verified raw artifact
+bytes and remaining opaque IDs, commit/finding hashes and other descriptors;
+the count-only diagnostic explicitly blocks unverified physical artifact
+disclosure rights and must never be treated as customer-ready.
+The separate original USER physical-byte partial ZIP v3 PRIVATE
+stage/inspect boundary now rechecks the full original-owner artifact
+manifest and canonical hold/erasure/deletion/retention and mutation
+epoch gate, rather than trusting unchanged ZIP/source digests alone.
+A queue-only deletion makes staged private state stale without altering
+core SHA. No customer route/entitlement or public delivery added.
+Original numeric GitHub USER source inventory and physical artifact
+locator reads now fail closed BEFORE returning source metadata or
+private storage paths if the export is expired, any tenant legal hold
+is active, or a real running/completed erasure exists. Dry-run erasure
+remains nonblocking; legitimate non-destructive uninstall export
+request intake is unaffected. Locked final-transfer admission and
+customer ownership/disclosure rights are separate, still-required
+steps. Verified with PostgreSQL deny/recover tests.
+
+A separate internal live GitHub OAuth step-up helper now validates
+one-time GitHub authorization-code exchange and live /user numeric
+identity against a recent signed server session and export-bound
+callback CSRF state. Isolated PostgreSQL acceptance uses a distinct
+suspended GitHub USER tenant to respect the one-active-export and
+immutable one-preflight constraints. Tests verify successful PRIVATE
+stage, foreign numeric USER and wrong state rejection, irreversible
+revocation and no customer delivery. A default-OFF, source-only
+historical OAuth start route now reuses the existing registered callback.
+The original numeric USER, exact pending export, <=5-minute signed
+session, HMAC-bound state/export/user/issuance-time challenge and fresh
+GitHub /user must match. Wrong/expired/challenge-substituted state is
+rejected before GitHub, and two __Host- HttpOnly/Secure state cookies
+are cleared on callback. Success redirects only to dashboard status,
+without replacing the ordinary login session, staging a ZIP, or minting
+customer entitlement. New source-only migration 0122 now stores only
+the SHA-256 nonce digest with original numeric USER/export identity,
+immutable five-minute expiry and one-way consumed timestamp. It
+requires a pending original USER export, blocks active tenant holds/
+non-dry-run erasure, and atomically consumes the nonce BEFORE GitHub
+authentication. OAuth nonce issue/consume now share the existing
+original USER private preflight short-lived legal-hold table and owner
+row locks, and the nonblocking tenant advisory lock used by real
+erasure writers. PostgreSQL tests prove exactly one of 12 concurrent
+callbacks wins and that uncommitted hold/erasure writer races fail
+closed without provider access. Replay or provider failure cannot
+restore nonce authority. Neither the migration nor feature is
+deployed; there is
+no real GitHub browser acceptance, full archive release, or customer
+download entitlement. A SOURCE-ONLY private partial-ZIP v3 seal path now fsyncs the
+verified physical archive to owner-private 0700/0600 storage, uses
+atomic no-clobber linking, reopens with no-follow integrity validation,
+then rechecks full original numeric USER source and physical object
+preflight. Real isolated PostgreSQL/local-file tests reject changed
+artifact bytes, wrong owner, symlinked/group-readable roots and
+corrupted destinations. This is NOT a complete externally signed
+archive, DB+filesystem atomic commitment or active cleanup policy;
+private orphans without an exact immutable DB binding remain
+quarantined. A SOURCE-ONLY migration 0124 and MANUAL-ONLY helper now
+permit audited deletion of matching verified private partial ZIP files
+only for failed original numeric USER exports aged over one hour and
+revoked/expired private preflights. Current hold/erasure/reader reservations,
+wrong owner, tampered ZIP or unsafe filesystem state deny. An immutable
+per-export deleted/missing audit is recorded; no orphan scanning, scheduled cleanup, customer route or complete DB+FS
+transaction is introduced. A separate source-only migration 0125 now
+provides an explicit durable original numeric USER/private preflight
+reservation for the NEW internal ZIP verifier. The reservation is
+committed before private disk IO and released once after DB/ZIP check;
+cleanup denies unresolved readers, confirmed by separate PostgreSQL
+connection tests. Crashed readers are NOT timer-reaped and the
+low-level disk reader and future HTTP delivery streams do not inherit
+this coordination automatically. Automatic janitor/customer ZIP NO_GO.
+
+Historical customer export remains NO_GO.
+
+The source-only metadata-only ZIP builder now also uses the canonical
+original USER PostgreSQL prepublication gate after enumerating all
+retained artifact database locators without filesystem IO. It denies
+active legal holds, revoked exports, running erasure, imminent artifact
+retention, stale/changed artifact manifests, or core/visual/epoch drift,
+instead of relying solely on two snapshot reads. This is a short
+internal database admission, NOT a persisted customer delivery claim,
+lifetime snapshot lock or permission to publish bytes.
+
+A separate **private count-only metadata exposure diagnostic** now
+classifies remaining opaque GitHub repository IDs, run/revision commit
+hashes, artifact SHA-256/size, finding fingerprint/evidence digests and
+private visual digest descriptors. The result contains fixed category
+names, row counts and explicit `NO_GO` blockers only; it does not disclose
+source values or attest original-user identity/third-party rights. Its
+input is an independently verified local metadata-only ZIP, never the
+physical-byte partial v3 archive. Not a customer route or export approval.
+A SEPARATE internal original numeric USER metadata-only ZIP variant now
+stores exactly three verified metadata entries (redacted historical core,
+content-free visual evidence, v1 metadata-only integrity receipt), with
+zero objects/ paths or physical artifact file bytes. Even with a retained
+artifact descriptor present, no storageRoot/physical file read is required;
+its independent verifier rejects extra byte-backed entries and fully
+rehashed identity/receipt forgeries, and cannot confuse this type with
+the existing physical-byte partial ZIP v3. No customer authorization,
+signed grant, complete export or public download route was added. The
+DB-only original-owner admission checks current core/visual/epoch twice
+but is NOT an atomic delivery lease. Source-only; not deployed.
+
+Source-only private original USER partial ZIP v3 now strips six free-text
+surfaces (finding message, review comment content, review approval reason and
+invalidation reason, review checklist title and finding decision reason)
+to empty/null with false inclusion flags. Source database rows stay intact;
+independent ZIP verification and exclusions deny re-introduced text even with
+fully recomputed hashes. Diagnostic text counts reflect only exported
+included text and do NOT prove no original third-party content; private
+artifact bytes, titles/paths and legal rights remain separate blockers.
+The internal private ZIP v3 disclosure-readiness diagnostic now outputs
+only 13 source-class counts, six non-empty human-text field counts, excluded
+sensitive-source/audit redaction counts and explicit blocker codes; it never
+copies comments, design content, actor identities or repository names into
+the result. Even zero rows and zero exclusions mean
+`customerDeliveryReady=false` and `completeCustomerExport=false`:
+third-party text rights, private SVG/design rights, original-owner
+provenance and a genuine revocable sealed customer delivery remain unresolved.
+Format v2 explicitly adds six third-party text-source acceptance decisions
+with all ownership/rights evidence unverified and eight independent legal,
+provenance, completeness and transfer-safety gates; every decision remains
+NO_GO, even on empty archives. The diagnostic is a local, content-free
+assessment and does not replace the separate original numeric-USER live DB
+authorization preflight.
+The source-only web entrypoint now binds 0121's candidate fingerprint to
+the ACTUAL private ZIP v3 bytes: SHA-256 is computed from those bytes,
+the independent ZIP/receipt/object verifier runs first, and core/visual/ABA
+fingerprints extracted from the verified payload are checked against the
+original numeric GitHub USER's current coherent PostgreSQL snapshot.
+Tampered compressed data and a fully rehashed ZIP with forged owner mutation
+epoch are denied. The independent ZIP verifier additionally enforces the
+historical core's full top-level and per-row field allowlists, its exact
+exclusion-label policy, and fixed privacy/disclosure flags for review actors,
+approvers, checklist completion and artifacts. Unknown identity/credential
+fields remain rejected even if their JSON, receipt and full ZIP hashes are
+recomputed; this does not certify private source rights or full customer
+export completeness. This web preflight remains internal, does not persist/stream
+archive bytes or authorize a public customer download. The uncommitted
+additive 0121 private candidate preflight additionally records the original numeric USER, immutable prospective ZIP/core/visual/epoch hashes, at most 10-minute expiry and one-way revocation with staged/revoked audit events; it checks original-user scoped current metadata, legal holds and real erasure status and forbids customer_delivery_allowed or complete_customer_export at the SQL CHECK level. It is NOT a verified complete ZIP, a bearer/download token, actual customer delivery authorization, in-flight network revocation, or deployed capability. The archive acquires all durable physical-copy reservations in a single all-or-nothing PostgreSQL transaction before file IO, keeps every path fenced until the entire ZIP assembly settles, and has a per-file SHA-256 receipt, independent full ZIP integrity check and final core snapshot equality check. A separate source-only prepublication check now revalidates the original numeric user, complete physical manifest, request status, retention, deletion jobs, running erasure and active holds under short PostgreSQL row/hold-table locks. An active legal hold requires manual review; concurrent writers fail closed. The gate also has a source-only awaited-transfer test hook: it keeps export and legal-hold writer locks until a bounded write settles. PG17 and localhost Node HTTP tests prove a revoked original-user request denies the *next* transport chunk, while a failed sink rolls back. Source-only migration 0117 now also fences same-tenant erasure changes, artifact additions, physical deletion-job admissions and append-only audit INSERT/review INSERTs during a checked transfer chunk. Review reparenting locks the original and new tenant keys in deterministic order; unrelated tenant audit writes remain available. A competing retention row lock fails the gate busy without deadlock. No historical customer HTTP route, complete archive or durable transfer lease is created; already-sent chunks cannot be retracted. The source-only gate can now compare the expected private partial-core SHA-256 and byte count against a fresh original numeric-USER repeatable-read core before and after each bounded write: it rejects audit/review edits between chunks, or reports stale when review content mutates in-flight. This optional comparison is neither an atomic hold/metadata lock nor a durable delivery claim; previously written bytes cannot be recalled and untracked data-class edit-and-restore races remain possible. These transaction locks do not persist any customer publication rights or download authorization. Its completeCustomerExport=false marker is mandatory; it is not a publish permission or downloadable customer archive.
+
 ---
+
+The uninstall/export recovery status is still **partial**: migration 0115 records
+immutable GitHub user IDs for new signed-webhook user uninstall export requests.
+A dedicated session-authenticated metadata-only historical status endpoint is now in
+source, backed by the original immutable numeric GitHub account ID. Legacy
+username-only requests and actual historical ZIP archive delivery remain
+unavailable; this route is not deployed and never revives an uninstalled App.
+An internal bounded SHA-256 repository-metadata preflight now verifies retained
+suspended user installations by original numeric ID and tenant, but deliberately
+is separate from another bounded, SHA-256 run/finding historical
+preflight. A new internal combined repository/run/finding/artifact-metadata
+preflight uses one immutable-owner gate and one bounded repeatable-read
+PostgreSQL snapshot. It includes repository/run/finding facts, declared
+artifact digest/size/retention metadata, review/revision descriptions,
+bounded review comment/approval/checklist **descriptors**, repository-scoped
+and original suspended-installation audit event descriptions. Installation-
+only events have no actor/subject IDs or payloads. The original
+user/review/repository relationships
+and comment parent chains are checked, including per-class overflow rejection.
+It never includes artifact contents/storage paths, comment bodies/authors,
+approval actors/reasons, checklist titles or audit metadata/actors.
+Installation-only audit, full tenant data, ZIP staging, transfer and customer
+recovery remain unavailable.
 
 ## 7. Plugin SDK Extension Points
 
