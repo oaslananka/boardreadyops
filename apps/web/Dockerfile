@@ -84,7 +84,8 @@ COPY --chown=node:node apps/web/web-supervisor.mjs ./apps/web/web-supervisor.mjs
 # A fresh named volume inherits the artifact directory's unprivileged owner.
 # Existing data/permissions require separately authorized operator validation.
 RUN chmod 0755 /usr/local/bin/boardreadyops-entrypoint \
-    && install -d -o node -g node -m 0700 /data/artifacts
+    && install -d -o node -g node -m 0700 /data/artifacts \
+    && install -d -o node -g node -m 0700 /run/boardreadyops
 
 USER node
 

@@ -3,7 +3,7 @@ import { rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const defaultDrainMarkerPath = "/tmp/boardreadyops-web-draining";
+const defaultDrainMarkerPath = "/run/boardreadyops/draining";
 const defaultServerFile = fileURLToPath(new URL("./server.js", import.meta.url));
 
 /**
@@ -48,15 +48,15 @@ export function startWebSupervisor({
     if (timer !== undefined) clearTimeout(timer);
     parent.off("SIGTERM", onSigterm);
     parent.off("SIGINT", onSigint);
-    onExit(
-      markerFailed
-        ? 1
-        : typeof code === "number"
-          ? code
-          : draining && (signal === "SIGTERM" || signal === "SIGINT")
-            ? 0
-            : 1,
-    );
+    let exitStatus = 1;
+    if (!markerFailed) {
+      if (typeof code === "number") {
+        exitStatus = code;
+      } else if (draining && (signal === "SIGTERM" || signal === "SIGINT")) {
+        exitStatus = 0;
+      }
+    }
+    onExit(exitStatus);
   });
   child.once("error", () => {
     markerFailed = true;

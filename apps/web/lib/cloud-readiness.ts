@@ -9,7 +9,7 @@ import {
 
 const service = "boardreadyops-cloud" as const;
 const defaultTimeoutMs = 2_000;
-const defaultDrainMarkerPath = "/tmp/boardreadyops-web-draining";
+const defaultDrainMarkerPath = "/run/boardreadyops/draining";
 
 export type CloudReadinessResult =
   | {
