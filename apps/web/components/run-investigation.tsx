@@ -172,7 +172,7 @@ export function RunPageFrame({
         <RunVerdictBanner run={run} />
         {liveRefresh ? <RunLiveRefresh enabled /> : null}
         <RunNavigation runId={run.id} active={active} />
-        <RunStateNotice run={run} />
+        <RunStateNotice run={run} compact={active === "design"} />
         <div className="flex flex-col gap-4">{children}</div>
       </main>
     </AppShell>
@@ -250,7 +250,7 @@ export function RunUnavailable({ runId }: Readonly<{ runId: string }>) {
   );
 }
 
-export function RunStateNotice({ run }: Readonly<{ run: RunDetail }>) {
+export function RunStateNotice({ run, compact = false }: Readonly<{ run: RunDetail; compact?: boolean }>) {
   if (run.investigationState === "dead_letter") {
     return (
       <Alert title="Recovery requires operator action" tone="danger">
@@ -264,8 +264,8 @@ export function RunStateNotice({ run }: Readonly<{ run: RunDetail }>) {
     );
   }
   if (run.investigationState === "partial_data") {
-    return (
-      <Alert title="This run has partial data" tone="warning">
+    const evidenceLimitations = (
+      <>
         <p>This run finished without an accepted signed result. Readiness is not verified.</p>
         <p>
           {run.attempts.some((attempt) => attempt.workflowRunUrl)
@@ -273,6 +273,25 @@ export function RunStateNotice({ run }: Readonly<{ run: RunDetail }>) {
             : "No GitHub Actions run is linked to this record, so workflow logs cannot be assumed to exist."}
         </p>
         <Link href={`/runs/${run.id}/publication`}>Review publication state</Link>
+      </>
+    );
+    // The verdict banner directly above the design already states that readiness is unverified.
+    // Keep the secondary evidence detail available by keyboard without pushing source artwork below the fold.
+    if (compact) {
+      return (
+        <details className="rounded-md border border-warning/40 bg-warning-surface text-sm text-foreground">
+          <summary className="cursor-pointer px-4 py-3 font-medium text-warning focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+            Additional evidence limitations · no signed result
+          </summary>
+          <div className="space-y-2 border-t border-warning/30 px-4 py-3 text-muted-foreground">
+            {evidenceLimitations}
+          </div>
+        </details>
+      );
+    }
+    return (
+      <Alert title="This run has partial data" tone="warning">
+        {evidenceLimitations}
       </Alert>
     );
   }

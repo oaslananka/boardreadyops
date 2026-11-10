@@ -222,6 +222,33 @@ describe("run investigation accessibility", () => {
     expect(await axeViolations(markup, `/runs/${run.id}/design`)).toEqual([]);
   });
 
+  it("keeps unsigned-run evidence accessible without repeating a full warning panel before the mobile design", async () => {
+    const run = sampleRun();
+    run.investigationState = "partial_data";
+    run.readinessScore = undefined;
+    const markup = renderToStaticMarkup(
+      createElement(
+        RunPageFrame,
+        { run, active: "design" },
+        createElement("section", { id: "design-evidence" }, "Source-bound design"),
+      ),
+    );
+    expect(markup).toContain("Readiness not verified");
+    expect(markup).toContain("Inspect missing result");
+    expect(markup).toContain("Additional evidence limitations");
+    expect(markup).toContain("<details");
+    expect(markup.indexOf("Additional evidence limitations")).toBeLessThan(markup.indexOf('id="design-evidence"'));
+    expect(markup).toContain("No GitHub Actions run is linked to this record");
+    expect(markup).toContain('href="/runs/run-accessible/publication"');
+    expect(await axeViolations(markup, "/runs/run-accessible/design")).toEqual([]);
+
+    const summary = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "summary" }, createElement("section", null, "Summary")),
+    );
+    expect(summary).toContain("This run has partial data");
+    expect(summary).not.toContain("Additional evidence limitations");
+  });
+
   it("keeps the run header stacked through tablet widths and wraps long source identities", () => {
     const html = viewMarkup("findings");
     expect(html).toContain("lg:flex-row lg:items-start lg:justify-between");
