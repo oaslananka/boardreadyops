@@ -8,6 +8,7 @@ import pinmapSchema from "../../../schemas/pinmap.schema.json" with { type: "jso
 import reviewPublishResultSchema from "../../../schemas/review-publish-result.schema.json" with { type: "json" };
 
 const SCHEMAS: Record<string, unknown> = {
+  config: configSchema,
   "agent-plan": agentPlanSchema,
   plan: agentPlanSchema,
   doctor: doctorSchema,
@@ -19,8 +20,17 @@ const SCHEMAS: Record<string, unknown> = {
   generate: generateRecipeSchema,
 };
 
-export function schemaCommand(name: string | undefined, streams: { stdout: NodeJS.WritableStream }): number {
-  const schema = (name ? SCHEMAS[name] : undefined) ?? configSchema;
-  streams.stdout.write(`${JSON.stringify(schema, null, 2)}\n`);
+export function schemaCommand(
+  name: string | undefined,
+  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
+): number {
+  const selectedName = name ?? "config";
+  if (!Object.hasOwn(SCHEMAS, selectedName)) {
+    streams.stderr.write(
+      `Unknown schema: ${selectedName || "(empty)"}. Available schemas: ${Object.keys(SCHEMAS).join(", ")}.\n`,
+    );
+    return 2;
+  }
+  streams.stdout.write(`${JSON.stringify(SCHEMAS[selectedName], null, 2)}\n`);
   return 0;
 }

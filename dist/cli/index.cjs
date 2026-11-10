@@ -87363,6 +87363,7 @@ var review_publish_result_schema_default = {
 
 // src/cli/commands/schema.ts
 var SCHEMAS = {
+  config: config_schema_default,
   "agent-plan": agent_plan_schema_default,
   plan: agent_plan_schema_default,
   doctor: doctor_schema_default,
@@ -87374,8 +87375,15 @@ var SCHEMAS = {
   generate: generate_recipe_schema_default
 };
 function schemaCommand(name, streams) {
-  const schema = (name ? SCHEMAS[name] : void 0) ?? config_schema_default;
-  streams.stdout.write(`${JSON.stringify(schema, null, 2)}
+  const selectedName = name ?? "config";
+  if (!Object.hasOwn(SCHEMAS, selectedName)) {
+    streams.stderr.write(
+      `Unknown schema: ${selectedName || "(empty)"}. Available schemas: ${Object.keys(SCHEMAS).join(", ")}.
+`
+    );
+    return 2;
+  }
+  streams.stdout.write(`${JSON.stringify(SCHEMAS[selectedName], null, 2)}
 `);
   return 0;
 }

@@ -574,7 +574,7 @@ describe("CLI review publish command", () => {
   it("ships the versioned review-publish schema through the schema command", () => {
     const stdout = createMockStream();
 
-    expect(schemaCommand("review-publish", { stdout: stdout.stream })).toBe(0);
+    expect(schemaCommand("review-publish", { stdout: stdout.stream, stderr: createMockStream().stream })).toBe(0);
     expect(JSON.parse(stdout.output)).toEqual(reviewPublishSchema);
   });
 });
