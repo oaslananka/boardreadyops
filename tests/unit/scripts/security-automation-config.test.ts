@@ -282,7 +282,7 @@ describe("dependency and security automation configuration", () => {
     const fedoraMatch = new RegExp(fedoraManager?.matchStrings?.[0] ?? "(?!)", "u").exec(actionDockerfilePin);
     expect(fedoraMatch?.groups).toMatchObject({
       currentValue: "45",
-      currentDigest: "sha256:aacbc26b38361ba0cb3d10f268da40b61b36aed6ed6fe5831a35871636bedb06",
+      currentDigest: "sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c",
     });
     expect(fedoraManager?.autoReplaceStringTemplate).toBe(
       "# renovate: datasource=docker depName=fedora currentValue={{{newValue}}}\nFROM fedora@{{{newDigest}}}",
