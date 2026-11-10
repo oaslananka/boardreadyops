@@ -77186,6 +77186,12 @@ async function prepareRun(root, options, streams, locale, signal) {
   }
   return { loaded, exitCode: 3 };
 }
+function preflightStatusMessage(exitCode, findingCount) {
+  if (exitCode !== 0) return "\u274C \x1B[31mPreflight Failed!\x1B[0m";
+  if (findingCount === 0) return "\u2728 \x1B[32mPreflight Passed!\x1B[0m";
+  const findings = findingCount === 1 ? "finding requires" : "findings require";
+  return `\u26A0\uFE0F \x1B[33mScan complete: ${findingCount} ${findings} review (non-blocking).\x1B[0m`;
+}
 async function runCommand(pathInput, options, streams, commandName = "run", runtime = {}) {
   runtime.signal?.throwIfAborted();
   const locale = resolveLocale();
@@ -77225,9 +77231,7 @@ async function runCommand(pathInput, options, streams, commandName = "run", runt
         const resultExitCode = result.summary.failed ? 1 : 0;
         const cliResult = withCliStatus(result, resultExitCode);
         if (spinner) {
-          spinner.stop(
-            resultExitCode === 0 ? "\u2728 \x1B[32mPreflight Passed!\x1B[0m" : "\u274C \x1B[31mPreflight Failed!\x1B[0m"
-          );
+          spinner.stop(preflightStatusMessage(resultExitCode, result.findings.length));
         }
         await writeReports(cliResult, root, outputOptions(options), loaded, streams.stdout, locale);
         if (!hasExplicitReportOutput(options)) {
