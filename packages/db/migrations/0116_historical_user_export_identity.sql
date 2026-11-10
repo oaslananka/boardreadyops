@@ -21,5 +21,5 @@ CREATE INDEX IF NOT EXISTS idx_data_exports_historical_user_identity
   WHERE original_github_user_id IS NOT NULL AND scope='user' AND installation_id IS NULL;
 
 INSERT INTO cloud_schema_migrations(version)
-VALUES ('0115_historical_user_export_identity')
+VALUES ('0116_historical_user_export_identity')
 ON CONFLICT (version) DO NOTHING;

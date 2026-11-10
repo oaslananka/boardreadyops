@@ -76,5 +76,5 @@ END;
 $$;
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0120_historical_user_core_source_mutation_epoch')
+VALUES ('0121_historical_user_core_source_mutation_epoch')
 ON CONFLICT(version) DO NOTHING;

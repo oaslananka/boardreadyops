@@ -27,6 +27,7 @@ vi.mock("../../../packages/db/src/pg-executor.ts", () => ({
 import {
   loadRepositoryBoardHistory,
   loadRepositoryDetail,
+  loadViewerDesignEvidence,
   loadViewerRepositories,
   summarizeViewerRepositories,
 } from "../../../apps/web/lib/repository-dashboard.js";
@@ -128,6 +129,112 @@ describe("repository dashboard and viewer loader branches", () => {
     expect(sql).toContain("probe.status = 'completed'");
     expect(sql).toContain("probe.installation_id = repositories.installation_id");
     expect(sql).toContain("probe.repository_id = repositories.id");
+  });
+
+  it("loads only scoped metadata for the latest published source design, not SVG contents", async () => {
+    const first = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      installationId: "installation-1",
+      githubInstallationId: 123,
+      accountLogin: "acme",
+      owner: "acme",
+      name: "private-board",
+      private: true,
+      latestRunId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      latestRunStatus: "completed",
+      latestRunDecision: "unknown",
+      latestRunAt: "2026-11-08T00:00:00Z",
+      openFindings: 3,
+      watchedBoards: 0,
+      openSupplyFindings: 0,
+    };
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          run_id: first.latestRunId,
+          repository_id: first.id,
+          has_pcb: true,
+          has_schematic: true,
+        },
+      ],
+    });
+    const result = await loadViewerDesignEvidence(
+      { login: "alice", installationIds: [123] },
+      [{ accountLogin: "acme", repositories: [first] }],
+      { DATABASE_URL: TEST_DB_URL },
+    );
+    expect(result).toEqual({
+      runId: first.latestRunId,
+      repositoryId: first.id,
+      repository: "acme/private-board",
+      hasPcb: true,
+      hasSchematic: true,
+    });
+    const [sql, params] = mockQuery.mock.lastCall ?? [];
+    expect(sql).toContain("unnest($1::text[], $2::text[])");
+    expect(sql).toContain("release_runs.repository_id = candidate.repository_id");
+    expect(sql).toContain("installations.github_installation_id = any($3::bigint[])");
+    expect(sql).toContain("installations.suspended_at is null");
+    expect(sql).toContain("repositories.disabled_at is null");
+    expect(sql).toContain("not exists (");
+    expect(sql).toContain("limit 1");
+    expect(sql).not.toContain("s.content");
+    expect(sql).not.toContain("s.anchors");
+    expect(params).toEqual([[first.latestRunId], [first.id], [123]]);
+    expect(mockClose).toHaveBeenCalled();
+  });
+
+  it("does not disclose another installation's run even when a metadata query returns an unexpected row", async () => {
+    const repo = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      installationId: "installation-1",
+      githubInstallationId: 123,
+      accountLogin: "acme",
+      owner: "acme",
+      name: "board",
+      private: true,
+      latestRunId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      latestRunStatus: "completed",
+      latestRunDecision: "unknown",
+      latestRunAt: undefined,
+      openFindings: 0,
+      watchedBoards: 0,
+      openSupplyFindings: 0,
+    };
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          run_id: repo.latestRunId,
+          repository_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          has_pcb: true,
+          has_schematic: true,
+        },
+      ],
+    });
+    expect(
+      await loadViewerDesignEvidence(
+        { login: "alice", installationIds: [123] },
+        [{ accountLogin: "acme", repositories: [repo] }],
+        { DATABASE_URL: TEST_DB_URL },
+      ),
+    ).toBeUndefined();
+  });
+
+  it("skips design evidence queries for unauthenticated, unconfigured or runless dashboards", async () => {
+    const empty = [{ accountLogin: "acme", repositories: [] }];
+    expect(await loadViewerDesignEvidence(undefined, empty, { DATABASE_URL: TEST_DB_URL })).toBeUndefined();
+    expect(
+      await loadViewerDesignEvidence({ login: "alice" } as Parameters<typeof loadViewerDesignEvidence>[0], empty, {
+        DATABASE_URL: TEST_DB_URL,
+      }),
+    ).toBeUndefined();
+    expect(
+      await loadViewerDesignEvidence({ login: "alice", installationIds: [] }, empty, { DATABASE_URL: TEST_DB_URL }),
+    ).toBeUndefined();
+    expect(
+      await loadViewerDesignEvidence({ login: "alice", installationIds: [123] }, empty, { DATABASE_URL: TEST_DB_URL }),
+    ).toBeUndefined();
+    expect(await loadViewerDesignEvidence({ login: "alice", installationIds: [123] }, empty, {})).toBeUndefined();
   });
 
   it("summarizes only repository facts already present in the viewer groups", () => {

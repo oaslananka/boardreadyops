@@ -4,7 +4,9 @@ import type { RepositorySetupPreset } from "@boardreadyops/cloud-core/repository
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { customerStatusLabel } from "../lib/customer-nomenclature.js";
+import type { InstallationCapabilities } from "../lib/installation-capabilities.js";
 import { deriveRepositorySetupState } from "../lib/repository-setup-state.js";
+import { AppPermissionProfile } from "./app-permission-profile.js";
 import { Alert, Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
 import { YamlSyntaxHighlighter } from "./yaml-syntax-highlighter.js";
 
@@ -21,11 +23,21 @@ export type SetupTargetRepository = {
   setupProbeStatus?: string;
   setupProbeWorkflowRunId?: string;
   setupProbeExpiresAt?: string;
+  /** Most recent run visible to the selected installation. The Run route reauthorizes access. */
+  latestRunId?: string;
+  /** Scoped to this repository's actual GitHub App installation, not the first selector entry. */
+  installationGrants?: Pick<InstallationCapabilities, "permissions" | "missing" | "manageUrl">;
+  setupBlockedReason?: string;
+  readinessBlockedReason?: string;
+  /** Full readiness execution is distinct from setup validation and may be rollout-gated. */
+  readinessRunBlockedReason?: string;
 };
 
 export type RepositorySetupInteractiveProps = {
   presets: readonly RepositorySetupPreset[];
   initialPresetId: string;
+  /** Server-validated repository deep link; empty means the requested repository is unavailable. */
+  initialRepositoryId?: string;
   presetVersion: number;
   workflowPath: string;
   workflowContractVersion: number;
@@ -34,9 +46,6 @@ export type RepositorySetupInteractiveProps = {
   repositories?: readonly SetupTargetRepository[];
   signedIn?: boolean;
   /** Why the one-click path is unavailable for this installation, when it is. */
-  blockedReason?: string;
-  /** Why setup readiness validation is unavailable for this installation, when it is. */
-  readinessBlockedReason?: string;
 };
 
 type SetupPrResult = {
@@ -184,21 +193,27 @@ function SetupPrResultOutput({ result }: Readonly<{ result: SetupPrResult }>) {
 export function RepositorySetupInteractive({
   presets,
   initialPresetId,
+  initialRepositoryId,
   presetVersion,
   workflowPath,
   workflowContractVersion,
   workflowSource,
   repositories = [],
   signedIn = false,
-  blockedReason,
-  readinessBlockedReason,
 }: Readonly<RepositorySetupInteractiveProps>) {
   const [selectedId, setSelectedId] = useState(initialPresetId);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [prResult, setPrResult] = useState<SetupPrResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [probeResult, setProbeResult] = useState<SetupProbeResult | null>(null);
-  const [repositoryId, setRepositoryId] = useState(repositories[0]?.id ?? "");
+  const [repositoryId, setRepositoryId] = useState(() => {
+    if (initialRepositoryId !== undefined) {
+      if (repositories.some((repository) => repository.id === initialRepositoryId)) return initialRepositoryId;
+      return "";
+    }
+    if (repositories.length === 1) return repositories[0]?.id ?? "";
+    return "";
+  });
   const [setupOverrides, setSetupOverrides] = useState<
     Record<
       string,
@@ -258,6 +273,12 @@ export function RepositorySetupInteractive({
     setRepositoryId(id);
     setPrResult(null);
     setProbeResult(null);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (id) url.searchParams.set("repositoryId", id);
+      else url.searchParams.delete("repositoryId");
+      window.history.replaceState({}, "", url.toString());
+    }
   }, []);
 
   const selectedRepository = repositories.find((repository) => repository.id === repositoryId);
@@ -412,7 +433,9 @@ export function RepositorySetupInteractive({
           isCreating={isCreatingPr}
           selectionDisabled={isCreatingPr || isValidating}
           workflowPath={workflowPath}
-          {...(blockedReason ? { blockedReason } : {})}
+          {...(displayedRepository?.setupBlockedReason
+            ? { blockedReason: displayedRepository.setupBlockedReason }
+            : {})}
           {...(prResult ? { result: prResult } : {})}
         />
       </Panel>
@@ -422,8 +445,19 @@ export function RepositorySetupInteractive({
         {...(displayedRepository ? { repository: displayedRepository } : {})}
         isValidating={isValidating}
         onValidate={handleValidateReadiness}
-        {...(readinessBlockedReason ? { blockedReason: readinessBlockedReason } : {})}
+        {...(displayedRepository?.readinessBlockedReason
+          ? { blockedReason: displayedRepository.readinessBlockedReason }
+          : {})}
         {...(probeResult ? { result: probeResult } : {})}
+      />
+      <AppPermissionProfile
+        {...(displayedRepository?.installationGrants
+          ? {
+              granted: displayedRepository.installationGrants.permissions,
+              missing: displayedRepository.installationGrants.missing,
+              manageUrl: displayedRepository.installationGrants.manageUrl,
+            }
+          : {})}
       />
     </>
   );
@@ -639,6 +673,56 @@ function SetupReadiness(props: Readonly<SetupReadinessProps>) {
           blockedReason={props.blockedReason}
         />
         {props.result ? <SetupProbeResultOutput result={props.result} /> : null}
+        <Alert
+          title="After validation: run a real hardware check"
+          tone={props.repository?.readinessRunBlockedReason ? "warning" : "info"}
+        >
+          <p>
+            A setup probe verifies workflow configuration. It does not produce hardware findings, a signed readiness
+            result, or manufacturing approval.
+          </p>
+          {props.repository?.readinessRunBlockedReason ? (
+            <>
+              <p>{props.repository.readinessRunBlockedReason}</p>
+              <p>
+                You can still investigate your hardware while hosted runs are unavailable. A recorded run may be
+                incomplete or unsigned, and it does not prove your current design is ready.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                {props.repository.latestRunId ? (
+                  <Link
+                    href={`/runs/${encodeURIComponent(props.repository.latestRunId)}`}
+                    className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
+                  >
+                    Inspect latest recorded run →
+                  </Link>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No earlier run is recorded for this repository yet.</p>
+                )}
+                <a
+                  href="https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
+                >
+                  Run a local first check →
+                </a>
+              </div>
+              <p>
+                A local check can identify issues on the files you have, but it does not enable hosted runs, create an
+                OIDC-signed Check Run, or approve fabrication.
+              </p>
+            </>
+          ) : props.repository ? (
+            <p>
+              After the reviewed setup pull request is merged and the probe succeeds, open a pull request changing your
+              hardware project. Inspect the resulting GitHub Check Run for an actionable finding and its hosted run; an
+              empty or queued result is not a first useful finding.
+            </p>
+          ) : (
+            <p>Connect and select a repository to see whether full readiness runs are enabled for it.</p>
+          )}
+        </Alert>
         <SetupReadinessTroubleshooting />
       </div>
     </Panel>
@@ -894,6 +978,9 @@ function OneClickSetup({
             onChange={(event) => onSelectRepository(event.currentTarget.value)}
             className="mt-1 min-h-11 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
+            <option value="" disabled>
+              Choose an authorized repository
+            </option>
             {repositories.map((repository) => (
               <option key={repository.id} value={repository.id}>
                 {repository.fullName}

@@ -108,5 +108,5 @@ END;
 $$;
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0116_historical_user_artifact_copy_fence')
+VALUES ('0117_historical_user_artifact_copy_fence')
 ON CONFLICT(version) DO NOTHING;

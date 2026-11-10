@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
+import { RealDesignEvidencePanel } from "../../components/real-design-evidence-panel.js";
 import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { AppShell, Panel, StatusBadge } from "../../components/ui.js";
@@ -7,9 +8,11 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { repositoriesRequiringReview } from "../../lib/dashboard-next-action.js";
 import {
   type DashboardRepositorySummary,
+  loadViewerDesignEvidence,
   loadViewerRepositories,
   type RepositoryGroup,
   summarizeViewerRepositories,
+  type ViewerDesignEvidence,
 } from "../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
@@ -395,11 +398,13 @@ function DashboardBody({
   hasInstallation,
   groups,
   summary,
+  designEvidence,
 }: Readonly<{
   hasSession: boolean;
   hasInstallation: boolean;
   groups: RepositoryGroup[];
   summary: DashboardRepositorySummary;
+  designEvidence?: ViewerDesignEvidence;
 }>) {
   if (!hasSession) {
     return (
@@ -428,6 +433,7 @@ function DashboardBody({
 
   return (
     <div className="flex flex-col gap-5">
+      {designEvidence ? <RealDesignEvidencePanel evidence={designEvidence} /> : null}
       <AttentionBanner summary={summary} groups={groups} />
       <RecordedHardwareWork groups={groups} />
       {summary.repositoriesWithoutRuns > summary.repositories / 2 ? (
@@ -472,6 +478,7 @@ export default async function DashboardPage() {
   const viewer = await viewerAuthorization();
   const groups = await loadViewerRepositories(viewer.session);
   const summary = summarizeViewerRepositories(groups);
+  const designEvidence = await loadViewerDesignEvidence(viewer.session, groups);
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Dashboard" }]}>
@@ -487,6 +494,7 @@ export default async function DashboardPage() {
           hasInstallation={Boolean(viewer.session?.installationIds?.length)}
           groups={groups}
           summary={summary}
+          {...(designEvidence ? { designEvidence } : {})}
         />
       </main>
     </AppShell>

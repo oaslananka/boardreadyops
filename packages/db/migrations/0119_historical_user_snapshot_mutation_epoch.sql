@@ -106,5 +106,5 @@ AFTER INSERT ON public.audit_events
 FOR EACH ROW EXECUTE FUNCTION boardreadyops_note_historical_audit_epoch();
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0118_historical_user_snapshot_mutation_epoch')
+VALUES ('0119_historical_user_snapshot_mutation_epoch')
 ON CONFLICT(version) DO NOTHING;

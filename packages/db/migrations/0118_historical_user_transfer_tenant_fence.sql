@@ -187,5 +187,5 @@ BEFORE INSERT OR UPDATE OF repository_id ON public.reviews
 FOR EACH ROW EXECUTE FUNCTION boardreadyops_guard_historical_transfer_new_review();
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0117_historical_user_transfer_tenant_fence')
+VALUES ('0118_historical_user_transfer_tenant_fence')
 ON CONFLICT (version) DO NOTHING;

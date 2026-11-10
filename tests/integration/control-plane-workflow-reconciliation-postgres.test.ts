@@ -500,35 +500,110 @@ describeDatabase("GitHub workflow PostgreSQL reconciliation", () => {
     ]);
   });
 
-  it("dead-letters a spent item instead of rescheduling it back onto the queue", async () => {
-    const fixture = await createFixture("exhausted");
-    const workerId = `${testPrefix}-worker-exhausted`;
-    const claimed = await detectAndClaim(fixture, workerId);
-
-    // Spend the budget. A workflow that never settles reaches this on its own; forcing it keeps
-    // the test to the behaviour under examination rather than a dozen round trips.
-    await database().query(`update control_plane_reconciliation_items set attempt_count = max_attempts where id = $1`, [
-      claimed.reconciliationId,
+  it("does not exhaust the error budget for successful pending workflow observations", async () => {
+    const fixture = await createFixture("pending-polls");
+    await database().query("update release_runs set github_check_run_id = $2 where id = $1", [
+      fixture.releaseRunId,
+      externalIdSeed + 15,
     ]);
+    const firstWorkerId = `${testPrefix}-worker-poll-0`;
+    let claimed = await detectAndClaim(fixture, firstWorkerId);
 
+    // The original 12-claim limit can run out before the authoritative 30-minute deadline,
+    // even though every GitHub API observation succeeds and the runner callback is pending.
+    for (let minute = 0; minute < 16; minute += 1) {
+      const at = new Date(fixture.now.valueOf() + minute * 60_000);
+      const workerId = minute === 0 ? firstWorkerId : `${testPrefix}-worker-poll-${minute}`;
+      const store =
+        minute === 0
+          ? fixture.store
+          : createSqlControlPlaneOperationsStore(database(), { now: () => at, leaseSeconds: 60 });
+      if (minute > 0) {
+        const next = (await store.claimWorkflowReconciliationItems({ workerId, limit: 1 }))[0];
+        if (!next) throw new Error(`missing pending workflow observation ${minute}`);
+        claimed = next;
+      }
+      expect(claimed.attemptCount).toBe(1);
+      await expect(
+        store.rescheduleReconciliationItem({
+          reconciliationId: claimed.reconciliationId,
+          workerId,
+          nextCheckAt: new Date(at.valueOf() + 60_000),
+          outcomeCode: "github_result_callback_pending",
+        }),
+      ).resolves.toBe("rescheduled");
+      expect(
+        rows(
+          await database().query(
+            `select status, attempt_count::int, completed_at is not null as completed
+               from control_plane_reconciliation_items where id = $1`,
+            [claimed.reconciliationId],
+          ),
+        ),
+      ).toEqual([{ status: "available", attempt_count: 0, completed: false }]);
+    }
+
+    // At the actual deadline, the workflow's success without a signed callback is a
+    // fail-closed operational failure, never an invented readiness PASS.
+    const terminalAt = new Date(fixture.now.valueOf() + 21 * 60_000);
+    const terminalStore = createSqlControlPlaneOperationsStore(database(), {
+      now: () => terminalAt,
+      leaseSeconds: 60,
+    });
+    const workerId = `${testPrefix}-worker-terminal`;
+    const terminalClaim = (await terminalStore.claimWorkflowReconciliationItems({ workerId, limit: 1 }))[0];
+    expect(terminalClaim?.reconciliationId).toBe(claimed.reconciliationId);
     await expect(
-      fixture.store.rescheduleReconciliationItem({
+      terminalStore.applyWorkflowReconciliation({
         reconciliationId: claimed.reconciliationId,
         workerId,
-        nextCheckAt: new Date(fixture.now.valueOf() + 1000),
-        outcomeCode: "github_workflow_in_progress",
+        observedStatus: "completed",
+        observedConclusion: "success",
+        terminalStatus: "failed",
+        publicFailureReason: "github_result_callback_missing",
       }),
-    ).resolves.toBe("dead_letter");
-
+    ).resolves.toBe("applied");
     expect(
       rows(
         await database().query(
-          `select status, public_failure_reason, completed_at is not null as completed
-             from control_plane_reconciliation_items where id = $1`,
-          [claimed.reconciliationId],
+          `select rr.status as run_status, rra.status as attempt_status,
+                  rra.failure_class, cpri.status as reconciliation_status
+             from release_runs rr
+             join release_run_attempts rra on rra.run_id = rr.id
+             join control_plane_reconciliation_items cpri on cpri.execution_attempt_id = rra.id
+            where rr.id = $1`,
+          [fixture.releaseRunId],
         ),
       ),
-    ).toEqual([{ status: "dead_letter", public_failure_reason: "operator_replay_required", completed: true }]);
+    ).toEqual([
+      {
+        run_status: "failed",
+        attempt_status: "failed",
+        failure_class: "github_result_callback_missing",
+        reconciliation_status: "completed",
+      },
+    ]);
+
+    // A terminal run with no signed result is eligible for the existing Check Run
+    // recovery path, which publishes failure rather than leaving the PR pending.
+    const checkAt = new Date(fixture.now.valueOf() + 27 * 60_000);
+    const checkStore = createSqlControlPlaneOperationsStore(database(), { now: () => checkAt, leaseSeconds: 60 });
+    await expect(
+      checkStore.detectCheckRunReconciliationCandidates({
+        observationDelaySeconds: 300,
+        terminalDeadlineSeconds: 1800,
+        limit: 10,
+      }),
+    ).resolves.toBe(1);
+    const checkWorkerId = `${testPrefix}-check-worker`;
+    const checkClaim = (await checkStore.claimCheckRunReconciliationItems({ workerId: checkWorkerId, limit: 1 }))[0];
+    expect(checkClaim?.releaseRunId).toBe(fixture.releaseRunId);
+    await expect(
+      checkStore.loadCheckRunReconciliationContext({
+        reconciliationId: checkClaim?.reconciliationId ?? "",
+        workerId: checkWorkerId,
+      }),
+    ).resolves.toMatchObject({ expectedConclusion: "failure", resultReported: false });
   });
 
   it("keeps claiming while an exhausted item sits on the queue", async () => {

@@ -79,5 +79,5 @@ BEFORE DELETE ON public.data_exports
 FOR EACH ROW EXECUTE FUNCTION public.boardreadyops_guard_historical_export_private_read();
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0125_historical_user_private_partial_read_reservations')
+VALUES ('0126_historical_user_private_partial_read_reservations')
 ON CONFLICT(version) DO NOTHING;

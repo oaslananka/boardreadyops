@@ -202,6 +202,15 @@ describe("reproducible contributor toolchain", () => {
     expect(ci).toContain(`UV_VERSION: "${config.python.uv}"`);
     expect(security).toContain(`semgrep==${config.validation.semgrep}`);
     expect(security).toContain(`GITLEAKS_VERSION: ${config.validation.gitleaks}`);
+    // Keep the real secret scanner required when GitHub's direct release-download URL is unavailable.
+    expect(security).toContain("api.github.com/repos/gitleaks/gitleaks/releases");
+    expect(security).toContain("/tags/v");
+    expect(security).toContain("'Accept: application/octet-stream'");
+    expect(security).toContain("sha256sum -c -");
+    expect(security).toContain("gitleaks detect --source . --redact --verbose");
+    const gitleaksInstall = security.split("      - name: Install Gitleaks")[1]?.split("      - name: Run Gitleaks")[0];
+    expect(gitleaksInstall).toBeDefined();
+    expect(gitleaksInstall).not.toContain("continue-on-error");
     const webDockerfile = await repositoryFile("apps/web/Dockerfile");
     expect(webDockerfile).toContain(`# Node ${config.node.preferred}-slim (digest-pinned)`);
     const pinnedImageReferences = webDockerfile.match(/FROM node@sha256:[a-f0-9]{64} AS (?:base|runner)/gu);

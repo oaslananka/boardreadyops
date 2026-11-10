@@ -14,5 +14,5 @@ CREATE INDEX IF NOT EXISTS idx_data_export_archive_commitments_cleanup_candidate
   ON data_export_archive_commitments(expires_at)
   WHERE cleaned_at IS NULL;
 INSERT INTO cloud_schema_migrations(version)
-VALUES ('0114_data_export_archive_cleanup')
+VALUES ('0115_data_export_archive_cleanup')
 ON CONFLICT (version) DO NOTHING;

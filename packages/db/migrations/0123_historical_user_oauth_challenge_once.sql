@@ -52,5 +52,5 @@ BEFORE UPDATE OR DELETE ON public.historical_user_oauth_challenges
 FOR EACH ROW EXECUTE FUNCTION public.boardreadyops_guard_historical_oauth_challenge();
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0122_historical_user_oauth_challenge_once')
+VALUES ('0123_historical_user_oauth_challenge_once')
 ON CONFLICT(version) DO NOTHING;

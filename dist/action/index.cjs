@@ -40835,8 +40835,8 @@ var require_parse_class = __commonJS({
       "[:digit:]": ["\\p{Nd}"],
       "[:graph:]": ["\\p{Z}\\p{C}", true],
       "[:lower:]": ["\\p{Ll}"],
-      "[:print:]": ["\\p{C}"],
-      "[:punct:]": ["\\p{P}"],
+      "[:print:]": ["\\p{C}", true],
+      "[:punct:]": ["\\p{P}\\p{S}"],
       "[:space:]": ["\\p{Z}\\t\\r\\n\\v\\f"],
       "[:upper:]": ["\\p{Lu}"],
       "[:word:]": ["\\p{L}\\p{Nl}\\p{Nd}\\p{Pc}"],
@@ -40946,7 +40946,18 @@ var require_commonjs5 = __commonJS({
     var extTypes = "!?+*@";
     var lit = (ch) => ({ t: "lit", ch });
     var reEscape = (s) => s.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&");
-    var foldRe = (s) => new RegExp(`^${reEscape(s)}$`, "iu");
+    var newFoldRe = (s) => new RegExp(`^${reEscape(s)}$`, "iu");
+    var foldCache = /* @__PURE__ */ new Map();
+    var foldRe = (ch) => {
+      let re = foldCache.get(ch);
+      if (!re) {
+        re = newFoldRe(ch);
+        if (foldCache.size >= 1e3)
+          foldCache.clear();
+        foldCache.set(ch, re);
+      }
+      return re;
+    };
     var litMatch = (l, c) => {
       if (c === l.ch)
         return true;
@@ -41421,9 +41432,11 @@ var require_commonjs5 = __commonJS({
       #marks;
       // the Sim for strings that are only `.` or `..`
       #dotsSim;
-      // the string to compare, if the pattern has no magic. The RegExp
-      // folds case, if `nocase:true`.
+      // the string to compare, if the pattern has no magic. With
+      // `nocase:true`, the RegExp that folds case is made when it is
+      // first used.
       #literal;
+      #literalFold = false;
       #literalRe;
       // the nodes between the prefix and suffix, if the graph is a
       // single chain
@@ -41464,8 +41477,7 @@ var require_commonjs5 = __commonJS({
         this.#size = size;
         if (items.every((it) => it.t === "lit")) {
           this.#literal = items.map((it) => it.ch).join("");
-          if (nocase)
-            this.#literalRe = foldRe(this.#literal);
+          this.#literalFold = nocase;
         } else {
           const lit2 = (it) => it.t !== "lit" ? void 0 : nocase ? { ch: it.ch, re: foldRe(it.ch) } : { ch: it.ch };
           for (const it of items) {
@@ -41518,7 +41530,7 @@ var require_commonjs5 = __commonJS({
       // If it is not given, it is only found if a step needs it.
       #test(s, chars) {
         if (this.#literal !== void 0) {
-          return this.#literalRe ? this.#literalRe.test(s) : s === this.#literal;
+          return this.#literalFold ? (this.#literalRe ??= newFoldRe(this.#literal)).test(s) : s === this.#literal;
         }
         const min = this.#min;
         const max = this.#max;
@@ -55691,20 +55703,20 @@ var require_index_min = __commonJS({
         let e = t2.match(n);
         return e ? e[0] : null;
       }, pi = (n, t2, e) => {
-        let s, i, r, h, o, a = e.indexOf(n), l = e.indexOf(t2, a + 1), c = a;
-        if (a >= 0 && l > 0) {
-          if (n === t2) return [a, l];
-          for (s = [], r = e.length; c >= 0 && !o; ) {
-            if (c === a) s.push(c), a = e.indexOf(n, c + 1);
+        let s, i, r, h, a, o = e.indexOf(n), l = e.indexOf(t2, o + 1), c = o;
+        if (o >= 0 && l > 0) {
+          if (n === t2) return [o, l];
+          for (s = [], r = e.length; c >= 0 && !a; ) {
+            if (c === o) s.push(c), o = e.indexOf(n, c + 1);
             else if (s.length === 1) {
               let u = s.pop();
-              u !== void 0 && (o = [u, l]);
+              u !== void 0 && (a = [u, l]);
             } else i = s.pop(), i !== void 0 && i < r && (r = i, h = l), l = e.indexOf(t2, c + 1);
-            c = a < l && a >= 0 ? a : l;
+            c = o < l && o >= 0 ? o : l;
           }
-          s.length && h !== void 0 && (o = [r, h]);
+          s.length && h !== void 0 && (a = [r, h]);
         }
-        return o;
+        return a;
       };
       tt.range = pi;
     });
@@ -55735,12 +55747,12 @@ var require_index_min = __commonJS({
         for (; ; ) {
           let s = (0, cs.balanced)("{", "}", n);
           if (!s) {
-            let a = n.split(",");
-            return a[0] = e + a[0], ye(t2, a), t2;
+            let o = n.split(",");
+            return o[0] = e + o[0], ye(t2, o), t2;
           }
-          let { pre: i, body: r, post: h } = s, o = i.split(",");
-          if (o[0] = e + o[0], o[o.length - 1] += "{" + r + "}", !h.length) return ye(t2, o), t2;
-          e = o.pop(), ye(t2, o), n = h;
+          let { pre: i, body: r, post: h } = s, a = i.split(",");
+          if (a[0] = e + a[0], a[a.length - 1] += "{" + r + "}", !h.length) return ye(t2, a), t2;
+          e = a.pop(), ye(t2, a), n = h;
         }
       }
       function Mi(n, t2 = {}) {
@@ -55761,13 +55773,13 @@ var require_index_min = __commonJS({
         return n >= t2;
       }
       function lt(n, t2, e, s, i, r) {
-        let h = [], o = 0;
-        for (let a = 0; a < n.length; a++) for (let l = 0; l < e.length; l++) {
+        let h = [], a = 0;
+        for (let o = 0; o < n.length; o++) for (let l = 0; l < e.length; l++) {
           if (h.length >= s) return h;
-          let c = n[a] + t2 + e[l];
+          let c = n[o] + t2 + e[l];
           if (!(r && !c)) {
-            if (o + c.length > i) return h;
-            h.push(c), o += c.length;
+            if (a + c.length > i) return h;
+            h.push(c), a += c.length;
           }
         }
         return h;
@@ -55775,17 +55787,17 @@ var require_index_min = __commonJS({
       function Fi(n, t2, e, s) {
         let i = n.split(/\.\./), r = [];
         if (i[0] === void 0 || i[1] === void 0) return r;
-        let h = be(i[0]), o = be(i[1]), a = Math.max(i[0].length, i[1].length), l = i.length === 3 && i[2] !== void 0 ? Math.max(Math.abs(be(i[2])), 1) : 1, c = Pi;
-        o < h && (l *= -1, c = Ti);
-        let m = i.some(Ri), d = 0;
-        for (let g = h; c(g, o) && r.length < e; g += l) {
+        let h = be(i[0]), a = be(i[1]), o = Math.max(i[0].length, i[1].length), l = i.length === 3 && i[2] !== void 0 ? Math.max(Math.abs(be(i[2])), 1) : 1, c = Pi;
+        a < h && (l *= -1, c = Ti);
+        let p = i.some(Ri), d = 0;
+        for (let g = h; c(g, a) && r.length < e; g += l) {
           let f;
           if (t2) f = String.fromCharCode(g), f === "\\" && (f = "");
-          else if (f = String(g), m) {
-            let b = a - f.length;
+          else if (f = String(g), p) {
+            let b = o - f.length;
             if (b > 0) {
-              let p = new Array(b + 1).join("0");
-              g < 0 ? f = "-" + p + f.slice(1) : f = p + f;
+              let m = new Array(b + 1).join("0");
+              g < 0 ? f = "-" + m + f.slice(1) : f = m + f;
             }
           }
           if (d + f.length > s) break;
@@ -55795,107 +55807,107 @@ var require_index_min = __commonJS({
       }
       function Se(n, t2, e, s, i, r, h) {
         if (i > s) return [n];
-        let o = [""], a = 0, l = false, c = true;
+        let a = [""], o = 0, l = false, c = true;
         for (; ; ) {
           let u = (0, cs.balanced)("{", "}", n);
-          if (!u) return lt(o, n, [""], t2, e, l);
-          let m = u.pre;
-          if (/\$$/.test(m)) {
-            if (o = lt(o, m + "{" + u.body + "}", [""], t2, e, l && !u.post.length), c = false, !u.post.length) break;
+          if (!u) return lt(a, n, [""], t2, e, l);
+          let p = u.pre;
+          if (/\$$/.test(p)) {
+            if (a = lt(a, p + "{" + u.body + "}", [""], t2, e, l && !u.post.length), c = false, !u.post.length) break;
             n = u.post;
             continue;
           }
           let d = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(u.body), g = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(u.body), f = d || g, b = u.body.indexOf(",") >= 0;
           if (!f && !b) {
-            if (a < r && u.post.match(/,(?!,).*\}/)) {
-              a++, n = u.pre + "{" + u.body + ve + u.post, h = true;
+            if (o < r && u.post.match(/,(?!,).*\}/)) {
+              o++, n = u.pre + "{" + u.body + ve + u.post, h = true;
               continue;
             }
-            return lt(o, m + "{" + u.body + "}" + u.post, [""], t2, e, l);
+            return lt(a, p + "{" + u.body + "}" + u.post, [""], t2, e, l);
           }
           c && (l = h && !f, c = false);
-          let p;
-          if (f) p = Fi(u.body, g, t2, e);
+          let m;
+          if (f) m = Fi(u.body, g, t2, e);
           else {
             let y = ki(u.body);
             if (y.length === 1 && y[0] !== void 0 && (y = Se(y[0], t2, e, s, i + 1, r, false).map(xi), y.length === 1)) {
-              if (o = lt(o, m + y[0], [""], t2, e, l && !u.post.length), !u.post.length) break;
+              if (a = lt(a, p + y[0], [""], t2, e, l && !u.post.length), !u.post.length) break;
               n = u.post;
               continue;
             }
-            let _2 = l && !u.post.length && !m;
-            for (let S = 0; _2 && S < o.length; S++) o[S] && (_2 = false);
-            p = [];
+            let _2 = l && !u.post.length && !p;
+            for (let S = 0; _2 && S < a.length; S++) a[S] && (_2 = false);
+            m = [];
             let v = 0;
             t: for (let S = 0; S < y.length; S++) {
               let K = Se(y[S], t2, e, s, i + 1, r, false);
               for (let z3 = 0; z3 < K.length; z3++) {
                 let $ = K[z3];
                 if (!(_2 && !$)) {
-                  if (p.length >= t2 || v + $.length > e) break t;
-                  p.push($), v += $.length;
+                  if (m.length >= t2 || v + $.length > e) break t;
+                  m.push($), v += $.length;
                 }
               }
             }
           }
-          if (o = lt(o, m, p, t2, e, l && !u.post.length), !u.post.length) break;
+          if (a = lt(a, p, m, t2, e, l && !u.post.length), !u.post.length) break;
           n = u.post;
         }
-        return o;
+        return a;
       }
     });
     var gs = x((Tt) => {
       "use strict";
       Object.defineProperty(Tt, "__esModule", { value: true });
       Tt.parseClass = void 0;
-      var ji = { "[:alnum:]": ["\\p{L}\\p{Nl}\\p{Nd}"], "[:alpha:]": ["\\p{L}\\p{Nl}"], "[:ascii:]": ["\\x00-\\x7f"], "[:blank:]": ["\\p{Zs}\\t"], "[:cntrl:]": ["\\p{Cc}"], "[:digit:]": ["\\p{Nd}"], "[:graph:]": ["\\p{Z}\\p{C}", true], "[:lower:]": ["\\p{Ll}"], "[:print:]": ["\\p{C}"], "[:punct:]": ["\\p{P}"], "[:space:]": ["\\p{Z}\\t\\r\\n\\v\\f"], "[:upper:]": ["\\p{Lu}"], "[:word:]": ["\\p{L}\\p{Nl}\\p{Nd}\\p{Pc}"], "[:xdigit:]": ["A-Fa-f0-9"] }, ct = (n) => n.replace(/[[\]\\-]/g, "\\$&"), _e = /$./, Di = (n, t2, e = false, s) => {
-        let i = (p) => {
-          let y = s ? p.normalize(s) : p;
-          return [...y].length === 1 ? y : p;
+      var ji = { "[:alnum:]": ["\\p{L}\\p{Nl}\\p{Nd}"], "[:alpha:]": ["\\p{L}\\p{Nl}"], "[:ascii:]": ["\\x00-\\x7f"], "[:blank:]": ["\\p{Zs}\\t"], "[:cntrl:]": ["\\p{Cc}"], "[:digit:]": ["\\p{Nd}"], "[:graph:]": ["\\p{Z}\\p{C}", true], "[:lower:]": ["\\p{Ll}"], "[:print:]": ["\\p{C}", true], "[:punct:]": ["\\p{P}\\p{S}"], "[:space:]": ["\\p{Z}\\t\\r\\n\\v\\f"], "[:upper:]": ["\\p{Lu}"], "[:word:]": ["\\p{L}\\p{Nl}\\p{Nd}\\p{Pc}"], "[:xdigit:]": ["A-Fa-f0-9"] }, ct = (n) => n.replace(/[[\]\\-]/g, "\\$&"), _e = /$./, Di = (n, t2, e = false, s) => {
+        let i = (m) => {
+          let y = s ? m.normalize(s) : m;
+          return [...y].length === 1 ? y : m;
         }, r = t2;
         if (n.charAt(r) !== "[") throw new Error("not in a brace expression");
-        let h = [], o = [], a = r + 1, l = false, c = false, u = false, m = r, d = "";
-        t: for (; a < n.length; ) {
-          let p = String.fromCodePoint(n.codePointAt(a));
-          if ((p === "!" || p === "^") && a === r + 1) {
-            u = true, a++;
+        let h = [], a = [], o = r + 1, l = false, c = false, u = false, p = r, d = "";
+        t: for (; o < n.length; ) {
+          let m = String.fromCodePoint(n.codePointAt(o));
+          if ((m === "!" || m === "^") && o === r + 1) {
+            u = true, o++;
             continue;
           }
-          if (p === "]" && l && !c) {
-            m = a + 1;
+          if (m === "]" && l && !c) {
+            p = o + 1;
             break;
           }
-          if (l = true, p === "\\" && !c) {
-            c = true, a++;
+          if (l = true, m === "\\" && !c) {
+            c = true, o++;
             continue;
           }
-          if (p === "[" && !c) {
-            for (let [_2, [v, S]] of Object.entries(ji)) if (n.startsWith(_2, a)) {
+          if (m === "[" && !c) {
+            for (let [_2, [v, S]] of Object.entries(ji)) if (n.startsWith(_2, o)) {
               if (d) return [_e, n.length - r];
-              a += _2.length, S ? o.push(v) : h.push(v);
+              o += _2.length, S ? a.push(v) : h.push(v);
               continue t;
             }
           }
           c = false;
-          let y = i(p);
+          let y = i(m);
           if (d) {
-            y.codePointAt(0) > d.codePointAt(0) ? h.push(ct(d) + "-" + ct(y)) : y === d && h.push(ct(y)), d = "", a += p.length;
+            y.codePointAt(0) > d.codePointAt(0) ? h.push(ct(d) + "-" + ct(y)) : y === d && h.push(ct(y)), d = "", o += m.length;
             continue;
           }
-          if (n.startsWith("-]", a + p.length)) {
-            h.push(ct(y + "-")), a += p.length + 1;
+          if (n.startsWith("-]", o + m.length)) {
+            h.push(ct(y + "-")), o += m.length + 1;
             continue;
           }
-          if (n.startsWith("-", a + p.length)) {
-            d = y, a += p.length + 1;
+          if (n.startsWith("-", o + m.length)) {
+            d = y, o += m.length + 1;
             continue;
           }
-          h.push(ct(y)), a += p.length;
+          h.push(ct(y)), o += m.length;
         }
-        if (m < a) return [_e, 0];
-        if (!h.length && !o.length) return [_e, n.length - r];
-        let g = "[" + (u ? "^" : "") + h.join("") + "]", f = "[" + (u ? "" : "^") + o.join("") + "]", b = "^" + (h.length && o.length ? "(" + g + "|" + f + ")" : h.length ? g : f);
-        return [new RegExp(b, e ? "iu" : "u"), m - r];
+        if (p < o) return [_e, 0];
+        if (!h.length && !a.length) return [_e, n.length - r];
+        let g = "[" + (u ? "^" : "") + h.join("") + "]", f = "[" + (u ? "" : "^") + a.join("") + "]", b = "^" + (h.length && a.length ? "(" + g + "|" + f + ")" : h.length ? g : f);
+        return [new RegExp(b, e ? "iu" : "u"), p - r];
       };
       Tt.parseClass = Di;
     });
@@ -55915,14 +55927,14 @@ var require_index_min = __commonJS({
         for (let r = 0; r < n.length; ) {
           let h = String.fromCodePoint(n.codePointAt(r));
           if (h === "\\") {
-            let o = n.codePointAt(r + 1), a = o === void 0 ? h : String.fromCodePoint(o);
-            i.push(et(a)), r += 1 + a.length;
+            let a = n.codePointAt(r + 1), o = a === void 0 ? h : String.fromCodePoint(a);
+            i.push(et(o)), r += 1 + o.length;
             continue;
           }
           if (h === "[") {
-            let [o, a] = (0, Ni.parseClass)(n, r, t2, s);
-            if (a) {
-              i.push({ t: "class", re: o }), r += a;
+            let [a, o] = (0, Ni.parseClass)(n, r, t2, s);
+            if (o) {
+              i.push({ t: "class", re: a }), r += o;
               continue;
             }
           }
@@ -55940,12 +55952,12 @@ var require_index_min = __commonJS({
         }), t2;
       }, Ss = (n, t2, e, s, i) => {
         let r = [], h = [r];
-        for (let o = e; o < s; o++) {
-          let a = n[o], l = t2.get(o);
-          if (a.t === "open" && l !== void 0) {
-            let c = Ss(n, t2, o + 1, l, false);
-            r.push({ t: "ext", type: a.type, alts: c }), o = l;
-          } else a.t === "bar" && !i ? h.push(r = []) : a.t === "open" ? r.push(et(a.type), et("(")) : a.t === "bar" ? r.push(et("|")) : a.t === "close" ? r.push(et(")")) : r.push(a);
+        for (let a = e; a < s; a++) {
+          let o = n[a], l = t2.get(a);
+          if (o.t === "open" && l !== void 0) {
+            let c = Ss(n, t2, a + 1, l, false);
+            r.push({ t: "ext", type: o.type, alts: c }), a = l;
+          } else o.t === "bar" && !i ? h.push(r = []) : o.t === "open" ? r.push(et(o.type), et("(")) : o.t === "bar" ? r.push(et("|")) : o.t === "close" ? r.push(et(")")) : r.push(o);
         }
         return h;
       }, vs = (n, t2) => {
@@ -55962,50 +55974,50 @@ var require_index_min = __commonJS({
         }
         return i(), e;
       }, Gi = (n, t2) => {
-        let e = 1, s = (o) => ({ t: "split", id: e++, out: o }), i = (o, a) => o.reduceRight((l, c) => r(c, l), a), r = (o, a) => {
-          switch (o.t) {
+        let e = 1, s = (a) => ({ t: "split", id: e++, out: a }), i = (a, o) => a.reduceRight((l, c) => r(c, l), o), r = (a, o) => {
+          switch (a.t) {
             case "lit":
-              let m = t2 ? Oe(o.ch) : void 0;
-              return { t: "lit", id: e++, ch: o.ch, re: m, next: a };
+              let p = t2 ? Oe(a.ch) : void 0;
+              return { t: "lit", id: e++, ch: a.ch, re: p, next: o };
             case "any":
             case "star":
-              return { t: o.t, id: e++, next: a };
+              return { t: a.t, id: e++, next: o };
             case "class":
-              return { t: "class", id: e++, re: o.re, next: a };
+              return { t: "class", id: e++, re: a.re, next: o };
           }
-          let l = (m) => o.alts.map((d) => i(d, m));
-          switch (o.type) {
+          let l = (p) => a.alts.map((d) => i(d, p));
+          switch (a.type) {
             case "@":
-              return s(l(a));
+              return s(l(o));
             case "?":
-              return s([a, ...l(a)]);
+              return s([o, ...l(o)]);
             case "!":
-              return { t: "neg", id: e++, sub: s(l(Ee)), next: a };
+              return { t: "neg", id: e++, sub: s(l(Ee)), next: o };
           }
           let c = s([]), u = s(l(c));
-          return c.out.push(a, u), o.type === "*" ? c : u;
+          return c.out.push(o, u), a.type === "*" ? c : u;
         };
         return [i(n, Ee), e];
       }, Ii = (n) => {
         let t2 = [], e = /* @__PURE__ */ new Set(), s = (r) => r.t === "match" ? "match" : String(r.id), i = (r, h) => {
           if (r.t === "match" || e.has(r)) return;
           e.add(r);
-          let o = (a) => t2.push(`${h}${r.id}: ${a}`);
+          let a = (o) => t2.push(`${h}${r.id}: ${o}`);
           switch (r.t) {
             case "split":
-              o(`split -> ${r.out.map(s).join(", ")}`);
-              for (let a of r.out) i(a, h);
+              a(`split -> ${r.out.map(s).join(", ")}`);
+              for (let o of r.out) i(o, h);
               return;
             case "neg":
-              return o(`!(${s(r.sub)}) -> ${s(r.next)}`), i(r.sub, h + "  "), i(r.next, h);
+              return a(`!(${s(r.sub)}) -> ${s(r.next)}`), i(r.sub, h + "  "), i(r.next, h);
             case "lit":
-              o(`${JSON.stringify(r.ch)} -> ${s(r.next)}`);
+              a(`${JSON.stringify(r.ch)} -> ${s(r.next)}`);
               break;
             case "class":
-              o(`${r.re} -> ${s(r.next)}`);
+              a(`${r.re} -> ${s(r.next)}`);
               break;
             default:
-              o(`${r.t === "any" ? "?" : "*"} -> ${s(r.next)}`);
+              a(`${r.t === "any" ? "?" : "*"} -> ${s(r.next)}`);
           }
           i(r.next, h);
         };
@@ -56092,8 +56104,8 @@ var require_index_min = __commonJS({
               this.addRun(r, h, s + 1, i);
               continue;
             }
-            let o = this.step(h.state, e, s, false);
-            this.addRun(r, { t: "run", neg: h.neg, state: o }, s + 1, i);
+            let a = this.step(h.state, e, s, false);
+            this.addRun(r, { t: "run", neg: h.neg, state: a }, s + 1, i);
           }
           return this.done(r);
         }
@@ -56150,20 +56162,20 @@ var require_index_min = __commonJS({
         }
         return t2;
       }, qi = (n, t2, e, s) => {
-        let i = 0, r = e, h = -1, o = 0;
+        let i = 0, r = e, h = -1, a = 0;
         for (; r < s; ) {
-          let a = n[i];
-          if (a?.t === "star") {
-            h = i++, o = r;
+          let o = n[i];
+          if (o?.t === "star") {
+            h = i++, a = r;
             continue;
           }
           let l = t2[r];
-          if (a && (a.t === "any" || a.t === "lit" && Me(a, l) || a.t === "class" && a.re.test(l))) {
+          if (o && (o.t === "any" || o.t === "lit" && Me(o, l) || o.t === "class" && o.re.test(l))) {
             i++, r++;
             continue;
           }
           if (h === -1) return false;
-          i = h + 1, r = ++o;
+          i = h + 1, r = ++a;
         }
         for (; n[i]?.t === "star"; ) i++;
         return i === n.length;
@@ -56210,25 +56222,25 @@ var require_index_min = __commonJS({
           this.pattern = t2, this.options = e;
           let { nocase: s = false, noext: i = false, normalize: r } = e;
           this.#u = r === true ? "NFC" : r || void 0;
-          let h = /^[?*+@]\(\)$/.test(t2), o = Bi(t2, s, i || h, this.#u), [a] = Ss(o, zi(o), 0, o.length, true);
-          this.#u && (a = vs(a, this.#u));
-          let [l, c] = Gi(a, s);
-          if (this.#t = l, this.#i = c, a.every((u) => u.t === "lit")) this.#n = a.map((u) => u.ch).join(""), s && (this.#d = Oe(this.#n));
+          let h = /^[?*+@]\(\)$/.test(t2), a = Bi(t2, s, i || h, this.#u), [o] = Ss(a, zi(a), 0, a.length, true);
+          this.#u && (o = vs(o, this.#u));
+          let [l, c] = Gi(o, s);
+          if (this.#t = l, this.#i = c, o.every((u) => u.t === "lit")) this.#n = o.map((u) => u.ch).join(""), s && (this.#d = Oe(this.#n));
           else {
             let u = (g) => g.t !== "lit" ? void 0 : s ? { ch: g.ch, re: Oe(g.ch) } : { ch: g.ch };
-            for (let g of a) {
+            for (let g of o) {
               let f = u(g);
               if (!f) break;
               this.#a.push(f);
             }
-            for (let g = a.length - 1; g >= 0; g--) {
-              let f = u(a[g]);
+            for (let g = o.length - 1; g >= 0; g--) {
+              let f = u(o[g]);
               if (!f) break;
               this.#l.unshift(f);
             }
             this.#_ = !!(this.#a.length || this.#l.length), s || (this.#r = this.#a.map((g) => g.ch).join(""), this.#w = this.#l.map((g) => g.ch).join("")), this.#c = $i(this.#t)?.slice(this.#a.length, -this.#l.length || void 0), this.#p = !!this.#c?.every((g) => g.t === "star" || g.t === "any");
-            let [m, d] = Os(a);
-            this.#o = m, this.#m = d;
+            let [p, d] = Os(o);
+            this.#o = p, this.#m = d;
           }
         }
         test(t2) {
@@ -56266,18 +56278,18 @@ var require_index_min = __commonJS({
             this.#e ??= ws(this.#i);
             let c = this.#h ??= new ut(true, false, this.#e), u = c.state();
             c.add(u, this.#t, 0, true);
-            let m = c.done(u);
-            for (let d = 0; d < e.length; d++) m = c.step(m, e[d], d, true);
-            return m.match;
+            let p = c.done(u);
+            for (let d = 0; d < e.length; d++) p = c.step(p, e[d], d, true);
+            return p.match;
           }
           this.#e ??= ws(this.#i);
-          let o = this.#b ??= new Ae(this.#t, this.#e), a = o.start(h), l = e === t2;
+          let a = this.#b ??= new Ae(this.#t, this.#e), o = a.start(h), l = e === t2;
           for (let c = 0; c < e.length; c++) {
-            if (a.dead) return false;
+            if (o.dead) return false;
             let u = l ? t2.charCodeAt(c) : e[c].charCodeAt(0);
-            a = a.ascii?.[u] ?? o.next(a, e[c]);
+            o = o.ascii?.[u] ?? a.next(o, e[c]);
           }
-          return a.match;
+          return o.match;
         }
         toString() {
           return Ii(this.#t);
@@ -56404,8 +56416,8 @@ var require_index_min = __commonJS({
         for (let r = t2; r < e; ) {
           if (n.charCodeAt(r) === 46) {
             if (!s) return true;
-            let o = n.charCodeAt(r + 1) === 46 ? r + 2 : r + 1;
-            if (o >= e || Gt(n.charCodeAt(o), i)) return true;
+            let a = n.charCodeAt(r + 1) === 46 ? r + 2 : r + 1;
+            if (a >= e || Gt(n.charCodeAt(a), i)) return true;
           }
           let h = De(n, r, i);
           if (h === -1) return false;
@@ -56450,16 +56462,16 @@ var require_index_min = __commonJS({
           let i = e.normalize;
           this.#h = i === true ? "NFC" : i || void 0, this.make();
           let r = this.set.map((h) => this.#a(h));
-          this.#c = this.set.map((h, o) => this.#t && h.length - 1 > r[o]), this.#n = this.set.map((h, o) => {
-            let a = this.#c[o] ? h.length - 1 : h.length, l = h.slice(r[o] + 1, a).filter((c) => typeof c == "string" && !!c);
+          this.#c = this.set.map((h, a) => this.#t && h.length - 1 > r[a]), this.#n = this.set.map((h, a) => {
+            let o = this.#c[a] ? h.length - 1 : h.length, l = h.slice(r[a] + 1, o).filter((c) => typeof c == "string" && !!c);
             return [...new Set(l)];
-          }), this.#i = this.#n.some((h) => h.length), this.#d = this.set.map((h, o) => {
-            let [a, l, c] = h;
-            if (this.#c[o] && h.length === 2 && a === w.GLOBSTAR && l !== w.GLOBSTAR) return "tail";
-            if (this.#c[o] && e.matchBase && h.length === 1 && a !== w.GLOBSTAR && a !== "") return "base";
-            if (!(!this.#t || r[o] !== -1)) {
-              if (h.length === 3 && a === w.GLOBSTAR && c === w.GLOBSTAR && l !== w.GLOBSTAR && l !== "" && this.maxGlobstarRecursion > 0) return "mid";
-              if (h.length === 2 && l === w.GLOBSTAR && a !== w.GLOBSTAR && a !== "") return "head";
+          }), this.#i = this.#n.some((h) => h.length), this.#d = this.set.map((h, a) => {
+            let [o, l, c] = h;
+            if (this.#c[a] && h.length === 2 && o === w.GLOBSTAR && l !== w.GLOBSTAR) return "tail";
+            if (this.#c[a] && e.matchBase && h.length === 1 && o !== w.GLOBSTAR && o !== "") return "base";
+            if (!(!this.#t || r[a] !== -1)) {
+              if (h.length === 3 && o === w.GLOBSTAR && c === w.GLOBSTAR && l !== w.GLOBSTAR && l !== "" && this.maxGlobstarRecursion > 0) return "mid";
+              if (h.length === 2 && l === w.GLOBSTAR && o !== w.GLOBSTAR && o !== "") return "head";
             }
           });
         }
@@ -56491,13 +56503,13 @@ var require_index_min = __commonJS({
           this.parseNegate(), this.globSet = [...new Set(this.braceExpand())];
           let s = this.globSet.map((r) => this.#S(r));
           this.globParts = this.preprocess(s);
-          let i = this.globParts.map((r, h, o) => {
+          let i = this.globParts.map((r, h, a) => {
             if (this.isWindows && this.windowsNoMagicRoot) {
-              let a = r[2] === "?" && Bt(r[3]) ? 6 : 4, l = r[0] === "" && r[1] === "" && (r[2] === "?" || !xs.test(r[2])) && r.slice(3, a).every((u) => !xs.test(u)), c = /^[a-z]:/i.test(r[0]);
-              if (l) return [...r.slice(0, a).map((u) => this.#m(u)), ...r.slice(a).map((u) => this.parse(u))];
+              let o = r[2] === "?" && Bt(r[3]) ? 6 : 4, l = r[0] === "" && r[1] === "" && (r[2] === "?" || !xs.test(r[2])) && r.slice(3, o).every((u) => !xs.test(u)), c = /^[a-z]:/i.test(r[0]);
+              if (l) return [...r.slice(0, o).map((u) => this.#m(u)), ...r.slice(o).map((u) => this.parse(u))];
               if (c) return [this.#m(r[0]), ...r.slice(1).map((u) => this.parse(u))];
             }
-            return r.map((a) => this.parse(a));
+            return r.map((o) => this.parse(o));
           });
           if (this.set = i.filter((r) => r.indexOf(false) === -1), this.isWindows) for (let r = 0; r < this.set.length; r++) {
             let h = this.set[r];
@@ -56512,21 +56524,21 @@ var require_index_min = __commonJS({
             let e = Math.max(0, ...this.set.map((s) => s.length));
             for (let s = 0; s < e; s++) {
               let i = /* @__PURE__ */ new Map();
-              this.set.forEach((h, o) => {
-                if (!(h[s] instanceof ks.Matcher) || !ar(this.globParts[o][s])) return;
-                let a = [...this.globParts[o]];
-                a[s] = "";
-                let l = `${h.length}/${a.join("/")}`, c = i.get(l);
-                c ? c.push(o) : i.set(l, [o]);
+              this.set.forEach((h, a) => {
+                if (!(h[s] instanceof ks.Matcher) || !ar(this.globParts[a][s])) return;
+                let o = [...this.globParts[a]];
+                o[s] = "";
+                let l = `${h.length}/${o.join("/")}`, c = i.get(l);
+                c ? c.push(a) : i.set(l, [a]);
               });
               let r = /* @__PURE__ */ new Set();
               for (let h of i.values()) {
                 if (h.length < 2) continue;
-                let [o, ...a] = h, c = `@(${h.map((u) => this.globParts[u][s]).join("|")})`;
-                this.globParts[o][s] = c, this.set[o][s] = this.parse(c);
-                for (let u of a) r.add(u);
+                let [a, ...o] = h, c = `@(${h.map((u) => this.globParts[u][s]).join("|")})`;
+                this.globParts[a][s] = c, this.set[a][s] = this.parse(c);
+                for (let u of o) r.add(u);
               }
-              r.size && (t2 = true, this.set = this.set.filter((h, o) => !r.has(o)), this.globParts = this.globParts.filter((h, o) => !r.has(o)));
+              r.size && (t2 = true, this.set = this.set.filter((h, a) => !r.has(a)), this.globParts = this.globParts.filter((h, a) => !r.has(a)));
             }
           }
         }
@@ -56556,34 +56568,34 @@ var require_index_min = __commonJS({
           });
         }
         #l(t2) {
-          let e = !this.isWindows || !t2.includes("\\") ? "/" : t2.includes("/") ? "both" : "\\", s = this.#t ? 0 : -1, i = "", r = 0, h, o = 0, a = !!this.options.dot;
+          let e = !this.isWindows || !t2.includes("\\") ? "/" : t2.includes("/") ? "both" : "\\", s = this.#t ? 0 : -1, i = "", r = 0, h, a = 0, o = !!this.options.dot;
           t: for (let l = 0; l < this.set.length; l++) {
-            let c = this.set[l], u = c[c.length - 1], m = s !== -1 && this.#c[l] && u !== w.GLOBSTAR;
-            if (m && s === 0) {
+            let c = this.set[l], u = c[c.length - 1], p = s !== -1 && this.#c[l] && u !== w.GLOBSTAR;
+            if (p && s === 0) {
               let f = Ts(t2, t2.length, e);
               if (r = f + 1, i = t2.slice(r), i === "" && f >= 0) {
-                let p = f;
-                for (; p > 0 && Gt(t2.charCodeAt(p - 1), e); ) p--;
-                o = p === 0 ? 0 : Ts(t2, p - 1, e) + 1, h = t2.slice(o, p);
+                let m = f;
+                for (; m > 0 && Gt(t2.charCodeAt(m - 1), e); ) m--;
+                a = m === 0 ? 0 : Ts(t2, m - 1, e) + 1, h = t2.slice(a, m);
               }
               let b = this.#e && (je(i) || i === "" && h !== void 0 && je(h));
-              s = b ? -1 : 1, m = !b;
+              s = b ? -1 : 1, p = !b;
             }
             let d = -1;
-            if (m && typeof u == "string" && (d = Ps(u, i, r, h, o), d === -1)) continue;
+            if (p && typeof u == "string" && (d = Ps(u, i, r, h, a), d === -1)) continue;
             if (this.#i) {
               for (let f of this.#n[l]) if (!t2.includes(f)) continue t;
             }
-            if (m && typeof u == "object" && (d = Ps(u, i, r, h, o), d === -1)) continue;
+            if (p && typeof u == "object" && (d = Ps(u, i, r, h, a), d === -1)) continue;
             let g = this.#d[l];
-            if (g === "base" && m) return "yes";
-            if (g === "tail" && m) {
+            if (g === "base" && p) return "yes";
+            if (g === "tail" && p) {
               if (this.#e && ft(t2, 0, d, true, e)) return "maybe";
-              if (!ft(t2, 0, d, a, e)) return "yes";
+              if (!ft(t2, 0, d, o, e)) return "yes";
               continue;
             }
             if (g === "mid" || g === "head") {
-              let f = this.#w(t2, c, g === "head", a, e);
+              let f = this.#w(t2, c, g === "head", o, e);
               if (f !== "no") return f;
               continue;
             }
@@ -56595,35 +56607,35 @@ var require_index_min = __commonJS({
           let i = !!this.options.dot, r = t2.length;
           if (s === "head") {
             if (r < 2 || !V(e[0], t2[0])) return false;
-            for (let o = 1; o < r; o++) if (!Wt(t2[o], i)) return false;
+            for (let a = 1; a < r; a++) if (!Wt(t2[a], i)) return false;
             return true;
           }
           let h = e[1];
           if (s === "tail") {
-            let o = r - 1;
-            if (!V(h, t2[o]) && (t2[o] !== "" || r === 1 || !V(h, t2[--o]))) return false;
-            for (let a = 0; a < o; a++) if (!Wt(t2[a], i)) return false;
+            let a = r - 1;
+            if (!V(h, t2[a]) && (t2[a] !== "" || r === 1 || !V(h, t2[--a]))) return false;
+            for (let o = 0; o < a; o++) if (!Wt(t2[o], i)) return false;
             return true;
           }
-          for (let o = 0; o < r; o++) {
-            if (V(h, t2[o]) && o + 1 < r) {
-              let a = o + 1;
-              for (; a < r && Wt(t2[a], i); ) a++;
-              if (a === r) return true;
+          for (let a = 0; a < r; a++) {
+            if (V(h, t2[a]) && a + 1 < r) {
+              let o = a + 1;
+              for (; o < r && Wt(t2[o], i); ) o++;
+              if (o === r) return true;
             }
-            if (!Wt(t2[o], i)) return false;
+            if (!Wt(t2[a], i)) return false;
           }
           return false;
         }
         #w(t2, e, s, i, r) {
           if (this.#e && ft(t2, 0, t2.length, true, r)) return "maybe";
-          let h = e[s ? 0 : 1], o = 0;
-          for (let a = De(t2, o, r); a !== -1; a = De(t2, o, r)) {
-            let l = a + 1;
+          let h = e[s ? 0 : 1], a = 0;
+          for (let o = De(t2, a, r); o !== -1; o = De(t2, a, r)) {
+            let l = o + 1;
             for (; l < t2.length && Gt(t2.charCodeAt(l), r); ) l++;
-            if ((typeof h == "string" ? a - o === h.length && t2.startsWith(h, o) : a > o && h.testUnchecked(t2.slice(o, a))) && !ft(t2, l, t2.length, i, r)) return "yes";
-            if (s || ft(t2, o, l, i, r)) return "no";
-            o = l;
+            if ((typeof h == "string" ? o - a === h.length && t2.startsWith(h, a) : o > a && h.testUnchecked(t2.slice(a, o))) && !ft(t2, l, t2.length, i, r)) return "yes";
+            if (s || ft(t2, a, l, i, r)) return "no";
+            a = l;
           }
           return "no";
         }
@@ -56640,8 +56652,8 @@ var require_index_min = __commonJS({
           do {
             if (s = false, !this.preserveMultipleSlashes) {
               for (let h = 1; h < e.length - 1; h++) {
-                let o = e[h];
-                h === 1 && o === "" && e[0] === "" || (o === "." || o === "") && (s = true, e.splice(h, 1), h--);
+                let a = e[h];
+                h === 1 && a === "" && e[0] === "" || (a === "." || a === "") && (s = true, e.splice(h, 1), h--);
               }
               e[0] === "." && e.length === 2 && (e[1] === "." || e[1] === "") && (s = true, e.pop());
             }
@@ -56654,42 +56666,43 @@ var require_index_min = __commonJS({
           return e.length === 0 ? [""] : e;
         }
         firstPhasePreProcess(t2) {
-          let e = false;
+          let { braceExpandMax: e = 1e5 } = this.options, s = false;
           do {
-            e = false;
-            for (let s of t2) {
-              let i = -1;
-              for (; (i = s.indexOf("**", i + 1)) !== -1; ) {
-                let o = i;
-                for (; s[o + 1] === "**"; ) o++;
-                o > i && s.splice(i + 1, o - i);
-                let a = s[i + 1], l = s[i + 2], c = s[i + 3];
-                if (a !== ".." || !l || l === "." || l === ".." || !c || c === "." || c === "..") continue;
-                e = true, s.splice(i, 1);
-                let u = s.slice(0);
-                u[i] = "**", t2.push(u), i--;
+            s = false;
+            for (let i of t2) {
+              let r = -1;
+              for (; (r = i.indexOf("**", r + 1)) !== -1; ) {
+                let o = r;
+                for (; i[o + 1] === "**"; ) o++;
+                o > r && i.splice(r + 1, o - r);
+                let l = i[r + 1], c = i[r + 2], u = i[r + 3];
+                if (l !== ".." || !c || c === "." || c === ".." || !u || u === "." || u === ".." || t2.length >= e) continue;
+                s = true, i.splice(r, 1);
+                let p = i.slice(0);
+                p[r] = "**", t2.push(p), r--;
               }
               if (!this.preserveMultipleSlashes) {
-                for (let o = 1; o < s.length - 1; o++) {
-                  let a = s[o];
-                  o === 1 && a === "" && s[0] === "" || (a === "." || a === "") && (e = true, s.splice(o, 1), o--);
+                for (let o = 1; o < i.length - 1; o++) {
+                  let l = i[o];
+                  o === 1 && l === "" && i[0] === "" || (l === "." || l === "") && (s = true, i.splice(o, 1), o--);
                 }
-                s[0] === "." && s.length === 2 && (s[1] === "." || s[1] === "") && (e = true, s.pop());
+                i[0] === "." && i.length === 2 && (i[1] === "." || i[1] === "") && (s = true, i.pop());
               }
-              let r = this.#a(s) + 1, h = r;
-              for (; (h = s.indexOf("..", h + 1)) !== -1; ) {
-                let o = s[h - 1];
+              let h = this.#a(i) + 1, a = h;
+              for (; (a = i.indexOf("..", a + 1)) !== -1; ) {
+                let o = i[a - 1];
                 if (o && o !== "." && o !== ".." && o !== "**") {
-                  e = true;
-                  let l = h === 1 && s[h + 1] === "**" ? ["."] : [];
-                  s.splice(h - 1, 2, ...l), s.length === 0 && s.push(""), h = Math.max(h - 2, r);
+                  s = true;
+                  let c = a === 1 && i[a + 1] === "**" ? ["."] : [];
+                  i.splice(a - 1, 2, ...c), i.length === 0 && i.push(""), a = Math.max(a - 2, h);
                 }
               }
             }
-          } while (e);
+          } while (s);
           return t2;
         }
         secondPhasePreProcess(t2) {
+          if (t2.length > 1e3) return t2;
           for (let e = 0; e < t2.length - 1; e++) for (let s = e + 1; s < t2.length; s++) {
             let i = this.partsMatch(t2[e], t2[s], !this.preserveMultipleSlashes);
             if (i) {
@@ -56700,16 +56713,16 @@ var require_index_min = __commonJS({
           return t2.filter((e) => e.length);
         }
         partsMatch(t2, e, s = false) {
-          let i = 0, r = 0, h = [], o = "";
-          for (; i < t2.length && r < e.length; ) if (t2[i] === e[r]) h.push(o === "b" ? e[r] : t2[i]), i++, r++;
+          let i = 0, r = 0, h = [], a = "";
+          for (; i < t2.length && r < e.length; ) if (t2[i] === e[r]) h.push(a === "b" ? e[r] : t2[i]), i++, r++;
           else if (s && t2[i] === "**" && e[r] === t2[i + 1]) h.push(t2[i]), i++;
           else if (s && e[r] === "**" && t2[i] === e[r + 1]) h.push(e[r]), r++;
           else if (t2[i] === "*" && e[r] && (this.options.dot || !e[r].startsWith(".")) && e[r] !== "**") {
-            if (o === "b") return false;
-            o = "a", h.push(t2[i]), i++, r++;
+            if (a === "b") return false;
+            a = "a", h.push(t2[i]), i++, r++;
           } else if (e[r] === "*" && t2[i] && (this.options.dot || !t2[i].startsWith(".")) && t2[i] !== "**") {
-            if (o === "a") return false;
-            o = "b", h.push(e[r]), i++, r++;
+            if (a === "a") return false;
+            a = "b", h.push(e[r]), i++, r++;
           } else return false;
           return t2.length === e.length && h;
         }
@@ -56720,12 +56733,12 @@ var require_index_min = __commonJS({
           s && (this.pattern = t2.slice(s)), this.negate = e;
         }
         #v(t2, e, s, i) {
-          let r = 0, h = 0, o = this.isWindows ? Fe(e) : -1, a = o === -1 ? -1 : Fe(s);
-          if (a !== -1) {
-            let l = s[a], c = s[a + 1];
-            typeof l != "string" || typeof c != "string" ? (r = o, h = a) : e[o].toLowerCase() === l.toLowerCase() && e[o + 1].toLowerCase() === c.toLowerCase() && (r = o + 2, h = a + 2);
+          let r = 0, h = 0, a = this.isWindows ? Fe(e) : -1, o = a === -1 ? -1 : Fe(s);
+          if (o !== -1) {
+            let l = s[o], c = s[o + 1];
+            typeof l != "string" || typeof c != "string" ? (r = a, h = o) : e[a].toLowerCase() === l.toLowerCase() && e[a + 1].toLowerCase() === c.toLowerCase() && (r = a + 2, h = o + 2);
           } else if (this.isWindows) {
-            let l = typeof t2[0] == "string" && /^[a-z]:$/i.test(t2[0]), c = !l && t2[0] === "" && t2[1] === "" && t2[2] === "?" && /^[a-z]:$/i.test(t2[3]), u = typeof s[0] == "string" && /^[a-z]:$/i.test(s[0]), m = !u && s[0] === "" && s[1] === "" && s[2] === "?" && typeof s[3] == "string" && /^[a-z]:$/i.test(s[3]), d = c ? 3 : l ? 0 : void 0, g = m ? 3 : u ? 0 : void 0;
+            let l = typeof t2[0] == "string" && /^[a-z]:$/i.test(t2[0]), c = !l && t2[0] === "" && t2[1] === "" && t2[2] === "?" && /^[a-z]:$/i.test(t2[3]), u = typeof s[0] == "string" && /^[a-z]:$/i.test(s[0]), p = !u && s[0] === "" && s[1] === "" && s[2] === "?" && typeof s[3] == "string" && /^[a-z]:$/i.test(s[3]), d = c ? 3 : l ? 0 : void 0, g = p ? 3 : u ? 0 : void 0;
             if (typeof d == "number" && typeof g == "number") {
               let [f, b] = [t2[d], s[g]];
               f.toLowerCase() === b.toLowerCase() && (h = g + 1, r = d + 1);
@@ -56734,26 +56747,26 @@ var require_index_min = __commonJS({
           return t2 = e, s.includes(w.GLOBSTAR) ? this.#y(t2, s, i, r, h) : this.#g(t2, s, i, r, h);
         }
         #y(t2, e, s, i, r) {
-          let { head: h, body: o, tail: a, segments: l } = this.#E(e, s, r);
+          let { head: h, body: a, tail: o, segments: l } = this.#E(e, s, r);
           if (h.length) {
             let u = i + h.length;
             if (!this.#g(t2, h, s, i, 0, u)) return false;
             i += h.length, r += h.length;
           }
           let c = 0;
-          if (a.length) {
-            if (a.length + i > t2.length) return false;
-            let u = t2.length - a.length;
-            if (this.#g(t2, a, s, u, 0)) c = a.length;
+          if (o.length) {
+            if (o.length + i > t2.length) return false;
+            let u = t2.length - o.length;
+            if (this.#g(t2, o, s, u, 0)) c = o.length;
             else {
-              if (t2[t2.length - 1] !== "" || i + a.length === t2.length || (u--, !this.#g(t2, a, s, u, 0))) return false;
-              c = a.length + 1;
+              if (t2[t2.length - 1] !== "" || i + o.length === t2.length || (u--, !this.#g(t2, o, s, u, 0))) return false;
+              c = o.length + 1;
             }
           }
-          if (!o.length) {
+          if (!a.length) {
             let u = !!c;
-            for (let m = i; m < t2.length - c; m++) {
-              let d = String(t2[m]);
+            for (let p = i; p < t2.length - c; p++) {
+              let d = String(t2[p]);
               if (u = true, d === "." || d === ".." || !this.options.dot && d.startsWith(".")) return false;
             }
             return s || u;
@@ -56765,32 +56778,32 @@ var require_index_min = __commonJS({
           i || (i = [], this.#o.set(t2, i));
           let r = s * 2 + (e ? 1 : 0), h = i[r];
           if (h) return h;
-          let o = t2.indexOf(w.GLOBSTAR, s), a = t2.lastIndexOf(w.GLOBSTAR), l = t2.slice(s, o), c = t2.slice(o + 1, e ? void 0 : a), u = e ? [] : t2.slice(a + 1), m = [[[], 0]], d = m[0], g = 0, f = [0];
-          for (let p of c) p === w.GLOBSTAR ? (f.push(g), d = [[], 0], m.push(d)) : (d[0].push(p), g++);
-          m.forEach((p, y) => {
-            p[1] = g - f[y];
+          let a = t2.indexOf(w.GLOBSTAR, s), o = t2.lastIndexOf(w.GLOBSTAR), l = t2.slice(s, a), c = t2.slice(a + 1, e ? void 0 : o), u = e ? [] : t2.slice(o + 1), p = [[[], 0]], d = p[0], g = 0, f = [0];
+          for (let m of c) m === w.GLOBSTAR ? (f.push(g), d = [[], 0], p.push(d)) : (d[0].push(m), g++);
+          p.forEach((m, y) => {
+            m[1] = g - f[y];
           });
-          let b = { head: l, body: c, tail: u, segments: m };
+          let b = { head: l, body: c, tail: u, segments: p };
           return i[r] = b, b;
         }
-        #O(t2, e, s, i, r, h, o, a, l) {
+        #O(t2, e, s, i, r, h, a, o, l) {
           let c = e[r];
           if (!c) {
             if (h) return i >= s || i === s - 1 && t2[i] === "";
             for (let g = i; g < s; g++) {
-              a = true;
+              o = true;
               let f = t2[g];
               if (f === "." || f === ".." || !this.options.dot && f.startsWith(".")) return false;
             }
-            return a;
+            return o;
           }
-          let [u, m] = c, d = h ? s : s - m;
+          let [u, p] = c, d = h ? s : s - p;
           for (; i <= d; ) {
             let g = r * (t2.length + 1) + i;
             if (l.has(g)) return false;
-            if (l.add(g), this.#g(t2, u, h, i, 0, i + u.length) && o < this.maxGlobstarRecursion) {
-              let p = this.#O(t2, e, s, i + u.length, r + 1, h, o + 1, a, l);
-              if (p !== false) return p;
+            if (l.add(g), this.#g(t2, u, h, i, 0, i + u.length) && a < this.maxGlobstarRecursion) {
+              let m = this.#O(t2, e, s, i + u.length, r + 1, h, a + 1, o, l);
+              if (m !== false) return m;
             }
             if (i === d) break;
             let b = t2[i];
@@ -56800,14 +56813,14 @@ var require_index_min = __commonJS({
           return h || null;
         }
         #g(t2, e, s, i, r, h = t2.length) {
-          let o, a, l, c;
-          for (o = i, a = r, c = Math.min(h, t2.length), l = e.length; o < c && a < l; o++, a++) {
-            let u = e[a], m = t2[o];
-            if (u === false || u === w.GLOBSTAR || !V(u, m)) return false;
+          let a, o, l, c;
+          for (a = i, o = r, c = Math.min(h, t2.length), l = e.length; a < c && o < l; a++, o++) {
+            let u = e[o], p = t2[a];
+            if (u === false || u === w.GLOBSTAR || !V(u, p)) return false;
           }
-          if (o === c && a === l) return true;
-          if (o === c) return s;
-          if (a === l) return o === c - 1 && t2[o] === "";
+          if (a === c && o === l) return true;
+          if (a === c) return s;
+          if (o === l) return a === c - 1 && t2[a] === "";
           throw new Error("wtf?");
         }
         braceExpand() {
@@ -56818,10 +56831,10 @@ var require_index_min = __commonJS({
           let e = this.options;
           if (t2 === "**") return w.GLOBSTAR;
           if (t2 === "") return "";
-          let { nocase: s, nocaseMagicOnly: i, noext: r = false, dot: h, normalize: o } = e, a = or(t2, r);
-          if (a !== void 0 && !(s && !i && t2.toUpperCase() !== t2.toLowerCase())) return this.#m(a);
+          let { nocase: s, nocaseMagicOnly: i, noext: r = false, dot: h, normalize: a } = e, o = or(t2, r);
+          if (o !== void 0 && !(s && !i && t2.toUpperCase() !== t2.toLowerCase())) return this.#m(o);
           let l = this.#p.get(t2);
-          return l || (l = new ks.Matcher(t2, { nocase: s, noext: r, dot: h, normalize: o }), this.#p.set(t2, l)), l;
+          return l || (l = new ks.Matcher(t2, { nocase: s, noext: r, dot: h, normalize: a }), this.#p.set(t2, l)), l;
         }
         #S(t2) {
           return this.preserveMultipleSlashes ? t2.split("/") : this.isWindows && /^\/\/[^/]+/.test(t2) ? ["", ...t2.split(/\/+/)] : t2.split(/\/+/);
@@ -56840,11 +56853,11 @@ var require_index_min = __commonJS({
             }
             i = this.#b(t2);
           }
-          let r = i.parts, h = this.#e ? i.resolved ??= this.#u(r) : r, o = this.set, a = r[r.length - 1];
-          if (!a) for (let l = r.length - 2; !a && l >= 0; l--) a = r[l];
-          for (let l = 0; l < o.length; l++) {
-            let c = o[l], u = e ? void 0 : this.#d[l];
-            if (u === "base" ? V(c[0], a) : u ? this.#r(h, c, u) : s.matchBase && c.length === 1 ? this.#v([a], [a], c, e) : this.#v(r, h, c, e)) return s.flipNegate ? true : !this.negate;
+          let r = i.parts, h = this.#e ? i.resolved ??= this.#u(r) : r, a = this.set, o = r[r.length - 1];
+          if (!o) for (let l = r.length - 2; !o && l >= 0; l--) o = r[l];
+          for (let l = 0; l < a.length; l++) {
+            let c = a[l], u = e ? void 0 : this.#d[l];
+            if (u === "base" ? V(c[0], o) : u ? this.#r(h, c, u) : s.matchBase && c.length === 1 ? this.#v([o], [o], c, e) : this.#v(r, h, c, e)) return s.flipNegate ? true : !this.negate;
           }
           return s.flipNegate ? false : this.negate;
         }
@@ -56987,7 +57000,7 @@ var require_index_min = __commonJS({
           return this.#n;
         }
         constructor(t2) {
-          let { max: e = 0, ttl: s, ttlResolution: i = 1, ttlAutopurge: r, updateAgeOnGet: h, updateAgeOnHas: o, allowStale: a, dispose: l, onInsert: c, disposeAfter: u, noDisposeOnSet: m, noUpdateTTL: d, maxSize: g = 0, maxEntrySize: f = 0, sizeCalculation: b, fetchMethod: p, memoMethod: y, noDeleteOnFetchRejection: _2, noDeleteOnStaleGet: v, allowStaleOnFetchRejection: S, allowStaleOnFetchAbort: K, ignoreFetchAbort: z3, backgroundFetchSize: $ = 1, perf: nt } = t2;
+          let { max: e = 0, ttl: s, ttlResolution: i = 1, ttlAutopurge: r, updateAgeOnGet: h, updateAgeOnHas: a, allowStale: o, dispose: l, onInsert: c, disposeAfter: u, noDisposeOnSet: p, noUpdateTTL: d, maxSize: g = 0, maxEntrySize: f = 0, sizeCalculation: b, fetchMethod: m, memoMethod: y, noDeleteOnFetchRejection: _2, noDeleteOnStaleGet: v, allowStaleOnFetchRejection: S, allowStaleOnFetchAbort: K, ignoreFetchAbort: z3, backgroundFetchSize: $ = 1, perf: nt } = t2;
           if (this.backgroundFetchSize = $, nt !== void 0 && typeof nt?.now != "function") throw new TypeError("perf option must have a now() method if specified");
           if (this.#p = nt ?? dr.defaultPerf, e !== 0 && !Z(e)) throw new TypeError("max option must be a nonnegative integer");
           let ge = e ? Ws(e) : Array;
@@ -56997,13 +57010,13 @@ var require_index_min = __commonJS({
             if (typeof this.sizeCalculation != "function") throw new TypeError("sizeCalculation set to non-function");
           }
           if (y !== void 0 && typeof y != "function") throw new TypeError("memoMethod must be a function if defined");
-          if (this.#c = y, p !== void 0 && typeof p != "function") throw new TypeError("fetchMethod must be a function if specified");
-          if (this.#d = p, this.#M = !!p, this.#a = /* @__PURE__ */ new Map(), this.#l = Array.from({ length: e }).fill(void 0), this.#r = Array.from({ length: e }).fill(void 0), this.#w = new ge(e), this.#_ = new ge(e), this.#b = 0, this.#u = 0, this.#v = gr.create(e), this.#o = 0, this.#m = 0, typeof l == "function" && (this.#e = l), typeof c == "function" && (this.#h = c), typeof u == "function" ? (this.#n = u, this.#y = []) : (this.#n = void 0, this.#y = void 0), this.#C = !!this.#e, this.#P = !!this.#h, this.#s = !!this.#n, this.noDisposeOnSet = !!m, this.noUpdateTTL = !!d, this.noDeleteOnFetchRejection = !!_2, this.allowStaleOnFetchRejection = !!S, this.allowStaleOnFetchAbort = !!K, this.ignoreFetchAbort = !!z3, this.maxEntrySize !== 0) {
+          if (this.#c = y, m !== void 0 && typeof m != "function") throw new TypeError("fetchMethod must be a function if specified");
+          if (this.#d = m, this.#M = !!m, this.#a = /* @__PURE__ */ new Map(), this.#l = Array.from({ length: e }).fill(void 0), this.#r = Array.from({ length: e }).fill(void 0), this.#w = new ge(e), this.#_ = new ge(e), this.#b = 0, this.#u = 0, this.#v = gr.create(e), this.#o = 0, this.#m = 0, typeof l == "function" && (this.#e = l), typeof c == "function" && (this.#h = c), typeof u == "function" ? (this.#n = u, this.#y = []) : (this.#n = void 0, this.#y = void 0), this.#C = !!this.#e, this.#P = !!this.#h, this.#s = !!this.#n, this.noDisposeOnSet = !!p, this.noUpdateTTL = !!d, this.noDeleteOnFetchRejection = !!_2, this.allowStaleOnFetchRejection = !!S, this.allowStaleOnFetchAbort = !!K, this.ignoreFetchAbort = !!z3, this.maxEntrySize !== 0) {
             if (this.#i !== 0 && !Z(this.#i)) throw new TypeError("maxSize must be a positive integer if specified");
             if (!Z(this.maxEntrySize)) throw new TypeError("maxEntrySize must be a positive integer if specified");
             this.#$();
           }
-          if (this.allowStale = !!a, this.noDeleteOnStaleGet = !!v, this.updateAgeOnGet = !!h, this.updateAgeOnHas = !!o, this.ttlResolution = Z(i) || i === 0 ? i : 1, this.ttlAutopurge = !!r, this.ttl = s || 0, this.ttl) {
+          if (this.allowStale = !!o, this.noDeleteOnStaleGet = !!v, this.updateAgeOnGet = !!h, this.updateAgeOnHas = !!a, this.ttlResolution = Z(i) || i === 0 ? i : 1, this.ttlAutopurge = !!r, this.ttl = s || 0, this.ttl) {
             if (!Z(this.ttl)) throw new TypeError("ttl must be a positive integer if specified");
             this.#T();
           }
@@ -57020,50 +57033,50 @@ var require_index_min = __commonJS({
           let t2 = new It(this.#t), e = new It(this.#t);
           this.#g = t2, this.#O = e;
           let s = this.ttlAutopurge ? Array.from({ length: this.#t }) : void 0;
-          this.#S = s, this.#B = (a, l, c = this.#p.now()) => {
-            e[a] = l !== 0 ? c : 0, t2[a] = l, i(a, l);
-          }, this.#k = (a) => {
-            e[a] = t2[a] !== 0 ? this.#p.now() : 0, i(a, t2[a]);
+          this.#S = s, this.#B = (o, l, c = this.#p.now()) => {
+            e[o] = l !== 0 ? c : 0, t2[o] = l, i(o, l);
+          }, this.#k = (o) => {
+            e[o] = t2[o] !== 0 ? this.#p.now() : 0, i(o, t2[o]);
           };
-          let i = this.ttlAutopurge ? (a, l) => {
-            if (s?.[a] && (clearTimeout(s[a]), s[a] = void 0), l && l !== 0 && s) {
+          let i = this.ttlAutopurge ? (o, l) => {
+            if (s?.[o] && (clearTimeout(s[o]), s[o] = void 0), l && l !== 0 && s) {
               let c = setTimeout(() => {
-                this.#A(a) ? (this.#W(this.#l[a], "expire"), s[a] = void 0) : i(a, o(a));
+                this.#A(o) ? (this.#W(this.#l[o], "expire"), s[o] = void 0) : i(o, a(o));
               }, l + 1);
-              c.unref && c.unref(), s[a] = c;
+              c.unref && c.unref(), s[o] = c;
             }
           } : () => {
           };
-          this.#F = (a, l) => {
+          this.#F = (o, l) => {
             if (t2[l]) {
               let c = t2[l], u = e[l];
               if (!c || !u) return;
-              a.ttl = c, a.start = u, a.now = r || h();
-              let m = a.now - u;
-              a.remainingTTL = c - m;
+              o.ttl = c, o.start = u, o.now = r || h();
+              let p = o.now - u;
+              o.remainingTTL = c - p;
             }
           };
           let r = 0, h = () => {
-            let a = this.#p.now();
+            let o = this.#p.now();
             if (this.ttlResolution > 0) {
-              r = a;
+              r = o;
               let l = setTimeout(() => r = 0, this.ttlResolution);
               l.unref && l.unref();
             }
-            return a;
+            return o;
           };
-          this.getRemainingTTL = (a) => {
-            let l = this.#a.get(a);
-            return l === void 0 ? 0 : o(l);
+          this.getRemainingTTL = (o) => {
+            let l = this.#a.get(o);
+            return l === void 0 ? 0 : a(l);
           };
-          let o = (a) => {
-            let l = t2[a], c = e[a];
+          let a = (o) => {
+            let l = t2[o], c = e[o];
             if (!l || !c) return 1 / 0;
             let u = (r || h()) - c;
             return l - u;
           };
-          this.#A = (a) => {
-            let l = e[a], c = t2[a];
+          this.#A = (o) => {
+            let l = e[o], c = t2[o];
             return !!c && !!l && (r || h()) - l > c;
           };
         }
@@ -57170,10 +57183,10 @@ var require_index_min = __commonJS({
           if (i === void 0) return;
           let r = { value: i };
           if (this.#g && this.#O) {
-            let h = this.#g[e], o = this.#O[e];
-            if (h && o) {
-              let a = h - (this.#p.now() - o);
-              r.ttl = a, r.start = Date.now();
+            let h = this.#g[e], a = this.#O[e];
+            if (h && a) {
+              let o = h - (this.#p.now() - a);
+              r.ttl = o, r.start = Date.now();
             }
           }
           return this.#E && (r.size = this.#E[e]), r;
@@ -57186,8 +57199,8 @@ var require_index_min = __commonJS({
             let h = { value: r };
             if (this.#g && this.#O) {
               h.ttl = this.#g[e];
-              let o = this.#p.now() - this.#O[e];
-              h.start = Math.floor(Date.now() - o);
+              let a = this.#p.now() - this.#O[e];
+              h.start = Math.floor(Date.now() - a);
             }
             this.#E && (h.size = this.#E[e]), t2.unshift([s, h]);
           }
@@ -57210,30 +57223,30 @@ var require_index_min = __commonJS({
           return i && O.metrics.hasSubscribers && O.metrics.publish(i), r;
         }
         #N(t2, e, s, i) {
-          let { ttl: r = this.ttl, start: h, noDisposeOnSet: o = this.noDisposeOnSet, sizeCalculation: a = this.sizeCalculation, status: l } = s, c = this.#f(e);
+          let { ttl: r = this.ttl, start: h, noDisposeOnSet: a = this.noDisposeOnSet, sizeCalculation: o = this.sizeCalculation, status: l } = s, c = this.#f(e);
           if (e === void 0) return l && (l.set = "deleted"), this.delete(t2), this;
           let { noUpdateTTL: u = this.noUpdateTTL } = s;
           l && !c && (l.value = e);
-          let m = this.#z(t2, e, s.size || 0, a, l);
-          if (this.maxEntrySize && m > this.maxEntrySize) return this.#W(t2, "set"), l && (l.set = "miss", l.maxEntrySizeExceeded = true), this;
+          let p = this.#z(t2, e, s.size || 0, o, l);
+          if (this.maxEntrySize && p > this.maxEntrySize) return this.#W(t2, "set"), l && (l.set = "miss", l.maxEntrySizeExceeded = true), this;
           let d = this.#o === 0 ? void 0 : this.#a.get(t2);
-          if (d === void 0) d = this.#o === 0 ? this.#u : this.#v.length !== 0 ? this.#v.pop() : this.#o === this.#t ? this.#U(false) : this.#o, this.#l[d] = t2, this.#r[d] = e, this.#a.set(t2, d), this.#w[this.#u] = d, this.#_[d] = this.#u, this.#u = d, this.#o++, this.#j(d, m, l), l && (l.set = "add"), u = false, this.#P && !c && this.#h?.(e, t2, "add");
+          if (d === void 0) d = this.#o === 0 ? this.#u : this.#v.length !== 0 ? this.#v.pop() : this.#o === this.#t ? this.#U(false) : this.#o, this.#l[d] = t2, this.#r[d] = e, this.#a.set(t2, d), this.#w[this.#u] = d, this.#_[d] = this.#u, this.#u = d, this.#o++, this.#j(d, p, l), l && (l.set = "add"), u = false, this.#P && !c && this.#h?.(e, t2, "add");
           else {
             this.#K(d);
             let g = this.#r[d];
             if (e !== g) {
-              if (!o) if (this.#f(g)) {
+              if (!a) if (this.#f(g)) {
                 g !== i && g.__abortController.abort(new Error("replaced"));
                 let { __staleWhileFetching: f } = g;
                 f !== void 0 && f !== e && (this.#C && this.#e?.(f, t2, "set"), this.#s && this.#y?.push([f, t2, "set"]));
               } else this.#C && this.#e?.(g, t2, "set"), this.#s && this.#y?.push([g, t2, "set"]);
-              if (this.#D(d), this.#j(d, m, l), this.#r[d] = e, !c) {
+              if (this.#D(d), this.#j(d, p, l), this.#r[d] = e, !c) {
                 let f = g && this.#f(g) ? g.__staleWhileFetching : g, b = f === void 0 ? "add" : e !== f ? "replace" : "update";
                 l && (l.set = b, f !== void 0 && (l.oldValue = f)), this.#P && this.onInsert?.(e, t2, b);
               }
             } else c || (l && (l.set = "update"), this.#P && this.onInsert?.(e, t2, "update"));
           }
-          if (r !== 0 && !this.#g && this.#T(), this.#g && (u || this.#B(d, r, h), l && this.#F(l, d)), !o && this.#s && this.#y) {
+          if (r !== 0 && !this.#g && this.#T(), this.#g && (u || this.#B(d, r, h), l && this.#F(l, d)), !a && this.#s && this.#y) {
             let g = this.#y, f;
             for (; f = g?.shift(); ) this.#n?.(...f);
           }
@@ -57288,32 +57301,32 @@ var require_index_min = __commonJS({
             s && (s.peek = r === void 0 ? "miss" : "stale");
             return;
           }
-          let h = this.#r[r], o = this.#f(h) ? h.__staleWhileFetching : h;
-          return s && (o !== void 0 ? (s.peek = "hit", s.value = o) : s.peek = "miss"), o;
+          let h = this.#r[r], a = this.#f(h) ? h.__staleWhileFetching : h;
+          return s && (a !== void 0 ? (s.peek = "hit", s.value = a) : s.peek = "miss"), a;
         }
         #L(t2, e, s, i) {
           let r = e === void 0 ? void 0 : this.#r[e];
           if (this.#f(r)) return r;
-          let h = new AbortController(), { signal: o } = s;
-          o?.addEventListener("abort", () => h.abort(o.reason), { signal: h.signal });
-          let a = { signal: h.signal, options: s, context: i }, l = (f, b = false) => {
-            let { aborted: p } = h.signal, y = s.ignoreFetchAbort && f !== void 0, _2 = s.ignoreFetchAbort || !!(s.allowStaleOnFetchAbort && f !== void 0);
-            if (s.status && (p && !b ? (s.status.fetchAborted = true, s.status.fetchError = h.signal.reason, y && (s.status.fetchAbortIgnored = true)) : s.status.fetchResolved = true), p && !y && !b) return u(h.signal.reason, _2);
+          let h = new AbortController(), { signal: a } = s;
+          a?.addEventListener("abort", () => h.abort(a.reason), { signal: h.signal });
+          let o = { signal: h.signal, options: s, context: i }, l = (f, b = false) => {
+            let { aborted: m } = h.signal, y = s.ignoreFetchAbort && f !== void 0, _2 = s.ignoreFetchAbort || !!(s.allowStaleOnFetchAbort && f !== void 0);
+            if (s.status && (m && !b ? (s.status.fetchAborted = true, s.status.fetchError = h.signal.reason, y && (s.status.fetchAbortIgnored = true)) : s.status.fetchResolved = true), m && !y && !b) return u(h.signal.reason, _2);
             let v = d, S = this.#r[e];
-            return (S === d || S === void 0 && y && b) && (f === void 0 ? v.__staleWhileFetching !== void 0 ? this.#r[e] = v.__staleWhileFetching : this.#W(t2, "fetch") : (s.status && (s.status.fetchUpdated = true), this.#N(t2, f, a.options, v))), f;
+            return (S === d || S === void 0 && y && b) && (f === void 0 ? v.__staleWhileFetching !== void 0 ? this.#r[e] = v.__staleWhileFetching : this.#W(t2, "fetch") : (s.status && (s.status.fetchUpdated = true), this.#N(t2, f, o.options, v))), f;
           }, c = (f) => (s.status && (s.status.fetchRejected = true, s.status.fetchError = f), u(f, false)), u = (f, b) => {
-            let { aborted: p } = h.signal, y = p && s.allowStaleOnFetchAbort, _2 = y || s.allowStaleOnFetchRejection, v = _2 || s.noDeleteOnFetchRejection, S = d;
+            let { aborted: m } = h.signal, y = m && s.allowStaleOnFetchAbort, _2 = y || s.allowStaleOnFetchRejection, v = _2 || s.noDeleteOnFetchRejection, S = d;
             if (this.#r[e] === d && (!v || !b && S.__staleWhileFetching === void 0 ? this.#W(t2, "fetch") : y || (this.#r[e] = S.__staleWhileFetching)), _2) return s.status && S.__staleWhileFetching !== void 0 && (s.status.returnedStale = true), S.__staleWhileFetching;
             if (S.__returned === S) throw f;
-          }, m = (f, b) => {
-            let p = this.#d?.(t2, r, a);
+          }, p = (f, b) => {
+            let m = this.#d?.(t2, r, o);
             h.signal.addEventListener("abort", () => {
               (!s.ignoreFetchAbort || s.allowStaleOnFetchAbort) && (f(void 0), s.allowStaleOnFetchAbort && (f = (y) => l(y, true)));
-            }), p && p instanceof Promise ? p.then((y) => f(y === void 0 ? void 0 : y), b) : p !== void 0 && f(p);
+            }), m && m instanceof Promise ? m.then((y) => f(y === void 0 ? void 0 : y), b) : m !== void 0 && f(m);
           };
           s.status && (s.status.fetchDispatched = true);
-          let d = new Promise(m).then(l, c), g = Object.assign(d, { __abortController: h, __staleWhileFetching: r, __returned: void 0 });
-          return e === void 0 ? (this.#N(t2, g, { ...a.options, status: void 0 }), e = this.#a.get(t2)) : this.#r[e] = g, g;
+          let d = new Promise(p).then(l, c), g = Object.assign(d, { __abortController: h, __staleWhileFetching: r, __returned: void 0 });
+          return e === void 0 ? (this.#N(t2, g, { ...o.options, status: void 0 }), e = this.#a.get(t2)) : this.#r[e] = g, g;
         }
         #f(t2) {
           if (!this.#M) return false;
@@ -57328,23 +57341,23 @@ var require_index_min = __commonJS({
           })), r;
         }
         async #H(t2, e = {}) {
-          let { allowStale: s = this.allowStale, updateAgeOnGet: i = this.updateAgeOnGet, noDeleteOnStaleGet: r = this.noDeleteOnStaleGet, ttl: h = this.ttl, noDisposeOnSet: o = this.noDisposeOnSet, size: a = 0, sizeCalculation: l = this.sizeCalculation, noUpdateTTL: c = this.noUpdateTTL, noDeleteOnFetchRejection: u = this.noDeleteOnFetchRejection, allowStaleOnFetchRejection: m = this.allowStaleOnFetchRejection, ignoreFetchAbort: d = this.ignoreFetchAbort, allowStaleOnFetchAbort: g = this.allowStaleOnFetchAbort, context: f, forceRefresh: b = false, status: p, signal: y } = e;
-          if (p && (p.op = "fetch", p.key = t2, b && (p.forceRefresh = true), p.cache = this), !this.#M) return p && (p.fetch = "get"), this.#X(t2, { allowStale: s, updateAgeOnGet: i, noDeleteOnStaleGet: r, status: p });
-          let _2 = { allowStale: s, updateAgeOnGet: i, noDeleteOnStaleGet: r, ttl: h, noDisposeOnSet: o, size: a, sizeCalculation: l, noUpdateTTL: c, noDeleteOnFetchRejection: u, allowStaleOnFetchRejection: m, allowStaleOnFetchAbort: g, ignoreFetchAbort: d, status: p, signal: y }, v = this.#a.get(t2);
+          let { allowStale: s = this.allowStale, updateAgeOnGet: i = this.updateAgeOnGet, noDeleteOnStaleGet: r = this.noDeleteOnStaleGet, ttl: h = this.ttl, noDisposeOnSet: a = this.noDisposeOnSet, size: o = 0, sizeCalculation: l = this.sizeCalculation, noUpdateTTL: c = this.noUpdateTTL, noDeleteOnFetchRejection: u = this.noDeleteOnFetchRejection, allowStaleOnFetchRejection: p = this.allowStaleOnFetchRejection, ignoreFetchAbort: d = this.ignoreFetchAbort, allowStaleOnFetchAbort: g = this.allowStaleOnFetchAbort, context: f, forceRefresh: b = false, status: m, signal: y } = e;
+          if (m && (m.op = "fetch", m.key = t2, b && (m.forceRefresh = true), m.cache = this), !this.#M) return m && (m.fetch = "get"), this.#X(t2, { allowStale: s, updateAgeOnGet: i, noDeleteOnStaleGet: r, status: m });
+          let _2 = { allowStale: s, updateAgeOnGet: i, noDeleteOnStaleGet: r, ttl: h, noDisposeOnSet: a, size: o, sizeCalculation: l, noUpdateTTL: c, noDeleteOnFetchRejection: u, allowStaleOnFetchRejection: p, allowStaleOnFetchAbort: g, ignoreFetchAbort: d, status: m, signal: y }, v = this.#a.get(t2);
           if (v === void 0) {
-            p && (p.fetch = "miss");
+            m && (m.fetch = "miss");
             let S = this.#L(t2, v, _2, f);
             return S.__returned = S;
           } else {
             let S = this.#r[v];
             if (this.#f(S)) {
               let nt = s && S.__staleWhileFetching !== void 0;
-              return p && (p.fetch = "inflight", nt && (p.returnedStale = true)), nt ? S.__staleWhileFetching : S.__returned = S;
+              return m && (m.fetch = "inflight", nt && (m.returnedStale = true)), nt ? S.__staleWhileFetching : S.__returned = S;
             }
             let K = this.#A(v);
-            if (!b && !K) return p && (p.fetch = "hit"), this.#K(v), i && this.#k(v), p && this.#F(p, v), S;
+            if (!b && !K) return m && (m.fetch = "hit"), this.#K(v), i && this.#k(v), m && this.#F(m, v), S;
             let z3 = this.#L(t2, v, _2, f), $ = z3.__staleWhileFetching !== void 0 && s;
-            return p && (p.fetch = K ? "stale" : "refresh", $ && K && (p.returnedStale = true)), $ ? z3.__staleWhileFetching : z3.__returned = z3;
+            return m && (m.fetch = K ? "stale" : "refresh", $ && K && (m.returnedStale = true)), $ ? z3.__staleWhileFetching : z3.__returned = z3;
           }
         }
         forceFetch(t2, e = {}) {
@@ -57368,12 +57381,12 @@ var require_index_min = __commonJS({
         #J(t2, e = {}) {
           let s = this.#c;
           if (!s) throw new Error("no memoMethod provided to constructor");
-          let { context: i, status: r, forceRefresh: h, ...o } = e;
+          let { context: i, status: r, forceRefresh: h, ...a } = e;
           r && h && (r.forceRefresh = true);
-          let a = this.#X(t2, o), l = h || a === void 0;
-          if (r && (r.memo = l ? "miss" : "hit", l || (r.value = a)), !l) return a;
-          let c = s(t2, a, { options: o, context: i });
-          return r && (r.value = c), this.#N(t2, c, o), c;
+          let o = this.#X(t2, a), l = h || o === void 0;
+          if (r && (r.memo = l ? "miss" : "hit", l || (r.value = o)), !l) return o;
+          let c = s(t2, o, { options: a, context: i });
+          return r && (r.value = c), this.#N(t2, c, a), c;
         }
         get(t2, e = {}) {
           let { status: s = O.metrics.hasSubscribers ? {} : void 0 } = e;
@@ -57382,13 +57395,13 @@ var require_index_min = __commonJS({
           return s && (i !== void 0 && (s.value = i), O.metrics.hasSubscribers && O.metrics.publish(s)), i;
         }
         #X(t2, e = {}) {
-          let { allowStale: s = this.allowStale, updateAgeOnGet: i = this.updateAgeOnGet, noDeleteOnStaleGet: r = this.noDeleteOnStaleGet, status: h } = e, o = this.#a.get(t2);
-          if (o === void 0) {
+          let { allowStale: s = this.allowStale, updateAgeOnGet: i = this.updateAgeOnGet, noDeleteOnStaleGet: r = this.noDeleteOnStaleGet, status: h } = e, a = this.#a.get(t2);
+          if (a === void 0) {
             h && (h.get = "miss");
             return;
           }
-          let a = this.#r[o], l = this.#f(a);
-          return h && this.#F(h, o), this.#A(o) ? l ? (h && (h.get = "stale-fetching"), s && a.__staleWhileFetching !== void 0 ? (h && (h.returnedStale = true), a.__staleWhileFetching) : void 0) : (r || this.#W(t2, "expire"), h && (h.get = "stale"), s ? (h && (h.returnedStale = true), a) : void 0) : (h && (h.get = l ? "fetching" : "hit"), this.#K(o), i && this.#k(o), l ? a.__staleWhileFetching : a);
+          let o = this.#r[a], l = this.#f(o);
+          return h && this.#F(h, a), this.#A(a) ? l ? (h && (h.get = "stale-fetching"), s && o.__staleWhileFetching !== void 0 ? (h && (h.returnedStale = true), o.__staleWhileFetching) : void 0) : (r || this.#W(t2, "expire"), h && (h.get = "stale"), s ? (h && (h.returnedStale = true), o) : void 0) : (h && (h.get = l ? "fetching" : "hit"), this.#K(a), i && this.#k(a), l ? o.__staleWhileFetching : o);
         }
         #Y(t2, e) {
           this.#_[e] = t2, this.#w[t2] = e;
@@ -57413,8 +57426,8 @@ var require_index_min = __commonJS({
               else {
                 let h = this.#_[i];
                 this.#w[h] = this.#w[i];
-                let o = this.#w[i];
-                this.#_[o] = this.#_[i];
+                let a = this.#w[i];
+                this.#_[a] = this.#_[i];
               }
               this.#o--, this.#v.push(i);
             }
@@ -57721,15 +57734,15 @@ var require_index_min = __commonJS({
             let i = this.read();
             if (i !== null) return Promise.resolve({ done: false, value: i });
             if (this[H]) return e();
-            let r, h, o = (u) => {
-              this.off("data", a), this.off("end", l), this.off(C, c), e(), h(u);
-            }, a = (u) => {
-              this.off("error", o), this.off("end", l), this.off(C, c), this.pause(), r({ value: u, done: !!this[H] });
+            let r, h, a = (u) => {
+              this.off("data", o), this.off("end", l), this.off(C, c), e(), h(u);
+            }, o = (u) => {
+              this.off("error", a), this.off("end", l), this.off(C, c), this.pause(), r({ value: u, done: !!this[H] });
             }, l = () => {
-              this.off("error", o), this.off("data", a), this.off(C, c), e(), r({ done: true, value: void 0 });
-            }, c = () => o(new Error("stream destroyed"));
-            return new Promise((u, m) => {
-              h = m, r = u, this.once(C, c), this.once("error", o), this.once("end", l), this.once("data", a);
+              this.off("error", a), this.off("data", o), this.off(C, c), e(), r({ done: true, value: void 0 });
+            }, c = () => a(new Error("stream destroyed"));
+            return new Promise((u, p) => {
+              h = p, r = u, this.once(C, c), this.once("error", a), this.once("end", l), this.once("data", o);
             });
           }, throw: e, return: e, [Symbol.asyncIterator]() {
             return this;
@@ -57909,8 +57922,8 @@ var require_index_min = __commonJS({
         get path() {
           return this.parentPath;
         }
-        constructor(t2, e = L, s, i, r, h, o) {
-          this.name = t2, this.#E = r ? Qt(t2) : _t(t2), this.#s = e & Ir, this.nocase = r, this.roots = i, this.root = s || this, this.#P = h, this.#g = o.fullpath, this.#C = o.relative, this.#M = o.relativePosix, this.parent = o.parent, this.parent ? this.#t = this.parent.#t : this.#t = Js(o.fs);
+        constructor(t2, e = L, s, i, r, h, a) {
+          this.name = t2, this.#E = r ? Qt(t2) : _t(t2), this.#s = e & Ir, this.nocase = r, this.roots = i, this.root = s || this, this.#P = h, this.#g = a.fullpath, this.#C = a.relative, this.#M = a.relativePosix, this.parent = a.parent, this.parent ? this.#t = this.parent.#t : this.#t = Js(a.fs);
         }
         get fs() {
           return this.#t;
@@ -57941,9 +57954,9 @@ var require_index_min = __commonJS({
           if (t2 === "" || t2 === ".") return this;
           if (t2 === "..") return this.parent || this;
           let s = this.children(), i = this.nocase ? Qt(t2) : _t(t2);
-          for (let a of s) if (a.#E === i) return a;
-          let r = this.parent ? this.sep : "", h = this.#g ? this.#g + r + t2 : void 0, o = this.newChild(t2, L, { ...e, parent: this, fullpath: h });
-          return this.canReaddir() || (o.#s |= B), s.push(o), o;
+          for (let o of s) if (o.#E === i) return o;
+          let r = this.parent ? this.sep : "", h = this.#g ? this.#g + r + t2 : void 0, a = this.newChild(t2, L, { ...e, parent: this, fullpath: h });
+          return this.canReaddir() || (a.#s |= B), s.push(a), a;
         }
         relative() {
           if (this.isCWD) return "";
@@ -58124,8 +58137,8 @@ var require_index_min = __commonJS({
           }
         }
         #q(t2) {
-          let { atime: e, atimeMs: s, birthtime: i, birthtimeMs: r, blksize: h, blocks: o, ctime: a, ctimeMs: l, dev: c, gid: u, ino: m, mode: d, mtime: g, mtimeMs: f, nlink: b, rdev: p, size: y, uid: _2 } = t2;
-          this.#b = e, this.#l = s, this.#y = i, this.#_ = r, this.#p = h, this.#a = o, this.#v = a, this.#w = l, this.#i = c, this.#d = u, this.#o = m, this.#e = d, this.#u = g, this.#r = f, this.#h = b, this.#c = p, this.#m = y, this.#n = _2;
+          let { atime: e, atimeMs: s, birthtime: i, birthtimeMs: r, blksize: h, blocks: a, ctime: o, ctimeMs: l, dev: c, gid: u, ino: p, mode: d, mtime: g, mtimeMs: f, nlink: b, rdev: m, size: y, uid: _2 } = t2;
+          this.#b = e, this.#l = s, this.#y = i, this.#_ = r, this.#p = h, this.#a = a, this.#v = o, this.#w = l, this.#i = c, this.#d = u, this.#o = p, this.#e = d, this.#u = g, this.#r = f, this.#h = b, this.#c = m, this.#m = y, this.#n = _2;
           let v = He(t2);
           this.#s = this.#s & bt | v | Ks, v !== L && v !== I && v !== it && (this.#s |= vt);
         }
@@ -58153,7 +58166,7 @@ var require_index_min = __commonJS({
           this.#t.readdir(i, { withFileTypes: true }, (r, h) => {
             if (r) this.#z(r.code), s.provisional = 0;
             else {
-              for (let o of h) this.#G(o, s);
+              for (let a of h) this.#G(a, s);
               this.#B(s);
             }
             this.#H(s.slice(0, s.provisional));
@@ -58231,8 +58244,8 @@ var require_index_min = __commonJS({
       var Ot = class n extends R {
         sep = "\\";
         splitSep = Gr;
-        constructor(t2, e = L, s, i, r, h, o) {
-          super(t2, e, s, i, r, h, o);
+        constructor(t2, e = L, s, i, r, h, a) {
+          super(t2, e, s, i, r, h, a);
         }
         newChild(t2, e = L, s = {}) {
           return new n(t2, e, this.root, this.roots, this.nocase, this.childrenCache(), s);
@@ -58253,8 +58266,8 @@ var require_index_min = __commonJS({
       var Ct = class n extends R {
         splitSep = "/";
         sep = "/";
-        constructor(t2, e = L, s, i, r, h, o) {
-          super(t2, e, s, i, r, h, o);
+        constructor(t2, e = L, s, i, r, h, a) {
+          super(t2, e, s, i, r, h, a);
         }
         getRootString(t2) {
           return t2.startsWith("/") ? "/" : "";
@@ -58279,15 +58292,15 @@ var require_index_min = __commonJS({
         #h;
         constructor(t2 = process.cwd(), e, s, { nocase: i, childrenCacheSize: r = 16 * 1024, fs: h = St } = {}) {
           this.#h = Js(h), (t2 instanceof URL || t2.startsWith("file://")) && (t2 = (0, Tr.fileURLToPath)(t2));
-          let o = e.resolve(t2);
-          this.roots = /* @__PURE__ */ Object.create(null), this.rootPath = this.parseRootPath(o), this.#t = new Et(), this.#i = new Et(), this.#e = new se(r);
-          let a = o.substring(this.rootPath.length).split(s);
-          if (a.length === 1 && !a[0] && a.pop(), i === void 0) throw new TypeError("must provide nocase setting to PathScurryBase ctor");
+          let a = e.resolve(t2);
+          this.roots = /* @__PURE__ */ Object.create(null), this.rootPath = this.parseRootPath(a), this.#t = new Et(), this.#i = new Et(), this.#e = new se(r);
+          let o = a.substring(this.rootPath.length).split(s);
+          if (o.length === 1 && !o[0] && o.pop(), i === void 0) throw new TypeError("must provide nocase setting to PathScurryBase ctor");
           this.nocase = i, this.root = this.newRoot(this.#h), this.roots[this.rootPath] = this.root;
-          let l = this.root, c = a.length - 1, u = e.sep, m = this.rootPath, d = false;
-          for (let g of a) {
+          let l = this.root, c = o.length - 1, u = e.sep, p = this.rootPath, d = false;
+          for (let g of o) {
             let f = c--;
-            l = l.child(g, { relative: new Array(f).fill("..").join(u), relativePosix: new Array(f).fill("..").join("/"), fullpath: m += (d ? "" : u) + g }), d = true;
+            l = l.child(g, { relative: new Array(f).fill("..").join(u), relativePosix: new Array(f).fill("..").join("/"), fullpath: p += (d ? "" : u) + g }), d = true;
           }
           this.cwd = l;
         }
@@ -58372,44 +58385,44 @@ var require_index_min = __commonJS({
         }
         async walk(t2 = this.cwd, e = {}) {
           typeof t2 == "string" ? t2 = this.cwd.resolve(t2) : t2 instanceof R || (e = t2, t2 = this.cwd);
-          let { withFileTypes: s = true, follow: i = false, filter: r, walkFilter: h } = e, o = [];
-          (!r || r(t2)) && o.push(s ? t2 : t2.fullpath());
-          let a = /* @__PURE__ */ new Set(), l = (u, m) => {
-            a.add(u), u.readdirCB((d, g) => {
-              if (d) return m(d);
+          let { withFileTypes: s = true, follow: i = false, filter: r, walkFilter: h } = e, a = [];
+          (!r || r(t2)) && a.push(s ? t2 : t2.fullpath());
+          let o = /* @__PURE__ */ new Set(), l = (u, p) => {
+            o.add(u), u.readdirCB((d, g) => {
+              if (d) return p(d);
               let f = g.length;
-              if (!f) return m();
+              if (!f) return p();
               let b = () => {
-                --f === 0 && m();
+                --f === 0 && p();
               };
-              for (let p of g) (!r || r(p)) && o.push(s ? p : p.fullpath()), i && p.isSymbolicLink() ? p.realpath().then((y) => y?.isUnknown() ? y.lstat() : y).then((y) => y?.shouldWalk(a, h) ? l(y, b) : b()) : p.shouldWalk(a, h) ? l(p, b) : b();
+              for (let m of g) (!r || r(m)) && a.push(s ? m : m.fullpath()), i && m.isSymbolicLink() ? m.realpath().then((y) => y?.isUnknown() ? y.lstat() : y).then((y) => y?.shouldWalk(o, h) ? l(y, b) : b()) : m.shouldWalk(o, h) ? l(m, b) : b();
             }, true);
           }, c = t2;
-          return new Promise((u, m) => {
+          return new Promise((u, p) => {
             l(c, (d) => {
-              if (d) return m(d);
-              u(o);
+              if (d) return p(d);
+              u(a);
             });
           });
         }
         walkSync(t2 = this.cwd, e = {}) {
           typeof t2 == "string" ? t2 = this.cwd.resolve(t2) : t2 instanceof R || (e = t2, t2 = this.cwd);
-          let { withFileTypes: s = true, follow: i = false, filter: r, walkFilter: h } = e, o = [];
-          (!r || r(t2)) && o.push(s ? t2 : t2.fullpath());
-          let a = /* @__PURE__ */ new Set([t2]);
-          for (let l of a) {
+          let { withFileTypes: s = true, follow: i = false, filter: r, walkFilter: h } = e, a = [];
+          (!r || r(t2)) && a.push(s ? t2 : t2.fullpath());
+          let o = /* @__PURE__ */ new Set([t2]);
+          for (let l of o) {
             let c = l.readdirSync();
             for (let u of c) {
-              (!r || r(u)) && o.push(s ? u : u.fullpath());
-              let m = u;
+              (!r || r(u)) && a.push(s ? u : u.fullpath());
+              let p = u;
               if (u.isSymbolicLink()) {
-                if (!(i && (m = u.realpathSync()))) continue;
-                m.isUnknown() && m.lstatSync();
+                if (!(i && (p = u.realpathSync()))) continue;
+                p.isUnknown() && p.lstatSync();
               }
-              m.shouldWalk(a, h) && a.add(m);
+              p.shouldWalk(o, h) && o.add(p);
             }
           }
-          return o;
+          return a;
         }
         [Symbol.asyncIterator]() {
           return this.iterate();
@@ -58424,9 +58437,9 @@ var require_index_min = __commonJS({
           typeof t2 == "string" ? t2 = this.cwd.resolve(t2) : t2 instanceof R || (e = t2, t2 = this.cwd);
           let { withFileTypes: s = true, follow: i = false, filter: r, walkFilter: h } = e;
           (!r || r(t2)) && (yield s ? t2 : t2.fullpath());
-          let o = /* @__PURE__ */ new Set([t2]);
-          for (let a of o) {
-            let l = a.readdirSync();
+          let a = /* @__PURE__ */ new Set([t2]);
+          for (let o of a) {
+            let l = o.readdirSync();
             for (let c of l) {
               (!r || r(c)) && (yield s ? c : c.fullpath());
               let u = c;
@@ -58434,61 +58447,61 @@ var require_index_min = __commonJS({
                 if (!(i && (u = c.realpathSync()))) continue;
                 u.isUnknown() && u.lstatSync();
               }
-              u.shouldWalk(o, h) && o.add(u);
+              u.shouldWalk(a, h) && a.add(u);
             }
           }
         }
         stream(t2 = this.cwd, e = {}) {
           typeof t2 == "string" ? t2 = this.cwd.resolve(t2) : t2 instanceof R || (e = t2, t2 = this.cwd);
-          let { withFileTypes: s = true, follow: i = false, filter: r, walkFilter: h } = e, o = new Hs.Minipass({ objectMode: true });
-          (!r || r(t2)) && o.write(s ? t2 : t2.fullpath());
-          let a = /* @__PURE__ */ new Set(), l = [t2], c = 0, u = () => {
-            let m = false;
-            for (; !m; ) {
+          let { withFileTypes: s = true, follow: i = false, filter: r, walkFilter: h } = e, a = new Hs.Minipass({ objectMode: true });
+          (!r || r(t2)) && a.write(s ? t2 : t2.fullpath());
+          let o = /* @__PURE__ */ new Set(), l = [t2], c = 0, u = () => {
+            let p = false;
+            for (; !p; ) {
               let d = l.shift();
               if (!d) {
-                c === 0 && o.end();
+                c === 0 && a.end();
                 return;
               }
-              c++, a.add(d);
-              let g = (b, p, y = false) => {
-                if (b) return o.emit("error", b);
+              c++, o.add(d);
+              let g = (b, m, y = false) => {
+                if (b) return a.emit("error", b);
                 if (i && !y) {
                   let _2 = [];
-                  for (let v of p) v.isSymbolicLink() && _2.push(v.realpath().then((S) => S?.isUnknown() ? S.lstat() : S));
+                  for (let v of m) v.isSymbolicLink() && _2.push(v.realpath().then((S) => S?.isUnknown() ? S.lstat() : S));
                   if (_2.length) {
-                    Promise.all(_2).then(() => g(null, p, true));
+                    Promise.all(_2).then(() => g(null, m, true));
                     return;
                   }
                 }
-                for (let _2 of p) _2 && (!r || r(_2)) && (o.write(s ? _2 : _2.fullpath()) || (m = true));
+                for (let _2 of m) _2 && (!r || r(_2)) && (a.write(s ? _2 : _2.fullpath()) || (p = true));
                 c--;
-                for (let _2 of p) {
+                for (let _2 of m) {
                   let v = _2.realpathCached() || _2;
-                  v.shouldWalk(a, h) && l.push(v);
+                  v.shouldWalk(o, h) && l.push(v);
                 }
-                m && !o.flowing ? o.once("drain", u) : f || u();
+                p && !a.flowing ? a.once("drain", u) : f || u();
               }, f = true;
               d.readdirCB(g, true), f = false;
             }
           };
-          return u(), o;
+          return u(), a;
         }
         streamSync(t2 = this.cwd, e = {}) {
           typeof t2 == "string" ? t2 = this.cwd.resolve(t2) : t2 instanceof R || (e = t2, t2 = this.cwd);
-          let { withFileTypes: s = true, follow: i = false, filter: r, walkFilter: h } = e, o = new Hs.Minipass({ objectMode: true }), a = /* @__PURE__ */ new Set();
-          (!r || r(t2)) && o.write(s ? t2 : t2.fullpath());
+          let { withFileTypes: s = true, follow: i = false, filter: r, walkFilter: h } = e, a = new Hs.Minipass({ objectMode: true }), o = /* @__PURE__ */ new Set();
+          (!r || r(t2)) && a.write(s ? t2 : t2.fullpath());
           let l = [t2], c = 0, u = () => {
-            let m = false;
-            for (; !m; ) {
+            let p = false;
+            for (; !p; ) {
               let d = l.shift();
               if (!d) {
-                c === 0 && o.end();
+                c === 0 && a.end();
                 return;
               }
-              c++, a.add(d);
+              c++, o.add(d);
               let g = d.readdirSync();
-              for (let f of g) (!r || r(f)) && (o.write(s ? f : f.fullpath()) || (m = true));
+              for (let f of g) (!r || r(f)) && (a.write(s ? f : f.fullpath()) || (p = true));
               c--;
               for (let f of g) {
                 let b = f;
@@ -58496,12 +58509,12 @@ var require_index_min = __commonJS({
                   if (!(i && (b = f.realpathSync()))) continue;
                   b.isUnknown() && b.lstatSync();
                 }
-                b.shouldWalk(a, h) && l.push(b);
+                b.shouldWalk(o, h) && l.push(b);
               }
             }
-            m && !o.flowing && o.once("drain", u);
+            p && !a.flowing && a.once("drain", u);
           };
-          return u(), o;
+          return u(), a;
         }
         chdir(t2 = this.cwd) {
           let e = this.cwd;
@@ -58577,15 +58590,15 @@ var require_index_min = __commonJS({
           if (this.length = t2.length, s < 0 || s >= this.length) throw new TypeError("index out of range");
           if (this.#t = t2, this.#i = e, this.#e = s, this.#h = i, this.#e === 0) {
             if (this.isUNC()) {
-              let r = this.#a() ? 6 : 4, h = this.#t.slice(0, r), o = this.#i.slice(0, r), a = this.#t.slice(r), l = this.#i.slice(r);
-              a[0] === "" && (a.shift(), l.shift());
-              let c = [...h, ""].join("/"), u = [...o, ""].join("/");
-              this.#t = [c, ...a], this.#i = [u, ...l], this.length = this.#t.length;
+              let r = this.#a() ? 6 : 4, h = this.#t.slice(0, r), a = this.#i.slice(0, r), o = this.#t.slice(r), l = this.#i.slice(r);
+              o[0] === "" && (o.shift(), l.shift());
+              let c = [...h, ""].join("/"), u = [...a, ""].join("/");
+              this.#t = [c, ...o], this.#i = [u, ...l], this.length = this.#t.length;
             } else if (this.isDrive() || this.isAbsolute()) {
-              let [r, ...h] = this.#t, [o, ...a] = this.#i;
-              h[0] === "" && (h.shift(), a.shift());
-              let l = `${r}/`, c = `${o}/`;
-              this.#t = [l, ...h], this.#i = [c, ...a], this.length = this.#t.length;
+              let [r, ...h] = this.#t, [a, ...o] = this.#i;
+              h[0] === "" && (h.shift(), o.shift());
+              let l = `${r}/`, c = `${a}/`;
+              this.#t = [l, ...h], this.#i = [c, ...o], this.length = this.#t.length;
             }
           }
         }
@@ -58654,10 +58667,10 @@ var require_index_min = __commonJS({
         platform;
         mmopts;
         slashRoot;
-        constructor(t2, { nobrace: e, nocase: s, noext: i, noglobstar: r, normalize: h, platform: o = Kr, root: a, windowsPathsNoEscape: l, allowWindowsEscape: c }, u) {
-          this.relative = [], this.absolute = [], this.relativeChildren = [], this.absoluteChildren = [], this.platform = o, l = !!l || c === false, this.mmopts = { dot: true, nobrace: e, nocase: s, noext: i, noglobstar: r, normalize: h, optimizationLevel: 2, platform: o, nocomment: true, nonegate: true, windowsPathsNoEscape: l };
-          let m = u?.resolve(a ?? "/").fullpath() ?? "/";
-          this.slashRoot = (0, Ve.escape)(m.replace(/\\/g, "/").replace(/\/$/, ""), { windowsPathsNoEscape: l });
+        constructor(t2, { nobrace: e, nocase: s, noext: i, noglobstar: r, normalize: h, platform: a = Kr, root: o, windowsPathsNoEscape: l, allowWindowsEscape: c }, u) {
+          this.relative = [], this.absolute = [], this.relativeChildren = [], this.absoluteChildren = [], this.platform = a, l = !!l || c === false, this.mmopts = { dot: true, nobrace: e, nocase: s, noext: i, noglobstar: r, normalize: h, optimizationLevel: 2, platform: a, nocomment: true, nonegate: true, windowsPathsNoEscape: l };
+          let p = u?.resolve(o ?? "/").fullpath() ?? "/";
+          this.slashRoot = (0, Ve.escape)(p.replace(/\\/g, "/").replace(/\/$/, ""), { windowsPathsNoEscape: l });
           for (let d of t2) this.add(d);
         }
         add(t2) {
@@ -58666,8 +58679,8 @@ var require_index_min = __commonJS({
             let i = e.set[s], r = e.globParts[s];
             if (!i || !r) throw new Error("invalid pattern object");
             for (; i[0] === "." && r[0] === "."; ) i.shift(), r.shift();
-            let h = new Xr.Pattern(i, r, 0, this.platform), o = h.root() === "/" ? `${this.slashRoot}/${h.rest()?.globString() ?? ""}` : h.globString(), a = new Ve.Minimatch(o, this.mmopts), l = r[r.length - 1] === "**", c = h.isAbsolute();
-            c ? this.absolute.push(a) : this.relative.push(a), l && (c ? this.absoluteChildren.push(a) : this.relativeChildren.push(a));
+            let h = new Xr.Pattern(i, r, 0, this.platform), a = h.root() === "/" ? `${this.slashRoot}/${h.rest()?.globString() ?? ""}` : h.globString(), o = new Ve.Minimatch(a, this.mmopts), l = r[r.length - 1] === "**", c = h.isAbsolute();
+            c ? this.absolute.push(o) : this.relative.push(o), l && (c ? this.absoluteChildren.push(o) : this.relativeChildren.push(o));
           }
         }
         ignored(t2) {
@@ -58757,7 +58770,7 @@ var require_index_min = __commonJS({
           let s = e.map((i) => [t2, i]);
           for (let [i, r] of s) {
             this.hasWalkedCache.storeWalked(i, r);
-            let h = r.root(), o = r.isAbsolute() && this.opts.absolute !== false;
+            let h = r.root(), a = r.isAbsolute() && this.opts.absolute !== false;
             if (h) {
               i = i.resolve(h === "/" && this.opts.root !== void 0 ? this.opts.root : h);
               let u = r.rest();
@@ -58768,25 +58781,25 @@ var require_index_min = __commonJS({
               }
             }
             if (i.isENOENT()) continue;
-            let a, l, c = false;
-            for (; typeof (a = r.pattern()) == "string" && (l = r.rest()); ) i = i.resolve(a), r = l, c = true;
-            if (a = r.pattern(), l = r.rest(), c) {
+            let o, l, c = false;
+            for (; typeof (o = r.pattern()) == "string" && (l = r.rest()); ) i = i.resolve(o), r = l, c = true;
+            if (o = r.pattern(), l = r.rest(), c) {
               if (this.hasWalkedCache.hasWalked(i, r)) continue;
               this.hasWalkedCache.storeWalked(i, r);
             }
-            if (typeof a == "string") {
-              let u = a === ".." || a === "" || a === ".";
-              this.matches.add(i.resolve(a), o, u);
+            if (typeof o == "string") {
+              let u = o === ".." || o === "" || o === ".";
+              this.matches.add(i.resolve(o), a, u);
               continue;
-            } else if (a === hi.GLOBSTAR) {
+            } else if (o === hi.GLOBSTAR) {
               (!i.isSymbolicLink() || this.follow || r.checkFollowGlobstar()) && this.subwalks.add(i, r);
-              let u = l?.pattern(), m = l?.rest();
-              if (!l || (u === "" || u === ".") && !m) this.matches.add(i, o, u === "" || u === ".");
+              let u = l?.pattern(), p = l?.rest();
+              if (!l || (u === "" || u === ".") && !p) this.matches.add(i, a, u === "" || u === ".");
               else if (u === "..") {
                 let d = i.parent || i;
-                m ? this.hasWalkedCache.hasWalked(d, m) || this.subwalks.add(d, m) : this.matches.add(d, o, true);
+                p ? this.hasWalkedCache.hasWalked(d, p) || this.subwalks.add(d, p) : this.matches.add(d, a, true);
               }
-            } else typeof a == "object" && this.subwalks.add(i, r);
+            } else typeof o == "object" && this.subwalks.add(i, r);
           }
           return this;
         }
@@ -58799,8 +58812,8 @@ var require_index_min = __commonJS({
         filterEntries(t2, e) {
           let s = this.subwalks.get(t2), i = this.child();
           for (let r of e) for (let h of s) {
-            let o = h.isAbsolute(), a = h.pattern(), l = h.rest();
-            a === hi.GLOBSTAR ? i.testGlobstar(r, h, l, o) : typeof a == "object" ? i.testMatcher(r, a, l, o) : i.testString(r, a, l, o);
+            let a = h.isAbsolute(), o = h.pattern(), l = h.rest();
+            o === hi.GLOBSTAR ? i.testGlobstar(r, h, l, a) : typeof o == "object" ? i.testMatcher(r, o, l, a) : i.testString(r, o, l, a);
           }
           return i;
         }
@@ -58876,8 +58889,8 @@ var require_index_min = __commonJS({
           } else i = t2;
           let h = i.isUnknown() || this.opts.stat ? await i.lstat() : i;
           if (this.opts.follow && this.opts.nodir && h?.isSymbolicLink()) {
-            let o = await h.realpath();
-            o && (o.isUnknown() || this.opts.stat) && await o.lstat();
+            let a = await h.realpath();
+            a && (a.isUnknown() || this.opts.stat) && await a.lstat();
           }
           return this.matchCheckTest(h, e);
         }
@@ -58893,8 +58906,8 @@ var require_index_min = __commonJS({
           } else i = t2;
           let h = i.isUnknown() || this.opts.stat ? i.lstatSync() : i;
           if (this.opts.follow && this.opts.nodir && h?.isSymbolicLink()) {
-            let o = h.realpathSync();
-            o && (o?.isUnknown() || this.opts.stat) && o.lstatSync();
+            let a = h.realpathSync();
+            a && (a?.isUnknown() || this.opts.stat) && a.lstatSync();
           }
           return this.matchCheckTest(h, e);
         }
@@ -58940,22 +58953,22 @@ var require_index_min = __commonJS({
           let r = 1, h = () => {
             --r === 0 && i();
           };
-          for (let [o, a] of s.matches.store) this.#h(o) || (r++, this.match(o, !!(a & ce), !!(a & ue)).then(() => h()));
-          for (let o of s.subwalkTargets()) {
-            if (this.maxDepth !== 1 / 0 && o.depth() >= this.maxDepth) continue;
+          for (let [a, o] of s.matches.store) this.#h(a) || (r++, this.match(a, !!(o & ce), !!(o & ue)).then(() => h()));
+          for (let a of s.subwalkTargets()) {
+            if (this.maxDepth !== 1 / 0 && a.depth() >= this.maxDepth) continue;
             r++;
-            let a = o.readdirCached();
-            o.calledReaddir() ? this.walkCB3(o, a, s, h) : o.readdirCB((l, c) => this.walkCB3(o, c, s, h), true);
+            let o = a.readdirCached();
+            a.calledReaddir() ? this.walkCB3(a, o, s, h) : a.readdirCB((l, c) => this.walkCB3(a, c, s, h), true);
           }
           h();
         }
         walkCB3(t2, e, s, i) {
-          let r = s.filterEntries(t2, e), h = 1, o = () => {
+          let r = s.filterEntries(t2, e), h = 1, a = () => {
             --h === 0 && i();
           };
-          for (let [a, l] of r.matches.store) this.#h(a) || (h++, this.match(a, !!(l & ce), !!(l & ue)).then(() => o()));
-          for (let [a, l] of r.subwalks.entries()) h++, this.walkCB2(a, l, r.child(), o);
-          o();
+          for (let [o, l] of r.matches.store) this.#h(o) || (h++, this.match(o, !!(l & ce), !!(l & ue)).then(() => a()));
+          for (let [o, l] of r.subwalks.entries()) h++, this.walkCB2(o, l, r.child(), a);
+          a();
         }
         walkCBSync(t2, e, s) {
           if (this.signal?.aborted) return s();
@@ -58971,22 +58984,22 @@ var require_index_min = __commonJS({
           let r = 1, h = () => {
             --r === 0 && i();
           };
-          for (let [o, a] of s.matches.store) this.#h(o) || this.matchSync(o, !!(a & ce), !!(a & ue));
-          for (let o of s.subwalkTargets()) {
-            if (this.maxDepth !== 1 / 0 && o.depth() >= this.maxDepth) continue;
+          for (let [a, o] of s.matches.store) this.#h(a) || this.matchSync(a, !!(o & ce), !!(o & ue));
+          for (let a of s.subwalkTargets()) {
+            if (this.maxDepth !== 1 / 0 && a.depth() >= this.maxDepth) continue;
             r++;
-            let a = o.readdirSync();
-            this.walkCB3Sync(o, a, s, h);
+            let o = a.readdirSync();
+            this.walkCB3Sync(a, o, s, h);
           }
           h();
         }
         walkCB3Sync(t2, e, s, i) {
-          let r = s.filterEntries(t2, e), h = 1, o = () => {
+          let r = s.filterEntries(t2, e), h = 1, a = () => {
             --h === 0 && i();
           };
-          for (let [a, l] of r.matches.store) this.#h(a) || this.matchSync(a, !!(l & ce), !!(l & ue));
-          for (let [a, l] of r.subwalks.entries()) h++, this.walkCB2Sync(a, l, r.child(), o);
-          o();
+          for (let [o, l] of r.matches.store) this.#h(o) || this.matchSync(o, !!(l & ce), !!(l & ue));
+          for (let [o, l] of r.subwalks.entries()) h++, this.walkCB2Sync(o, l, r.child(), a);
+          a();
         }
       };
       Q.GlobUtil = xt;
@@ -59081,9 +59094,9 @@ var require_index_min = __commonJS({
             this.scurry = new l(this.cwd, { nocase: e.nocase, fs: e.fs });
           }
           this.nocase = this.scurry.nocase;
-          let i = this.platform === "darwin" || this.platform === "win32", r = { braceExpandMax: 1e4, ...e, dot: this.dot, matchBase: this.matchBase, nobrace: this.nobrace, nocase: this.nocase, nocaseMagicOnly: i, nocomment: true, noext: this.noext, nonegate: true, optimizationLevel: 2, platform: this.platform, windowsPathsNoEscape: this.windowsPathsNoEscape }, h = this.pattern.map((l) => new Zr.Minimatch(l, r)), [o, a] = h.reduce((l, c) => (l[0].push(...c.set), l[1].push(...c.globParts), l), [[], []]);
-          this.patterns = o.map((l, c) => {
-            let u = a[c];
+          let i = this.platform === "darwin" || this.platform === "win32", r = { braceExpandMax: 1e4, ...e, dot: this.dot, matchBase: this.matchBase, nobrace: this.nobrace, nocase: this.nocase, nocaseMagicOnly: i, nocomment: true, noext: this.noext, nonegate: true, optimizationLevel: 2, platform: this.platform, windowsPathsNoEscape: this.windowsPathsNoEscape }, h = this.pattern.map((l) => new Zr.Minimatch(l, r)), [a, o] = h.reduce((l, c) => (l[0].push(...c.set), l[1].push(...c.globParts), l), [[], []]);
+          this.patterns = a.map((l, c) => {
+            let u = o[c];
             if (!u) throw new Error("invalid pattern object");
             return new Qr.Pattern(l, u, 0, this.platform);
           });
@@ -68660,7 +68673,7 @@ var import_promises17 = __toESM(require("node:fs/promises"), 1);
 var import_node_path48 = __toESM(require("node:path"), 1);
 
 // src/generated/version.ts
-var boardReadyVersion = "1.70.0";
+var boardReadyVersion = "1.71.1";
 
 // src/core/findings.ts
 var import_node_crypto2 = __toESM(require("node:crypto"), 1);

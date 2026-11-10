@@ -70,6 +70,13 @@ describe("repository setup preview page", () => {
     expect(markup).not.toContain("/blob/v1/.github/workflows/readiness-runner.yml");
   });
 
+  it("does not leak or treat an unscoped repository deep link as authority", async () => {
+    const markup = await render({ repositoryId: "private-repository-not-in-viewer-installations" });
+    expect(markup).not.toContain("private-repository-not-in-viewer-installations");
+    expect(markup).toContain("Choose a repository to persist setup progress");
+    expect(markup).toContain("Sign in with GitHub");
+  });
+
   it("does not revive the legacy contract-design preset through a query parameter", async () => {
     const markup = await render({ preset: "contract-design" });
     expect(markup).toContain("Active: Prototype fabrication");

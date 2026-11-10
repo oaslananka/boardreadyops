@@ -440,6 +440,7 @@ export function ReviewCanvas({
     () =>
       (preferPcbLayer ? headSnapshots.find((snapshot) => snapshot.kind === "pcb_layer") : undefined)?.sheetOrLayer ??
       headSnapshots[0]?.sheetOrLayer ??
+      baseSnapshots[0]?.sheetOrLayer ??
       "Main",
   );
   const [viewMode, setViewMode] = useState<ViewMode>("head");
@@ -584,10 +585,15 @@ export function ReviewCanvas({
 
   // Differing SVG viewBox origins and scales cannot be overlaid faithfully.
   const comparable = comparableReviewSnapshots(currentBaseSnapshot, currentHeadSnapshot);
-  const effectiveViewMode =
-    !baseSrc || (!comparable && (viewMode === "overlay" || viewMode === "diff" || viewMode === "split"))
-      ? "head"
-      : viewMode;
+  // A source-revision-only layer must not render as an empty head canvas. Show
+  // the available artwork, but never infer that the missing snapshot proves
+  // the layer was physically deleted or that the design passed review.
+  const effectiveViewMode: ViewMode =
+    !headSrc && baseSrc
+      ? "base"
+      : !baseSrc || (!comparable && (viewMode === "overlay" || viewMode === "diff" || viewMode === "split"))
+        ? "head"
+        : viewMode;
 
   let canvasHeightClass = compactMobile ? "h-[19rem] md:h-[34rem]" : "h-[27rem] md:h-[34rem]";
   if (immersive) canvasHeightClass = "h-[min(75dvh,56rem)]";
@@ -656,6 +662,7 @@ export function ReviewCanvas({
               type="button"
               className={modeButtonClass(effectiveViewMode === "head")}
               aria-pressed={effectiveViewMode === "head"}
+              disabled={!headSrc}
               onClick={() => setViewMode("head")}
               title="Head revision only"
             >
@@ -727,10 +734,30 @@ export function ReviewCanvas({
         </div>
       </section>
 
+      {baseSrc && !headSrc ? (
+        <p className="rounded-md border border-warning/40 bg-warning-surface p-2 text-xs text-warning" role="status">
+          No head snapshot was published for {selectedSheetOrLayer}. Showing the available base revision only. This does
+          not establish that the layer was removed from the design.
+        </p>
+      ) : null}
+      {headSrc && !baseSrc && baseSnapshots.length > 0 ? (
+        <p className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground" role="status">
+          No matching base snapshot was published for {selectedSheetOrLayer}. Showing the head revision only; visual
+          comparison is unavailable for this layer.
+        </p>
+      ) : null}
       {baseSrc && headSrc && !comparable ? (
         <p className="rounded-md border border-warning/40 bg-warning-surface p-2 text-xs text-warning" role="status">
           These revisions have different canvas coordinates or image dimensions. Visual comparison is unavailable;
           inspect each source revision separately.
+        </p>
+      ) : null}
+
+      {effectiveViewMode === "diff" ? (
+        <p className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground" role="status">
+          Visual Diff shows color differences between the two published images. Black areas have no visible pixel-color
+          change at this rendering scale; colored areas show changes. An all-black view is not proof of electrical
+          equivalence or fabrication readiness. Use Split to inspect both source images.
         </p>
       ) : null}
 

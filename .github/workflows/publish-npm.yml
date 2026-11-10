@@ -12,11 +12,6 @@ on:
         required: false
         default: false
         type: boolean
-      update_floating_tags:
-        description: Move vMAJOR and vMAJOR.MINOR tags after a stable publish.
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.tag || github.ref }}
@@ -38,7 +33,6 @@ jobs:
       id-token: write
       attestations: write
     outputs:
-      release_allows_floating_tags: ${{ steps.release.outputs.release_allows_floating_tags }}
       release_is_prerelease: ${{ steps.release.outputs.release_is_prerelease }}
       release_tag: ${{ steps.release.outputs.release_tag }}
       should_publish: ${{ steps.release.outputs.should_publish }}
@@ -62,18 +56,15 @@ jobs:
         env:
           DISPATCH_PRERELEASE: ${{ inputs.prerelease }}
           DISPATCH_TAG: ${{ inputs.tag }}
-          DISPATCH_UPDATE_FLOATING_TAGS: ${{ inputs.update_floating_tags }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           release_tag=""
           release_is_prerelease="false"
-          release_allows_floating_tags="false"
           should_publish="true"
 
           release_tag="${DISPATCH_TAG}"
           release_is_prerelease="${DISPATCH_PRERELEASE}"
-          release_allows_floating_tags="${DISPATCH_UPDATE_FLOATING_TAGS}"
 
           if [ "${should_publish}" = "true" ] && [ -z "${release_tag}" ]; then
             echo "::error::Could not resolve a release tag for workflow_dispatch."
@@ -82,12 +73,10 @@ jobs:
 
           {
             echo "RELEASE_IS_PRERELEASE=${release_is_prerelease}"
-            echo "RELEASE_ALLOWS_FLOATING_TAGS=${release_allows_floating_tags}"
             echo "RELEASE_TAG=${release_tag}"
             echo "SHOULD_PUBLISH=${should_publish}"
           } >> "${GITHUB_ENV}"
           {
-            echo "release_allows_floating_tags=${release_allows_floating_tags}"
             echo "release_is_prerelease=${release_is_prerelease}"
             echo "release_tag=${release_tag}"
             echo "should_publish=${should_publish}"
@@ -371,27 +360,3 @@ jobs:
           else
             npm publish --access public
           fi
-
-  floating-release-tags:
-    if: ${{ needs.publish-npm.outputs.should_publish == 'true' && needs.publish-npm.outputs.release_is_prerelease == 'false' && needs.publish-npm.outputs.release_allows_floating_tags == 'true' }}
-    needs: publish-npm
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-          ref: ${{ needs.publish-npm.outputs.release_tag }}
-      - name: Update floating release tags
-        env:
-          GH_AUTH_TOKEN: ${{ secrets.GH_AUTH_TOKEN }}
-          RELEASE_TAG: ${{ needs.publish-npm.outputs.release_tag }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GH_AUTH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          bash scripts/update-floating-tags.sh "${RELEASE_TAG}"

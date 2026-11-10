@@ -7,7 +7,9 @@ import {
   AttemptsView,
   AuditView,
   FindingsView,
+  PublicationView,
   RunPageFrame,
+  RunUnavailable,
   reviewPublishCommand,
   SummaryView,
 } from "../../../apps/web/components/run-investigation.js";
@@ -221,6 +223,47 @@ describe("run investigation accessibility", () => {
     expect(await axeViolations(markup, `/runs/${run.id}/design`)).toEqual([]);
   });
 
+  it("keeps unsigned-run evidence accessible without repeating a full warning panel before the mobile design", async () => {
+    const run = sampleRun();
+    run.investigationState = "partial_data";
+    run.readinessScore = undefined;
+    const markup = renderToStaticMarkup(
+      createElement(
+        RunPageFrame,
+        { run, active: "design" },
+        createElement("section", { id: "design-evidence" }, "Source-bound design"),
+      ),
+    );
+    expect(markup).toContain("Readiness not verified");
+    expect(markup).toContain("Inspect evidence");
+    expect(markup).toContain("No accepted signed result");
+    expect(markup).not.toContain(
+      "A stored decision cannot confirm fabrication readiness; check the execution and publication record.",
+    );
+    expect(markup).toContain("Additional evidence limitations");
+    expect(markup).toContain("<details");
+    expect(markup.indexOf("Additional evidence limitations")).toBeLessThan(markup.indexOf('id="design-evidence"'));
+    expect(markup).toContain("No GitHub Actions run is linked to this record");
+    expect(markup).toContain('href="/runs/run-accessible/publication"');
+    expect(await axeViolations(markup, "/runs/run-accessible/design")).toEqual([]);
+
+    const summary = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "summary" }, createElement("section", null, "Summary")),
+    );
+    expect(summary).toContain("This run has partial data");
+    expect(summary).toContain("Inspect missing result");
+    expect(summary).not.toContain("Additional evidence limitations");
+  });
+
+  it("shows honest unavailable run feedback without inventing result data", async () => {
+    const markup = renderToStaticMarkup(createElement(RunUnavailable, { runId: "missing-run-42" }));
+    expect(markup).toContain("Run details temporarily unavailable");
+    expect(markup).toContain("missing-run-42");
+    expect(markup).toContain("No run data was inferred or cached");
+    expect(markup).toContain("GitHub issue");
+    expect(await axeViolations(markup, "/runs/missing-run-42/design")).toEqual([]);
+  });
+
   it("keeps the run header stacked through tablet widths and wraps long source identities", () => {
     const html = viewMarkup("findings");
     expect(html).toContain("lg:flex-row lg:items-start lg:justify-between");
@@ -246,6 +289,86 @@ describe("run investigation accessibility", () => {
     expect(filtered).toContain("No matching artifacts");
     expect(filtered).toContain("No current artifact metadata matches these filters");
     expect(filtered).not.toContain("No stored artifacts for this run");
+  });
+
+  it("does not pretend an unsigned historical run has a Check Run, metrics or GitHub workflow logs", async () => {
+    const run = sampleRun();
+    run.investigationState = "partial_data";
+    run.resultContractVersion = undefined;
+    run.metrics = {};
+    run.githubCheckRunId = undefined;
+    run.githubCheckPublishedAt = undefined;
+    run.lastPublicationAttemptAt = undefined;
+
+    const markup = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "publication" }, createElement(PublicationView, { run })),
+    );
+
+    expect(markup).toContain("No signed result arrived, so numeric metrics cannot be verified");
+    expect(markup).toContain("No signed result or report links were received");
+    expect(markup).toContain("No published Check Run is recorded");
+    expect(markup).toContain("No GitHub Actions run is linked to this record");
+    expect(markup).toContain('href="/runs/run-accessible/attempts"');
+    expect(markup).toContain("Inspect recorded attempts");
+    expect(markup).not.toContain("The Check Run and the workflow logs in your repository have the full detail.");
+    expect(markup).not.toContain("workflow logs in GitHub are the record to trust");
+    expect(markup).toContain(
+      "No GitHub Actions run is linked to this record, so workflow logs cannot be assumed to exist.",
+    );
+    expect(markup).not.toContain("Open linked GitHub Actions run");
+    expect(await axeViolations(markup, "/runs/run-accessible/publication")).toEqual([]);
+  });
+
+  it("links a recorded workflow run without claiming its logs or report files are present", () => {
+    const run = sampleRun();
+    run.investigationState = "partial_data";
+    run.resultContractVersion = undefined;
+    run.githubCheckPublishedAt = undefined;
+    run.githubCheckRunId = undefined;
+    run.reportLinks = [];
+    run.attempts = [
+      {
+        id: "attempt-1",
+        attemptNumber: 1,
+        status: "failed",
+        createdAt: run.startedAt,
+        dispatchRequestedAt: run.startedAt,
+        dispatchedAt: run.startedAt,
+        startedAt: run.startedAt,
+        heartbeatAt: undefined,
+        completedAt: run.completedAt,
+        retryAfterAt: undefined,
+        workflowDispatchId: "456789",
+        workflowRunUrl: "https://github.com/oaslananka/boardreadyops/actions/runs/456789",
+        failureClass: "publication_missing",
+        failureMessage: undefined,
+        resultDigest: undefined,
+      },
+    ];
+    const markup = renderToStaticMarkup(createElement(PublicationView, { run }));
+
+    expect(markup).toContain("A GitHub Actions run is linked to this record");
+    const summary = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "summary" }, createElement(SummaryView, { run })),
+    );
+    expect(summary).toContain("workflow logs do not replace a signed result");
+    expect(summary).not.toContain("workflow logs in GitHub are the record to trust");
+    expect(markup).toContain('href="https://github.com/oaslananka/boardreadyops/actions/runs/456789"');
+    expect(markup).toContain("Open linked GitHub Actions run");
+    expect(markup).toContain("No published Check Run is recorded");
+    expect(markup).not.toContain("have the full detail");
+  });
+
+  it("recognizes a published Check Run without inventing accepted report links", () => {
+    const run = sampleRun();
+    run.reportLinks = [];
+    run.attempts = [];
+    const markup = renderToStaticMarkup(createElement(PublicationView, { run }));
+
+    expect(markup).toContain("No report links were recorded for this run");
+    expect(markup).toContain("A published Check Run is recorded");
+    expect(markup).toContain("No GitHub Actions run is linked to this record");
+    expect(markup).not.toContain("Open linked GitHub Actions run");
   });
 
   it("links GitHub Actions logs and repository-owned artifacts from the authoritative workflow run", () => {

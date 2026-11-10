@@ -2,6 +2,7 @@
  * @vitest-environment happy-dom
  */
 
+import { githubAppPermissionProfile, missingDeclaredPermissions } from "@boardreadyops/cloud-core/github-capabilities";
 import {
   repositorySetupPresets,
   repositorySetupPresetVersion,
@@ -63,6 +64,247 @@ describe("repository setup readiness controls", () => {
     container.remove();
     vi.unstubAllGlobals();
     delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+  });
+
+  it("opens a deep link on the intended authorized repository rather than the first installation entry", async () => {
+    const repositories = [
+      { ...readyForProbe, id: "repo-first", fullName: "first/board" },
+      { ...readyForProbe, id: "repo-second", fullName: "second/board" },
+    ];
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          repositories,
+          signedIn: true,
+          initialRepositoryId: "repo-second",
+        }),
+      );
+    });
+    expect(container.querySelector("select")?.value).toBe("repo-second");
+    expect(container.textContent).toContain("second/board");
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+  });
+
+  it("requires an explicit repository target when several installations are available", async () => {
+    const repositories = [
+      { ...readyForProbe, id: "repo-first", fullName: "first/board" },
+      { ...readyForProbe, id: "repo-second", fullName: "second/board" },
+    ];
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await act(async () => {
+      root.render(createElement(RepositorySetupInteractive, { ...baseProps, repositories, signedIn: true }));
+    });
+    const selector = container.querySelector("select");
+    if (!(selector instanceof HTMLSelectElement)) throw new Error("repository selector not found");
+    expect(selector.value).toBe("");
+    expect(container.textContent).toContain("Choose a repository to persist setup progress");
+    expect(button(container, "Open setup pull request").disabled).toBe(true);
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(selector, "repo-second");
+      selector.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(selector.value).toBe("repo-second");
+    expect(container.textContent).toContain("second/board");
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+    expect(button(container, "Validate readiness").disabled).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("selects the only authorized repository without making that customer click twice", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, { ...baseProps, repositories: [readyForProbe], signedIn: true }),
+      );
+    });
+    expect(container.querySelector("select")?.value).toBe("repo-1");
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+  });
+
+  it("does not silently select another repository for an unauthorized or stale deep link", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          repositories: [readyForProbe],
+          signedIn: true,
+          initialRepositoryId: "other-installation-repository",
+        }),
+      );
+    });
+    expect(container.querySelector("select")?.value).toBe("");
+    expect(container.textContent).toContain("Choose an authorized repository");
+    expect(button(container, "Open setup pull request").disabled).toBe(true);
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+  });
+
+  it("explains rollout-gated first runs per selected repository without claiming a setup probe is a result", async () => {
+    const repositories: SetupTargetRepository[] = [
+      {
+        ...readyForProbe,
+        id: "repo-blocked",
+        fullName: "alpha/board-a",
+        readinessRunBlockedReason: "Cloud readiness runs are not enabled for this repository yet.",
+        latestRunId: "run-a",
+      },
+      { ...readyForProbe, id: "repo-enabled", fullName: "beta/board-b" },
+    ];
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories,
+          initialRepositoryId: "repo-blocked",
+        }),
+      );
+    });
+    expect(container.textContent).toContain("After validation: run a real hardware check");
+    expect(container.textContent).toContain("It does not produce hardware findings");
+    expect(container.textContent).toContain("Cloud readiness runs are not enabled for this repository yet.");
+    expect(container.textContent).not.toContain("open a pull request changing your hardware project");
+    expect(container.querySelector('a[href="/runs/run-a"]')?.textContent).toContain("Inspect latest recorded run");
+    expect(container.querySelector('a[href*="/docs/quickstart.md"]')?.textContent).toContain("Run a local first check");
+    expect(container.textContent).toContain("does not enable hosted runs, create");
+    const selector = container.querySelector<HTMLSelectElement>("select");
+    if (!selector) throw new Error("repository selector not found");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(selector, "repo-enabled");
+      selector.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.textContent).not.toContain("Cloud readiness runs are not enabled for this repository yet.");
+    expect(container.querySelector('a[href="/runs/run-a"]')).toBeNull();
+    expect(container.querySelector('a[href*="/docs/quickstart.md"]')).toBeNull();
+    expect(container.textContent).toContain("open a pull request changing your");
+    expect(container.textContent).toContain("an empty or queued result is not a first useful finding");
+  });
+
+  it("provides an honest local-first alternative without inventing a run for a blocked new repository", async () => {
+    const repo = {
+      ...readyForProbe,
+      id: "new-repo",
+      fullName: "octo/new-board",
+      readinessRunBlockedReason: "Hosted runs are unavailable for this repository.",
+    };
+    await act(async () => {
+      root.render(createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [repo] }));
+    });
+    expect(container.textContent).toContain("No earlier run is recorded for this repository yet.");
+    expect(container.querySelector('a[href^="/runs/"]')).toBeNull();
+    expect(container.textContent).toContain("A local check can identify issues");
+    expect(container.textContent).toContain("or approve fabrication");
+    expect(container.querySelector('a[href*="/docs/quickstart.md"]')).not.toBeNull();
+  });
+
+  it("keeps previous-run links scoped to the selected authorized repository", async () => {
+    const first = {
+      ...readyForProbe,
+      id: "repo-first",
+      fullName: "first/pcb",
+      latestRunId: "first-run",
+      readinessRunBlockedReason: "Hosted runs unavailable.",
+    };
+    const second = {
+      ...readyForProbe,
+      id: "repo-second",
+      fullName: "second/pcb",
+      latestRunId: "second-run",
+      readinessRunBlockedReason: "Hosted runs unavailable.",
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [first, second],
+          initialRepositoryId: "repo-second",
+        }),
+      );
+    });
+    expect(container.querySelector('a[href="/runs/second-run"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/runs/first-run"]')).toBeNull();
+
+    const select = container.querySelector("select");
+    if (!(select instanceof HTMLSelectElement)) throw new Error("repository selector not found");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(select, "repo-first");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.querySelector('a[href="/runs/first-run"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/runs/second-run"]')).toBeNull();
+  });
+
+  it("switches setup, probe and live permissions with the selected GitHub installation", async () => {
+    const fullPermissions = Object.fromEntries(githubAppPermissionProfile.map((p) => [p.key, p.level]));
+    const blockedPermissions = { ...fullPermissions, actions: "read", pull_requests: "read" };
+    const blocked = {
+      ...readyForProbe,
+      id: "repo-first",
+      fullName: "first-org/board",
+      setupBlockedReason: "First installation cannot open setup pull requests.",
+      readinessBlockedReason: "First installation cannot dispatch Actions.",
+      installationGrants: {
+        permissions: blockedPermissions,
+        missing: missingDeclaredPermissions(blockedPermissions),
+        manageUrl: "https://github.com/settings/installations/101",
+      },
+    };
+    const allowed = {
+      ...readyForProbe,
+      id: "repo-second",
+      fullName: "second-org/board",
+      installationGrants: {
+        permissions: fullPermissions,
+        missing: missingDeclaredPermissions(fullPermissions),
+        manageUrl: "https://github.com/settings/installations/202",
+      },
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [blocked, allowed],
+          initialRepositoryId: "repo-first",
+        }),
+      );
+    });
+    expect(button(container, "Open setup pull request").disabled).toBe(true);
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+    expect(container.textContent).toContain("First installation cannot open setup pull requests.");
+    expect(container.textContent).toContain("First installation cannot dispatch Actions.");
+    expect(container.textContent).toContain("This installation is missing a required permission");
+    expect(container.querySelector('a[href="https://github.com/settings/installations/101"]')).not.toBeNull();
+
+    const select = container.querySelector("select");
+    if (!(select instanceof HTMLSelectElement)) throw new Error("repository selector not found");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(select, "repo-second");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+    expect(button(container, "Validate readiness").disabled).toBe(false);
+    expect(container.textContent).not.toContain("First installation cannot");
+    expect(container.textContent).toContain("second-org/board");
+    expect(container.textContent).toContain("Every declared permission is granted");
+    expect(container.querySelector('a[href="https://github.com/settings/installations/101"]')).toBeNull();
+
+    await act(async () => {
+      setter?.call(select, "repo-first");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(button(container, "Open setup pull request").disabled).toBe(true);
+    expect(button(container, "Validate readiness").disabled).toBe(true);
+    expect(container.textContent).toContain("First installation cannot open setup pull requests.");
+    expect(container.querySelector('a[href="https://github.com/settings/installations/101"]')).not.toBeNull();
   });
 
   it("disables readiness validation when the viewer is signed out", async () => {
@@ -224,7 +466,14 @@ describe("repository setup readiness controls", () => {
     );
 
     await act(async () => {
-      root.render(createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories }));
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories,
+          initialRepositoryId: "repo-1",
+        }),
+      );
     });
     await act(async () => {
       button(container, "Open setup pull request").click();

@@ -32,21 +32,25 @@ ARG GH_VERSION=2.103.3
 # The existing source-export verifier delegates Sigstore cryptographic verification
 # to GitHub CLI. Pin the official immutable release archive by architecture digest
 # so production verification uses the same reviewed verifier as local acceptance.
+# Fetch the SHA256-pinned package from GitHub CLI’s official signed Debian repository.
+# Its host is reachable from the isolated build network even when github.com/API is not.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ca-certificates curl openssl; \
     rm -rf /var/lib/apt/lists/*; \
     case "$(dpkg --print-architecture)" in \
-      amd64) gh_arch="amd64"; gh_sha256="4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d" ;; \
-      arm64) gh_arch="arm64"; gh_sha256="ee32df2323c8847f5fac6cb6b4b69ca75828e9329a8f22f677021f7b3306ce63" ;; \
+      amd64) gh_arch="amd64"; gh_sha256="e3bafef96328d1a67de3a968bdfe1cc2ffd58cf6aba8b5e201356897ed06bb3d" ;; \
+      arm64) gh_arch="arm64"; gh_sha256="cac3ff84b60b68e64cca69f31f303210c26320361cc3286b773655d4226b7b06" ;; \
       *) echo "Unsupported GitHub CLI architecture." >&2; exit 1 ;; \
     esac; \
-    archive="gh_""$GH_VERSION""_linux_""$gh_arch"".tar.gz"; \
-    curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSLo "/tmp/$archive" "https://github.com/cli/cli/releases/download/v$GH_VERSION/$archive"; \
+    archive="gh_${GH_VERSION}_${gh_arch}.deb"; \
+    curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --silent --show-error --location \
+      --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 10 --max-time 135 \
+      -o "/tmp/$archive" "https://cli.github.com/packages/pool/main/g/gh/$archive"; \
     printf '%s  %s\n' "$gh_sha256" "/tmp/$archive" | sha256sum --check --strict; \
     mkdir -p /tmp/gh-cli; \
-    tar -xzf "/tmp/$archive" -C /tmp/gh-cli; \
-    install -o root -g root -m 0755 "/tmp/gh-cli/gh_$GH_VERSION""_linux_""$gh_arch"/bin/gh /usr/local/bin/gh; \
+    dpkg-deb -x "/tmp/$archive" /tmp/gh-cli; \
+    install -o root -g root -m 0755 /tmp/gh-cli/usr/bin/gh /usr/local/bin/gh; \
     gh --version | grep -F "gh version $GH_VERSION"; \
     rm -rf /tmp/gh-cli "/tmp/$archive"
 
@@ -76,17 +80,19 @@ COPY --chown=node:node --from=build /app/apps/web/.next/worker.mjs ./worker.mjs
 COPY --chown=node:node --from=build /app/apps/web/.next/migrate.mjs ./migrate.mjs
 COPY --chown=node:node --from=build /app/apps/web/public ./apps/web/public
 COPY apps/web/docker-entrypoint.sh /usr/local/bin/boardreadyops-entrypoint
+COPY --chown=node:node apps/web/web-supervisor.mjs ./apps/web/web-supervisor.mjs
 # A fresh named volume inherits the artifact directory's unprivileged owner.
 # Existing data/permissions require separately authorized operator validation.
 RUN chmod 0755 /usr/local/bin/boardreadyops-entrypoint \
-    && install -d -o node -g node -m 0700 /data/artifacts
+    && install -d -o node -g node -m 0700 /data/artifacts \
+    && install -d -o node -g node -m 0700 /run/boardreadyops
 
 USER node
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=4 \
-  CMD ["node", "-e", "fetch('http://127.0.0.1:3000/api/health',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))"]
+HEALTHCHECK --interval=3s --timeout=5s --start-period=30s --retries=2 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:3000/api/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))"]
 
 ENTRYPOINT ["/usr/local/bin/boardreadyops-entrypoint"]
-CMD ["node", "apps/web/server.js"]
+CMD ["node", "apps/web/web-supervisor.mjs"]

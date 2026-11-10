@@ -1,7 +1,31 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { checkCloudReadiness } from "../../../apps/web/lib/cloud-readiness.js";
 
 describe("cloud readiness", () => {
+  it("marks a draining container unready before querying PostgreSQL or configuration", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "boardreadyops-drain-"));
+    const drainMarkerPath = join(directory, "draining");
+    const query = vi.fn();
+
+    try {
+      writeFileSync(drainMarkerPath, "draining", { mode: 0o600 });
+      await expect(
+        checkCloudReadiness({ environment: { NODE_ENV: "production" }, query, drainMarkerPath }),
+      ).resolves.toEqual({
+        ok: false,
+        service: "boardreadyops-cloud",
+        check: "readiness",
+        reason: "shutting-down",
+      });
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("reports missing deployed configuration without calling PostgreSQL", async () => {
     const query = vi.fn();
 

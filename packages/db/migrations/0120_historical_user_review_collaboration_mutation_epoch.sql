@@ -61,5 +61,5 @@ END;
 $$;
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0119_historical_user_review_collaboration_mutation_epoch')
+VALUES ('0120_historical_user_review_collaboration_mutation_epoch')
 ON CONFLICT(version) DO NOTHING;

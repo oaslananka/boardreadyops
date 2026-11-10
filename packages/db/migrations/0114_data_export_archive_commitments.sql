@@ -18,5 +18,5 @@ CREATE INDEX IF NOT EXISTS idx_data_export_archive_commitments_expiry
   WHERE revoked_at IS NULL;
 
 INSERT INTO cloud_schema_migrations(version)
-VALUES ('0113_data_export_archive_commitments')
+VALUES ('0114_data_export_archive_commitments')
 ON CONFLICT (version) DO NOTHING;

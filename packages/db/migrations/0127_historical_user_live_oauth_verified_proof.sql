@@ -55,5 +55,5 @@ BEFORE UPDATE OR DELETE ON public.historical_user_live_oauth_verified_proofs
 FOR EACH ROW EXECUTE FUNCTION public.boardreadyops_guard_historical_live_oauth_verified_proof();
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0126_historical_user_live_oauth_verified_proof')
+VALUES ('0127_historical_user_live_oauth_verified_proof')
 ON CONFLICT(version) DO NOTHING;

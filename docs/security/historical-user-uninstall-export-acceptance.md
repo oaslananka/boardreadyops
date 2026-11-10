@@ -109,7 +109,7 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   unsafe directory permissions or symlinks fail closed. An existing
   corrupted destination is never overwritten. Disk files may remain
   quarantined after failure; no background cleanup is enabled for them.
-  Source-only migration 0124 now adds an immutable, original numeric USER
+  Source-only migration 0125 now adds an immutable, original numeric USER
   and exact private-preflight-bound cleanup audit. A separate MANUAL-ONLY
   cleanup helper can unlink/fsync a known private partial ZIP only after
   verifying its persisted private preflight SHA/byte length, exact original
@@ -122,7 +122,7 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   in the database; a failed commit after unlink may require explicit
   missing-file recovery on the next approved cleanup call. Unbound
   orphan ZIPs or corrupted files stay quarantined and are not scanned
-  or removed automatically. New source-only migration 0125 supplies a
+  or removed automatically. New source-only migration 0126 supplies a
   persisted, ORIGINAL numeric USER/private-preflight/export-bound
   private ZIP reader reservation with SHA/byte-length, immutable
   identity, once-only release and NO automatic expiry. Its admission
@@ -145,7 +145,7 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   cleanup audit acknowledgement must match the actual missing/deleted
   outcome. A second PostgreSQL connection cannot clean an unresolved
   private ZIP reader, including after export revocation.
-  Source-only migration 0125 also rejects parent export deletion while
+  Source-only migration 0126 also rejects parent export deletion while
   any private ZIP reader is unresolved, preventing cascade removal of
   the cross-worker fence. A crashed reader is quarantined indefinitely, NOT reaped on a timer.
   The SOURCE-ONLY, READ-ONLY assessHistoricalUserPrivateReadRecovery
@@ -252,7 +252,7 @@ This is a short-lived private diagnostic truth claim, NOT a customer's
 download authorization or a complete DB+filesystem commitment.
 The archive root is a trusted server-injected private path, NOT a user-supplied
 URL, and no bytes or download capability are returned.
-For existing historical mutation epoch triggers from migrations 0118–0120
+For existing historical mutation epoch triggers from migrations 0119–0121
 (core repository/run/finding/artifact rows, supported review/collaboration,
 private visual and audit classes), the private source-scope digest now
 also incorporates the **original-USER installation-bound mutation epoch**
@@ -267,7 +267,7 @@ sorted per-row digests, so no BOM, firmware, private IP or third-party raw
 row content is transferred to the application. Any row count above 100 per
 class, ambiguous owner, foreign scope or malformed digest fails closed.
 Changing hardware/BOM data while keeping row counts unchanged now changes
-the internal source-scope digest. Existing 0118–0120 mutation epochs also
+the internal source-scope digest. Existing 0119–0121 mutation epochs also
 detect edit-then-restore for the tracked core/review/visual classes.
 No hardware mutation epoch was added: an edit restored byte-identically
 between independent reads remains unobservable for untracked tables.
@@ -351,7 +351,7 @@ cookies are cleared on success or failure; the same-server signed
 original USER, live GitHub /user ID and pending export must still match.
 The callback does not create a fresh dashboard session, durable customer
 identity proof, preflight record, ZIP, delivery token or external URL.
-Additive migration 0122 introduces a durable original-user-scoped
+Additive migration 0123 introduces a durable original-user-scoped
 nonce ledger: ONLY the domain-separated SHA-256 digest of the 32-byte
 OAuth state, immutable export/user/issuance/expiry and a one-way consumed
 timestamp. Registration is denied without a pending unexpired export
@@ -372,7 +372,7 @@ never held across an external request. Simultaneous or repeated
 callbacks cannot both succeed; provider failure burns the nonce
 irreversibly. Browser state and proof cookies are also cleared.
 A challenge record remains until the source export is lawfully removed.
-Source-only migration 0123 adds a per-export time index. The nonce
+Source-only migration 0124 adds a per-export time index. The nonce
 registration transaction uses the existing tenant admission advisory
 lock to enforce a bounded rolling quota of **24 challenges per five
 minutes** and a **128-challenge lifetime maximum per export**.
@@ -390,7 +390,7 @@ means disabled). It must remain off in production pending acceptance.
 No customer-download endpoint exists.
 
 **SOURCE-ONLY durable fresh GitHub USER OAuth confirmation:** Migration
-`0126_historical_user_live_oauth_verified_proof` adds a separate append-only
+`0127_historical_user_live_oauth_verified_proof` adds a separate append-only
 five-minute verification record tied to the existing one-use, SHA-256-only
 OAuth nonce ledger, exact original numeric GitHub USER and suspended
 uninstalled-account export. The normal successful historical callback
@@ -414,7 +414,7 @@ migration and its feature flag remain UNDEPLOYED and OFF.
 **SOURCE-ONLY source-schema coverage guard:** The original-user private
 data-class audit now fingerprints the complete catalog structure, not
 customer rows: public base-table names and all ordered column names,
-types and nullability as observed in PostgreSQL 17 after migration 0126.
+types and nullability as observed in PostgreSQL 17 after migration 0127.
 The explicit baseline is **92 tables / 1,033 columns**, with 13 tables
 contributing to the **redacted partial private metadata candidate**,
 16 deliberately sensitive withheld classes and **63 further tables still

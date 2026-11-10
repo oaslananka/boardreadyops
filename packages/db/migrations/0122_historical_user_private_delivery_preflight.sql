@@ -125,5 +125,5 @@ BEFORE UPDATE ON public.historical_user_private_delivery_preflights
 FOR EACH ROW EXECUTE FUNCTION public.boardreadyops_guard_private_delivery_preflight_update();
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0121_historical_user_private_delivery_preflight')
+VALUES ('0122_historical_user_private_delivery_preflight')
 ON CONFLICT(version) DO NOTHING;

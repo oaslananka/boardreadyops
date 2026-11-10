@@ -33,5 +33,5 @@ BEFORE UPDATE OR DELETE ON public.historical_user_partial_cleanup_events
 FOR EACH ROW EXECUTE FUNCTION public.boardreadyops_guard_historical_partial_cleanup_event();
 
 INSERT INTO public.cloud_schema_migrations(version)
-VALUES ('0124_historical_user_private_partial_cleanup_audit')
+VALUES ('0125_historical_user_private_partial_cleanup_audit')
 ON CONFLICT(version) DO NOTHING;

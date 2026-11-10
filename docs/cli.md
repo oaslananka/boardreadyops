@@ -20,6 +20,8 @@ Use `--format json` with `run` or `check` when another tool should consume diagn
 
 See [Exit Codes & Finding Severities](reference/exit-codes.md) for the full nonzero exit code and severity reference shared across these commands.
 
+`boardreadyops schema [name]` prints the requested JSON Schema, defaulting to `config` when no name is supplied. Use `boardreadyops schema --help` to see the names. An unknown schema name returns exit code `2`, writes a supported-name hint to stderr, and emits **no** JSON on stdout; automation must not mistake an invalid request for the configuration schema.
+
 ## Review publishing
 
 `boardreadyops review publish [path]` publishes the local review evidence to BoardReadyOps Cloud. Text output remains the default for interactive use. Pass `--format json` for integrations that need a stable machine-readable result without parsing display text.

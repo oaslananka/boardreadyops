@@ -50,6 +50,8 @@ describe("BoardReadyOps Cloud migrations", () => {
 
   it("discovers SQL migrations in deterministic order", async () => {
     const files = (await readdir(migrationsDir)).filter((file) => /^\d+_.+\.sql$/u.test(file)).sort();
+    const migrationNumbers = files.map((file) => file.slice(0, 4));
+    expect(new Set(migrationNumbers).size).toBe(migrationNumbers.length);
 
     expect(files).toEqual([
       "0001_cloud_schema.sql",
@@ -162,26 +164,27 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0110_artifact_export_copy_unlink_fence.sql",
       "0111_review_policy_run_ingestion_snapshot.sql",
       "0112_signed_manufacturing_export_evidence.sql",
-      "0113_data_export_archive_commitments.sql",
-      "0114_data_export_archive_cleanup.sql",
-      "0115_historical_user_export_identity.sql",
-      "0116_historical_user_artifact_copy_fence.sql",
-      "0117_historical_user_transfer_tenant_fence.sql",
-      "0118_historical_user_snapshot_mutation_epoch.sql",
-      "0119_historical_user_review_collaboration_mutation_epoch.sql",
-      "0120_historical_user_core_source_mutation_epoch.sql",
-      "0121_historical_user_private_delivery_preflight.sql",
-      "0122_historical_user_oauth_challenge_once.sql",
-      "0123_historical_user_oauth_challenge_export_bounds.sql",
-      "0124_historical_user_private_partial_cleanup_audit.sql",
-      "0125_historical_user_private_partial_read_reservations.sql",
-      "0126_historical_user_live_oauth_verified_proof.sql",
+      "0113_workflow_reconciliation_pending_poll_budget.sql",
+      "0114_data_export_archive_commitments.sql",
+      "0115_data_export_archive_cleanup.sql",
+      "0116_historical_user_export_identity.sql",
+      "0117_historical_user_artifact_copy_fence.sql",
+      "0118_historical_user_transfer_tenant_fence.sql",
+      "0119_historical_user_snapshot_mutation_epoch.sql",
+      "0120_historical_user_review_collaboration_mutation_epoch.sql",
+      "0121_historical_user_core_source_mutation_epoch.sql",
+      "0122_historical_user_private_delivery_preflight.sql",
+      "0123_historical_user_oauth_challenge_once.sql",
+      "0124_historical_user_oauth_challenge_export_bounds.sql",
+      "0125_historical_user_private_partial_cleanup_audit.sql",
+      "0126_historical_user_private_partial_read_reservations.sql",
+      "0127_historical_user_live_oauth_verified_proof.sql",
     ]);
   });
 
-  it("stores historical numeric GitHub USER OAuth challenge digests as irreversible short-lived source-only state in schema v122", async () => {
+  it("stores historical numeric GitHub USER OAuth challenge digests as irreversible short-lived source-only state in schema v123", async () => {
     const sql = (
-      await readFile(join(migrationsDir, "0122_historical_user_oauth_challenge_once.sql"), "utf8")
+      await readFile(join(migrationsDir, "0123_historical_user_oauth_challenge_once.sql"), "utf8")
     ).toLowerCase();
     expect(sql).toContain("historical_user_oauth_challenges");
     expect(sql).toContain("state_sha256 text primary key");
@@ -198,18 +201,18 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).not.toContain("customer_delivery_allowed boolean not null default true");
   });
 
-  it("indexes bounded original USER OAuth challenge audit rows by export and time in schema v123", async () => {
+  it("indexes bounded original USER OAuth challenge audit rows by export and time in schema v124", async () => {
     const sql = (
-      await readFile(join(migrationsDir, "0123_historical_user_oauth_challenge_export_bounds.sql"), "utf8")
+      await readFile(join(migrationsDir, "0124_historical_user_oauth_challenge_export_bounds.sql"), "utf8")
     ).toLowerCase();
     expect(sql).toContain("historical_user_oauth_challenges_export_created");
     expect(sql).toContain("(export_id,created_at)");
     expect(sql).not.toContain("delete from historical_user_oauth_challenges");
   });
 
-  it("retains immutable original USER-bound private partial cleanup outcomes in schema v124", async () => {
+  it("retains immutable original USER-bound private partial cleanup outcomes in schema v125", async () => {
     const sql = (
-      await readFile(join(migrationsDir, "0124_historical_user_private_partial_cleanup_audit.sql"), "utf8")
+      await readFile(join(migrationsDir, "0125_historical_user_private_partial_cleanup_audit.sql"), "utf8")
     ).toLowerCase();
     expect(sql).toContain("historical_user_partial_cleanup_events");
     expect(sql).toContain("export_id text primary key");
@@ -221,9 +224,9 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).not.toContain("delete from public.data_exports");
   });
 
-  it("persists non-expiring source-only historical USER private ZIP read reservations in schema v125", async () => {
+  it("persists non-expiring source-only historical USER private ZIP read reservations in schema v126", async () => {
     const sql = (
-      await readFile(join(migrationsDir, "0125_historical_user_private_partial_read_reservations.sql"), "utf8")
+      await readFile(join(migrationsDir, "0126_historical_user_private_partial_read_reservations.sql"), "utf8")
     ).toLowerCase();
     expect(sql).toContain("historical_user_partial_read_reservations");
     expect(sql).toContain("original_github_user_id bigint not null");
@@ -234,9 +237,9 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).not.toContain("delete from public.historical_user_partial_read_reservations");
   });
 
-  it("binds a consumed original USER nonce to a private, revocable but never downloadable verified OAuth proof in schema v126", async () => {
+  it("binds a consumed original USER nonce to a private, revocable but never downloadable verified OAuth proof in schema v127", async () => {
     const sql = (
-      await readFile(join(migrationsDir, "0126_historical_user_live_oauth_verified_proof.sql"), "utf8")
+      await readFile(join(migrationsDir, "0127_historical_user_live_oauth_verified_proof.sql"), "utf8")
     ).toLowerCase();
     expect(sql).toContain("historical_user_live_oauth_verified_proofs");
     expect(sql).toContain("state_sha256 text not null unique");
