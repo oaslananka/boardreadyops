@@ -84,6 +84,78 @@ describe("recorded run design workspace", () => {
     expect(html).toContain('aria-label="Run design investigation workspace"');
   });
 
+  it("puts physical component investigation ahead of legacy virtual BOM warnings without losing either finding", () => {
+    const first = findings[0];
+    const second = findings[1];
+    if (!first || !second) throw new Error("missing source findings");
+    const original = [
+      {
+        ...first,
+        id: "virtual-pwr",
+        fingerprint: "virtual-pwr",
+        ruleId: "bom.missing-mpn",
+        message: "#PWR030 is missing an MPN.",
+      },
+      {
+        ...second,
+        id: "populated-r8",
+        fingerprint: "populated-r8",
+        ruleId: "bom.missing-mpn",
+        message: "R8 is missing an MPN.",
+      },
+    ];
+    const html = render([], original);
+    expect(html.indexOf("R8 is missing an MPN.")).toBeLessThan(html.indexOf("#PWR030 is missing an MPN."));
+    const inspector = html.slice(html.indexOf('aria-label="Selected run finding"'));
+    expect(inspector).toContain("Supply a verifiable manufacturer part number");
+    expect(html).toContain("Virtual KiCad reference: Exclude from BOM");
+    expect(html).toContain("2 of 14");
+    expect(original[0]?.id).toBe("virtual-pwr"); // Input remains in historical record order.
+  });
+
+  it("prioritizes only validated, unambiguous source-linked markers before other findings", () => {
+    const first = findings[0];
+    const second = findings[1];
+    if (!first || !second) throw new Error("missing source findings");
+    const physical = {
+      ...first,
+      id: "populated-r8",
+      fingerprint: "r8",
+      ruleId: "bom.missing-mpn",
+      message: "R8 is missing an MPN.",
+    };
+    const anchored = {
+      ...second,
+      id: "pcb-open",
+      fingerprint: "verified-pcb",
+      ruleId: "design.board-outline",
+      message: "PCB outline is open.",
+    };
+    const virtual = {
+      ...first,
+      id: "virtual-pwr",
+      fingerprint: "virtual-pwr",
+      ruleId: "bom.missing-mpn",
+      message: "#PWR030 is missing an MPN.",
+    };
+    const marker = {
+      id: "native-marker",
+      kind: "finding" as const,
+      targetRef: "edge",
+      x: 0.4,
+      y: 0.3,
+      metadata: { fingerprint: "verified-pcb", ruleId: "design.board-outline", severity: "high" },
+    };
+    const html = render([marker], [virtual, physical, anchored]);
+    expect(html.indexOf("PCB outline is open.")).toBeLessThan(html.indexOf("R8 is missing an MPN."));
+    expect(html.indexOf("R8 is missing an MPN.")).toBeLessThan(html.indexOf("#PWR030 is missing an MPN."));
+    expect(html).toContain("This finding has a recorded image anchor");
+    expect(html).toContain("ring-2 ring-primary");
+    const untrusted = render([{ ...marker, x: 1.5 }], [virtual, physical, anchored]);
+    expect(untrusted.indexOf("R8 is missing an MPN.")).toBeLessThan(untrusted.indexOf("PCB outline is open."));
+    expect(untrusted).not.toContain("ring-2 ring-primary");
+  });
+
   it("selects a marker only when the recorded wire fingerprint matches (not its database row ID)", () => {
     const anchors = [
       {
