@@ -80,6 +80,7 @@ COPY --chown=node:node --from=build /app/apps/web/.next/worker.mjs ./worker.mjs
 COPY --chown=node:node --from=build /app/apps/web/.next/migrate.mjs ./migrate.mjs
 COPY --chown=node:node --from=build /app/apps/web/public ./apps/web/public
 COPY apps/web/docker-entrypoint.sh /usr/local/bin/boardreadyops-entrypoint
+COPY --chown=node:node apps/web/web-supervisor.mjs ./apps/web/web-supervisor.mjs
 # A fresh named volume inherits the artifact directory's unprivileged owner.
 # Existing data/permissions require separately authorized operator validation.
 RUN chmod 0755 /usr/local/bin/boardreadyops-entrypoint \
@@ -89,8 +90,8 @@ USER node
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=4 \
+HEALTHCHECK --interval=3s --timeout=5s --start-period=30s --retries=2 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:3000/api/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))"]
 
 ENTRYPOINT ["/usr/local/bin/boardreadyops-entrypoint"]
-CMD ["node", "apps/web/server.js"]
+CMD ["node", "apps/web/web-supervisor.mjs"]
