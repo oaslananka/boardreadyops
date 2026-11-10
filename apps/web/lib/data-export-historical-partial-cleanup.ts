@@ -153,6 +153,7 @@ async function deleteVerifiedHistoricalPartial(
  * or customer ZIP delivery (which remains NO_GO).
  */
 export async function cleanupHistoricalUserPrivatePartial(input: CleanupInput): Promise<Result> {
+  if (process.platform !== "linux") return "quarantined";
   if (!validCleanupInput(input)) return "quarantined";
   const root = input.archiveRoot;
   const [folder, actual] = await Promise.all([lstat(root).catch(() => null), realpath(root).catch(() => null)]);

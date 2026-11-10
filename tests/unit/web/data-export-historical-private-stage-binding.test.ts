@@ -52,8 +52,11 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
+// These success-path filesystem tests require Linux private-volume semantics.
+const linuxIt = it.skipIf(process.platform !== "linux");
+
 describe("source-only historical USER physical ZIP stage trusted binding", () => {
-  it("holds the same numeric USER, export UUID, DB, storage root and driver after first source read", async () => {
+  linuxIt("holds the same numeric USER, export UUID, DB, storage root and driver after first source read", async () => {
     const { input, returned } = await fixture();
     const original = {
       db: input.db,
@@ -103,7 +106,7 @@ describe("source-only historical USER physical ZIP stage trusted binding", () =>
     ).toEqual(bytes);
   });
 
-  it("freezes original USER/DB/storage inputs BEFORE asynchronous private directory preparation", async () => {
+  linuxIt("freezes original USER/DB/storage inputs BEFORE asynchronous private directory preparation", async () => {
     const { input, returned } = await fixture();
     const original = {
       db: input.db,

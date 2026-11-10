@@ -106,8 +106,13 @@ by the customer on GitHub are outside BoardReadyOps's export scope.
   A separate private orchestration path
   performs a SECOND original numeric USER DB and physical object/
   hold/retention verification AFTER fsync. Wrong user, changed bytes,
-  unsafe directory permissions or symlinks fail closed. An existing
-  corrupted destination is never overwritten. Disk files may remain
+  unsafe directory permissions or symlinks fail closed. The private
+  physical ZIP path is supported only inside the Linux container filesystem:
+  native Windows ACL semantics and macOS directory fsync are not interchangeable
+  with the required 0700/0600 owner, no-follow, and durable-directory checks.
+  Other hosts reject private archive provisioning, reads and cleanup before
+  database mutations; cross-platform CI verifies this fail-closed behavior.
+  An existing corrupted destination is never overwritten. Disk files may remain
   quarantined after failure; no background cleanup is enabled for them.
   Source-only migration 0125 now adds an immutable, original numeric USER
   and exact private-preflight-bound cleanup audit. A separate MANUAL-ONLY
