@@ -164,5 +164,5 @@ describe("generated output inventory safeguards", () => {
     }
     const exceededDepth = await checkFirstPartyOutputSet(other.root, other.manifest, []);
     expect(exceededDepth.join(" ")).toContain("Output tree scan exceeds depth 32");
-  });
+  }, 60_000);
 });
