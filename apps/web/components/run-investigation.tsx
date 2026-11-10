@@ -169,7 +169,7 @@ export function RunPageFrame({
         ) : (
           <RunHeader run={run} />
         )}
-        <RunVerdictBanner run={run} />
+        <RunVerdictBanner run={run} compact={active === "design" && run.investigationState === "partial_data"} />
         {liveRefresh ? <RunLiveRefresh enabled /> : null}
         <RunNavigation runId={run.id} active={active} />
         <RunStateNotice run={run} compact={active === "design"} />
@@ -200,26 +200,41 @@ const verdictTextClass: Record<"success" | "danger" | "warning" | "info", string
  * scan. This is the sentence the reader came for, so it is given the top of the page, the
  * largest type on it, and a single next step.
  */
-function RunVerdictBanner({ run }: Readonly<{ run: RunDetail }>) {
+function RunVerdictBanner({ run, compact = false }: Readonly<{ run: RunDetail; compact?: boolean }>) {
   const verdict = runVerdict(run);
   return (
     <section
-      className={`rounded-md border p-5 ${verdictBandClass[verdict.tone]}`}
+      className={`rounded-md border ${compact ? "px-4 py-2" : "p-5"} ${verdictBandClass[verdict.tone]}`}
       aria-labelledby="run-verdict-headline"
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className={
+          compact
+            ? "flex flex-wrap items-center justify-between gap-2"
+            : "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+        }
+      >
         <div>
-          <h2 id="run-verdict-headline" className={`text-xl font-bold ${verdictTextClass[verdict.tone]}`}>
+          <h2
+            id="run-verdict-headline"
+            className={`${compact ? "text-base" : "text-xl"} font-bold ${verdictTextClass[verdict.tone]}`}
+          >
             {verdict.headline}
           </h2>
-          <p className="mt-1 text-sm text-foreground">{verdict.detail}</p>
+          <p className={compact ? "text-xs text-foreground" : "mt-1 text-sm text-foreground"}>
+            {compact ? "No accepted signed result" : verdict.detail}
+          </p>
         </div>
         {verdict.action ? (
           <Link
             href={verdict.action.href}
-            className="w-fit rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+            className={
+              compact
+                ? "inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-foreground underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                : "w-fit rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+            }
           >
-            {verdict.action.label}
+            {compact ? "Inspect evidence" : verdict.action.label}
           </Link>
         ) : undefined}
       </div>

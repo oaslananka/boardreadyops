@@ -234,7 +234,11 @@ describe("run investigation accessibility", () => {
       ),
     );
     expect(markup).toContain("Readiness not verified");
-    expect(markup).toContain("Inspect missing result");
+    expect(markup).toContain("Inspect evidence");
+    expect(markup).toContain("No accepted signed result");
+    expect(markup).not.toContain(
+      "A stored decision cannot confirm fabrication readiness; check the execution and publication record.",
+    );
     expect(markup).toContain("Additional evidence limitations");
     expect(markup).toContain("<details");
     expect(markup.indexOf("Additional evidence limitations")).toBeLessThan(markup.indexOf('id="design-evidence"'));
@@ -246,6 +250,7 @@ describe("run investigation accessibility", () => {
       createElement(RunPageFrame, { run, active: "summary" }, createElement("section", null, "Summary")),
     );
     expect(summary).toContain("This run has partial data");
+    expect(summary).toContain("Inspect missing result");
     expect(summary).not.toContain("Additional evidence limitations");
   });
 
