@@ -270,7 +270,12 @@ export function categorizeFindings(findings: readonly Finding[]): RuleCategorySu
   );
 
   for (const finding of findings) {
-    const category = metaById.get(finding.ruleId)?.category ?? "unclassified";
+    // Unregistered KiCad DRC/ERC diagnostics still have a known electrical domain.
+    // Do not infer evidence quality or overwrite an explicitly registered category.
+    const registeredCategory = metaById.get(finding.ruleId)?.category;
+    const category =
+      registeredCategory ??
+      (finding.ruleId.startsWith("drc.") || finding.ruleId.startsWith("erc.") ? "electrical" : "unclassified");
     const bucket = buckets.get(category) ?? emptyCategorySummary(category);
     bucket.total += 1;
     bucket[finding.severity] += 1;

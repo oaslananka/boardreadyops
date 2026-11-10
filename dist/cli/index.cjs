@@ -45807,7 +45807,8 @@ function categorizeFindings(findings) {
     knownCategories.map((category) => [category, emptyCategorySummary(category)])
   );
   for (const finding2 of findings) {
-    const category = metaById.get(finding2.ruleId)?.category ?? "unclassified";
+    const registeredCategory = metaById.get(finding2.ruleId)?.category;
+    const category = registeredCategory ?? (finding2.ruleId.startsWith("drc.") || finding2.ruleId.startsWith("erc.") ? "electrical" : "unclassified");
     const bucket = buckets.get(category) ?? emptyCategorySummary(category);
     bucket.total += 1;
     bucket[finding2.severity] += 1;
