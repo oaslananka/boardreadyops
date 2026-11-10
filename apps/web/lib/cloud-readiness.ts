@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import {
   CloudRuntimeConfigurationError,
@@ -8,6 +9,7 @@ import {
 
 const service = "boardreadyops-cloud" as const;
 const defaultTimeoutMs = 2_000;
+const defaultDrainMarkerPath = "/run/boardreadyops/draining";
 
 export type CloudReadinessResult =
   | {
@@ -67,10 +69,13 @@ function defaultPostgresQuery(databaseUrl: string): Query {
 }
 
 export async function checkCloudReadiness(
-  options: { environment?: NodeJS.ProcessEnv; query?: Query; timeoutMs?: number } = {},
+  options: { environment?: NodeJS.ProcessEnv; query?: Query; timeoutMs?: number; drainMarkerPath?: string } = {},
 ): Promise<CloudReadinessResult> {
   const environment = options.environment ?? process.env;
-  if (environment.BOARDREADYOPS_SHUTTING_DOWN === "1") {
+  if (
+    environment.BOARDREADYOPS_SHUTTING_DOWN === "1" ||
+    existsSync(options.drainMarkerPath ?? defaultDrainMarkerPath)
+  ) {
     return { ok: false, service, check: "readiness", reason: "shutting-down" };
   }
   const missing = missingRequiredConfiguration(environment);

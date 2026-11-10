@@ -26,6 +26,14 @@ The Docker image healthcheck uses /api/health/ready (not dependency-free /api/he
 
 **This does not eliminate downtime in the current Git-sourced Docker Compose application.** Coolify stops and reconciles its Compose services, including the single tunnel and web. Production cutovers have returned Cloudflare HTTP 530 before the replacement tunnel connected. See issue #1433 for the independently required stable tunnel, rolling web, stable stateful services, and actual customer-traffic cutover acceptance. Do not describe a healthy Docker image or an unchanged postdeploy status as zero-downtime proof.
 
+## Web readiness drain prerequisite (not a Compose zero-downtime fix)
+
+The Dockerfile web runner now uses a small Node parent process. On SIGTERM/SIGINT it creates the rootless, container-local /run/boardreadyops/draining readiness marker with owner-only permissions, while the existing Next.js child continues serving for **12 seconds**. The regular /api/health/ready returns HTTP 503 during that window; liveness remains up. The Docker image healthcheck runs every **3 seconds** (two consecutive failed probes to become unhealthy), allowing the existing Traefik Docker provider to stop routing new work to the terminating container. Only after the drain interval does the parent forward the signal to Next.js for its own graceful shutdown. On an unexpected child exit the parent exits nonzero; a process restart clears a stale drain marker before starting its child. No public shutdown route or extra permanently running service is added.
+
+**Required for a future rolling-eligible Dockerfile deployment:** stop-grace duration of at least **30 seconds** (parent drain plus child shutdown), simultaneous old/new web readiness and Traefik routing, **stable** database/Redis/worker and a separately persistent **single** existing Cloudflare Tunnel. The private origin must stay private and deny direct-public-host and untrusted Docker network requests on **both HTTP and HTTPS** routers; do not publish a direct web port. Do not enable these changes solely based on a synthetic test: verify real Next.js/SSE/long-lived requests, authenticated session continuity, migration compatibility, rollback and a complete public cutover witness. A 3-second healthcheck and 12-second drain delay mitigate a tested routing race; they do not by themselves guarantee all requests survive.
+
+**Current production still uses stop-then-start Docker Compose**. It still recreates web, tunnel and stateful services and may return HTTP 530/502 during a redeploy. The readiness/drain code must not be represented as a completed zero-downtime migration. Issue #1433 remains OPEN until the production topology is transitioned reversibly and customer-path acceptance passes.
+
 ## Mandatory cutover prerequisites
 
 - Identify the running image SHA and preserve a known good rollback image, database snapshot, and artifact recovery path.
