@@ -110,7 +110,7 @@ describe("first-use visual-first routes", () => {
     const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
     expect(html.indexOf("Your next hardware review starts with the board")).toBeGreaterThan(0);
     expect(html.indexOf("Your next hardware review starts with the board")).toBeLessThan(
-      html.indexOf("No projects in this workspace yet"),
+      html.indexOf("No CAD workspace projects yet"),
     );
     expect(html).not.toContain('aria-label="Example hardware review"');
     expect(html).toContain('href="/reviews"');
@@ -151,10 +151,10 @@ describe("first-use visual-first routes", () => {
     expect(html).toContain("Schematic published");
     expect(html).toContain('href="/runs/run-z/design"');
     expect(html).toContain("not a sample or a signed manufacturing clearance");
+    expect(html).toContain("Inspect recorded design");
+    expect(html).toContain("without creating a CAD workspace project");
     expect(html).not.toContain('aria-label="Example PCB and schematic design views"');
-    expect(html.indexOf("Real recorded design evidence")).toBeLessThan(
-      html.indexOf("No projects in this workspace yet"),
-    );
+    expect(html.indexOf("Real recorded design evidence")).toBeLessThan(html.indexOf("No CAD workspace projects yet"));
     expect(html.indexOf("Real recorded design evidence")).toBeLessThan(html.indexOf("Add a project</"));
     expect(repositoriesMock).toHaveBeenCalledWith(session);
     expect(designEvidenceMock).toHaveBeenCalledWith(session, groups);

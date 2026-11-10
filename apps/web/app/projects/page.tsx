@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AppShell } from "../../components/app-shell.js";
 import { ProjectRowActions, WorkspaceDangerZone } from "../../components/projects/teardown-forms.js";
 import { CreateProjectForm, CreateWorkspaceForm } from "../../components/projects/workspace-forms.js";
+import { WorkspaceProjectsEmptyState } from "../../components/projects/workspace-projects-empty-state.js";
 import { RealDesignEvidencePanel } from "../../components/real-design-evidence-panel.js";
 import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
 import { Button } from "../../components/ui/button.js";
@@ -249,12 +250,10 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
                 rows={result.projects}
                 rowKey={(project) => project.id}
                 empty={
-                  <EmptyState title="No projects in this workspace yet">
-                    <p>
-                      Create a project, then connect its GitHub repository. Direct hosted ZIP upload is not yet
-                      available.
-                    </p>
-                  </EmptyState>
+                  <WorkspaceProjectsEmptyState
+                    hasAnyProjects={result.total > 0}
+                    {...(designEvidence && result.total === 0 ? { recordedRunId: designEvidence.runId } : {})}
+                  />
                 }
               />
               <div className="mt-4">
