@@ -190,6 +190,96 @@ function SetupPrResultOutput({ result }: Readonly<{ result: SetupPrResult }>) {
   );
 }
 
+function RepositoryFirstPicker({
+  signedIn,
+  repositories,
+  repositoryId,
+  onSelectRepository,
+  disabled,
+}: Readonly<{
+  signedIn: boolean;
+  repositories: readonly SetupTargetRepository[];
+  repositoryId: string;
+  onSelectRepository: (id: string) => void;
+  disabled: boolean;
+}>) {
+  if (!signedIn) {
+    return (
+      <section aria-label="Choose your GitHub repository" className="rounded-xl border border-border bg-card p-5">
+        <h2 className="text-lg font-semibold text-foreground">First, connect your GitHub account</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Sign in to choose an authorized repository. No files change just by signing in.
+        </p>
+        <a
+          href="/api/auth/github/login"
+          className="mt-3 inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground"
+        >
+          Sign in with GitHub
+        </a>
+      </section>
+    );
+  }
+
+  if (repositories.length === 0) {
+    return (
+      <section aria-label="Choose your GitHub repository" className="rounded-xl border border-border bg-card p-5">
+        <h2 className="text-lg font-semibold text-foreground">Connect your first GitHub repository</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Install the GitHub App on the repository containing your board before choosing a policy.
+        </p>
+        <a
+          href="https://github.com/apps/boardreadyops/installations/new"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground"
+        >
+          Install the GitHub App
+        </a>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      aria-labelledby="setup-first-repository-heading"
+      className="rounded-xl border border-primary/30 bg-card p-4 shadow-e1 sm:p-5"
+    >
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(16rem,1.2fr)] md:items-center">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Start here</p>
+          <h2 id="setup-first-repository-heading" className="mt-1 text-lg font-semibold text-foreground">
+            Which repository has your board?
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Choose one of your authorized repositories first. Selecting it makes no changes.
+          </p>
+        </div>
+        <div className="min-w-0">
+          <label htmlFor="one-click-setup-repository" className="text-sm font-medium text-foreground">
+            Repository
+          </label>
+          <select
+            id="one-click-setup-repository"
+            value={repositoryId}
+            disabled={disabled}
+            onChange={(event) => onSelectRepository(event.currentTarget.value)}
+            className="mt-1 min-h-11 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <option value="" disabled>
+              Choose an authorized repository
+            </option>
+            {repositories.map((repository) => (
+              <option key={repository.id} value={repository.id}>
+                {repository.fullName}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function RepositorySetupInteractive({
   presets,
   initialPresetId,
@@ -288,6 +378,13 @@ export function RepositorySetupInteractive({
 
   return (
     <>
+      <RepositoryFirstPicker
+        signedIn={signedIn}
+        repositories={repositories}
+        repositoryId={repositoryId}
+        onSelectRepository={handleSelectRepository}
+        disabled={isCreatingPr || isValidating}
+      />
       <SetupProgress {...(displayedRepository ? { repository: displayedRepository } : {})} />
 
       <Panel
@@ -427,11 +524,9 @@ export function RepositorySetupInteractive({
           repositories={repositories}
           repositoryId={repositoryId}
           {...(displayedRepository ? { repository: displayedRepository } : {})}
-          onSelectRepository={handleSelectRepository}
           onCreate={() => void handleCreateSetupPr(false)}
           onUpdate={() => void handleCreateSetupPr(true)}
           isCreating={isCreatingPr}
-          selectionDisabled={isCreatingPr || isValidating}
           workflowPath={workflowPath}
           {...(displayedRepository?.setupBlockedReason
             ? { blockedReason: displayedRepository.setupBlockedReason }
@@ -892,11 +987,9 @@ type OneClickSetupProps = {
   repositories: readonly SetupTargetRepository[];
   repositoryId: string;
   repository?: SetupTargetRepository;
-  onSelectRepository: (id: string) => void;
   onCreate: () => void;
   onUpdate: () => void;
   isCreating: boolean;
-  selectionDisabled: boolean;
   workflowPath: string;
   blockedReason?: string;
   result?: SetupPrResult;
@@ -915,32 +1008,23 @@ function OneClickSetup({
   repositories,
   repositoryId,
   repository,
-  onSelectRepository,
   onCreate,
   onUpdate,
   isCreating,
-  selectionDisabled,
   workflowPath,
   blockedReason,
   result,
 }: Readonly<OneClickSetupProps>) {
-  const selectId = "one-click-setup-repository";
   const setupVerified = repository !== undefined && deriveRepositorySetupState(repository).id === "ready";
 
   if (!signedIn) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card p-4">
         <p className="text-sm text-muted-foreground">
-          Sign in to open a reviewed setup pull request for the repository you choose. You can also copy the two files
+          Sign in at the top of this page to choose a repository and review a setup pull request. You may copy the files
           above and commit them yourself, but that does not register a BoardReadyOps setup revision and does not verify
-          readiness. Return here to complete the guided setup.
+          readiness.
         </p>
-        <a
-          href="/api/auth/github/login"
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
-        >
-          Sign in with GitHub
-        </a>
       </div>
     );
   }
@@ -949,17 +1033,8 @@ function OneClickSetup({
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card p-4">
         <p className="text-sm text-muted-foreground">
-          No repository is connected to your account yet. Install the BoardReadyOps GitHub App on the repository holding
-          your KiCad project, then come back to this step.
+          Connect a repository with the GitHub App at the top of this page before opening a setup pull request.
         </p>
-        <a
-          href="https://github.com/apps/boardreadyops/installations/new"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
-        >
-          Install the GitHub App
-        </a>
       </div>
     );
   }
@@ -968,25 +1043,9 @@ function OneClickSetup({
     <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 flex-1">
-          <label htmlFor={selectId} className="text-sm font-medium text-foreground">
-            Repository
-          </label>
-          <select
-            id={selectId}
-            value={repositoryId}
-            disabled={selectionDisabled}
-            onChange={(event) => onSelectRepository(event.currentTarget.value)}
-            className="mt-1 min-h-11 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            <option value="" disabled>
-              Choose an authorized repository
-            </option>
-            {repositories.map((repository) => (
-              <option key={repository.id} value={repository.id}>
-                {repository.fullName}
-              </option>
-            ))}
-          </select>
+          <p className="text-sm font-semibold text-foreground">
+            {repository?.fullName ?? "Select a repository above to continue"}
+          </p>
           <p className="mt-1.5 text-meta text-muted-foreground">
             {setupVerified ? (
               "No new setup pull request is needed. The repository workflow and configuration are already verified."
