@@ -182,6 +182,8 @@ export function RunDesignWorkspace({
           headSnapshots={visibleSnapshots}
           baseSnapshots={baseSnapshots}
           compactMobile
+          compactComparisonOnNarrowScreens
+          preferPcbLayer
           {...(recordedAnchor ? { selectedFindingFingerprint: selectedFingerprint } : {})}
           onSelectFinding={(fingerprint) => {
             // A snapshot may contain anchors outside the current findings page. Only
