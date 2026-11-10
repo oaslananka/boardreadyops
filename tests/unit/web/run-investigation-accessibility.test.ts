@@ -9,6 +9,7 @@ import {
   FindingsView,
   PublicationView,
   RunPageFrame,
+  RunUnavailable,
   reviewPublishCommand,
   SummaryView,
 } from "../../../apps/web/components/run-investigation.js";
@@ -234,7 +235,11 @@ describe("run investigation accessibility", () => {
       ),
     );
     expect(markup).toContain("Readiness not verified");
-    expect(markup).toContain("Inspect missing result");
+    expect(markup).toContain("Inspect evidence");
+    expect(markup).toContain("No accepted signed result");
+    expect(markup).not.toContain(
+      "A stored decision cannot confirm fabrication readiness; check the execution and publication record.",
+    );
     expect(markup).toContain("Additional evidence limitations");
     expect(markup).toContain("<details");
     expect(markup.indexOf("Additional evidence limitations")).toBeLessThan(markup.indexOf('id="design-evidence"'));
@@ -246,7 +251,17 @@ describe("run investigation accessibility", () => {
       createElement(RunPageFrame, { run, active: "summary" }, createElement("section", null, "Summary")),
     );
     expect(summary).toContain("This run has partial data");
+    expect(summary).toContain("Inspect missing result");
     expect(summary).not.toContain("Additional evidence limitations");
+  });
+
+  it("shows honest unavailable run feedback without inventing result data", async () => {
+    const markup = renderToStaticMarkup(createElement(RunUnavailable, { runId: "missing-run-42" }));
+    expect(markup).toContain("Run details temporarily unavailable");
+    expect(markup).toContain("missing-run-42");
+    expect(markup).toContain("No run data was inferred or cached");
+    expect(markup).toContain("GitHub issue");
+    expect(await axeViolations(markup, "/runs/missing-run-42/design")).toEqual([]);
   });
 
   it("keeps the run header stacked through tablet widths and wraps long source identities", () => {
