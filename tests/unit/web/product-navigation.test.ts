@@ -161,10 +161,30 @@ describe("ProductNavigation preserved behavior: mobile drawer and focus manageme
 describe("ProductNavigation collapse persistence", () => {
   let container: HTMLDivElement;
   let root: Root;
+  let originalStorageDescriptor: PropertyDescriptor | undefined;
   const storageKey = "boardreadyops.product-nav.compact";
 
   beforeEach(() => {
-    window.localStorage.clear();
+    // Node test workers can expose an unavailable experimental localStorage
+    // even with happy-dom. Supply an isolated real Storage-shaped fixture so
+    // these tests check persistence rather than the worker's browser globals.
+    const entries = new Map<string, string>();
+    const storage: Storage = {
+      get length() {
+        return entries.size;
+      },
+      clear: () => entries.clear(),
+      getItem: (key) => entries.get(key) ?? null,
+      key: (index) => [...entries.keys()][index] ?? null,
+      removeItem: (key) => {
+        entries.delete(key);
+      },
+      setItem: (key, value) => {
+        entries.set(key, String(value));
+      },
+    };
+    originalStorageDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", { configurable: true, value: storage });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -175,7 +195,8 @@ describe("ProductNavigation collapse persistence", () => {
     act(() => root.unmount());
     container.remove();
     delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
-    window.localStorage.clear();
+    if (originalStorageDescriptor) Object.defineProperty(window, "localStorage", originalStorageDescriptor);
+    else Reflect.deleteProperty(window, "localStorage");
   });
 
   it("starts expanded (matching the server render) even if a prior session left it collapsed", async () => {
