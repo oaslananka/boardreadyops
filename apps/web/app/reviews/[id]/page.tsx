@@ -39,7 +39,11 @@ export default async function ReviewDetailPage({ params }: Readonly<{ params: Pr
         className="review-detail-main mx-auto flex w-full max-w-6xl flex-col gap-3 px-3 py-3 sm:gap-6 sm:px-6 sm:py-8"
         id="main-content"
       >
-        <ReviewView initialReview={review} viewerLogin={viewer.session?.login} />
+        <ReviewView
+          initialReview={review}
+          viewerLogin={viewer.session?.login}
+          readOnly={review.viewerCanEdit !== true}
+        />
       </main>
     </AppShell>
   );

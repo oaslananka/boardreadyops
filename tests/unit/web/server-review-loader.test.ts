@@ -211,6 +211,7 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
     const review = await loadServerReview(reviewId, authorizedSession);
     expect(review).toBeDefined();
     expect(review?.id).toBe(reviewId);
+    expect(review?.viewerCanEdit).toBe(true);
     expect(review?.headRunId).toBe("run-hw-105");
     expect(review?.baseRunId).toBeUndefined();
     expect(review?.decision).toBe("approved");
@@ -573,6 +574,7 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
 
       const review = await loadServerReview(reviewId, null);
       expect(review?.title).toBe(expectedTitle);
+      expect(review?.viewerCanEdit).toBe(false);
       expect(review?.headCommitSha).toBe(headSha);
       expect(mockLoaderQuery.mock.calls.some(([sql]) => /^\s*(?:update|insert|delete)\b/iu.test(String(sql)))).toBe(
         false,
