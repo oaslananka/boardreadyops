@@ -8,6 +8,13 @@ import { ReviewCanvas } from "./review/review-canvas.js";
 
 type RunFinding = RunDetail["findings"][number];
 
+/** Presentation priority only: never suppress or rewrite historical findings. */
+function findingReviewPriority(finding: RunFinding, linkedFingerprints: ReadonlySet<string>): number {
+  if (finding.fingerprint && linkedFingerprints.has(finding.fingerprint)) return 0;
+  if (recordedVirtualBomNotice(finding.ruleId, finding.message)) return 2;
+  return 1;
+}
+
 /** Use the same source-grounded finding details in the mobile row and desktop inspector. */
 function FindingEvidence({
   finding,
@@ -71,8 +78,7 @@ export function RunDesignWorkspace({
   repository: string;
   commitSha: string;
 }>) {
-  const [selectedId, setSelectedId] = useState<string | undefined>(findings[0]?.id);
-  const selected = findings.find((finding) => finding.id === selectedId);
+  const [selectedId, setSelectedId] = useState<string | undefined>();
   // A run snapshot may contain findings from another results page, or stale
   // fingerprints. Do not display clickable locations without exactly one
   // matching finding on the page currently visible to this viewer.
@@ -100,6 +106,22 @@ export function RunDesignWorkspace({
           anchor.y <= 1),
     ),
   }));
+  // Only source-linked markers that survived the same uniqueness/coordinate
+  // checks as the canvas get visual priority. Other physical findings follow,
+  // with historical virtual BOM warnings still visible last on this page.
+  const linkedFingerprints = new Set<string>();
+  for (const snapshot of visibleSnapshots) {
+    for (const anchor of snapshot.anchors) {
+      if (anchor.kind === "finding" && typeof anchor.metadata?.fingerprint === "string") {
+        linkedFingerprints.add(anchor.metadata.fingerprint);
+      }
+    }
+  }
+  const orderedFindings = [...findings].sort(
+    (a, b) => findingReviewPriority(a, linkedFingerprints) - findingReviewPriority(b, linkedFingerprints),
+  );
+  const selected = orderedFindings.find((finding) => finding.id === selectedId) ?? orderedFindings[0];
+  const activeSelectedId = selected?.id;
   const selectedFingerprint =
     selected?.fingerprint && visibleFingerprints.has(selected.fingerprint) ? selected.fingerprint : undefined;
   const recordedAnchor = Boolean(
@@ -125,18 +147,20 @@ export function RunDesignWorkspace({
             {findings.length} of {totalFindings}
           </span>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Select an issue to inspect its verified source evidence.</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Verified markers first; legacy virtual BOM references last on this page. All severities remain unchanged.
+        </p>
         {findings.length > 0 ? (
           <ul className="mt-3 flex max-h-[34rem] flex-col gap-2 overflow-y-auto">
-            {findings.map((finding) => (
+            {orderedFindings.map((finding) => (
               <li key={finding.id}>
                 <button
                   type="button"
-                  aria-pressed={selectedId === finding.id}
+                  aria-pressed={activeSelectedId === finding.id}
                   onClick={() => setSelectedId(finding.id)}
                   className={
                     "w-full rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
-                    (selectedId === finding.id
+                    (activeSelectedId === finding.id
                       ? "border-primary bg-primary/10"
                       : "border-border bg-background hover:border-primary/60")
                   }
@@ -154,7 +178,7 @@ export function RunDesignWorkspace({
                     <span className="mt-1 block text-xs text-muted-foreground">Waived · remains recorded</span>
                   ) : null}
                 </button>
-                {selectedId === finding.id && selected ? (
+                {activeSelectedId === finding.id && selected ? (
                   <section
                     aria-label="Selected finding details"
                     className="mt-2 rounded-md border border-primary/40 bg-primary/5 p-3 xl:hidden"
