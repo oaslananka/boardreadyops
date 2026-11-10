@@ -23,6 +23,7 @@ export type SealedHistoricalUserPartial = {
 };
 
 async function verifiedRoot(root: string): Promise<string | null> {
+  if (process.platform !== "linux") return null;
   if (
     typeof root !== "string" ||
     !path.isAbsolute(root) ||

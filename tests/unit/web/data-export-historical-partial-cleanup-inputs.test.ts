@@ -45,6 +45,9 @@ function lockedCleanupFixture(privateZipReader = false, injected: Partial<Record
   return { db: { withTransaction } as never, query, withTransaction };
 }
 
+// These success-path filesystem tests require Linux private-volume semantics.
+const linuxIt = it.skipIf(process.platform !== "linux");
+
 describe("manual historical private cleanup input gate", () => {
   it("rejects malformed identities, missing DB and unsafe roots before any IO", async () => {
     const inputs = [
@@ -66,7 +69,7 @@ describe("manual historical private cleanup input gate", () => {
     expect(valid.db.withTransaction).not.toHaveBeenCalled();
   });
 
-  it("admits only a private, owned canonical root into the DB transaction gate", async () => {
+  linuxIt("admits only a private, owned canonical root into the DB transaction gate", async () => {
     const base = await mkdtemp(join(tmpdir(), "boardreadyops-cleanup-input-"));
     const archiveRoot = join(base, ".private-export-archives");
     try {
@@ -80,7 +83,7 @@ describe("manual historical private cleanup input gate", () => {
       await rm(base, { recursive: true, force: true });
     }
   });
-  it("audits a missing private ZIP only after the original-user gate and transaction", async () => {
+  linuxIt("audits a missing private ZIP only after the original-user gate and transaction", async () => {
     const base = await mkdtemp(join(tmpdir(), "boardreadyops-cleanup-absent-"));
     const archiveRoot = join(base, ".private-export-archives");
     try {
@@ -104,7 +107,7 @@ describe("manual historical private cleanup input gate", () => {
     }
   });
 
-  it.each([
+  linuxIt.each([
     ["owner", { rows: [{ tenant_id: "original-user" }, { tenant_id: "original-user" }] }, "quarantined"],
     ["owner", { rows: [null] }, "quarantined"],
     ["owner", { rows: { length: 1 } }, "quarantined"],
@@ -162,24 +165,23 @@ describe("manual historical private cleanup input gate", () => {
     },
   );
 
-  it.each([{ rows: [] }, { rows: [{ outcome: "wrong" }] }, { rows: [{ outcome: "missing" }, { outcome: "missing" }] }])(
-    "rejects a missing, mismatched or ambiguous cleanup audit acknowledgement",
-    async (audit) => {
-      const base = await mkdtemp(join(tmpdir(), "boardreadyops-audit-ack-"));
-      const archiveRoot = join(base, ".private-export-archives");
-      try {
-        await mkdir(archiveRoot, { mode: 0o700 });
-        const fixture = lockedCleanupFixture(false, { audit });
-        expect(await cleanupHistoricalUserPrivatePartial({ ...valid, db: fixture.db, archiveRoot })).toBe(
-          "quarantined",
-        );
-      } finally {
-        await rm(base, { recursive: true, force: true });
-      }
-    },
-  );
+  linuxIt.each([
+    { rows: [] },
+    { rows: [{ outcome: "wrong" }] },
+    { rows: [{ outcome: "missing" }, { outcome: "missing" }] },
+  ])("rejects a missing, mismatched or ambiguous cleanup audit acknowledgement", async (audit) => {
+    const base = await mkdtemp(join(tmpdir(), "boardreadyops-audit-ack-"));
+    const archiveRoot = join(base, ".private-export-archives");
+    try {
+      await mkdir(archiveRoot, { mode: 0o700 });
+      const fixture = lockedCleanupFixture(false, { audit });
+      expect(await cleanupHistoricalUserPrivatePartial({ ...valid, db: fixture.db, archiveRoot })).toBe("quarantined");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
 
-  it("never revisits a previously committed exact cleanup audit", async () => {
+  linuxIt("never revisits a previously committed exact cleanup audit", async () => {
     const base = await mkdtemp(join(tmpdir(), "boardreadyops-cleanup-audited-"));
     const archiveRoot = join(base, ".private-export-archives");
     try {
@@ -196,7 +198,7 @@ describe("manual historical private cleanup input gate", () => {
     }
   });
 
-  it("never audits or removes an unsafe private file or an outstanding reader reservation", async () => {
+  linuxIt("never audits or removes an unsafe private file or an outstanding reader reservation", async () => {
     const base = await mkdtemp(join(tmpdir(), "boardreadyops-cleanup-reader-"));
     const archiveRoot = join(base, ".private-export-archives");
     const name = join(archiveRoot, `${valid.authority.exportId}.historical-private-partial-v3.zip`);

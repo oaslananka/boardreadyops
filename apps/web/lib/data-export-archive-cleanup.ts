@@ -110,6 +110,7 @@ async function deleteVerifiedCleanupFile(
  * an explicit later retry. Never called automatically or by public HTTP.
  */
 export async function cleanupExpiredPrivateLocalExportArchive(input: CleanupInput): Promise<ArchiveCleanupResult> {
+  if (process.platform !== "linux") return "quarantined";
   if (!validCleanupInput(input)) return "quarantined";
 
   const root = path.resolve(input.archiveRoot);

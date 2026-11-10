@@ -19,6 +19,9 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
+// These success-path filesystem tests require Linux private-volume semantics.
+const linuxIt = it.skipIf(process.platform !== "linux");
+
 describe("bounded private ZIP physical cleanup admission", () => {
   it("refuses invalid IDs, arbitrary paths and missing directories without querying the DB", async () => {
     const withTransaction = vi.fn();
@@ -53,7 +56,7 @@ describe("bounded private ZIP physical cleanup admission", () => {
     expect(withTransaction).not.toHaveBeenCalled();
   });
 
-  it("marks a genuinely absent private archive missing only inside the owned transaction", async () => {
+  linuxIt("marks a genuinely absent private archive missing only inside the owned transaction", async () => {
     const parent = await folder();
     const archiveRoot = path.join(parent, ".private-export-archives");
     await mkdir(archiveRoot, { mode: 0o700 });
@@ -89,7 +92,7 @@ describe("bounded private ZIP physical cleanup admission", () => {
     );
   });
 
-  it("quarantines an unsafe existing archive without unlinking or committing cleanup", async () => {
+  linuxIt("quarantines an unsafe existing archive without unlinking or committing cleanup", async () => {
     const parent = await folder();
     const archiveRoot = path.join(parent, ".private-export-archives");
     await mkdir(archiveRoot, { mode: 0o700 });

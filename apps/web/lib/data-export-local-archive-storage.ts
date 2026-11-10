@@ -15,6 +15,7 @@ export type SealedLocalExportArchive = {
 };
 
 async function privateArchiveDirectory(root: string): Promise<string | null> {
+  if (process.platform !== "linux") return null;
   if (typeof root !== "string" || root.length === 0 || root.trim() !== root) return null;
   const resolved = path.resolve(root);
   const [file, actual] = await Promise.all([lstat(resolved).catch(() => null), realpath(resolved).catch(() => null)]);
@@ -41,6 +42,7 @@ export async function ensurePrivateLocalExportArchiveDirectory(input: {
   storageRoot: string;
   privateArchiveRoot: string;
 }): Promise<boolean> {
+  if (process.platform !== "linux") return false;
   if (typeof input?.storageRoot !== "string" || typeof input?.privateArchiveRoot !== "string") return false;
   if (!path.isAbsolute(input.storageRoot) || !path.isAbsolute(input.privateArchiveRoot)) return false;
   const parent = path.resolve(input.storageRoot);

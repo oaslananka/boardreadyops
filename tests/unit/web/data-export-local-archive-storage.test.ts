@@ -51,8 +51,11 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(async (directory) => await rm(directory, { recursive: true, force: true })));
 });
 
+// These success-path filesystem tests require Linux private-volume semantics.
+const linuxIt = it.skipIf(process.platform !== "linux");
+
 describe("private, locally sealed export ZIP", () => {
-  it("creates only the reserved private subdirectory under the existing artifact volume", async () => {
+  linuxIt("creates only the reserved private subdirectory under the existing artifact volume", async () => {
     const storageRoot = await root();
     const privateArchiveRoot = path.join(storageRoot, ".private-export-archives");
     const config = { storageRoot, privateArchiveRoot };
@@ -87,7 +90,7 @@ describe("private, locally sealed export ZIP", () => {
     ).toBe(false);
   });
 
-  it("refuses group-readable and symlinked pre-existing private directories", async () => {
+  linuxIt("refuses group-readable and symlinked pre-existing private directories", async () => {
     const storageRoot = await root();
     const privateArchiveRoot = path.join(storageRoot, ".private-export-archives");
     const config = { storageRoot, privateArchiveRoot };
@@ -101,7 +104,7 @@ describe("private, locally sealed export ZIP", () => {
     expect(await ensurePrivateLocalExportArchiveDirectory(config)).toBe(false);
   });
 
-  it("fsyncs and stores a deterministic no-clobber ZIP, then independently verifies every entry", async () => {
+  linuxIt("fsyncs and stores a deterministic no-clobber ZIP, then independently verifies every entry", async () => {
     const archiveRoot = await root();
     const exportId = randomUUID();
     const archive = zip(exportId);
@@ -128,17 +131,20 @@ describe("private, locally sealed export ZIP", () => {
     expect(await readFile(filename)).toEqual(archive.bytes);
   });
 
-  it("refuses to overwrite an export ID even when a caller supplies a valid alternative ZIP and digest", async () => {
-    const archiveRoot = await root();
-    const exportId = randomUUID();
-    const first = zip(exportId);
-    const second = zip(exportId, "not the same bytes");
-    expect(await sealLocalExportArchive({ archiveRoot, exportId, archive: first })).not.toBeNull();
-    expect(await sealLocalExportArchive({ archiveRoot, exportId, archive: second })).toBeNull();
-    expect(await readFile(path.join(archiveRoot, `${exportId}.zip`))).toEqual(first.bytes);
-  });
+  linuxIt(
+    "refuses to overwrite an export ID even when a caller supplies a valid alternative ZIP and digest",
+    async () => {
+      const archiveRoot = await root();
+      const exportId = randomUUID();
+      const first = zip(exportId);
+      const second = zip(exportId, "not the same bytes");
+      expect(await sealLocalExportArchive({ archiveRoot, exportId, archive: first })).not.toBeNull();
+      expect(await sealLocalExportArchive({ archiveRoot, exportId, archive: second })).toBeNull();
+      expect(await readFile(path.join(archiveRoot, `${exportId}.zip`))).toEqual(first.bytes);
+    },
+  );
 
-  it("rejects a modified, truncated, or renamed ZIP before an internal reader returns bytes", async () => {
+  linuxIt("rejects a modified, truncated, or renamed ZIP before an internal reader returns bytes", async () => {
     const archiveRoot = await root();
     const exportId = randomUUID();
     const archive = zip(exportId);
