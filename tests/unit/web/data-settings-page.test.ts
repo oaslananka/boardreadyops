@@ -60,6 +60,24 @@ describe("Data & Retention settings administration", () => {
     expect(page).toContain("non-local managed-object deletion");
   });
 
+  it("returns users to Data & Retention after sign-in and isolates client form state per installation", async () => {
+    const page = await readFile("apps/web/app/settings/data/page.tsx", "utf8");
+
+    // The existing OAuth return_to contract only allows same-site paths. Never copy an
+    // arbitrary installation id from the URL into an OAuth redirect.
+    expect(page).toContain('href="/api/auth/github/login?return_to=%2Fsettings%2Fdata"');
+    expect(page).not.toContain('href="/api/auth/github/login"');
+
+    // React preserves client-component local state across RSC updates unless their
+    // identity changes. A user switching the selected GitHub installation must not
+    // retain the preceding installation's export receipt, erasure confirmation,
+    // legal-hold draft or editable retention form values.
+    for (const component of ["RetentionPolicyForm", "LegalHoldCreateForm", "ExportRequestForm", "ErasureRequestForm"]) {
+      expect(page).toMatch(new RegExp(String.raw`<${component}\s+key=\{admin\.selected\.id\}`));
+    }
+    expect(page).not.toContain("key={first(parameters.installation)}");
+  });
+
   it("does not promise completed exports or destructive erasure from intake alone", async () => {
     const page = await readFile("apps/web/app/settings/data/page.tsx", "utf8");
     const forms = (await readFile("apps/web/components/settings/data-lifecycle-forms.tsx", "utf8")).replace(

@@ -152,7 +152,7 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
         <Panel title="Retention policy and legal holds">
           <EmptyState title="Sign in to administer data policy">
             <Button asChild className="mt-3">
-              <a href="/api/auth/github/login">Sign in with GitHub</a>
+              <a href="/api/auth/github/login?return_to=%2Fsettings%2Fdata">Sign in with GitHub</a>
             </Button>
           </EmptyState>
         </Panel>
@@ -219,6 +219,7 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
                     hours.
                   </p>
                   <RetentionPolicyForm
+                    key={admin.selected.id}
                     installationId={admin.selected.id}
                     currentRetentionDays={retentionDays}
                     customizable={customizableRetention(admin.selected.planTier)}
@@ -334,7 +335,11 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
             description={`Preserve records under ${admin.selected.accountLogin}.`}
             tone="critical"
           >
-            <LegalHoldCreateForm installationId={admin.selected.id} action={createLegalHoldAction} />
+            <LegalHoldCreateForm
+              key={admin.selected.id}
+              installationId={admin.selected.id}
+              action={createLegalHoldAction}
+            />
           </Panel>
         </>
       )}
@@ -352,7 +357,11 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
               and optionally download or revoke the 15-minute metadata-only preview if an operator publishes it. This
               preview is not a complete customer data archive.
             </p>
-            <ExportRequestForm installationId={admin.selected.id} action={requestExportAction} />
+            <ExportRequestForm
+              key={admin.selected.id}
+              installationId={admin.selected.id}
+              action={requestExportAction}
+            />
           </Panel>
           <Panel
             title="Erasure request"
@@ -365,6 +374,7 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
               workflow and must respect active legal holds.
             </p>
             <ErasureRequestForm
+              key={admin.selected.id}
               installationId={admin.selected.id}
               action={requestErasureAction}
               defaultScopeLabel={admin.selected.accountLogin}
