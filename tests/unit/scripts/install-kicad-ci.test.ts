@@ -15,6 +15,8 @@ const sudoMock = [
   '  case "$BRO_MOCK_REPO_MODE" in',
   '    launchpad503) echo "lazr.restfulclient.errors.ServerError: HTTP Error 503: Service Unavailable" >&2; exit 1;;',
   '    launchpad504) echo "lazr.restfulclient.errors.ServerError: HTTP Error 504: Gateway Time-out" >&2; exit 1;;',
+  '    launchpad_disconnect) echo "http.client.RemoteDisconnected: Remote end closed connection without response" >&2; exit 1;;',
+  '    launchpad_disconnect_signature) echo "GPG error: BADSIG; http.client.RemoteDisconnected: Remote end closed connection without response" >&2; exit 1;;',
   '    launchpad504_signature) echo "GPG error: NO_PUBKEY; lazr.restfulclient.errors.ServerError: HTTP Error 504: Gateway Time-out" >&2; exit 1;;',
   '    launchpad404) echo "lazr.restfulclient.errors.NotFound: HTTP Error 404: Not Found" >&2; exit 1;;',
   '    launchpad_signature) echo "GPG error: NO_PUBKEY for KiCad PPA" >&2; exit 1;;',
@@ -182,7 +184,22 @@ describe.runIf(process.platform === "linux")("Linux KiCad 10 signed PPA with off
     }
   });
 
-  it.each(["launchpad404", "launchpad_signature", "launchpad504_signature"])(
+  it("uses only immutable official OCI after repeated Launchpad API disconnections", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_REPO_MODE: "launchpad_disconnect" });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
+      expect((await readFile(f.env.BRO_MOCK_REPO_CALLS as string, "utf8")).trim().split("\n")).toHaveLength(3);
+      expect(existsSync(f.env.BRO_MOCK_APT_CALLS as string)).toBe(false);
+      const docker = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
+      expect(docker).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["launchpad404", "launchpad_signature", "launchpad504_signature", "launchpad_disconnect_signature"])(
     "never selects OCI after a non-transient PPA registration failure: %s",
     async (mode) => {
       const f = await fixture();
