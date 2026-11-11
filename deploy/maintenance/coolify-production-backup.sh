@@ -35,7 +35,23 @@ container_for_service() {
   printf '%s\n' "${ids[0]}"
 }
 pg="$(container_for_service postgres)"
-web="$(container_for_service web)"
+# PostgreSQL stays in the legacy Compose project, while the production web
+# may be an independent Coolify rolling application. Select that application
+# only by its explicitly configured identity; never choose any running web.
+rolling_web_app_uuid="${BOARDREADYOPS_ROLLING_WEB_APP_UUID:-}"
+if [[ -n "$rolling_web_app_uuid" ]]; then
+  [[ "$rolling_web_app_uuid" =~ ^[a-z0-9]{16,40}$ ]] || fail "invalid rolling web app identity"
+  mapfile -t rolling_web_containers < <(docker ps \
+    --filter "label=coolify.applicationUuid=$rolling_web_app_uuid" \
+    --filter status=running --format '{{.ID}}')
+  [[ "${#rolling_web_containers[@]}" -eq 1 ]] || fail "expected exactly one current rolling production web container"
+  web="${rolling_web_containers[0]}"
+  [[ "$(docker inspect "$web" --format '{{index .Config.Labels "coolify.applicationUuid"}}')" == "$rolling_web_app_uuid" ]] || fail "rolling web app identity mismatch"
+else
+  # Legacy all-in-one deployments remain supported explicitly, but a missing
+  # rolling UUID cannot silently select an unrelated application.
+  web="$(container_for_service web)"
+fi
 for container in "$pg" "$web"; do
   status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container")"
   [[ "$status" == healthy ]] || fail "production service is not healthy"
