@@ -126,6 +126,18 @@ describe("data settings admin", () => {
     expect(await loadDataSettingsAdmin(session, "inst-a", revokedDependencies)).toMatchObject({
       state: "not-authorized",
     });
+
+    // A GitHub App installation can be reassigned under the same database id.
+    // Old tenant receipts must not be server-rendered in that case either.
+    const { dependencies: reassignedDependencies } = deps();
+    reassignedDependencies.resolveTenant.mockResolvedValueOnce({ installations: [business], selected: business });
+    reassignedDependencies.resolveTenant.mockResolvedValueOnce({
+      installations: [{ ...business, accountLogin: "other-owner" }],
+      selected: { ...business, accountLogin: "other-owner" },
+    });
+    expect(await loadDataSettingsAdmin(session, "inst-a", reassignedDependencies)).toMatchObject({
+      state: "not-authorized",
+    });
   });
 
   it("saves a retention policy using the selected account login rather than the submitted id", async () => {
