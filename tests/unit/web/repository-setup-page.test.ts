@@ -1,9 +1,59 @@
 import { Window } from "happy-dom";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { viewerMock, groupsMock, capabilitiesMock, rolloutMock } = vi.hoisted(() => ({
+  viewerMock: vi.fn(),
+  groupsMock: vi.fn(),
+  capabilitiesMock: vi.fn(),
+  rolloutMock: vi.fn(),
+}));
+vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({ viewerAuthorization: viewerMock }));
+vi.mock("../../../apps/web/lib/repository-dashboard.js", async (original) => ({
+  ...(await original<typeof import("../../../apps/web/lib/repository-dashboard.js")>()),
+  loadViewerRepositoryResult: groupsMock,
+}));
+vi.mock("../../../apps/web/lib/installation-capabilities.js", () => ({
+  loadInstallationCapabilities: capabilitiesMock,
+}));
+vi.mock("../../../apps/web/lib/release-rollout.js", () => ({
+  releaseRepositoryDispatchAvailability: rolloutMock,
+}));
+
 import SetupPage from "../../../apps/web/app/setup/page.js";
 
-async function render(searchParams: Record<string, string> = {}): Promise<string> {
+beforeEach(() => {
+  vi.resetAllMocks();
+  viewerMock.mockResolvedValue({ session: undefined });
+  groupsMock.mockResolvedValue({ state: "ok", groups: [] });
+  capabilitiesMock.mockResolvedValue(undefined);
+  rolloutMock.mockReturnValue({ enabled: true });
+});
+
+async function render(searchParams: Record<string, string> = {}, connected = false): Promise<string> {
+  if (connected) {
+    viewerMock.mockResolvedValueOnce({
+      session: { login: "test-user", userId: 1, installationIds: [1001] },
+    });
+    groupsMock.mockResolvedValueOnce({
+      state: "ok",
+      groups: [
+        {
+          accountLogin: "test-user",
+          repositories: [
+            {
+              id: "connected-repo",
+              owner: "test-user",
+              name: "board",
+              accountLogin: "test-user",
+              githubInstallationId: 1001,
+              latestRunId: undefined,
+            },
+          ],
+        },
+      ],
+    });
+  }
   return renderToStaticMarkup(await SetupPage({ searchParams: Promise.resolve(searchParams) }));
 }
 
@@ -39,7 +89,7 @@ async function axeViolations(markup: string): Promise<string[]> {
 
 describe("repository setup preview page", () => {
   it("renders only distinct selectable presets, exact file paths, the declared permission profile and validation steps", async () => {
-    const markup = await render({ preset: "production" });
+    const markup = await render({ preset: "production" }, true);
     expect(markup).toContain("Open-source hardware");
     expect(markup).toContain("Prototype fabrication");
     expect(markup).toContain("Production release");
@@ -63,7 +113,7 @@ describe("repository setup preview page", () => {
   });
 
   it("links manual setup to the current canonical workflow instead of the stale v1 release tag", async () => {
-    const markup = await render({ preset: "prototype" });
+    const markup = await render({ preset: "prototype" }, true);
     expect(markup).toContain(
       'href="https://github.com/oaslananka/boardreadyops/blob/main/.github/workflows/readiness-runner.yml"',
     );
@@ -73,12 +123,12 @@ describe("repository setup preview page", () => {
   it("does not leak or treat an unscoped repository deep link as authority", async () => {
     const markup = await render({ repositoryId: "private-repository-not-in-viewer-installations" });
     expect(markup).not.toContain("private-repository-not-in-viewer-installations");
-    expect(markup).toContain("Choose a repository to persist setup progress");
+    expect(markup).toContain("First, connect your GitHub account");
     expect(markup).toContain("Sign in with GitHub");
   });
 
   it("does not revive the legacy contract-design preset through a query parameter", async () => {
-    const markup = await render({ preset: "contract-design" });
+    const markup = await render({ preset: "contract-design" }, true);
     expect(markup).toContain("Active: Prototype fabrication");
     expect(markup).not.toContain("Contract design handoff");
   });
@@ -99,30 +149,30 @@ describe("repository setup preview page", () => {
   });
 
   it("presents setup as a four-step guided journey ending at a real pull request", async () => {
-    const markup = await render({ preset: "prototype" });
-    expect(markup).toContain("1. Choose a release policy");
-    expect(markup).toContain("2. Review repository-owned files");
-    expect(markup).toContain("3. Open the pull request");
+    const markup = await render({ preset: "prototype" }, true);
+    expect(markup).toContain("Choose a release policy");
+    expect(markup).toContain("Review proposed repository files");
+    expect(markup).toContain("Open a setup pull request");
     expect(markup).toContain("4. Validate readiness in GitHub Actions");
     expect(markup).toContain('href="#policy-preset"');
     expect(markup).toContain('href="#proposed-files"');
     expect(markup).toContain('href="#automated-setup"');
     expect(markup).toContain('href="#readiness"');
     expect(markup).toContain("Repository onboarding state");
-    expect(markup).toContain("Preview only");
+    expect(markup).toContain("test-user/board");
   });
 
-  it("offers the one-click step to a signed-out visitor instead of hiding it", async () => {
+  it("shows one useful GitHub sign-in action to a signed-out visitor, without showing inactive PR or YAML", async () => {
     const markup = await render({ preset: "prototype" });
-    // The panel used to render only when an installation and repository were both passed, and
-    // the only caller passed neither, so the zero-touch promise had no entry point at all.
-    expect(markup).toContain("3. Open the setup pull request");
+    expect(markup).toContain("First, connect your GitHub account");
     expect(markup).toContain("Sign in with GitHub");
-    expect(markup).toContain("commit them yourself");
+    expect(markup).not.toContain('id="automated-setup"');
+    expect(markup).not.toContain('id="policy-preset"');
+    expect(markup).not.toContain("Ready to fabricate");
   });
 
   it("gives every preset selection action a 44px mobile touch target", async () => {
-    const markup = await render({ preset: "prototype" });
+    const markup = await render({ preset: "prototype" }, true);
     const window = new Window({ url: "https://boardreadyops.example/setup" });
     window.document.write(markup);
     const presetLinks = [...window.document.querySelectorAll<HTMLAnchorElement>('a[href^="/setup?preset="]')];
@@ -135,7 +185,7 @@ describe("repository setup preview page", () => {
   });
 
   it("says what is written and where it cannot be written, plus explicit recovery actions", async () => {
-    const markup = await render({ preset: "prototype" });
+    const markup = await render({ preset: "prototype" }, true);
     expect(markup).toContain("Read the files before you decide");
     expect(markup).toContain("BoardReadyOps never");
     expect(markup).toContain("Files you copy manually are outside this guarantee");
@@ -143,14 +193,14 @@ describe("repository setup preview page", () => {
   });
 
   it("keeps the scrollable configuration preview natively keyboard focusable", async () => {
-    const markup = await render({ preset: "production" });
+    const markup = await render({ preset: "production" }, true);
     expect(markup).toContain("setup-code-preview");
     expect(markup).toContain('aria-labelledby="setup-config-preview-caption"');
     expect(markup).toContain('readOnly=""');
   });
 
   it("falls back safely and has no WCAG A/AA violations", async () => {
-    const markup = await render({ preset: "not-a-preset" });
+    const markup = await render({ preset: "not-a-preset" }, true);
     expect(markup).toContain("Prototype fabrication");
     await expect(axeViolations(markup)).resolves.toEqual([]);
   });
