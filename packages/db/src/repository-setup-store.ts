@@ -276,6 +276,7 @@ export function createSqlRepositorySetupStore(
              on setup.id = repositories.current_setup_revision_id
           where installations.id = $1
             and repositories.id = $2
+            and installations.suspended_at is null
             and repositories.disabled_at is null`,
         [installationId, repositoryId],
       );
@@ -340,6 +341,7 @@ export function createSqlRepositorySetupStore(
              on setup.id = repositories.current_setup_revision_id
           where installations.github_installation_id = $1
             and repositories.github_repo_id = $2
+            and installations.suspended_at is null
             and repositories.disabled_at is null`,
         [input.githubInstallationId, input.githubRepositoryId],
       );

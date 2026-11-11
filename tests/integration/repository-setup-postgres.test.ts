@@ -77,6 +77,21 @@ describeDatabase("repository setup PostgreSQL integration", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("does not expose a locally active repository from a suspended GitHub App installation", async () => {
+    const store = createSqlRepositorySetupStore(database());
+    await expect(store.getContext({ installationId, repositoryId })).resolves.toBeDefined();
+    await expect(store.getContextByGitHub({ githubInstallationId, githubRepositoryId })).resolves.toBeDefined();
+
+    await database().query("update installations set suspended_at = now() where id = $1", [installationId]);
+    try {
+      await expect(store.getContext({ installationId, repositoryId })).resolves.toBeUndefined();
+      await expect(store.getContextByGitHub({ githubInstallationId, githubRepositoryId })).resolves.toBeUndefined();
+    } finally {
+      await database().query("update installations set suspended_at = null where id = $1", [installationId]);
+    }
+    await expect(store.getContext({ installationId, repositoryId })).resolves.toBeDefined();
+  });
+
   it("keeps setup revisions append-only, tenant-scoped and idempotent", async () => {
     const ids = [revisionOneId, revisionOneId, revisionOneId, revisionTwoId];
     const store = createSqlRepositorySetupStore(database(), {
