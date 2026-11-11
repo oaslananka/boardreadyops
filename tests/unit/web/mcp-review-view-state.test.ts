@@ -2,6 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { remoteFootprintFacts } from "../../../apps/web/lib/remote-mcp-foundation.js";
 import { updateReviewToolResult } from "../../../apps/web/mcp-review-view/review-evidence.js";
 
 beforeEach(() => {
@@ -33,9 +34,20 @@ describe("MCP Apps Review evidence lifecycle", () => {
       schemaVersion: 1,
       scope: "pcb-footprints-only",
       disclosure: "counts-and-digests-only",
+      provenance: "local-git-commits",
       baseCommitSha: "1".repeat(40),
       headCommitSha: "2".repeat(40),
-      changes: { added: 2, removed: 1, modified: 3 },
+      baseBlobSha: "3".repeat(40),
+      headBlobSha: "4".repeat(40),
+      baseSourceSha256: "5".repeat(64),
+      headSourceSha256: "6".repeat(64),
+      changes: {
+        added: 2,
+        removed: 1,
+        modified: 3,
+        byField: { reference: 3, libraryId: 0, layer: 0, positionMm: 0, rotationDeg: 0 },
+      },
+      riskAssessment: "not-evaluated",
     };
     const show = () => {
       handle({ structuredContent: valid });
@@ -63,7 +75,7 @@ describe("MCP Apps Review evidence lifecycle", () => {
     show();
     handle({ structuredContent: { ...valid, scope: "unknown" } });
     cleared();
-    expect(status.textContent).toContain("No verified");
+    expect(status.textContent).toContain("unavailable");
 
     for (const invalidChanges of [
       null,
@@ -76,6 +88,29 @@ describe("MCP Apps Review evidence lifecycle", () => {
       handle({ structuredContent: { ...valid, changes: invalidChanges } });
       cleared();
       expect(status.textContent).toBe("Source evidence unavailable");
+    }
+
+    show();
+    handle({ structuredContent: remoteFootprintFacts(valid) });
+    expect(counts.textContent).toContain("2 added");
+    expect(status.textContent).toContain("client-reported");
+    expect(provenance.textContent).toContain("Base commit");
+
+    for (const invalidResult of [
+      remoteFootprintFacts(null),
+      { availability: "client-reported", summary: null },
+      { availability: "verified", summary: valid },
+      { ...valid, headCommitSha: "not-a-real-git-id" },
+      { ...valid, baseCommitSha: undefined },
+      { ...valid, headSourceSha256: "not-a-digest" },
+      { ...valid, provenance: "untrusted-example" },
+      { ...valid, changes: { ...valid.changes, added: 10_001 } },
+      { ...valid, changes: { ...valid.changes, byField: { ...valid.changes.byField, reference: 4 } } },
+    ]) {
+      show();
+      handle({ structuredContent: invalidResult });
+      cleared();
+      expect(status.textContent).toContain("unavailable");
     }
 
     show();

@@ -1,3 +1,5 @@
+import { pcbFootprintSummarySchema } from "@boardreadyops/contracts/pcb-footprint-summary";
+
 /**
  * Render only evidence for the most recent MCP tool result.
  * Never leave old review counts or provenance visible after an error.
@@ -40,34 +42,24 @@ export function updateReviewToolResult(elements: ReviewEvidenceElements, result:
       return;
     }
 
-    const evidence = value as Record<string, unknown>;
-    if (
-      evidence.schemaVersion !== 1 ||
-      evidence.scope !== "pcb-footprints-only" ||
-      evidence.disclosure !== "counts-and-digests-only"
-    ) {
-      status.textContent = "No verified PCB footprint summary for this review";
-      return;
-    }
-
-    const change = evidence.changes;
-    if (!change || typeof change !== "object" || Array.isArray(change)) {
-      status.textContent = "Source evidence unavailable";
-      return;
-    }
-    const changes = change as Record<string, unknown>;
-    const values = [changes.added, changes.removed, changes.modified];
-    if (!values.every((x) => typeof x === "number" && Number.isSafeInteger(x) && x >= 0)) {
+    const payload = value as Record<string, unknown>;
+    // Both the repository-scoped MCP Apps tool and the OAuth remote MCP tool
+    // use this resource. The latter wraps an authorized summary in an
+    // explicit client-reported/unavailable availability state.
+    const candidate =
+      payload.availability === "client-reported" ? payload.summary : "availability" in payload ? null : payload;
+    const parsed = pcbFootprintSummarySchema.safeParse(candidate);
+    if (!parsed.success) {
       status.textContent = "Source evidence unavailable";
       return;
     }
 
+    const evidence = parsed.data;
     heading.textContent = "Source-linked footprint changes";
-    counts.textContent = `${values[0]} added · ${values[1]} removed · ${values[2]} modified`;
+    const { added, removed, modified } = evidence.changes;
+    counts.textContent = `${added} added · ${removed} removed · ${modified} modified`;
     status.textContent = "One KiCad PCB file · client-reported Git evidence · risk not evaluated";
-    const baseCommit = typeof evidence.baseCommitSha === "string" ? evidence.baseCommitSha : "unavailable";
-    const headCommit = typeof evidence.headCommitSha === "string" ? evidence.headCommitSha : "unavailable";
-    provenance.textContent = `Base commit: ${baseCommit}\nHead commit: ${headCommit}`;
+    provenance.textContent = `Base commit: ${evidence.baseCommitSha}\nHead commit: ${evidence.headCommitSha}`;
     detailButton.hidden = false;
   } catch {
     status.textContent = "Evidence unavailable";
