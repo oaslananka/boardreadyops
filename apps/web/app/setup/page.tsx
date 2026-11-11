@@ -153,18 +153,34 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
         </section>
 
         {hasInstallationHandoff ? (
-          <Alert title="GitHub App installation handoff" tone="success">
+          <Alert title="Installation link received — not verified" tone="info">
             <p>
-              This URL includes the same <code>installation_id</code> parameter GitHub adds to its post-installation
-              handoff. It is an untrusted redirect parameter: this page never displays it, does not authorize repository
-              access from it, and does not load tenant data without authenticated control-plane access.
+              GitHub may add an <code>installation_id</code> to this URL. It is an untrusted redirect parameter: this
+              page never displays it, does not authorize repository access from it, and only lists repositories verified
+              against your signed-in session. The link alone does not confirm a completed installation.
             </p>
-            <p>
-              <a href="#policy-preset" className="text-primary underline underline-offset-2">
-                Continue with repository setup
-              </a>{" "}
-              by choosing a preset and reviewing the two repository-owned files below.
-            </p>
+            {!targets.signedIn ? (
+              <p>
+                <a
+                  href="/api/auth/github/login?return_to=%2Fsetup"
+                  className="font-medium text-primary underline underline-offset-2"
+                >
+                  Sign in to verify repository access
+                </a>{" "}
+                before continuing with setup.
+              </p>
+            ) : targets.repositories.length === 0 ? (
+              <p>
+                No authorized repositories are visible yet. Check your GitHub App repository grants and return here.
+              </p>
+            ) : (
+              <p>
+                <a href="#policy-preset" className="font-medium text-primary underline underline-offset-2">
+                  Continue with repository setup
+                </a>{" "}
+                by choosing one of your authorized repositories and reviewing its setup files.
+              </p>
+            )}
           </Alert>
         ) : null}
 

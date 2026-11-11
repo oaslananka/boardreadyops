@@ -62,7 +62,10 @@ describe("dashboard operational hierarchy", () => {
       watchedBoards: 0,
     });
     const html = renderToStaticMarkup(await DashboardPage());
-    expect(html).toContain("Get your first board reviewed — 3 steps left");
+    expect(html).toContain("Get your first board reviewed — 4 steps left");
+    expect(html).toContain("Merge the reviewed setup pull request");
+    expect(html).toContain("Validate readiness before the first hardware run");
+    expect(html).not.toContain("Open a pull request to trigger the first run");
     expect(html).toContain('href="https://github.com/apps/boardreadyops/installations/new"');
     expect(html).not.toMatch(/line-through[^>]*>Connect the BoardReadyOps GitHub App/u);
   });
@@ -87,7 +90,10 @@ describe("dashboard operational hierarchy", () => {
       watchedBoards: 0,
     });
     const html = renderToStaticMarkup(await DashboardPage());
-    expect(html).toContain("Get your first board reviewed — 2 steps left");
+    expect(html).toContain("Get your first board reviewed — 3 steps left");
+    expect(html).toContain("Merge the reviewed setup pull request");
+    expect(html).toContain("Validate readiness before the first hardware run");
+    expect(html).not.toContain("Open a pull request to trigger the first run");
     expect(html).toMatch(/line-through[^>]*>Connect the BoardReadyOps GitHub App/u);
     expect(html).toContain('href="/setup"');
   });

@@ -40,7 +40,7 @@ function SignInRequiredPanel() {
 function NoRepositoriesPanel({ hasInstallation }: Readonly<{ hasInstallation: boolean }>) {
   return (
     <GuidedChecklist
-      heading={`Get your first board reviewed — ${hasInstallation ? 2 : 3} steps left`}
+      heading={`Get your first board reviewed — ${hasInstallation ? 3 : 4} steps left`}
       steps={[
         {
           id: "install",
@@ -52,11 +52,16 @@ function NoRepositoriesPanel({ hasInstallation }: Readonly<{ hasInstallation: bo
         },
         {
           id: "link",
-          label: "Link a repository with a hardware project",
+          label: "Choose a hardware repository and open its setup pull request",
           status: hasInstallation ? "current" : "upcoming",
-          ...(hasInstallation ? { href: "/setup", actionLabel: "Start" } : {}),
+          ...(hasInstallation ? { href: "/setup", actionLabel: "Start setup" } : {}),
         },
-        { id: "pr", label: "Open a pull request to trigger the first run", status: "upcoming" },
+        { id: "merge", label: "Merge the reviewed setup pull request", status: "upcoming" },
+        {
+          id: "first-run",
+          label: "Validate readiness before the first hardware run, then open a hardware PR",
+          status: "upcoming",
+        },
       ]}
     />
   );
