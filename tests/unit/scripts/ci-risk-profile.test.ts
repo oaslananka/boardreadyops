@@ -114,6 +114,18 @@ describe("ci-risk-profile", () => {
     expect(profile.needs_cross_platform).toBe(true);
   });
 
+  it("runs the OS/Node matrix for backup shell and its portable mock fixture", () => {
+    for (const file of [
+      "deploy/maintenance/coolify-production-backup.sh",
+      "tests/unit/scripts/coolify-production-backup.test.ts",
+    ]) {
+      const profile = classifyChangedFiles([file], { eventName: "pull_request" });
+      expect(profile.needs_unit_matrix, file).toBe(true);
+      expect(profile.needs_cross_platform, file).toBe(true);
+      expect(profile.needs_kicad, file).toBe(false);
+    }
+  });
+
   it("keeps billing/database PRs off KiCad PPA while exercising PostgreSQL integration", () => {
     for (const file of [
       "packages/db/src/billing-store.ts",
