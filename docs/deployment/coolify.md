@@ -122,6 +122,14 @@ This does not deploy or run migrations. A successful parse is not evidence of wo
 
 ## Ongoing production recovery backups
 
+Daily backup output reports artifact_files and artifact_bytes from
+physical regular files in the source artifact volume archive. An archive of
+zero regular files is a valid snapshot **only when the volume is genuinely
+empty**; even if its tar checksum passes, it is **not** evidence that nonempty
+artifact bytes can be recovered. Symlinks and other non-file/non-directory
+entries fail closed. Use the separate nonempty isolated artifact-volume
+restore verifier before claiming a real artifact-byte recovery milestone.
+
 Coolify Storage Backups only lists eligible managed application mounts. The existing
 PostgreSQL and artifact data use named external Compose volumes and must not be
 replaced or copied as a live PostgreSQL filesystem snapshot. Do not create a storage
