@@ -61,6 +61,7 @@ describe("repository setup store", () => {
       private: true,
       current: { preset: "production", revision: 2, workflowStatus: "ready", configStatus: "ready" },
     });
+    expect(String(query.mock.calls[0]?.[0])).toContain("installations.suspended_at is null");
     expect(query.mock.calls[0]?.[1]).toEqual(["installation-1", "repository-1"]);
   });
 
@@ -92,6 +93,7 @@ describe("repository setup store", () => {
     });
     expect(String(query.mock.calls[0]?.[0])).toContain("installations.github_installation_id = $1");
     expect(String(query.mock.calls[0]?.[0])).toContain("repositories.github_repo_id = $2");
+    expect(String(query.mock.calls[0]?.[0])).toContain("installations.suspended_at is null");
     expect(query.mock.calls[0]?.[1]).toEqual([123, 456]);
   });
 
