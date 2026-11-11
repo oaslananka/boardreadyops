@@ -71,13 +71,15 @@ free_kb="$(df -Pk "$BOARDREADYOPS_BACKUP_DIR" | awk 'END { print $4 }')"
 [[ "$free_kb" =~ ^[0-9]+$ ]] || fail "disk capacity unavailable"
 (( free_kb >= 524288 )) || fail "less than 512 MiB free"
 
-# Bound each archive to 1 GiB, avoiding unbounded growth on a shared host.
-ulimit -f 1048576
-
 if [[ "$mode" == "--preflight" ]]; then
   echo "BoardReadyOps backup preflight: PASS"
   exit 0
 fi
+
+# Apply the 1 GiB file-size ceiling only when actually creating archives.
+# Dry-run preflight must not alter OS resource limits; Git Bash on Windows
+# cannot set this Linux production limit.
+ulimit -f 1048576
 
 exec 9>"$BOARDREADYOPS_BACKUP_DIR/.coolify-backup.lock"
 flock -n 9 || fail "backup already running"
