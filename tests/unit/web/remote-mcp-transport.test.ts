@@ -389,7 +389,10 @@ describe("MCP v2 stateless web request boundary", () => {
       { githubUserId: ghUser, grantId: jti, scopes: ["review:read"] },
       dependencies,
     );
-    expect(await authorized.text()).toContain("boardreadyops_review_footprint_summary");
+    const authorizedTools = await authorized.text();
+    expect(authorizedTools).toContain("boardreadyops_review_footprint_summary");
+    expect(authorizedTools).toContain('"ui":{"resourceUri":"ui://boardreadyops/review.html"}');
+    expect(authorizedTools).toContain('"ui/resourceUri":"ui://boardreadyops/review.html"');
     const evidenceOnly = await handleAuthorizedRemoteMcpHttp(
       mcpRequest("tools/list"),
       { githubUserId: ghUser, grantId: jti, scopes: ["evidence:read"] },

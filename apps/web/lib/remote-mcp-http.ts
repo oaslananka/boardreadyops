@@ -1,5 +1,5 @@
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { RESOURCE_MIME_TYPE, registerAppResource } from "@modelcontextprotocol/ext-apps/server";
+import { RESOURCE_MIME_TYPE, registerAppResource, registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mcpReviewViewHtml } from "./generated-mcp-review-view.js";
@@ -135,12 +135,14 @@ export async function handleAuthorizedRemoteMcpHttp(
         );
       }
       if (principal.scopes.includes("review:read")) {
-        server.registerTool(
+        registerAppTool(
+          server,
           "boardreadyops_review_footprint_summary",
           {
             description:
               "Read previously consented, client-reported PCB footprint change counts and digests for a current authorized Review. Not a fabrication or risk verdict.",
             inputSchema: z.object({ reviewId: z.string().uuid() }).strict(),
+            _meta: { ui: { resourceUri: "ui://boardreadyops/review.html" } },
             annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
           },
           ({ reviewId }) =>
