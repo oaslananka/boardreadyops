@@ -30,6 +30,37 @@ stop it and verify schema/queue rollback compatibility before considering
 restart of the retained legacy worker. Actual GitHub Actions execution and
 customer acceptance remain separate release gates.
 
+### Post-migration rollback: preserve writes, do not restart an incompatible worker
+
+A successful backup restore is a **recovery point**, not permission to restore
+that snapshot over a live database that has accepted newer customer writes.
+Before a worker/schema cutover, stop the previous worker and independently
+verify that no other queue, outbox, reconciliation or artifact-unlink actor
+can consume the same state. Record the last accepted write boundary and
+reconcile webhook/outbox leases and any work committed **after** the backup.
+A momentary zero-leased-job query is not a write fence while the web or GitHub
+webhook ingress can still accept new work.
+
+Migration `0128_reused_github_repository_name_identity.sql` deliberately permits
+a new GitHub repository ID to reuse an old **disabled** repository's
+installation/owner/name while preserving historical links. If such a
+replacement has been recorded, the older global
+`repositories_installation_id_owner_name_key` uniqueness constraint cannot
+be reintroduced without rejecting legitimate persisted rows. A rollback
+must not restart an old pre-0128 worker on an unverified new schema, nor
+restore an earlier dump and silently discard newer runs or repository
+identities.
+
+**Fail-closed recovery choice:** if the post-backup write set is not
+independently preserved and replayable, or old-worker schema compatibility
+cannot be proved, keep the old worker stopped. Repair forward using the
+current schema and a verified single writer, or prepare a separately
+reviewed, isolated restore/catch-up with a proven write freeze and no
+unaccounted customer records. Recheck affected GitHub side effects before
+any retry; never blanket-replay old dead-letter jobs. The offline 0113-to-0128
+migration drill proves data preservation *in that fixture only*, not a
+live stop-first cutover, rollback or customer signed PCB result.
+
 ## Legacy all-in-one Compose template topology
 
 The **template** contains web, control-plane worker, one-shot database migration, PostgreSQL, Redis and Cloudflare Tunnel. It does not publish host ports 80/443 or start another Caddy reverse proxy. In this legacy template, the tunnel routes to web:3000 on its private Compose network. This is not the live independent-connector / rolling-web route.
