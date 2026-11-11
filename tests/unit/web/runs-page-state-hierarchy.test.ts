@@ -1,10 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const viewerAuthorization = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
-  viewerAuthorization: vi.fn(async () => ({
-    session: { login: "octocat", installationIds: [1] },
-  })),
+  viewerAuthorization,
 }));
 vi.mock("../../../apps/web/components/run-live-refresh.js", () => ({
   RunLiveRefresh: () => "Live status updates refresh every five seconds and resume automatically after reconnect.",
@@ -17,6 +16,33 @@ vi.mock("../../../apps/web/lib/run-listing.js", async (original) => ({
 const { default: RunsPage } = await import("../../../apps/web/app/runs/page.js");
 
 describe("RunsPage status hierarchy", () => {
+  beforeEach(() => {
+    viewerAuthorization.mockResolvedValue({ session: { login: "octocat", installationIds: [1] } });
+  });
+
+  it("keeps first-run setup and login actions accurate for the viewer's installation state", async () => {
+    loadViewerRuns.mockResolvedValue({ state: "ok", next: undefined, runs: [] });
+
+    viewerAuthorization.mockResolvedValueOnce({ session: undefined });
+    const signedOut = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));
+    expect(signedOut).toContain('href="/api/auth/github/login?return_to=%2Fruns"');
+    expect(signedOut).toContain("Sign in to see your runs");
+    expect(signedOut).not.toContain("No runs recorded yet");
+
+    viewerAuthorization.mockResolvedValueOnce({ session: { login: "octocat", installationIds: [] } });
+    const noInstallation = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));
+    expect(noInstallation).toContain("Connect the BoardReadyOps GitHub App");
+    expect(noInstallation).toContain('href="https://github.com/apps/boardreadyops/installations/new"');
+    expect(noInstallation).not.toContain("Start setup");
+
+    const hasInstallation = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));
+    expect(hasInstallation).toContain("Choose a hardware repository and open its setup pull request");
+    expect(hasInstallation).toContain("Merge the reviewed setup pull request");
+    expect(hasInstallation).toContain("Validate readiness before the first hardware run");
+    expect(hasInstallation).toContain('href="/setup"');
+    expect(hasInstallation).not.toContain("Open a pull request so the readiness workflow runs");
+  });
+
   it("distinguishes missing control-plane configuration from a genuinely empty run history", async () => {
     loadViewerRuns.mockResolvedValue({ state: "not-configured" });
     const unavailable = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));

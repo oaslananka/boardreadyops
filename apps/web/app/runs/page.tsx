@@ -100,7 +100,11 @@ const columns: readonly DataColumn<RunListingEntry>[] = [
   },
 ];
 
-function RunsEmptyState({ state, signedIn }: Readonly<{ state: RunListingResult["state"]; signedIn: boolean }>) {
+function RunsEmptyState({
+  state,
+  signedIn,
+  hasInstallation,
+}: Readonly<{ state: RunListingResult["state"]; signedIn: boolean; hasInstallation: boolean }>) {
   if (state === "not-configured") {
     return (
       <EmptyState title="Run history is not configured">
@@ -117,7 +121,7 @@ function RunsEmptyState({ state, signedIn }: Readonly<{ state: RunListingResult[
       <EmptyState title="Sign in to see your runs">
         <p>Runs are scoped to the repositories your GitHub App installations can access.</p>
         <Button asChild className="mt-3">
-          <a href="/api/auth/github/login">Sign in with GitHub</a>
+          <a href="/api/auth/github/login?return_to=%2Fruns">Sign in with GitHub</a>
         </Button>
       </EmptyState>
     );
@@ -128,15 +132,23 @@ function RunsEmptyState({ state, signedIn }: Readonly<{ state: RunListingResult[
       heading="No runs recorded yet"
       steps={[
         {
-          id: "setup",
-          label: "Link a repository with a hardware project",
-          status: "current",
-          href: "/setup",
-          actionLabel: "Go to Setup",
+          id: "install",
+          label: "Connect the BoardReadyOps GitHub App",
+          status: hasInstallation ? "done" : "current",
+          ...(!hasInstallation
+            ? { href: "https://github.com/apps/boardreadyops/installations/new", actionLabel: "Install" }
+            : {}),
         },
         {
-          id: "open-pr",
-          label: "Open a pull request so the readiness workflow runs",
+          id: "setup",
+          label: "Choose a hardware repository and open its setup pull request",
+          status: hasInstallation ? "current" : "upcoming",
+          ...(hasInstallation ? { href: "/setup", actionLabel: "Start setup" } : {}),
+        },
+        { id: "merge", label: "Merge the reviewed setup pull request", status: "upcoming" },
+        {
+          id: "run",
+          label: "Validate readiness before the first hardware run, then open a hardware PR",
           status: "upcoming",
         },
         { id: "review", label: "Work the findings the run reports", status: "upcoming" },
@@ -187,7 +199,13 @@ export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>
             columns={columns}
             rows={runs}
             rowKey={(run) => run.id}
-            empty={<RunsEmptyState state={listing.state} signedIn={Boolean(viewer.session)} />}
+            empty={
+              <RunsEmptyState
+                state={listing.state}
+                signedIn={Boolean(viewer.session)}
+                hasInstallation={Boolean(viewer.session?.installationIds.length)}
+              />
+            }
           />
         </Panel>
 
