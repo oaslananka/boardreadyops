@@ -31,6 +31,7 @@ export const POSTGRES_INTEGRATION_TESTS = [
   "tests/integration/postgres-backup-restore.test.ts",
   "tests/integration/control-plane-operations-postgres.test.ts",
   "tests/integration/control-plane-outbox-postgres.test.ts",
+  "tests/integration/repository-identity-reuse-postgres.test.ts",
   "tests/integration/repository-setup-postgres.test.ts",
   "tests/integration/runner-artifact-store-postgres.test.ts",
   "tests/integration/run-dashboard-postgres.test.ts",
