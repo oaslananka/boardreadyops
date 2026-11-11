@@ -66,6 +66,56 @@ describe("data export status requester authorization", () => {
     expect(data).toMatchObject({ ok: true, export: { id: exportId, requestedBy: "original-requester" } });
   });
 
+  it("denies private status when the original installation is revoked during the database read", async () => {
+    mocks.viewerAuthorization.mockResolvedValue({ session: { login: "Original-Requester", userId: 52 } });
+    mocks.resolveSettingsTenantScope
+      .mockResolvedValueOnce({ selected: { id: "inst-a", accountLogin: "organization-a" } })
+      .mockResolvedValueOnce({ selected: undefined });
+
+    const response = await GET(new Request(url), context);
+    const body = await response.text();
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(body).not.toContain("private-repository-id");
+    expect(body).not.toContain("original-requester");
+    expect(mocks.resolveSettingsTenantScope).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not publish a status that disappeared or was revoked after its initial database lookup", async () => {
+    mocks.viewerAuthorization.mockResolvedValue({ session: { login: "Original-Requester", userId: 52 } });
+    mocks.getExport.mockResolvedValueOnce(record).mockResolvedValueOnce(null);
+    const response = await GET(new Request(url), context);
+    expect(response.status).toBe(404);
+    expect(mocks.getExport).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses the latest authorized status when it changes during a request", async () => {
+    mocks.viewerAuthorization.mockResolvedValue({ session: { login: "Original-Requester", userId: 52 } });
+    mocks.getExport.mockResolvedValueOnce(record).mockResolvedValueOnce({ ...record, status: "ready" });
+
+    const response = await GET(new Request(url), context);
+    expect(response.status).toBe(200);
+    expect((await response.json()).export).toMatchObject({ status: "ready", requestedBy: "original-requester" });
+    expect(mocks.getExport).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reveal the status if the stored requester changes during the request", async () => {
+    mocks.viewerAuthorization.mockResolvedValue({ session: { login: "Original-Requester", userId: 52 } });
+    mocks.getExport.mockResolvedValueOnce(record).mockResolvedValueOnce({ ...record, requestedBy: "other-user" });
+
+    const response = await GET(new Request(url), context);
+    expect(response.status).toBe(404);
+    expect(mocks.getExport).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects ambiguous duplicate installation selectors instead of choosing one", async () => {
+    mocks.viewerAuthorization.mockResolvedValue({ session: { login: "Original-Requester", userId: 52 } });
+    const response = await GET(new Request(`${url}&installationId=inst-b`), context);
+    expect(response.status).toBe(400);
+    expect(mocks.resolveSettingsTenantScope).not.toHaveBeenCalled();
+    expect(mocks.getExport).not.toHaveBeenCalled();
+  });
+
   it("does not expose a status if the stored requester identity is invalid", async () => {
     mocks.getExport.mockResolvedValue({ ...record, requestedBy: null });
     const response = await GET(new Request(url), context);

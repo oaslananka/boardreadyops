@@ -19,7 +19,11 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
   const url = new URL(request.url);
   const installationId = url.searchParams.get("installationId");
   const canonicalInstallationId = installationId?.trim();
-  if (!canonicalInstallationId || canonicalInstallationId !== installationId) {
+  if (
+    url.searchParams.getAll("installationId").length !== 1 ||
+    !canonicalInstallationId ||
+    canonicalInstallationId !== installationId
+  ) {
     return Response.json(
       { ok: false, error: "installationId is required" },
       { status: 400, headers: { "cache-control": "private, no-store" } },
@@ -200,19 +204,35 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
         { ok: false, error: "not found" },
         { status: 404, headers: { "cache-control": "private, no-store" } },
       );
-    // Status metadata is not a delivery capability; never serialize a stored raw URL.
+    // The installation and the export scope may be revoked while the first
+    // database read is in flight. Recheck both authorities before disclosing
+    // repository-scoped status, just as the metadata preview path does.
+    const currentInstallation = (await resolveSettingsTenantScope(viewer.session, canonicalInstallationId)).selected;
+    const currentExport =
+      currentInstallation?.id === canonicalInstallationId &&
+      currentInstallation.accountLogin.trim().toLowerCase() === tenantLogin.toLowerCase()
+        ? await store.getExport(tenantId, exportId, canonicalInstallationId)
+        : null;
+    if (!currentExport || currentExport.requestedBy?.toLowerCase() !== viewer.session.login.toLowerCase())
+      return Response.json(
+        { ok: false, error: "not found" },
+        { status: 404, headers: { "cache-control": "private, no-store" } },
+      );
+
+    // Return only the current requester-bound status, never a stored URL or
+    // the possibly stale first lookup result.
     return Response.json(
       {
         ok: true,
         export: {
-          id: exp.id,
-          tenantId: exp.tenantId,
-          requestedBy: exp.requestedBy,
-          status: exp.status,
-          scope: exp.scope,
-          scopeId: exp.scopeId,
-          expiresAt: exp.expiresAt,
-          createdAt: exp.createdAt,
+          id: currentExport.id,
+          tenantId: currentExport.tenantId,
+          requestedBy: currentExport.requestedBy,
+          status: currentExport.status,
+          scope: currentExport.scope,
+          scopeId: currentExport.scopeId,
+          expiresAt: currentExport.expiresAt,
+          createdAt: currentExport.createdAt,
         },
       },
       { status: 200, headers: { "cache-control": "private, no-store" } },
