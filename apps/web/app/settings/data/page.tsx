@@ -1,4 +1,4 @@
-import type { LegalHold } from "@boardreadyops/db";
+import type { LegalHold, VerifiedHistoricalUserExportReceipt } from "@boardreadyops/db";
 import Link from "next/link";
 import {
   LegalHoldCreateForm,
@@ -97,6 +97,51 @@ function HoldRow({ hold, installationId }: Readonly<{ hold: LegalHold; installat
   );
 }
 
+function HistoricalUserExportHistory({
+  requests,
+  historyUnavailable,
+}: Readonly<{
+  requests: readonly VerifiedHistoricalUserExportReceipt[];
+  historyUnavailable: boolean;
+}>) {
+  return (
+    <Panel
+      title="Past personal-account export requests"
+      description="Statuses for requests tied to your original GitHub user identity, even after uninstall."
+    >
+      {historyUnavailable ? (
+        <Alert tone="warning" title="Historical request status unavailable">
+          Your historical request status cannot be checked right now. Your data was not changed.
+        </Alert>
+      ) : requests.length === 0 ? (
+        <EmptyState title="No personal uninstall requests found">
+          <p>No still-eligible historical USER export requests belong to this signed-in GitHub account.</p>
+        </EmptyState>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {requests.map((request) => (
+            <li key={request.exportId} className="rounded-md border border-border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <time dateTime={request.createdAt}>{request.createdAt.slice(0, 10)}</time>
+                <span className="font-medium">{customerStatusLabel(request.status)}</span>
+              </div>
+              <p className="mt-2 break-all font-mono text-meta text-muted-foreground">Reference: {request.exportId}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-3 text-xs text-muted-foreground">
+        No downloadable customer archive is available through this status history. An export request is not confirmation
+        that all customer data has been delivered. Organization uninstall requests are not user-scoped recovery
+        requests.
+      </p>
+      <Link href="/settings/data" className="mt-3 inline-block text-sm text-primary underline underline-offset-2">
+        Refresh request statuses
+      </Link>
+    </Panel>
+  );
+}
+
 export default async function DataSettingsPage({ searchParams }: Readonly<DataSettingsPageProps>) {
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
@@ -152,20 +197,33 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
       {admin.state === "signed-out" ? (
         <Panel title="Retention policy and legal holds">
           <EmptyState title="Sign in to administer data policy">
+            <p>
+              Use your original GitHub account to check the status of a past personal-account uninstall request, even if
+              you no longer have an active App installation.
+            </p>
             <Button asChild className="mt-3">
               <a href="/api/auth/github/login?return_to=%2Fsettings%2Fdata">Sign in with GitHub</a>
             </Button>
           </EmptyState>
         </Panel>
       ) : admin.state === "no-installations" ? (
-        <Panel title="Retention policy and legal holds">
-          <EmptyState title="Install BoardReadyOps first">
-            <p>Data policy belongs to a GitHub App installation. Complete setup, then return here.</p>
-            <Button asChild className="mt-3">
-              <Link href="/setup">Go to Setup</Link>
-            </Button>
-          </EmptyState>
-        </Panel>
+        <>
+          <Panel title="Retention policy and legal holds">
+            <EmptyState title="No active GitHub App installation">
+              <p>
+                Installation data policy requires a current GitHub App grant. If you removed a personal-account
+                installation, check its historical export status below.
+              </p>
+              <Button asChild className="mt-3">
+                <Link href="/setup">Go to Setup</Link>
+              </Button>
+            </EmptyState>
+          </Panel>
+          <HistoricalUserExportHistory
+            requests={admin.historicalUserRequests}
+            historyUnavailable={admin.historyUnavailable}
+          />
+        </>
       ) : admin.state === "not-authorized" ? (
         <Panel title="Retention policy and legal holds">
           <Alert tone="danger" title="Installation not available">
@@ -395,6 +453,12 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
               )}
             </div>
           </Panel>
+          {admin.historicalUserRequests.length > 0 ? (
+            <HistoricalUserExportHistory
+              requests={admin.historicalUserRequests}
+              historyUnavailable={admin.historyUnavailable}
+            />
+          ) : null}
           <Panel
             title="Erasure request"
             id="erasure-request"

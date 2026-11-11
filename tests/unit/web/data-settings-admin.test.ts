@@ -50,6 +50,9 @@ function deps(selected = business) {
     releaseLegalHold: vi.fn().mockResolvedValue(true),
     createExport: vi.fn().mockImplementation(async (input) => ({ id: "export-1", status: "pending", ...input })),
     createBoundPendingExport: vi.fn().mockResolvedValue("export-1"),
+    listVerifiedHistoricalUserExportReceipts: vi
+      .fn()
+      .mockResolvedValue([{ exportId: "history-1", status: "pending", createdAt: "2026-11-11T07:00:00.000Z" }]),
     listRecentForRequester: vi
       .fn()
       .mockResolvedValue([{ exportId: "recent-1", status: "pending", createdAt: "2026-11-11T00:00:00.000Z" }]),
@@ -107,6 +110,7 @@ describe("data settings admin", () => {
       policy: null,
       holds: [],
     });
+    expect(store.listVerifiedHistoricalUserExportReceipts).toHaveBeenCalledWith({ verifiedGitHubUserId: 42 });
     expect(store.getRetentionPolicy).toHaveBeenCalledWith("acme");
     expect(store.listLegalHolds).toHaveBeenCalledWith("acme");
   });
@@ -138,6 +142,59 @@ describe("data settings admin", () => {
     expect(await loadDataSettingsAdmin(session, "inst-a", reassignedDependencies)).toMatchObject({
       state: "not-authorized",
     });
+  });
+
+  it("shows personal uninstall recovery status when the signed-in GitHub user has no App installation", async () => {
+    const { store, dependencies } = deps();
+    dependencies.resolveTenant.mockResolvedValueOnce({ installations: [], selected: undefined });
+    const outcome = await loadDataSettingsAdmin(session, undefined, dependencies);
+    expect(outcome).toMatchObject({
+      state: "no-installations",
+      historyUnavailable: false,
+      historicalUserRequests: [{ exportId: "history-1", status: "pending" }],
+    });
+    expect(store.listVerifiedHistoricalUserExportReceipts).toHaveBeenCalledWith({ verifiedGitHubUserId: 42 });
+    expect(dependencies.openStore).toHaveBeenCalledTimes(1);
+  });
+
+  it("never lists historical requests for an unauthenticated viewer or an invalid GitHub identity", async () => {
+    const { store, dependencies } = deps();
+    expect(await loadDataSettingsAdmin(undefined, undefined, dependencies)).toMatchObject({ state: "signed-out" });
+    expect(dependencies.openStore).not.toHaveBeenCalled();
+    dependencies.resolveTenant.mockResolvedValue({ installations: [], selected: undefined });
+    expect(await loadDataSettingsAdmin({ ...session, userId: -10 }, undefined, dependencies)).toMatchObject({
+      state: "no-installations",
+      historicalUserRequests: [],
+    });
+    expect(store.listVerifiedHistoricalUserExportReceipts).not.toHaveBeenCalled();
+  });
+
+  it("reports unavailable history without disclosing backend errors", async () => {
+    const { dependencies } = deps();
+    dependencies.resolveTenant.mockResolvedValue({ installations: [], selected: undefined });
+    dependencies.openStore.mockRejectedValueOnce(new Error("secret database URL and customer id"));
+    const outcome = await loadDataSettingsAdmin(session, undefined, dependencies);
+    expect(outcome).toMatchObject({
+      state: "no-installations",
+      historicalUserRequests: [],
+      historyUnavailable: true,
+    });
+    expect(JSON.stringify(outcome)).not.toContain("secret database");
+  });
+
+  it("preserves current installation policy if historical status storage temporarily fails", async () => {
+    const { store, dependencies } = deps();
+    vi.mocked(store.listVerifiedHistoricalUserExportReceipts).mockRejectedValueOnce(
+      new Error("private database detail"),
+    );
+    const state = await loadDataSettingsAdmin(session, "inst-a", dependencies);
+    expect(state).toMatchObject({
+      state: "ok",
+      selected: business,
+      historicalUserRequests: [],
+      historyUnavailable: true,
+    });
+    expect(JSON.stringify(state)).not.toContain("private database detail");
   });
 
   it("saves a retention policy using the selected account login rather than the submitted id", async () => {

@@ -30,6 +30,12 @@ describe("Data & Retention settings administration", () => {
     }
     expect(page).toContain("loadDataSettingsAdmin");
     expect(page).toContain("Recent export requests");
+    expect(page).toContain("Past personal-account export requests");
+    expect(page).toContain("Use your original GitHub account");
+    expect(page).toContain("HistoricalUserExportHistory");
+    expect(page).toContain("admin.historicalUserRequests");
+    expect(page).toContain("historyUnavailable");
+    expect(page).toContain("No downloadable customer archive is available through this status history");
     expect(page).toContain("admin.recentExportRequests");
     expect(page).toContain("request.exportId.slice(0, 8)");
     expect(page).toContain("ExportRequestReceipt");
