@@ -6,6 +6,7 @@ import {
   type RecentExportRequest,
   type RepositoryRetentionPolicy,
   type RetentionPolicy,
+  type VerifiedHistoricalUserExportReceipt,
 } from "@boardreadyops/db";
 import { type ActionResult, fail, ok } from "./action-result.js";
 import {
@@ -17,7 +18,12 @@ import type { UserSession } from "./user-session.js";
 
 export type DataSettingsAdminState =
   | { state: "signed-out" }
-  | { state: "no-installations"; installations: readonly SettingsTenantInstallation[] }
+  | {
+      state: "no-installations";
+      installations: readonly SettingsTenantInstallation[];
+      historicalUserRequests: readonly VerifiedHistoricalUserExportReceipt[];
+      historyUnavailable: boolean;
+    }
   | { state: "not-authorized"; installations: readonly SettingsTenantInstallation[] }
   | {
       state: "not-configured";
@@ -32,6 +38,8 @@ export type DataSettingsAdminState =
       repositoryPolicies: readonly RepositoryRetentionPolicy[];
       holds: readonly LegalHold[];
       recentExportRequests: readonly RecentExportRequest[];
+      historicalUserRequests: readonly VerifiedHistoricalUserExportReceipt[];
+      historyUnavailable: boolean;
     };
 
 type DataSettingsStore = Pick<
@@ -46,6 +54,7 @@ type DataSettingsStore = Pick<
   | "releaseLegalHold"
   | "createExport"
   | "createErasure"
+  | "listVerifiedHistoricalUserExportReceipts"
 > &
   Pick<DataExportPreparationStore, "createBoundPendingExport" | "listRecentForRequester">;
 
@@ -141,12 +150,39 @@ export async function loadDataSettingsAdmin(
 ): Promise<DataSettingsAdminState> {
   if (!session) return { state: "signed-out" };
   const scope = await dependencies.resolveTenant(session, requestedInstallationId);
-  if (scope.installations.length === 0) return { state: "no-installations", installations: scope.installations };
+  if (scope.installations.length === 0) {
+    // A removed personal GitHub App has no live installation permission.
+    // Historical USER requests are tied solely to the original immutable
+    // GitHub user id, never to a supplied tenant or former installation.
+    const empty = {
+      state: "no-installations" as const,
+      installations: scope.installations,
+      historicalUserRequests: [] as readonly VerifiedHistoricalUserExportReceipt[],
+      historyUnavailable: true,
+    };
+    if (!Number.isSafeInteger(session.userId) || session.userId <= 0) return empty;
+    try {
+      const opened = await dependencies.openStore();
+      if (!opened) return empty;
+      try {
+        const historicalUserRequests = await opened.store.listVerifiedHistoricalUserExportReceipts({
+          verifiedGitHubUserId: session.userId,
+        });
+        return { ...empty, historyUnavailable: false, historicalUserRequests };
+      } finally {
+        await opened.close();
+      }
+    } catch {
+      // Database/identity failures must not disclose private historical
+      // request contents or errors on an otherwise public-facing page.
+      return empty;
+    }
+  }
   if (!scope.selected) return { state: "not-authorized", installations: scope.installations };
   const opened = await dependencies.openStore();
   if (!opened) return { state: "not-configured", installations: scope.installations, selected: scope.selected };
   try {
-    const [policy, repositoryPolicies, holds, recentExportRequests] = await Promise.all([
+    const [policy, repositoryPolicies, holds, recentExportRequests, historical] = await Promise.all([
       opened.store.getRetentionPolicy(scope.selected.accountLogin),
       opened.store.listRepositoryRetentionPolicies(scope.selected.id),
       opened.store.listLegalHolds(scope.selected.accountLogin),
@@ -155,6 +191,10 @@ export async function loadDataSettingsAdmin(
         installationId: scope.selected.id,
         actorLogin: session.login,
       }),
+      opened.store.listVerifiedHistoricalUserExportReceipts({ verifiedGitHubUserId: session.userId }).then(
+        (requests) => ({ requests, unavailable: false }),
+        () => ({ requests: [] as readonly VerifiedHistoricalUserExportReceipt[], unavailable: true }),
+      ),
     ]);
     // Installation access can disappear while database queries are in flight.
     // Do not server-render private receipts (or policy/holds) from a stale scope.
@@ -172,6 +212,8 @@ export async function loadDataSettingsAdmin(
       repositoryPolicies,
       holds,
       recentExportRequests,
+      historicalUserRequests: historical.requests,
+      historyUnavailable: historical.unavailable,
     };
   } finally {
     await opened.close();

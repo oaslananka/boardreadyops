@@ -17,6 +17,12 @@ export type RepositoryRetentionPolicy = {
   retentionDays: number | null;
 };
 
+export type VerifiedHistoricalUserExportReceipt = Readonly<{
+  exportId: string;
+  status: "pending" | "running" | "completed" | "failed";
+  createdAt: string;
+}>;
+
 export type DataExport = {
   id: string;
   tenantId: string;
@@ -435,6 +441,53 @@ export class DataLifecycleStore {
       expiresAt: row.expires_at ? new Date(row.expires_at as string).toISOString() : null,
       createdAt: new Date(row.created_at as string).toISOString(),
     };
+  }
+
+  /**
+   * Read-only discoverability for a signed-in original personal GitHub user.
+   * Matches the exact historical USER ownership/erasure policy used by the
+   * single-record recovery route. Never returns tenant, scope, old links,
+   * physical artifact bytes, credentials or a customer download capability.
+   */
+  async listVerifiedHistoricalUserExportReceipts(input: {
+    verifiedGitHubUserId: number;
+  }): Promise<VerifiedHistoricalUserExportReceipt[]> {
+    if (!Number.isSafeInteger(input?.verifiedGitHubUserId) || input.verifiedGitHubUserId <= 0) return [];
+    const result = await this.db.query(
+      `SELECT exports.id, exports.status, exports.created_at
+         FROM data_exports AS exports
+        WHERE exports.original_github_user_id=$1::bigint
+          AND exports.installation_id IS NULL
+          AND exports.scope='user'
+          AND lower(exports.scope_id)=lower(exports.tenant_id)
+          AND exports.requested_by='github_app_uninstall'
+          AND NOT EXISTS (
+            SELECT 1 FROM erasure_requests AS erased
+             WHERE lower(erased.tenant_id)=lower(exports.tenant_id)
+               AND erased.status='completed'
+               AND erased.dry_run=FALSE
+               AND (erased.scope='organization'
+                 OR (erased.scope='user' AND lower(erased.scope_id)=lower(exports.scope_id)))
+          )
+        ORDER BY exports.created_at DESC, exports.id DESC
+        LIMIT 10`,
+      [input.verifiedGitHubUserId],
+    );
+    const rows = (result as { rows?: Array<Record<string, unknown>> }).rows ?? [];
+    return rows.map((row) => {
+      const created = row.created_at instanceof Date ? row.created_at : new Date(String(row.created_at));
+      if (
+        typeof row.id !== "string" ||
+        !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(row.id) ||
+        (row.status !== "pending" &&
+          row.status !== "running" &&
+          row.status !== "completed" &&
+          row.status !== "failed") ||
+        Number.isNaN(created.getTime())
+      )
+        throw new Error("Historical export receipt unavailable");
+      return { exportId: row.id, status: row.status, createdAt: created.toISOString() };
+    });
   }
 
   /**

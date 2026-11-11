@@ -920,6 +920,15 @@ installation; it excludes historical unbound/user recovery records, inactive
 repositories, suspended installations, private scope details and stored delivery
 URLs. Leaving the original request page never grants or extends ZIP access.
 
+For personal GitHub App uninstall, a signed-in original GitHub user with **or without an active
+installation** can now return to **Settings → Data & Retention** to see their
+10 latest still-eligible historical USER-scope export request statuses without
+knowing an internal export UUID. This read-only list uses the original immutable
+GitHub user ID, excludes completed erasure, login-only/unbound legacy rows and
+organization requests, and never exposes tenant details, signed links or ZIP
+bytes. It is a **status-only** interface; full historical customer export and
+post-uninstall archive delivery still require independent acceptance.
+
 The Data & Retention receipt reveals its native ZIP download and a separate
 `revoke=archive` action only after a fresh successful status check. A failed
 refresh, absent/revoked/expired commitment or missing delivery configuration
