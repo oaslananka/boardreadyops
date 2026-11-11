@@ -909,7 +909,16 @@ archive root must be set through
 `ARTIFACT_STORAGE_ROOT` and must independently pass the same-UID, non-symlink,
 0700 checks. The Web Streams body owns the PostgreSQL executor until its
 transaction completes or cancels. No archive storage root is deployed by
-default. The existing worker now supports an opt-in, one-installation-at-a-time
+default. For a currently authenticated original requester, the export-status GET
+adds `export.archivePrepared: true` only if opt-in private ZIP delivery is
+configured and a live installation-bound archive commitment is still readable.
+The Data & Retention receipt reveals its native ZIP download and a separate
+`revoke=archive` action only after a fresh successful status check. A failed
+refresh, absent/revoked/expired commitment or missing delivery configuration
+hides the link; following it independently rechecks server-side authority,
+archive bytes and expiry. This stage signal is not a completed customer export,
+physical-file guarantee or proof that the network recipient received ZIP bytes.
+The existing worker now supports an opt-in, one-installation-at-a-time
 ZIP preparation pass: both `BOARDREADYOPS_EXPORT_PREPARATION_INSTALLATION_ID`
 and `BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT` must be configured. It checks
 the existing local artifact volume owner and permissions before claiming any

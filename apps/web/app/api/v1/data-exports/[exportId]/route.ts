@@ -7,6 +7,18 @@ import { createAuthorizedSealedLocalExportWebStream } from "../../../../../lib/d
 import { resolveSettingsTenantScope } from "../../../../../lib/settings-tenant.js";
 import { viewerAuthorization } from "../../../../../lib/viewer-authorization.js";
 
+function configuredPrivateArchiveRoot(): string | null {
+  const archiveRoot = process.env.BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT?.trim();
+  const artifactRoot = process.env.ARTIFACT_STORAGE_ROOT?.trim();
+  if (
+    !archiveRoot ||
+    !path.isAbsolute(archiveRoot) ||
+    (artifactRoot && path.resolve(archiveRoot) === path.resolve(artifactRoot))
+  )
+    return null;
+  return archiveRoot;
+}
+
 export const runtime = "nodejs";
 
 export async function GET(request: Request, context: { params: Promise<{ exportId: string }> }): Promise<Response> {
@@ -69,13 +81,8 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
 
     // Nothing is exposed until a separate private 0700 same-UID directory has
     // been provisioned on the shared durable volume. Never use public uploads.
-    const archiveRoot = process.env.BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT?.trim();
-    const artifactRoot = process.env.ARTIFACT_STORAGE_ROOT?.trim();
-    if (
-      !archiveRoot ||
-      !path.isAbsolute(archiveRoot) ||
-      (artifactRoot && path.resolve(archiveRoot) === path.resolve(artifactRoot))
-    )
+    const archiveRoot = configuredPrivateArchiveRoot();
+    if (!archiveRoot)
       return Response.json({ ok: false, error: "ZIP delivery unavailable" }, { status: 503, headers: noStore });
 
     const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
@@ -208,11 +215,24 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
     // database read is in flight. Recheck both authorities before disclosing
     // repository-scoped status, just as the metadata preview path does.
     const currentInstallation = (await resolveSettingsTenantScope(viewer.session, canonicalInstallationId)).selected;
-    const currentExport =
+    const stillAuthorized =
       currentInstallation?.id === canonicalInstallationId &&
-      currentInstallation.accountLogin.trim().toLowerCase() === tenantLogin.toLowerCase()
-        ? await store.getExport(tenantId, exportId, canonicalInstallationId)
-        : null;
+      currentInstallation.accountLogin.trim().toLowerCase() === tenantLogin.toLowerCase();
+    // A staged commitment is not a complete export. This flag reveals no
+    // archive bytes or link capability, and is never true without live
+    // original-requester authority and opt-in private delivery configuration.
+    const archivePrepared =
+      stillAuthorized && configuredPrivateArchiveRoot() !== null
+        ? Boolean(
+            await new DataExportArchiveCommitmentStore(executor).readForRequester({
+              exportId,
+              tenantId,
+              installationId: canonicalInstallationId,
+              actorLogin: viewer.session.login,
+            }),
+          )
+        : false;
+    const currentExport = stillAuthorized ? await store.getExport(tenantId, exportId, canonicalInstallationId) : null;
     if (!currentExport || currentExport.requestedBy?.toLowerCase() !== viewer.session.login.toLowerCase())
       return Response.json(
         { ok: false, error: "not found" },
@@ -233,6 +253,7 @@ export async function GET(request: Request, context: { params: Promise<{ exportI
           scopeId: currentExport.scopeId,
           expiresAt: currentExport.expiresAt,
           createdAt: currentExport.createdAt,
+          archivePrepared,
         },
       },
       { status: 200, headers: { "cache-control": "private, no-store" } },
