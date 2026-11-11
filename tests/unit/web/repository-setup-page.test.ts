@@ -88,10 +88,13 @@ describe("repository setup preview page", () => {
       installation_id: "123456789",
       setup_action: "install",
     });
-    expect(markup).toContain("GitHub App installation handoff");
+    expect(markup).toContain("Installation link received — not verified");
+    expect(markup).not.toContain("GitHub App installation handoff");
+    expect(markup).toContain("Sign in to verify repository access");
     expect(markup).toContain("untrusted redirect parameter");
     expect(markup).toContain("does not authorize repository access");
-    expect(markup).toContain("Continue with repository setup");
+    expect(markup).toContain('href="/api/auth/github/login?return_to=%2Fsetup"');
+    expect(markup).not.toContain("Continue with repository setup");
     expect(markup).not.toContain("123456789");
   });
 
