@@ -2,13 +2,19 @@ import type { Metadata } from "next";
 import { AppShell } from "../../../components/app-shell.js";
 import { ProjectUploadWizard } from "../../../components/project-upload-wizard.js";
 import { Panel } from "../../../components/ui.js";
+import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 
 export const metadata: Metadata = {
   title: "Add a Project Source",
   description: "Connect a repository or run BoardReadyOps locally for DFM pre-flight review.",
 };
 
-export default function NewProjectPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NewProjectPage() {
+  const viewer = await viewerAuthorization();
+  const signedIn = Boolean(viewer.session);
+  const hasInstallation = Boolean(viewer.session?.installationIds?.length);
   return (
     <AppShell
       breadcrumbs={[
@@ -27,7 +33,7 @@ export default function NewProjectPage() {
         </header>
 
         <Panel title="Choose an ingestion source">
-          <ProjectUploadWizard />
+          <ProjectUploadWizard signedIn={signedIn} hasInstallation={hasInstallation} />
         </Panel>
       </main>
     </AppShell>

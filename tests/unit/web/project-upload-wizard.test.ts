@@ -66,10 +66,10 @@ describe("ProjectUploadWizard", () => {
       ghTab?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
     });
 
-    const link = container.querySelector('a[href="/setup"]');
+    const link = container.querySelector('a[href="/api/auth/github/login?return_to=%2Fsetup"]');
     expect(link).not.toBeNull();
-    expect(link?.textContent).toBe("Connect GitHub App");
-    expect(container.querySelector('a[href="/reviews"]')?.textContent).toContain("Open reviews");
+    expect(link?.textContent).toBe("Sign in with GitHub");
+    expect(container.querySelector('a[href="/reviews"]')).toBeNull();
   });
 
   it("defaults to the supported GitHub path instead of hosted upload", async () => {
@@ -77,12 +77,41 @@ describe("ProjectUploadWizard", () => {
       root.render(createElement(ProjectUploadWizard, { workspaceId: "ws_test_01" }));
     });
 
-    expect(container.querySelector('a[href="/setup"]')?.textContent).toBe("Connect GitHub App");
+    expect(container.querySelector('a[href="/api/auth/github/login?return_to=%2Fsetup"]')?.textContent).toBe(
+      "Sign in with GitHub",
+    );
     expect(container.querySelector('[role="tabpanel"]:not([hidden])')?.textContent).toContain(
-      "Connect your GitHub organization or personal repository",
+      "Sign in with GitHub to choose a repository",
     );
     expect(container.querySelector('input[type="file"]')).toBeNull();
     expect(container.querySelector('button[type="submit"]')).toBeNull();
+  });
+
+  it("sends an installed GitHub viewer directly to repository setup, not App installation or empty reviews", async () => {
+    await act(async () => {
+      root.render(createElement(ProjectUploadWizard, { signedIn: true, hasInstallation: true }));
+    });
+    const entry = container.querySelector('a[href="/setup"]');
+    expect(entry?.textContent).toContain("Choose a repository");
+    expect(container.textContent).not.toContain("Connect GitHub App");
+    expect(container.querySelector('a[href="/reviews"]')).toBeNull();
+  });
+
+  it("shows the App connection step when signed in but no installation is present", async () => {
+    await act(async () => {
+      root.render(createElement(ProjectUploadWizard, { signedIn: true, hasInstallation: false }));
+    });
+    expect(container.querySelector('a[href="/setup"]')?.textContent).toContain("Connect GitHub App");
+  });
+
+  it("routes signed-out viewers through OAuth to setup", async () => {
+    await act(async () => {
+      root.render(createElement(ProjectUploadWizard, { signedIn: false }));
+    });
+    expect(container.querySelector('a[href="/api/auth/github/login?return_to=%2Fsetup"]')?.textContent).toContain(
+      "Sign in with GitHub",
+    );
+    expect(container.querySelector('a[href="/reviews"]')).toBeNull();
   });
 
   it("explains hosted upload only after the explicitly unavailable tab is selected", async () => {

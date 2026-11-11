@@ -6,9 +6,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs.js";
 export type ProjectUploadWizardProps = Readonly<{
   workspaceId?: string;
   onComplete?: (reviewId: string) => void;
+  signedIn?: boolean;
+  hasInstallation?: boolean;
 }>;
 
-export function ProjectUploadWizard({ workspaceId: _workspaceId = "default" }: ProjectUploadWizardProps) {
+export function ProjectUploadWizard({
+  workspaceId: _workspaceId = "default",
+  signedIn = false,
+  hasInstallation = false,
+}: ProjectUploadWizardProps) {
   return (
     <Tabs defaultValue="github">
       <TabsList aria-label="Ingestion Source">
@@ -30,20 +36,22 @@ export function ProjectUploadWizard({ workspaceId: _workspaceId = "default" }: P
 
       <TabsContent value="github" className="flex flex-col gap-3 text-sm">
         <p className="text-foreground">
-          Connect your GitHub organization or personal repository to run automated BoardReadyOps verdict checks directly
-          on pull requests and commit pushes.
+          {hasInstallation && signedIn
+            ? "Your GitHub App is connected. Choose a repository in Setup to check its readiness; no files change until you review a setup pull request."
+            : signedIn
+              ? "Your GitHub account is connected, but no App installation is available. Choose an installation in Setup."
+              : "Sign in with GitHub to choose a repository for your first readiness check."}
         </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/setup"
-            className="inline-flex w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Connect GitHub App
-          </Link>
-          <Link href="/reviews" className="text-sm font-medium text-primary underline underline-offset-2">
-            Already connected? Open reviews
-          </Link>
-        </div>
+        <Link
+          href={signedIn ? "/setup" : "/api/auth/github/login?return_to=%2Fsetup"}
+          className="inline-flex w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          {hasInstallation && signedIn
+            ? "Choose a repository"
+            : signedIn
+              ? "Connect GitHub App"
+              : "Sign in with GitHub"}
+        </Link>
       </TabsContent>
 
       <TabsContent value="cli" className="flex flex-col gap-3 text-sm">
