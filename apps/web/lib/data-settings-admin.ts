@@ -3,6 +3,7 @@ import {
   type DataLifecycleStore,
   type LegalHold,
   LegalHoldAdmissionConflictError,
+  type RecentExportRequest,
   type RepositoryRetentionPolicy,
   type RetentionPolicy,
 } from "@boardreadyops/db";
@@ -30,6 +31,7 @@ export type DataSettingsAdminState =
       policy: RetentionPolicy | null;
       repositoryPolicies: readonly RepositoryRetentionPolicy[];
       holds: readonly LegalHold[];
+      recentExportRequests: readonly RecentExportRequest[];
     };
 
 type DataSettingsStore = Pick<
@@ -45,7 +47,7 @@ type DataSettingsStore = Pick<
   | "createExport"
   | "createErasure"
 > &
-  Pick<DataExportPreparationStore, "createBoundPendingExport">;
+  Pick<DataExportPreparationStore, "createBoundPendingExport" | "listRecentForRequester">;
 
 type OpenedStore = { readonly store: DataSettingsStore; readonly close: () => Promise<void> };
 
@@ -71,6 +73,8 @@ async function openDefaultStore(): Promise<OpenedStore | undefined> {
     store: Object.assign(store, {
       createBoundPendingExport: (input: Parameters<DataExportPreparationStore["createBoundPendingExport"]>[0]) =>
         exportStore.createBoundPendingExport(input),
+      listRecentForRequester: (input: Parameters<DataExportPreparationStore["listRecentForRequester"]>[0]) =>
+        exportStore.listRecentForRequester(input),
     }),
     close: () => executor.close(),
   };
@@ -142,11 +146,24 @@ export async function loadDataSettingsAdmin(
   const opened = await dependencies.openStore();
   if (!opened) return { state: "not-configured", installations: scope.installations, selected: scope.selected };
   try {
-    const [policy, repositoryPolicies, holds] = await Promise.all([
+    const [policy, repositoryPolicies, holds, recentExportRequests] = await Promise.all([
       opened.store.getRetentionPolicy(scope.selected.accountLogin),
       opened.store.listRepositoryRetentionPolicies(scope.selected.id),
       opened.store.listLegalHolds(scope.selected.accountLogin),
+      opened.store.listRecentForRequester({
+        tenantId: scope.selected.accountLogin,
+        installationId: scope.selected.id,
+        actorLogin: session.login,
+      }),
     ]);
+    // Installation access can disappear while database queries are in flight.
+    // Do not server-render private receipts (or policy/holds) from a stale scope.
+    const current = (await dependencies.resolveTenant(session, scope.selected.id)).selected;
+    if (
+      current?.id !== scope.selected.id ||
+      current.accountLogin.toLowerCase() !== scope.selected.accountLogin.toLowerCase()
+    )
+      return { state: "not-authorized", installations: scope.installations };
     return {
       state: "ok",
       installations: scope.installations,
@@ -154,6 +171,7 @@ export async function loadDataSettingsAdmin(
       policy,
       repositoryPolicies,
       holds,
+      recentExportRequests,
     };
   } finally {
     await opened.close();

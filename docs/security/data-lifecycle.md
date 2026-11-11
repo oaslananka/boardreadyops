@@ -912,6 +912,14 @@ transaction completes or cancels. No archive storage root is deployed by
 default. For a currently authenticated original requester, the export-status GET
 adds `export.archivePrepared: true` only if opt-in private ZIP delivery is
 configured and a live installation-bound archive commitment is still readable.
+A signed-in requester can revisit **Settings → Data & Retention** to expand any
+of their 10 most recent installation-bound export requests, refresh the current
+request status, and access an operator-prepared ZIP if still authorized. This
+read-only history is limited to the original requester's active GitHub App
+installation; it excludes historical unbound/user recovery records, inactive
+repositories, suspended installations, private scope details and stored delivery
+URLs. Leaving the original request page never grants or extends ZIP access.
+
 The Data & Retention receipt reveals its native ZIP download and a separate
 `revoke=archive` action only after a fresh successful status check. A failed
 refresh, absent/revoked/expired commitment or missing delivery configuration

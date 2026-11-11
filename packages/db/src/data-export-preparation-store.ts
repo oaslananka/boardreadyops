@@ -11,6 +11,12 @@ export class ExportPreparationInputError extends Error {
 }
 
 type BoundExportScope = "organization" | "repository";
+export type RecentExportRequest = Readonly<{
+  exportId: string;
+  status: "pending" | "running" | "completed" | "failed";
+  createdAt: string;
+}>;
+
 export type ExportPreparationClaim = {
   exportId: string;
   installationId: string;
@@ -61,6 +67,56 @@ function rows(result: unknown): Record<string, unknown>[] {
  */
 export class DataExportPreparationStore {
   constructor(private readonly db: SqlQueryExecutor) {}
+
+  /**
+   * The original requester can reopen their most recent installation-bound
+   * requests after leaving the intake page. This returns receipt metadata only,
+   * never an archive capability, raw repository scope or historical user record.
+   */
+  async listRecentForRequester(input: {
+    tenantId: string;
+    installationId: string;
+    actorLogin: string;
+  }): Promise<RecentExportRequest[]> {
+    if (!canonical(input.tenantId, 256) || !canonical(input.installationId) || !canonical(input.actorLogin, 256))
+      throw new ExportPreparationInputError();
+    const result = await this.db.query(
+      `SELECT data_exports.id, data_exports.status, data_exports.created_at
+         FROM data_exports
+         JOIN installations ON installations.id = data_exports.installation_id
+        WHERE lower(data_exports.tenant_id) = lower($1)
+          AND data_exports.installation_id = $2
+          AND lower(data_exports.requested_by) = lower($3)
+          AND installations.suspended_at IS NULL
+          AND lower(installations.account_login) = lower(data_exports.tenant_id)
+          AND (
+            (data_exports.scope = 'organization' AND data_exports.scope_id IS NULL)
+            OR (data_exports.scope = 'repository' AND EXISTS (
+              SELECT 1 FROM repositories
+               WHERE repositories.id = data_exports.scope_id
+                 AND repositories.installation_id = installations.id
+                 AND repositories.disabled_at IS NULL
+            ))
+          )
+        ORDER BY data_exports.created_at DESC, data_exports.id DESC
+        LIMIT 10`,
+      [input.tenantId, input.installationId, input.actorLogin],
+    );
+    return rows(result).map((row) => {
+      const created = row.created_at instanceof Date ? row.created_at : new Date(String(row.created_at));
+      if (
+        typeof row.id !== "string" ||
+        !canonical(row.id) ||
+        (row.status !== "pending" &&
+          row.status !== "running" &&
+          row.status !== "completed" &&
+          row.status !== "failed") ||
+        Number.isNaN(created.getTime())
+      )
+        throw new Error("Invalid persisted export request");
+      return { exportId: row.id, status: row.status, createdAt: created.toISOString() };
+    });
+  }
 
   async createBoundPendingExport(input: {
     tenantId: string;
