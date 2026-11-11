@@ -63,6 +63,71 @@ describe("Data & Retention export request receipt", () => {
     expect(container.textContent).toContain("not confirmation of a completed customer export");
   });
 
+  it("reveals a prepared ZIP download only after its requester-bound status check", async () => {
+    const fetch = vi.fn(async () => Response.json({ ok: true, export: { status: "running", archivePrepared: true } }));
+    globalThis.fetch = fetch as typeof globalThis.fetch;
+    expect(container.textContent).not.toContain("Download prepared ZIP");
+    await click("Refresh request status");
+    const link = Array.from(container.querySelectorAll("a")).find((a) =>
+      a.textContent?.includes("Download prepared ZIP"),
+    );
+    expect(link?.getAttribute("href")).toBe(`${url}&download=archive`);
+    expect(link?.getAttribute("download")).toBe(`boardreadyops-export-${issue.exportId}.zip`);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain("not a complete customer data export");
+  });
+
+  it("hides a previously prepared ZIP when authority or the archive expires", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ ok: true, export: { status: "running", archivePrepared: true } }))
+      .mockResolvedValueOnce(Response.json({ ok: true, export: { status: "running", archivePrepared: false } }))
+      .mockResolvedValueOnce(Response.json({ ok: true, export: { status: "running", archivePrepared: true } }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+    globalThis.fetch = fetch as typeof globalThis.fetch;
+    await click("Refresh request status");
+    expect(container.textContent).toContain("Download prepared ZIP");
+    await click("Refresh request status");
+    expect(container.textContent).not.toContain("Download prepared ZIP");
+    await click("Refresh request status");
+    expect(container.textContent).toContain("Download prepared ZIP");
+    await click("Refresh request status");
+    expect(container.textContent).not.toContain("Download prepared ZIP");
+  });
+
+  it("treats untrusted archive flags as unavailable and never autostarts ZIP delivery", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ ok: true, export: { status: "running", archivePrepared: "true" } }),
+    );
+    globalThis.fetch = fetch as typeof globalThis.fetch;
+    await click("Refresh request status");
+    expect(container.textContent).not.toContain("Download prepared ZIP");
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it("revokes only a prepared ZIP after confirmation without affecting the metadata preview", async () => {
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ ok: true, export: { status: "running", archivePrepared: true } }))
+      .mockResolvedValueOnce(Response.json({ ok: true, revoked: true }));
+    globalThis.fetch = fetch as typeof globalThis.fetch;
+    await click("Refresh request status");
+    await click("Revoke prepared ZIP");
+    expect(fetch).toHaveBeenCalledOnce();
+    confirm.mockReturnValue(true);
+    await click("Revoke prepared ZIP");
+    expect(fetch).toHaveBeenLastCalledWith(`${url}&revoke=archive`, {
+      method: "DELETE",
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    expect(container.textContent).not.toContain("Download prepared ZIP");
+    expect(container.textContent).toContain("Prepared ZIP access revoked");
+    expect(container.textContent).toContain("Download metadata preview");
+  });
+
   it("fails closed for unavailable metadata previews without triggering file download", async () => {
     const fetch = vi.fn(async () => new Response(null, { status: 404 }));
     globalThis.fetch = fetch as typeof globalThis.fetch;

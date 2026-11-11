@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   viewerAuthorization: vi.fn(),
@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   persistence: vi.fn(),
   openDb: vi.fn(),
   getExport: vi.fn(),
+  readArchiveForRequester: vi.fn(),
 }));
 vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({ viewerAuthorization: mocks.viewerAuthorization }));
 vi.mock("../../../apps/web/lib/settings-tenant.js", () => ({
@@ -20,6 +21,9 @@ vi.mock("@boardreadyops/db", () => ({
     getExport = mocks.getExport;
   },
   DataExportPreparationStore: class {},
+  DataExportArchiveCommitmentStore: class {
+    readForRequester = mocks.readArchiveForRequester;
+  },
 }));
 
 import { GET } from "../../../apps/web/app/api/v1/data-exports/[exportId]/route.js";
@@ -39,6 +43,8 @@ const record = {
 };
 
 describe("data export status requester authorization", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.viewerAuthorization.mockResolvedValue({ session: { login: "another-member", userId: 42 } });
@@ -46,6 +52,7 @@ describe("data export status requester authorization", () => {
     mocks.persistence.mockReturnValue({ mode: "postgres", databaseUrl: "test-only" });
     mocks.openDb.mockReturnValue({ close: vi.fn().mockResolvedValue(undefined) });
     mocks.getExport.mockResolvedValue(record);
+    mocks.readArchiveForRequester.mockResolvedValue(null);
   });
 
   it("does not expose another requester's export status or private repository scope to an installation member", async () => {
@@ -64,6 +71,58 @@ describe("data export status requester authorization", () => {
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data).toMatchObject({ ok: true, export: { id: exportId, requestedBy: "original-requester" } });
+  });
+
+  it("advertises only a currently staged, requester-authorized ZIP when private delivery is configured", async () => {
+    vi.stubEnv("BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT", "/private/archive");
+    vi.stubEnv("ARTIFACT_STORAGE_ROOT", "/storage/artifacts");
+    mocks.viewerAuthorization.mockResolvedValue({ session: { login: "Original-Requester", userId: 52 } });
+    mocks.readArchiveForRequester.mockResolvedValue({ sha256: "a".repeat(64), byteLength: 4096 });
+    const response = await GET(new Request(url), context);
+    expect(response.status).toBe(200);
+    expect((await response.json()).export.archivePrepared).toBe(true);
+    expect(mocks.readArchiveForRequester).toHaveBeenCalledWith({
+      exportId,
+      tenantId: "organization-a",
+      installationId: "inst-a",
+      actorLogin: "Original-Requester",
+    });
+  });
+
+  it("never advertises an archive when delivery is disabled or the original requester is denied", async () => {
+    vi.stubEnv("BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT", "");
+    mocks.viewerAuthorization.mockResolvedValue({ session: { login: "Original-Requester", userId: 52 } });
+    let response = await GET(new Request(url), context);
+    expect((await response.json()).export.archivePrepared).toBe(false);
+    expect(mocks.readArchiveForRequester).not.toHaveBeenCalled();
+
+    vi.stubEnv("BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT", "relative/archive");
+    response = await GET(new Request(url), context);
+    expect((await response.json()).export.archivePrepared).toBe(false);
+    expect(mocks.readArchiveForRequester).not.toHaveBeenCalled();
+
+    vi.stubEnv("BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT", "/storage/artifacts");
+    vi.stubEnv("ARTIFACT_STORAGE_ROOT", "/storage/artifacts");
+    response = await GET(new Request(url), context);
+    expect((await response.json()).export.archivePrepared).toBe(false);
+    expect(mocks.readArchiveForRequester).not.toHaveBeenCalled();
+
+    vi.stubEnv("BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT", "/private/archive");
+    mocks.readArchiveForRequester.mockResolvedValue(null);
+    response = await GET(new Request(url), context);
+    expect((await response.json()).export.archivePrepared).toBe(false);
+
+    mocks.resolveSettingsTenantScope
+      .mockResolvedValueOnce({ selected: { id: "inst-a", accountLogin: "organization-a" } })
+      .mockResolvedValueOnce({ selected: undefined });
+    response = await GET(new Request(url), context);
+    expect(response.status).toBe(404);
+    expect(mocks.readArchiveForRequester).toHaveBeenCalledTimes(1);
+
+    mocks.viewerAuthorization.mockResolvedValue({ session: { login: "Another-Member", userId: 12 } });
+    response = await GET(new Request(url), context);
+    expect(response.status).toBe(404);
+    expect(mocks.readArchiveForRequester).toHaveBeenCalledTimes(1);
   });
 
   it("denies private status when the original installation is revoked during the database read", async () => {

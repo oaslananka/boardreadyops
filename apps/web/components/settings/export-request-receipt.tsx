@@ -13,7 +13,7 @@ function statusUrl(exportId: string, installationId: string): string {
 
 /**
  * A post-request receipt, not an export worker.
- * All three controls rely on the same server-side session, installation and
+ * Each action relies on the same server-side session, installation and
  * original-requester authorization; client state grants no access by itself.
  */
 export function ExportRequestReceipt({
@@ -24,11 +24,14 @@ export function ExportRequestReceipt({
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [revoked, setRevoked] = useState(false);
+  const [archivePrepared, setArchivePrepared] = useState(false);
   const url = statusUrl(issued.exportId, installationId);
 
   async function refreshStatus(): Promise<void> {
     setBusy(true);
     setFeedback("");
+    // Do not keep a stale ZIP link visible after the authorization check fails.
+    setArchivePrepared(false);
     try {
       const response = await fetch(url, { cache: "no-store", credentials: "same-origin" });
       if (!response.ok) {
@@ -49,6 +52,7 @@ export function ExportRequestReceipt({
         return;
       }
       setStatus(result.export.status);
+      setArchivePrepared("archivePrepared" in result.export && result.export.archivePrepared === true);
       setFeedback("Request status refreshed. This is not confirmation of a completed customer export.");
     } catch {
       setFeedback("Unable to refresh status. Please try again.");
@@ -102,26 +106,41 @@ export function ExportRequestReceipt({
     }
   }
 
-  async function revokeMetadata(): Promise<void> {
-    if (!window.confirm("Revoke access to this metadata preview? This does not delete existing downloaded copies.")) {
-      return;
-    }
+  async function revokeAccess(target: "metadata" | "archive"): Promise<void> {
+    const isArchive = target === "archive";
+    const prompt = isArchive
+      ? "Revoke access to this prepared ZIP? Already downloaded copies cannot be removed."
+      : "Revoke access to this metadata preview? This does not delete existing downloaded copies.";
+    if (!window.confirm(prompt)) return;
     setBusy(true);
     setFeedback("");
+    if (isArchive) setArchivePrepared(false);
     try {
-      const response = await fetch(url, {
+      const response = await fetch(isArchive ? `${url}&revoke=archive` : url, {
         method: "DELETE",
         cache: "no-store",
         credentials: "same-origin",
       });
       if (!response.ok) {
-        setFeedback("No active metadata preview could be revoked for this request.");
+        setFeedback(
+          isArchive
+            ? "No active prepared ZIP could be revoked. Refresh status before retrying."
+            : "No active metadata preview could be revoked for this request.",
+        );
         return;
       }
-      setRevoked(true);
-      setFeedback("Metadata preview access revoked. Downloaded copies are not deleted.");
+      if (isArchive) {
+        setFeedback("Prepared ZIP access revoked. Previously downloaded copies are not deleted.");
+      } else {
+        setRevoked(true);
+        setFeedback("Metadata preview access revoked. Downloaded copies are not deleted.");
+      }
     } catch {
-      setFeedback("Unable to revoke the metadata preview. Please try again.");
+      setFeedback(
+        isArchive
+          ? "Unable to revoke the prepared ZIP. Refresh status before retrying."
+          : "Unable to revoke the metadata preview. Please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -142,13 +161,33 @@ export function ExportRequestReceipt({
           <Button type="button" size="sm" variant="secondary" disabled={busy || revoked} onClick={downloadMetadata}>
             Download metadata preview
           </Button>
-          <Button type="button" size="sm" variant="outline" disabled={busy || revoked} onClick={revokeMetadata}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy || revoked}
+            onClick={() => revokeAccess("metadata")}
+          >
             Revoke metadata preview
           </Button>
+          {archivePrepared && !busy ? (
+            <>
+              <Button asChild size="sm" variant="secondary">
+                <a href={`${url}&download=archive`} download={`boardreadyops-export-${issued.exportId}.zip`}>
+                  Download prepared ZIP
+                </a>
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => revokeAccess("archive")}>
+                Revoke prepared ZIP
+              </Button>
+            </>
+          ) : null}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           The preview, if an operator publishes it, contains limited repository metadata only. Access expires after 15
-          minutes and can be revoked. A completed customer archive is not yet available.
+          minutes and can be revoked. An operator-prepared ZIP, if staged, can be downloaded after refreshing status.
+          That ZIP is a partial archive, not a complete customer data export; the server rechecks access and expiry
+          during download. A download link is not proof that the export was completed or received.
         </p>
         {feedback ? (
           <p role="status" aria-live="polite" className="mt-2 text-sm">

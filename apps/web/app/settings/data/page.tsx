@@ -354,8 +354,9 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
             <p className="mb-3 text-sm text-muted-foreground">
               An export request does not create a downloadable pack automatically. An authorized operator must prepare
               and deliver an export using a separate workflow. After recording the request, you can refresh its status
-              and optionally download or revoke the 15-minute metadata-only preview if an operator publishes it. This
-              preview is not a complete customer data archive.
+              and optionally download or revoke the 15-minute metadata-only preview if an operator publishes it. If an
+              operator stages a private ZIP, refresh the request to reveal a requester-only download and revoke option.
+              That prepared ZIP is partial and is not confirmation of a complete customer data export.
             </p>
             <ExportRequestForm
               key={admin.selected.id}
