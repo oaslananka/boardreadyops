@@ -1,25 +1,30 @@
 "use client";
 
 import { useId, useState } from "react";
-import type { DemoComment } from "../../lib/demo-data.js";
+import type { DemoComment, DemoFinding } from "../../lib/demo-data.js";
 import { Button } from "../ui/button.js";
 import { Panel } from "../ui.js";
 
 export function DiscussionTab({
   comments,
+  findings = [],
   viewerLogin,
   onAddComment,
   onToggleStatus,
+  onInspectFinding,
   readOnly = false,
 }: Readonly<{
   comments: DemoComment[];
+  findings?: readonly DemoFinding[] | undefined;
   viewerLogin?: string | undefined;
   onAddComment?: (content: string) => void;
   onToggleStatus?: (commentId: string, nextStatus: "open" | "resolved") => void;
+  onInspectFinding?: ((fingerprint: string) => void) | undefined;
   readOnly?: boolean | undefined;
 }>) {
   const [newContent, setNewContent] = useState("");
   const commentFieldId = useId();
+  const findingsByFingerprint = new Map(findings.map((finding) => [finding.fingerprint, finding]));
 
   function handlePost(e: React.FormEvent) {
     e.preventDefault();
@@ -77,9 +82,32 @@ export function DiscussionTab({
                 </div>
 
                 {cmt.findingFingerprint ? (
-                  <footer className="mt-2 text-xs text-muted-foreground">
-                    <span>Anchored to Finding: </span>
-                    <code>{cmt.findingFingerprint}</code>
+                  <footer className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2 text-xs text-muted-foreground">
+                    {findingsByFingerprint.get(cmt.findingFingerprint) ? (
+                      <>
+                        <span>
+                          Linked to recorded finding:{" "}
+                          <strong className="font-medium text-foreground">
+                            {findingsByFingerprint.get(cmt.findingFingerprint)?.ruleId}
+                          </strong>
+                        </span>
+                        {onInspectFinding ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            aria-label={`Inspect recorded finding ${findingsByFingerprint.get(cmt.findingFingerprint)?.ruleId}`}
+                            onClick={() => {
+                              if (cmt.findingFingerprint) onInspectFinding(cmt.findingFingerprint);
+                            }}
+                          >
+                            Inspect finding →
+                          </Button>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span>Linked finding is unavailable in this Review.</span>
+                    )}
                   </footer>
                 ) : null}
               </div>

@@ -715,9 +715,15 @@ export function ReviewView({
         {rawActiveTab === "discussion" ? (
           <DiscussionTab
             comments={review.comments}
+            findings={review.findings}
             viewerLogin={viewerLogin}
             onAddComment={handleAddComment}
             onToggleStatus={handleToggleCommentStatus}
+            onInspectFinding={(fingerprint) => {
+              if (!review.findings.some((finding) => finding.fingerprint === fingerprint)) return;
+              setOverviewMarkerFingerprint(fingerprint);
+              setActiveTab("changes");
+            }}
             readOnly={readOnly}
           />
         ) : null}
