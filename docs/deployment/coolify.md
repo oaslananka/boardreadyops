@@ -8,7 +8,27 @@ The existing single Cloudflare Tunnel connector runs **independently** of the we
 
 For a same-source rolling web release, preserve the pinned web commit, single connector, stateful services, existing rollback image and private routing. Start external HTTPS/transport and independently authenticated customer-path witnesses **before** the release. Sample through new-web readiness, old/new overlap, drain, retirement and post-release stability. Verify terminal deployment status and immutable image/source identity. Previous request-level witnesses or successful healthcheck spot checks do not establish zero failure for another release.
 
-Track the rolling-web and rollback acceptance in [issue #1433](https://github.com/oaslananka/boardreadyops/issues/1433). Keep this issue open until **the applicable** production cutover has the required authenticated-session and supported long-lived request evidence. A first useful signed PCB result is a separate product acceptance gate. Do not commit release-policy files, tunnel credentials, origin addresses or private operator procedures to this repository.
+The 10 November controlled rolling-web continuity incident was resolved in [issue #1433](https://github.com/oaslananka/boardreadyops/issues/1433) with sampled authenticated-session evidence. Every **new** production cutover, including worker/database changes, still requires its own runtime and customer-path acceptance; the earlier evidence does not transfer to another deployment. A first useful signed PCB result is a separate product acceptance gate. Do not commit release-policy files, tunnel credentials, origin addresses or private operator procedures to this repository.
+
+## Worker-only handoff resource (source-prepared, not commissioned)
+
+`deploy/docker-compose.worker.yml` defines a separate Git-sourced **worker-only**
+Coolify Compose application. It creates no web, tunnel, PostgreSQL, Redis or
+migration service and publishes no host port. It requires an existing private
+Docker network, external artifact volume, the existing read-only release-policy
+file and the same protected configuration as the current worker. Its readiness
+check uses port 3001 and requires database and GitHub Actions configuration
+to be valid, overriding the Docker image's web-only health check on port 3000.
+
+This source template is **not deployed** and does not authorize cutover.
+Keep automatic deployment disabled; verify backups, rollback, the migrated
+schema, queues/leases, policy/artifact access and authenticated customer paths.
+**Stop and verify the old worker has fully exited before starting the new one.**
+Coolify's rolling application update could run both workers concurrently.
+Never redeploy the old all-in-one Compose stack. If the new worker fails,
+stop it and verify schema/queue rollback compatibility before considering
+restart of the retained legacy worker. Actual GitHub Actions execution and
+customer acceptance remain separate release gates.
 
 ## Legacy all-in-one Compose template topology
 

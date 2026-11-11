@@ -1,0 +1,63 @@
+# Worker-only Git-sourced Coolify application for a supervised, stop-first handoff.
+# Do not deploy while another worker can consume the same production queue.
+# Web, PostgreSQL, Redis and the tunnel remain independently managed.
+x-boardreadyops-worker-logging: &worker-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  worker:
+    logging: *worker-logging
+    image: boardreadyops-web-runtime:${SOURCE_COMMIT:?An immutable Git source commit is required}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        BUILD_DATE: ${BOARDREADYOPS_BUILD_DATE:-unknown}
+        VCS_REF: ${SOURCE_COMMIT:?An immutable Git source commit is required}
+        VERSION: ${BOARDREADYOPS_VERSION:-dev}
+    restart: unless-stopped
+    stop_grace_period: 5m
+    command: ["node", "worker.mjs"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?The existing production database URL is required}
+      BOARDREADYOPS_RUNNER_MODE: github-actions
+      BOARDREADYOPS_WORKER_HEALTH_PORT: "3001"
+      BOARDREADYOPS_EXPORT_PREPARATION_INSTALLATION_ID: ${BOARDREADYOPS_EXPORT_PREPARATION_INSTALLATION_ID:-}
+      ARTIFACT_STORAGE_ROOT: /data/artifacts
+      BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT: ${BOARDREADYOPS_PRIVATE_EXPORT_ARCHIVE_ROOT:-}
+      BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
+      # Required-value mirrors avoid Coolify's bind-source interpolation limitation.
+      BOARDREADYOPS_RELEASE_POLICY_HOST_FILE: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE:?Verified policy file is required}
+      BOARDREADYOPS_ARTIFACT_VOLUME: ${BOARDREADYOPS_ARTIFACT_VOLUME:?Verified existing artifact volume is required}
+      BOARDREADYOPS_WORKER_BACKEND_NETWORK: ${BOARDREADYOPS_WORKER_BACKEND_NETWORK:?Verified private backend network is required}
+    volumes:
+      - boardreadyops_artifacts:/data/artifacts
+      - type: bind
+        source: ${BOARDREADYOPS_RELEASE_POLICY_HOST_FILE}
+        target: /run/policies/repositories
+        read_only: true
+    networks:
+      - backend
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true||b?.databaseReady!==true||b?.runnerConfigurationValid!==true)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+
+volumes:
+  boardreadyops_artifacts:
+    external: true
+    name: ${BOARDREADYOPS_ARTIFACT_VOLUME}
+
+networks:
+  backend:
+    external: true
+    name: ${BOARDREADYOPS_WORKER_BACKEND_NETWORK}
