@@ -58,7 +58,7 @@ transient_launchpad_api_outage() {
   if grep -Eiq 'NO_PUBKEY|BADSIG|EXPKEYSIG|KEYEXPIRED|GPG error|not signed|invalid signature' "$log"; then
     return 1
   fi
-  grep -Eq '(lazr\.restfulclient\.errors\.ServerError: HTTP Error (503|504)(:| )|http\.client\.RemoteDisconnected: Remote end closed connection without response)' "$log"
+  grep -Eq '(lazr\.restfulclient\.errors\.ServerError: HTTP Error (503|504)(:| )|http\.client\.RemoteDisconnected: Remote end closed connection without response|TimeoutError: \[Errno 110\] Connection timed out|ConnectionResetError: \[Errno 104\] Connection reset by peer)' "$log"
 }
 
 echo '::notice::Attempting signed KiCad 10.0 PPA installation'

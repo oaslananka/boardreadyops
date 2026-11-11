@@ -16,6 +16,9 @@ const sudoMock = [
   '    launchpad503) echo "lazr.restfulclient.errors.ServerError: HTTP Error 503: Service Unavailable" >&2; exit 1;;',
   '    launchpad504) echo "lazr.restfulclient.errors.ServerError: HTTP Error 504: Gateway Time-out" >&2; exit 1;;',
   '    launchpad_disconnect) echo "http.client.RemoteDisconnected: Remote end closed connection without response" >&2; exit 1;;',
+  '    launchpad_timeout) echo "TimeoutError: [Errno 110] Connection timed out" >&2; exit 1;;',
+  '    launchpad_reset) echo "ConnectionResetError: [Errno 104] Connection reset by peer" >&2; exit 1;;',
+  '    launchpad_timeout_signature) echo "GPG error: NO_PUBKEY; TimeoutError: [Errno 110] Connection timed out" >&2; exit 1;;',
   '    launchpad_disconnect_signature) echo "GPG error: BADSIG; http.client.RemoteDisconnected: Remote end closed connection without response" >&2; exit 1;;',
   '    launchpad504_signature) echo "GPG error: NO_PUBKEY; lazr.restfulclient.errors.ServerError: HTTP Error 504: Gateway Time-out" >&2; exit 1;;',
   '    launchpad404) echo "lazr.restfulclient.errors.NotFound: HTTP Error 404: Not Found" >&2; exit 1;;',
@@ -154,65 +157,41 @@ describe.runIf(process.platform === "linux")("Linux KiCad 10 signed PPA with off
     }
   });
 
-  it("uses only immutable official OCI after repeated Launchpad API 503 responses", async () => {
-    const f = await fixture();
-    try {
-      const result = execute({ ...f.env, BRO_MOCK_REPO_MODE: "launchpad503" });
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
-      expect((await readFile(f.env.BRO_MOCK_REPO_CALLS as string, "utf8")).trim().split("\n")).toHaveLength(3);
-      expect(existsSync(f.env.BRO_MOCK_APT_CALLS as string)).toBe(false);
-      const docker = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
-      expect(docker).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
-    } finally {
-      await rm(f.root, { recursive: true, force: true });
-    }
-  });
-
-  it("uses only immutable official OCI after repeated Launchpad API 504 responses", async () => {
-    const f = await fixture();
-    try {
-      const result = execute({ ...f.env, BRO_MOCK_REPO_MODE: "launchpad504" });
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
-      expect((await readFile(f.env.BRO_MOCK_REPO_CALLS as string, "utf8")).trim().split("\n")).toHaveLength(3);
-      expect(existsSync(f.env.BRO_MOCK_APT_CALLS as string)).toBe(false);
-      const docker = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
-      expect(docker).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
-    } finally {
-      await rm(f.root, { recursive: true, force: true });
-    }
-  });
-
-  it("uses only immutable official OCI after repeated Launchpad API disconnections", async () => {
-    const f = await fixture();
-    try {
-      const result = execute({ ...f.env, BRO_MOCK_REPO_MODE: "launchpad_disconnect" });
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
-      expect((await readFile(f.env.BRO_MOCK_REPO_CALLS as string, "utf8")).trim().split("\n")).toHaveLength(3);
-      expect(existsSync(f.env.BRO_MOCK_APT_CALLS as string)).toBe(false);
-      const docker = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
-      expect(docker).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
-    } finally {
-      await rm(f.root, { recursive: true, force: true });
-    }
-  });
-
-  it.each(["launchpad404", "launchpad_signature", "launchpad504_signature", "launchpad_disconnect_signature"])(
-    "never selects OCI after a non-transient PPA registration failure: %s",
+  it.each(["launchpad503", "launchpad504", "launchpad_disconnect", "launchpad_timeout", "launchpad_reset"])(
+    "uses only immutable official OCI after repeated Launchpad transport failure: %s",
     async (mode) => {
       const f = await fixture();
       try {
         const result = execute({ ...f.env, BRO_MOCK_REPO_MODE: mode });
-        expect(result.status).not.toBe(0);
-        expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
+        expect((await readFile(f.env.BRO_MOCK_REPO_CALLS as string, "utf8")).trim().split("\n")).toHaveLength(3);
         expect(existsSync(f.env.BRO_MOCK_APT_CALLS as string)).toBe(false);
+        const docker = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
+        expect(docker).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
       } finally {
         await rm(f.root, { recursive: true, force: true });
       }
     },
   );
+
+  it.each([
+    "launchpad404",
+    "launchpad_signature",
+    "launchpad504_signature",
+    "launchpad_disconnect_signature",
+    "launchpad_timeout_signature",
+  ])("never selects OCI after a non-transient PPA registration failure: %s", async (mode) => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_MOCK_REPO_MODE: mode });
+      expect(result.status).not.toBe(0);
+      expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+      expect(existsSync(f.env.BRO_MOCK_APT_CALLS as string)).toBe(false);
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
 
   it("uses only the immutable official image after an explicit KiCad PPA 503", async () => {
     const f = await fixture();
