@@ -85,6 +85,7 @@ async function fixture() {
     PATH: bin + path.delimiter + process.env.PATH,
     BRO_KICAD_VERSION: "10.0",
     BRO_KICAD_PPA_SERIES: "10.0",
+    BRO_KICAD_INSTALL_MODE: "ppa",
     RUNNER_TEMP: root,
     GITHUB_PATH: githubPath,
     GITHUB_WORKSPACE: process.cwd(),
@@ -110,8 +111,39 @@ function execute(env: NodeJS.ProcessEnv) {
 // Linux-style paths; executing these shell mocks on macOS/Windows would test
 // the host shell instead of the supported CI target. The portable structural
 // contracts below still run in every OS/Node matrix lane.
-describe.runIf(process.platform === "linux")("Linux KiCad 10 signed PPA with official OCI outage fallback", () => {
-  it("keeps the signed PPA and native KiCad CLI as the primary path", async () => {
+describe.runIf(process.platform === "linux")("Linux KiCad 10 pinned OCI with optional signed PPA", () => {
+  it("uses the pinned official OCI image by default without any Launchpad API dependency", async () => {
+    const f = await fixture();
+    try {
+      const env: NodeJS.ProcessEnv = { ...f.env, BRO_MOCK_REPO_MODE: "launchpad404" };
+      delete env.BRO_KICAD_INSTALL_MODE;
+      const result = execute(env);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Verified genuine KiCad CLI 10.0.7");
+      expect(existsSync(f.env.BRO_MOCK_REPO_CALLS as string)).toBe(false);
+      expect(existsSync(f.env.BRO_MOCK_APT_CALLS as string)).toBe(false);
+      const docker = await readFile(f.env.BRO_MOCK_DOCKER_LOG as string, "utf8");
+      expect(docker).toContain("ghcr.io/kicad/kicad@sha256:3224d1bf");
+      expect(docker).toContain("pull --quiet");
+      expect(docker).toContain("run --rm --pull=never --network none --read-only");
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses unknown installation modes rather than falling back silently", async () => {
+    const f = await fixture();
+    try {
+      const result = execute({ ...f.env, BRO_KICAD_INSTALL_MODE: "auto-unverified" });
+      expect(result.status).not.toBe(0);
+      expect(existsSync(f.env.BRO_MOCK_DOCKER_LOG as string)).toBe(false);
+      expect(existsSync(f.env.BRO_MOCK_REPO_CALLS as string)).toBe(false);
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves the explicitly opted-in signed PPA and native KiCad CLI", async () => {
     const f = await fixture();
     try {
       const result = execute(f.env);
