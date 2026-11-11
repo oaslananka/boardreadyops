@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CopyButton } from "../../components/copy-button.js";
+import { firstRunSetupSteps } from "../../components/first-run-steps.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
 import { RunLiveRefresh } from "../../components/run-live-refresh.js";
 import { RunStateIndicators } from "../../components/run-state-indicators.js";
@@ -131,26 +132,7 @@ function RunsEmptyState({
     <GuidedChecklist
       heading="No runs recorded yet"
       steps={[
-        {
-          id: "install",
-          label: "Connect the BoardReadyOps GitHub App",
-          status: hasInstallation ? "done" : "current",
-          ...(!hasInstallation
-            ? { href: "https://github.com/apps/boardreadyops/installations/new", actionLabel: "Install" }
-            : {}),
-        },
-        {
-          id: "setup",
-          label: "Choose a hardware repository and open its setup pull request",
-          status: hasInstallation ? "current" : "upcoming",
-          ...(hasInstallation ? { href: "/setup", actionLabel: "Start setup" } : {}),
-        },
-        { id: "merge", label: "Merge the reviewed setup pull request", status: "upcoming" },
-        {
-          id: "run",
-          label: "Validate readiness before the first hardware run, then open a hardware PR",
-          status: "upcoming",
-        },
+        ...firstRunSetupSteps(hasInstallation),
         { id: "review", label: "Work the findings the run reports", status: "upcoming" },
       ]}
     />
