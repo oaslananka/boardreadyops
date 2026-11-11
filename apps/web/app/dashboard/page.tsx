@@ -71,7 +71,7 @@ function NoRepositoriesPanel({ hasInstallation }: Readonly<{ hasInstallation: bo
         </summary>
         <div className="mt-4">
           <GuidedChecklist
-            heading={"Get your first board reviewed — " + (hasInstallation ? 3 : 4) + " steps left"}
+            heading={`Get your first board reviewed — ${hasInstallation ? 3 : 4} steps left`}
             steps={firstRunSetupSteps(hasInstallation)}
           />
         </div>
@@ -454,15 +454,15 @@ function ConnectedBoardNextAction({ groups }: Readonly<{ groups: RepositoryGroup
           const needsSetup = !repo.latestRunId;
           let action = "Open latest review";
           let stateLabel = "Recent review available";
-          let href = "/runs/" + repo.latestRunId;
+          let href = `/runs/${repo.latestRunId}`;
           if (needsReview) {
             action = "Review findings";
-            stateLabel = repo.openFindings + " recorded findings";
+            stateLabel = `${repo.openFindings} recorded findings`;
             href += "/findings";
           } else if (needsSetup) {
             action = "Set up first check";
             stateLabel = "No review yet";
-            href = "/setup?repositoryId=" + encodeURIComponent(repo.id);
+            href = `/setup?repositoryId=${encodeURIComponent(repo.id)}`;
           } else if (repo.latestRunStatus !== "completed") {
             action = "Check run status";
             stateLabel = "Check in progress or incomplete";
@@ -504,6 +504,31 @@ function ConnectedBoardNextAction({ groups }: Readonly<{ groups: RepositoryGroup
   );
 }
 
+function GitHubAccessUnavailablePanel() {
+  return (
+    <section className="rounded-xl border border-border bg-card p-6" aria-label="GitHub access verification">
+      <h2 className="text-lg font-semibold">GitHub repository access unavailable</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Current GitHub App permissions could not be verified. Your saved repositories have not been changed.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link
+          className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+          href="/dashboard"
+        >
+          Retry access check
+        </Link>
+        <a
+          href="https://github.com/settings/installations"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline"
+        >
+          Review GitHub App access
+        </a>
+      </div>
+    </section>
+  );
+}
+
 function DashboardBody({
   hasSession,
   hasInstallation,
@@ -531,30 +556,7 @@ function DashboardBody({
       </div>
     );
   }
-  if (accessUnavailable) {
-    return (
-      <section className="rounded-xl border border-border bg-card p-6" aria-label="GitHub access verification">
-        <h2 className="text-lg font-semibold">GitHub repository access unavailable</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Current GitHub App permissions could not be verified. Your saved repositories have not been changed.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Link
-            className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
-            href="/dashboard"
-          >
-            Retry access check
-          </Link>
-          <a
-            href="https://github.com/settings/installations"
-            className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline"
-          >
-            Review GitHub App access
-          </a>
-        </div>
-      </section>
-    );
-  }
+  if (accessUnavailable) return <GitHubAccessUnavailablePanel />;
   if (summary.repositories === 0) {
     return (
       <div className="flex flex-col gap-4">

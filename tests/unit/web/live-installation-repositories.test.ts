@@ -10,7 +10,7 @@ const response = (ids: number[], total_count = ids.length, ok = true) =>
 
 describe("GitHub App live repository grants", () => {
   it("uses current selected repositories, not previously stored installation rows", async () => {
-    const mintToken = vi.fn(async (id: number) => "token-" + id);
+    const mintToken = vi.fn(async (id: number) => `token-${id}`);
     const fetcher = vi.fn(async () => response([210]));
     const ids = await resolveLiveInstallationRepositoryIds([55], env, { mintToken, fetcher });
     expect(ids).toEqual([210]);
@@ -26,7 +26,7 @@ describe("GitHub App live repository grants", () => {
   });
 
   it("unions allowed repo IDs for multiple installations and paginates", async () => {
-    const mintToken = vi.fn(async (id: number) => "token-" + id);
+    const mintToken = vi.fn(async (id: number) => `token-${id}`);
     const fetcher = vi.fn(async (url: string, init: RequestInit) => {
       const token = String((init.headers as Record<string, string>).authorization);
       if (token === "Bearer token-8") return response([9001]);
