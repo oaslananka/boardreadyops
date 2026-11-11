@@ -51,14 +51,14 @@ apt_transport_options=(
 )
 
 # add-apt-repository consults Launchpad's REST API before any APT download.
-# Retry only a confirmed upstream 503, then use the same pinned official OCI
+# Retry only confirmed upstream 503/504, then use the same pinned official OCI
 # fallback already permitted for signed KiCad PPA transport outages.
 transient_launchpad_api_outage() {
   local log="$1"
   if grep -Eiq 'NO_PUBKEY|BADSIG|EXPKEYSIG|KEYEXPIRED|GPG error|not signed|invalid signature' "$log"; then
     return 1
   fi
-  grep -Eq 'lazr\.restfulclient\.errors\.ServerError: HTTP Error 503(:| )' "$log"
+  grep -Eq 'lazr\.restfulclient\.errors\.ServerError: HTTP Error (503|504)(:| )' "$log"
 }
 
 echo '::notice::Attempting signed KiCad 10.0 PPA installation'
