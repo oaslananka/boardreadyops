@@ -179,6 +179,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0125_historical_user_private_partial_cleanup_audit.sql",
       "0126_historical_user_private_partial_read_reservations.sql",
       "0127_historical_user_live_oauth_verified_proof.sql",
+      "0128_reused_github_repository_name_identity.sql",
     ]);
   });
 
