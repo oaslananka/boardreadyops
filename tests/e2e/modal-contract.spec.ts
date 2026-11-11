@@ -15,26 +15,23 @@ import { demoReviewId } from "../../qa/audit/routes.js";
 
 async function openReviewAndWaitForHydration(page: Page) {
   await page.goto(`/reviews/${demoReviewId}`);
-  await page
-    .getByRole("button", { name: /Approve/i })
-    .first()
-    .waitFor({ state: "visible" });
-  await page.waitForTimeout(1000);
+  const changes = page.getByRole("tab", { name: /^Changes/ });
+  await expect(changes).toBeVisible();
+  await changes.click();
+  await expect(changes).toHaveAttribute("aria-selected", "true");
+  const overview = page.getByRole("tab", { name: "Overview" });
+  await overview.click();
+  await expect(overview).toHaveAttribute("aria-selected", "true");
 }
 
 test.describe("Dialog contract", () => {
-  test("ApprovalModal satisfies the dialog contract", async ({ page }) => {
+  test("public review prevents approval without an authorized session", async ({ page }) => {
     await openReviewAndWaitForHydration(page);
-    const trigger = page
-      .getByRole("button", { name: "Approve review" })
-      .or(page.getByRole("button", { name: "Approve" }))
-      .first();
-
-    await expectDialogContract(page, {
-      open: () => trigger.click(),
-      triggerLocator: trigger,
-      accessibleName: /Sign-Off|Approve|Approval/i,
-    });
+    await expect(page.getByText("Read-only review.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Approve review" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Request changes" })).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Sign in to manage an authorized review" })).toBeVisible();
   });
 
   test("CommandPalette satisfies the dialog contract", async ({ page }) => {
@@ -49,25 +46,12 @@ test.describe("Dialog contract", () => {
     });
   });
 
-  test("DecisionModal (opened via a finding's disposition select) satisfies the dialog contract", async ({ page }) => {
+  test("public finding inspection does not expose waiver or disposition controls", async ({ page }) => {
     await openReviewAndWaitForHydration(page);
-    const findingsTab = page.getByRole("tab").filter({ hasText: "Findings" });
-    await findingsTab.click();
-    await expect(findingsTab).toHaveAttribute("aria-selected", "true");
-
-    const select = page.locator(".finding-triage-card").first().locator(".disposition-select");
-
-    await expectDialogContract(page, {
-      open: async () => {
-        // A real user always focuses a <select> (mouse or keyboard) before its value changes;
-        // Playwright's selectOption() can fire the change without reliably leaving that focus
-        // behind first, which made this test observe a false "focus didn't restore" failure --
-        // verified manually that the real interaction does focus it. Matching real usage here.
-        await select.focus();
-        await select.selectOption("accepted_risk");
-      },
-      triggerLocator: select,
-      accessibleName: /Record Finding Decision/i,
-    });
+    await page.getByRole("tab", { name: /^Findings/ }).click();
+    await expect(page.locator(".finding-triage-card").first()).toBeVisible();
+    await expect(page.locator(".disposition-select")).toHaveCount(0);
+    await page.keyboard.press("e");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 });
