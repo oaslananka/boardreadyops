@@ -109,6 +109,16 @@ these names from the **verified live** Coolify Compose project and Docker mounts
     BOARDREADYOPS_ARTIFACT_VOLUME=<existing production artifact volume name>
     BOARDREADYOPS_BACKUP_DIR=<absolute private backup directory, mode 0700>
     BOARDREADYOPS_BACKUP_KEEP=7
+    BOARDREADYOPS_ROLLING_WEB_APP_UUID=<Coolify UUID of the independent rolling web, if used>
+
+The PostgreSQL service remains inside the original Compose project. For the
+separate rolling-web production topology, set `BOARDREADYOPS_ROLLING_WEB_APP_UUID`
+to the verified active Coolify web application UUID. The backup script
+requires exactly one running container with that label and a healthy web;
+an absent, invalid or ambiguous match fails closed. Omitting the variable
+uses the legacy Compose web service only, and cannot fall back to another
+application when the legacy web has stopped. Keep this UUID in the private
+host config, not in versioned source.
 
 Install deploy/maintenance/coolify-production-backup.sh at
 $HOME/.local/libexec/boardreadyops-coolify-backup.sh (mode 0700), and install
