@@ -47,6 +47,8 @@ const ACTION_PATTERNS = [
   /^tests\/unit\/action\//,
 ];
 const KICAD_PATTERNS = [
+  // Installer changes must prove the real KiCad CLI lane on the PR head.
+  /^scripts\/install-kicad-ci\.sh$/,
   /^src\/kicad\//,
   /^src\/rules\/manufacturing\//,
   /^src\/action\//,

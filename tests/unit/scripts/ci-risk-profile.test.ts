@@ -95,6 +95,17 @@ describe("ci-risk-profile", () => {
     }
   });
 
+  it("runs actual KiCad 10 integration when its signed install script changes", () => {
+    const profile = classifyChangedFiles(["scripts/install-kicad-ci.sh"], {
+      eventName: "pull_request",
+    });
+
+    expect(profile.needs_integration).toBe(true);
+    expect(profile.needs_kicad).toBe(true);
+    expect(profile.needs_unit).toBe(true);
+    expect(profile.needs_build).toBe(true);
+  });
+
   it("runs the native path matrix for signed export storage key changes", () => {
     const profile = classifyChangedFiles(["apps/web/lib/signed-manufacturing-export-import.ts"], {
       eventName: "pull_request",

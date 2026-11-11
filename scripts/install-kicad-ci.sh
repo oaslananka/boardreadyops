@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # KiCad 10 installation for the real GitHub-hosted integration lane.
-# Prefer Ubuntu APT with signed PPA metadata; use the official digest-pinned
-# KiCad CLI OCI image only for verifiable transient upstream PPA outages.
+# For reproducible kicad-cli CI, prefer the official immutable KiCad OCI image.
+# Signed Ubuntu PPA remains an explicit opt-in path with fail-closed verification.
 set -euo pipefail
 
 series="${BRO_KICAD_VERSION:-}"
@@ -51,69 +51,80 @@ apt_transport_options=(
 )
 
 # add-apt-repository consults Launchpad's REST API before any APT download.
-# Retry only a confirmed upstream 503, then use the same pinned official OCI
+# Retry only confirmed upstream 503/504, then use the same pinned official OCI
 # fallback already permitted for signed KiCad PPA transport outages.
 transient_launchpad_api_outage() {
   local log="$1"
   if grep -Eiq 'NO_PUBKEY|BADSIG|EXPKEYSIG|KEYEXPIRED|GPG error|not signed|invalid signature' "$log"; then
     return 1
   fi
-  grep -Eq 'lazr\.restfulclient\.errors\.ServerError: HTTP Error 503(:| )' "$log"
+  grep -Eq '(lazr\.restfulclient\.errors\.ServerError: HTTP Error (503|504)(:| )|http\.client\.RemoteDisconnected: Remote end closed connection without response|TimeoutError: \[Errno 110\] Connection timed out|ConnectionResetError: \[Errno 104\] Connection reset by peer)' "$log"
 }
 
-echo '::notice::Attempting signed KiCad 10.0 PPA installation'
-ppa_ready=false
-for attempt in 1 2 3; do
-  if sudo add-apt-repository --yes --no-update "ppa:kicad/kicad-$ppa_series-releases" 2>&1 | tee "$apt_log"; then
-    ppa_ready=true
-    break
-  fi
-  if ! transient_launchpad_api_outage "$apt_log"; then
-    echo '::error::Signed KiCad PPA registration failed for a non-transient reason.'
-    tail -25 "$apt_log"
-    exit 1
-  fi
-  if [[ "$attempt" -lt 3 ]]; then
-    echo "::warning::Launchpad KiCad PPA API unavailable (attempt $attempt/3)"
-    sleep 15
-  fi
-done
-
+mode="${BRO_KICAD_INSTALL_MODE:-oci}"
+if [[ "$mode" != 'oci' && "$mode" != 'ppa' ]]; then
+  echo '::error::Unsupported KiCad installation mode; expected oci or ppa.'
+  exit 2
+fi
 native_ready=false
-if [[ "$ppa_ready" == true ]]; then
-  for attempt in 1 2 3 4; do
-    if sudo apt-get update -o Acquire::Languages=none -o APT::Update::Error-Mode=any "${apt_transport_options[@]}" -qq 2>&1 | tee "$apt_log"; then
-      candidate="$(apt-cache policy kicad | awk '/Candidate:/ {print $2; exit}')"
-      if [[ "$candidate" != "$series".* ]]; then
-        echo "::error::Signed KiCad PPA returned an unexpected candidate: ${candidate:-none}"
-        exit 1
-      fi
-      if sudo apt-get install --yes --no-install-recommends "${apt_transport_options[@]}" kicad 2>&1 | tee "$apt_log"; then
-        native_ready=true
-        break
-      fi
-      # If the index was valid but the .deb download failed, this check still
-      # requires an explicit transient *KiCad PPA* failure before using OCI.
-      if ! transient_ppa_outage "$apt_log"; then
-        echo '::error::KiCad package install failed for a non-transient reason.'
-        tail -25 "$apt_log"
-        exit 1
-      fi
-    elif ! transient_ppa_outage "$apt_log"; then
-      echo '::error::APT index verification or a non-KiCad source failed.'
+if [[ "$mode" == 'ppa' ]]; then
+  echo '::notice::Attempting signed KiCad 10.0 PPA installation'
+  ppa_ready=false
+  for attempt in 1 2 3; do
+    if sudo add-apt-repository --yes --no-update "ppa:kicad/kicad-$ppa_series-releases" 2>&1 | tee "$apt_log"; then
+      ppa_ready=true
+      break
+    fi
+    if ! transient_launchpad_api_outage "$apt_log"; then
+      echo '::error::Signed KiCad PPA registration failed for a non-transient reason.'
       tail -25 "$apt_log"
       exit 1
     fi
-
-    if [[ "$attempt" -lt 4 ]]; then
-      echo "::warning::Signed KiCad PPA transiently unavailable (attempt $attempt/4)"
+    if [[ "$attempt" -lt 3 ]]; then
+      echo "::warning::Launchpad KiCad PPA API unavailable (attempt $attempt/3)"
       sleep 15
     fi
   done
+
+  if [[ "$ppa_ready" == true ]]; then
+    for attempt in 1 2 3 4; do
+      if sudo apt-get update -o Acquire::Languages=none -o APT::Update::Error-Mode=any "${apt_transport_options[@]}" -qq 2>&1 | tee "$apt_log"; then
+        candidate="$(apt-cache policy kicad | awk '/Candidate:/ {print $2; exit}')"
+        if [[ "$candidate" != "$series".* ]]; then
+          echo "::error::Signed KiCad PPA returned an unexpected candidate: ${candidate:-none}"
+          exit 1
+        fi
+        if sudo apt-get install --yes --no-install-recommends "${apt_transport_options[@]}" kicad 2>&1 | tee "$apt_log"; then
+          native_ready=true
+          break
+        fi
+        # If the index was valid but the .deb download failed, this check still
+        # requires an explicit transient *KiCad PPA* failure before using OCI.
+        if ! transient_ppa_outage "$apt_log"; then
+          echo '::error::KiCad package install failed for a non-transient reason.'
+          tail -25 "$apt_log"
+          exit 1
+        fi
+      elif ! transient_ppa_outage "$apt_log"; then
+        echo '::error::APT index verification or a non-KiCad source failed.'
+        tail -25 "$apt_log"
+        exit 1
+      fi
+
+      if [[ "$attempt" -lt 4 ]]; then
+        echo "::warning::Signed KiCad PPA transiently unavailable (attempt $attempt/4)"
+        sleep 15
+      fi
+    done
+  fi
 fi
 
 if [[ "$native_ready" != true ]]; then
-  echo '::warning::Verified transient KiCad PPA registration or package outage; switching to official OCI CLI by immutable SHA-256 digest.'
+  if [[ "$mode" == 'oci' ]]; then
+    echo '::notice::Using official digest-pinned KiCad CLI OCI image for reproducible CI.'
+  else
+    echo '::warning::Verified transient KiCad PPA outage; using official digest-pinned OCI CLI.'
+  fi
   [[ "$(uname -m)" == 'x86_64' ]] || { echo '::error::Official OCI image is pinned for linux/amd64.'; exit 1; }
   timeout 300 docker pull --quiet "$image"
   vendor="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.vendor"}}' "$image")"
