@@ -31,6 +31,11 @@ vi.mock("../../../packages/db/src/pg-executor.ts", () => ({
   })),
 }));
 
+const liveRepoIds = vi.hoisted(() => vi.fn(async () => [53991]));
+vi.mock("../../../apps/web/lib/live-installation-repositories.js", () => ({
+  resolveLiveInstallationRepositoryIds: liveRepoIds,
+}));
+
 const secret = "s".repeat(48);
 const now = new Date("2026-08-25T12:00:00.000Z");
 
@@ -90,6 +95,47 @@ describe("viewerAuthorization", () => {
       "github_marketplace_subscriptions.github_installation_id = installations.github_installation_id",
     );
     expect(mockClose).toHaveBeenCalled();
+  });
+
+  it("rejects a private run's previously granted repository after GitHub App selection is narrowed", async () => {
+    const token = encodeUserSession(makeSession([1001]), secret);
+    cookieStore.get.mockImplementation((name: string) => (name === sessionCookieName ? { value: token } : undefined));
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ github_installation_id: "1001", github_repo_id: "53991" }],
+    });
+    liveRepoIds.mockResolvedValueOnce([63111]);
+    const viewer = await viewerAuthorization(
+      { SESSION_SECRET: secret, DATABASE_URL: "postgresql://localhost/test" },
+      now,
+    );
+    expect(
+      await viewer.authorizeRepository({
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        installationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      }),
+    ).toBe(false);
+    const sql = String(mockQuery.mock.calls[0]?.[0]);
+    expect(sql).toContain("repositories.github_repo_id");
+    expect(sql).toContain("repositories.installation_id = $2");
+  });
+
+  it("allows a private run only while its GitHub repo is currently selected for its exact installation", async () => {
+    const token = encodeUserSession(makeSession([1001]), secret);
+    cookieStore.get.mockImplementation((name: string) => (name === sessionCookieName ? { value: token } : undefined));
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ github_installation_id: "1001", github_repo_id: "53991" }],
+    });
+    const viewer = await viewerAuthorization(
+      { SESSION_SECRET: secret, DATABASE_URL: "postgresql://localhost/test" },
+      now,
+    );
+    expect(
+      await viewer.authorizeRepository({
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        installationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      }),
+    ).toBe(true);
+    expect(liveRepoIds).toHaveBeenCalledWith([1001], expect.any(Object));
   });
 
   it("denies when database returns an installation not in the viewer session", async () => {

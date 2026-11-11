@@ -1,4 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const liveRepositoryIds = vi.hoisted(() => vi.fn(async () => [49301]));
+vi.mock("../../../apps/web/lib/live-installation-repositories.js", () => ({
+  resolveLiveInstallationRepositoryIds: liveRepositoryIds,
+}));
+
 import {
   decodeRunListingCursor,
   encodeRunListingCursor,
@@ -70,6 +76,14 @@ describe("loadViewerRuns", () => {
       runs: [],
       next: undefined,
     });
+  });
+
+  it("denies the stale run listing when the App grant was removed", async () => {
+    const { loadViewerRuns } = await import("../../../apps/web/lib/run-listing.js");
+    liveRepositoryIds.mockResolvedValueOnce(null);
+    expect(
+      await loadViewerRuns({ login: "alice", installationIds: [123] }, {}, { DATABASE_URL: "postgres://local" }),
+    ).toEqual({ state: "access-unavailable" });
   });
 
   it("returns not-configured state when DATABASE_URL is not set", async () => {

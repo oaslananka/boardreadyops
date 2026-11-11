@@ -117,6 +117,17 @@ function RunsEmptyState({
     );
   }
 
+  if (state === "access-unavailable") {
+    return (
+      <EmptyState title="GitHub repository access could not be verified">
+        <p>Refresh to retry your current App permissions. Your saved run history remains unchanged.</p>
+        <Button asChild className="mt-3">
+          <Link href="/runs">Retry access check</Link>
+        </Button>
+      </EmptyState>
+    );
+  }
+
   if (!signedIn) {
     return (
       <EmptyState title="Sign in to see your runs">

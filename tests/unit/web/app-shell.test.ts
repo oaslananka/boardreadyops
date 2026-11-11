@@ -22,9 +22,9 @@ describe("AppShell", () => {
     expect(markup).toContain('href="/setup"');
     expect(markup).toContain('href="https://docs.boardreadyops.com"');
     expect(markup).toContain('href="#main-content"');
-    expect(markup).toContain("Get a board in");
-    expect(markup).toContain("Work the findings");
-    expect(markup).toContain("Ship it");
+    expect(markup).toContain("1. Connect");
+    expect(markup).toContain("2. Review");
+    expect(markup).toContain("3. Deliver");
     expect(markup).toContain("A missing signed result or workflow link is not");
     expect(markup).toContain("fabrication approval.");
     expect(markup).not.toContain("full workflow logs");

@@ -30,7 +30,7 @@ describe("public manufacturing evidence claims (#445 / #771)", () => {
     expect(source).toContain("normalized findings, run metadata, audit events and optional managed artifacts");
     expect(source).toContain("not a certification, compliance finding");
     expect(source).not.toContain("does not take custody of anything");
-    expect(source).toContain("Illustrative sample — not a readiness result from your repository.");
+    expect(source).toContain("A design example, not an actual BoardReadyOps verdict or manufacturing clearance.");
     expect(source).toContain("evidence actually recorded");
     expect(source).not.toContain("full workflow logs stay the source of");
     expect(source).not.toContain("documented, auditable compliance");

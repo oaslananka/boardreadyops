@@ -1,9 +1,10 @@
 import { isValidElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { viewerMock, repositoriesMock, capabilitiesMock, rolloutMock } = vi.hoisted(() => ({
+const { viewerMock, repositoriesMock, repositoryResultMock, capabilitiesMock, rolloutMock } = vi.hoisted(() => ({
   viewerMock: vi.fn(),
   repositoriesMock: vi.fn(),
+  repositoryResultMock: vi.fn(),
   capabilitiesMock: vi.fn(),
   rolloutMock: vi.fn(),
 }));
@@ -12,6 +13,7 @@ vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({ viewerAuthoriz
 vi.mock("../../../apps/web/lib/repository-dashboard.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../apps/web/lib/repository-dashboard.js")>()),
   loadViewerRepositories: repositoriesMock,
+  loadViewerRepositoryResult: repositoryResultMock,
 }));
 vi.mock("../../../apps/web/lib/installation-capabilities.js", () => ({
   loadInstallationCapabilities: capabilitiesMock,
@@ -46,6 +48,10 @@ describe("repository setup installation grant scope", () => {
         : { enabled: true },
     );
     viewerMock.mockResolvedValue({ session: { userId: "user-1", login: "engineer" } });
+    repositoryResultMock.mockImplementation(async () => ({
+      state: "ok",
+      groups: await repositoriesMock(),
+    }));
     repositoriesMock.mockResolvedValue([
       {
         repositories: [
@@ -71,6 +77,14 @@ describe("repository setup installation grant scope", () => {
             ],
       manageUrl: `https://github.com/settings/installations/${installationId}`,
     }));
+  });
+
+  it("passes a temporary grant-check outage through to the single repository picker", async () => {
+    repositoryResultMock.mockResolvedValueOnce({ state: "access-unavailable", groups: [] });
+    const setup = findSetup(await SetupPage({ searchParams: Promise.resolve({}) }));
+    expect(setup?.repositories).toEqual([]);
+    expect((setup as Record<string, unknown>)?.accessUnavailable).toBe(true);
+    expect(capabilitiesMock).not.toHaveBeenCalled();
   });
 
   it("fetches once per installation and never borrows the first installation's grants for another repository", async () => {

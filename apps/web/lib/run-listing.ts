@@ -1,4 +1,5 @@
 import { displayedRunnerDecisionSql } from "@boardreadyops/db/runner-result-trust";
+import { resolveLiveInstallationRepositoryIds } from "./live-installation-repositories.js";
 import { notCancelledSubscription } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
@@ -32,6 +33,7 @@ export type RunListingCursor = { startedAt: string; id: string };
 
 export type RunListingResult =
   | { state: "not-configured" }
+  | { state: "access-unavailable" }
   | { state: "ok"; runs: RunListingEntry[]; next: string | undefined };
 
 const defaultPageSize = 25;
@@ -78,6 +80,7 @@ const runListingQuery = `
          release_runs.repository_id,
          repositories.owner,
          repositories.name as repository_name,
+         repositories.github_repo_id,
          release_runs.status,
          ${displayedRunnerDecisionSql("release_runs")} as decision,
          release_runs.commit_sha,
@@ -88,12 +91,13 @@ const runListingQuery = `
     join repositories on repositories.id = release_runs.repository_id
     join installations on installations.id = repositories.installation_id
    where installations.github_installation_id = any($1::bigint[])
+     and repositories.github_repo_id = any($2::bigint[])
      and repositories.disabled_at is null
      and installations.suspended_at is null
      and ${notCancelledSubscription}
-     and ($2::timestamptz is null or (release_runs.started_at, release_runs.id) < ($2::timestamptz, $3::text))
+     and ($3::timestamptz is null or (release_runs.started_at, release_runs.id) < ($3::timestamptz, $4::text))
    order by release_runs.started_at desc, release_runs.id desc
-   limit $4`;
+   limit $5`;
 
 /**
  * Lists runs across every repository the session's installations grant access to.
@@ -110,12 +114,18 @@ export async function loadViewerRuns(
   const connectionString = environment.DATABASE_URL;
   if (!connectionString) return { state: "not-configured" };
 
+  const verifiedRepoIds = await resolveLiveInstallationRepositoryIds(session.installationIds, environment);
+  if (verifiedRepoIds === null) return { state: "access-unavailable" };
+  if (verifiedRepoIds.length === 0) return { state: "ok", runs: [], next: undefined };
+  const allowed = new Set(verifiedRepoIds);
+
   const limit = normalizedRunListingLimit(options.limit);
   const { createPgQueryExecutor } = await import("@boardreadyops/db/pg-executor");
   const executor = createPgQueryExecutor({ connectionString, max: 1 });
   try {
     const result = await executor.query(runListingQuery, [
       session.installationIds,
+      verifiedRepoIds,
       options.cursor?.startedAt ?? null,
       options.cursor?.id ?? null,
       limit + 1,
@@ -127,7 +137,9 @@ export async function loadViewerRuns(
       const id = text(row, "id");
       const repositoryId = text(row, "repository_id");
       const startedAt = text(row, "started_at");
-      if (!id || !repositoryId || !startedAt) return [];
+      const githubRepoId = Number(row.github_repo_id);
+      if (!id || !repositoryId || !startedAt || !Number.isSafeInteger(githubRepoId) || !allowed.has(githubRepoId))
+        return [];
       const pullRequestNumber = row.pull_request_number;
       return [
         {

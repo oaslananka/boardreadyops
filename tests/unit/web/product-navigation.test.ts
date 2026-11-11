@@ -13,18 +13,20 @@ import { ProductNavigation } from "../../../apps/web/components/product-navigati
 describe("ProductNavigation task-sequence grouping", () => {
   it("groups by workflow step, not by category", () => {
     const markup = renderToStaticMarkup(createElement(ProductNavigation, {}));
-    expect(markup).toContain("Get a board in");
-    expect(markup).toContain("Work the findings");
-    expect(markup).toContain("Ship it");
+    expect(markup).toContain("1. Connect");
+    expect(markup).toContain("2. Review");
+    expect(markup).toContain("3. Deliver");
     expect(markup).not.toContain(">Overview<");
     expect(markup).not.toContain(">Engineering<");
     expect(markup).not.toContain(">Manage<");
 
-    const projectsIndex = markup.indexOf("Projects");
-    const getBoardInIndex = markup.indexOf("Get a board in");
-    const workFindingsIndex = markup.indexOf("Work the findings");
+    const projectsIndex = markup.indexOf("GitHub repositories");
+    const workspaceIndex = markup.indexOf("CAD workspaces (optional)");
+    const getBoardInIndex = markup.indexOf("1. Connect");
+    const workFindingsIndex = markup.indexOf("2. Review");
     expect(getBoardInIndex).toBeLessThan(projectsIndex);
-    expect(projectsIndex).toBeLessThan(workFindingsIndex);
+    expect(projectsIndex).toBeLessThan(workspaceIndex);
+    expect(workspaceIndex).toBeLessThan(workFindingsIndex);
   });
 
   it("still renders Dashboard as its own top-level link", () => {

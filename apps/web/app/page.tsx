@@ -336,8 +336,8 @@ export default function HomePage() {
                 Know what stands between your board and production.
               </h1>
               <p className="mt-4 text-lg text-muted-foreground">
-                BoardReadyOps checks whether your board is ready to fabricate on every pull request — or right from your
-                local terminal. One verdict, clear blockers, and verifiable release evidence.
+                Connect a GitHub repository, check the exact design revision, and open visual findings. Your source and
+                branch protections stay in GitHub.
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Suspense
@@ -361,65 +361,61 @@ export default function HomePage() {
               </ul>
             </div>
 
-            <aside className="rounded-md border border-border bg-card p-5 shadow-lg" aria-label="What a run looks like">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="size-2 rounded-full bg-success" aria-hidden="true" />
-                <span>Sample review · USB-C Sensor Node v2.1</span>
-                <code className="ml-auto rounded-sm bg-muted px-1.5 py-0.5">sample-pull-request</code>
+            <aside
+              className="overflow-hidden rounded-xl border border-border bg-card shadow-lg"
+              aria-label="What a run looks like"
+            >
+              <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4 text-xs text-muted-foreground">
+                <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
+                Sample PCB · RoyalBlue54L Feather
+                <span className="ml-auto rounded-md border border-border px-2 py-1">Illustrative sample</span>
               </div>
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <div>
-                  <span className="block text-xs uppercase text-muted-foreground">The verdict</span>
-                  <strong className="text-base text-foreground">Ready to fabricate</strong>
-                </div>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">Resolved after rerun</span>
-              </div>
-              <ol className="mt-4 flex flex-col gap-3">
-                <li className="flex items-center gap-3">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-foreground">
-                    01
-                  </span>
-                  <div className="flex-1">
-                    <strong className="block text-sm text-foreground">Inspect release decision</strong>
-                    <span className="text-xs text-muted-foreground">Exact revision, branch, and Check Run</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Pinned</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-foreground">
-                    02
-                  </span>
-                  <div className="flex-1">
-                    <strong className="block text-sm text-foreground">What it found</strong>
-                    <span className="text-xs text-muted-foreground">
-                      Layout, schematic, BOM, and manufacturing checks
-                    </span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Explained</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-foreground">
-                    03
-                  </span>
-                  <div className="flex-1">
-                    <strong className="block text-sm text-foreground">The files it produced</strong>
-                    <span className="text-xs text-muted-foreground">Reports and outputs, each with a checksum</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Downloadable</span>
-                </li>
-              </ol>
-              {/*
-                This panel is a drawing, and saying so is the honest thing. Saying only that
-                left the reader with no way to see a real one, so it now points at the pull
-                requests below where the same thing happens on an actual board.
-              */}
-              <p className="mt-4 text-xs text-muted-foreground">
-                Illustrative sample — not a readiness result from your repository.{" "}
-                <a href="#live-demos" className="text-primary underline underline-offset-2">
-                  See it on a real pull request
+              <figure>
+                <a
+                  href="/demo/royalblue54l-pcb.webp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="View the full KiCad example board"
+                  className="block overflow-hidden bg-muted/30 focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  {/* biome-ignore lint/performance/noImgElement: Source-faithful local KiCad plot with known intrinsic dimensions. */}
+                  <img
+                    src="/demo/royalblue54l-pcb.webp"
+                    width={1400}
+                    height={820}
+                    alt="Actual KiCad board render of the open-source RoyalBlue54L Feather PCB, with ICs, pads, traces and USB connector"
+                    decoding="async"
+                    className="aspect-[1400/820] w-full object-contain"
+                  />
                 </a>
-                .
-              </p>
+                <figcaption className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+                  Open-source{" "}
+                  <a
+                    href="https://github.com/LordsBoards/RoyalBlue54L-Feather-Hardware"
+                    className="text-primary underline"
+                  >
+                    RoyalBlue54L Feather
+                  </a>{" "}
+                  KiCad render. A design example, not an actual BoardReadyOps verdict or manufacturing clearance.
+                </figcaption>
+              </figure>
+              <div className="space-y-3 px-5 py-4">
+                <h2 className="text-base font-semibold text-foreground">Your board. One next step.</h2>
+                <ol
+                  className="grid grid-cols-3 gap-2 text-center text-xs"
+                  aria-label="Three steps to a hardware review"
+                >
+                  <li className="rounded-lg bg-muted/50 px-2 py-3 font-medium">1 · Connect</li>
+                  <li className="rounded-lg bg-muted/50 px-2 py-3 font-medium">2 · Check</li>
+                  <li className="rounded-lg bg-muted/50 px-2 py-3 font-medium">3 · Review</li>
+                </ol>
+                <a
+                  href="#live-demos"
+                  className="inline-flex min-h-10 items-center text-sm font-semibold text-primary underline underline-offset-4"
+                >
+                  See a real, verifiable run
+                </a>
+              </div>
             </aside>
           </div>
         </section>
@@ -815,14 +811,19 @@ export default function HomePage() {
                 the canonical documentation; for the public machine-readable service contract, see OpenAPI.
               </p>
             </div>
-            <dl className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {glossaryTerms.map((entry) => (
-                <div key={entry.term}>
-                  <dt className="text-sm font-bold text-foreground">{entry.term}</dt>
-                  <dd className="mt-1 text-sm text-muted-foreground">{entry.definition}</dd>
-                </div>
-              ))}
-            </dl>
+            <details aria-label="Engineering glossary" className="mt-6 rounded-xl border border-border bg-card p-4">
+              <summary className="min-h-10 cursor-pointer text-sm font-semibold text-foreground">
+                Explore technical terms
+              </summary>
+              <dl className="mt-5 grid grid-cols-1 gap-6 border-t border-border pt-5 sm:grid-cols-2">
+                {glossaryTerms.map((entry) => (
+                  <div key={entry.term}>
+                    <dt className="text-sm font-bold text-foreground">{entry.term}</dt>
+                    <dd className="mt-1 text-sm text-muted-foreground">{entry.definition}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
             <nav
               className="mt-8 flex flex-wrap gap-4 text-sm [&_a]:flex [&_a]:min-h-11 [&_a]:items-center md:[&_a]:min-h-0"
               aria-label="Technical discovery references"

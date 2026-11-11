@@ -17,14 +17,14 @@ export type NavigationGroup = Readonly<{ label: string; items: readonly Navigati
  */
 export const navigationGroups: readonly NavigationGroup[] = [
   {
-    label: "1. Get a board in",
+    label: "1. Connect",
     items: [
-      { label: "Projects", href: "/projects", icon: "projects" },
-      { label: "Setup", href: "/setup", icon: "setup" },
+      { label: "GitHub repositories", href: "/setup", icon: "setup" },
+      { label: "CAD workspaces (optional)", href: "/projects", icon: "projects" },
     ],
   },
   {
-    label: "2. Work the findings",
+    label: "2. Review",
     items: [
       { label: "My Work", href: "/work", icon: "work" },
       { label: "Reviews", href: "/reviews", icon: "reviews" },
@@ -32,7 +32,7 @@ export const navigationGroups: readonly NavigationGroup[] = [
     ],
   },
   {
-    label: "3. Ship it",
+    label: "3. Deliver",
     items: [
       { label: "Deliveries", href: "/deliveries", icon: "deliveries" },
       { label: "Parts", href: "/parts", icon: "parts" },

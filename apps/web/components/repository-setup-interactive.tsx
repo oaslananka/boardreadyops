@@ -45,6 +45,8 @@ export type RepositorySetupInteractiveProps = {
   /** Repositories the viewer's session may act on. Empty for a signed-out visitor. */
   repositories?: readonly SetupTargetRepository[];
   signedIn?: boolean;
+  hasInstallation?: boolean;
+  accessUnavailable?: boolean;
   /** Why the one-click path is unavailable for this installation, when it is. */
 };
 
@@ -192,12 +194,16 @@ function SetupPrResultOutput({ result }: Readonly<{ result: SetupPrResult }>) {
 
 function RepositoryFirstPicker({
   signedIn,
+  hasInstallation,
+  accessUnavailable,
   repositories,
   repositoryId,
   onSelectRepository,
   disabled,
 }: Readonly<{
   signedIn: boolean;
+  hasInstallation: boolean;
+  accessUnavailable: boolean;
   repositories: readonly SetupTargetRepository[];
   repositoryId: string;
   onSelectRepository: (id: string) => void;
@@ -220,20 +226,45 @@ function RepositoryFirstPicker({
     );
   }
 
+  if (accessUnavailable) {
+    return (
+      <section aria-label="Choose your GitHub repository" className="rounded-xl border border-border bg-card p-5">
+        <h2 className="text-lg font-semibold text-foreground">GitHub repository access unavailable</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          We could not verify your current GitHub App repository selection. No saved projects were changed.
+        </p>
+        <a
+          href="/setup"
+          className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+        >
+          Retry access check
+        </a>
+      </section>
+    );
+  }
+
   if (repositories.length === 0) {
     return (
       <section aria-label="Choose your GitHub repository" className="rounded-xl border border-border bg-card p-5">
-        <h2 className="text-lg font-semibold text-foreground">Connect your first GitHub repository</h2>
+        <h2 className="text-lg font-semibold text-foreground">
+          {hasInstallation ? "Select repositories on GitHub" : "Connect your first GitHub repository"}
+        </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Install the GitHub App on the repository containing your board before choosing a policy.
+          {hasInstallation
+            ? "Choose the repositories allowed for BoardReadyOps in your existing App installation, then return here."
+            : "Install the GitHub App on a repository containing your board files."}
         </p>
         <a
-          href="https://github.com/apps/boardreadyops/installations/new"
+          href={
+            hasInstallation
+              ? "https://github.com/settings/installations"
+              : "https://github.com/apps/boardreadyops/installations/new"
+          }
           target="_blank"
           rel="noreferrer"
           className="mt-3 inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground"
         >
-          Install the GitHub App
+          {hasInstallation ? "Manage selected repositories" : "Install the GitHub App"}
         </a>
       </section>
     );
@@ -290,6 +321,8 @@ export function RepositorySetupInteractive({
   workflowSource,
   repositories = [],
   signedIn = false,
+  hasInstallation = false,
+  accessUnavailable = false,
 }: Readonly<RepositorySetupInteractiveProps>) {
   const [selectedId, setSelectedId] = useState(initialPresetId);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
@@ -380,180 +413,199 @@ export function RepositorySetupInteractive({
     <>
       <RepositoryFirstPicker
         signedIn={signedIn}
+        hasInstallation={hasInstallation}
+        accessUnavailable={accessUnavailable}
         repositories={repositories}
         repositoryId={repositoryId}
         onSelectRepository={handleSelectRepository}
         disabled={isCreatingPr || isValidating}
       />
-      <SetupProgress {...(displayedRepository ? { repository: displayedRepository } : {})} />
 
-      <Panel
-        id="policy-preset"
-        title="1. Choose a release policy"
-        description={`Preset v${presetVersion}. Switching presets starts a new revision; runs you have already done keep the policy they were checked against.`}
-      >
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {presets.map((preset) => {
-            const isSelected = preset.id === activePreset.id;
-            return (
-              <article
-                className={`flex flex-col gap-2 rounded-md border p-4 transition-all duration-150 ${
-                  isSelected
-                    ? "border-primary bg-card shadow-sm shadow-primary/10 ring-1 ring-primary/40"
-                    : "border-border bg-card hover:border-primary/40 hover:bg-muted/10"
-                }`}
-                data-selected={isSelected || undefined}
-                key={preset.id}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2 [&>div]:min-w-0">
-                  <h3 className="text-base font-bold text-foreground">{preset.name}</h3>
-                  {isSelected ? <StatusBadge value="selected" label="Selected" /> : null}
-                </div>
-                <p className="text-xs uppercase text-muted-foreground">
-                  {isSelected ? "Current preview" : "Available release policy"}
-                </p>
-                <p className="text-sm text-muted-foreground">{preset.description}</p>
-                <DefinitionGrid>
-                  <Definition label="Release mode">{preset.releaseMode}</Definition>
-                  <Definition label="Fail threshold">{preset.failOn}</Definition>
-                </DefinitionGrid>
-                <div className="mt-1">
-                  <p className="text-meta font-medium text-foreground">What changes</p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                    {preset.changes.map((change) => (
-                      <li key={change}>{change}</li>
-                    ))}
-                  </ul>
-                </div>
-                <Link
-                  className={`mt-2 inline-flex min-h-11 w-fit items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98] ${
-                    isSelected
-                      ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
-                      : "border-border bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                  }`}
-                  href={`/setup?preset=${preset.id}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleSelectPreset(preset.id);
-                  }}
-                  aria-current={isSelected ? "page" : undefined}
-                >
-                  {isSelected ? `Active: ${preset.name}` : `Preview ${preset.name}`}
-                </Link>
-              </article>
-            );
-          })}
-        </div>
-      </Panel>
-
-      <Panel
-        id="proposed-files"
-        title="2. Review repository-owned files"
-        description="These are the only repository-owned files required for the setup flow. Commit them through a reviewed pull request."
-      >
-        <div className="flex flex-col gap-4">
-          <article className="rounded-md border border-border bg-card p-4 transition-all">
-            <header className="flex flex-wrap items-start justify-between gap-2 [&>div]:min-w-0">
-              <div>
-                <h3 className="text-sm font-bold text-foreground">boardreadyops.yml</h3>
-                <p className="text-xs text-muted-foreground">Selected preset: {activePreset.name}</p>
-              </div>
-              <StatusBadge value="new" label="New or replace intentionally" />
-            </header>
-            <div className="mt-3">
-              <DefinitionGrid>
-                <Definition label="Blocks">Enabled findings at {activePreset.failOn} severity or above</Definition>
-                <Definition label="Warns">Enabled findings below {activePreset.failOn} severity</Definition>
-                <Definition label="Ignores">Rules explicitly set to false in the preview</Definition>
-              </DefinitionGrid>
-            </div>
-            <YamlSyntaxHighlighter
-              code={activePreset.config}
-              filename="boardreadyops.yml"
-              presetName={activePreset.name}
-            />
-          </article>
-
-          <article className="rounded-md border border-border bg-card p-4">
-            <header className="flex flex-wrap items-start justify-between gap-2 [&>div]:min-w-0">
-              <div>
-                <h3 className="text-sm font-bold text-foreground">.github/workflows/{workflowPath}</h3>
-                <p className="text-xs text-muted-foreground">
-                  Canonical v1 runner workflow, contract v{workflowContractVersion}
-                </p>
-              </div>
-              <StatusBadge value="review" label="Review before copying" />
-            </header>
-            <ol className="mt-3 flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
-              <li>
-                Open the{" "}
-                <a
-                  href={workflowSource}
-                  className="text-primary underline underline-offset-2"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  canonical v1 workflow source
-                </a>{" "}
-                and review its pinned actions, permissions, inputs, and timeouts.
-              </li>
-              <li>
-                Copy it unchanged to <code>.github/workflows/{workflowPath}</code> on a feature branch.
-              </li>
-              <li>Open a pull request and let your repository ruleset and required checks approve the change.</li>
-            </ol>
-          </article>
-        </div>
-      </Panel>
-
-      <Panel
-        id="automated-setup"
-        title={
-          displayedRepository && deriveRepositorySetupState(displayedRepository).id === "ready"
-            ? "3. Setup is already verified"
-            : "3. Open the setup pull request"
-        }
-        description={
-          displayedRepository && deriveRepositorySetupState(displayedRepository).id === "ready"
-            ? "Continue to your runs, or explicitly choose to update the verified repository configuration."
-            : "Commits the two files above to a new branch and opens a pull request, without a terminal or a local clone."
-        }
-      >
-        <OneClickSetup
-          signedIn={signedIn}
-          repositories={repositories}
-          repositoryId={repositoryId}
-          {...(displayedRepository ? { repository: displayedRepository } : {})}
-          onCreate={() => void handleCreateSetupPr(false)}
-          onUpdate={() => void handleCreateSetupPr(true)}
-          isCreating={isCreatingPr}
-          workflowPath={workflowPath}
-          {...(displayedRepository?.setupBlockedReason
-            ? { blockedReason: displayedRepository.setupBlockedReason }
-            : {})}
-          {...(prResult ? { result: prResult } : {})}
-        />
-      </Panel>
-
-      <SetupReadiness
-        signedIn={signedIn}
-        {...(displayedRepository ? { repository: displayedRepository } : {})}
-        isValidating={isValidating}
-        onValidate={handleValidateReadiness}
-        {...(displayedRepository?.readinessBlockedReason
-          ? { blockedReason: displayedRepository.readinessBlockedReason }
-          : {})}
-        {...(probeResult ? { result: probeResult } : {})}
-      />
-      <AppPermissionProfile
-        {...(displayedRepository?.installationGrants
-          ? {
-              granted: displayedRepository.installationGrants.permissions,
-              missing: displayedRepository.installationGrants.missing,
-              manageUrl: displayedRepository.installationGrants.manageUrl,
+      {displayedRepository ? (
+        <>
+          <Panel
+            id="automated-setup"
+            title={
+              displayedRepository && deriveRepositorySetupState(displayedRepository).id === "ready"
+                ? "Setup is already verified"
+                : "Open a setup pull request"
             }
-          : {})}
-      />
+            description={
+              displayedRepository && deriveRepositorySetupState(displayedRepository).id === "ready"
+                ? "Continue to your runs, or explicitly choose to update the verified repository configuration."
+                : "Recommended starting policy: " +
+                  activePreset.name +
+                  ". You can review or change it below before opening the PR."
+            }
+          >
+            <OneClickSetup
+              signedIn={signedIn}
+              repositories={repositories}
+              repositoryId={repositoryId}
+              {...(displayedRepository ? { repository: displayedRepository } : {})}
+              onCreate={() => void handleCreateSetupPr(false)}
+              onUpdate={() => void handleCreateSetupPr(true)}
+              isCreating={isCreatingPr}
+              workflowPath={workflowPath}
+              {...(displayedRepository?.setupBlockedReason
+                ? { blockedReason: displayedRepository.setupBlockedReason }
+                : {})}
+              {...(prResult ? { result: prResult } : {})}
+            />
+          </Panel>
+
+          <SetupReadiness
+            signedIn={signedIn}
+            {...(displayedRepository ? { repository: displayedRepository } : {})}
+            isValidating={isValidating}
+            onValidate={handleValidateReadiness}
+            {...(displayedRepository?.readinessBlockedReason
+              ? { blockedReason: displayedRepository.readinessBlockedReason }
+              : {})}
+            {...(probeResult ? { result: probeResult } : {})}
+          />
+          <details aria-label="Advanced setup configuration" className="rounded-xl border border-border bg-card p-4">
+            <summary className="min-h-11 cursor-pointer text-sm font-semibold text-foreground hover:text-primary">
+              Advanced setup: policy, proposed files and permissions
+            </summary>
+            <div className="mt-5 space-y-5 border-t border-border pt-5">
+              <SetupProgress {...(displayedRepository ? { repository: displayedRepository } : {})} />
+              <Panel
+                id="policy-preset"
+                title="Choose a release policy"
+                description={`Preset v${presetVersion}. Switching presets starts a new revision; runs you have already done keep the policy they were checked against.`}
+              >
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  {presets.map((preset) => {
+                    const isSelected = preset.id === activePreset.id;
+                    return (
+                      <article
+                        className={`flex flex-col gap-2 rounded-md border p-4 transition-all duration-150 ${
+                          isSelected
+                            ? "border-primary bg-card shadow-sm shadow-primary/10 ring-1 ring-primary/40"
+                            : "border-border bg-card hover:border-primary/40 hover:bg-muted/10"
+                        }`}
+                        data-selected={isSelected || undefined}
+                        key={preset.id}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2 [&>div]:min-w-0">
+                          <h3 className="text-base font-bold text-foreground">{preset.name}</h3>
+                          {isSelected ? <StatusBadge value="selected" label="Selected" /> : null}
+                        </div>
+                        <p className="text-xs uppercase text-muted-foreground">
+                          {isSelected ? "Current preview" : "Available release policy"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{preset.description}</p>
+                        <DefinitionGrid>
+                          <Definition label="Release mode">{preset.releaseMode}</Definition>
+                          <Definition label="Fail threshold">{preset.failOn}</Definition>
+                        </DefinitionGrid>
+                        <div className="mt-1">
+                          <p className="text-meta font-medium text-foreground">What changes</p>
+                          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                            {preset.changes.map((change) => (
+                              <li key={change}>{change}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        <Link
+                          className={`mt-2 inline-flex min-h-11 w-fit items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98] ${
+                            isSelected
+                              ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+                              : "border-border bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                          }`}
+                          href={`/setup?preset=${preset.id}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleSelectPreset(preset.id);
+                          }}
+                          aria-current={isSelected ? "page" : undefined}
+                        >
+                          {isSelected ? `Active: ${preset.name}` : `Preview ${preset.name}`}
+                        </Link>
+                      </article>
+                    );
+                  })}
+                </div>
+              </Panel>
+
+              <Panel
+                id="proposed-files"
+                title="Review proposed repository files"
+                description="These are the only repository-owned files required for the setup flow. Commit them through a reviewed pull request."
+              >
+                <div className="flex flex-col gap-4">
+                  <article className="rounded-md border border-border bg-card p-4 transition-all">
+                    <header className="flex flex-wrap items-start justify-between gap-2 [&>div]:min-w-0">
+                      <div>
+                        <h3 className="text-sm font-bold text-foreground">boardreadyops.yml</h3>
+                        <p className="text-xs text-muted-foreground">Selected preset: {activePreset.name}</p>
+                      </div>
+                      <StatusBadge value="new" label="New or replace intentionally" />
+                    </header>
+                    <div className="mt-3">
+                      <DefinitionGrid>
+                        <Definition label="Blocks">
+                          Enabled findings at {activePreset.failOn} severity or above
+                        </Definition>
+                        <Definition label="Warns">Enabled findings below {activePreset.failOn} severity</Definition>
+                        <Definition label="Ignores">Rules explicitly set to false in the preview</Definition>
+                      </DefinitionGrid>
+                    </div>
+                    <YamlSyntaxHighlighter
+                      code={activePreset.config}
+                      filename="boardreadyops.yml"
+                      presetName={activePreset.name}
+                    />
+                  </article>
+
+                  <article className="rounded-md border border-border bg-card p-4">
+                    <header className="flex flex-wrap items-start justify-between gap-2 [&>div]:min-w-0">
+                      <div>
+                        <h3 className="text-sm font-bold text-foreground">.github/workflows/{workflowPath}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Canonical v1 runner workflow, contract v{workflowContractVersion}
+                        </p>
+                      </div>
+                      <StatusBadge value="review" label="Review before copying" />
+                    </header>
+                    <ol className="mt-3 flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
+                      <li>
+                        Open the{" "}
+                        <a
+                          href={workflowSource}
+                          className="text-primary underline underline-offset-2"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          canonical v1 workflow source
+                        </a>{" "}
+                        and review its pinned actions, permissions, inputs, and timeouts.
+                      </li>
+                      <li>
+                        Copy it unchanged to <code>.github/workflows/{workflowPath}</code> on a feature branch.
+                      </li>
+                      <li>
+                        Open a pull request and let your repository ruleset and required checks approve the change.
+                      </li>
+                    </ol>
+                  </article>
+                </div>
+              </Panel>
+
+              <AppPermissionProfile
+                {...(displayedRepository?.installationGrants
+                  ? {
+                      granted: displayedRepository.installationGrants.permissions,
+                      missing: displayedRepository.installationGrants.missing,
+                      manageUrl: displayedRepository.installationGrants.manageUrl,
+                    }
+                  : {})}
+              />
+            </div>
+          </details>
+        </>
+      ) : null}
     </>
   );
 }
@@ -1081,8 +1133,8 @@ function OneClickSetup({
         <details className="rounded-md border border-border p-3">
           <summary className="cursor-pointer text-sm font-medium text-foreground">Change verified setup</summary>
           <p className="mt-2 text-sm text-muted-foreground">
-            Reconfiguration creates a reviewed pull request for the policy and workflow files above. It does not change
-            your default branch until you merge it.
+            Reconfiguration creates a reviewed pull request for the policy and workflow files in Advanced setup. It does
+            not change your default branch until you merge it.
           </p>
           <button
             type="button"

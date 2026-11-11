@@ -1,35 +1,35 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-async function yamlRowTops(page: Page): Promise<number[]> {
-  const preview = page
-    .locator("figure")
-    .filter({ has: page.getByRole("button", { name: "Copy YAML" }) })
-    .first();
-  const rows = preview.locator("pre code > span");
-  await expect(rows).toHaveCount(41);
-  return rows.evaluateAll((elements) =>
-    elements.map((element) => Math.round((element as HTMLElement).getBoundingClientRect().top)),
-  );
-}
-
-function expectRowsStrictlyIncrease(tops: number[]): void {
-  for (let index = 1; index < tops.length; index += 1) {
-    expect(tops[index], `row ${index + 1} should render below row ${index}`).toBeGreaterThan(
-      tops[index - 1] ?? -Infinity,
-    );
-  }
-}
-
-test("@smoke keeps production YAML rows vertically ordered after switching from open-source", async ({ page }) => {
+/**
+ * An unconnected visitor must have one useful first step. Preset/YAML controls
+ * are only meaningful after an authorized GitHub repository has been chosen.
+ * Connected repository variants are tested in the setup component, page, and
+ * PostgreSQL installation-scope contract suites.
+ */
+test("@smoke signed-out setup offers one action and hides premature policy or YAML controls", async ({ page }) => {
   await page.goto("/setup?preset=open-source");
-  await page.getByRole("link", { name: "Preview Production release" }).click();
-  await expect(page).toHaveURL(/preset=production/);
+  await expect(page.getByRole("heading", { name: "First, connect your GitHub account" })).toBeVisible();
+  const signIn = page.getByLabel("Choose your GitHub repository").getByRole("link", { name: "Sign in with GitHub" });
+  await expect(signIn).toHaveCount(1);
+  await expect(signIn).toHaveAttribute("href", "/api/auth/github/login");
+  await expect(page.locator("#policy-preset")).toHaveCount(0);
+  await expect(page.locator("#automated-setup")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Validate readiness" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copy YAML" })).toHaveCount(0);
 
-  expectRowsStrictlyIncrease(await yamlRowTops(page));
+  await page.goto("/setup?preset=production");
+  await expect(page.getByRole("heading", { name: "First, connect your GitHub account" })).toBeVisible();
+  await expect(page.locator("#policy-preset")).toHaveCount(0);
 });
 
-test("@smoke does not offer the legacy duplicate contract-design preset", async ({ page }) => {
+test("@smoke an unsupported legacy preset cannot bypass the repository selection gate", async ({ page }) => {
   await page.goto("/setup?preset=contract-design");
+  await expect(page.getByRole("heading", { name: "First, connect your GitHub account" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Preview Contract design handoff" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Active: Prototype fabrication" })).toBeVisible();
+  await expect(
+    page.getByLabel("Choose your GitHub repository").getByRole("link", { name: "Sign in with GitHub" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open setup pull request" })).toHaveCount(0);
+  await expect(page.locator("#policy-preset")).toHaveCount(0);
+  await expect(page.getByText("Setup is already verified")).toHaveCount(0);
 });
