@@ -102,6 +102,12 @@ export async function GET(request: Request): Promise<Response> {
   if (page.state === "not-configured") {
     return Response.json({ ok: false, error: "run store is not configured" }, { status: 503 });
   }
+  if (page.state === "access-unavailable") {
+    return Response.json(
+      { ok: false, error: "GitHub repository permissions could not be verified" },
+      { status: 503, headers: { "cache-control": "private, no-store" } },
+    );
+  }
 
   return Response.json(
     { ok: true, runs: page.runs, next: page.next ?? null },

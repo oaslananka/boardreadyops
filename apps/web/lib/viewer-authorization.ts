@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { resolveLiveInstallationRepositoryIds } from "./live-installation-repositories.js";
 import { notCancelledSubscription } from "./tenant-scope.js";
 import {
   configuredSessionSecret,
@@ -22,7 +23,7 @@ export const sessionLifetimeMs = 8 * 60 * 60 * 1000;
 
 export type ViewerAuthorization = {
   session: UserSession | undefined;
-  authorizeRepository: (repository: { installationId: string }) => Promise<boolean>;
+  authorizeRepository: (repository: { installationId: string; id?: string }) => Promise<boolean>;
   /**
    * Whether the viewer may act on an installation itself.
    *
@@ -62,7 +63,13 @@ export async function viewerAuthorization(
 
   return {
     session,
-    authorizeRepository: async (repository) => authorizeInstallation(repository.installationId),
+    authorizeRepository: async (repository) => {
+      if (!session || !repository.id) return false;
+      const scope = await currentRepositoryScope(repository.id, repository.installationId, environment);
+      if (!scope || !sessionAllowsInstallation(session, scope.githubInstallationId)) return false;
+      const granted = await resolveLiveInstallationRepositoryIds([scope.githubInstallationId], environment);
+      return granted?.includes(scope.githubRepoId) ?? false;
+    },
     authorizeInstallation,
   };
 }
@@ -101,6 +108,39 @@ async function githubInstallationIdFor(
     // node-postgres decodes bigint as a string to avoid precision loss.
     const parsed = numericId(value);
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+  } finally {
+    await executor.close();
+  }
+}
+
+/** Protect private Run links by current GitHub repo ID and exact installation.
+ * Public Run links retain their separately documented public behavior.
+ */
+async function currentRepositoryScope(
+  repositoryId: string,
+  installationId: string,
+  environment: Readonly<Record<string, string | undefined>>,
+): Promise<{ githubInstallationId: number; githubRepoId: number } | undefined> {
+  if (!environment.DATABASE_URL) return undefined;
+  const { createPgQueryExecutor } = await import("@boardreadyops/db/pg-executor");
+  const executor = createPgQueryExecutor({ connectionString: environment.DATABASE_URL, max: 1 });
+  try {
+    const result = await executor.query(
+      `select installations.github_installation_id, repositories.github_repo_id
+         from repositories
+         join installations on installations.id = repositories.installation_id
+        where repositories.id = $1 and repositories.installation_id = $2
+          and repositories.disabled_at is null
+          and installations.suspended_at is null
+          and ${notCancelledSubscription}`,
+      [repositoryId, installationId],
+    );
+    const first = (result as { rows?: Array<Record<string, unknown>> }).rows?.[0];
+    const githubInstallationId = numericId(first?.github_installation_id);
+    const githubRepoId = numericId(first?.github_repo_id);
+    if (!Number.isSafeInteger(githubInstallationId) || githubInstallationId <= 0) return undefined;
+    if (!Number.isSafeInteger(githubRepoId) || githubRepoId <= 0) return undefined;
+    return { githubInstallationId, githubRepoId };
   } finally {
     await executor.close();
   }

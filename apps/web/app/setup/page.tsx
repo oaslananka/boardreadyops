@@ -11,7 +11,7 @@ import { Alert, AppShell, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { loadInstallationCapabilities } from "../../lib/installation-capabilities.js";
 import { releaseRepositoryDispatchAvailability } from "../../lib/release-rollout.js";
-import { loadViewerRepositories } from "../../lib/repository-dashboard.js";
+import { loadViewerRepositoryResult } from "../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
 export const metadata = {
@@ -38,7 +38,7 @@ async function setupTargets() {
   const viewer = await viewerAuthorization();
   if (!viewer.session) return { signedIn: false, repositories: [] as const };
 
-  const groups = await loadViewerRepositories(viewer.session);
+  const { state, groups } = await loadViewerRepositoryResult(viewer.session);
   const repositories = groups.flatMap((group) =>
     group.repositories.map((repository) => ({
       id: repository.id,
@@ -90,7 +90,12 @@ async function setupTargets() {
       ...(readinessBlockedReason ? { readinessBlockedReason } : {}),
     };
   });
-  return { signedIn: true, repositories: scopedRepositories };
+  return {
+    signedIn: true,
+    hasInstallation: (viewer.session.installationIds?.length ?? 0) > 0,
+    accessUnavailable: state === "access-unavailable",
+    repositories: scopedRepositories,
+  };
 }
 
 export default async function SetupPage({ searchParams }: Readonly<SetupPageProps>) {
@@ -197,6 +202,8 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
           workflowSource={workflowSource}
           repositories={targets.repositories}
           signedIn={targets.signedIn}
+          hasInstallation={"hasInstallation" in targets && targets.hasInstallation === true}
+          accessUnavailable={"accessUnavailable" in targets && targets.accessUnavailable === true}
         />
       </main>
     </AppShell>

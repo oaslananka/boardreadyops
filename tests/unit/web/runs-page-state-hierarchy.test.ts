@@ -43,6 +43,15 @@ describe("RunsPage status hierarchy", () => {
     expect(hasInstallation).not.toContain("Open a pull request so the readiness workflow runs");
   });
 
+  it("shows an actionable access retry, not onboarding instructions, when GitHub grants cannot be verified", async () => {
+    loadViewerRuns.mockResolvedValueOnce({ state: "access-unavailable" });
+    const html = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("GitHub repository access could not be verified");
+    expect(html).toContain('href="/runs"');
+    expect(html).not.toContain("No runs recorded yet");
+    expect(html).not.toContain("Run pagination");
+  });
+
   it("distinguishes missing control-plane configuration from a genuinely empty run history", async () => {
     loadViewerRuns.mockResolvedValue({ state: "not-configured" });
     const unavailable = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));

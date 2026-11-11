@@ -6,6 +6,10 @@ vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
 }));
 vi.mock("../../../apps/web/lib/repository-dashboard.js", () => ({
   loadViewerDesignEvidence: vi.fn(async () => undefined),
+  loadViewerRepositoryResult: vi.fn(async () => ({
+    state: "ok",
+    groups: await loadViewerRepositories(),
+  })),
   loadViewerRepositories: vi.fn(async () => [
     {
       accountLogin: "octocat",
@@ -36,12 +40,19 @@ vi.mock("../../../apps/web/lib/repository-dashboard.js", () => ({
 }));
 
 const { default: DashboardPage } = await import("../../../apps/web/app/dashboard/page.js");
-const { loadViewerDesignEvidence, loadViewerRepositories, summarizeViewerRepositories } = await import(
-  "../../../apps/web/lib/repository-dashboard.js"
-);
+const { loadViewerDesignEvidence, loadViewerRepositories, loadViewerRepositoryResult, summarizeViewerRepositories } =
+  await import("../../../apps/web/lib/repository-dashboard.js");
 const { viewerAuthorization } = await import("../../../apps/web/lib/viewer-authorization.js");
 
 describe("dashboard operational hierarchy", () => {
+  it("does not mislead users that no repositories are selected when GitHub grant verification fails", async () => {
+    vi.mocked(loadViewerRepositoryResult).mockResolvedValueOnce({ state: "access-unavailable", groups: [] });
+    const html = renderToStaticMarkup(await DashboardPage());
+    expect(html).toContain("GitHub repository access unavailable");
+    expect(html).toContain("Retry access check");
+    expect(html).not.toContain("Connect your first board");
+  });
+
   it("does not claim the GitHub App was installed when a signed-in user has no installations", async () => {
     vi.mocked(viewerAuthorization).mockResolvedValueOnce({
       session: {
@@ -271,6 +282,17 @@ describe("dashboard operational hierarchy", () => {
     const markup = renderToStaticMarkup(await DashboardPage());
     expect(markup).not.toContain("Real recorded design evidence");
     expect(markup).not.toContain("Inspect real design");
+  });
+
+  it("prioritizes one obvious repository action and hides technical reports behind progressive disclosure", async () => {
+    const html = renderToStaticMarkup(await DashboardPage());
+    expect(html).toContain("Choose a board to review");
+    expect(html).toContain("Review findings");
+    expect(html).toContain('href="/runs/run-1/findings"');
+    expect(html).toContain("GitHub repository");
+    expect(html).toContain("CAD projects are optional");
+    expect(html).toContain('aria-label="Advanced engineering details"');
+    expect(html.indexOf("Choose a board to review")).toBeLessThan(html.indexOf("Engineering activity"));
   });
 
   it("prioritizes verified repository work above sample artwork without inventing a risk score", async () => {

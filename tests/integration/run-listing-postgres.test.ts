@@ -1,6 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { decodeRunListingCursor, encodeRunListingCursor, loadViewerRuns } from "../../apps/web/lib/run-listing.js";
 import type { UserSession } from "../../apps/web/lib/user-session.js";
+
+const liveRepoIds = vi.hoisted(() => vi.fn(async () => [49301, 49302, 49303]));
+vi.mock("../../apps/web/lib/live-installation-repositories.js", () => ({
+  resolveLiveInstallationRepositoryIds: liveRepoIds,
+}));
+
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -108,6 +114,12 @@ describeDatabase("viewer run listing", () => {
     expect(page.runs[0]?.decision).toBe("pass");
     expect(page.runs.slice(1).every((run) => run.decision === "readiness_not_verified")).toBe(true);
     expect(page.runs.some((run) => run.id === theirsRunId)).toBe(false);
+  });
+
+  it("removes history when live GitHub selection no longer includes the previously connected repository", async () => {
+    liveRepoIds.mockResolvedValueOnce([49303]);
+    const outcome = await loadViewerRuns(session([mineGithubInstallation]), { limit: 100 }, environment);
+    expect(outcome).toEqual({ state: "ok", runs: [], next: undefined });
   });
 
   it("excludes runs under a disabled repository", async () => {

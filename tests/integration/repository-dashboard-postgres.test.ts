@@ -1,10 +1,16 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   loadRepositoryBoardHistory,
   loadRepositoryDetail,
   loadViewerRepositories,
 } from "../../apps/web/lib/repository-dashboard.js";
 import type { UserSession } from "../../apps/web/lib/user-session.js";
+
+const liveRepoIds = vi.hoisted(() => vi.fn(async () => [49201, 49202, 49203]));
+vi.mock("../../apps/web/lib/live-installation-repositories.js", () => ({
+  resolveLiveInstallationRepositoryIds: liveRepoIds,
+}));
+
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -125,6 +131,13 @@ describeDatabase("repository dashboard", () => {
     // than being fetched and then hidden.
     expect(names).toContain("mine-org/board-a");
     expect(names).not.toContain("theirs-org/board-b");
+  });
+
+  it("does not expose stored rows revoked by GitHub All-to-Selected change without a webhook", async () => {
+    liveRepoIds.mockResolvedValueOnce([49203]);
+    const current = await loadViewerRepositories(session([mineGithubInstallation]), environment);
+    expect(current.flatMap((g) => g.repositories.map((r) => r.name))).toEqual(["board-quiet"]);
+    expect(current.flatMap((g) => g.repositories.map((r) => r.name))).not.toContain("board-a");
   });
 
   it("groups repositories by the account that owns them", async () => {

@@ -67,9 +67,19 @@ describe("HomePage", () => {
     expect(text).toContain("Know what stands between your board and production.");
   });
 
+  it("leads with a genuine labeled KiCad PCB view, not a wall of mock release-verdict text", () => {
+    const html = renderToStaticMarkup(HomePage());
+    expect(html).toContain('src="/demo/royalblue54l-pcb.webp"');
+    expect(html).toContain('width="1400"');
+    expect(html).toContain("RoyalBlue54L Feather");
+    expect(html).toContain('aria-label="Engineering glossary"');
+    expect(html).toContain("Connect");
+    expect(html).toContain("Review");
+  });
+
   it("visibly labels the hero evidence stack as an illustrative sample review", () => {
     const text = collectText(HomePage());
-    expect(text).toContain("Sample review · USB-C Sensor Node v2.1");
+    expect(text).toContain("Sample PCB · RoyalBlue54L Feather");
     expect(text).toContain("Illustrative sample");
   });
 

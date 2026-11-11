@@ -1,4 +1,5 @@
 import { displayedRunnerDecisionSql } from "@boardreadyops/db/runner-result-trust";
+import { resolveLiveInstallationRepositoryIds } from "./live-installation-repositories.js";
 import { notCancelledSubscription } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
@@ -158,6 +159,7 @@ function integer(row: Record<string, unknown>, name: string): number | undefined
 const repositorySummaryQuery = `
   with visible as (
     select repositories.id,
+           repositories.github_repo_id,
            repositories.owner,
            repositories.name,
            repositories.private,
@@ -196,6 +198,7 @@ const repositorySummaryQuery = `
          limit 1
       ) as setup_probe on true
      where installations.github_installation_id = any($1::bigint[])
+       and repositories.github_repo_id = any($2::bigint[])
        and repositories.disabled_at is null
        and installations.suspended_at is null
        and ${notCancelledSubscription}
@@ -212,6 +215,7 @@ const repositorySummaryQuery = `
      order by release_runs.repository_id, release_runs.started_at desc, release_runs.id desc
   )
   select visible.id,
+         visible.github_repo_id,
          visible.owner,
          visible.name,
          visible.private,
@@ -253,18 +257,23 @@ const repositorySummaryQuery = `
  * installation and should not click through a list of one, while somebody with a personal and
  * an organisation account still sees which is which.
  */
-export async function loadViewerRepositories(
+export async function loadViewerRepositoryResult(
   session: UserSession | undefined,
   environment: Readonly<Record<string, string | undefined>> = process.env,
-): Promise<RepositoryGroup[]> {
-  if (!session || session.installationIds.length === 0) return [];
+): Promise<{ state: "ok" | "access-unavailable"; groups: RepositoryGroup[] }> {
+  if (!session || session.installationIds.length === 0) return { state: "ok", groups: [] };
   const connectionString = environment.DATABASE_URL;
-  if (!connectionString) return [];
+  if (!connectionString) return { state: "ok", groups: [] };
+
+  const verifiedRepoIds = await resolveLiveInstallationRepositoryIds(session.installationIds, environment);
+  if (verifiedRepoIds === null) return { state: "access-unavailable", groups: [] };
+  if (verifiedRepoIds.length === 0) return { state: "ok", groups: [] };
+  const allowed = new Set(verifiedRepoIds);
 
   const { createPgQueryExecutor } = await import("@boardreadyops/db/pg-executor");
   const executor = createPgQueryExecutor({ connectionString, max: 1 });
   try {
-    const result = await executor.query(repositorySummaryQuery, [session.installationIds]);
+    const result = await executor.query(repositorySummaryQuery, [session.installationIds, verifiedRepoIds]);
     const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
 
     const groups = new Map<string, RepositoryGroup>();
@@ -273,7 +282,9 @@ export async function loadViewerRepositories(
       const owner = text(row, "owner");
       const name = text(row, "name");
       const installationId = text(row, "installation_id");
-      if (!id || !owner || !name || !installationId) continue;
+      const githubRepoId = integer(row, "github_repo_id");
+      if (!id || !owner || !name || !installationId || githubRepoId === undefined || !allowed.has(githubRepoId))
+        continue;
       const accountLogin = text(row, "account_login") ?? owner;
       const setupRevision = integer(row, "setup_revision");
       const setupPreset = text(row, "setup_preset");
@@ -317,10 +328,18 @@ export async function loadViewerRepositories(
       groups.set(accountLogin, group);
     }
 
-    return [...groups.values()];
+    return { state: "ok", groups: [...groups.values()] };
   } finally {
     await executor.close();
   }
+}
+
+/** Compatibility adapter for callers that only render authorized repository rows. */
+export async function loadViewerRepositories(
+  session: UserSession | undefined,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Promise<RepositoryGroup[]> {
+  return (await loadViewerRepositoryResult(session, environment)).groups;
 }
 
 type RepositoryRun = {

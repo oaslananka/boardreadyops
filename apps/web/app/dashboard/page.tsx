@@ -1,3 +1,4 @@
+import { ArrowUpRight, GitBranch, Plus } from "lucide-react";
 import Link from "next/link";
 import { firstRunSetupSteps } from "../../components/first-run-steps.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
@@ -10,7 +11,7 @@ import { repositoriesRequiringReview } from "../../lib/dashboard-next-action.js"
 import {
   type DashboardRepositorySummary,
   loadViewerDesignEvidence,
-  loadViewerRepositories,
+  loadViewerRepositoryResult,
   type RepositoryGroup,
   summarizeViewerRepositories,
   type ViewerDesignEvidence,
@@ -40,10 +41,42 @@ function SignInRequiredPanel() {
 
 function NoRepositoriesPanel({ hasInstallation }: Readonly<{ hasInstallation: boolean }>) {
   return (
-    <GuidedChecklist
-      heading={`Get your first board reviewed — ${hasInstallation ? 3 : 4} steps left`}
-      steps={firstRunSetupSteps(hasInstallation)}
-    />
+    <section
+      aria-label="Connect your first repository"
+      className="rounded-xl border border-border bg-card p-6 shadow-e1"
+    >
+      <p className="text-xs font-semibold uppercase tracking-wider text-primary">First step</p>
+      <h2 className="mt-2 font-display text-2xl font-semibold text-foreground">
+        {hasInstallation ? "Choose a GitHub repository" : "Connect GitHub to start"}
+      </h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        {hasInstallation
+          ? "Choose one repository allowed by your GitHub App. Your existing boards can stay where they are."
+          : "Allow BoardReadyOps to access a repository containing your board files."}
+      </p>
+      <Link
+        href={
+          hasInstallation
+            ? "https://github.com/settings/installations"
+            : "https://github.com/apps/boardreadyops/installations/new"
+        }
+        className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+      >
+        {hasInstallation ? "Select repositories on GitHub" : "Connect GitHub"}
+        <ArrowUpRight className="size-4" aria-hidden="true" />
+      </Link>
+      <details className="mt-5 border-t border-border pt-4">
+        <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+          Show detailed setup steps
+        </summary>
+        <div className="mt-4">
+          <GuidedChecklist
+            heading={"Get your first board reviewed — " + (hasInstallation ? 3 : 4) + " steps left"}
+            steps={firstRunSetupSteps(hasInstallation)}
+          />
+        </div>
+      </details>
+    </section>
   );
 }
 
@@ -381,14 +414,106 @@ function RepositorySections({ groups }: Readonly<{ groups: RepositoryGroup[] }>)
   );
 }
 
+/** A primary action first; advanced run tables and telemetry stay on demand.
+ * A GitHub repository can contain several KiCad board projects. Neither is a
+ * CAD workspace, and creating a workspace is not a prerequisite to a run.
+ */
+function ConnectedBoardNextAction({ groups }: Readonly<{ groups: RepositoryGroup[] }>) {
+  const repos = groups.flatMap((group) => group.repositories);
+  const priority = [...repos].sort((a, b) => {
+    const urgency = (repo: (typeof repos)[number]) => {
+      if (repo.openFindings > 0 && repo.latestRunId) return 0;
+      if (!repo.latestRunId) return 1;
+      return 2;
+    };
+    return urgency(a) - urgency(b) || a.name.localeCompare(b.name);
+  });
+  return (
+    <section aria-labelledby="choose-board-heading" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Your next action</p>
+          <h2 id="choose-board-heading" className="mt-1 font-display text-2xl font-semibold tracking-tight">
+            Choose a board to review
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Start with a GitHub repository. CAD projects are optional and can be managed later.
+          </p>
+        </div>
+        <Link
+          href="/setup"
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+        >
+          <Plus className="size-4" aria-hidden="true" />
+          Choose another repository
+        </Link>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {priority.slice(0, 3).map((repo) => {
+          const needsReview = repo.openFindings > 0 && Boolean(repo.latestRunId);
+          const needsSetup = !repo.latestRunId;
+          let action = "Open latest review";
+          let stateLabel = "Recent review available";
+          let href = "/runs/" + repo.latestRunId;
+          if (needsReview) {
+            action = "Review findings";
+            stateLabel = repo.openFindings + " recorded findings";
+            href += "/findings";
+          } else if (needsSetup) {
+            action = "Set up first check";
+            stateLabel = "No review yet";
+            href = "/setup?repositoryId=" + encodeURIComponent(repo.id);
+          } else if (repo.latestRunStatus !== "completed") {
+            action = "Check run status";
+            stateLabel = "Check in progress or incomplete";
+          }
+          return (
+            <article
+              key={repo.id}
+              className="flex flex-col justify-between gap-4 rounded-xl border border-border bg-card p-5 shadow-e1"
+            >
+              <div>
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <GitBranch className="size-4" aria-hidden="true" />
+                  GitHub repository
+                </p>
+                <h3 className="mt-3 break-words text-lg font-semibold text-foreground">
+                  {repo.owner}/{repo.name}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">{stateLabel}</p>
+              </div>
+              <Link
+                href={href}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+              >
+                {action} <ArrowUpRight className="size-4" aria-hidden="true" />
+              </Link>
+            </article>
+          );
+        })}
+      </div>
+      {repos.length > 3 ? (
+        <Link
+          href="/setup"
+          className="inline-flex min-h-10 items-center text-sm font-medium text-primary hover:underline"
+        >
+          See all {repos.length} connected repositories
+        </Link>
+      ) : null}
+    </section>
+  );
+}
+
 function DashboardBody({
   hasSession,
   hasInstallation,
   groups,
   summary,
   designEvidence,
+  accessUnavailable,
 }: Readonly<{
   hasSession: boolean;
+  accessUnavailable: boolean;
   hasInstallation: boolean;
   groups: RepositoryGroup[];
   summary: DashboardRepositorySummary;
@@ -404,6 +529,30 @@ function DashboardBody({
         />
         <SignInRequiredPanel />
       </div>
+    );
+  }
+  if (accessUnavailable) {
+    return (
+      <section className="rounded-xl border border-border bg-card p-6" aria-label="GitHub access verification">
+        <h2 className="text-lg font-semibold">GitHub repository access unavailable</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Current GitHub App permissions could not be verified. Your saved repositories have not been changed.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+            href="/dashboard"
+          >
+            Retry access check
+          </Link>
+          <a
+            href="https://github.com/settings/installations"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline"
+          >
+            Review GitHub App access
+          </a>
+        </div>
+      </section>
     );
   }
   if (summary.repositories === 0) {
@@ -422,49 +571,57 @@ function DashboardBody({
   return (
     <div className="flex flex-col gap-5">
       {designEvidence ? <RealDesignEvidencePanel evidence={designEvidence} /> : null}
-      <AttentionBanner summary={summary} groups={groups} />
-      <RecordedHardwareWork groups={groups} />
-      {summary.repositoriesWithoutRuns > summary.repositories / 2 ? (
-        <ReviewEmptyVisualPreview mode="onboarding" />
-      ) : null}
-      {summary.repositoriesWithOpenFindings === 0 &&
-      summary.repositoriesWithoutRuns === 0 &&
-      summary.supplyAlerts === 0 &&
-      latestRunsCompleted ? (
-        <section className="rounded-md border border-border bg-card p-5" aria-label="Latest checks">
-          <h2 className="text-lg font-semibold text-foreground">No open findings recorded in the latest runs</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            This is not a live safety assessment or permission to fabricate. Open a run to inspect its exact source and
-            evidence.
-          </p>
-          <Link
-            href="/runs"
-            className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-primary underline"
-          >
-            Inspect recorded readiness runs →
-          </Link>
-        </section>
-      ) : null}
-      {summary.repositories > 5 ? (
-        <details className="rounded-xl border border-border bg-card" aria-label="All connected repositories">
-          <summary className="min-h-12 cursor-pointer px-5 py-4 text-sm font-semibold hover:text-primary">
-            Browse all {summary.repositories} connected repositories
-          </summary>
-          <div className="border-t border-border p-4">
+      <ConnectedBoardNextAction groups={groups} />
+      <details aria-label="Advanced engineering details" className="rounded-xl border border-border bg-card px-5 py-4">
+        <summary className="min-h-9 cursor-pointer text-sm font-semibold text-muted-foreground hover:text-primary">
+          Activity and engineering details
+        </summary>
+        <div className="mt-5 space-y-5 border-t border-border pt-5">
+          <AttentionBanner summary={summary} groups={groups} />
+          <RecordedHardwareWork groups={groups} />
+          {summary.repositoriesWithoutRuns > summary.repositories / 2 ? (
+            <ReviewEmptyVisualPreview mode="onboarding" />
+          ) : null}
+          {summary.repositoriesWithOpenFindings === 0 &&
+          summary.repositoriesWithoutRuns === 0 &&
+          summary.supplyAlerts === 0 &&
+          latestRunsCompleted ? (
+            <section className="rounded-md border border-border bg-card p-5" aria-label="Latest checks">
+              <h2 className="text-lg font-semibold text-foreground">No open findings recorded in the latest runs</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                This is not a live safety assessment or permission to fabricate. Open a run to inspect its exact source
+                and evidence.
+              </p>
+              <Link
+                href="/runs"
+                className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-primary underline"
+              >
+                Inspect recorded readiness runs →
+              </Link>
+            </section>
+          ) : null}
+          {summary.repositories > 5 ? (
+            <details className="rounded-xl border border-border bg-card" aria-label="All connected repositories">
+              <summary className="min-h-12 cursor-pointer px-5 py-4 text-sm font-semibold hover:text-primary">
+                Browse all {summary.repositories} connected repositories
+              </summary>
+              <div className="border-t border-border p-4">
+                <RepositorySections groups={groups} />
+              </div>
+            </details>
+          ) : (
             <RepositorySections groups={groups} />
-          </div>
-        </details>
-      ) : (
-        <RepositorySections groups={groups} />
-      )}
-      <OperationalSummarySection summary={summary} />
+          )}
+          <OperationalSummarySection summary={summary} />
+        </div>
+      </details>
     </div>
   );
 }
 
 export default async function DashboardPage() {
   const viewer = await viewerAuthorization();
-  const groups = await loadViewerRepositories(viewer.session);
+  const { state, groups } = await loadViewerRepositoryResult(viewer.session);
   const summary = summarizeViewerRepositories(groups);
   const designEvidence = await loadViewerDesignEvidence(viewer.session, groups);
 
@@ -473,13 +630,12 @@ export default async function DashboardPage() {
       <main id="main-content" className="flex flex-col gap-5 px-6 py-6">
         <header>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Repositories BoardReadyOps is watching, with the latest release readiness for each.
-          </p>
+          <p className="text-sm text-muted-foreground">Your connected boards and what to do next.</p>
         </header>
         <DashboardBody
           hasSession={Boolean(viewer.session)}
           hasInstallation={Boolean(viewer.session?.installationIds?.length)}
+          accessUnavailable={state === "access-unavailable"}
           groups={groups}
           summary={summary}
           {...(designEvidence ? { designEvidence } : {})}

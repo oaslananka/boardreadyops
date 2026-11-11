@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
+const liveRepositoryIds = vi.hoisted(() => vi.fn(async () => [49201]));
+vi.mock("../../../apps/web/lib/live-installation-repositories.js", () => ({
+  resolveLiveInstallationRepositoryIds: liveRepositoryIds,
+}));
+
 const mockQuery = vi.fn();
 const mockClose = vi.fn();
 
@@ -29,6 +34,7 @@ import {
   loadRepositoryDetail,
   loadViewerDesignEvidence,
   loadViewerRepositories,
+  loadViewerRepositoryResult,
   summarizeViewerRepositories,
 } from "../../../apps/web/lib/repository-dashboard.js";
 import { loadViewerRuns } from "../../../apps/web/lib/run-listing.js";
@@ -44,6 +50,7 @@ function viewerRepositoryRow(overrides: Record<string, unknown> = {}) {
     private: true,
     installation_id: "inst-1",
     github_installation_id: "12345",
+    github_repo_id: "49201",
     account_login: "acme-corp",
     run_id: "run-100",
     status: "completed",
@@ -69,6 +76,20 @@ describe("repository dashboard and viewer loader branches", () => {
   it("returns empty groups when session is undefined or has no installations", async () => {
     expect(await loadViewerRepositories(undefined)).toEqual([]);
     expect(await loadViewerRepositories({ login: "alice", installationIds: [] })).toEqual([]);
+  });
+
+  it("distinguishes unavailable GitHub live grants from a verified empty repository selection", async () => {
+    const session = { login: "alice", installationIds: [12345] };
+    liveRepositoryIds.mockResolvedValueOnce(null);
+    expect(await loadViewerRepositoryResult(session, { DATABASE_URL: TEST_DB_URL })).toEqual({
+      state: "access-unavailable",
+      groups: [],
+    });
+    liveRepositoryIds.mockResolvedValueOnce([]);
+    expect(await loadViewerRepositoryResult(session, { DATABASE_URL: TEST_DB_URL })).toEqual({
+      state: "ok",
+      groups: [],
+    });
   });
 
   it("returns empty groups when DATABASE_URL is not configured", async () => {
@@ -98,6 +119,27 @@ describe("repository dashboard and viewer loader branches", () => {
       setupProbeWorkflowRunId: "987654321",
       setupProbeExpiresAt: "2026-10-02T02:00:00.000Z",
     });
+  });
+
+  it("excludes stored repos whose GitHub App selection was revoked without a removal webhook", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [viewerRepositoryRow()] });
+    liveRepositoryIds.mockResolvedValueOnce([49333]);
+    const groups = await loadViewerRepositories(
+      { login: "alice", installationIds: [12345] },
+      { DATABASE_URL: TEST_DB_URL },
+    );
+    expect(groups).toEqual([]);
+    const sql = String(mockQuery.mock.lastCall?.[0] ?? "");
+    expect(sql).toContain("repositories.github_repo_id = any($2::bigint[])");
+    expect(mockQuery.mock.lastCall?.[1]).toEqual([[12345], [49333]]);
+  });
+
+  it("fails closed when live GitHub grants cannot be verified", async () => {
+    liveRepositoryIds.mockResolvedValueOnce(null);
+    const session = { login: "alice", installationIds: [12345] };
+    const before = mockQuery.mock.calls.length;
+    expect(await loadViewerRepositories(session, { DATABASE_URL: TEST_DB_URL })).toEqual([]);
+    expect(mockQuery.mock.calls.length).toBe(before);
   });
 
   it("shows a completed readiness probe after its result revision becomes current", async () => {
@@ -294,6 +336,7 @@ describe("repository dashboard and viewer loader branches", () => {
             private: false,
             installation_id: "inst-1",
             github_installation_id: "12345",
+            github_repo_id: "49201",
             account_login: "acme",
           },
         ],
@@ -518,6 +561,7 @@ describe("repository dashboard and viewer loader branches", () => {
         {
           id: "run-1",
           repository_id: "repo-1",
+          github_repo_id: "49201",
           status: "completed",
           decision: "pass",
           commit_sha: "abcdef1",

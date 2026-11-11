@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadViewerRepositories } from "../../apps/web/lib/repository-dashboard.js";
 import { loadViewerRuns } from "../../apps/web/lib/run-listing.js";
 import { viewerInstallations } from "../../apps/web/lib/viewer-installations.js";
@@ -17,6 +17,13 @@ const githubAccountId = 9_000_000 + Math.floor(Math.random() * 100_000);
 const githubInstallationId = 8_000_000 + Math.floor(Math.random() * 100_000);
 const installationId = randomUUID();
 const repositoryId = randomUUID();
+const repoGithubId = 7_000_000 + Math.floor(Math.random() * 100_000);
+const reusedRepoGithubId = 6_000_000 + Math.floor(Math.random() * 100_000);
+const liveRepoIds = vi.hoisted(() => vi.fn(async () => [] as number[]));
+vi.mock("../../apps/web/lib/live-installation-repositories.js", () => ({
+  resolveLiveInstallationRepositoryIds: liveRepoIds,
+}));
+
 const apiTokenId = randomUUID();
 const renamedApiTokenId = randomUUID();
 const renameLegalHoldId = randomUUID();
@@ -61,6 +68,7 @@ afterAll(async () => {
 });
 
 describeDatabase("GitHub Marketplace billing PostgreSQL integration", () => {
+  beforeEach(() => liveRepoIds.mockImplementation(async () => [repoGithubId, reusedRepoGithubId]));
   it("applies account state atomically without mutating Stripe or installation entitlements", async () => {
     await database().query(
       `INSERT INTO installations (id, github_installation_id, account_login, account_type, plan_tier)
@@ -75,7 +83,7 @@ describeDatabase("GitHub Marketplace billing PostgreSQL integration", () => {
     await database().query(
       `INSERT INTO repositories (id, installation_id, github_repo_id, owner, name, private, default_branch)
        VALUES ($1,$2,$3,$4,'board',FALSE,'main')`,
-      [repositoryId, installationId, 7_000_000 + Math.floor(Math.random() * 100_000), tenantId],
+      [repositoryId, installationId, repoGithubId, tenantId],
     );
     await database().query(
       `INSERT INTO api_tokens (id, repository_id, name, token_prefix, token_hash, scopes, created_by)
@@ -441,7 +449,7 @@ describeDatabase("GitHub Marketplace billing PostgreSQL integration", () => {
     await database().query(
       `INSERT INTO repositories (id, installation_id, github_repo_id, owner, name, private, default_branch)
        VALUES ($1,$2,$3,$4,'reused-login-board',FALSE,'main')`,
-      [reusedLoginRepositoryId, reusedLoginInternalId, 6_000_000 + Math.floor(Math.random() * 100_000), tenantId],
+      [reusedLoginRepositoryId, reusedLoginInternalId, reusedRepoGithubId, tenantId],
     );
     await database().query(
       `INSERT INTO release_runs (id, repository_id, commit_sha, ref, trigger_kind, status, started_at)
