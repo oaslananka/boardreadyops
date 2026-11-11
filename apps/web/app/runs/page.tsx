@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CopyButton } from "../../components/copy-button.js";
+import { firstRunSetupSteps } from "../../components/first-run-steps.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
 import { RunLiveRefresh } from "../../components/run-live-refresh.js";
 import { RunStateIndicators } from "../../components/run-state-indicators.js";
@@ -100,7 +101,11 @@ const columns: readonly DataColumn<RunListingEntry>[] = [
   },
 ];
 
-function RunsEmptyState({ state, signedIn }: Readonly<{ state: RunListingResult["state"]; signedIn: boolean }>) {
+function RunsEmptyState({
+  state,
+  signedIn,
+  hasInstallation,
+}: Readonly<{ state: RunListingResult["state"]; signedIn: boolean; hasInstallation: boolean }>) {
   if (state === "not-configured") {
     return (
       <EmptyState title="Run history is not configured">
@@ -117,7 +122,7 @@ function RunsEmptyState({ state, signedIn }: Readonly<{ state: RunListingResult[
       <EmptyState title="Sign in to see your runs">
         <p>Runs are scoped to the repositories your GitHub App installations can access.</p>
         <Button asChild className="mt-3">
-          <a href="/api/auth/github/login">Sign in with GitHub</a>
+          <a href="/api/auth/github/login?return_to=%2Fruns">Sign in with GitHub</a>
         </Button>
       </EmptyState>
     );
@@ -127,18 +132,7 @@ function RunsEmptyState({ state, signedIn }: Readonly<{ state: RunListingResult[
     <GuidedChecklist
       heading="No runs recorded yet"
       steps={[
-        {
-          id: "setup",
-          label: "Link a repository with a hardware project",
-          status: "current",
-          href: "/setup",
-          actionLabel: "Go to Setup",
-        },
-        {
-          id: "open-pr",
-          label: "Open a pull request so the readiness workflow runs",
-          status: "upcoming",
-        },
+        ...firstRunSetupSteps(hasInstallation),
         { id: "review", label: "Work the findings the run reports", status: "upcoming" },
       ]}
     />
@@ -187,7 +181,13 @@ export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>
             columns={columns}
             rows={runs}
             rowKey={(run) => run.id}
-            empty={<RunsEmptyState state={listing.state} signedIn={Boolean(viewer.session)} />}
+            empty={
+              <RunsEmptyState
+                state={listing.state}
+                signedIn={Boolean(viewer.session)}
+                hasInstallation={Boolean(viewer.session?.installationIds.length)}
+              />
+            }
           />
         </Panel>
 

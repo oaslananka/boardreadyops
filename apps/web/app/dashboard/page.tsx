@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { firstRunSetupSteps } from "../../components/first-run-steps.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
 import { RealDesignEvidencePanel } from "../../components/real-design-evidence-panel.js";
 import { ReviewEmptyVisualPreview } from "../../components/review/review-empty-visual-preview.js";
@@ -41,28 +42,7 @@ function NoRepositoriesPanel({ hasInstallation }: Readonly<{ hasInstallation: bo
   return (
     <GuidedChecklist
       heading={`Get your first board reviewed — ${hasInstallation ? 3 : 4} steps left`}
-      steps={[
-        {
-          id: "install",
-          label: "Connect the BoardReadyOps GitHub App",
-          status: hasInstallation ? "done" : "current",
-          ...(!hasInstallation
-            ? { href: "https://github.com/apps/boardreadyops/installations/new", actionLabel: "Install" }
-            : {}),
-        },
-        {
-          id: "link",
-          label: "Choose a hardware repository and open its setup pull request",
-          status: hasInstallation ? "current" : "upcoming",
-          ...(hasInstallation ? { href: "/setup", actionLabel: "Start setup" } : {}),
-        },
-        { id: "merge", label: "Merge the reviewed setup pull request", status: "upcoming" },
-        {
-          id: "first-run",
-          label: "Validate readiness before the first hardware run, then open a hardware PR",
-          status: "upcoming",
-        },
-      ]}
+      steps={firstRunSetupSteps(hasInstallation)}
     />
   );
 }
