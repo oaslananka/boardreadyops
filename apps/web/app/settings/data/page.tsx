@@ -7,11 +7,12 @@ import {
   RetentionPolicyForm,
 } from "../../../components/settings/data-admin-forms.js";
 import { ErasureRequestForm, ExportRequestForm } from "../../../components/settings/data-lifecycle-forms.js";
+import { ExportRequestReceipt } from "../../../components/settings/export-request-receipt.js";
 import { Button } from "../../../components/ui/button.js";
 import { NativeSelect } from "../../../components/ui/native-select.js";
 import { Alert, EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
 import { resolveControlPlaneRetentionConfiguration } from "../../../lib/cloud-runtime-config.js";
-import { customerPlanLabel } from "../../../lib/customer-nomenclature.js";
+import { customerPlanLabel, customerStatusLabel } from "../../../lib/customer-nomenclature.js";
 import {
   customizableRetention,
   loadDataSettingsAdmin,
@@ -363,6 +364,36 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
               installationId={admin.selected.id}
               action={requestExportAction}
             />
+            <div className="mt-5 border-t border-border pt-4">
+              <h3 className="text-sm font-semibold">Recent export requests</h3>
+              <p className="mt-1 text-meta text-muted-foreground">
+                Your 10 most recent requests for this installation. Open a request to check its current status and any
+                separately prepared partial ZIP.
+              </p>
+              {admin.recentExportRequests.length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">No earlier export requests from this account.</p>
+              ) : (
+                <ol className="mt-3 flex flex-col gap-2">
+                  {admin.recentExportRequests.map((request) => (
+                    <li key={request.exportId}>
+                      <details className="rounded-md border border-border p-3">
+                        <summary className="cursor-pointer text-sm font-medium">
+                          {request.createdAt.slice(0, 10)} · {customerStatusLabel(request.status)} · #
+                          {request.exportId.slice(0, 8)}
+                        </summary>
+                        <div className="mt-3">
+                          <ExportRequestReceipt
+                            key={request.exportId}
+                            issued={{ exportId: request.exportId, status: request.status }}
+                            installationId={admin.selected.id}
+                          />
+                        </div>
+                      </details>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
           </Panel>
           <Panel
             title="Erasure request"

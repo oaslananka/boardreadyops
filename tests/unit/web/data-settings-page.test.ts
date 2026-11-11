@@ -29,6 +29,10 @@ describe("Data & Retention settings administration", () => {
       expect(page).toContain(text);
     }
     expect(page).toContain("loadDataSettingsAdmin");
+    expect(page).toContain("Recent export requests");
+    expect(page).toContain("admin.recentExportRequests");
+    expect(page).toContain("request.exportId.slice(0, 8)");
+    expect(page).toContain("ExportRequestReceipt");
     expect(page).toContain("Business/Pilot/Enterprise");
     expect(page).toContain("retained for up to {sourceRetentionHours}");
     expect(page).not.toContain("source data remains capped at 24 hours");

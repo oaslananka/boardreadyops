@@ -178,6 +178,84 @@ describeDatabase("installation-bound read-only export preparation claims (Postgr
     await db().query("DELETE FROM data_exports WHERE id=ANY($1::text[])", [[id, old, user]]);
   });
 
+  it("lists only 10 recent original-requester receipts, never sibling installations, revoked repositories or unbound history", async () => {
+    const owned: string[] = [];
+    try {
+      for (let i = 0; i < 12; i++) {
+        const id = await store().createBoundPendingExport({
+          tenantId: tenant,
+          installationId: installations[0],
+          requestedBy: "Operator",
+          scope: "organization",
+        });
+        expect(id).not.toBeNull();
+        if (!id) throw new Error("missing fixture");
+        owned.push(id);
+        await db().query(
+          "UPDATE data_exports SET created_at = NOW() - interval '2 hours' + ($2::integer * interval '1 minute') WHERE id=$1",
+          [id, i],
+        );
+      }
+      const otherRequester = await store().createBoundPendingExport({
+        tenantId: tenant,
+        installationId: installations[0],
+        requestedBy: "unrelated",
+        scope: "organization",
+      });
+      const sibling = await store().createBoundPendingExport({
+        tenantId: tenant,
+        installationId: installations[1],
+        requestedBy: "Operator",
+        scope: "organization",
+      });
+      const repository = await store().createBoundPendingExport({
+        tenantId: tenant,
+        installationId: installations[0],
+        requestedBy: "Operator",
+        scope: "repository",
+        scopeId: repositories[0],
+      });
+      for (const id of [otherRequester, sibling, repository]) {
+        expect(id).not.toBeNull();
+        if (!id) throw new Error("missing fixture");
+        owned.push(id);
+      }
+      const historicalId = randomUUID();
+      owned.push(historicalId);
+      await db().query(
+        "INSERT INTO data_exports(id, tenant_id, requested_by, status, scope) VALUES($1,$2,'Operator','pending','organization')",
+        [historicalId, tenant],
+      );
+
+      const input = { tenantId: tenant, installationId: installations[0], actorLogin: "operator" };
+      const visible = await store().listRecentForRequester(input);
+      expect(visible).toHaveLength(10);
+      expect(visible[0]?.exportId).toBe(repository);
+      expect(visible.map((v) => v.exportId)).not.toContain(sibling);
+      expect(visible.map((v) => v.exportId)).not.toContain(otherRequester);
+      expect(visible.map((v) => v.exportId)).not.toContain(historicalId);
+      expect(visible[0]).toEqual({
+        exportId: repository,
+        status: "pending",
+        createdAt: expect.any(String),
+      });
+      expect(await store().listRecentForRequester({ ...input, tenantId: outsider })).toEqual([]);
+      expect(await store().listRecentForRequester({ ...input, installationId: installations[2] })).toEqual([]);
+      expect(await store().listRecentForRequester({ ...input, installationId: installations[1] })).toHaveLength(1);
+
+      await db().query("UPDATE repositories SET disabled_at=NOW() WHERE id=$1", [repositories[0]]);
+      expect((await store().listRecentForRequester(input)).map((v) => v.exportId)).toEqual(
+        owned.slice(2, 12).reverse(),
+      );
+      await db().query("UPDATE installations SET suspended_at=NOW() WHERE id=$1", [installations[0]]);
+      expect(await store().listRecentForRequester(input)).toEqual([]);
+    } finally {
+      await db().query("UPDATE installations SET suspended_at=NULL WHERE id=$1", [installations[0]]);
+      await db().query("UPDATE repositories SET disabled_at=NULL WHERE id=$1", [repositories[0]]);
+      if (owned.length) await db().query("DELETE FROM data_exports WHERE id = ANY($1::text[])", [owned]);
+    }
+  });
+
   it("claims only installation-bound requests; old unbound rows remain untouched", async () => {
     const old = randomUUID();
     exported.push(old);

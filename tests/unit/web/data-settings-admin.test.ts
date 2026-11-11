@@ -50,6 +50,9 @@ function deps(selected = business) {
     releaseLegalHold: vi.fn().mockResolvedValue(true),
     createExport: vi.fn().mockImplementation(async (input) => ({ id: "export-1", status: "pending", ...input })),
     createBoundPendingExport: vi.fn().mockResolvedValue("export-1"),
+    listRecentForRequester: vi
+      .fn()
+      .mockResolvedValue([{ exportId: "recent-1", status: "pending", createdAt: "2026-11-11T00:00:00.000Z" }]),
     createErasure: vi.fn().mockImplementation(async (input) => ({
       id: "erase-1",
       status: "pending",
@@ -106,6 +109,23 @@ describe("data settings admin", () => {
     });
     expect(store.getRetentionPolicy).toHaveBeenCalledWith("acme");
     expect(store.listLegalHolds).toHaveBeenCalledWith("acme");
+  });
+
+  it("loads recent receipts for the original requester and rechecks installation permission after storage IO", async () => {
+    const { store, dependencies } = deps();
+    const outcome = await loadDataSettingsAdmin(session, "inst-a", dependencies);
+    expect(outcome).toMatchObject({ state: "ok", recentExportRequests: [{ exportId: "recent-1" }] });
+    expect(
+      (store as typeof store & { listRecentForRequester: ReturnType<typeof vi.fn> }).listRecentForRequester,
+    ).toHaveBeenCalledWith({ tenantId: "acme", installationId: "inst-a", actorLogin: "octocat" });
+    expect(dependencies.resolveTenant).toHaveBeenCalledTimes(2);
+
+    const { dependencies: revokedDependencies } = deps();
+    revokedDependencies.resolveTenant.mockResolvedValueOnce({ installations: [business], selected: business });
+    revokedDependencies.resolveTenant.mockResolvedValueOnce({ installations: [], selected: undefined });
+    expect(await loadDataSettingsAdmin(session, "inst-a", revokedDependencies)).toMatchObject({
+      state: "not-authorized",
+    });
   });
 
   it("saves a retention policy using the selected account login rather than the submitted id", async () => {
