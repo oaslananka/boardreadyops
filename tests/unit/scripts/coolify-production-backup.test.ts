@@ -36,6 +36,25 @@ const fakeDockerScript = [
   "exit 29",
 ].join("\n");
 
+// The production helper intentionally targets Linux. Stub GNU coreutils in the
+// preflight fixture so the same repository checks run on macOS CI without
+// accidentally calling real Docker or relying on host-specific stat flags.
+const fakeStatScript = [
+  "#!/usr/bin/env sh",
+  'case "$1:$2" in',
+  "  -c:%u) id -u; exit 0 ;;",
+  "  -c:%a) echo 700; exit 0 ;;",
+  "esac",
+  "echo 'unexpected stat arguments' >&2",
+  "exit 23",
+].join("\n");
+
+const fakeDfScript = [
+  "#!/usr/bin/env sh",
+  "echo 'Filesystem 1024-blocks Used Available Capacity Mounted on'",
+  "echo 'fixture 2097152 1024 2096128 1% /'",
+].join("\n");
+
 type PreflightOptions = {
   rollingUuid?: string;
   rollingAvailable?: boolean;
@@ -52,6 +71,12 @@ function preflight(options: PreflightOptions = {}) {
   mkdirSync(bin, { mode: 0o700 });
   mkdirSync(backups, { mode: 0o700 });
   writeFileSync(join(bin, "docker"), fakeDockerScript, { mode: 0o700 });
+  writeFileSync(join(bin, "stat"), fakeStatScript, { mode: 0o700 });
+  writeFileSync(join(bin, "df"), fakeDfScript, { mode: 0o700 });
+  for (const command of ["flock", "timeout", "sha256sum"]) {
+    // Preflight checks for these executables but does not invoke them.
+    writeFileSync(join(bin, command), "#!/usr/bin/env sh\nexit 0\n", { mode: 0o700 });
+  }
   try {
     return spawnSync("bash", [backupScript, "--preflight"], {
       encoding: "utf8",
