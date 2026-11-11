@@ -149,6 +149,53 @@ describeDatabase("viewer run listing", () => {
     expect(page.runs.some((run) => run.id === theirsRunId)).toBe(false);
   });
 
+  it("separates run history for two independent installations, including mixed-session access", async () => {
+    const mine = await loadViewerRuns(session([mineGithubInstallation]), { limit: 100 }, environment);
+    const theirs = await loadViewerRuns(session([theirsGithubInstallation]), { limit: 100 }, environment);
+    const both = await loadViewerRuns(
+      session([mineGithubInstallation, theirsGithubInstallation]),
+      { limit: 100 },
+      environment,
+    );
+
+    if (mine.state !== "ok" || theirs.state !== "ok" || both.state !== "ok") {
+      throw new Error("expected scoped run history for each installation");
+    }
+    expect(mine.runs).toHaveLength(runIds.length);
+    expect(mine.runs.every(({ repositoryId }) => repositoryId === mineRepository)).toBe(true);
+    expect(theirs.runs.map(({ id }) => id)).toEqual([theirsRunId]);
+    expect(theirs.runs.every(({ repositoryId }) => repositoryId === theirsRepository)).toBe(true);
+    expect(both.runs.map(({ id }) => id)).toContain(theirsRunId);
+    expect(both.runs.map(({ id }) => id)).toEqual(expect.arrayContaining(runIds));
+    expect(both.runs).toHaveLength(runIds.length + 1);
+  });
+
+  it("hides a suspended installation immediately, even while its original viewer session is still valid", async () => {
+    const oldSession = session([mineGithubInstallation]);
+    const before = await loadViewerRuns(oldSession, { limit: 100 }, environment);
+    if (before.state !== "ok") throw new Error("expected run listing before suspension");
+    expect(before.runs).toHaveLength(runIds.length);
+
+    await database().query("update installations set suspended_at = now() where id = $1", [mineInstallation]);
+    try {
+      const revoked = await loadViewerRuns(oldSession, { limit: 100 }, environment);
+      if (revoked.state !== "ok") throw new Error("expected a scoped listing after suspension");
+      expect(revoked.runs).toEqual([]);
+      expect(revoked.next).toBeUndefined();
+
+      // Suspension of installation A must not hide installation B.
+      const foreign = await loadViewerRuns(session([theirsGithubInstallation]), { limit: 100 }, environment);
+      if (foreign.state !== "ok") throw new Error("expected independent installation listing");
+      expect(foreign.runs.map(({ id }) => id)).toEqual([theirsRunId]);
+    } finally {
+      await database().query("update installations set suspended_at = null where id = $1", [mineInstallation]);
+    }
+
+    const restored = await loadViewerRuns(oldSession, { limit: 100 }, environment);
+    if (restored.state !== "ok") throw new Error("expected original installation listing after restoration");
+    expect(restored.runs).toHaveLength(runIds.length);
+  });
+
   it("returns an empty page for a signed-out viewer or one with no installations", async () => {
     expect(await loadViewerRuns(undefined, {}, environment)).toEqual({ state: "ok", runs: [], next: undefined });
     expect(await loadViewerRuns(session([]), {}, environment)).toEqual({ state: "ok", runs: [], next: undefined });
