@@ -28,7 +28,12 @@ docker info >/dev/null 2>&1 || fail "Docker daemon not accessible"
 
 container_for_service() {
   local service="$1" ids=()
-  mapfile -t ids < <(docker ps \
+  # Bash 3.2 (the macOS CI default) has no mapfile. Explicitly read every
+  # matching ID so ambiguous or missing containers still fail closed.
+  local candidate
+  while IFS= read -r candidate; do
+    if [[ -n "$candidate" ]]; then ids+=("$candidate"); fi
+  done < <(docker ps \
     --filter "label=com.docker.compose.project=$BOARDREADYOPS_COMPOSE_PROJECT" \
     --filter "label=com.docker.compose.service=$service" --format '{{.ID}}')
   [[ "${#ids[@]}" -eq 1 ]] || fail "expected exactly one running $service container"
@@ -41,7 +46,10 @@ pg="$(container_for_service postgres)"
 rolling_web_app_uuid="${BOARDREADYOPS_ROLLING_WEB_APP_UUID:-}"
 if [[ -n "$rolling_web_app_uuid" ]]; then
   [[ "$rolling_web_app_uuid" =~ ^[a-z0-9]{16,40}$ ]] || fail "invalid rolling web app identity"
-  mapfile -t rolling_web_containers < <(docker ps \
+  rolling_web_containers=()
+  while IFS= read -r candidate; do
+    if [[ -n "$candidate" ]]; then rolling_web_containers+=("$candidate"); fi
+  done < <(docker ps \
     --filter "label=coolify.applicationUuid=$rolling_web_app_uuid" \
     --filter status=running --format '{{.ID}}')
   [[ "${#rolling_web_containers[@]}" -eq 1 ]] || fail "expected exactly one current rolling production web container"
@@ -63,13 +71,15 @@ free_kb="$(df -Pk "$BOARDREADYOPS_BACKUP_DIR" | awk 'END { print $4 }')"
 [[ "$free_kb" =~ ^[0-9]+$ ]] || fail "disk capacity unavailable"
 (( free_kb >= 524288 )) || fail "less than 512 MiB free"
 
-# Bound each archive to 1 GiB, avoiding unbounded growth on a shared host.
-ulimit -f 1048576
-
 if [[ "$mode" == "--preflight" ]]; then
   echo "BoardReadyOps backup preflight: PASS"
   exit 0
 fi
+
+# Apply the 1 GiB file-size ceiling only when actually creating archives.
+# Dry-run preflight must not alter OS resource limits; Git Bash on Windows
+# cannot set this Linux production limit.
+ulimit -f 1048576
 
 exec 9>"$BOARDREADYOPS_BACKUP_DIR/.coolify-backup.lock"
 flock -n 9 || fail "backup already running"

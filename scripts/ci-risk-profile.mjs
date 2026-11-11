@@ -114,6 +114,10 @@ const PACKAGE_PATTERNS = [
 ];
 const PATH_PATTERNS = [
   /path/i,
+  // Host backup shell preflight uses native paths and process tools; a passing
+  // Linux-only PR check cannot prove its macOS/Windows test harness works.
+  /^deploy\/maintenance\/coolify-production-backup\.sh$/,
+  /^tests\/unit\/scripts\/coolify-production-backup\.test\.ts$/,
   // Signed export archive names are persisted across OS-native storage paths.
   /^apps\/web\/lib\/signed-manufacturing-export-import\.ts$/,
   /^src\/(core|kicad|cli|release|vendor)\//,

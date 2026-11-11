@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const backupScript = resolve("deploy/maintenance/coolify-production-backup.sh");
@@ -64,6 +64,14 @@ type PreflightOptions = {
   health?: string;
 };
 
+/** Git Bash uses /c/... paths on the Windows runner rather than C: drive paths.
+ * Adapt only the test fixture. The deployed backup script is Linux-only.
+ */
+function posixBashPath(path: string, platform: NodeJS.Platform = process.platform): string {
+  if (platform !== "win32") return path;
+  return path.replaceAll("\\", "/").replace(/^([a-z]):\//iu, (_match, drive: string) => `/${drive.toLowerCase()}/`);
+}
+
 function preflight(options: PreflightOptions = {}) {
   const dir = mkdtempSync(join(tmpdir(), "bro-backup-preflight-"));
   const bin = join(dir, "bin");
@@ -83,11 +91,11 @@ function preflight(options: PreflightOptions = {}) {
       timeout: 10_000,
       env: {
         ...process.env,
-        PATH: `${bin}:${process.env.PATH}`,
+        PATH: [bin, process.env.PATH].filter(Boolean).join(delimiter),
         BOARDREADYOPS_COMPOSE_PROJECT: "c".repeat(25),
         BOARDREADYOPS_POSTGRES_VOLUME: "fixture-postgres-volume",
         BOARDREADYOPS_ARTIFACT_VOLUME: "fixture-artifact-volume",
-        BOARDREADYOPS_BACKUP_DIR: backups,
+        BOARDREADYOPS_BACKUP_DIR: posixBashPath(backups),
         BOARDREADYOPS_BACKUP_KEEP: "7",
         BOARDREADYOPS_ROLLING_WEB_APP_UUID: options.rollingUuid ?? "",
         MOCK_LEGACY: options.legacyAvailable ? "1" : "0",
@@ -103,6 +111,13 @@ function preflight(options: PreflightOptions = {}) {
 }
 
 describe("Coolify production backup preflight with independent rolling web", () => {
+  it("converts native Windows drive paths to absolute Git Bash paths without touching POSIX paths", () => {
+    expect(posixBashPath(["D:", "a", "_temp", "backups"].join(String.fromCharCode(92)), "win32")).toBe(
+      "/d/a/_temp/backups",
+    );
+    expect(posixBashPath("/tmp/backups", "linux")).toBe("/tmp/backups");
+  });
+
   it("selects one explicitly named healthy rolling web, leaving PostgreSQL in the Compose project", () => {
     const run = preflight({ rollingUuid: validRollingUuid });
     expect(run.status, run.stderr).toBe(0);
