@@ -175,18 +175,16 @@ test.describe("Review lifecycle", () => {
     await expect(body.getByRole("link", { name: /Sign in with GitHub/i })).toBeVisible();
   });
 
-  test("13. Keyboard-only triage: j/k move selection, e opens the waiver modal", async ({ page }) => {
+  test("13. Keyboard finding selection cannot open a public waiver", async ({ page }) => {
     await openReviewAndWaitForHydration(page);
     await openTab(page, "Findings (6)");
-
-    const firstCard = page.locator(".finding-triage-card").first();
-    await firstCard.click();
+    await page.locator(".finding-triage-card").first().click();
     await page.keyboard.press("j");
     await expect(page.locator(".finding-triage-card.selected-row")).toHaveCount(1);
-
     await page.keyboard.press("e");
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator(".disposition-select")).toHaveCount(0);
+    await expect(page.getByText("Read-only review.")).toBeVisible();
   });
 
   test("14. Screen-reader semantics: headings and landmarks are present", async ({ page }) => {
@@ -209,18 +207,19 @@ test.describe("Review lifecycle", () => {
     expect(errors).toEqual([]);
   });
 
-  test("16. Mobile viewport renders the comment form usably", async ({ page }) => {
+  test("16. Mobile public review retains evidence and discussion, not write actions", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await openReviewAndWaitForHydration(page);
-    // The full decision actions remain available on mobile, but only when
-    // the user explicitly opens the disclosure rather than above the board.
     const actions = page.locator("details", { has: page.getByText("Review actions & evidence") });
-    await expect(actions.getByRole("button", { name: "Approve review" })).toBeHidden();
+    await expect(actions).toBeVisible();
+    await expect(actions.getByRole("button", { name: "Approve review" })).toHaveCount(0);
     await actions.locator("summary").click();
-    await expect(actions.getByRole("button", { name: "Approve review" })).toBeVisible();
+    await expect(actions.getByRole("button", { name: "Copy digest" })).toBeVisible();
     await openTab(page, "Discussion (3)");
-    await expect(page.getByPlaceholder("Leave an engineering review note or question...")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Post Comment" })).toBeVisible();
+    await expect(page.getByText("Review Discussion & Threads")).toBeVisible();
+    await expect(page.getByPlaceholder("Leave an engineering review note or question...")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Post Comment" })).toHaveCount(0);
+    await expect(page.getByText("Read-only review.")).toBeVisible();
   });
 
   test("17. Mobile navigation is operable and the review page has no body overflow", async ({ page }) => {
