@@ -615,6 +615,8 @@ jobs:
       - run: node scripts/toolchain.mjs corepack-install
       - run: corepack pnpm run deps:install-ci
       - run: bash scripts/install-playwright-ci.sh chromium
+        env:
+          BOARDREADYOPS_CI_PROBE_CHROMIUM: "1"
       - name: QA smoke suite (Chromium, critical routes)
         run: corepack pnpm run qa:smoke
         env:
