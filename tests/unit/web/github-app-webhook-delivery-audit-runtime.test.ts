@@ -3,7 +3,7 @@ import {
   readExistingInboxGuids,
   runWebhookDeliveryAudit,
 } from "../../../apps/web/scripts/audit-github-app-webhooks.mjs";
-import { delivery, guidA, mockResponse, time } from "./github-app-webhook-delivery-audit-fixtures";
+import { delivery, guidA, guidB, mockResponse, time } from "./github-app-webhook-delivery-audit-fixtures";
 
 describe("GitHub App webhook delivery safety audit", () => {
   it("verifies read-only database access even with no failed GitHub deliveries", async () => {
@@ -109,6 +109,37 @@ describe("GitHub App webhook delivery safety audit", () => {
     expect(report).toMatchObject({
       failedAttempts: 0,
       acknowledgedInstallationsWithoutInbox: 1,
+      needsReview: true,
+    });
+  });
+
+  it("queries acknowledged repository selections while excluding unrelated 2xx events", async () => {
+    const lookedUp: string[][] = [];
+    const report = await runWebhookDeliveryAudit(
+      {
+        GITHUB_APP_ID: "123456",
+        GITHUB_APP_PRIVATE_KEY: "test-only-key",
+        DATABASE_URL: "postgresql://test-only:test-only@localhost/mock",
+      },
+      {
+        now: () => Date.parse(time),
+        authenticate: async () => ({ token: "test-only-jwt" }),
+        request: async () =>
+          mockResponse([
+            { ...delivery(24, guidA, 200), event: "installation_repositories" },
+            { ...delivery(25, guidB, 202), event: "ping", installation_id: null },
+          ]),
+        lookupInbox: async (ids: string[]) => {
+          lookedUp.push(ids);
+          return new Set();
+        },
+      },
+    );
+    expect(lookedUp).toEqual([[guidA]]);
+    expect(report).toMatchObject({
+      attempts: 2,
+      failedAttempts: 0,
+      acknowledgedRepositorySelectionsWithoutInbox: 1,
       needsReview: true,
     });
   });

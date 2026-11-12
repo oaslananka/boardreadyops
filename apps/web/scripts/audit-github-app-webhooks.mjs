@@ -141,7 +141,12 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
   const groups = new Map();
   let failedAttempts = 0;
   for (const attempt of attempts) {
-    const existing = groups.get(attempt.guid) ?? { failures: [], successful: false, installationAckId: undefined };
+    const existing = groups.get(attempt.guid) ?? {
+      failures: [],
+      successful: false,
+      installationAckId: undefined,
+      repositorySelectionAckId: undefined,
+    };
     if (attempt.status === "OK" && attempt.statusCode >= 200 && attempt.statusCode < 300) {
       existing.successful = true;
       // A genuine installation lifecycle event should enqueue durable work. Other
@@ -153,6 +158,13 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
       ) {
         existing.installationAckId = Math.min(existing.installationAckId ?? attempt.id, attempt.id);
       }
+      if (
+        attempt.event === "installation_repositories" &&
+        Number.isSafeInteger(attempt.installationId) &&
+        attempt.installationId > 0
+      ) {
+        existing.repositorySelectionAckId = Math.min(existing.repositorySelectionAckId ?? attempt.id, attempt.id);
+      }
     } else {
       existing.failures.push(attempt.id);
       failedAttempts += 1;
@@ -163,16 +175,27 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
   let failuresWithNoInbox = 0;
   let unresolvedAfterSuccess = 0;
   let acknowledgedInstallationsWithoutInbox = 0;
+  let acknowledgedRepositorySelectionsWithoutInbox = 0;
   const review = [];
   for (const [guid, outcome] of groups) {
     if (outcome.failures.length === 0) {
-      if (outcome.installationAckId !== undefined && !inboxGuids.has(guid)) {
-        acknowledgedInstallationsWithoutInbox += 1;
-        review.push({
-          deliveryId: outcome.installationAckId,
-          guid,
-          category: "acknowledged_installation_without_inbox",
-        });
+      if (!inboxGuids.has(guid)) {
+        if (outcome.installationAckId !== undefined) {
+          acknowledgedInstallationsWithoutInbox += 1;
+          review.push({
+            deliveryId: outcome.installationAckId,
+            guid,
+            category: "acknowledged_installation_without_inbox",
+          });
+        }
+        if (outcome.repositorySelectionAckId !== undefined) {
+          acknowledgedRepositorySelectionsWithoutInbox += 1;
+          review.push({
+            deliveryId: outcome.repositorySelectionAckId,
+            guid,
+            category: "acknowledged_repository_selection_without_inbox",
+          });
+        }
       }
       continue;
     }
@@ -196,6 +219,7 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
     failuresWithNoInbox,
     unresolvedAfterSuccess,
     acknowledgedInstallationsWithoutInbox,
+    acknowledgedRepositorySelectionsWithoutInbox,
     needsReview: !complete || review.length > 0,
     review,
   };
@@ -260,7 +284,7 @@ export async function runWebhookDeliveryAudit(environment = process.env, depende
             attempt.status !== "OK" ||
             attempt.statusCode < 200 ||
             attempt.statusCode >= 300 ||
-            (attempt.event === "installation" &&
+            (["installation", "installation_repositories"].includes(attempt.event) &&
               Number.isSafeInteger(attempt.installationId) &&
               attempt.installationId > 0),
         )
