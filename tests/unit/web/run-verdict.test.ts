@@ -57,7 +57,7 @@ describe("run verdict", () => {
     // already know what it is.
     expect(verdict.detail).toContain("Clearance between GND and VBUS");
     // Pre-filtered to what is open and sorted worst-first, so the link lands on the reason.
-    expect(verdict.action?.href).toBe("/runs/run-1/findings?findingState=active&findingSort=severity");
+    expect(verdict.action?.href).toBe("/runs/run-1/findings?findingState=active&findingSort=severity#finding-results");
   });
 
   it("mentions the remaining blockers after naming the first", () => {

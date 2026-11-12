@@ -37,43 +37,61 @@ type FindingDetail = RunDetail["findings"][number];
 
 export type RunView = "artifacts" | "attempts" | "audit" | "design" | "findings" | "publication" | "summary";
 
-const navigationItems: ReadonlyArray<{ view: RunView; label: string; suffix: string }> = [
-  { view: "summary", label: "Summary", suffix: "" },
-  { view: "design", label: "PCB / Schematic", suffix: "/design" },
-  { view: "attempts", label: "Attempts", suffix: "/attempts" },
+const primaryNavigationItems: ReadonlyArray<{ view: RunView; label: string; suffix: string }> = [
+  { view: "summary", label: "Overview", suffix: "" },
   { view: "findings", label: "Findings", suffix: "/findings" },
+  { view: "design", label: "PCB / Schematic", suffix: "/design" },
+];
+
+const evidenceNavigationItems: ReadonlyArray<{ view: RunView; label: string; suffix: string }> = [
+  { view: "attempts", label: "Attempts", suffix: "/attempts" },
   { view: "artifacts", label: "Artifacts", suffix: "/artifacts" },
   { view: "publication", label: "Publication", suffix: "/publication" },
   { view: "audit", label: "Audit", suffix: "/audit" },
 ];
 
-function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunView }>) {
+function RunNavigationLink({
+  item,
+  active,
+  runId,
+}: Readonly<{ item: { view: RunView; label: string; suffix: string }; active: RunView; runId: string }>) {
   return (
-    <nav
-      className={
-        active === "design"
-          ? "flex gap-1 overflow-x-auto border-b border-border lg:overflow-visible"
-          : "flex flex-wrap gap-1 border-b border-border"
-      }
-      aria-label="Run investigation"
-    >
-      <ul
-        className={active === "design" ? "flex w-max flex-nowrap gap-1 lg:w-auto lg:flex-wrap" : "flex flex-wrap gap-1"}
+    <li>
+      <Link
+        href={`/runs/${runId}${item.suffix}`}
+        aria-current={active === item.view ? "page" : undefined}
+        className={
+          "flex min-h-11 items-center whitespace-nowrap rounded-t-md border-b-2 px-3 py-2 text-sm font-medium " +
+          (active === item.view
+            ? "border-primary text-foreground"
+            : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground")
+        }
       >
-        {navigationItems.map((item) => (
-          <li key={item.view}>
-            <Link
-              href={`/runs/${runId}${item.suffix}`}
-              aria-current={active === item.view ? "page" : undefined}
-              // 44px on touch, the designed 38px from `md:` up. The strip is a row of small
-              // targets sitting close together, which is the case the minimum exists for.
-              className={`flex min-h-11 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${active === item.view ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            >
-              {item.label}
-            </Link>
-          </li>
+        {item.label}
+      </Link>
+    </li>
+  );
+}
+
+function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunView }>) {
+  const moreActive = evidenceNavigationItems.some((item) => item.view === active);
+  return (
+    <nav className="flex min-w-0 flex-col gap-2" aria-label="Run investigation">
+      <ul className="flex min-w-0 gap-1 overflow-x-auto border-b border-border">
+        {primaryNavigationItems.map((item) => (
+          <RunNavigationLink key={item.view} item={item} active={active} runId={runId} />
         ))}
       </ul>
+      <details open={moreActive} className="rounded-md border border-border/70 bg-card">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+          More evidence <span className="text-xs font-normal">(execution, artifacts, publication, audit)</span>
+        </summary>
+        <ul className="flex flex-wrap gap-1 border-t border-border px-2 py-1">
+          {evidenceNavigationItems.map((item) => (
+            <RunNavigationLink key={item.view} item={item} active={active} runId={runId} />
+          ))}
+        </ul>
+      </details>
     </nav>
   );
 }
@@ -135,7 +153,8 @@ export function RunPageFrame({
   children,
   liveRefresh,
 }: Readonly<{ run: RunDetail; active: RunView; children: ReactNode; liveRefresh?: boolean }>) {
-  const currentLabel = navigationItems.find((item) => item.view === active)?.label ?? "Run";
+  const currentLabel =
+    [...primaryNavigationItems, ...evidenceNavigationItems].find((item) => item.view === active)?.label ?? "Run";
   return (
     <AppShell
       viewerNav={<ViewerNav />}
@@ -149,26 +168,20 @@ export function RunPageFrame({
         className={`mx-auto flex w-full max-w-6xl flex-col gap-4 ${active === "design" ? "px-4 py-4 sm:px-6 sm:py-8" : "px-6 py-8"}`}
         id="main-content"
       >
-        {active === "design" ? (
-          <>
-            <details className="rounded-md border border-border bg-card lg:hidden">
-              <summary className="cursor-pointer px-4 py-3 text-sm text-foreground">
-                <span className="block break-words font-semibold">{run.repository}</span>
-                <span className="block text-xs text-muted-foreground">
-                  Commit {run.commitSha.slice(0, 12)} · Run details and actions
-                </span>
-              </summary>
-              <div className="p-2 pt-0">
-                <RunHeader run={run} headingTag="h2" />
-              </div>
-            </details>
-            <div className="hidden lg:block">
-              <RunHeader run={run} />
-            </div>
-          </>
-        ) : (
+        <details className="rounded-md border border-border bg-card lg:hidden">
+          <summary className="cursor-pointer px-4 py-3 text-sm text-foreground">
+            <span className="block break-words font-semibold">{run.repository}</span>
+            <span className="block text-xs text-muted-foreground">
+              Commit {run.commitSha.slice(0, 12)} · Run details and actions
+            </span>
+          </summary>
+          <div className="p-2 pt-0">
+            <RunHeader run={run} headingTag="h2" />
+          </div>
+        </details>
+        <div className="hidden lg:block">
           <RunHeader run={run} />
-        )}
+        </div>
         <RunVerdictBanner run={run} compact={active === "design" && run.investigationState === "partial_data"} />
         {liveRefresh ? <RunLiveRefresh enabled /> : null}
         <RunNavigation runId={run.id} active={active} />
@@ -848,18 +861,6 @@ function SourceRuntimePanel({ run }: Readonly<{ run: RunDetail }>) {
 export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
   return (
     <>
-      <RunSummaryPanel run={run} />
-
-      <ReviewLifecyclePanel run={run} />
-
-      <CategoryBreakdownPanel run={run} />
-
-      <BoardsPanel run={run} />
-
-      <ProductionOutcomesPanel run={run} />
-
-      <SourceRuntimePanel run={run} />
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel
           title="Findings"
@@ -923,6 +924,18 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
           )}
         </Panel>
       </div>
+
+      <RunSummaryPanel run={run} />
+
+      <ReviewLifecyclePanel run={run} />
+
+      <CategoryBreakdownPanel run={run} />
+
+      <BoardsPanel run={run} />
+
+      <ProductionOutcomesPanel run={run} />
+
+      <SourceRuntimePanel run={run} />
     </>
   );
 }
@@ -1169,72 +1182,91 @@ export function FindingsView({
   const group = filtersFromSearchParameters(searchParameters).findingGroup ?? "none";
   return (
     <Panel title="Findings" description="Find what you need without loading every finding at once." id="findings">
-      <form className="flex flex-wrap items-end gap-3" method="get" action={`/runs/${run.id}/findings`}>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-xs text-muted-foreground">Search findings</span>
-          <Input
-            name="findingSearch"
-            type="search"
-            maxLength={128}
-            defaultValue={current.findingSearch}
-            placeholder="Rule, message, or path"
+      <details
+        className="rounded-md border border-border/70 bg-background/40"
+        open={Boolean(
+          current.findingSearch ||
+            current.findingSeverity ||
+            current.findingState === "waived" ||
+            (current.findingGroup && current.findingGroup !== "none"),
+        )}
+      >
+        <summary className="flex min-h-11 cursor-pointer items-center px-3 py-2 text-sm font-medium text-foreground">
+          Search, filter and sort findings
+        </summary>
+        <form
+          className="flex flex-wrap items-end gap-3 border-t border-border p-3"
+          method="get"
+          action={`/runs/${run.id}/findings`}
+        >
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-muted-foreground">Search findings</span>
+            <Input
+              name="findingSearch"
+              type="search"
+              maxLength={128}
+              defaultValue={current.findingSearch}
+              placeholder="Rule, message, or path"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-muted-foreground">Severity</span>
+            <NativeSelect name="findingSeverity" defaultValue={current.findingSeverity ?? ""}>
+              <option value="">All severities</option>
+              {["critical", "error", "high", "medium", "warning", "low", "info"].map((severity) => (
+                <option key={severity} value={severity}>
+                  {humanize(severity)}
+                </option>
+              ))}
+            </NativeSelect>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-muted-foreground">Waiver state</span>
+            <NativeSelect name="findingState" defaultValue={current.findingState ?? "all"}>
+              <option value="all">All findings</option>
+              <option value="active">Active only</option>
+              <option value="waived">Waived only</option>
+            </NativeSelect>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-muted-foreground">Group</span>
+            <NativeSelect name="findingGroup" defaultValue={current.findingGroup ?? "none"}>
+              <option value="none">No grouping</option>
+              <option value="severity">Severity</option>
+              <option value="rule">Rule ID</option>
+              <option value="kind">Kind</option>
+              <option value="path">Path</option>
+            </NativeSelect>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-muted-foreground">Sort</span>
+            <NativeSelect name="findingSort" defaultValue={current.findingSort ?? "severity"}>
+              <option value="severity">Severity</option>
+              <option value="rule">Rule ID</option>
+              <option value="path">Path</option>
+            </NativeSelect>
+          </label>
+          <div className="flex items-center gap-2">
+            <Button type="submit">Apply filters</Button>
+            <Link className={buttonVariants({ variant: "secondary" })} href={`/runs/${run.id}/findings`}>
+              Reset
+            </Link>
+          </div>
+        </form>
+      </details>
+      <div id="finding-results" tabIndex={-1} className="scroll-mt-24 focus-visible:outline-none">
+        <p className="mt-3 text-sm font-medium text-foreground" aria-live="polite">
+          {run.findingsPage.total} matching finding{run.findingsPage.total === 1 ? "" : "s"}
+        </p>
+        <div className="mt-3">
+          <FindingList
+            findings={run.findings}
+            repositoryId={run.repositoryId}
+            repository={run.repository}
+            commitSha={run.commitSha}
+            group={group}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-xs text-muted-foreground">Severity</span>
-          <NativeSelect name="findingSeverity" defaultValue={current.findingSeverity ?? ""}>
-            <option value="">All severities</option>
-            {["critical", "error", "high", "medium", "warning", "low", "info"].map((severity) => (
-              <option key={severity} value={severity}>
-                {humanize(severity)}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-xs text-muted-foreground">Waiver state</span>
-          <NativeSelect name="findingState" defaultValue={current.findingState ?? "all"}>
-            <option value="all">All findings</option>
-            <option value="active">Active only</option>
-            <option value="waived">Waived only</option>
-          </NativeSelect>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-xs text-muted-foreground">Group</span>
-          <NativeSelect name="findingGroup" defaultValue={current.findingGroup ?? "none"}>
-            <option value="none">No grouping</option>
-            <option value="severity">Severity</option>
-            <option value="rule">Rule ID</option>
-            <option value="kind">Kind</option>
-            <option value="path">Path</option>
-          </NativeSelect>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-xs text-muted-foreground">Sort</span>
-          <NativeSelect name="findingSort" defaultValue={current.findingSort ?? "severity"}>
-            <option value="severity">Severity</option>
-            <option value="rule">Rule ID</option>
-            <option value="path">Path</option>
-          </NativeSelect>
-        </label>
-        <div className="flex items-center gap-2">
-          <Button type="submit">Apply filters</Button>
-          <Link className={buttonVariants({ variant: "secondary" })} href={`/runs/${run.id}/findings`}>
-            Reset
-          </Link>
         </div>
-      </form>
-      <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
-        {run.findingsPage.total} matching finding{run.findingsPage.total === 1 ? "" : "s"}
-      </p>
-      <div className="mt-3">
-        <FindingList
-          findings={run.findings}
-          repositoryId={run.repositoryId}
-          repository={run.repository}
-          commitSha={run.commitSha}
-          group={group}
-        />
       </div>
       <div className="mt-4">
         <Pagination

@@ -195,7 +195,8 @@ describe("run design visual inspection", () => {
     expect(html).toContain("No PCB or schematic preview published for this run");
     expect(html).toContain("--native-visuals");
     expect(html).toContain('href="/reviews#publish-review"');
-    expect(html).toContain("How to publish a Review");
+    expect(html).toContain("How to publish source-derived visuals");
+    expect(html).not.toContain("Investigate 0 recorded findings");
     expect(html).toContain("0 KiCad-native");
     expect(html).not.toContain("pcb-copper");
   });
