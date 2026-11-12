@@ -58,6 +58,38 @@ describe("GitHub App webhook delivery safety audit", () => {
     expect(stored.needsReview).toBe(false);
   });
 
+  it("reviews successfully acknowledged repository additions without an inbox record", () => {
+    const selection = {
+      ...delivery(21, guidA, 202),
+      event: "installation_repositories",
+      installationId: 123,
+    };
+    const report = deliveryGapSummary([selection], new Set(), true);
+    expect(report).toMatchObject({
+      failedAttempts: 0,
+      acknowledgedInstallationsWithoutInbox: 0,
+      acknowledgedRepositorySelectionsWithoutInbox: 1,
+      needsReview: true,
+    });
+    expect(report.review).toEqual([
+      { deliveryId: 21, guid: guidA, category: "acknowledged_repository_selection_without_inbox" },
+    ]);
+    const stored = deliveryGapSummary([selection], new Set([guidA]), true);
+    expect(stored.acknowledgedRepositorySelectionsWithoutInbox).toBe(0);
+    expect(stored.needsReview).toBe(false);
+  });
+
+  it("treats a repository-selection failed delivery with a later 2xx as retry review only", () => {
+    const attempts = [
+      { ...delivery(22, guidB, 503), event: "installation_repositories", installationId: 123 },
+      { ...delivery(23, guidB, 202), event: "installation_repositories", installationId: 123 },
+    ];
+    const report = deliveryGapSummary(attempts, new Set(), true);
+    expect(report.acknowledgedRepositorySelectionsWithoutInbox).toBe(0);
+    expect(report.unresolvedAfterSuccess).toBe(1);
+    expect(report.review).toEqual([{ deliveryId: 22, guid: guidB, category: "successful_retry_without_inbox" }]);
+  });
+
   it("does not require an inbox for successful ping, non-lifecycle or missing-installation events", () => {
     const attempts = [
       { ...delivery(12, guidA, 200), event: "ping", installation_id: null, installationId: null },

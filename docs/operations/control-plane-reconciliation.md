@@ -75,13 +75,16 @@ The database identity should have SELECT on webhook_inbox and no write grants.
 The audit always checks database and inbox-table readability, including when
 GitHub reports zero failed attempts; a disconnected or unauthorized database is
 an audit failure, **not** a clean handoff result. It also checks successfully
-acknowledged GitHub App **installation** lifecycle deliveries with a known
-installation ID against the durable inbox. A missing row is flagged as
-`acknowledged_installation_without_inbox` for **human review**: the setup
-event may have been intentionally ignored (for example, a previously canceled
-Marketplace account), so this is **not automatic proof of data loss**.
-Other acknowledged webhook events may legitimately have no queued actions;
-the audit does not claim every HTTP 2xx delivery was persisted.
+acknowledged GitHub App **installation** and **installation_repositories**
+lifecycle deliveries with a known installation ID against the durable inbox.
+A missing row is flagged as `acknowledged_installation_without_inbox` or
+`acknowledged_repository_selection_without_inbox` for **human review**.
+Installation setup may have been intentionally ignored (for example, a
+previously canceled Marketplace account); an installation_repositories event
+may have contained no actionable repository changes. Neither flag is
+**automatic proof of data loss**. Other acknowledged webhook events may
+legitimately have no queued actions, so this audit does not claim every HTTP
+2xx delivery was persisted.
 Do not print credentials or paste the private key into a command, ticket or log.
 
     BOARDREADYOPS_WEBHOOK_AUDIT_HOURS=24 \
@@ -99,7 +102,7 @@ and rerun, but retain the incomplete result as an unresolved release gate.
 Exit codes:
 
 - 0 — bounded scan complete, with no unrecorded failed deliveries or
-  acknowledged installation deliveries lacking an inbox row found.
+  acknowledged installation/repository-selection deliveries lacking an inbox row found.
 - 2 — delivery IDs require human review (never automatic redelivery).
 - 3 — incomplete scan; no release-pass conclusion is permitted.
 - 4 — credentials, API, database read, response or report failed.
