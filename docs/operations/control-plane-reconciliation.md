@@ -63,8 +63,11 @@ the PostgreSQL queue alone.
 
 The manual, bounded audit compares App webhook delivery attempts with
 webhook_inbox.delivery_id, using GitHub App **JWT** authorization and
-BEGIN READ ONLY against PostgreSQL. It never redelivers, replays, calls
-GitHub mutation APIs, or changes database state.
+BEGIN READ ONLY against PostgreSQL. For release safety, only an HTTP 2xx
+**and** GitHub delivery `status: OK` count as acknowledged; all other
+outcomes require review. This is deliberately stricter than the GitHub API's
+`status=success` query filter, which also includes 3xx. It never redelivers,
+replays, calls GitHub mutation APIs, or changes database state.
 
 Run only from a trusted operator environment with existing, securely supplied
 GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, and DATABASE_URL credentials.

@@ -55,13 +55,15 @@ export function parseNextCursor(linkHeader) {
 }
 function validatedDelivery(item) {
   if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("invalid_github_delivery");
-  const { id, guid, status_code: statusCode, delivered_at: deliveredAt } = item;
+  const { id, guid, status, status_code: statusCode, delivered_at: deliveredAt } = item;
   const date = typeof deliveredAt === "string" ? Date.parse(deliveredAt) : Number.NaN;
   if (
     !Number.isSafeInteger(id) ||
     id <= 0 ||
     typeof guid !== "string" ||
     !guidPattern.test(guid) ||
+    typeof status !== "string" ||
+    !status.trim() ||
     !Number.isInteger(statusCode) ||
     statusCode < 0 ||
     statusCode > 599 ||
@@ -69,7 +71,7 @@ function validatedDelivery(item) {
   ) {
     throw new Error("invalid_github_delivery");
   }
-  return { id, guid, statusCode, deliveredAt: date };
+  return { id, guid, status, statusCode, deliveredAt: date };
 }
 async function readGitHubDeliveryPage(response) {
   if (!response.ok) throw new Error(`github_delivery_request_failed_${response.status}`);
@@ -122,7 +124,7 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
   let failedAttempts = 0;
   for (const attempt of attempts) {
     const existing = groups.get(attempt.guid) ?? { failures: [], successful: false };
-    if (attempt.statusCode >= 200 && attempt.statusCode < 300) {
+    if (attempt.status === "OK" && attempt.statusCode >= 200 && attempt.statusCode < 300) {
       existing.successful = true;
     } else {
       existing.failures.push(attempt.id);
@@ -213,7 +215,7 @@ export async function runWebhookDeliveryAudit(environment = process.env, depende
   const failedGuids = [
     ...new Set(
       deliveries.attempts
-        .filter((attempt) => attempt.statusCode < 200 || attempt.statusCode >= 300)
+        .filter((attempt) => attempt.status !== "OK" || attempt.statusCode < 200 || attempt.statusCode >= 300)
         .map((attempt) => attempt.guid),
     ),
   ];

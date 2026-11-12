@@ -40,6 +40,17 @@ describe("GitHub App webhook delivery safety audit", () => {
     });
     expect(result.review).toEqual([{ deliveryId: 3, guid: guidB, category: "failed_not_stored" }]);
   });
+  it("flags a non-OK provider status even if HTTP code is 2xx", () => {
+    const reportedFailure = { ...delivery(9, guidB, 202), status: "FAILED" };
+    const result = deliveryGapSummary([reportedFailure], new Set(), true);
+    expect(result).toMatchObject({
+      complete: true,
+      failedAttempts: 1,
+      failuresWithNoInbox: 1,
+      needsReview: true,
+    });
+    expect(result.review).toEqual([{ deliveryId: 9, guid: guidB, category: "failed_not_stored" }]);
+  });
   it("flags successful retries with no database record as review, not definite loss", () => {
     const result = deliveryGapSummary([delivery(1, guidA, 500), delivery(2, guidA, 204)], new Set(), true);
     expect(result.review).toEqual([{ deliveryId: 1, guid: guidA, category: "successful_retry_without_inbox" }]);

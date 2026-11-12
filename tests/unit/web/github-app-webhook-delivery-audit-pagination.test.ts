@@ -66,6 +66,16 @@ describe("GitHub App webhook delivery safety audit", () => {
       }),
     ).rejects.toThrow("invalid_github_delivery");
   });
+  it("rejects a GitHub delivery without an outcome status", async () => {
+    const { status: _status, ...missingStatus } = delivery(7, guidA, 200);
+    await expect(
+      fetchRecentAppWebhookDeliveries({
+        token: "test-only",
+        since: time,
+        request: async () => mockResponse([missingStatus]),
+      }),
+    ).rejects.toThrow("invalid_github_delivery");
+  });
   it("does not count deliveries outside the requested window", async () => {
     const result = await fetchRecentAppWebhookDeliveries({
       token: "test-only",
