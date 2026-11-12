@@ -7,7 +7,7 @@ import type { AcceptGitHubWebhookResult } from "@boardreadyops/db/control-plane-
 import { RequestBodyTooLargeError, readBoundedRequestBody } from "../../../../lib/bounded-request-body.js";
 import { CloudRuntimeConfigurationError } from "../../../../lib/cloud-runtime-config.js";
 import { runnerModeSummary } from "../../../../lib/runner-mode.js";
-import { emitWebhookIntakeTelemetry } from "../../../../lib/webhook-intake-telemetry.js";
+import { emitWebhookIntakeTelemetry, webhookEventClass } from "../../../../lib/webhook-intake-telemetry.js";
 import { checkWebhookRateLimit } from "../../../../lib/webhook-rate-limit.js";
 import { getControlPlaneJobStore } from "./intake-store.js";
 
@@ -213,6 +213,12 @@ export async function POST(request: Request): Promise<Response> {
     payload: verified.parsedPayload,
   });
   if (!lifecycle.accepted) {
+    emitWebhookIntakeTelemetry({
+      outcome: "ignored",
+      ignoredReason: "unsupported",
+      eventClass: webhookEventClass(verified.event),
+      latencyMs: performance.now() - startedAt,
+    });
     return Response.json(
       {
         ok: false,
@@ -223,15 +229,35 @@ export async function POST(request: Request): Promise<Response> {
       { status: 202 },
     );
   }
-  if (lifecycle.actions.length === 0) return acceptedResponse(verified, lifecycle);
+  if (lifecycle.actions.length === 0) {
+    emitWebhookIntakeTelemetry({
+      outcome: "ignored",
+      ignoredReason: "no_action",
+      eventClass: webhookEventClass(verified.event),
+      latencyMs: performance.now() - startedAt,
+    });
+    return acceptedResponse(verified, lifecycle);
+  }
 
   const store = configuredStore(startedAt);
   if (store instanceof Response) return store;
 
   const intake = await acceptLifecycle(store, lifecycle, verified, startedAt);
   if (intake instanceof Response) return intake;
-  if (intake === "marketplace_canceled") return marketplaceCanceledResponse(verified);
+  if (intake === "marketplace_canceled") {
+    emitWebhookIntakeTelemetry({
+      outcome: "ignored",
+      ignoredReason: "marketplace_canceled",
+      eventClass: webhookEventClass(verified.event),
+      latencyMs: performance.now() - startedAt,
+    });
+    return marketplaceCanceledResponse(verified);
+  }
 
-  emitWebhookIntakeTelemetry({ outcome: intake.outcome, latencyMs: performance.now() - startedAt });
+  emitWebhookIntakeTelemetry({
+    outcome: intake.outcome,
+    eventClass: webhookEventClass(verified.event),
+    latencyMs: performance.now() - startedAt,
+  });
   return acceptedResponse(verified, lifecycle, intake);
 }
