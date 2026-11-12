@@ -97,7 +97,7 @@ describe("CopyButton component", () => {
     await clickButton();
     expect(writeText).toHaveBeenCalledWith("abc123");
     expect(button().textContent).toBe("Copied ✓");
-    expect(container.textContent).toContain("Checksum copied.");
+    expect(container.textContent).toContain("Copied to clipboard.");
 
     await act(async () => vi.advanceTimersByTime(2_000));
     expect(button().textContent).toBe("Copy SHA-256");
@@ -112,7 +112,7 @@ describe("CopyButton component", () => {
 
     await clickButton();
     expect(button().textContent).toBe("Copy failed");
-    expect(container.textContent).toContain("Checksum could not be copied.");
+    expect(container.textContent).toContain("Could not copy to clipboard.");
 
     await act(async () => vi.advanceTimersByTime(2_500));
     expect(button().textContent).toBe("Copy SHA-256");

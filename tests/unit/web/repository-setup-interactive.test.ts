@@ -266,6 +266,15 @@ describe("repository setup readiness controls", () => {
       "Run a local hardware check",
     );
     expect(progress?.querySelector('a[href="#policy-preset"]')?.textContent).toContain("Prepare repository setup");
+    expect(progress?.querySelector("[data-local-first-check] pre code")?.textContent).toBe(
+      "npm i -g boardreadyops\nboardreadyops check . --fail-on never",
+    );
+    expect(
+      progress?.querySelector('button[aria-label="Copy BoardReadyOps installation and local hardware check commands"]'),
+    ).not.toBeNull();
+    expect(progress?.textContent).toContain("prints local findings in the terminal");
+    expect(progress?.textContent).toContain("does not automatically create a report file");
+    expect(progress?.textContent).toContain("exit code 0 only means");
     expect(container.textContent).not.toContain("open a pull request changing your hardware project");
     expect(container.querySelector('a[href="/runs/run-a"]')?.textContent).toContain("Inspect latest recorded run");
     expect(container.querySelector('a[href*="/docs/quickstart.md"]')?.textContent).toContain("Run a local first check");
@@ -281,6 +290,7 @@ describe("repository setup readiness controls", () => {
     const unblockedProgress = container.querySelector("[data-setup-state]");
     expect(unblockedProgress?.textContent).not.toContain("Hosted hardware runs are not available yet");
     expect(unblockedProgress?.querySelector('a[href*="/docs/quickstart.md"]')).toBeNull();
+    expect(unblockedProgress?.querySelector("[data-local-first-check]")).toBeNull();
     expect(unblockedProgress?.querySelector('a[href="#policy-preset"]')?.textContent).toContain(
       "Review policy and next setup step",
     );
@@ -309,6 +319,9 @@ describe("repository setup readiness controls", () => {
       "Run a local hardware check",
     );
     expect(progress?.querySelector('a[href="#readiness"]')?.textContent).toContain("Review verified setup");
+    expect(progress?.querySelector("[data-local-first-check] pre code")?.textContent).toBe(
+      "npm i -g boardreadyops\nboardreadyops check . --fail-on never",
+    );
     expect(progress?.querySelector('a[href="/repositories/repo-1"]')).toBeNull();
     expect(container.textContent).toContain("Cloud readiness runs are not enabled yet.");
 
@@ -323,6 +336,7 @@ describe("repository setup readiness controls", () => {
     });
     const enabledProgress = container.querySelector('[data-setup-state="ready"]');
     expect(enabledProgress?.textContent).not.toContain("Hosted hardware runs are not available yet");
+    expect(enabledProgress?.querySelector("[data-local-first-check]")).toBeNull();
     expect(enabledProgress?.querySelector('a[href="/repositories/repo-1"]')?.textContent).toContain(
       "View this repository's readiness runs",
     );

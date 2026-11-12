@@ -10,8 +10,8 @@ type CopyButtonProps = Readonly<{
 }>;
 
 function copyStatusMessage(status: "copied" | "failed" | "idle"): string {
-  if (status === "copied") return "Checksum copied.";
-  if (status === "failed") return "Checksum could not be copied.";
+  if (status === "copied") return "Copied to clipboard.";
+  if (status === "failed") return "Could not copy to clipboard.";
   return "";
 }
 
