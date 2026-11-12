@@ -115,11 +115,19 @@ export function RunDesignView({
             publishing. Native KiCad artwork requires the explicit --native-visuals option because it may disclose
             proprietary PCB and schematic details.
           </p>
+          {totalFindings > 0 ? (
+            <Link
+              href={`/runs/${encodeURIComponent(runId)}/findings#finding-results`}
+              className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              Investigate {totalFindings} recorded findings →
+            </Link>
+          ) : null}
           <Link
             href="/reviews#publish-review"
             className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-2"
           >
-            How to publish a Review →
+            How to publish source-derived visuals →
           </Link>
         </div>
       )}

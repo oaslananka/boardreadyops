@@ -2,6 +2,7 @@ import { Window } from "happy-dom";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RunDesignView } from "../../../apps/web/components/run-design-view.js";
 import {
   ArtifactsView,
   AttemptsView,
@@ -217,7 +218,7 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain('<details class="rounded-md border border-border bg-card lg:hidden">');
     expect(markup).toContain("Run details and actions");
     expect(markup).toContain('class="hidden lg:block"');
-    expect(markup).toContain("overflow-x-auto border-b border-border lg:overflow-visible");
+    expect(markup).toContain("overflow-x-auto border-b border-border");
     expect(markup.indexOf("Run details and actions")).toBeLessThan(markup.indexOf("Readiness checks passed"));
     expect(markup.indexOf("Readiness checks passed")).toBeLessThan(markup.indexOf('id="design-evidence"'));
     expect(await axeViolations(markup, `/runs/${run.id}/design`)).toEqual([]);
@@ -262,6 +263,42 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("No run data was inferred or cached");
     expect(markup).toContain("GitHub issue");
     expect(await axeViolations(markup, "/runs/missing-run-42/design")).toEqual([]);
+  });
+
+  it("makes the user-facing finding the first task, before metadata and optional execution evidence", async () => {
+    const summary = viewMarkup("summary");
+    const findings = viewMarkup("findings");
+    const art = viewMarkup("artifacts");
+
+    for (const markup of [summary, findings, art]) {
+      expect(markup).toContain('<details class="rounded-md border border-border bg-card lg:hidden">');
+      expect(markup).toContain("Run details and actions");
+      const nav = markup.slice(markup.indexOf('aria-label="Run investigation"'));
+      expect(nav.indexOf(">Overview</a>")).toBeLessThan(nav.indexOf(">Findings</a>"));
+      expect(nav.indexOf(">Findings</a>")).toBeLessThan(nav.indexOf(">PCB / Schematic</a>"));
+      expect(nav).toContain("More evidence");
+      expect(nav).toContain(">Publication</a>");
+    }
+
+    expect(summary.indexOf("1 matching finding")).toBeLessThan(summary.indexOf("Source and runtime"));
+    expect(findings).toContain('id="finding-results"');
+    expect(findings).toContain("Search, filter and sort findings");
+    expect(findings).toContain(
+      'href="/runs/run-accessible/findings?findingState=active&amp;findingSort=severity#finding-results"',
+    );
+    expect(findings.indexOf('id="finding-results"')).toBeLessThan(findings.indexOf("A populated component"));
+    expect(await axeViolations(findings, "/runs/run-accessible/findings")).toEqual([]);
+  });
+
+  it("gives no-snapshot reviews a direct route to recorded evidence without claiming artwork exists", () => {
+    const markup = renderToStaticMarkup(
+      createElement(RunDesignView, { runId: "run-accessible", snapshots: [], totalFindings: 19 }),
+    );
+    expect(markup).toContain("No PCB or schematic preview published for this run");
+    expect(markup).toContain("Investigate 19 recorded findings");
+    expect(markup).toContain('href="/runs/run-accessible/findings#finding-results"');
+    expect(markup).toContain("How to publish source-derived visuals");
+    expect(markup).not.toContain("PCB geometry verified");
   });
 
   it("keeps the run header stacked through tablet widths and wraps long source identities", () => {

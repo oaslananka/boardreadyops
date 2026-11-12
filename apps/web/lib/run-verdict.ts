@@ -39,7 +39,7 @@ export type VerdictRun = {
 
 const blockingSeverities = new Set(["critical", "error", "high"]);
 /** Lands on the findings already filtered to what is open and sorted worst-first. */
-const blockingFindingsQuery = "?findingState=active&findingSort=severity";
+const blockingFindingsQuery = "?findingState=active&findingSort=severity#finding-results";
 const settlingStates = new Set(["queued", "dispatched", "running"]);
 
 function shortSha(commitSha: string): string {
