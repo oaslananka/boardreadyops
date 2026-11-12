@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { authMock, repositoriesMock, summaryMock, projectsMock, designEvidenceMock } = vi.hoisted(() => ({
   authMock: vi.fn(),
@@ -39,6 +39,8 @@ const emptySummary = {
 };
 
 describe("first-use visual-first routes", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   beforeEach(() => {
     vi.resetAllMocks();
     authMock.mockResolvedValue({ session: undefined });
@@ -94,6 +96,36 @@ describe("first-use visual-first routes", () => {
     expect(html).toContain("Create your first workspace");
     expect(html).toContain("Optional: group CAD projects");
     expect(repositoriesMock).not.toHaveBeenCalled();
+  });
+
+  it("shows a local first check instead of promising hosted runs for a rollout-gated workspace", async () => {
+    vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES", "");
+    vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE", undefined);
+    const session = { userId: "123", login: "tester", installationIds: [4321] };
+    authMock.mockResolvedValue({ session });
+    repositoriesMock.mockResolvedValue([
+      {
+        accountLogin: "tester",
+        repositories: [{ id: "repo-1", owner: "tester", name: "pcb", latestRunId: undefined }],
+      },
+    ]);
+    projectsMock.mockResolvedValue({
+      state: "ok",
+      selected: { id: "workspace-1", name: "Hardware team", role: "owner", planTier: "free" },
+      workspaces: [{ id: "workspace-1", name: "Hardware team", role: "owner", planTier: "free" }],
+      projects: [],
+      impact: { workspace: { projects: 0, revisions: 0, deliveries: 0 }, byProject: {} },
+      total: 0,
+      page: 1,
+      totalPages: 1,
+    });
+    const html = renderToStaticMarkup(await ProjectsPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("Hosted PCB checks are not enabled for your repositories yet");
+    expect(html).toContain("Check your PCB locally");
+    expect(html).toContain("without creating a CAD workspace");
+    expect(html).toContain("not an OIDC-signed hosted review");
+    expect(html).toContain("Browse connected repositories");
+    expect(html).not.toContain("Connect your board repository");
   });
 
   it("places an example before a genuinely empty authorized workspace", async () => {

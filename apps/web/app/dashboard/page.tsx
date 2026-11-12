@@ -8,6 +8,7 @@ import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { AppShell, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { repositoriesRequiringReview } from "../../lib/dashboard-next-action.js";
+import { firstRunAvailability } from "../../lib/first-run-availability.js";
 import {
   type DashboardRepositorySummary,
   loadViewerDesignEvidence,
@@ -283,7 +284,53 @@ function RecordedHardwareWork({ groups }: Readonly<{ groups: RepositoryGroup[] }
   );
 }
 
-function SetupInProgressBanner({ summary }: Readonly<{ summary: DashboardRepositorySummary }>) {
+const localQuickstartUrl = "https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md";
+type FirstRunAccess = ReturnType<typeof firstRunAvailability>;
+
+function SetupInProgressBanner({
+  summary,
+  access,
+}: Readonly<{ summary: DashboardRepositorySummary; access: FirstRunAccess }>) {
+  const allGated = access.gated > 0 && access.eligible === 0 && access.withoutRuns === summary.repositoriesWithoutRuns;
+  const partlyGated = access.gated > 0 && access.eligible > 0;
+
+  if (allGated) {
+    return (
+      <section
+        aria-label="Hosted first-run availability"
+        className="flex flex-col gap-3 rounded-xl border border-warning/40 bg-warning-surface px-5 py-4"
+      >
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-warning">Hosted checks awaiting rollout</p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">
+            {access.gated} connected {access.gated === 1 ? "repository has" : "repositories have"} no hosted check yet
+          </h2>
+          <p className="mt-2 text-sm text-foreground">
+            Cloud readiness runs are not enabled for these repositories on this deployment. Setup validation cannot
+            start a hosted PCB review while rollout is restricted.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <a
+            href={localQuickstartUrl}
+            className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Check your PCB locally →
+          </a>
+          <Link
+            href="/setup"
+            className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
+          >
+            Inspect repository setup
+          </Link>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          A local finding is not an OIDC-signed hosted Check Run or approval to manufacture.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <output className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-info/40 bg-info-surface px-5 py-4">
       <div>
@@ -293,11 +340,24 @@ function SetupInProgressBanner({ summary }: Readonly<{ summary: DashboardReposit
           {summary.repositoriesWithoutRuns === 1 ? "repository has" : "repositories have"} no recorded readiness run
           yet.
         </strong>
+        {partlyGated ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {access.eligible} {access.eligible === 1 ? "repository is" : "repositories are"} eligible for hosted checks;{" "}
+            {access.gated} {access.gated === 1 ? "repository is" : "repositories are"} awaiting rollout.
+          </p>
+        ) : null}
       </div>
       <div className="flex items-center gap-2 text-sm">
         <span className="rounded-full bg-info/20 px-2 py-0.5 text-xs font-bold text-info">Next action</span>
-        <Link href="/setup" className="font-medium text-info hover:underline">
-          Review setup and run the first check →
+        <Link
+          href={
+            partlyGated && access.firstEnabledRepositoryId
+              ? `/setup?repositoryId=${encodeURIComponent(access.firstEnabledRepositoryId)}`
+              : "/setup"
+          }
+          className="font-medium text-info hover:underline"
+        >
+          {partlyGated ? "Review an eligible repository's setup →" : "Review setup and run the first check →"}
         </Link>
       </div>
     </output>
@@ -307,15 +367,26 @@ function SetupInProgressBanner({ summary }: Readonly<{ summary: DashboardReposit
 function AttentionBanner({
   summary,
   groups,
-}: Readonly<{ summary: DashboardRepositorySummary; groups: RepositoryGroup[] }>) {
+  firstRun,
+  suppressSetupBanner = false,
+}: Readonly<{
+  summary: DashboardRepositorySummary;
+  groups: RepositoryGroup[];
+  firstRun: FirstRunAccess;
+  suppressSetupBanner?: boolean;
+}>) {
   const hasFindingsOrAlerts = summary.repositoriesWithOpenFindings > 0 || summary.supplyAlerts > 0;
   if (!hasFindingsOrAlerts) {
-    return summary.repositoriesWithoutRuns > 0 ? <SetupInProgressBanner summary={summary} /> : null;
+    return !suppressSetupBanner && summary.repositoriesWithoutRuns > 0 ? (
+      <SetupInProgressBanner summary={summary} access={firstRun} />
+    ) : null;
   }
   return (
     <>
       <FindingsAttentionBanner summary={summary} groups={groups} />
-      {summary.repositoriesWithoutRuns > 0 ? <SetupInProgressBanner summary={summary} /> : null}
+      {!suppressSetupBanner && summary.repositoriesWithoutRuns > 0 ? (
+        <SetupInProgressBanner summary={summary} access={firstRun} />
+      ) : null}
     </>
   );
 }
@@ -418,7 +489,10 @@ function RepositorySections({ groups }: Readonly<{ groups: RepositoryGroup[] }>)
  * A GitHub repository can contain several KiCad board projects. Neither is a
  * CAD workspace, and creating a workspace is not a prerequisite to a run.
  */
-function ConnectedBoardNextAction({ groups }: Readonly<{ groups: RepositoryGroup[] }>) {
+function ConnectedBoardNextAction({
+  groups,
+  firstRun,
+}: Readonly<{ groups: RepositoryGroup[]; firstRun: FirstRunAccess }>) {
   const repos = groups.flatMap((group) => group.repositories);
   const priority = [...repos].sort((a, b) => {
     const urgency = (repo: (typeof repos)[number]) => {
@@ -459,9 +533,13 @@ function ConnectedBoardNextAction({ groups }: Readonly<{ groups: RepositoryGroup
             action = "Review findings";
             stateLabel = `${repo.openFindings} recorded findings`;
             href += "/findings";
+          } else if (needsSetup && firstRun.gatedRepositoryIds.has(repo.id)) {
+            action = "Check this board locally";
+            stateLabel = "Hosted checks awaiting rollout · no recorded review";
+            href = localQuickstartUrl;
           } else if (needsSetup) {
-            action = "Set up first check";
-            stateLabel = "No review yet";
+            action = "Set up first hosted check";
+            stateLabel = "Eligible for hosted checks · no review yet";
             href = `/setup?repositoryId=${encodeURIComponent(repo.id)}`;
           } else if (repo.latestRunStatus !== "completed") {
             action = "Check run status";
@@ -566,6 +644,14 @@ function DashboardBody({
     );
   }
 
+  const firstRun = firstRunAvailability(groups);
+  const showRolloutBlockerFirst =
+    firstRun.gated > 0 &&
+    firstRun.eligible === 0 &&
+    firstRun.withoutRuns === summary.repositoriesWithoutRuns &&
+    summary.repositoriesWithOpenFindings === 0 &&
+    summary.supplyAlerts === 0;
+
   const latestRunsCompleted = groups.every((group) =>
     group.repositories.every((repository) => !repository.latestRunId || repository.latestRunStatus === "completed"),
   );
@@ -573,13 +659,19 @@ function DashboardBody({
   return (
     <div className="flex flex-col gap-5">
       {designEvidence ? <RealDesignEvidencePanel evidence={designEvidence} /> : null}
-      <ConnectedBoardNextAction groups={groups} />
+      {showRolloutBlockerFirst ? <SetupInProgressBanner summary={summary} access={firstRun} /> : null}
+      <ConnectedBoardNextAction groups={groups} firstRun={firstRun} />
       <details aria-label="Advanced engineering details" className="rounded-xl border border-border bg-card px-5 py-4">
         <summary className="min-h-9 cursor-pointer text-sm font-semibold text-muted-foreground hover:text-primary">
           Activity and engineering details
         </summary>
         <div className="mt-5 space-y-5 border-t border-border pt-5">
-          <AttentionBanner summary={summary} groups={groups} />
+          <AttentionBanner
+            summary={summary}
+            groups={groups}
+            firstRun={firstRun}
+            suppressSetupBanner={showRolloutBlockerFirst}
+          />
           <RecordedHardwareWork groups={groups} />
           {summary.repositoriesWithoutRuns > summary.repositories / 2 ? (
             <ReviewEmptyVisualPreview mode="onboarding" />
