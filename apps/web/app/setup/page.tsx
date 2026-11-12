@@ -15,8 +15,8 @@ import { loadViewerRepositoryResult } from "../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
 export const metadata = {
-  title: "Repository setup preview",
-  description: "Preview BoardReadyOps policy presets, repository files, permissions, and readiness validation.",
+  title: "Repository setup",
+  description: "Check repository setup, policy presets, permissions, and readiness validation.",
 };
 
 type SetupPageProps = {

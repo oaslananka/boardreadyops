@@ -1013,6 +1013,15 @@ function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetReposi
         <StatusBadge value={setupProgressBadgeValue(state.id)} label={label} />
       </div>
       <p className="text-sm text-muted-foreground">{description}</p>
+      {repository?.readinessRunBlockedReason ? (
+        <Alert title="Hosted hardware runs are not available yet" tone="warning">
+          <p>{repository.readinessRunBlockedReason}</p>
+          <p>
+            Setup can prepare and validate the repository, but it cannot produce a hosted hardware finding while cloud
+            runs are unavailable. A local check cannot create an OIDC-signed hosted run.
+          </p>
+        </Alert>
+      ) : null}
       {state.id === "ready" ? (
         <Link
           href={`/repositories/${repository?.id}`}
@@ -1020,6 +1029,23 @@ function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetReposi
         >
           View this repository's readiness runs →
         </Link>
+      ) : repository?.readinessRunBlockedReason ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <a
+            href="https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-11 w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Run a local hardware check →
+          </a>
+          <a
+            href="#policy-preset"
+            className="inline-flex min-h-11 w-fit items-center rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground"
+          >
+            Prepare repository setup →
+          </a>
+        </div>
       ) : (
         <a
           href="#policy-preset"
