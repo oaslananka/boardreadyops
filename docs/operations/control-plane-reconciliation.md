@@ -54,6 +54,53 @@ The response contains bounded operational metadata such as item type, item ident
 
 Cross-tenant identifiers are not disclosed. PostgreSQL resolves every row through the supplied installation scope.
 
+## Audit GitHub App delivery gaps before a cutover (read-only)
+
+GitHub does **not** automatically retry failed webhook deliveries. Its recent
+delivery history is retained for only **three days**. Before and after a worker
+handoff, a missing GitHub delivery is therefore not discoverable by checking
+the PostgreSQL queue alone.
+
+The manual, bounded audit compares App webhook delivery attempts with
+webhook_inbox.delivery_id, using GitHub App **JWT** authorization and
+BEGIN READ ONLY against PostgreSQL. It never redelivers, replays, calls
+GitHub mutation APIs, or changes database state.
+
+Run only from a trusted operator environment with existing, securely supplied
+GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, and DATABASE_URL credentials.
+The database identity should have SELECT on webhook_inbox and no write grants.
+Do not print credentials or paste the private key into a command, ticket or log.
+
+    BOARDREADYOPS_WEBHOOK_AUDIT_HOURS=24 \
+    BOARDREADYOPS_WEBHOOK_AUDIT_MAX_PAGES=30 \
+    corepack pnpm --filter @boardreadyops/web webhook:delivery:audit
+
+The stdout report contains **aggregate counts only**. For private,
+operator-reviewable delivery IDs and GUIDs, set
+BOARDREADYOPS_WEBHOOK_AUDIT_REPORT_PATH to a *new* file in a protected
+directory (created mode 0600, existing files are not overwritten).
+If pagination exceeds its bounded limit, the result is **incomplete**,
+never a claim that all deliveries were checked. Use a shorter lookback window
+and rerun, but retain the incomplete result as an unresolved release gate.
+
+Exit codes:
+
+- 0 — bounded scan complete, with no unrecorded *failed* deliveries found.
+- 2 — delivery IDs require human review (never automatic redelivery).
+- 3 — incomplete scan; no release-pass conclusion is permitted.
+- 4 — credentials, API, database read, response or report failed.
+
+A failed attempt with an inbox record might have been persisted despite a
+failed acknowledgment. A later 2xx retry without an inbox row is suspicious,
+but may be an intentionally ignored event, **not proof of loss**. Inspect the
+delivery event type, installation, current grants and existing effects before
+considering a manually approved, deduplicated redelivery. This audit does not
+establish last-write-safe PostgreSQL migration, webhook uptime during DDL,
+PITR or live worker ownership.
+
+References: https://docs.github.com/en/rest/apps/webhooks and
+https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries
+
 ## Replay one safe dead letter
 
 ```http
