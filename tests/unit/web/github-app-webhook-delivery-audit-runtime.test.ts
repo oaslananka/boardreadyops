@@ -83,6 +83,36 @@ describe("GitHub App webhook delivery safety audit", () => {
     expect(JSON.stringify(report)).not.toContain("sensitive-private-key-for-mock");
     expect(JSON.stringify(report)).not.toContain("fake-jwt-token");
   });
+  it("queries even successful GitHub App installation deliveries for missing durable state", async () => {
+    const lookedUp: string[][] = [];
+    const report = await runWebhookDeliveryAudit(
+      {
+        GITHUB_APP_ID: "123456",
+        GITHUB_APP_PRIVATE_KEY: "test-only-key",
+        DATABASE_URL: "postgresql://test-only:test-only@localhost/mock",
+      },
+      {
+        now: () => Date.parse(time),
+        authenticate: async () => ({ token: "test-only-jwt" }),
+        request: async () =>
+          mockResponse([
+            { ...delivery(10, guidA, 202), event: "installation", action: "created" },
+            { ...delivery(11, guidA, 202), event: "installation", action: "created" },
+          ]),
+        lookupInbox: async (ids: string[]) => {
+          lookedUp.push(ids);
+          return new Set();
+        },
+      },
+    );
+    expect(lookedUp).toEqual([[guidA]]);
+    expect(report).toMatchObject({
+      failedAttempts: 0,
+      acknowledgedInstallationsWithoutInbox: 1,
+      needsReview: true,
+    });
+  });
+
   it("queries the inbox when GitHub status disagrees with a 2xx code", async () => {
     const lookedUp: string[][] = [];
     const report = await runWebhookDeliveryAudit(

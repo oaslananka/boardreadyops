@@ -40,6 +40,35 @@ describe("GitHub App webhook delivery safety audit", () => {
     });
     expect(result.review).toEqual([{ deliveryId: 3, guid: guidB, category: "failed_not_stored" }]);
   });
+  it("reviews a successful installation with no durable inbox, without claiming definite loss", () => {
+    const install = { ...delivery(11, guidA, 202), event: "installation", action: "created", installationId: 123 };
+    const report = deliveryGapSummary([install], new Set(), true);
+    expect(report).toMatchObject({
+      attempts: 1,
+      failedAttempts: 0,
+      failedEvents: 0,
+      acknowledgedInstallationsWithoutInbox: 1,
+      needsReview: true,
+    });
+    expect(report.review).toEqual([
+      { deliveryId: 11, guid: guidA, category: "acknowledged_installation_without_inbox" },
+    ]);
+    const stored = deliveryGapSummary([install], new Set([guidA]), true);
+    expect(stored.acknowledgedInstallationsWithoutInbox).toBe(0);
+    expect(stored.needsReview).toBe(false);
+  });
+
+  it("does not require an inbox for successful ping, non-lifecycle or missing-installation events", () => {
+    const attempts = [
+      { ...delivery(12, guidA, 200), event: "ping", installation_id: null, installationId: null },
+      { ...delivery(13, guidB, 202), event: "issues" },
+      { ...delivery(14, guidC, 202), event: "installation", installation_id: null, installationId: null },
+    ];
+    const result = deliveryGapSummary(attempts, new Set(), true);
+    expect(result.acknowledgedInstallationsWithoutInbox).toBe(0);
+    expect(result.needsReview).toBe(false);
+  });
+
   it("flags a non-OK provider status even if HTTP code is 2xx", () => {
     const reportedFailure = { ...delivery(9, guidB, 202), status: "FAILED" };
     const result = deliveryGapSummary([reportedFailure], new Set(), true);

@@ -10,6 +10,9 @@ export function delivery(id: number, guid: string, code: number, at = time) {
     status_code: code,
     status: code >= 200 && code < 300 ? "OK" : "failed",
     delivered_at: at,
+    event: "issues",
+    action: "opened",
+    installation_id: 123,
   };
 }
 export function mockResponse(rows: unknown[], next?: string) {
