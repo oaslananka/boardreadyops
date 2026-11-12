@@ -72,6 +72,11 @@ replays, calls GitHub mutation APIs, or changes database state.
 Run only from a trusted operator environment with existing, securely supplied
 GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, and DATABASE_URL credentials.
 The database identity should have SELECT on webhook_inbox and no write grants.
+The audit always checks database and inbox-table readability, including when
+GitHub reports zero failed attempts; a disconnected or unauthorized database is
+an audit failure, **not** a clean handoff result. This still does not independently
+prove that every acknowledged (2xx) delivery was durably persisted, because
+intentionally ignored events may be acknowledged without an inbox row.
 Do not print credentials or paste the private key into a command, ticket or log.
 
     BOARDREADYOPS_WEBHOOK_AUDIT_HOURS=24 \

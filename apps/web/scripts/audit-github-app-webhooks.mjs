@@ -162,9 +162,10 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
   };
 }
 
-async function readExistingInboxGuids(databaseUrl, guids) {
-  if (guids.length === 0) return new Set();
-  const pool = new pg.Pool({
+export async function readExistingInboxGuids(databaseUrl, guids, createPool = (options) => new pg.Pool(options)) {
+  // Even an all-success GitHub scan must prove the inbox table is readable.
+  // An empty GUID lookup is intentional: it checks database access without writes.
+  const pool = createPool({
     connectionString: databaseUrl,
     application_name: "boardreadyops-webhook-delivery-readonly-audit",
     max: 1,

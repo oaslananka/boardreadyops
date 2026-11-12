@@ -1,8 +1,57 @@
 import { describe, expect, it } from "vitest";
-import { runWebhookDeliveryAudit } from "../../../apps/web/scripts/audit-github-app-webhooks.mjs";
+import {
+  readExistingInboxGuids,
+  runWebhookDeliveryAudit,
+} from "../../../apps/web/scripts/audit-github-app-webhooks.mjs";
 import { delivery, guidA, mockResponse, time } from "./github-app-webhook-delivery-audit-fixtures";
 
 describe("GitHub App webhook delivery safety audit", () => {
+  it("verifies read-only database access even with no failed GitHub deliveries", async () => {
+    const queries: Array<{ sql: string; params?: unknown[] }> = [];
+    let released = 0;
+    let ended = 0;
+    const result = await readExistingInboxGuids("postgresql://test-only:test-only@localhost/mock", [], () => ({
+      connect: async () => ({
+        query: async (sql: string, params?: unknown[]) => {
+          queries.push({ sql, ...(params ? { params } : {}) });
+          return { rows: [] };
+        },
+        release: () => {
+          released += 1;
+        },
+      }),
+      end: async () => {
+        ended += 1;
+      },
+    }));
+    expect([...result]).toEqual([]);
+    expect(queries).toEqual([
+      { sql: "BEGIN READ ONLY" },
+      {
+        sql: "SELECT delivery_id FROM webhook_inbox WHERE provider = 'github' AND delivery_id = ANY($1::text[])",
+        params: [[]],
+      },
+      { sql: "COMMIT" },
+    ]);
+    expect(released).toBe(1);
+    expect(ended).toBe(1);
+  });
+
+  it("fails closed when an empty delivery scan cannot reach the database", async () => {
+    let ended = 0;
+    await expect(
+      readExistingInboxGuids("postgresql://test-only:test-only@localhost/mock", [], () => ({
+        connect: async () => {
+          throw new Error("db unavailable");
+        },
+        end: async () => {
+          ended += 1;
+        },
+      })),
+    ).rejects.toThrow("read_only_webhook_inbox_query_failed");
+    expect(ended).toBe(1);
+  });
+
   it("performs app-auth and read-only DB lookup with no exposed credential or payload", async () => {
     const requested: string[] = [];
     const report = await runWebhookDeliveryAudit(
