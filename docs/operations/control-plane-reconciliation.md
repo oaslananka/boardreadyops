@@ -74,9 +74,14 @@ GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, and DATABASE_URL credentials.
 The database identity should have SELECT on webhook_inbox and no write grants.
 The audit always checks database and inbox-table readability, including when
 GitHub reports zero failed attempts; a disconnected or unauthorized database is
-an audit failure, **not** a clean handoff result. This still does not independently
-prove that every acknowledged (2xx) delivery was durably persisted, because
-intentionally ignored events may be acknowledged without an inbox row.
+an audit failure, **not** a clean handoff result. It also checks successfully
+acknowledged GitHub App **installation** lifecycle deliveries with a known
+installation ID against the durable inbox. A missing row is flagged as
+`acknowledged_installation_without_inbox` for **human review**: the setup
+event may have been intentionally ignored (for example, a previously canceled
+Marketplace account), so this is **not automatic proof of data loss**.
+Other acknowledged webhook events may legitimately have no queued actions;
+the audit does not claim every HTTP 2xx delivery was persisted.
 Do not print credentials or paste the private key into a command, ticket or log.
 
     BOARDREADYOPS_WEBHOOK_AUDIT_HOURS=24 \
@@ -93,14 +98,16 @@ and rerun, but retain the incomplete result as an unresolved release gate.
 
 Exit codes:
 
-- 0 — bounded scan complete, with no unrecorded *failed* deliveries found.
+- 0 — bounded scan complete, with no unrecorded failed deliveries or
+  acknowledged installation deliveries lacking an inbox row found.
 - 2 — delivery IDs require human review (never automatic redelivery).
 - 3 — incomplete scan; no release-pass conclusion is permitted.
 - 4 — credentials, API, database read, response or report failed.
 
 A failed attempt with an inbox record might have been persisted despite a
-failed acknowledgment. A later 2xx retry without an inbox row is suspicious,
-but may be an intentionally ignored event, **not proof of loss**. Inspect the
+failed acknowledgment. A later 2xx retry or an acknowledged installation event
+without an inbox row is suspicious, but may be an intentionally ignored event,
+**not proof of loss**. Inspect the
 delivery event type, installation, current grants and existing effects before
 considering a manually approved, deduplicated redelivery. This audit does not
 establish last-write-safe PostgreSQL migration, webhook uptime during DDL,

@@ -76,6 +76,24 @@ describe("GitHub App webhook delivery safety audit", () => {
       }),
     ).rejects.toThrow("invalid_github_delivery");
   });
+  it("rejects malformed event metadata instead of silently missing acknowledged installations", async () => {
+    const { event: _event, ...missingEvent } = delivery(10, guidA, 202);
+    await expect(
+      fetchRecentAppWebhookDeliveries({
+        token: "test-only",
+        since: time,
+        request: async () => mockResponse([missingEvent]),
+      }),
+    ).rejects.toThrow("invalid_github_delivery");
+    await expect(
+      fetchRecentAppWebhookDeliveries({
+        token: "test-only",
+        since: time,
+        request: async () => mockResponse([{ ...delivery(10, guidA, 202), installation_id: -1 }]),
+      }),
+    ).rejects.toThrow("invalid_github_delivery");
+  });
+
   it("does not count deliveries outside the requested window", async () => {
     const result = await fetchRecentAppWebhookDeliveries({
       token: "test-only",

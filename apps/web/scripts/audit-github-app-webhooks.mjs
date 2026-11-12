@@ -55,7 +55,15 @@ export function parseNextCursor(linkHeader) {
 }
 function validatedDelivery(item) {
   if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("invalid_github_delivery");
-  const { id, guid, status, status_code: statusCode, delivered_at: deliveredAt } = item;
+  const {
+    id,
+    guid,
+    status,
+    status_code: statusCode,
+    delivered_at: deliveredAt,
+    event,
+    installation_id: installationId,
+  } = item;
   const date = typeof deliveredAt === "string" ? Date.parse(deliveredAt) : Number.NaN;
   if (
     !Number.isSafeInteger(id) ||
@@ -67,11 +75,14 @@ function validatedDelivery(item) {
     !Number.isInteger(statusCode) ||
     statusCode < 0 ||
     statusCode > 599 ||
-    !Number.isFinite(date)
+    !Number.isFinite(date) ||
+    typeof event !== "string" ||
+    !event.trim() ||
+    (installationId !== null && (!Number.isSafeInteger(installationId) || installationId <= 0))
   ) {
     throw new Error("invalid_github_delivery");
   }
-  return { id, guid, status, statusCode, deliveredAt: date };
+  return { id, guid, status, statusCode, deliveredAt: date, event, installationId };
 }
 async function readGitHubDeliveryPage(response) {
   if (!response.ok) throw new Error(`github_delivery_request_failed_${response.status}`);
@@ -109,7 +120,14 @@ export async function fetchRecentAppWebhookDeliveries({ token, since, maxPages =
     });
     for (const delivery of await readGitHubDeliveryPage(response)) {
       const prior = seen.get(delivery.id);
-      if (prior && (prior.guid !== delivery.guid || prior.statusCode !== delivery.statusCode)) {
+      if (
+        prior &&
+        (prior.guid !== delivery.guid ||
+          prior.statusCode !== delivery.statusCode ||
+          prior.status !== delivery.status ||
+          prior.event !== delivery.event ||
+          prior.installationId !== delivery.installationId)
+      ) {
         throw new Error("conflicting_github_delivery_identity");
       }
       if (delivery.deliveredAt >= cutoff) seen.set(delivery.id, delivery);
@@ -123,9 +141,18 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
   const groups = new Map();
   let failedAttempts = 0;
   for (const attempt of attempts) {
-    const existing = groups.get(attempt.guid) ?? { failures: [], successful: false };
+    const existing = groups.get(attempt.guid) ?? { failures: [], successful: false, installationAckId: undefined };
     if (attempt.status === "OK" && attempt.statusCode >= 200 && attempt.statusCode < 300) {
       existing.successful = true;
+      // A genuine installation lifecycle event should enqueue durable work. Other
+      // events may be intentionally acknowledged without persistence.
+      if (
+        attempt.event === "installation" &&
+        Number.isSafeInteger(attempt.installationId) &&
+        attempt.installationId > 0
+      ) {
+        existing.installationAckId = Math.min(existing.installationAckId ?? attempt.id, attempt.id);
+      }
     } else {
       existing.failures.push(attempt.id);
       failedAttempts += 1;
@@ -135,9 +162,20 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
   let failuresAlreadyStored = 0;
   let failuresWithNoInbox = 0;
   let unresolvedAfterSuccess = 0;
+  let acknowledgedInstallationsWithoutInbox = 0;
   const review = [];
   for (const [guid, outcome] of groups) {
-    if (outcome.failures.length === 0) continue;
+    if (outcome.failures.length === 0) {
+      if (outcome.installationAckId !== undefined && !inboxGuids.has(guid)) {
+        acknowledgedInstallationsWithoutInbox += 1;
+        review.push({
+          deliveryId: outcome.installationAckId,
+          guid,
+          category: "acknowledged_installation_without_inbox",
+        });
+      }
+      continue;
+    }
     if (inboxGuids.has(guid)) {
       failuresAlreadyStored += 1;
     } else if (outcome.successful) {
@@ -157,6 +195,7 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
     failuresAlreadyStored,
     failuresWithNoInbox,
     unresolvedAfterSuccess,
+    acknowledgedInstallationsWithoutInbox,
     needsReview: !complete || review.length > 0,
     review,
   };
@@ -213,16 +252,24 @@ export async function runWebhookDeliveryAudit(environment = process.env, depende
     maxPages: options.maxPages,
     ...(dependencies.request ? { request: dependencies.request } : {}),
   });
-  const failedGuids = [
+  const reviewCandidateGuids = [
     ...new Set(
       deliveries.attempts
-        .filter((attempt) => attempt.status !== "OK" || attempt.statusCode < 200 || attempt.statusCode >= 300)
+        .filter(
+          (attempt) =>
+            attempt.status !== "OK" ||
+            attempt.statusCode < 200 ||
+            attempt.statusCode >= 300 ||
+            (attempt.event === "installation" &&
+              Number.isSafeInteger(attempt.installationId) &&
+              attempt.installationId > 0),
+        )
         .map((attempt) => attempt.guid),
     ),
   ];
   const recorded = dependencies.lookupInbox
-    ? await dependencies.lookupInbox(failedGuids)
-    : await readExistingInboxGuids(databaseUrl, failedGuids);
+    ? await dependencies.lookupInbox(reviewCandidateGuids)
+    : await readExistingInboxGuids(databaseUrl, reviewCandidateGuids);
   const result = deliveryGapSummary(deliveries.attempts, recorded, deliveries.complete);
   const summary = {
     event: "github_app_webhook_delivery_readonly_audit",
