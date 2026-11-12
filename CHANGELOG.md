@@ -4,6 +4,66 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.72.0](https://github.com/oaslananka/boardreadyops/compare/v1.71.1...v1.72.0) (2026-11-12)
+
+
+### Features
+
+* **cloud:** audit missing GitHub App webhook deliveries safely ([#1485](https://github.com/oaslananka/boardreadyops/issues/1485)) ([3ca4f87](https://github.com/oaslananka/boardreadyops/commit/3ca4f8709c3a9dce60f99f60af15ae577db39a37))
+* **privacy:** discover personal uninstall export statuses ([#1469](https://github.com/oaslananka/boardreadyops/issues/1469)) ([6e68915](https://github.com/oaslananka/boardreadyops/commit/6e6891583b56f010e256bdf2f9f49aa350221d2c))
+* **privacy:** expose requester-only prepared ZIP controls ([#1467](https://github.com/oaslananka/boardreadyops/issues/1467)) ([b997dc7](https://github.com/oaslananka/boardreadyops/commit/b997dc70f553e0b124a0f0988e50d2ce8d87ca14))
+* **privacy:** harden historical user export preflights ([#44](https://github.com/oaslananka/boardreadyops/issues/44)) ([#1405](https://github.com/oaslananka/boardreadyops/issues/1405)) ([3ab6ac9](https://github.com/oaslananka/boardreadyops/commit/3ab6ac981811fdd83651442337d67067cd48ddcf))
+* **privacy:** reopen requester-bound export receipts ([#1468](https://github.com/oaslananka/boardreadyops/issues/1468)) ([d8d1f1c](https://github.com/oaslananka/boardreadyops/commit/d8d1f1cde717b6ad00afb358aee6dc9e51b8d599))
+
+
+### Bug Fixes
+
+* **backup:** report physical artifact evidence in recovery snapshots ([#1481](https://github.com/oaslananka/boardreadyops/issues/1481)) ([89fe987](https://github.com/oaslananka/boardreadyops/commit/89fe987df20e86cb3c958a52347a0070b82af05f))
+* **ci:** fail closed on unsupported private ZIP filesystems ([#1444](https://github.com/oaslananka/boardreadyops/issues/1444)) ([af21fc7](https://github.com/oaslananka/boardreadyops/commit/af21fc7525ffdf56a89e8f5cbdcf1bbfa7756a57))
+* **ci:** require native OS verification for backup preflight ([#1478](https://github.com/oaslananka/boardreadyops/issues/1478)) ([230fd3b](https://github.com/oaslananka/boardreadyops/commit/230fd3bc1e59b308ef4cf94a574a10c99d0a7821))
+* **ci:** treat Launchpad 504 as transient during signed KiCad 10 setup ([#1472](https://github.com/oaslananka/boardreadyops/issues/1472)) ([e19f4ef](https://github.com/oaslananka/boardreadyops/commit/e19f4ef696d5f6d381f028a741f0b0d466be78a4))
+* **cli:** distinguish scan completion from hardware readiness ([#1449](https://github.com/oaslananka/boardreadyops/issues/1449)) ([eebe8c5](https://github.com/oaslananka/boardreadyops/commit/eebe8c5139141cc74e02ddcff4810eda5f2a66f0))
+* **cli:** reject unknown schema names instead of returning config ([#1440](https://github.com/oaslananka/boardreadyops/issues/1440)) ([2cfb8f5](https://github.com/oaslananka/boardreadyops/commit/2cfb8f5def2b1caf2dd6d1c20b46abbe3d29424a))
+* **cloud:** audit acknowledged installation persistence ([#1489](https://github.com/oaslananka/boardreadyops/issues/1489)) ([89b6f7d](https://github.com/oaslananka/boardreadyops/commit/89b6f7de6aad7ef3f8b93a660f2ce127d79139ce))
+* **cloud:** audit acknowledged repository selection persistence ([#1490](https://github.com/oaslananka/boardreadyops/issues/1490)) ([399fc57](https://github.com/oaslananka/boardreadyops/commit/399fc57a51f8bfa45fef866e0e196487b3224354))
+* **cloud:** count webhook redirects as failed deliveries ([#1486](https://github.com/oaslananka/boardreadyops/issues/1486)) ([7ade6c2](https://github.com/oaslananka/boardreadyops/commit/7ade6c2c1ae12ccebaad7b1964192f1df378a4ba))
+* **cloud:** drain web before rolling container shutdown ([#1436](https://github.com/oaslananka/boardreadyops/issues/1436)) ([e634b17](https://github.com/oaslananka/boardreadyops/commit/e634b173eaef2bc2ee4c035c9c33d130bb5ab48f))
+* **cloud:** fail cutover witness on any request gap ([#1435](https://github.com/oaslananka/boardreadyops/issues/1435)) ([93670d5](https://github.com/oaslananka/boardreadyops/commit/93670d53aa00ac32c467d0426eb8c864618b560b))
+* **cloud:** observe signed no-action webhook acknowledgments ([#1491](https://github.com/oaslananka/boardreadyops/issues/1491)) ([be34e8d](https://github.com/oaslananka/boardreadyops/commit/be34e8d1827feea9a910ea853df8e777b7b2b5fc))
+* **cloud:** preserve reconciliation budget for healthy workflow polls ([#1432](https://github.com/oaslananka/boardreadyops/issues/1432)) ([07ec331](https://github.com/oaslananka/boardreadyops/commit/07ec331e9d60121e0687a0bcbda66e259a710a43))
+* **cloud:** reject setup context for suspended installations ([#1475](https://github.com/oaslananka/boardreadyops/issues/1475)) ([2722149](https://github.com/oaslananka/boardreadyops/commit/27221498ac408aa845d50c9d9ba837e90b5ba293))
+* **cloud:** require database check for clean webhook audits ([#1488](https://github.com/oaslananka/boardreadyops/issues/1488)) ([a7bf921](https://github.com/oaslananka/boardreadyops/commit/a7bf9215c2bbbbd01ee08c2cf0b85aefd74f634f))
+* **cloud:** use readiness and drain signals for web rollout ([#1434](https://github.com/oaslananka/boardreadyops/issues/1434)) ([d189a3f](https://github.com/oaslananka/boardreadyops/commit/d189a3f12836f36820482a97d2cdf68562626a32))
+* **cloud:** verify GitHub delivery status in webhook audit ([#1487](https://github.com/oaslananka/boardreadyops/issues/1487)) ([e1d4e86](https://github.com/oaslananka/boardreadyops/commit/e1d4e86fd9ecb732b3d3ab4f80e7f45d70844557))
+* **core:** categorize native KiCad DRC and ERC findings ([#1451](https://github.com/oaslananka/boardreadyops/issues/1451)) ([c9238aa](https://github.com/oaslananka/boardreadyops/commit/c9238aa41ccc00f5a113791bcca30c025a0b3a7f))
+* **db:** allow disabled GitHub repository names to be reused safely ([#1474](https://github.com/oaslananka/boardreadyops/issues/1474)) ([5e4c8e4](https://github.com/oaslananka/boardreadyops/commit/5e4c8e414e46e118769ae9d294111547ea7d3e2a))
+* **deploy:** isolate worker handoff from production Compose stack ([#1473](https://github.com/oaslananka/boardreadyops/issues/1473)) ([b20b415](https://github.com/oaslananka/boardreadyops/commit/b20b415885c462eac6761e62c1f764c39b917411))
+* **deploy:** support independent rolling web in backup preflight ([#1476](https://github.com/oaslananka/boardreadyops/issues/1476)) ([8b2af30](https://github.com/oaslananka/boardreadyops/commit/8b2af30b56e5aab262fe74d1fd019ded12dba39a))
+* **deps:** resolve fast-xml-parser OSV finding in main ([#1455](https://github.com/oaslananka/boardreadyops/issues/1455)) ([f91fe24](https://github.com/oaslananka/boardreadyops/commit/f91fe24870c9d99f21a0ee1c902faa5793ac9fce))
+* **github:** honor selected repos and simplify the first-run workflow ([#1470](https://github.com/oaslananka/boardreadyops/issues/1470)) ([f1e835c](https://github.com/oaslananka/boardreadyops/commit/f1e835cec717dd6777e68cbcf177ee3549a8a5be))
+* **mcp:** show remote footprint evidence only with valid provenance ([#1465](https://github.com/oaslananka/boardreadyops/issues/1465)) ([1ff7857](https://github.com/oaslananka/boardreadyops/commit/1ff785759e075aff66fb2fdaacca714aa5e99a5f))
+* **onboarding:** offer copyable local-first PCB check in Setup ([#1493](https://github.com/oaslananka/boardreadyops/issues/1493)) ([be83cce](https://github.com/oaslananka/boardreadyops/commit/be83cce9ec0c7ee3097df4587f56ca1cff4ef47d))
+* **onboarding:** show hosted rollout blocker before setup PR ([#1492](https://github.com/oaslananka/boardreadyops/issues/1492)) ([7224023](https://github.com/oaslananka/boardreadyops/commit/7224023a79c2f213541b9e6be525d973f6023dc8))
+* **onboarding:** show truthful setup and verified installation handoff ([#1459](https://github.com/oaslananka/boardreadyops/issues/1459)) ([d64569b](https://github.com/oaslananka/boardreadyops/commit/d64569ba632e9bdc420da2070219f3cffb544646))
+* **privacy:** isolate lifecycle form state by installation ([#1460](https://github.com/oaslananka/boardreadyops/issues/1460)) ([c09c62b](https://github.com/oaslananka/boardreadyops/commit/c09c62beadd712873ef581d2dec95f085d667371))
+* **privacy:** revalidate export status before disclosing scope ([#1466](https://github.com/oaslananka/boardreadyops/issues/1466)) ([60ff982](https://github.com/oaslananka/boardreadyops/commit/60ff98225bcfd4d9489c9bea6d61b19fe7503a6d))
+* **review:** explain black visual diff without implying readiness ([#1431](https://github.com/oaslananka/boardreadyops/issues/1431)) ([4307fc1](https://github.com/oaslananka/boardreadyops/commit/4307fc1407277edd0a0793de7220f165d65c5df1))
+* **review:** keep non-spatial comments in discussion ([#1457](https://github.com/oaslananka/boardreadyops/issues/1457)) ([d19ffba](https://github.com/oaslananka/boardreadyops/commit/d19ffba52079ec04cdaa18cae9a929af59247854))
+* **review:** navigate from discussion to recorded finding ([#1458](https://github.com/oaslananka/boardreadyops/issues/1458)) ([f070983](https://github.com/oaslananka/boardreadyops/commit/f07098395540251d44c96a4144e359318a6131f1))
+* **runs:** guide first-time users through verified GitHub setup ([#1463](https://github.com/oaslananka/boardreadyops/issues/1463)) ([266c46b](https://github.com/oaslananka/boardreadyops/commit/266c46bbc36bba6dab0b2206143178920cc4d91b))
+* **ux:** select authorized repository directly from project sources ([#1479](https://github.com/oaslananka/boardreadyops/issues/1479)) ([5167b95](https://github.com/oaslananka/boardreadyops/commit/5167b9521c61c8ff6c2306957ec7a5a012915ea4))
+* **web:** bring recorded design artwork forward on mobile ([#1441](https://github.com/oaslananka/boardreadyops/issues/1441)) ([4f74038](https://github.com/oaslananka/boardreadyops/commit/4f74038fd5b4049b61979b5e527d715809ff5f37))
+* **web:** choose authorized repository before setup policy ([#1445](https://github.com/oaslananka/boardreadyops/issues/1445)) ([d6aa5b7](https://github.com/oaslananka/boardreadyops/commit/d6aa5b73d52f32f72d295d2269488b9d6a18a5c3))
+* **web:** guide first review without creating workspace project ([#1452](https://github.com/oaslananka/boardreadyops/issues/1452)) ([81e0cfd](https://github.com/oaslananka/boardreadyops/commit/81e0cfd72af3cff17bb3fff006d59c521a2cc1ea))
+* **web:** keep unsigned-run verdict concise above board artwork ([#1442](https://github.com/oaslananka/boardreadyops/issues/1442)) ([3e9d1c4](https://github.com/oaslananka/boardreadyops/commit/3e9d1c46a828d91ee26a04e2c41d36ff71862e5c))
+* **web:** make first-run setup reachable from chosen repository ([#1447](https://github.com/oaslananka/boardreadyops/issues/1447)) ([f1b902a](https://github.com/oaslananka/boardreadyops/commit/f1b902add42eb7842a71eb1e79331b76121f6004))
+* **web:** open exact schematic sheet for recorded finding ([#1453](https://github.com/oaslananka/boardreadyops/issues/1453)) ([fadad9f](https://github.com/oaslananka/boardreadyops/commit/fadad9f8ef52a94cb1283950759cef6ffaedd15b))
+* **web:** open selected review finding from overview marker ([#1454](https://github.com/oaslananka/boardreadyops/issues/1454)) ([3be32ef](https://github.com/oaslananka/boardreadyops/commit/3be32efb4206c71c6cd32769f5fbe1d10198f841))
+* **web:** present public hardware reviews as read-only to guests ([#1456](https://github.com/oaslananka/boardreadyops/issues/1456)) ([1254468](https://github.com/oaslananka/boardreadyops/commit/12544684f3a51856823c481bce41333bae628349))
+* **web:** prioritize source-linked findings during visual review ([#1450](https://github.com/oaslananka/boardreadyops/issues/1450)) ([d9f906b](https://github.com/oaslananka/boardreadyops/commit/d9f906b90cf14a19e83808b223650baa37db526f))
+* **web:** show PCB first on narrow run inspection ([#1446](https://github.com/oaslananka/boardreadyops/issues/1446)) ([cd04d6f](https://github.com/oaslananka/boardreadyops/commit/cd04d6f7d08f0ffd860d6fab926ca1fc0b7ef2e6))
+* **worker:** enforce exclusive PostgreSQL ownership before processing ([#1482](https://github.com/oaslananka/boardreadyops/issues/1482)) ([7129e78](https://github.com/oaslananka/boardreadyops/commit/7129e7812d18d2cd4cb3d73b654bbc389317eb54))
+
 ## [1.71.1](https://github.com/oaslananka/boardreadyops/compare/v1.71.0...v1.71.1) (2026-11-09)
 
 
