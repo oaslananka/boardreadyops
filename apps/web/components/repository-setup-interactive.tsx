@@ -1041,9 +1041,9 @@ function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetReposi
             value={localFirstCheckCommands}
           />
           <p className="text-muted-foreground">
-            The installation requires npm access. The check writes local findings to{" "}
-            <code>build/boardreadyops.findings.json</code>. With <code>--fail-on never</code>, exit code 0 only means
-            the scan finished; review the findings before manufacturing. This does not produce an OIDC-signed cloud run.
+            The installation requires npm access. The check prints local findings in the terminal; it does not
+            automatically create a report file. With <code>--fail-on never</code>, exit code 0 only means the scan
+            finished; review findings before manufacturing. This does not produce an OIDC-signed cloud run.
           </p>
         </div>
       ) : null}

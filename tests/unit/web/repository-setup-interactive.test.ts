@@ -272,6 +272,8 @@ describe("repository setup readiness controls", () => {
     expect(
       progress?.querySelector('button[aria-label="Copy BoardReadyOps installation and local hardware check commands"]'),
     ).not.toBeNull();
+    expect(progress?.textContent).toContain("prints local findings in the terminal");
+    expect(progress?.textContent).toContain("does not automatically create a report file");
     expect(progress?.textContent).toContain("exit code 0 only means");
     expect(container.textContent).not.toContain("open a pull request changing your hardware project");
     expect(container.querySelector('a[href="/runs/run-a"]')?.textContent).toContain("Inspect latest recorded run");
