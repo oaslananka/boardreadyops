@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
   viewerAuthorization: vi.fn(async () => ({ session: { login: "octocat", installationIds: [123] } })),
@@ -45,6 +45,12 @@ const { loadViewerDesignEvidence, loadViewerRepositories, loadViewerRepositoryRe
 const { viewerAuthorization } = await import("../../../apps/web/lib/viewer-authorization.js");
 
 describe("dashboard operational hierarchy", () => {
+  beforeEach(() => {
+    vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES", "all");
+    vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE", undefined);
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
   it("does not mislead users that no repositories are selected when GitHub grant verification fails", async () => {
     vi.mocked(loadViewerRepositoryResult).mockResolvedValueOnce({ state: "access-unavailable", groups: [] });
     const html = renderToStaticMarkup(await DashboardPage());
@@ -171,6 +177,63 @@ describe("dashboard operational hierarchy", () => {
     expect(markup).toContain("octocat/sensor-board");
     expect(markup).toContain('href="/setup?repositoryId=repo-just-connected"');
     expect(markup).toContain("no runs yet");
+  });
+
+  it("shows the real rollout blocker before board cards when no hosted run is allowed", async () => {
+    vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES", "");
+    vi.mocked(loadViewerRepositories).mockResolvedValueOnce([
+      {
+        accountLogin: "octocat",
+        repositories: [
+          { id: "blocked-a", owner: "octocat", name: "first-board", latestRunId: undefined, openFindings: 0 },
+          { id: "blocked-b", owner: "octocat", name: "second-board", latestRunId: undefined, openFindings: 0 },
+        ],
+      },
+    ]);
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 2,
+      repositoriesWithOpenFindings: 0,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 2,
+      watchedBoards: 0,
+    });
+    const html = renderToStaticMarkup(await DashboardPage());
+    expect(html).toContain("Hosted checks awaiting rollout");
+    expect(html).toContain("Cloud readiness runs are not enabled for these repositories");
+    expect(html).toContain("Check your PCB locally");
+    expect(html).toContain("Check this board locally");
+    expect(html).toContain("A local finding is not an OIDC-signed hosted Check Run");
+    expect(html).toContain("docs/quickstart.md");
+    expect(html).not.toContain("Review setup and run the first check");
+    expect(html.indexOf("Hosted checks awaiting rollout")).toBeLessThan(html.indexOf("Choose a board to review"));
+    expect(html.match(/aria-label="Hosted first-run availability"/gu)).toHaveLength(1);
+  });
+
+  it("routes a mixed rollout to the enabled repository rather than a blocked one", async () => {
+    vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES", "octocat/enabled");
+    vi.mocked(loadViewerRepositories).mockResolvedValueOnce([
+      {
+        accountLogin: "octocat",
+        repositories: [
+          { id: "blocked-id", owner: "octocat", name: "blocked", latestRunId: undefined, openFindings: 0 },
+          { id: "enabled-id", owner: "octocat", name: "enabled", latestRunId: undefined, openFindings: 0 },
+        ],
+      },
+    ]);
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 2,
+      repositoriesWithOpenFindings: 0,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 2,
+      watchedBoards: 0,
+    });
+    const html = renderToStaticMarkup(await DashboardPage());
+    expect(html).toContain("1 repository is eligible for hosted checks");
+    expect(html).toContain("1 repository is awaiting rollout");
+    expect(html).toContain('href="/setup?repositoryId=enabled-id"');
+    expect(html).toContain("Check this board locally");
+    expect(html).toContain("Set up first hosted check");
+    expect(html).not.toContain("Cloud readiness runs are not enabled for these repositories");
   });
 
   it("keeps first-run setup visible beside an existing repository finding", async () => {
