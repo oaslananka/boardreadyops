@@ -10,10 +10,10 @@ const guidPattern = /^[a-zA-Z0-9._:-]{8,128}$/u;
 function boundedOption(environment, name, fallback, min, max) {
   const value = environment[name];
   if (value === undefined) return fallback;
-  if (!/^[1-9]\d*$/u.test(value)) throw new Error("invalid_" + name.toLowerCase());
+  if (!/^[1-9]\d*$/u.test(value)) throw new Error(`invalid_${name.toLowerCase()}`);
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error("invalid_" + name.toLowerCase());
+    throw new Error(`invalid_${name.toLowerCase()}`);
   }
   return parsed;
 }
@@ -71,6 +71,17 @@ function validatedDelivery(item) {
   }
   return { id, guid, statusCode, deliveredAt: date };
 }
+async function readGitHubDeliveryPage(response) {
+  if (!response.ok) throw new Error(`github_delivery_request_failed_${response.status}`);
+  let rows;
+  try {
+    rows = await response.json();
+  } catch {
+    throw new Error("invalid_github_delivery_response");
+  }
+  if (!Array.isArray(rows) || rows.length > 100) throw new Error("invalid_github_delivery_response");
+  return rows.map(validatedDelivery);
+}
 export async function fetchRecentAppWebhookDeliveries({ token, since, maxPages = 30, request = fetch }) {
   const cutoff = Date.parse(since);
   if (!Number.isFinite(cutoff) || !Number.isInteger(maxPages) || maxPages < 1 || maxPages > 30) {
@@ -88,22 +99,13 @@ export async function fetchRecentAppWebhookDeliveries({ token, since, maxPages =
       method: "GET",
       redirect: "error",
       headers: {
-        authorization: "Bearer " + token,
+        authorization: `Bearer ${token}`,
         accept: "application/vnd.github+json",
         "x-github-api-version": apiVersion,
       },
       signal: AbortSignal.timeout(10_000),
     });
-    if (!response.ok) throw new Error("github_delivery_request_failed_" + response.status);
-    let rows;
-    try {
-      rows = await response.json();
-    } catch {
-      throw new Error("invalid_github_delivery_response");
-    }
-    if (!Array.isArray(rows) || rows.length > 100) throw new Error("invalid_github_delivery_response");
-    for (const item of rows) {
-      const delivery = validatedDelivery(item);
+    for (const delivery of await readGitHubDeliveryPage(response)) {
       const prior = seen.get(delivery.id);
       if (prior && (prior.guid !== delivery.guid || prior.statusCode !== delivery.statusCode)) {
         throw new Error("conflicting_github_delivery_identity");
@@ -187,7 +189,7 @@ async function readExistingInboxGuids(databaseUrl, guids) {
 }
 function required(environment, name) {
   const value = environment[name]?.trim();
-  if (!value) throw new Error("missing_" + name.toLowerCase());
+  if (!value) throw new Error(`missing_${name.toLowerCase()}`);
   return value;
 }
 
@@ -228,7 +230,7 @@ export async function runWebhookDeliveryAudit(environment = process.env, depende
   const reportPath = environment.BOARDREADYOPS_WEBHOOK_AUDIT_REPORT_PATH?.trim();
   if (reportPath) {
     try {
-      await writeFile(reportPath, JSON.stringify(summary, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+      await writeFile(reportPath, `${JSON.stringify(summary, null, 2)}\n`, { flag: "wx", mode: 0o600 });
     } catch {
       throw new Error("private_audit_report_write_failed");
     }
@@ -239,7 +241,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   try {
     const report = await runWebhookDeliveryAudit();
     const { review: _privateReview, ...aggregate } = report;
-    process.stdout.write(JSON.stringify(aggregate) + "\n");
+    process.stdout.write(`${JSON.stringify(aggregate)}\n`);
     if (!report.complete) process.exitCode = 3;
     else if (report.needsReview) process.exitCode = 2;
   } catch (error) {
@@ -249,10 +251,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
         error.message,
       );
     process.stderr.write(
-      JSON.stringify({
+      `${JSON.stringify({
         event: "github_app_webhook_delivery_audit_failed",
         code: known ? error.message : "unexpected_error",
-      }) + "\n",
+      })}\n`,
     );
     process.exitCode = 4;
   }
