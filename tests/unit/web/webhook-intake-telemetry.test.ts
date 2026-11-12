@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { emitWebhookIntakeTelemetry } from "../../../apps/web/lib/webhook-intake-telemetry.js";
+import { emitWebhookIntakeTelemetry, webhookEventClass } from "../../../apps/web/lib/webhook-intake-telemetry.js";
 
 describe("webhook intake telemetry", () => {
   it("emits bounded aggregate fields without delivery or tenant identifiers", () => {
@@ -25,6 +25,26 @@ describe("webhook intake telemetry", () => {
     expect(line).not.toContain("delivery");
     expect(line).not.toContain("repository");
     expect(line).not.toContain("installation");
+  });
+
+  it("classifies verified no-action events with fixed low-cardinality metadata", () => {
+    const write = vi.fn<(line: string) => boolean>(() => true);
+    emitWebhookIntakeTelemetry(
+      { outcome: "ignored", ignoredReason: "no_action", eventClass: webhookEventClass("check_run"), latencyMs: 6.7 },
+      write,
+    );
+    const line = String(write.mock.calls[0]?.[0]);
+    expect(JSON.parse(line)).toMatchObject({
+      outcome: "ignored",
+      ignoredReason: "no_action",
+      eventClass: "check_run",
+      latencyMs: 7,
+    });
+    expect(line).not.toContain("delivery");
+    expect(line).not.toContain("installationId");
+    expect(line).not.toContain("repository");
+    expect(webhookEventClass("custom.private.event")).toBe("other");
+    expect(webhookEventClass("workflow_run")).toBe("workflow_run");
   });
 
   it("records enqueue failures without serializing error messages", () => {

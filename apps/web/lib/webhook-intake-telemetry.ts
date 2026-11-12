@@ -1,6 +1,35 @@
+export type WebhookEventClass =
+  | "check_run"
+  | "workflow_run"
+  | "installation"
+  | "installation_repositories"
+  | "pull_request"
+  | "issue_comment"
+  | "pull_request_review"
+  | "ping"
+  | "other";
+
+export function webhookEventClass(event: string): WebhookEventClass {
+  switch (event) {
+    case "check_run":
+    case "workflow_run":
+    case "installation":
+    case "installation_repositories":
+    case "pull_request":
+    case "issue_comment":
+    case "pull_request_review":
+    case "ping":
+      return event;
+    default:
+      return "other";
+  }
+}
+
 export type WebhookIntakeTelemetry = {
-  outcome: "accepted" | "duplicate" | "enqueue_failed";
+  outcome: "accepted" | "duplicate" | "enqueue_failed" | "ignored";
   latencyMs: number;
+  eventClass?: WebhookEventClass;
+  ignoredReason?: "no_action" | "marketplace_canceled" | "unsupported";
   errorClass?: string;
 };
 
@@ -31,6 +60,8 @@ export function emitWebhookIntakeTelemetry(
       event: "webhook.intake",
       outcome: telemetry.outcome,
       latencyMs: Math.max(0, Math.round(telemetry.latencyMs)),
+      ...(telemetry.eventClass ? { eventClass: telemetry.eventClass } : {}),
+      ...(telemetry.ignoredReason ? { ignoredReason: telemetry.ignoredReason } : {}),
       ...(errorClass ? { errorClass } : {}),
     })}\n`,
   );

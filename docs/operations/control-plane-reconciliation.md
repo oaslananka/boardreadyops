@@ -259,6 +259,20 @@ SLI collection and SLO evaluation are observability paths and do not affect work
 
 Public and private end-to-end observations are defined in the [synthetic target-repository canary runbook](synthetic-target-repository-canaries.md). Canary failures should be correlated with these aggregate SLO and reconciliation signals without exposing tenant content.
 
+### Webhook acknowledgment telemetry
+
+`webhook.intake` now records a bounded `ignored` outcome and `ignoredReason`
+(`no_action`, `unsupported`, or `marketplace_canceled`) for verified
+GitHub webhooks acknowledged without a durable job. The allowlisted
+`eventClass` distinguishes check-run no-ops from lifecycle work without
+logging delivery GUIDs, installation IDs, repository names, request payloads,
+signatures, or credentials. These fields complement `accepted`/`duplicate`
+and `enqueue_failed` latency metrics, but an absent application log entry
+**cannot prove** whether an upstream timeout happened before the application,
+during the request, or after a response was committed. GitHub's delivery
+history and authorized inbox/worker evidence remain decisive; no automatic
+redelivery or data-loss assumption follows from the metrics.
+
 ## Webhook inbox and lifecycle-job reconciliation
 
 The worker also detects internal PostgreSQL drift between `webhook_inbox` and `control_plane_jobs`. This path does not require GitHub credentials because it never calls GitHub: it repairs only tenant-scoped records already persisted by webhook acceptance and lifecycle processing.

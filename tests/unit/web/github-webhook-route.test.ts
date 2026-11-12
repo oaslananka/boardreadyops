@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   resetControlPlaneJobStoreForTests,
   setControlPlaneJobStoreForTests,
@@ -291,6 +291,44 @@ describe("GitHub webhook route lifecycle persistence", () => {
       lifecycleActions: [],
       execution: { total: 0 },
     });
+  });
+
+  it("emits identity-free no-action telemetry for signed check-run callbacks", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    delete process.env.DATABASE_URL;
+    delete process.env.BOARDREADYOPS_PERSISTENCE_MODE;
+
+    const payload = {
+      ...installationPayload(),
+      action: "completed",
+      repository: (installationPayload().repositories as Record<string, unknown>[])[0],
+      check_run: { id: 12345 },
+    };
+    const lines: string[] = [];
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    let response: Response;
+    try {
+      response = await POST(signedGitHubRequest("check_run", payload));
+    } finally {
+      stdout.mockRestore();
+    }
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ lifecycleActions: [] });
+    const telemetry = lines
+      .flatMap((line) => line.split("\n"))
+      .filter((line) => line.includes('"event":"webhook.intake"'))
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(telemetry).toHaveLength(1);
+    expect(telemetry[0]).toMatchObject({
+      outcome: "ignored",
+      ignoredReason: "no_action",
+      eventClass: "check_run",
+    });
+    expect(JSON.stringify(telemetry)).not.toContain("delivery-123");
+    expect(JSON.stringify(telemetry)).not.toContain("octo-org");
   });
 
   it("fails closed when PostgreSQL persistence is not configured", async () => {
