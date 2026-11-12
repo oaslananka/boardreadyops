@@ -33,8 +33,77 @@ env:
   NODE_VERSION: "24.22.1"
 
 jobs:
+  package-ready:
+    name: container-build / verify published npm bytes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - id: package
+        name: Resolve package version
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
+          MANUAL_PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          # A branch-targeted manual GHCR publication must specify the exact intended package.
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${MANUAL_PUBLISH}" = "true" ] && [ "${GITHUB_REF_TYPE}" != "tag" ] && [ -z "${MANUAL_VERSION}" ]; then
+            echo "::error::workflow_dispatch publish requires a version input"
+            exit 1
+          fi
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            # A prepared source version is not necessarily published yet. PR smoke
+            # exercises the container and toolchain against npm's published stable CLI;
+            # release and explicitly selected versions keep their exact-version gate.
+            version="$(npm view boardreadyops dist-tags.latest --json | jq -er 'select(type == "string")')"
+            if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::npm latest dist-tag must resolve to a stable semantic version"
+              exit 1
+            fi
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            if [ -n "${MANUAL_VERSION}" ] && [ "${MANUAL_VERSION#v}" != "${version}" ]; then
+              echo "::error::Manual package version does not match selected Git tag"
+              exit 1
+            fi
+          elif [ -n "${MANUAL_VERSION}" ]; then
+            version="${MANUAL_VERSION#v}"
+          else
+            version="$(jq -er '.version' package.json)"
+          fi
+          if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Container smoke needs an exact semver npm package version"
+            exit 1
+          fi
+          echo "Container smoke selected boardreadyops@${version}; published package is verified below"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+      - name: Wait for npm package availability
+        env:
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Registry metadata may precede tarball availability on npm's CDN.
+          # Require real package bytes; the first-party exact release is newer
+          # than the repo's 7-day dependency age policy, so exempt only this probe.
+          pack_dir="$(mktemp -d)"
+          trap 'rm -rf "${pack_dir}"' EXIT
+          for attempt in {1..84}; do
+            if npm pack --prefer-online --fetch-retries=0 --fetch-timeout=15000 --min-release-age=0 --ignore-scripts --silent --pack-destination "${pack_dir}" "boardreadyops@${PACKAGE_VERSION}" >/dev/null 2>&1; then
+              exit 0
+            fi
+            echo "boardreadyops@${PACKAGE_VERSION} tarball is not downloadable yet; retry ${attempt}/84"
+            sleep 10
+          done
+          echo "::error::boardreadyops@${PACKAGE_VERSION} tarball is still unavailable after 84 bounded attempts"
+          exit 1
+
   smoke:
     name: container-build / smoke (Arch ${{ matrix.arch }}, KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }})
+    needs: package-ready
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
@@ -53,49 +122,6 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
-      - id: package
-        name: Resolve package version
-        env:
-          MANUAL_VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            # A prepared source version is not necessarily published yet. PR smoke
-            # exercises the container and toolchain against npm's published stable CLI;
-            # release and explicitly selected versions keep their exact-version gate.
-            version="$(npm view boardreadyops dist-tags.latest --json | jq -er 'select(type == "string")')"
-            if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "::error::npm latest dist-tag must resolve to a stable semantic version"
-              exit 1
-            fi
-          elif [ -n "${MANUAL_VERSION}" ]; then
-            version="${MANUAL_VERSION#v}"
-          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            version="${GITHUB_REF_NAME#v}"
-          else
-            version="$(jq -er '.version' package.json)"
-          fi
-          echo "Container smoke selected boardreadyops@${version}; published package is verified below"
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-      - name: Wait for npm package availability
-        env:
-          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
-        run: |
-          set -euo pipefail
-          # Registry metadata may precede tarball availability on npm's CDN.
-          # Require real package bytes; the first-party exact release is newer
-          # than the repo's 7-day dependency age policy, so exempt only this probe.
-          pack_dir="$(mktemp -d)"
-          trap 'rm -rf "${pack_dir}"' EXIT
-          for attempt in {1..30}; do
-            if npm pack --min-release-age=0 --ignore-scripts --silent --pack-destination "${pack_dir}" "boardreadyops@${PACKAGE_VERSION}" >/dev/null 2>&1; then
-              exit 0
-            fi
-            echo "boardreadyops@${PACKAGE_VERSION} tarball is not downloadable yet; retry ${attempt}/30"
-            sleep 10
-          done
-          echo "::error::boardreadyops@${PACKAGE_VERSION} tarball is still unavailable after bounded retries"
-          exit 1
       - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
       - name: Build local smoke image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
@@ -107,7 +133,7 @@ jobs:
           push: false
           tags: boardreadyops-full:smoke-kicad-${{ matrix.kicad-version }}-node-${{ matrix.node-version }}
           build-args: |
-            BOARDREADYOPS_VERSION=${{ steps.package.outputs.version }}
+            BOARDREADYOPS_VERSION=${{ needs.package-ready.outputs.version }}
             NODE_VERSION=${{ matrix.node-version }}
       - name: Smoke container CLI
         run: docker run --rm boardreadyops-full:smoke-kicad-${{ matrix.kicad-version }}-node-${{ matrix.node-version }} --help
@@ -129,7 +155,7 @@ jobs:
   publish:
     name: container-build / publish
     if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish))
-    needs: smoke
+    needs: [package-ready, smoke]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -140,46 +166,13 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
-      - id: package
-        name: Resolve npm package version
-        env:
-          MANUAL_VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            version="${GITHUB_REF_NAME#v}"
-          else
-            version="${MANUAL_VERSION#v}"
-          fi
-          if [ -z "${version}" ]; then
-            echo "::error::workflow_dispatch publish requires a version input"
-            exit 1
-          fi
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-      - name: Wait for npm package availability
-        env:
-          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
-        run: |
-          set -euo pipefail
-          # Registry metadata may precede tarball availability on npm's CDN.
-          # Require real package bytes; the first-party exact release is newer
-          # than the repo's 7-day dependency age policy, so exempt only this probe.
-          pack_dir="$(mktemp -d)"
-          trap 'rm -rf "${pack_dir}"' EXIT
-          for attempt in {1..30}; do
-            if npm pack --min-release-age=0 --ignore-scripts --silent --pack-destination "${pack_dir}" "boardreadyops@${PACKAGE_VERSION}" >/dev/null 2>&1; then
-              exit 0
-            fi
-            echo "boardreadyops@${PACKAGE_VERSION} tarball is not downloadable yet; retry ${attempt}/30"
-            sleep 10
-          done
-          echo "::error::boardreadyops@${PACKAGE_VERSION} tarball is still unavailable after bounded retries"
-          exit 1
       - id: image-tags
         name: Resolve image tags
+        env:
+          PACKAGE_VERSION: ${{ needs.package-ready.outputs.version }}
         run: |
           set -euo pipefail
-          version="${{ steps.package.outputs.version }}"
+          version="${PACKAGE_VERSION}"
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             tag="${GITHUB_REF_NAME}"
           else
@@ -220,7 +213,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.image-tags.outputs.image-tag }}
           build-args: |
-            BOARDREADYOPS_VERSION=${{ steps.package.outputs.version }}
+            BOARDREADYOPS_VERSION=${{ needs.package-ready.outputs.version }}
             NODE_VERSION=${{ env.NODE_VERSION }}
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
