@@ -17,7 +17,22 @@ original owner must stop cleanly, and a successor with the same second-worker
 configuration must regain health readiness. These are isolated new-worker checks, not proof of a live
 legacy-worker cutover or a frozen customer write boundary.
 
-The uploaded evidence is aggregate-only. It contains the source commit SHA, backup byte count, migration/table/representative-row counts, a restored-run-state boolean, the runtime image contract, and web/worker readiness plus two worker handoff booleans. It does not contain installation IDs, repository names, run IDs, database URLs, payloads, findings, tokens, webhook values, or private source data.
+The workflow also exercises the **real signed GitHub webhook HTTP endpoint while
+every worker is stopped**. It requires a durable HTTP 202 admission, exact
+delivery-id deduplication into one PostgreSQL inbox/job, then resumes a
+disposable worker and waits for that same job to complete exactly once.
+This protects the no-loss intake contract during a worker pause; it does
+not prove compatibility with the currently deployed legacy web or guarantee
+live production ingestion during database DDL.
+
+GitHub does **not** automatically redeliver failed webhook deliveries:
+https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries.
+A maintenance strategy that simply returns 503 or disables the webhook
+receiver can therefore lose events. A live cutover must preserve durable
+webhook intake or include independently verified failed-delivery
+reconciliation; this isolated test authorizes neither procedure.
+
+The uploaded evidence is aggregate-only. It contains the source commit SHA, backup byte count, migration/table/representative-row counts, a restored-run-state boolean, the runtime image contract, and web/worker readiness plus aggregate worker handoff and durable webhook continuity booleans. It does not contain installation IDs, repository names, run IDs, database URLs, payloads, findings, tokens, webhook values, or private source data.
 
 ## Running the database portion locally
 
