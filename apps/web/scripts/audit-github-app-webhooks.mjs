@@ -122,7 +122,7 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
   let failedAttempts = 0;
   for (const attempt of attempts) {
     const existing = groups.get(attempt.guid) ?? { failures: [], successful: false };
-    if (attempt.statusCode >= 200 && attempt.statusCode < 400) {
+    if (attempt.statusCode >= 200 && attempt.statusCode < 300) {
       existing.successful = true;
     } else {
       existing.failures.push(attempt.id);
@@ -213,7 +213,7 @@ export async function runWebhookDeliveryAudit(environment = process.env, depende
   const failedGuids = [
     ...new Set(
       deliveries.attempts
-        .filter((attempt) => attempt.statusCode < 200 || attempt.statusCode >= 400)
+        .filter((attempt) => attempt.statusCode < 200 || attempt.statusCode >= 300)
         .map((attempt) => attempt.guid),
     ),
   ];
