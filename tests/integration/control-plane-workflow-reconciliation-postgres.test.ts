@@ -44,10 +44,10 @@ async function cleanup(): Promise<void> {
 
 async function createFixture(
   label: string,
-  options: { runStatus?: RunStatus; attemptStatus?: AttemptStatus } = {},
+  options: { runStatus?: RunStatus; attemptStatus?: AttemptStatus; now?: Date } = {},
 ): Promise<WorkflowFixture> {
   externalIdOffset += 2;
-  const now = new Date("2026-07-27T16:00:00.000Z");
+  const now = options.now ?? new Date("2026-07-27T16:00:00.000Z");
   const staleAt = new Date(now.valueOf() - 10 * 60 * 1000);
   const installationId = randomUUID();
   const repositoryId = randomUUID();
@@ -604,6 +604,236 @@ describeDatabase("GitHub workflow PostgreSQL reconciliation", () => {
         workerId: checkWorkerId,
       }),
     ).resolves.toMatchObject({ expectedConclusion: "failure", resultReported: false });
+  });
+
+  async function exhaustedLegacyCallback(label: string) {
+    // This live incident is ten days old; keep the sample duration inside the
+    // release_runs.duration_ms integer contract while retaining a pre-fix item.
+    const fixture = await createFixture(label, { now: new Date(Date.now() - 10 * 24 * 60 * 60_000) });
+    const checkRunId = externalIdSeed + externalIdOffset + 10_000;
+    await database().query("update release_runs set github_check_run_id = $2 where id = $1", [
+      fixture.releaseRunId,
+      checkRunId,
+    ]);
+    const claimed = await detectAndClaim(fixture, `${testPrefix}-legacy-${label}`);
+    await database().query(
+      `update control_plane_reconciliation_items
+          set status = 'dead_letter',
+              attempt_count = max_attempts,
+              lease_owner = null,
+              lease_expires_at = null,
+              completed_at = $2::timestamptz,
+              created_at = $3::timestamptz,
+              outcome_code = 'github_result_callback_pending',
+              public_failure_reason = 'operator_replay_required'
+        where id = $1`,
+      [claimed.reconciliationId, fixture.now.toISOString(), fixture.staleAt.toISOString()],
+    );
+    return { fixture, reconciliationId: claimed.reconciliationId, checkRunId };
+  }
+
+  async function reactivateLegacy(input: {
+    installationId: string;
+    reconciliationId: string;
+    checkRunId: number;
+    workflowId?: string;
+  }) {
+    const response = await database().query(
+      `select boardreadyops_reactivate_legacy_callback_dead_letter(
+          $1, $2, $3, $4::bigint, $5
+        ) as outcome`,
+      [
+        input.installationId,
+        input.reconciliationId,
+        input.workflowId ?? "987654321",
+        input.checkRunId,
+        "operator.recovery-test",
+      ],
+    );
+    return rows(response)[0]?.outcome;
+  }
+
+  it("reactivates only a pre-fix dead letter, then fails closed using existing signed-callback reconciliation", async () => {
+    const target = await exhaustedLegacyCallback("historic-current");
+    await expect(
+      reactivateLegacy({
+        installationId: target.fixture.installationId,
+        reconciliationId: target.reconciliationId,
+        checkRunId: target.checkRunId,
+      }),
+    ).resolves.toBe("reactivated");
+
+    const recoveryRow = rows(
+      await database().query(
+        `select status, attempt_count, completed_at, repaired, outcome_code
+         from control_plane_reconciliation_items where id = $1`,
+        [target.reconciliationId],
+      ),
+    )[0];
+    expect(recoveryRow).toMatchObject({
+      status: "available",
+      attempt_count: 0,
+      completed_at: null,
+      repaired: false,
+      outcome_code: "operator_legacy_callback_recovery",
+    });
+
+    const after = createSqlControlPlaneOperationsStore(database(), { now: () => new Date(), leaseSeconds: 60 });
+    const workerId = `${testPrefix}-legacy-current-worker`;
+    const claim = (await after.claimWorkflowReconciliationItems({ workerId, limit: 1 }))[0];
+    expect(claim).toMatchObject({ reconciliationId: target.reconciliationId, attemptCount: 1 });
+    await expect(
+      after.loadWorkflowReconciliationContext({
+        reconciliationId: target.reconciliationId,
+        workerId,
+      }),
+    ).resolves.toMatchObject({
+      githubWorkflowRunId: "987654321",
+      releaseRunId: target.fixture.releaseRunId,
+      executionAttemptId: target.fixture.executionAttemptId,
+    });
+    // The worker independently observes GitHub completed/success but has NO signed callback.
+    // Its existing guarded transition MUST fail, never produce a readiness pass.
+    await expect(
+      after.applyWorkflowReconciliation({
+        reconciliationId: target.reconciliationId,
+        workerId,
+        observedStatus: "completed",
+        observedConclusion: "success",
+        terminalStatus: "failed",
+        publicFailureReason: "github_result_callback_missing",
+      }),
+    ).resolves.toBe("applied");
+
+    const terminal = rows(
+      await database().query(
+        `select rr.status as run_status, ra.status as attempt_status,
+              ra.failure_class, c.status as reconciliation_status,
+              (select count(*)::int from release_run_results sr where sr.run_id = rr.id) as signed_results,
+              (select count(*)::int from audit_events ae
+                where ae.release_run_id = rr.id
+                  and ae.event_type = 'control_plane.legacy_callback_reconciliation_reactivated') as operator_audit
+         from release_runs rr
+         join release_run_attempts ra on ra.id = rr.execution_attempt_id
+         join control_plane_reconciliation_items c on c.execution_attempt_id = ra.id
+        where rr.id = $1`,
+        [target.fixture.releaseRunId],
+      ),
+    )[0];
+    expect(terminal).toEqual({
+      run_status: "failed",
+      attempt_status: "failed",
+      failure_class: "github_result_callback_missing",
+      reconciliation_status: "completed",
+      signed_results: 0,
+      operator_audit: 1,
+    });
+    await expect(
+      reactivateLegacy({
+        installationId: target.fixture.installationId,
+        reconciliationId: target.reconciliationId,
+        checkRunId: target.checkRunId,
+      }),
+    ).resolves.toBe("not_recoverable");
+  });
+
+  it("rejects cross-tenant, wrong GitHub identity, and duplicate legacy recovery", async () => {
+    const target = await exhaustedLegacyCallback("historic-scope");
+    await expect(
+      reactivateLegacy({
+        installationId: randomUUID(),
+        reconciliationId: target.reconciliationId,
+        checkRunId: target.checkRunId,
+      }),
+    ).resolves.toBe("not_recoverable");
+    await expect(
+      reactivateLegacy({
+        installationId: target.fixture.installationId,
+        reconciliationId: target.reconciliationId,
+        checkRunId: target.checkRunId,
+        workflowId: "111111111",
+      }),
+    ).resolves.toBe("not_recoverable");
+    await expect(
+      reactivateLegacy({
+        installationId: target.fixture.installationId,
+        reconciliationId: target.reconciliationId,
+        checkRunId: target.checkRunId + 1,
+      }),
+    ).resolves.toBe("not_recoverable");
+    await expect(
+      reactivateLegacy({
+        installationId: target.fixture.installationId,
+        reconciliationId: target.reconciliationId,
+        checkRunId: target.checkRunId,
+      }),
+    ).resolves.toBe("reactivated");
+    await expect(
+      reactivateLegacy({
+        installationId: target.fixture.installationId,
+        reconciliationId: target.reconciliationId,
+        checkRunId: target.checkRunId,
+      }),
+    ).resolves.toBe("not_recoverable");
+    const events = rows(
+      await database().query(
+        `select count(*)::int as count from audit_events
+        where release_run_id=$1 and event_type='control_plane.legacy_callback_reconciliation_reactivated'`,
+        [target.fixture.releaseRunId],
+      ),
+    );
+    expect(events[0]?.count).toBe(1);
+  });
+
+  it.each([
+    "suspended",
+    "disabled",
+    "run-version-drift",
+    "attempt-version-drift",
+    "signed-result",
+    "newer-than-fix",
+    "too-old-to-terminalize",
+  ])("refuses recovery when the subject is %s", async (variant) => {
+    const target = await exhaustedLegacyCallback(`guard-${variant}`);
+    const { fixture } = target;
+    if (variant === "suspended") {
+      await database().query("update installations set suspended_at=now() where id=$1", [fixture.installationId]);
+    } else if (variant === "disabled") {
+      await database().query("update repositories set disabled_at=now() where id=$1", [fixture.repositoryId]);
+    } else if (variant === "run-version-drift") {
+      await database().query("update release_runs set version=version+1 where id=$1", [fixture.releaseRunId]);
+    } else if (variant === "attempt-version-drift") {
+      await database().query("update release_run_attempts set version=version+1 where id=$1", [
+        fixture.executionAttemptId,
+      ]);
+    } else if (variant === "too-old-to-terminalize") {
+      await database().query("update release_runs set started_at=now()-interval '30 days' where id=$1", [
+        fixture.releaseRunId,
+      ]);
+    } else if (variant === "signed-result") {
+      await database().query("update release_runs set terminal_result_digest=$2 where id=$1", [
+        fixture.releaseRunId,
+        "a".repeat(64),
+      ]);
+    } else if (variant === "newer-than-fix") {
+      await database().query("update control_plane_reconciliation_items set created_at=now() where id=$1", [
+        target.reconciliationId,
+      ]);
+    }
+    await expect(
+      reactivateLegacy({
+        installationId: fixture.installationId,
+        reconciliationId: target.reconciliationId,
+        checkRunId: target.checkRunId,
+      }),
+    ).resolves.toBe("not_recoverable");
+    expect(
+      rows(
+        await database().query("select status from control_plane_reconciliation_items where id=$1", [
+          target.reconciliationId,
+        ]),
+      )[0]?.status,
+    ).toBe("dead_letter");
   });
 
   it("keeps claiming while an exhausted item sits on the queue", async () => {

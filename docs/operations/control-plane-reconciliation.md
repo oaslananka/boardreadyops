@@ -119,6 +119,73 @@ PITR or live worker ownership.
 References: https://docs.github.com/en/rest/apps/webhooks and
 https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries
 
+## Legacy callback-missing reconciliation recovery (issue #446)
+
+Migration 0129 installs the **opt-in**, `SECURITY INVOKER` PostgreSQL function
+`boardreadyops_reactivate_legacy_callback_dead_letter`. Applying the
+migration **does not change any run, reconciliation item, Check Run, or queue**.
+This is a narrow repair for an old reconciliation that exhausted its 12-claim
+budget *before* migration 0113, while GitHub subsequently finished the workflow
+but the separately signed BoardReadyOps result callback never arrived.
+
+**Do not invoke this repair while the existing production HOLD remains.** A
+supervised operator must first independently establish all of the following:
+
+1. A full maintenance/rollback handoff: old worker fully stopped, new worker
+   single-owner/fenced, accepted webhook writes preserved, database/write-boundary
+   compatibility, off-host recovery and current CI/deployment gates confirmed.
+   No rolling overlap of old and new queue consumers.
+2. A unique, current non-suspended GitHub App installation and enabled repository,
+   exact current release run and attempt, and no stored signed result, live runner
+   lease, or pending external side effect.
+3. Two **read-only GitHub GETs** using the appropriate installation/repository
+   authority: the exact persisted workflow run is terminal (a GitHub success is
+   **not** hardware success) and the exact persisted BoardReadyOps Check Run
+   remains open. Inspect the pending result/callback history without re-running
+   workflow jobs or replaying delivery webhooks.
+4. The exact original reconciliation is `dead_letter` with
+   `github_result_callback_pending`, an elapsed deadline and snapshot
+   versions matching the current `dispatched` run and attempt. Only historical
+   pre-0113 entries **less than 24 days old** are eligible; older runs are
+   refused because the legacy run duration field cannot safely represent their
+   age. Use scoped, protected operator DB access,
+   secure secret handling and an audit actor; never publish identifiers publicly.
+
+In a supervised maintenance transaction, a **single** explicitly selected
+reconciliation may be reactivated using the five bound arguments
+`(installation_id, reconciliation_id, exact_github_workflow_run_id,
+exact_boardreadyops_check_run_id, operator_actor_id)`. An operator can execute:
+
+```sql
+-- MUTATES the specified reconciliation when all guards pass.
+-- Not a preflight or release authorization.
+select boardreadyops_reactivate_legacy_callback_dead_letter(
+  :installation_id, :reconciliation_id,
+  :github_workflow_run_id, :github_check_run_id::bigint, :operator_actor_id
+);
+```
+
+A `not_recoverable` response makes **no changes** and intentionally discloses
+no cross-tenant details. `reactivated` adds one audit event and queues only the
+**existing** worker reconciliation for authoritative GitHub observation. It
+does not update a Check Run, dispatch a workflow, invent a signature, mark a
+run as passing, or waive user/tenant authorization. After the expired deadline,
+a GitHub `completed/success` without the signed result must become
+`github_result_callback_missing` / **failed**, and the existing Check Run
+reconciliation must independently publish the **failure**. Verify both
+terminal states, their audit links and the exact source/attempt versions.
+A second invocation, a different tenant/remote identity, a new signed result,
+or stale run/attempt returns `not_recoverable`. Never manually set an
+`in_progress` Check Run to `success`, run this on a broad batch or silently
+reset an unrelated `dead_letter`.
+
+The disposable-PostgreSQL integration test covers the reactivation to existing
+worker fail-closed transition and rejects wrong installation/workflow/Check
+Run, inactive repos, signed results, newer rows, and version drift. Source
+tests are **not** authorization or evidence of a completed production repair.
+Until independently observed on the hosted user journey, #446/#1161 remain
+open and Time To First Useful Finding is not accepted.
+
 ## Replay one safe dead letter
 
 ```http
