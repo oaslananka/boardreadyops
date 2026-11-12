@@ -259,6 +259,13 @@ describe("repository setup readiness controls", () => {
     expect(container.textContent).toContain("After validation: run a real hardware check");
     expect(container.textContent).toContain("It does not produce hardware findings");
     expect(container.textContent).toContain("Cloud readiness runs are not enabled for this repository yet.");
+    const progress = container.querySelector("[data-setup-state]");
+    expect(progress?.textContent).toContain("Hosted hardware runs are not available yet");
+    expect(progress?.textContent).toContain("A local check cannot create an OIDC-signed hosted run");
+    expect(progress?.querySelector('a[href*="/docs/quickstart.md"]')?.textContent).toContain(
+      "Run a local hardware check",
+    );
+    expect(progress?.querySelector('a[href="#policy-preset"]')?.textContent).toContain("Prepare repository setup");
     expect(container.textContent).not.toContain("open a pull request changing your hardware project");
     expect(container.querySelector('a[href="/runs/run-a"]')?.textContent).toContain("Inspect latest recorded run");
     expect(container.querySelector('a[href*="/docs/quickstart.md"]')?.textContent).toContain("Run a local first check");
@@ -271,10 +278,54 @@ describe("repository setup readiness controls", () => {
       selector.dispatchEvent(new Event("change", { bubbles: true }));
     });
     expect(container.textContent).not.toContain("Cloud readiness runs are not enabled for this repository yet.");
+    const unblockedProgress = container.querySelector("[data-setup-state]");
+    expect(unblockedProgress?.textContent).not.toContain("Hosted hardware runs are not available yet");
+    expect(unblockedProgress?.querySelector('a[href*="/docs/quickstart.md"]')).toBeNull();
+    expect(unblockedProgress?.querySelector('a[href="#policy-preset"]')?.textContent).toContain(
+      "Review policy and next setup step",
+    );
     expect(container.querySelector('a[href="/runs/run-a"]')).toBeNull();
     expect(container.querySelector('a[href*="/docs/quickstart.md"]')).toBeNull();
     expect(container.textContent).toContain("open a pull request changing your");
     expect(container.textContent).toContain("an empty or queued result is not a first useful finding");
+  });
+
+  it("prioritizes a useful local check over empty hosted runs when setup is verified but rollout is blocked", async () => {
+    const verified = {
+      ...readyForProbe,
+      setupWorkflowStatus: "ready",
+      setupConfigStatus: "ready",
+      setupObservedSha: "a".repeat(40),
+      readinessRunBlockedReason: "Cloud readiness runs are not enabled yet.",
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [verified] }),
+      );
+    });
+    const progress = container.querySelector('[data-setup-state="ready"]');
+    expect(progress?.textContent).toContain("Repository setup verified");
+    expect(progress?.querySelector('a[href*="/docs/quickstart.md"]')?.textContent).toContain(
+      "Run a local hardware check",
+    );
+    expect(progress?.querySelector('a[href="#readiness"]')?.textContent).toContain("Review verified setup");
+    expect(progress?.querySelector('a[href="/repositories/repo-1"]')).toBeNull();
+    expect(container.textContent).toContain("Cloud readiness runs are not enabled yet.");
+
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...verified, readinessRunBlockedReason: undefined }],
+        }),
+      );
+    });
+    const enabledProgress = container.querySelector('[data-setup-state="ready"]');
+    expect(enabledProgress?.textContent).not.toContain("Hosted hardware runs are not available yet");
+    expect(enabledProgress?.querySelector('a[href="/repositories/repo-1"]')?.textContent).toContain(
+      "View this repository's readiness runs",
+    );
   });
 
   it("provides an honest local-first alternative without inventing a run for a blocked new repository", async () => {
