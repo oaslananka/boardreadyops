@@ -7,6 +7,7 @@ import { customerStatusLabel } from "../lib/customer-nomenclature.js";
 import type { InstallationCapabilities } from "../lib/installation-capabilities.js";
 import { deriveRepositorySetupState } from "../lib/repository-setup-state.js";
 import { AppPermissionProfile } from "./app-permission-profile.js";
+import { CopyButton } from "./copy-button.js";
 import { Alert, Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
 import { YamlSyntaxHighlighter } from "./yaml-syntax-highlighter.js";
 
@@ -989,6 +990,9 @@ function SetupProgressNav({ currentStep }: Readonly<{ currentStep: 1 | 4 }>) {
   );
 }
 
+// These commands deliberately use no repository-supplied or account-supplied strings.
+const localFirstCheckCommands = "npm i -g boardreadyops\nboardreadyops check . --fail-on never";
+
 function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetRepository }>) {
   const state = deriveRepositorySetupState(repository ?? {});
   const label = repository ? state.label : "Preview only";
@@ -1021,6 +1025,27 @@ function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetReposi
             runs are unavailable. A local check cannot create an OIDC-signed hosted run.
           </p>
         </Alert>
+      ) : null}
+      {repository?.readinessRunBlockedReason ? (
+        <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3 text-sm" data-local-first-check>
+          <p className="font-semibold text-foreground">Your first local findings</p>
+          <p className="text-muted-foreground">
+            Open a terminal in your own KiCad project folder. With Node.js 24 installed, run:
+          </p>
+          <pre className="overflow-x-auto rounded-md border border-border bg-background p-3 text-xs text-foreground">
+            <code>{localFirstCheckCommands}</code>
+          </pre>
+          <CopyButton
+            label="Copy check commands"
+            accessibleLabel="Copy BoardReadyOps installation and local hardware check commands"
+            value={localFirstCheckCommands}
+          />
+          <p className="text-muted-foreground">
+            The installation requires npm access. The check writes local findings to{" "}
+            <code>build/boardreadyops.findings.json</code>. With <code>--fail-on never</code>, exit code 0 only means
+            the scan finished; review the findings before manufacturing. This does not produce an OIDC-signed cloud run.
+          </p>
+        </div>
       ) : null}
       {repository?.readinessRunBlockedReason ? (
         <div className="flex flex-wrap items-center gap-3">
