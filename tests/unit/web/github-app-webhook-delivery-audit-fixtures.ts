@@ -8,7 +8,7 @@ export function delivery(id: number, guid: string, code: number, at = time) {
     guid,
     statusCode: code,
     status_code: code,
-    status: code >= 200 && code < 400 ? "OK" : "failed",
+    status: code >= 200 && code < 300 ? "OK" : "failed",
     delivered_at: at,
   };
 }

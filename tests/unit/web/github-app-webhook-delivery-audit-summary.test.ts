@@ -45,4 +45,22 @@ describe("GitHub App webhook delivery safety audit", () => {
     expect(result.review).toEqual([{ deliveryId: 1, guid: guidA, category: "successful_retry_without_inbox" }]);
     expect(result.unresolvedAfterSuccess).toBe(1);
   });
+  it("treats redirects as failed deliveries, even when a later attempt succeeds", () => {
+    const result = deliveryGapSummary(
+      [delivery(1, guidA, 302), delivery(2, guidA, 204), delivery(3, guidB, 301)],
+      new Set(),
+      true,
+    );
+    expect(result).toMatchObject({
+      failedAttempts: 2,
+      failedEvents: 2,
+      failuresWithNoInbox: 1,
+      unresolvedAfterSuccess: 1,
+      needsReview: true,
+    });
+    expect(result.review).toEqual([
+      { deliveryId: 1, guid: guidA, category: "successful_retry_without_inbox" },
+      { deliveryId: 3, guid: guidB, category: "failed_not_stored" },
+    ]);
+  });
 });
