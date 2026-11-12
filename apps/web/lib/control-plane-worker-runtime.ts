@@ -293,3 +293,18 @@ export function createScopedConcurrencyGate(options: {
     },
   };
 }
+
+/** A failing queue loop must stop peers and drain all in-flight work before
+ * the caller releases its database ownership session. */
+export async function waitForAllWorkerLoops(loops: readonly Promise<void>[], onFailure: () => void): Promise<void> {
+  const settled = await Promise.allSettled(
+    loops.map((loop) =>
+      loop.catch((error: unknown) => {
+        onFailure();
+        throw error;
+      }),
+    ),
+  );
+  const failed = settled.find((result) => result.status === "rejected");
+  if (failed?.status === "rejected") throw failed.reason;
+}

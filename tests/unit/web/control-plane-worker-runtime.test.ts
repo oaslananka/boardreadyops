@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createScopedConcurrencyGate,
   jobCorrelation,
   outboxCorrelation,
   sanitizeWorkerLogFields,
+  waitForAllWorkerLoops,
   workerScopeFromJob,
   workerScopeFromOutboxEffect,
   workerScopeFromReconciliationItem,
@@ -308,5 +309,32 @@ describe("control-plane worker runtime", () => {
     expect(source).toContain("operations.claimCheckRunReconciliationItems");
     expect(source).toContain("processControlPlaneCheckRunReconciliation");
     expect(source).toContain('"worker.check_run_reconciliation_terminal"');
+  });
+});
+
+describe("exclusive-worker shutdown loop draining", () => {
+  it("waits for all pending effects before allowing the caller to release ownership", async () => {
+    const pendingEffect = deferred();
+    const stopNewClaims = vi.fn();
+    const failure = new Error("worker_loop_failed");
+    const drained = waitForAllWorkerLoops([Promise.reject(failure), pendingEffect.promise], stopNewClaims);
+    // Observe rejections now rather than leaving an unhandled rejected promise.
+    const observed = drained.catch((error: unknown) => error);
+    await settle();
+    expect(stopNewClaims).toHaveBeenCalledTimes(1);
+    let finished = false;
+    void observed.then(() => {
+      finished = true;
+    });
+    await settle();
+    expect(finished).toBe(false);
+    pendingEffect.resolve();
+    await expect(observed).resolves.toBe(failure);
+  });
+
+  it("completes normally after every queue loop finishes", async () => {
+    const stopNewClaims = vi.fn();
+    await expect(waitForAllWorkerLoops([Promise.resolve(), Promise.resolve()], stopNewClaims)).resolves.toBeUndefined();
+    expect(stopNewClaims).not.toHaveBeenCalled();
   });
 });

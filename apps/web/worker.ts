@@ -32,6 +32,7 @@ import { createSqlNotificationStore } from "@boardreadyops/db/notification-store
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createSqlRetentionMaintenanceStore } from "@boardreadyops/db/retention-maintenance-store";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
+import { acquireExclusiveWorkerOwnership, type WorkerOwnership } from "@boardreadyops/db/worker-ownership";
 import { processArtifactDeletion } from "./lib/artifact-deletion-worker.js";
 import { resolveControlPlaneRetentionConfiguration } from "./lib/cloud-runtime-config.js";
 import { createComponentIntelligenceResolver } from "./lib/component-intelligence-resolver.js";
@@ -46,6 +47,7 @@ import {
   jobCorrelation,
   outboxCorrelation,
   sanitizeWorkerLogFields,
+  waitForAllWorkerLoops,
   workerScopeFromJob,
   workerScopeFromOutboxEffect,
   workerScopeFromReconciliationItem,
@@ -1217,6 +1219,7 @@ async function runMaintenanceLoop(): Promise<void> {
 
 let activeLoops: Promise<unknown> = Promise.resolve();
 let shutdownPromise: Promise<void> | undefined;
+let workerOwnership: WorkerOwnership | undefined;
 
 async function closeHealthServer(): Promise<void> {
   if (!healthServer.listening) return;
@@ -1232,8 +1235,16 @@ function shutdown(signal: string): Promise<void> {
   log("info", "worker.shutdown_started", { workerId, signal, ...scopedConcurrency.snapshot() });
   shutdownPromise = (async () => {
     await closeHealthServer();
-    await activeLoops;
-    await executor.close();
+    try {
+      await activeLoops;
+    } finally {
+      // Do not surrender the exclusive lock until every in-flight loop stopped.
+      try {
+        await workerOwnership?.release();
+      } finally {
+        await executor.close();
+      }
+    }
     log("info", "worker.shutdown_completed", { workerId, signal });
   })();
   return shutdownPromise;
@@ -1254,22 +1265,38 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 }
 
 try {
+  // The dedicated PG session is acquired BEFORE health readiness or claims.
+  // On ownership loss, fail-stop immediately: a successor can now acquire it.
+  workerOwnership = await acquireExclusiveWorkerOwnership({
+    connectionString: databaseUrl,
+    onLost: () => {
+      log("error", "worker.ownership_lost", { workerId });
+      process.exit(1);
+    },
+  });
   await startHealthServer();
-  activeLoops = Promise.all([
-    runLifecycleLoop(),
-    runOutboxLoop(),
-    runArtifactDeletionLoop(),
-    runStripeReconciliationLoop(),
-    runLifecycleReconciliationLoop(),
-    runGitHubReconciliationLoop(),
-    runMaintenanceLoop(),
-  ]);
+  activeLoops = waitForAllWorkerLoops(
+    [
+      runLifecycleLoop(),
+      runOutboxLoop(),
+      runArtifactDeletionLoop(),
+      runStripeReconciliationLoop(),
+      runLifecycleReconciliationLoop(),
+      runGitHubReconciliationLoop(),
+      runMaintenanceLoop(),
+    ],
+    () => {
+      shuttingDown = true;
+      ready = false;
+    },
+  );
   await activeLoops;
 } catch (error) {
   shuttingDown = true;
   ready = false;
   log("error", "worker.fatal", { workerId, errorClass: errorClass(error) });
   await closeHealthServer().catch(() => undefined);
+  await workerOwnership?.release().catch(() => undefined);
   await executor.close().catch(() => undefined);
   process.exitCode = 1;
 }

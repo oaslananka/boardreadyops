@@ -24,6 +24,12 @@ This source template is **not deployed** and does not authorize cutover.
 Keep automatic deployment disabled; verify backups, rollback, the migrated
 schema, queues/leases, policy/artifact access and authenticated customer paths.
 **Stop and verify the old worker has fully exited before starting the new one.**
+The new worker acquires a dedicated PostgreSQL session-level exclusive ownership
+lock before exposing readiness or claiming any work. A second new worker refuses
+to start while that lock is held; if the owner connection is lost, the worker
+fails closed instead of continuing external effects. This does **not** fence
+the currently deployed legacy worker (which does not use the lock), so the
+very first cutover still requires an externally verified stop-first handoff.
 Coolify's rolling application update could run both workers concurrently.
 Never redeploy the old all-in-one Compose stack. If the new worker fails,
 stop it and verify schema/queue rollback compatibility before considering
