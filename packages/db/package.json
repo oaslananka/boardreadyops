@@ -56,6 +56,11 @@
       "import": "./src/pg-executor.ts",
       "default": "./src/pg-executor.ts"
     },
+    "./worker-ownership": {
+      "types": "./src/worker-ownership.ts",
+      "import": "./src/worker-ownership.ts",
+      "default": "./src/worker-ownership.ts"
+    },
     "./board-bom-store": {
       "types": "./src/board-bom-store.ts",
       "import": "./src/board-bom-store.ts",

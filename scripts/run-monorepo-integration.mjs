@@ -20,6 +20,7 @@ export const REQUIRED_INTEGRATION_TESTS = [
 
 export const POSTGRES_INTEGRATION_TESTS = [
   "tests/integration/control-plane-job-store-postgres.test.ts",
+  "tests/integration/worker-ownership-postgres.test.ts",
   "tests/integration/control-plane-history-retention-postgres.test.ts",
   "tests/integration/data-export-artifact-snapshot-postgres.test.ts",
   "tests/integration/data-export-copy-unlink-postgres.test.ts",

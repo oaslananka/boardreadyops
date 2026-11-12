@@ -50,6 +50,7 @@ describe("complete monorepo integration", () => {
 
     expect(plan.postgres.status).toBe("tested");
     expect(plan.postgresTests).toContain("tests/integration/control-plane-job-store-postgres.test.ts");
+    expect(plan.postgresTests).toContain("tests/integration/worker-ownership-postgres.test.ts");
     expect(plan.postgresTests).toContain("tests/integration/run-dashboard-postgres.test.ts");
     expect(plan.postgresTests).toContain("tests/integration/marketplace-billing-postgres.test.ts");
     expect(plan.postgresTests).toContain("tests/integration/postgres-backup-restore.test.ts");
