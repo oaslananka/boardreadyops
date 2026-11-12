@@ -479,10 +479,32 @@ jobs:
                 },
                 body: JSON.stringify(payload),
               });
+            // A 2xx proxy page is not a persisted signed result for this exact run.
+            const acknowledgedResult = async (response) => {
+              if (!response?.ok) return false;
+              let receipt;
+              try {
+                receipt = await response.clone().json();
+              } catch {
+                return false;
+              }
+              return (
+                receipt !== null &&
+                typeof receipt === "object" &&
+                !Array.isArray(receipt) &&
+                receipt.ok === true &&
+                (receipt.status === "accepted" || receipt.status === "replayed") &&
+                receipt.runId === runId &&
+                receipt.executionAttemptId === executionAttemptId &&
+                receipt.checkRunUpdated === true
+              );
+            };
             let response;
+            let acceptedReceipt = false;
             for (let attempt = 1; attempt <= 3; attempt += 1) {
               response = await sendResult();
-              if (response.ok) break;
+              acceptedReceipt = await acknowledgedResult(response);
+              if (acceptedReceipt) break;
               // During a rolling upgrade, an older strict v1 receiver does not know
               // the optional toolVersions field. Retry once without that field only
               // for its exact 400 validation error, never for authorization failures.
@@ -502,12 +524,16 @@ jobs:
                 if (legacyValidationError) {
                   delete payload.toolVersions;
                   response = await sendResult();
-                  if (response.ok) break;
+                  acceptedReceipt = await acknowledgedResult(response);
+                  if (acceptedReceipt) break;
                 }
               }
               if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
             }
-            if (!response?.ok) {
+            if (!acceptedReceipt) {
+              if (response?.ok) {
+                throw new Error("BoardReadyOps Cloud callback did not confirm the persisted result and Check Run.");
+              }
               const responseText = response ? (await response.text()).slice(0, 512) : "no response";
               throw new Error(`BoardReadyOps Cloud callback failed: HTTP ${response?.status ?? "unknown"}: ${responseText}`);
             }
