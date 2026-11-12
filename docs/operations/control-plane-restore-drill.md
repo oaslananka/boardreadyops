@@ -11,9 +11,10 @@ The `control-plane-restore-drill` workflow uses PostgreSQL 17, matching the repo
 After the database verification succeeds, the workflow builds the **production runtime image** from `apps/web/Dockerfile`. It starts the real web server and control-plane worker against the restored database, with outbound execution disabled and no production GitHub credentials, then requires both `/api/health/ready` and `/health/ready` to become ready.
 
 The drill additionally verifies exclusive worker ownership on the same
-restored database and production image: a second process must fail before
-starting, the original owner must stop cleanly, and a successor must regain
-health readiness. These are isolated new-worker checks, not proof of a live
+restored database and production image: the first process must hold the
+database advisory lock, a second process must fail before starting, the
+original owner must stop cleanly, and a successor with the same second-worker
+configuration must regain health readiness. These are isolated new-worker checks, not proof of a live
 legacy-worker cutover or a frozen customer write boundary.
 
 The uploaded evidence is aggregate-only. It contains the source commit SHA, backup byte count, migration/table/representative-row counts, a restored-run-state boolean, the runtime image contract, and web/worker readiness plus two worker handoff booleans. It does not contain installation IDs, repository names, run IDs, database URLs, payloads, findings, tokens, webhook values, or private source data.

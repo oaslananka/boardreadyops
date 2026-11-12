@@ -156,6 +156,24 @@ jobs:
         run: |
           set -euo pipefail
           # Only the disposable restored DB, with all GitHub dispatch disabled.
+          # Verify the existing owner really holds the singleton advisory lock.
+          node --input-type=module - <<'NODE'
+          import pg from "pg";
+          const client = new pg.Client({ connectionString: process.env.BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL });
+          await client.connect();
+          try {
+            const { rows } = await client.query([
+              "SELECT count(*)::integer AS owners",
+              "FROM pg_locks AS lock JOIN pg_stat_activity AS activity ON activity.pid = lock.pid",
+              "WHERE lock.locktype = 'advisory' AND lock.granted",
+              "AND activity.datname = current_database()",
+              "AND activity.application_name = 'boardreadyops-control-plane-owner'",
+            ].join(" "));
+            if (rows[0]?.owners !== 1) throw new Error("expected one exclusive worker ownership lock");
+          } finally {
+            await client.end();
+          }
+          NODE
           docker run --detach --network host --name boardreadyops-restore-contender \
             --env DATABASE_URL="$BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL" \
             --env GITHUB_WEBHOOK_SECRET=restore-drill-placeholder \
@@ -180,7 +198,7 @@ jobs:
             --env DATABASE_URL="$BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL" \
             --env GITHUB_WEBHOOK_SECRET=restore-drill-placeholder \
             --env BOARDREADYOPS_RUNNER_MODE=disabled \
-            --env BOARDREADYOPS_WORKER_HEALTH_PORT=3001 \
+            --env BOARDREADYOPS_WORKER_HEALTH_PORT=3002 \
             --env ARTIFACT_STORAGE_DRIVER=local \
             --env ARTIFACT_STORAGE_ROOT=/tmp/boardreadyops-artifacts \
             "boardreadyops-restore-drill:$GITHUB_SHA" node worker.mjs
@@ -188,7 +206,7 @@ jobs:
           let ready = false;
           for (let attempt = 0; attempt < 60; attempt += 1) {
             try {
-              const response = await fetch("http://127.0.0.1:3001/health/ready");
+              const response = await fetch("http://127.0.0.1:3002/health/ready");
               const body = await response.json();
               if (response.status === 200 && body?.ok === true) {
                 ready = true;

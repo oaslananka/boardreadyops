@@ -71,6 +71,8 @@ describe("control-plane restore drill documentation", () => {
     const handoff = steps[handoffIndex];
     expect(handoff?.run).toContain('test "$contender_exit" -ne 0');
     expect(handoff?.run).toContain("worker.shutdown_completed");
+    expect(handoff?.run).toContain("expected one exclusive worker ownership lock");
+    expect(handoff?.run).toContain("http://127.0.0.1:3002/health/ready");
     expect(handoff?.run).toContain("successor failed restored-worker readiness");
     expect(handoff?.run).toContain("gracefulStopAndSuccessorReady = true");
     expect(handoff?.["continue-on-error"]).not.toBe(true);
