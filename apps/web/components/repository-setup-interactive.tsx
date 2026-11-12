@@ -1022,14 +1022,7 @@ function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetReposi
           </p>
         </Alert>
       ) : null}
-      {state.id === "ready" ? (
-        <Link
-          href={`/repositories/${repository?.id}`}
-          className="inline-flex min-h-11 w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-        >
-          View this repository's readiness runs →
-        </Link>
-      ) : repository?.readinessRunBlockedReason ? (
+      {repository?.readinessRunBlockedReason ? (
         <div className="flex flex-wrap items-center gap-3">
           <a
             href="https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md"
@@ -1040,12 +1033,19 @@ function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetReposi
             Run a local hardware check →
           </a>
           <a
-            href="#policy-preset"
+            href={state.id === "ready" ? "#readiness" : "#policy-preset"}
             className="inline-flex min-h-11 w-fit items-center rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground"
           >
-            Prepare repository setup →
+            {state.id === "ready" ? "Review verified setup →" : "Prepare repository setup →"}
           </a>
         </div>
+      ) : state.id === "ready" ? (
+        <Link
+          href={`/repositories/${repository?.id}`}
+          className="inline-flex min-h-11 w-fit items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
+          View this repository's readiness runs →
+        </Link>
       ) : (
         <a
           href="#policy-preset"

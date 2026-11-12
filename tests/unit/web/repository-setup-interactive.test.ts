@@ -290,6 +290,44 @@ describe("repository setup readiness controls", () => {
     expect(container.textContent).toContain("an empty or queued result is not a first useful finding");
   });
 
+  it("prioritizes a useful local check over empty hosted runs when setup is verified but rollout is blocked", async () => {
+    const verified = {
+      ...readyForProbe,
+      setupWorkflowStatus: "ready",
+      setupConfigStatus: "ready",
+      setupObservedSha: "a".repeat(40),
+      readinessRunBlockedReason: "Cloud readiness runs are not enabled yet.",
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [verified] }),
+      );
+    });
+    const progress = container.querySelector('[data-setup-state="ready"]');
+    expect(progress?.textContent).toContain("Repository setup verified");
+    expect(progress?.querySelector('a[href*="/docs/quickstart.md"]')?.textContent).toContain(
+      "Run a local hardware check",
+    );
+    expect(progress?.querySelector('a[href="#readiness"]')?.textContent).toContain("Review verified setup");
+    expect(progress?.querySelector('a[href="/repositories/repo-1"]')).toBeNull();
+    expect(container.textContent).toContain("Cloud readiness runs are not enabled yet.");
+
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...verified, readinessRunBlockedReason: undefined }],
+        }),
+      );
+    });
+    const enabledProgress = container.querySelector('[data-setup-state="ready"]');
+    expect(enabledProgress?.textContent).not.toContain("Hosted hardware runs are not available yet");
+    expect(enabledProgress?.querySelector('a[href="/repositories/repo-1"]')?.textContent).toContain(
+      "View this repository's readiness runs",
+    );
+  });
+
   it("provides an honest local-first alternative without inventing a run for a blocked new repository", async () => {
     const repo = {
       ...readyForProbe,
