@@ -152,6 +152,7 @@ describe("container action release surfaces", () => {
     expect(workflow).toContain("publish:");
     expect(workflow).toContain("type: boolean");
     expect(workflow).toContain(`github.event_name == 'workflow_dispatch' && inputs.publish`);
+    expect(workflow).toContain("needs: [package-ready, smoke]");
     expect(workflow).toContain("workflow_dispatch publish requires a version input");
     expect(workflow).toContain(`tag="v${shellVariable("version")}"`);
     expect(workflow).toContain(
@@ -159,54 +160,64 @@ describe("container action release surfaces", () => {
     );
   });
 
-  it("waits for npm package availability before publishing the container", async () => {
-    const workflow = await readFile(".github/workflows/container-build.yml", "utf8");
+  it("waits once for exact public npm bytes before starting expensive matrix builds", async () => {
+    const metadata = (await loadActionMetadata(".github/workflows/container-build.yml")) as {
+      jobs: {
+        "package-ready": {
+          "runs-on": string;
+          "timeout-minutes": number;
+          outputs: Record<string, string>;
+          steps: Array<{ name?: string; run?: string }>;
+        };
+        smoke: { needs: string; steps: Array<{ name?: string; run?: string }> };
+        publish: { needs: string[]; steps: Array<{ name?: string; run?: string }> };
+      };
+    };
 
-    expect(workflow.match(/Wait for npm package availability/g)).toHaveLength(2);
-    expect(workflow.match(/npm pack --min-release-age=0 --ignore-scripts --silent --pack-destination/g)).toHaveLength(
-      2,
-    );
-    expect(workflow).toContain(`"boardreadyops@${shellVariable("PACKAGE_VERSION")}"`);
-    expect(workflow).not.toContain(`npm view "boardreadyops@${shellVariable("PACKAGE_VERSION")}" version`);
+    const ready = metadata.jobs["package-ready"];
+    const resolve = ready.steps.find((step) => step.name === "Resolve package version")?.run ?? "";
+    const wait = ready.steps.find((step) => step.name === "Wait for npm package availability")?.run ?? "";
+
+    expect(ready["runs-on"]).toBe("ubuntu-24.04");
+    expect(ready["timeout-minutes"]).toBe(18);
+    expect(ready.outputs.version).toBe(actionExpression("steps.package.outputs.version"));
+    expect(resolve).toContain("GITHUB_EVENT_NAME");
+    expect(resolve).toContain("pull_request");
+    expect(resolve).toContain("npm view boardreadyops dist-tags.latest --json");
+    expect(resolve).toContain('select(type == "string")');
+    expect(resolve).toContain("npm latest dist-tag must resolve to a stable semantic version");
+    expect(resolve.indexOf("pull_request")).toBeLessThan(resolve.indexOf("elif ["));
+    expect(resolve).toContain("GITHUB_REF_NAME#v");
+    expect(resolve).toContain("Container smoke needs an exact semver npm package version");
+    expect(resolve).toContain("Manual package version does not match selected Git tag");
+
+    // The first-party package is exempt from dependency-age pinning only for this exact probe.
+    // A failed availability check is never converted to a successful container build.
+    expect(wait).toContain("PACKAGE_VERSION");
+    expect(wait).toContain("for attempt in {1..84}");
+    expect(wait).toContain("npm pack --prefer-online --fetch-retries=0 --fetch-timeout=15000 --min-release-age=0");
+    expect(wait).toContain(`"boardreadyops@${shellVariable("PACKAGE_VERSION")}"`);
+    expect(wait).toContain("tarball is still unavailable");
+    expect(wait).toContain("exit 1");
+
+    expect(metadata.jobs.smoke.needs).toBe("package-ready");
+    expect(metadata.jobs.publish.needs).toEqual(["package-ready", "smoke"]);
+    expect(metadata.jobs.smoke.steps.some((step) => step.name === "Wait for npm package availability")).toBe(false);
+    expect(metadata.jobs.publish.steps.some((step) => step.name === "Wait for npm package availability")).toBe(false);
   });
 
-  it("uses the published package version for pull request smoke builds", async () => {
+  it("shares the single verified package version across smoke arches and GHCR publishing", async () => {
     const workflow = await readFile(".github/workflows/container-build.yml", "utf8");
+    const version = actionExpression("needs.package-ready.outputs.version");
 
+    expect(workflow.match(/Wait for npm package availability/g)).toHaveLength(1);
+    expect(workflow.match(/npm pack --prefer-online --fetch-retries=0 --fetch-timeout=15000/g)).toHaveLength(1);
     expect(workflow).not.toContain("npm pack --pack-destination apps/container");
     expect(workflow).not.toContain("file:boardreadyops-");
-    expect(workflow).toContain(`BOARDREADYOPS_VERSION=\${{ steps.package.outputs.version }}`);
-  });
-
-  it("uses the current published stable npm release for PR smoke, not an unpublished prepared version", async () => {
-    const metadata = (await loadActionMetadata(".github/workflows/container-build.yml")) as {
-      jobs?: { smoke?: { steps?: Array<{ name?: string; run?: string; env?: Record<string, string> }> } };
-    };
-    const steps = metadata.jobs?.smoke?.steps ?? [];
-    const resolution = steps.find((step) => step.name === "Resolve package version")?.run ?? "";
-    const waiting = steps.find((step) => step.name === "Wait for npm package availability")?.run ?? "";
-    const publish = metadata.jobs?.smoke?.steps?.find((step) => step.name === "Build local smoke image");
-
-    expect(resolution).toContain("GITHUB_EVENT_NAME");
-    expect(resolution).toContain("pull_request");
-    expect(resolution).toContain("npm view boardreadyops dist-tags.latest --json");
-    expect(resolution).toContain('select(type == "string")');
-    expect(resolution).toContain("npm latest dist-tag must resolve to a stable semantic version");
-    expect(resolution.indexOf("pull_request")).toBeLessThan(resolution.indexOf("GITHUB_REF_TYPE"));
-    expect(resolution).toContain("GITHUB_REF_NAME#v");
-    expect(waiting).toContain("PACKAGE_VERSION");
-    expect(publish).toBeDefined();
-    expect(resolution).not.toContain("npm pack");
-  });
-
-  it("waits for npm package availability before release smoke builds", async () => {
-    const workflow = await readFile(".github/workflows/container-build.yml", "utf8");
-
-    const waitIndex = workflow.indexOf("Wait for npm package availability");
-    const smokeBuildIndex = workflow.indexOf("Build local smoke image");
-
-    expect(waitIndex).toBeGreaterThan(-1);
-    expect(waitIndex).toBeLessThan(smokeBuildIndex);
+    expect(workflow.split(`BOARDREADYOPS_VERSION=${version}`)).toHaveLength(3);
+    expect(workflow).toContain(`PACKAGE_VERSION: ${version}`);
+    expect(workflow).toContain(`version="${shellVariable("PACKAGE_VERSION")}"`);
+    expect(workflow).not.toContain("continue-on-error");
   });
 
   it("only publishes stable moving aliases for stable release tags", async () => {
