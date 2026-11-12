@@ -31,6 +31,8 @@ describe("control-plane restore drill documentation", () => {
     expect(workflow).toContain("worker.shutdown_completed");
     expect(workflow).toContain("exclusiveOwnerContenderRejected");
     expect(workflow).toContain("gracefulStopAndSuccessorReady");
+    expect(workflow).toContain("signedWebhookAcceptedWithoutWorker");
+    expect(workflow).toContain("queuedWebhookProcessedAfterRestart");
     expect(workflow).toContain("/api/health/ready");
     expect(workflow).toContain("/health/ready");
     expect(workflow).toContain("node --input-type=module - <<'NODE'");
@@ -63,10 +65,18 @@ describe("control-plane restore drill documentation", () => {
     const handoffIndex = steps.findIndex(
       (step) => step.name === "Verify exclusive worker ownership and graceful successor",
     );
+    const stoppedIntakeIndex = steps.findIndex(
+      (step) => step.name === "Verify signed webhook is durably accepted while all workers are stopped",
+    );
+    const resumedIntakeIndex = steps.findIndex(
+      (step) => step.name === "Verify queued webhook is processed once after worker resumes",
+    );
     const cleanupIndex = steps.findIndex((step) => step.name === "Stop isolated restored runtime");
     expect(readinessIndex).toBeGreaterThan(-1);
     expect(handoffIndex).toBeGreaterThan(readinessIndex);
-    expect(cleanupIndex).toBeGreaterThan(handoffIndex);
+    expect(stoppedIntakeIndex).toBeGreaterThan(handoffIndex);
+    expect(resumedIntakeIndex).toBeGreaterThan(stoppedIntakeIndex);
+    expect(cleanupIndex).toBeGreaterThan(resumedIntakeIndex);
 
     const handoff = steps[handoffIndex];
     expect(handoff?.run).toContain('test "$contender_exit" -ne 0');
@@ -81,5 +91,16 @@ describe("control-plane restore drill documentation", () => {
     expect(cleanup?.if).toBe("always()");
     expect(cleanup?.run).toContain("boardreadyops-restore-contender");
     expect(cleanup?.run).toContain("boardreadyops-restore-successor");
+    expect(cleanup?.run).toContain("boardreadyops-restore-intake-worker");
+    const intake = steps[stoppedIntakeIndex];
+    expect(intake?.run).toContain("x-hub-signature-256");
+    expect(intake?.run).toContain('rows[0].status !== "available"');
+    expect(intake?.run).toContain("first.status !== 202");
+    expect(intake?.run).toContain("retry.status !== 202");
+    expect(intake?.["continue-on-error"]).not.toBe(true);
+    const resumed = steps[resumedIntakeIndex];
+    expect(resumed?.run).toContain('row.status === "completed"');
+    expect(resumed?.run).toContain("row.attempt_count !== 1");
+    expect(resumed?.["continue-on-error"]).not.toBe(true);
   });
 });

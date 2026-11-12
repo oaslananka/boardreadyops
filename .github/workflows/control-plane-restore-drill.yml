@@ -229,11 +229,117 @@ jobs:
           writeFileSync(path, JSON.stringify(report) + String.fromCharCode(10), { mode: 0o600 });
           NODE
 
+      - name: Verify signed webhook is durably accepted while all workers are stopped
+        run: |
+          node --input-type=module - <<'NODE'
+          import { createHmac } from "node:crypto";
+          import pg from "pg";
+
+          const delivery = "restore-intake-" + process.env.GITHUB_SHA.slice(0, 24);
+          const payload = JSON.stringify({
+            action: "created",
+            installation: {
+              id: 92345760,
+              account: { login: "restore-drill-synthetic", type: "Organization" },
+            },
+            repositories: [{
+              id: 92345761,
+              name: "synthetic-board",
+              full_name: "restore-drill-synthetic/synthetic-board",
+              private: true,
+              default_branch: "main",
+              owner: { login: "restore-drill-synthetic" },
+            }],
+          });
+          const signature = "sha256=" + createHmac("sha256", "restore-drill-placeholder").update(payload).digest("hex");
+          const headers = {
+            "content-type": "application/json",
+            "x-github-event": "installation",
+            "x-github-delivery": delivery,
+            "x-hub-signature-256": signature,
+          };
+          const url = "http://127.0.0.1:3000/api/github/webhook";
+          const first = await fetch(url, { method: "POST", headers, body: payload });
+          const firstResult = await first.json();
+          if (first.status !== 202 || firstResult.intake?.outcome !== "accepted" || firstResult.intake?.queued !== true) {
+            throw new Error("signed webhook was not durably accepted while the worker was stopped");
+          }
+          const retry = await fetch(url, { method: "POST", headers, body: payload });
+          const retryResult = await retry.json();
+          if (retry.status !== 202 || retryResult.intake?.outcome !== "duplicate" || retryResult.intake?.queued !== false) {
+            throw new Error("repeated signed webhook was not deduplicated");
+          }
+          const client = new pg.Client({ connectionString: process.env.BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL });
+          await client.connect();
+          try {
+            const { rows } = await client.query(
+              "SELECT wi.duplicate_count, job.status, job.attempt_count FROM webhook_inbox wi " +
+                "JOIN control_plane_jobs job ON job.inbox_id = wi.id " +
+                "WHERE wi.provider = 'github' AND wi.delivery_id = $1",
+              [delivery],
+            );
+            if (rows.length !== 1 || rows[0].duplicate_count !== 1 ||
+                rows[0].status !== "available" || rows[0].attempt_count !== 0) {
+              throw new Error("signed webhook was not durably queued exactly once while workers were stopped");
+            }
+          } finally {
+            await client.end();
+          }
+          NODE
+      - name: Verify queued webhook is processed once after worker resumes
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --network host --name boardreadyops-restore-intake-worker             --env DATABASE_URL="$BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL"             --env GITHUB_WEBHOOK_SECRET=restore-drill-placeholder             --env BOARDREADYOPS_RUNNER_MODE=disabled             --env BOARDREADYOPS_WORKER_HEALTH_PORT=3002             --env ARTIFACT_STORAGE_DRIVER=local             --env ARTIFACT_STORAGE_ROOT=/tmp/boardreadyops-artifacts             "boardreadyops-restore-drill:$GITHUB_SHA" node worker.mjs
+          node --input-type=module - <<'NODE'
+          import pg from "pg";
+          const delivery = "restore-intake-" + process.env.GITHUB_SHA.slice(0, 24);
+          const client = new pg.Client({ connectionString: process.env.BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL });
+          await client.connect();
+          try {
+            let processed = false;
+            for (let attempt = 0; attempt < 60; attempt += 1) {
+              const { rows } = await client.query(
+                "SELECT wi.state, wi.duplicate_count, job.status, job.attempt_count FROM webhook_inbox wi " +
+                  "JOIN control_plane_jobs job ON job.inbox_id = wi.id " +
+                  "WHERE wi.provider = 'github' AND wi.delivery_id = $1",
+                [delivery],
+              );
+              const row = rows[0];
+              if (rows.length !== 1) throw new Error("signed webhook queue identity changed");
+              if (row.status === "dead_letter") throw new Error("signed webhook dead-lettered after restart");
+              if (row.state === "processed" && row.status === "completed") {
+                if (row.duplicate_count !== 1 || row.attempt_count !== 1) {
+                  throw new Error("signed webhook was not processed exactly once");
+                }
+                processed = true;
+                break;
+              }
+              await new Promise((resolve) => setTimeout(resolve, 1_000));
+            }
+            if (!processed) throw new Error("queued signed webhook was not completed after worker resumed");
+          } finally {
+            await client.end();
+          }
+          NODE
+          docker stop --time 60 boardreadyops-restore-intake-worker
+          test "$(docker inspect --format '{{.State.ExitCode}}' boardreadyops-restore-intake-worker)" -eq 0
+          docker logs boardreadyops-restore-intake-worker 2>&1 | grep -q 'worker.shutdown_completed'
+          node --input-type=module - <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const path = "control-plane-restore-drill.json";
+          const report = JSON.parse(readFileSync(path, "utf8"));
+          report.runtime.signedWebhookAcceptedWithoutWorker = true;
+          report.runtime.queuedWebhookProcessedAfterRestart = true;
+          writeFileSync(path, JSON.stringify(report) + String.fromCharCode(10), { mode: 0o600 });
+          NODE
+
       - name: Stop isolated restored runtime
         if: always()
         run: |
           docker rm --force boardreadyops-restore-web boardreadyops-restore-worker \
-            boardreadyops-restore-contender boardreadyops-restore-successor 2>/dev/null || true
+            boardreadyops-restore-contender boardreadyops-restore-successor \
+            boardreadyops-restore-intake-worker 2>/dev/null || true
       - name: Upload aggregate-only restore evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
