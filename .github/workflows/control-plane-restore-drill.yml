@@ -151,9 +151,71 @@ jobs:
           };
           fs.writeFileSync("control-plane-restore-drill.json", `${JSON.stringify(report)}\n`, { mode: 0o600 });
           NODE
+      - name: Verify exclusive worker ownership and graceful successor
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only the disposable restored DB, with all GitHub dispatch disabled.
+          docker run --detach --network host --name boardreadyops-restore-contender \
+            --env DATABASE_URL="$BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL" \
+            --env GITHUB_WEBHOOK_SECRET=restore-drill-placeholder \
+            --env BOARDREADYOPS_RUNNER_MODE=disabled \
+            --env BOARDREADYOPS_WORKER_HEALTH_PORT=3002 \
+            --env ARTIFACT_STORAGE_DRIVER=local \
+            --env ARTIFACT_STORAGE_ROOT=/tmp/boardreadyops-artifacts \
+            "boardreadyops-restore-drill:$GITHUB_SHA" node worker.mjs
+          contender_exit="$(timeout 45s docker wait boardreadyops-restore-contender)"
+          test "$contender_exit" -ne 0
+          docker logs boardreadyops-restore-contender 2>&1 | grep -q 'worker.fatal'
+          if docker logs boardreadyops-restore-contender 2>&1 | grep -q 'worker.started'; then
+            echo "A duplicate worker started processing" >&2
+            exit 1
+          fi
+
+          docker stop --time 60 boardreadyops-restore-worker
+          test "$(docker inspect --format '{{.State.ExitCode}}' boardreadyops-restore-worker)" -eq 0
+          docker logs boardreadyops-restore-worker 2>&1 | grep -q 'worker.shutdown_completed'
+
+          docker run --detach --network host --name boardreadyops-restore-successor \
+            --env DATABASE_URL="$BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL" \
+            --env GITHUB_WEBHOOK_SECRET=restore-drill-placeholder \
+            --env BOARDREADYOPS_RUNNER_MODE=disabled \
+            --env BOARDREADYOPS_WORKER_HEALTH_PORT=3001 \
+            --env ARTIFACT_STORAGE_DRIVER=local \
+            --env ARTIFACT_STORAGE_ROOT=/tmp/boardreadyops-artifacts \
+            "boardreadyops-restore-drill:$GITHUB_SHA" node worker.mjs
+          node --input-type=module - <<'NODE'
+          let ready = false;
+          for (let attempt = 0; attempt < 60; attempt += 1) {
+            try {
+              const response = await fetch("http://127.0.0.1:3001/health/ready");
+              const body = await response.json();
+              if (response.status === 200 && body?.ok === true) {
+                ready = true;
+                break;
+              }
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 1_000));
+          }
+          if (!ready) throw new Error("successor failed restored-worker readiness");
+          NODE
+          docker stop --time 60 boardreadyops-restore-successor
+          test "$(docker inspect --format '{{.State.ExitCode}}' boardreadyops-restore-successor)" -eq 0
+          docker logs boardreadyops-restore-successor 2>&1 | grep -q 'worker.shutdown_completed'
+          node --input-type=module - <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const path = "control-plane-restore-drill.json";
+          const report = JSON.parse(readFileSync(path, "utf8"));
+          report.runtime.exclusiveOwnerContenderRejected = true;
+          report.runtime.gracefulStopAndSuccessorReady = true;
+          writeFileSync(path, JSON.stringify(report) + String.fromCharCode(10), { mode: 0o600 });
+          NODE
+
       - name: Stop isolated restored runtime
         if: always()
-        run: docker rm --force boardreadyops-restore-web boardreadyops-restore-worker 2>/dev/null || true
+        run: |
+          docker rm --force boardreadyops-restore-web boardreadyops-restore-worker \
+            boardreadyops-restore-contender boardreadyops-restore-successor 2>/dev/null || true
       - name: Upload aggregate-only restore evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

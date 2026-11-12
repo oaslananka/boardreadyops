@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 const workflowPath = ".github/workflows/control-plane-restore-drill.yml";
@@ -24,6 +25,12 @@ describe("control-plane restore drill documentation", () => {
     expect(workflow).toContain("pnpm run cloud:restore:verify");
     expect(workflow).toContain("apps/web/Dockerfile");
     expect(workflow).toContain("BOARDREADYOPS_RUNNER_MODE=disabled");
+    expect(workflow).toContain("Verify exclusive worker ownership and graceful successor");
+    expect(workflow).toContain("docker wait boardreadyops-restore-contender");
+    expect(workflow).toContain("boardreadyops-restore-successor");
+    expect(workflow).toContain("worker.shutdown_completed");
+    expect(workflow).toContain("exclusiveOwnerContenderRejected");
+    expect(workflow).toContain("gracefulStopAndSuccessorReady");
     expect(workflow).toContain("/api/health/ready");
     expect(workflow).toContain("/health/ready");
     expect(workflow).toContain("node --input-type=module - <<'NODE'");
@@ -41,5 +48,36 @@ describe("control-plane restore drill documentation", () => {
 
     expect(navigation).toContain("Control-plane Restore Drill: operations/control-plane-restore-drill.md");
     expect(packageJson).toContain('"cloud:restore:verify": "node scripts/control-plane-restore-drill.mjs"');
+  });
+
+  it("requires the real-image handoff after readiness and always cleans up competing workers", () => {
+    const document = load(fs.readFileSync(workflowPath, "utf8")) as {
+      jobs: {
+        validate: {
+          steps: Array<{ name?: string; if?: string; run?: string; "continue-on-error"?: boolean }>;
+        };
+      };
+    };
+    const steps = document.jobs.validate.steps;
+    const readinessIndex = steps.findIndex((step) => step.name === "Verify restored service readiness");
+    const handoffIndex = steps.findIndex(
+      (step) => step.name === "Verify exclusive worker ownership and graceful successor",
+    );
+    const cleanupIndex = steps.findIndex((step) => step.name === "Stop isolated restored runtime");
+    expect(readinessIndex).toBeGreaterThan(-1);
+    expect(handoffIndex).toBeGreaterThan(readinessIndex);
+    expect(cleanupIndex).toBeGreaterThan(handoffIndex);
+
+    const handoff = steps[handoffIndex];
+    expect(handoff?.run).toContain('test "$contender_exit" -ne 0');
+    expect(handoff?.run).toContain("worker.shutdown_completed");
+    expect(handoff?.run).toContain("successor failed restored-worker readiness");
+    expect(handoff?.run).toContain("gracefulStopAndSuccessorReady = true");
+    expect(handoff?.["continue-on-error"]).not.toBe(true);
+
+    const cleanup = steps[cleanupIndex];
+    expect(cleanup?.if).toBe("always()");
+    expect(cleanup?.run).toContain("boardreadyops-restore-contender");
+    expect(cleanup?.run).toContain("boardreadyops-restore-successor");
   });
 });
