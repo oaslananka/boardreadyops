@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -158,5 +158,48 @@ describe("Coolify production backup preflight with independent rolling web", () 
     const legacy = preflight({ legacyAvailable: true });
     expect(legacy.status, legacy.stderr).toBe(0);
     expect(legacy.stdout).toContain("BoardReadyOps backup preflight: PASS");
+  });
+});
+
+// The deployed backup runs on Linux/GNU tar, whereas --preflight runs on
+// cross-platform CI. Exercise the actual inline inventory function only on
+// the platform whose tar listing format is the production contract.
+describe.skipIf(process.platform !== "linux")("real artifact archive file evidence", () => {
+  function inspectFixture(includeFile: boolean, includeSymlink = false) {
+    const dir = mkdtempSync(join(tmpdir(), "bro-backup-artifact-evidence-"));
+    try {
+      const source = join(dir, "source");
+      mkdirSync(source, { mode: 0o700 });
+      if (includeFile) writeFileSync(join(source, "proof.bin"), Buffer.from("sample-proof"));
+      if (includeSymlink) symlinkSync("proof.bin", join(source, "linked.bin"));
+      const archive = join(dir, "snapshot.tar.gz");
+      const packed = spawnSync("tar", ["-czf", archive, "-C", source, "."], { encoding: "utf8" });
+      expect(packed.status, packed.stderr).toBe(0);
+
+      const backupSource = readFileSync(backupScript, "utf8");
+      const inventoryFunction = backupSource.match(/^artifact_archive_inventory\(\) \{[\s\S]*?^\}/mu)?.[0];
+      expect(inventoryFunction).toBeDefined();
+      const checked = spawnSync(
+        "bash",
+        ["-e", "-o", "pipefail", "-c", `${inventoryFunction}\nartifact_archive_inventory "$1"`, "_", archive],
+        { encoding: "utf8" },
+      );
+      expect(checked.status, checked.stderr).toBe(0);
+      return checked.stdout.trim();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("reports a valid directory-only backup as ZERO physical files and ZERO bytes", () => {
+    expect(inspectFixture(false)).toBe("0 0 0");
+  });
+
+  it("reports only real physical artifact file bytes, not compressed tar size", () => {
+    expect(inspectFixture(true)).toBe("1 12 0");
+  });
+
+  it("identifies symlinks as unsupported instead of treating them as verified bytes", () => {
+    expect(inspectFixture(true, true)).toBe("1 12 1");
   });
 });

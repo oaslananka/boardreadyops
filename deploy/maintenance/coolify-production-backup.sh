@@ -71,6 +71,19 @@ free_kb="$(df -Pk "$BOARDREADYOPS_BACKUP_DIR" | awk 'END { print $4 }')"
 [[ "$free_kb" =~ ^[0-9]+$ ]] || fail "disk capacity unavailable"
 (( free_kb >= 524288 )) || fail "less than 512 MiB free"
 
+# A valid tar stream can contain zero physical artifact files. Record that
+# truth explicitly; its nonzero compressed size is not evidence of file recovery.
+# GNU tar -v output starts with the entry type; fields 2 and 3 are
+# owner/group and uncompressed byte size respectively on the Linux host.
+artifact_archive_inventory() {
+  LC_ALL=C tar -tvzf "$1" |
+    LC_ALL=C awk '
+      substr($1, 1, 1) == "-" { files++; bytes += $3; next }
+      substr($1, 1, 1) == "d" { next }
+      { unsupported++ }
+      END { printf "%.0f %.0f %.0f\n", files, bytes, unsupported }'
+}
+
 if [[ "$mode" == "--preflight" ]]; then
   echo "BoardReadyOps backup preflight: PASS"
   exit 0
@@ -104,14 +117,19 @@ table_data_count="$(docker exec --user postgres -i "$pg" pg_restore --list < "$t
   awk '/ TABLE DATA /{n++} END{print n+0}')"
 (( table_data_count > 0 )) || fail "PostgreSQL dump has no table-data entries"
 timeout 300 docker exec --user node "$web" tar -C /data/artifacts -cf - . | gzip -n -1 > "$tmp_art"
-[[ -s "$tmp_art" ]] || fail "artifact archive is empty"
+[[ -s "$tmp_art" ]] || fail "artifact archive stream is empty"
 tar -tzf "$tmp_art" >/dev/null || fail "artifact archive verification failed"
+artifact_inventory="$(artifact_archive_inventory "$tmp_art")"
+read -r artifact_files artifact_bytes unsupported_entries <<< "$artifact_inventory"
+[[ "$artifact_files" =~ ^[0-9]+$ && "$artifact_bytes" =~ ^[0-9]+$ &&
+   "$unsupported_entries" =~ ^[0-9]+$ ]] || fail "artifact archive inventory is invalid"
+(( unsupported_entries == 0 )) || fail "artifact archive includes unsupported file types"
 
 mv --no-clobber -- "$tmp_db" "$db_target"
 mv --no-clobber -- "$tmp_art" "$artifact_target"
 sha256sum "$db_target" "$artifact_target" | sed "s|$BOARDREADYOPS_BACKUP_DIR/||g" > "$manifest_target"
 chmod 600 "$db_target" "$artifact_target" "$manifest_target"
-echo "BoardReadyOps backup: verified $(basename "$db_target"), tables=$table_data_count, bytes=$(stat -c %s "$db_target")"
+echo "BoardReadyOps backup: verified $(basename "$db_target"), tables=$table_data_count, bytes=$(stat -c %s "$db_target"), artifact_files=$artifact_files, artifact_bytes=$artifact_bytes"
 
 # Rotate ONLY files produced by this job; legacy/operator backups are never touched.
 mapfile -t backups < <(find "$BOARDREADYOPS_BACKUP_DIR" -maxdepth 1 -type f \
