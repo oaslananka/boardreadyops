@@ -424,6 +424,46 @@ export function RepositorySetupInteractive({
 
       {displayedRepository ? (
         <>
+          {displayedRepository.readinessRunBlockedReason ? (
+            <section
+              aria-label="Hosted hardware check availability"
+              className="flex flex-col gap-3 rounded-xl border border-warning/40 bg-warning-surface p-5"
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-warning">
+                  Hosted checks not available yet
+                </p>
+                <h2 className="mt-1 text-lg font-semibold text-foreground">You can check this board locally now</h2>
+                <p className="mt-2 text-sm text-foreground">{displayedRepository.readinessRunBlockedReason}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  A setup pull request prepares GitHub Actions; it does not start a hosted hardware check. A local check
+                  can reveal issues, but it is not an OIDC-signed hosted Review.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href="https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md"
+                  className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                >
+                  Check this PCB locally{" "}
+                  <span aria-hidden="true" className="ml-2">
+                    ↗
+                  </span>
+                </a>
+                <a
+                  href={
+                    deriveRepositorySetupState(displayedRepository).id === "ready" ? "#readiness" : "#automated-setup"
+                  }
+                  className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-2"
+                >
+                  {deriveRepositorySetupState(displayedRepository).id === "ready"
+                    ? "Review verified setup"
+                    : "Prepare repository setup"}
+                </a>
+              </div>
+            </section>
+          ) : null}
+
           <Panel
             id="automated-setup"
             title={
