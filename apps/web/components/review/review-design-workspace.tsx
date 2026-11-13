@@ -1,5 +1,6 @@
 "use client";
 
+import type { CanvasAnchor, SnapshotArtifact } from "@boardreadyops/contracts";
 import { useState } from "react";
 import type { DemoFinding, DemoReview } from "../../lib/demo-data.js";
 import { recordedVirtualBomNotice } from "../../lib/finding-guidance.js";
@@ -54,6 +55,36 @@ export function groupReviewFindings(findings: readonly DemoFinding[]): { ruleId:
   return Array.from(groups, ([ruleId, entries]) => ({ ruleId, findings: entries }));
 }
 
+/** Native object identity and plot-normalized coordinates are required
+ * before a finding may claim an inspectable physical reference. */
+function isVerifiedSourceObjectAnchor(anchor: CanvasAnchor): boolean {
+  const metadata = anchor.metadata;
+  if (
+    anchor.kind !== "finding" ||
+    metadata?.provenance !== "kicad-json-object-position" ||
+    typeof metadata.sourceUuid !== "string"
+  )
+    return false;
+  return (
+    /^[a-f0-9-]{36}$/iu.test(metadata.sourceUuid) &&
+    Number.isFinite(anchor.x) &&
+    Number.isFinite(anchor.y) &&
+    anchor.x >= 0 &&
+    anchor.x <= 1 &&
+    anchor.y >= 0 &&
+    anchor.y <= 1
+  );
+}
+
+/** A native source object cannot be shown on an unrelated copper side. */
+function isOnMatchingCopperLayer(snapshot: SnapshotArtifact, anchor: CanvasAnchor): boolean {
+  const layer = anchor.layer;
+  return (
+    (layer === "F.Cu" || layer === "B.Cu") &&
+    (snapshot.sheetOrLayer === layer || snapshot.sheetOrLayer.endsWith(`/ ${layer}`))
+  );
+}
+
 /**
  * A board-location shortcut is only valid for a KiCad-native, in-bounds
  * source-object anchor linked to exactly one persisted finding. A summary
@@ -70,22 +101,11 @@ function locatedSourceFindings(review: DemoReview): Set<string> {
     if (snapshot.kind !== "pcb_layer" || !snapshot.name.startsWith("kicad_native_")) continue;
     for (const anchor of snapshot.anchors) {
       const fingerprint = anchor.metadata?.fingerprint;
-      const layer = anchor.layer;
       if (
-        anchor.kind !== "finding" ||
         typeof fingerprint !== "string" ||
         counts.get(fingerprint) !== 1 ||
-        anchor.metadata?.provenance !== "kicad-json-object-position" ||
-        typeof anchor.metadata.sourceUuid !== "string" ||
-        !/^[a-f0-9-]{36}$/iu.test(anchor.metadata.sourceUuid) ||
-        (layer !== "F.Cu" && layer !== "B.Cu") ||
-        (snapshot.sheetOrLayer !== layer && !snapshot.sheetOrLayer.endsWith(`/ ${layer}`)) ||
-        !Number.isFinite(anchor.x) ||
-        !Number.isFinite(anchor.y) ||
-        anchor.x < 0 ||
-        anchor.x > 1 ||
-        anchor.y < 0 ||
-        anchor.y > 1
+        !isVerifiedSourceObjectAnchor(anchor) ||
+        !isOnMatchingCopperLayer(snapshot, anchor)
       )
         continue;
       located.add(fingerprint);
