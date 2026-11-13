@@ -31,9 +31,10 @@ import {
  *
  * - `setup` reuses the synchronous `createSetupPr` path the operator API already calls.
  * - `validate-setup` reuses the persisted setup-probe path the operator API already calls.
- * - `rerun`, `release-preview`, and `waive` enqueue the exact lifecycle actions
+ * - `rerun`, `release-preview`, and `waive` enqueue the same lifecycle action types
  *   `executeParsedCommand` builds, through the same `acceptGitHubWebhook` intake the webhook
- *   uses. They therefore inherit its idempotency, retry, dead-lettering, and audit trail, and
+ *   uses. Explicit re-runs get per-request idempotency scopes; network retries still dedupe.
+ *   They inherit the same dead-lettering, audit trail, and capability checks, and
  *   the capability refusal a restricted installation gets is the identical one.
  *
  * Authorization is `authenticateApiRequest` + `resolveRepositoryApiContext`: a session may act
@@ -208,8 +209,8 @@ async function loadSetupContext(
 /**
  * Builds the lifecycle actions an intent maps to.
  *
- * Deliberately the same shapes `executeParsedCommand` emits for the equivalent slash command.
- * A UI re-run and a `/boardreadyops rerun` therefore produce byte-identical queue entries.
+ * A dashboard re-run uses the same lifecycle contract as a slash command, with a distinct
+ * request-scoped idempotency key so an explicit re-run of an unchanged SHA is not dropped.
  */
 type EnqueueAction = Extract<GitHubAppLifecycleAction, { type: "release_run.enqueue" }>;
 type PrepareAction = Extract<GitHubAppLifecycleAction, { type: "release.prepare" }>;
@@ -219,6 +220,7 @@ export function lifecycleActionsFor(
   request: RepositoryActionRequest,
   context: RepositorySetupContext,
   target: RunTarget | undefined,
+  deliveryId: string,
 ): readonly GitHubAppLifecycleAction[] {
   const installation = { id: context.githubInstallationId };
   const repository = {
@@ -242,6 +244,8 @@ export function lifecycleActionsFor(
       ref: target.ref,
       commitSha: target.commitSha,
       triggerKind: "pr",
+      deliveryId,
+      idempotencyScope: `dashboard-rerun:${deliveryId}`,
     };
     if (target.baseCommitSha) action.baseCommitSha = target.baseCommitSha;
     return [action];
@@ -379,7 +383,8 @@ export async function handleRepositoryAction(
       );
     }
 
-    const actions = lifecycleActionsFor(parsed, context, target);
+    const deliveryId = actionDeliveryId(scope.repositoryId, parsed, requestId);
+    const actions = lifecycleActionsFor(parsed, context, target, deliveryId);
     if (actions.length === 0) {
       return json(
         {
@@ -393,7 +398,6 @@ export async function handleRepositoryAction(
       );
     }
 
-    const deliveryId = actionDeliveryId(scope.repositoryId, parsed, requestId);
     const accepted = await createSqlControlPlaneJobStore(scope.executor).acceptGitHubWebhook({
       deliveryId,
       eventType: "dashboard_action",

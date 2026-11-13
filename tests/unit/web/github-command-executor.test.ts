@@ -1,3 +1,4 @@
+import { releaseRunIdempotencyKey } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { describe, expect, it, vi } from "vitest";
 import {
   createGitHubCommandLifecycleExecutor,
@@ -75,6 +76,8 @@ describe("GitHub command lifecycle executor", () => {
         commitSha: "a".repeat(40),
         baseCommitSha: "b".repeat(40),
         triggerKind: "pr",
+        idempotencyScope: "comment-rerun:44",
+        deliveryId: "delivery-1",
         pullRequestDraft: false,
         pullRequestFromFork: false,
       },
@@ -83,6 +86,25 @@ describe("GitHub command lifecycle executor", () => {
     expect(upsertResponse).not.toHaveBeenCalled();
   });
 
+  it("scopes separate slash-command comments independently and dedupes a replay of one comment", async () => {
+    const { executor } = executorWithPermissions({ pull_requests: "read", actions: "write" });
+    const context = { deliveryId: "comment-delivery-1", eventType: "issue_comment", eventAction: "created" };
+    const comment = commandAction("/boardreadyops rerun");
+    const first = (await executor.executeGitHubCommand(comment, context))[0];
+    const replay = (await executor.executeGitHubCommand(comment, { ...context, deliveryId: "redelivery-2" }))[0];
+    const second = (await executor.executeGitHubCommand({ ...comment, commentId: 45 }, context))[0];
+    if (
+      first?.type !== "release_run.enqueue" ||
+      replay?.type !== "release_run.enqueue" ||
+      second?.type !== "release_run.enqueue"
+    ) {
+      throw new Error("An authorized comment re-run must enqueue a release run");
+    }
+    expect(releaseRunIdempotencyKey(first)).toBe(releaseRunIdempotencyKey(replay));
+    expect(releaseRunIdempotencyKey(first)).not.toBe(releaseRunIdempotencyKey(second));
+    expect(first.idempotencyScope).toBe("comment-rerun:44");
+    expect(second.idempotencyScope).toBe("comment-rerun:45");
+  });
   it("preserves draft and fork safe-mode restrictions on slash-command reruns", async () => {
     const { executor } = executorWithPermissions(
       { pull_requests: "read", actions: "write" },
