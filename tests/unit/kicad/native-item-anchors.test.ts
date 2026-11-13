@@ -173,6 +173,73 @@ describe("Source-bound KiCad DRC object markers", () => {
     if (!sourceFinding) throw new Error("Expected KiCad DRC diagnostic");
     expect(verifiedNativePcbItemAnchors(plot, bounds, [{ ...sourceFinding, ruleId: "bom.missing-mpn" }])).toEqual([]);
   });
+  it("maps an exact 4-line, 4-quarter-arc rounded outline from an actual KiCad PCB layout", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "bro-native-rounded-bounds-"));
+    temporary.push(root);
+    const pcb = path.join(root, "rounded.kicad_pcb");
+    const layers = '(layers (0 "F.Cu" signal) (31 "B.Cu" signal))';
+    const segments = [
+      '(gr_line (start 121.64 93.55) (end 174.98 93.55) (layer "Edge.Cuts"))',
+      '(gr_line (start 177.52 96.09) (end 177.52 113.87) (layer "Edge.Cuts"))',
+      '(gr_line (start 174.98 116.41) (end 121.64 116.41) (layer "Edge.Cuts"))',
+      '(gr_line (start 119.1 113.87) (end 119.1 96.09) (layer "Edge.Cuts"))',
+      '(gr_arc (start 174.98 93.55) (mid 176.776051 94.293949) (end 177.52 96.09) (layer "Edge.Cuts"))',
+      '(gr_arc (start 177.52 113.87) (mid 176.776051 115.666051) (end 174.98 116.41) (layer "Edge.Cuts"))',
+      '(gr_arc (start 121.64 116.41) (mid 119.843949 115.666051) (end 119.1 113.87) (layer "Edge.Cuts"))',
+      '(gr_arc (start 119.1 96.09) (mid 119.843949 94.293949) (end 121.64 93.55) (layer "Edge.Cuts"))',
+    ];
+    const write = async (parts: string[]) => {
+      await fs.writeFile(pcb, `(kicad_pcb (version 20240108) ${layers} ${parts.join(" ")})`);
+      return (await parsePcb(pcb)).outlineBounds;
+    };
+    const actual = { minX: 119.1, minY: 93.55, maxX: 177.52, maxY: 116.41 };
+    expect(await write(segments)).toEqual(actual);
+    // Actual KiCad 10 --fit-page-to-board SVG for these same dimensions.
+    const native = {
+      ...plot,
+      content: '<svg viewBox="0.0000 0.0000 58.4200 22.8600"></svg>',
+    };
+    const finding: SnapshotFinding = {
+      fingerprint: "e".repeat(64),
+      ruleId: "drc.hole_clearance",
+      severity: "high",
+      message: "Hole clearance",
+      details: {
+        coordinate_units: "mm",
+        items: [
+          {
+            description: "Track [/Debugger/USB.VBUS] on B.Cu, length 1.5150 mm",
+            pos: { x: 123.67, y: 102.75 },
+            uuid: "5d98b95c-d01d-4e88-8c2c-83c62e48cb07",
+          },
+        ],
+      },
+    };
+    const anchors = verifiedNativePcbItemAnchors({ ...native, sheetOrLayer: "rounded / B.Cu" }, actual, [finding]);
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0]).toMatchObject({
+      layer: "B.Cu",
+      metadata: { provenance: "kicad-json-object-position", sourceXmm: 123.67, sourceYmm: 102.75 },
+    });
+    expect(anchors[0]?.x).toBeCloseTo((123.67 - 119.1) / 58.42, 6);
+    expect(anchors[0]?.y).toBeCloseTo((102.75 - 93.55) / 22.86, 6);
+
+    // A wrong radius, arc midpoint, disconnected line or a second cutout
+    // must not be rendered as a confidently located DRC marker.
+    expect(
+      await write(segments.map((part, i) => (i === 4 ? part.replace("176.776051", "176.1") : part))),
+    ).toBeUndefined();
+    expect(
+      await write(segments.map((part, i) => (i === 4 ? part.replace("177.52 96.09", "177.3 96.09") : part))),
+    ).toBeUndefined();
+    expect(
+      await write([...segments, '(gr_circle (center 145 100) (end 146 100) (layer "Edge.Cuts"))']),
+    ).toBeUndefined();
+    expect(
+      await write(segments.map((part, i) => (i === 4 ? part.replace("174.98 93.55", "121.64 93.55") : part))),
+    ).toBeUndefined();
+  });
+
   it("recognizes only a single source-declared rectangular Edge.Cuts outline", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "bro-native-bounds-"));
     temporary.push(root);

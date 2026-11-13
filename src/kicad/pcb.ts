@@ -38,7 +38,7 @@ export interface PcbOutlineBounds {
 
 export interface ParsedPcb {
   footprints: PcbFootprint[];
-  /** Only an unambiguous single rectangular Edge.Cuts outline has a verified transform. */
+  /** Only a verified rectangle or quarter-arc rounded rectangle has a known native plot transform. */
   outlineBounds?: PcbOutlineBounds | undefined;
   revision?: string | undefined;
   drillSizes: string[];
@@ -57,7 +57,7 @@ export async function parsePcb(file: string): Promise<ParsedPcb> {
   const text = (await readDesignFile(file)) ?? "";
   const model = parseKicadDocument(text, "pcb");
   const copperLayerNames = copperLayers(model);
-  const outlineBounds = rectangularOutlineBounds(model);
+  const outlineBounds = rectangularOutlineBounds(model) ?? roundedRectangleOutlineBounds(model);
   return {
     footprints: footprints(model),
     revision: revision(model),
@@ -211,6 +211,115 @@ function rectangularOutlineBounds(model: KiCadDocumentModel): PcbOutlineBounds |
   const maxX = Math.max(rect.start.x, rect.end.x);
   const maxY = Math.max(rect.start.y, rect.end.y);
   return maxX > minX && maxY > minY ? { minX, minY, maxX, maxY } : undefined;
+}
+
+/**
+ * KiCad's --fit-page-to-board SVG has the exact design extent for a closed,
+ * axis-aligned rounded rectangle. Verify all four quarter-circles and all
+ * straight sides before mapping DRC source coordinates onto that SVG.
+ * Other arbitrary arcs, polygon edges, cutouts and ambiguous loops are
+ * deliberately not mapped; a misleading fault marker is worse than none.
+ */
+function straightRoundedRectangleSides(
+  lines: SexprListNode[],
+): { horizontal: Segment[]; vertical: Segment[] } | undefined {
+  const horizontal: Segment[] = [];
+  const vertical: Segment[] = [];
+  for (const block of lines) {
+    const segment = startEndFromList(block);
+    if (!segment) return undefined;
+    if (Math.abs(segment.start.y - segment.end.y) < 0.0001 && Math.abs(segment.start.x - segment.end.x) > 0.001) {
+      horizontal.push(segment);
+    } else if (
+      Math.abs(segment.start.x - segment.end.x) < 0.0001 &&
+      Math.abs(segment.start.y - segment.end.y) > 0.001
+    ) {
+      vertical.push(segment);
+    } else {
+      return undefined;
+    }
+  }
+  return horizontal.length === 2 && vertical.length === 2 ? { horizontal, vertical } : undefined;
+}
+
+function completeRoundedRectangleSides(horizontal: Segment[], vertical: Segment[], bounds: PcbOutlineBounds): boolean {
+  const near = (a: number, b: number) => Math.abs(a - b) < 0.0001;
+  return (
+    bounds.maxX > bounds.minX &&
+    bounds.maxY > bounds.minY &&
+    horizontal.every((line) => near(line.start.y, bounds.minY) || near(line.start.y, bounds.maxY)) &&
+    vertical.every((line) => near(line.start.x, bounds.minX) || near(line.start.x, bounds.maxX)) &&
+    horizontal.some((line) => near(line.start.y, bounds.minY)) &&
+    horizontal.some((line) => near(line.start.y, bounds.maxY)) &&
+    vertical.some((line) => near(line.start.x, bounds.minX)) &&
+    vertical.some((line) => near(line.start.x, bounds.maxX))
+  );
+}
+
+function registerVerifiedQuarterCorner(
+  arc: SexprListNode,
+  hEnds: Point[],
+  vEnds: Point[],
+  bounds: PcbOutlineBounds,
+  used: Set<Point>,
+  corners: Set<string>,
+): boolean {
+  const start = pointFromChild(arc, "start");
+  const mid = pointFromChild(arc, "mid");
+  const end = pointFromChild(arc, "end");
+  if (!start || !mid || !end) return false;
+  // Each quarter-circle must connect exactly one unused horizontal endpoint
+  // to one unused vertical endpoint, with genuine radius and midpoint.
+  const h = hEnds.find((point) => samePoint(point, start)) ?? hEnds.find((point) => samePoint(point, end));
+  const v = vEnds.find((point) => samePoint(point, start)) ?? vEnds.find((point) => samePoint(point, end));
+  if (!h || !v || used.has(h) || used.has(v) || samePoint(start, h) === samePoint(start, v)) return false;
+  const rX = Math.abs(v.x - h.x);
+  const rY = Math.abs(h.y - v.y);
+  if (!(rX > 0.001 && rX < Math.min(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2)) return false;
+  if (Math.abs(rX - rY) > 0.002) return false;
+  if (
+    Math.abs(mid.x - (h.x + (v.x - h.x) / Math.SQRT2)) > 0.002 ||
+    Math.abs(mid.y - (v.y + (h.y - v.y) / Math.SQRT2)) > 0.002
+  )
+    return false;
+  const corner = `${Math.abs(h.y - bounds.minY) < 0.0001 ? "top" : "bottom"}:${Math.abs(v.x - bounds.minX) < 0.0001 ? "left" : "right"}`;
+  if (corners.has(corner)) return false;
+  corners.add(corner);
+  used.add(h);
+  used.add(v);
+  return true;
+}
+
+function roundedRectangleOutlineBounds(model: KiCadDocumentModel): PcbOutlineBounds | undefined {
+  const lines = edgePrimitiveLists(model, "gr_line");
+  const arcs = edgePrimitiveLists(model, "gr_arc");
+  if (
+    lines.length !== 4 ||
+    arcs.length !== 4 ||
+    ["gr_rect", "gr_circle", "gr_poly", "gr_curve"].some((name) => edgePrimitiveLists(model, name).length > 0)
+  )
+    return undefined;
+
+  const sides = straightRoundedRectangleSides(lines);
+  if (!sides) return undefined;
+  const hEnds = sides.horizontal.flatMap((segment) => [segment.start, segment.end]);
+  const vEnds = sides.vertical.flatMap((segment) => [segment.start, segment.end]);
+  const ends = [...hEnds, ...vEnds];
+  if (ends.some((point, index) => ends.slice(index + 1).some((other) => samePoint(point, other)))) return undefined;
+  const bounds = {
+    minX: Math.min(...ends.map((point) => point.x)),
+    maxX: Math.max(...ends.map((point) => point.x)),
+    minY: Math.min(...ends.map((point) => point.y)),
+    maxY: Math.max(...ends.map((point) => point.y)),
+  };
+  if (!completeRoundedRectangleSides(sides.horizontal, sides.vertical, bounds)) return undefined;
+
+  const used = new Set<Point>();
+  const corners = new Set<string>();
+  for (const arc of arcs) {
+    if (!registerVerifiedQuarterCorner(arc, hEnds, vEnds, bounds, used, corners)) return undefined;
+  }
+  return corners.size === 4 && used.size === 8 ? bounds : undefined;
 }
 
 function boardArea(model: KiCadDocumentModel): number | undefined {
