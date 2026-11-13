@@ -220,7 +220,14 @@ describe("reproducible contributor toolchain", () => {
     expect(gitleaksInstall).toContain("sha256sum -c -");
     expect(gitleaksInstall).not.toContain("continue-on-error");
     const webDockerfile = await repositoryFile("apps/web/Dockerfile");
-    expect(webDockerfile).toContain(`# Node ${config.node.preferred}-slim (digest-pinned)`);
+    const runtimeHeader = webDockerfile.match(/^# Node (\d+\.\d+\.\d+) (?:Alpine \d+\.\d+|slim) \(digest-pinned\);/mu);
+    expect(runtimeHeader).not.toBeNull();
+    // The production image may adopt a patched Node release before
+    // contributor/CI tools move, but not a different Node minor.
+    const runtimeVersion = (runtimeHeader?.[1] ?? "0.0.0").split(".").map(Number);
+    const preferredVersion = config.node.preferred.split(".").map(Number);
+    expect(runtimeVersion.slice(0, 2)).toEqual(preferredVersion.slice(0, 2));
+    expect(runtimeVersion[2]).toBeGreaterThanOrEqual(preferredVersion[2] ?? 0);
     const pinnedImageReferences = webDockerfile.match(/FROM node@sha256:[a-f0-9]{64} AS (?:base|runner)/gu);
     expect(pinnedImageReferences).toHaveLength(2);
     expect(pinnedImageReferences?.[0]?.split(" AS ")[0]).toBe(pinnedImageReferences?.[1]?.split(" AS ")[0]);

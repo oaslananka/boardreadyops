@@ -1,10 +1,9 @@
-# Node 24.22.1-slim (digest-pinned); both runtime stages use the same immutable image.
-FROM node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS base
+# Node 24.22.3 Alpine 3.24 (digest-pinned); both runtime stages use the same immutable image.
+FROM node@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
-  && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates openssl bash
 WORKDIR /app
 
 FROM base AS deps
@@ -22,38 +21,35 @@ FROM deps AS build
 COPY . .
 RUN pnpm --filter @boardreadyops/web build
 
-FROM node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS runner
+# Build the signed Go module release with the patched x/net dependency.
+# The Go module checksum database authenticates the upstream version and modules.
+# This stage is discarded; only the statically linked binary enters production.
+FROM golang@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS gh-builder
+ARG GH_VERSION=2.104.0
+RUN set -eux; \
+    mkdir -p /src /out; \
+    cd /src; \
+    go mod init example.com/boardreadyops/gh-builder; \
+    go mod edit -require="github.com/cli/cli/v2@v${GH_VERSION}"; \
+    go mod edit -require=golang.org/x/net@v0.62.0; \
+    GOTOOLCHAIN=local go install -mod=mod github.com/cli/cli/v2/cmd/gh; \
+    cp /go/bin/gh /out/gh; \
+    go version -m /out/gh > /tmp/gh-build-info; \
+    grep -E 'mod[[:space:]]+github.com/cli/cli/v2[[:space:]]+v2.104.0' /tmp/gh-build-info; \
+    grep -E 'dep[[:space:]]+golang.org/x/net[[:space:]]+v0.62.0' /tmp/gh-build-info; \
+    /out/gh --version | grep -F "gh version ${GH_VERSION}"
+FROM node@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS runner
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG VERSION=dev
-# renovate: datasource=github-releases depName=cli/cli
-ARG GH_VERSION=2.103.3
-
-# The existing source-export verifier delegates Sigstore cryptographic verification
-# to GitHub CLI. Pin the official immutable release archive by architecture digest
-# so production verification uses the same reviewed verifier as local acceptance.
-# Fetch the SHA256-pinned package from GitHub CLI’s official signed Debian repository.
-# Its host is reachable from the isolated build network even when github.com/API is not.
+ARG GH_VERSION=2.104.0
+# The patched upstream CLI is built in the isolated Go stage above.
+COPY --from=gh-builder /out/gh /usr/local/bin/gh
 RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates curl openssl; \
-    rm -rf /var/lib/apt/lists/*; \
-    case "$(dpkg --print-architecture)" in \
-      amd64) gh_arch="amd64"; gh_sha256="e3bafef96328d1a67de3a968bdfe1cc2ffd58cf6aba8b5e201356897ed06bb3d" ;; \
-      arm64) gh_arch="arm64"; gh_sha256="cac3ff84b60b68e64cca69f31f303210c26320361cc3286b773655d4226b7b06" ;; \
-      *) echo "Unsupported GitHub CLI architecture." >&2; exit 1 ;; \
-    esac; \
-    archive="gh_${GH_VERSION}_${gh_arch}.deb"; \
-    curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --silent --show-error --location \
-      --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 10 --max-time 135 \
-      -o "/tmp/$archive" "https://cli.github.com/packages/pool/main/g/gh/$archive"; \
-    printf '%s  %s\n' "$gh_sha256" "/tmp/$archive" | sha256sum --check --strict; \
-    mkdir -p /tmp/gh-cli; \
-    dpkg-deb -x "/tmp/$archive" /tmp/gh-cli; \
-    install -o root -g root -m 0755 /tmp/gh-cli/usr/bin/gh /usr/local/bin/gh; \
-    gh --version | grep -F "gh version $GH_VERSION"; \
-    rm -rf /tmp/gh-cli "/tmp/$archive"
-
+    gh --version | grep -F "gh version ${GH_VERSION}"; \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+      /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/yarn /usr/local/bin/yarnpkg
 LABEL org.opencontainers.image.title="BoardReadyOps Cloud" \
       org.opencontainers.image.description="Self-hosted BoardReadyOps cloud control plane" \
       org.opencontainers.image.source="https://github.com/oaslananka/boardreadyops" \
