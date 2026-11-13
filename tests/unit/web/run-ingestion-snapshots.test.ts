@@ -102,6 +102,70 @@ describe("POST /api/v1/runs persists review-canvas snapshots", () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  it("publishes a tokenless signed-in browser bundle to the canonical repository UUID", async () => {
+    vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
+      ok: true,
+      actorId: "review-owner",
+      scopes: ["runs:write"],
+      authType: "session",
+      installationIds: [4242],
+      githubUserId: 89123,
+    });
+    mockQuery.mockImplementation(async (sql: string) => {
+      if (sql.toLowerCase().includes("from repositories")) {
+        return { rows: [{ id: "canonical-repository-uuid", github_installation_id: "4242" }] };
+      }
+      return { rows: [] };
+    });
+    const request = new Request("https://boardreadyops.test/api/v1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": "browser-unique-content" },
+      body: JSON.stringify({
+        repositoryId: "oaslananka-iot/RoyalBlue54L-Feather-Hardware",
+        commitSha: "a".repeat(40),
+        ref: "refs/heads/main",
+        triggerKind: "manual",
+        findings: [{ ruleId: "drc.hole_clearance", severity: "error", message: "Genuine board blocker" }],
+      }),
+    });
+    const response = await postRun(request);
+    expect(response.status).toBe(201);
+    expect((await response.json()).decision).toBe("fail");
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("lower(repositories.owner || '/' || repositories.name) = lower($1)"),
+      ["oaslananka-iot/RoyalBlue54L-Feather-Hardware"],
+    );
+    const inserted = mockQuery.mock.calls.find(([sql]) => String(sql).includes("insert into release_runs"));
+    expect(inserted?.[1]?.[1]).toBe("canonical-repository-uuid");
+    expect(inserted?.[1]?.[7]).toBe("fail");
+  });
+
+  it("refuses a browser bundle for a repository outside the owner's GitHub installations", async () => {
+    vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
+      ok: true,
+      actorId: "review-owner",
+      scopes: ["runs:write"],
+      authType: "session",
+      installationIds: [4242],
+    });
+    mockQuery.mockResolvedValue({ rows: [{ id: "out-of-scope", github_installation_id: "9876" }] });
+    const response = await postRun(
+      new Request("https://boardreadyops.test/api/v1/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          repositoryId: "different-owner/private-board",
+          commitSha: "b".repeat(40),
+          ref: "refs/heads/main",
+          triggerKind: "manual",
+        }),
+      }),
+    );
+    expect(response.status).toBe(403);
+    expect(mockClose).toHaveBeenCalled();
+    expect(mockQuery.mock.calls.some(([sql]) => String(sql).includes("insert into release_runs"))).toBe(false);
+  });
+
   it("inserts a run_snapshots row for each published review-canvas snapshot", async () => {
     const request = new Request("https://boardreadyops.test/api/v1/runs", {
       method: "POST",

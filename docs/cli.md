@@ -43,6 +43,27 @@ Before uploading, run `boardreadyops review publish . --project hardware/mainboa
 
 **Native PCB and schematic visuals require explicit opt-in.** Use boardreadyops review publish . --native-visuals only when your organization permits detailed source-derived design geometry to be stored by the configured BoardReadyOps server. The option changes the effective upload mode to snapshots when it would otherwise be metadata; the exported SVG can reveal copper routing, component arrangement, net labels, and schematics even though raw KiCad source files are not uploaded. Without the flag, Review publishing retains the existing lightweight summary snapshots and does **not** upload native design artwork. This option neither certifies manufacturing readiness nor independently verifies the geometry server-side. To avoid attributing edited CAD files to an immutable Git commit, native publishing requires the published head SHA to match checked-out `HEAD` and a clean committed working tree. Generated `.kicad_prl` editor state is exempt; other tracked or untracked changes are not. A mismatch exits with status 2 before uploading. Dry runs remain network-free.
 
+### Publish a Review through your signed-in browser (no API token)
+
+Prepare a **local-only** evidence file from a **clean committed Git checkout**. The chosen `--repo` must match the checkout's `origin`, and `--project` limits discovery so unrelated workspace designs are not included:
+
+```bash
+boardreadyops review publish . \
+  --project hardware/mainboard/mainboard.kicad_pro \
+  --repo owner/repository \
+  --native-visuals \
+  --bundle /tmp/mainboard-review-evidence.json \
+  --server https://boardreadyops.com
+```
+
+This command creates a new, owner-readable (`0600` on POSIX) JSON evidence bundle **without any HTTP request**, authentication token, or publication. It never overwrites an existing file, rejects an uncommitted Git source and conflicting `--token`, `--dry-run` or `--upload source` options, and limits the file to 64 MiB. Generated `.kicad_prl` editor state is excluded from the source-design modification guard. `--format json` optionally returns the local `bundlePath` with `dryRun: true`; this is not a published Review.
+
+While signed in with GitHub, open [Publish local Review](https://boardreadyops.com/reviews/publish), select the JSON file, verify the exact repository, commit SHA, findings, blocker count and native artwork, and deliberately click **Publish this Review**. Native PCB/schematic uploads require a separate explicit checkbox explaining the source-derived design-IP disclosure. The browser sends this **user-selected evidence only** with your current same-origin GitHub session, not an API token. Server-side authorization resolves the repository against your actual connected GitHub installation; a file containing a different owner/repo does not grant access.
+
+The file contains complete reported findings and, when `--native-visuals` was selected, real SVG copper routing, nets, schematics, layer names and KiCad source-object positions. Treat it as potentially confidential design data. Store it outside the Git working tree, never commit/share it unintentionally, and remove it when finished. No manufacturing authority follows from a published Review. When identical committed findings contain different genuine SVGs or source-object anchors, the bundle receives a distinct content-derived idempotency key; publishing the **same** bundle again will not duplicate a Run.
+
+The existing repository-scoped API token path remains available for CI and unattended local tools:
+
 To publish native views on the hosted service, choose the intended KiCad project and configure a repository-scoped `BOARDREADYOPS_TOKEN` with `runs:write`:
 
 ```bash

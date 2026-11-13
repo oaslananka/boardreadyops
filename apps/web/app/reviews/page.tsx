@@ -42,14 +42,23 @@ function NoMatchingReviews() {
   );
 }
 
-function ReviewPublishingGuidance() {
+function ReviewPublishingGuidance({ signedIn }: { signedIn: boolean }) {
   return (
     <Panel id="publish-review" title="Publish a Review" tone="section">
       <p className="text-sm text-muted-foreground">
-        Runs report findings; Reviews are separate, explicitly published records. Triage the source, then use{" "}
-        <code>boardreadyops review publish</code> from an authorized local checkout. It creates a new run/review; verify
-        its exact head commit and evidence before approval.
+        Reviews are separate, explicitly published records. First prepare source-linked evidence with{" "}
+        <code>boardreadyops review publish --bundle</code> on your own machine, then choose and inspect that file before
+        publishing it using your signed-in GitHub session. After publication, verify its exact head commit and evidence
+        before approval. A local file is not a Review until you explicitly publish it.
       </p>
+      {signedIn ? (
+        <Link
+          href="/reviews/publish"
+          className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+        >
+          Publish a local Review file
+        </Link>
+      ) : null}
     </Panel>
   );
 }
@@ -83,7 +92,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
               <p>Sign in with GitHub so BoardReadyOps knows which repositories you can see.</p>
             </EmptyState>
           </Panel>
-          <ReviewPublishingGuidance />
+          <ReviewPublishingGuidance signedIn={false} />
         </main>
       </AppShell>
     );
@@ -164,7 +173,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
         ) : null}
 
         {reviewsBody}
-        <ReviewPublishingGuidance />
+        <ReviewPublishingGuidance signedIn />
       </main>
     </AppShell>
   );
