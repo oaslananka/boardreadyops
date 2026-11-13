@@ -11,6 +11,19 @@ const schFile = path.resolve("tests/fixtures/projects/hierarchical-schematic/saf
 const hash = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
 
 describe("native SVG boundary", () => {
+  it("normalizes KiCad export timestamps without changing source artwork", () => {
+    const svg = (clock: string) =>
+      `<svg viewBox="0 0 40 20"><title>SVG Image created as main.svg date ${clock} </title><path d="M0 0L4 4"/></svg>`;
+    const expected = normalizeKicadSvg(svg("2026-11-13T15:18:12"));
+    expect(expected).toBeDefined();
+    expect(expected?.svg).toBe(normalizeKicadSvg(svg("2026-11-13T15:18:19"))?.svg);
+    expect(expected?.svg).toContain('<path d="M0 0L4 4"/>');
+    expect(expected?.svg).not.toContain("2026-11-13");
+    expect(
+      normalizeKicadSvg('<svg viewBox="0 0 40 20"><title>Customer date 2026-11-13T15:18:12</title></svg>')?.svg,
+    ).toContain("Customer date 2026-11-13T15:18:12");
+  });
+
   it("strips an external DTD and keeps exact KiCad viewBox dimensions", () => {
     const raw =
       '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg viewBox="0 0 320.5 200.25"><path /></svg>';
