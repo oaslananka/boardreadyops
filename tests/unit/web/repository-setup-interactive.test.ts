@@ -235,6 +235,73 @@ describe("repository setup readiness controls", () => {
     expect(container.querySelector("#readiness")).toBeNull();
   });
 
+  it("shows the hosted-run restriction before the setup PR and keeps local checking immediately reachable", async () => {
+    const repositories: SetupTargetRepository[] = [
+      {
+        ...readyForProbe,
+        id: "repo-gated",
+        fullName: "alpha/board",
+        readinessRunBlockedReason: "Hosted runs are not available for this repository yet.",
+      },
+      { ...readyForProbe, id: "repo-enabled", fullName: "beta/board" },
+    ];
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories,
+          initialRepositoryId: "repo-gated",
+        }),
+      );
+    });
+
+    const notice = container.querySelector<HTMLElement>('section[aria-label="Hosted hardware check availability"]');
+    const setup = container.querySelector<HTMLElement>("#automated-setup");
+    expect(notice).not.toBeNull();
+    expect(setup).not.toBeNull();
+    expect(notice?.compareDocumentPosition(setup as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(notice?.textContent).toContain("Hosted runs are not available for this repository yet.");
+    expect(notice?.textContent).toContain("does not start a hosted hardware check");
+    expect(notice?.querySelector('a[href*="/docs/quickstart.md"]')?.textContent).toContain("Check this PCB locally");
+    expect(notice?.querySelector('a[href="#automated-setup"]')?.textContent).toContain("Prepare repository setup");
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+
+    const selector = container.querySelector<HTMLSelectElement>("select");
+    if (!selector) throw new Error("repository selector not found");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(selector, "repo-enabled");
+      selector.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.querySelector('section[aria-label="Hosted hardware check availability"]')).toBeNull();
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+  });
+
+  it("does not recommend a new setup PR when rollout is gated but setup is already verified", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [
+            {
+              ...readyForProbe,
+              setupWorkflowStatus: "ready",
+              setupConfigStatus: "ready",
+              setupObservedSha: "a".repeat(40),
+              readinessRunBlockedReason: "Hosted runs are restricted.",
+            },
+          ],
+        }),
+      );
+    });
+    const notice = container.querySelector<HTMLElement>('section[aria-label="Hosted hardware check availability"]');
+    expect(notice?.textContent).toContain("Hosted runs are restricted.");
+    expect(notice?.querySelector('a[href="#readiness"]')?.textContent).toContain("Review verified setup");
+    expect(notice?.querySelector('a[href="#automated-setup"]')).toBeNull();
+  });
+
   it("explains rollout-gated first runs per selected repository without claiming a setup probe is a result", async () => {
     const repositories: SetupTargetRepository[] = [
       {
@@ -277,7 +344,9 @@ describe("repository setup readiness controls", () => {
     expect(progress?.textContent).toContain("exit code 0 only means");
     expect(container.textContent).not.toContain("open a pull request changing your hardware project");
     expect(container.querySelector('a[href="/runs/run-a"]')?.textContent).toContain("Inspect latest recorded run");
-    expect(container.querySelector('a[href*="/docs/quickstart.md"]')?.textContent).toContain("Run a local first check");
+    expect(container.querySelector('#readiness a[href*="/docs/quickstart.md"]')?.textContent).toContain(
+      "Run a local first check",
+    );
     expect(container.textContent).toContain("does not enable hosted runs, create");
     const selector = container.querySelector<HTMLSelectElement>("select");
     if (!selector) throw new Error("repository selector not found");
