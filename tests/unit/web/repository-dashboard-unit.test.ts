@@ -197,6 +197,8 @@ describe("repository dashboard and viewer loader branches", () => {
           repository_id: first.id,
           has_pcb: true,
           has_schematic: true,
+          has_native_pcb: true,
+          has_native_schematic: true,
         },
       ],
     });
@@ -211,6 +213,8 @@ describe("repository dashboard and viewer loader branches", () => {
       repository: "acme/private-board",
       hasPcb: true,
       hasSchematic: true,
+      hasNativePcb: true,
+      hasNativeSchematic: true,
     });
     const [sql, params] = mockQuery.mock.lastCall ?? [];
     expect(sql).toContain("unnest($1::text[], $2::text[])");

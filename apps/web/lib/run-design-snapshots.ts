@@ -112,3 +112,48 @@ export async function loadRunDesignBaseSnapshots(
     await executor.close();
   }
 }
+
+/**
+ * A single real native KiCad image for the signed-in visual-first entry point.
+ * The caller must authorize the exact Run before invoking this query. No board
+ * drawings are serialized into Dashboard/Projects HTML or their metadata API.
+ */
+export async function loadRunNativeDesignPreview(
+  runId: string,
+  repositoryId: string,
+  kind: "pcb_layer" | "schematic",
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+  createExecutor: (options: { connectionString: string }) => Executor = createPgQueryExecutor,
+): Promise<string | undefined> {
+  if (!environment.DATABASE_URL || (kind !== "pcb_layer" && kind !== "schematic")) return undefined;
+  const executor = createExecutor({ connectionString: environment.DATABASE_URL });
+  try {
+    const result = await executor.query(
+      `select s.content
+         from run_snapshots as s
+         join release_runs as r on r.id = s.run_id
+        where r.id = $1 and r.repository_id = $2
+          and s.kind = $3 and s.format = 'svg'
+          and left(s.name, 13) = 'kicad_native_'
+          and octet_length(s.content) between 128 and 2097152
+        order by case when s.sheet_or_layer like '% / F.Cu' then 0 else 1 end,
+                 s.created_at asc, s.snapshot_id asc
+        limit 1`,
+      [runId, repositoryId, kind],
+    );
+    const raw = (result as { rows?: Array<{ content?: unknown }> }).rows?.[0]?.content;
+    if (typeof raw !== "string" || Buffer.byteLength(raw, "utf8") > 2_097_152) return undefined;
+    // Never serve arbitrary uploaded HTML, scripts, active SVG or external fetches.
+    // Standard KiCad native plots have none of these elements/attributes.
+    if (
+      !/^\s*<svg\b/iu.test(raw) ||
+      /<\s*(?:script|foreignObject|iframe|object|embed|image|use)\b/iu.test(raw) ||
+      /<!DOCTYPE\b|<\?xml-stylesheet\b|\bon[a-z]+\s*=/iu.test(raw) ||
+      /\b(?:href|src)\s*=\s*["']\s*(?:https?:|data:|javascript:)/iu.test(raw)
+    )
+      return undefined;
+    return raw;
+  } finally {
+    await executor.close();
+  }
+}
