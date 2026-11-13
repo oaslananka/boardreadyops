@@ -3,8 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { CanvasAnchor, SnapshotArtifact, SnapshotFinding } from "@boardreadyops/contracts";
+import { isInside } from "../util/path.js";
 import { runProcess } from "../util/process.js";
 import type { PcbOutlineBounds } from "./pcb.js";
+import { findSexprLists, parseSexprDocument, sexprChildLists, sexprListValue } from "./sexpr.js";
 
 const MAX_SVG_BYTES = 4 * 1024 * 1024;
 const MAX_SHEETS = 16;
@@ -24,6 +26,9 @@ export function normalizeKicadSvg(raw: string): { svg: string; width: number; he
   const svg = raw
     .replace(/<\?xml[^?]*\?>/giu, "")
     .replace(/<!DOCTYPE\s+svg\s+PUBLIC\s+["'][^"']+["']\s+["'][^"']+["']\s*>/giu, "")
+    // KiCad embeds the export clock in SVG <title>, making identical source
+    // produce different hashes and misleading revision comparison results.
+    .replace(/(<title>SVG Image created as [^<]*?) date \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?=\s*<\/title>)/giu, "$1")
     .trim();
   if (Buffer.byteLength(svg, "utf8") > MAX_SVG_BYTES || !svg.includes("</svg>")) return undefined;
   const opening = /<svg\b[^>]*>/isu.exec(svg)?.[0];
@@ -193,24 +198,86 @@ async function collectSvg(
   };
 }
 
-async function stageSource(sourceFile: string, tempRoot: string, sourceSha: string): Promise<string | undefined> {
-  const stage = path.join(tempRoot, "source");
-  await fs.mkdir(stage);
-  const input = path.join(stage, path.basename(sourceFile));
-  await fs.copyFile(sourceFile, input);
-  const adjacent = (await fs.readdir(path.dirname(sourceFile), { withFileTypes: true }))
+interface StagedSource {
+  input: string;
+  originals: Array<{ file: string; sha256: string }>;
+}
+
+interface StagingContext {
+  sourceRoot: string;
+  directory: string;
+  originals: Map<string, string>;
+}
+
+async function copyStagedSource(context: StagingContext, file: string): Promise<string | undefined> {
+  const absolute = path.resolve(file);
+  const canonical = await fs.realpath(absolute).catch(() => undefined);
+  if (!canonical || !isInside(context.sourceRoot, absolute) || !isInside(context.sourceRoot, canonical))
+    return undefined;
+  const stat = await fs.stat(canonical);
+  if (!stat.isFile() || stat.size > MAX_SVG_BYTES * 4) return undefined;
+  const sha256 = await sourceDigest(canonical);
+  const target = path.join(context.directory, path.relative(context.sourceRoot, absolute));
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.copyFile(canonical, target);
+  if ((await sourceDigest(target)) !== sha256) return undefined;
+  context.originals.set(canonical, sha256);
+  return target;
+}
+
+function referencedSheetFiles(text: string): string[] {
+  return findSexprLists(parseSexprDocument(text), "sheet").flatMap((sheet) =>
+    sexprChildLists(sheet, "property")
+      .filter((property) => sexprListValue(property, 1) === "Sheetfile")
+      .map((property) => sexprListValue(property, 2) ?? ""),
+  );
+}
+
+/** Stage only declared, in-project hierarchical pages; KiCad otherwise plots empty placeholders. */
+async function stageHierarchicalSheets(context: StagingContext, master: string): Promise<boolean> {
+  const queue = [path.resolve(master)];
+  const visited = new Set<string>();
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current) break;
+    const canonical = await fs.realpath(current);
+    if (visited.has(canonical)) continue;
+    visited.add(canonical);
+    if (visited.size > MAX_SHEETS) return false;
+    const references = referencedSheetFiles(await fs.readFile(canonical, "utf8"));
+    for (const reference of references) {
+      if (!reference || !/\.kicad_sch$/iu.test(reference) || path.isAbsolute(reference)) return false;
+      const child = path.resolve(path.dirname(current), reference);
+      if (!(await copyStagedSource(context, child))) return false;
+      queue.push(child);
+    }
+  }
+  return true;
+}
+
+async function stageSource(sourceFile: string, tempRoot: string, sourceSha: string): Promise<StagedSource | undefined> {
+  const context: StagingContext = {
+    sourceRoot: await fs.realpath(path.dirname(sourceFile)),
+    directory: path.join(tempRoot, "source"),
+    originals: new Map(),
+  };
+  await fs.mkdir(context.directory);
+  const input = await copyStagedSource(context, sourceFile);
+  if (!input || (await sourceDigest(input)) !== sourceSha) return undefined;
+  const adjacent = (await fs.readdir(context.sourceRoot, { withFileTypes: true }))
     .filter(
       (entry) =>
         entry.isFile() && /\.(kicad_sch|kicad_pro)$/iu.test(entry.name) && entry.name !== path.basename(sourceFile),
     )
     .slice(0, 32);
-  await Promise.all(
-    adjacent.map(async ({ name }) => {
-      const from = path.join(path.dirname(sourceFile), name);
-      if ((await fs.stat(from)).size <= MAX_SVG_BYTES * 4) await fs.copyFile(from, path.join(stage, name));
-    }),
-  );
-  return (await sourceDigest(input)) === sourceSha ? input : undefined;
+  for (const { name } of adjacent) {
+    if (!(await copyStagedSource(context, path.join(context.sourceRoot, name)))) return undefined;
+  }
+  if (/\.kicad_sch$/iu.test(sourceFile) && !(await stageHierarchicalSheets(context, sourceFile))) return undefined;
+  return {
+    input,
+    originals: [...context.originals].map(([file, sha256]) => ({ file, sha256 })),
+  };
 }
 
 async function pcbLayer(
@@ -312,9 +379,16 @@ export async function exportNativeKicadSnapshots(
   try {
     const staged = await stageSource(sourceFile, directory, beforeSha);
     if (!staged) return [];
-    return kind === "pcb_layer"
-      ? await pcbSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label, layers)
-      : await schematicSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label);
+    const result =
+      kind === "pcb_layer"
+        ? await pcbSnapshots(cliPath, staged.input, sourceFile, beforeSha, directory, label, layers)
+        : await schematicSnapshots(cliPath, staged.input, sourceFile, beforeSha, directory, label);
+    // The root hash alone cannot detect a referenced sub-sheet edited during
+    // plotting. Never associate such mixed source evidence with one Git SHA.
+    const unchanged = await Promise.all(
+      staged.originals.map(async ({ file, sha256 }) => (await sourceDigest(file).catch(() => "")) === sha256),
+    );
+    return unchanged.every(Boolean) ? result : [];
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }

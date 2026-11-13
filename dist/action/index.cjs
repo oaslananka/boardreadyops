@@ -125437,7 +125437,7 @@ function sourceDigest(file3) {
   return import_promises18.default.readFile(file3).then(digest);
 }
 function normalizeKicadSvg(raw) {
-  const svg = raw.replace(/<\?xml[^?]*\?>/giu, "").replace(/<!DOCTYPE\s+svg\s+PUBLIC\s+["'][^"']+["']\s+["'][^"']+["']\s*>/giu, "").trim();
+  const svg = raw.replace(/<\?xml[^?]*\?>/giu, "").replace(/<!DOCTYPE\s+svg\s+PUBLIC\s+["'][^"']+["']\s+["'][^"']+["']\s*>/giu, "").replace(/(<title>SVG Image created as [^<]*?) date \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?=\s*<\/title>)/giu, "$1").trim();
   if (Buffer.byteLength(svg, "utf8") > MAX_SVG_BYTES || !svg.includes("</svg>")) return void 0;
   const opening = /<svg\b[^>]*>/isu.exec(svg)?.[0];
   const coordinates = opening?.match(/\bviewBox\s*=\s*["']([^"']+)["']/iu)?.[1]?.trim().split(/\s+/u).map(Number);
@@ -125539,21 +125539,66 @@ async function collectSvg(output3, beforeSha, sourceFile, kind, label) {
     anchors: []
   };
 }
+async function copyStagedSource(context5, file3) {
+  const absolute = import_node_path49.default.resolve(file3);
+  const canonical = await import_promises18.default.realpath(absolute).catch(() => void 0);
+  if (!canonical || !isInside(context5.sourceRoot, absolute) || !isInside(context5.sourceRoot, canonical))
+    return void 0;
+  const stat3 = await import_promises18.default.stat(canonical);
+  if (!stat3.isFile() || stat3.size > MAX_SVG_BYTES * 4) return void 0;
+  const sha256 = await sourceDigest(canonical);
+  const target = import_node_path49.default.join(context5.directory, import_node_path49.default.relative(context5.sourceRoot, absolute));
+  await import_promises18.default.mkdir(import_node_path49.default.dirname(target), { recursive: true });
+  await import_promises18.default.copyFile(canonical, target);
+  if (await sourceDigest(target) !== sha256) return void 0;
+  context5.originals.set(canonical, sha256);
+  return target;
+}
+function referencedSheetFiles(text) {
+  return findSexprLists(parseSexprDocument(text), "sheet").flatMap(
+    (sheet) => sexprChildLists(sheet, "property").filter((property2) => sexprListValue(property2, 1) === "Sheetfile").map((property2) => sexprListValue(property2, 2) ?? "")
+  );
+}
+async function stageHierarchicalSheets(context5, master) {
+  const queue = [import_node_path49.default.resolve(master)];
+  const visited = /* @__PURE__ */ new Set();
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current) break;
+    const canonical = await import_promises18.default.realpath(current);
+    if (visited.has(canonical)) continue;
+    visited.add(canonical);
+    if (visited.size > MAX_SHEETS) return false;
+    const references = referencedSheetFiles(await import_promises18.default.readFile(canonical, "utf8"));
+    for (const reference of references) {
+      if (!reference || !/\.kicad_sch$/iu.test(reference) || import_node_path49.default.isAbsolute(reference)) return false;
+      const child = import_node_path49.default.resolve(import_node_path49.default.dirname(current), reference);
+      if (!await copyStagedSource(context5, child)) return false;
+      queue.push(child);
+    }
+  }
+  return true;
+}
 async function stageSource(sourceFile, tempRoot, sourceSha) {
-  const stage = import_node_path49.default.join(tempRoot, "source");
-  await import_promises18.default.mkdir(stage);
-  const input3 = import_node_path49.default.join(stage, import_node_path49.default.basename(sourceFile));
-  await import_promises18.default.copyFile(sourceFile, input3);
-  const adjacent = (await import_promises18.default.readdir(import_node_path49.default.dirname(sourceFile), { withFileTypes: true })).filter(
+  const context5 = {
+    sourceRoot: await import_promises18.default.realpath(import_node_path49.default.dirname(sourceFile)),
+    directory: import_node_path49.default.join(tempRoot, "source"),
+    originals: /* @__PURE__ */ new Map()
+  };
+  await import_promises18.default.mkdir(context5.directory);
+  const input3 = await copyStagedSource(context5, sourceFile);
+  if (!input3 || await sourceDigest(input3) !== sourceSha) return void 0;
+  const adjacent = (await import_promises18.default.readdir(context5.sourceRoot, { withFileTypes: true })).filter(
     (entry) => entry.isFile() && /\.(kicad_sch|kicad_pro)$/iu.test(entry.name) && entry.name !== import_node_path49.default.basename(sourceFile)
   ).slice(0, 32);
-  await Promise.all(
-    adjacent.map(async ({ name }) => {
-      const from = import_node_path49.default.join(import_node_path49.default.dirname(sourceFile), name);
-      if ((await import_promises18.default.stat(from)).size <= MAX_SVG_BYTES * 4) await import_promises18.default.copyFile(from, import_node_path49.default.join(stage, name));
-    })
-  );
-  return await sourceDigest(input3) === sourceSha ? input3 : void 0;
+  for (const { name } of adjacent) {
+    if (!await copyStagedSource(context5, import_node_path49.default.join(context5.sourceRoot, name))) return void 0;
+  }
+  if (/\.kicad_sch$/iu.test(sourceFile) && !await stageHierarchicalSheets(context5, sourceFile)) return void 0;
+  return {
+    input: input3,
+    originals: [...context5.originals].map(([file3, sha256]) => ({ file: file3, sha256 }))
+  };
 }
 async function pcbLayer(cliPath, input3, original, beforeSha, tempRoot, label, layer) {
   if (!/^(?:F|B|In\d+)\.Cu$/u.test(layer)) return void 0;
@@ -125620,7 +125665,11 @@ async function exportNativeKicadSnapshots(cliPath, sourceFile, kind, layers = []
   try {
     const staged = await stageSource(sourceFile, directory, beforeSha);
     if (!staged) return [];
-    return kind === "pcb_layer" ? await pcbSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label, layers) : await schematicSnapshots(cliPath, staged, sourceFile, beforeSha, directory, label);
+    const result = kind === "pcb_layer" ? await pcbSnapshots(cliPath, staged.input, sourceFile, beforeSha, directory, label, layers) : await schematicSnapshots(cliPath, staged.input, sourceFile, beforeSha, directory, label);
+    const unchanged = await Promise.all(
+      staged.originals.map(async ({ file: file3, sha256 }) => await sourceDigest(file3).catch(() => "") === sha256)
+    );
+    return unchanged.every(Boolean) ? result : [];
   } finally {
     await import_promises18.default.rm(directory, { recursive: true, force: true });
   }
@@ -132326,7 +132375,7 @@ function internalArtifactTwirpClient(options) {
 
 // node_modules/@actions/artifact/lib/internal/upload/upload-zip-specification.js
 var fs23 = __toESM(require("fs"), 1);
-var import_path14 = require("path");
+var import_path15 = require("path");
 function validateRootDirectory(rootDirectory) {
   if (!fs23.existsSync(rootDirectory)) {
     throw new Error(`The provided rootDirectory ${rootDirectory} does not exist`);
@@ -132338,16 +132387,16 @@ function validateRootDirectory(rootDirectory) {
 }
 function getUploadZipSpecification(filesToZip, rootDirectory) {
   const specification = [];
-  rootDirectory = (0, import_path14.normalize)(rootDirectory);
-  rootDirectory = (0, import_path14.resolve)(rootDirectory);
+  rootDirectory = (0, import_path15.normalize)(rootDirectory);
+  rootDirectory = (0, import_path15.resolve)(rootDirectory);
   for (let file3 of filesToZip) {
     const stats = fs23.lstatSync(file3, { throwIfNoEntry: false });
     if (!stats) {
       throw new Error(`File ${file3} does not exist`);
     }
     if (!stats.isDirectory()) {
-      file3 = (0, import_path14.normalize)(file3);
-      file3 = (0, import_path14.resolve)(file3);
+      file3 = (0, import_path15.normalize)(file3);
+      file3 = (0, import_path15.resolve)(file3);
       if (!file3.startsWith(rootDirectory)) {
         throw new Error(`The rootDirectory: ${rootDirectory} is not a parent directory of the file: ${file3}`);
       }

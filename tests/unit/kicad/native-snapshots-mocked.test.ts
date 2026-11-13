@@ -87,6 +87,62 @@ describe("KiCad-native offline exporter without requiring installed KiCad", () =
     expect(await fs.readFile(sch, "utf8")).toBe("schematic");
   });
 
+  it("stages exactly the referenced hierarchy, preserving nested source layout and page content", async () => {
+    const master = path.join(root, "alpha.kicad_sch");
+    const child = path.join(root, "sch", "child.kicad_sch");
+    const grandchild = path.join(root, "sch", "nested", "detail.kicad_sch");
+    await fs.mkdir(path.dirname(grandchild), { recursive: true });
+    await fs.writeFile(master, '(kicad_sch (sheet (property "Sheetfile" "sch/child.kicad_sch")))');
+    await fs.writeFile(child, '(kicad_sch (sheet (property "Sheetfile" "nested/detail.kicad_sch")))');
+    await fs.writeFile(grandchild, '(kicad_sch (symbol (property "Reference" "R1")))');
+    await fs.writeFile(path.join(root, "unrelated.kicad_pcb"), "not part of this plot");
+
+    mockProcess.mockImplementation(async (_command, args) => {
+      const stageMain = args.at(-1) ?? "";
+      const stagedRoot = path.dirname(stageMain);
+      expect(await fs.readFile(path.join(stagedRoot, "sch", "child.kicad_sch"), "utf8")).toContain("nested/detail");
+      expect(await fs.readFile(path.join(stagedRoot, "sch", "nested", "detail.kicad_sch"), "utf8")).toContain("R1");
+      await expect(fs.access(path.join(stagedRoot, "unrelated.kicad_pcb"))).rejects.toThrow();
+      await fs.writeFile(path.join(args[args.indexOf("--output") + 1] ?? "", "a.svg"), VALID);
+      return result;
+    });
+    expect(await exportNativeKicadSnapshots("cli", master, "schematic")).toHaveLength(1);
+    expect(mockProcess).toHaveBeenCalledOnce();
+    expect(await fs.readFile(child, "utf8")).toContain("nested/detail");
+  });
+
+  it("refuses missing and outside-project hierarchical sheets before launching KiCad", async () => {
+    const master = path.join(root, "alpha.kicad_sch");
+    await fs.writeFile(master, '(kicad_sch (sheet (property "Sheetfile" "sch/missing.kicad_sch")))');
+    expect(await exportNativeKicadSnapshots("cli", master, "schematic")).toEqual([]);
+    expect(mockProcess).not.toHaveBeenCalled();
+
+    const externalDir = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-private-sheet-"));
+    try {
+      await fs.writeFile(path.join(externalDir, "external.kicad_sch"), "(kicad_sch)");
+      await fs.writeFile(master, '(kicad_sch (sheet (property "Sheetfile" "sch/external.kicad_sch")))');
+      await fs.mkdir(path.join(root, "sch"), { recursive: true });
+      await fs.symlink(path.join(externalDir, "external.kicad_sch"), path.join(root, "sch", "external.kicad_sch"));
+      expect(await exportNativeKicadSnapshots("cli", master, "schematic")).toEqual([]);
+      expect(mockProcess).not.toHaveBeenCalled();
+    } finally {
+      await fs.rm(externalDir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses source-bound native SVGs if a nested schematic changes during plotting", async () => {
+    const master = path.join(root, "alpha.kicad_sch");
+    const child = path.join(root, "child.kicad_sch");
+    await fs.writeFile(master, '(kicad_sch (sheet (property "Sheetfile" "child.kicad_sch")))');
+    await fs.writeFile(child, "(kicad_sch (symbol))");
+    mockProcess.mockImplementation(async (_command, args) => {
+      await fs.writeFile(path.join(args[args.indexOf("--output") + 1] ?? "", "a.svg"), VALID);
+      await fs.writeFile(child, '(kicad_sch (symbol (property "Reference" "changed")))');
+      return result;
+    });
+    expect(await exportNativeKicadSnapshots("cli", master, "schematic")).toEqual([]);
+  });
+
   it.each([
     { code: 1, timedOut: false },
     { code: null, timedOut: true },
