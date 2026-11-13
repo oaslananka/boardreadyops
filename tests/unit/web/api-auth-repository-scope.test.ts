@@ -76,6 +76,60 @@ describe("repository API authorization", () => {
     if (!(result instanceof Response)) await result.executor.close();
   });
 
+  it("resolves an owner/repository bundle alias to the session-authorized canonical UUID", async () => {
+    configurePostgres();
+    query.mockResolvedValueOnce({ rows: [{ id: "connected-repo-uuid", github_installation_id: "1001" }] });
+
+    const result = await resolveRepositoryApiContext(
+      sessionAuth([1001]),
+      new Request("https://boardreadyops.test/api/v1/runs"),
+      "oaslananka-iot/RoyalBlue54L-Feather-Hardware",
+    );
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("lower(repositories.owner || '/' || repositories.name) = lower($1)"),
+      ["oaslananka-iot/RoyalBlue54L-Feather-Hardware"],
+    );
+    expect(result).not.toBeInstanceOf(Response);
+    if (!(result instanceof Response)) {
+      expect(result.repositoryId).toBe("connected-repo-uuid");
+      await result.executor.close();
+    }
+  });
+
+  it("denies a named bundle repository whose GitHub installation is not in the viewer session", async () => {
+    configurePostgres();
+    query.mockResolvedValueOnce({ rows: [{ id: "unrelated-repo-id", github_installation_id: "1999" }] });
+
+    const result = await resolveRepositoryApiContext(
+      sessionAuth([1001]),
+      new Request("https://boardreadyops.test/api/v1/runs"),
+      "other-owner/private-design",
+    );
+
+    expect((result as Response).status).toBe(403);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed for malformed or conflicting owner/repo aliases before a database lookup", async () => {
+    configurePostgres();
+    for (const candidate of ["other/../private", "owner/repo/path", "owner/repo%2fsecret"]) {
+      const result = await resolveRepositoryApiContext(
+        sessionAuth([1001]),
+        new Request("https://boardreadyops.test/api/v1/runs"),
+        candidate,
+      );
+      expect((result as Response).status).toBe(403);
+    }
+    const mismatch = await resolveRepositoryApiContext(
+      sessionAuth([1001]),
+      new Request("https://boardreadyops.test/api/v1/runs?repositoryId=owner/other"),
+      "owner/repo",
+    );
+    expect((mismatch as Response).status).toBe(403);
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("accepts node-postgres bigint values that are already decoded as safe numbers", async () => {
     configurePostgres();
     query.mockResolvedValueOnce({ rows: [{ github_installation_id: 1001 }] });

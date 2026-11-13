@@ -9,6 +9,7 @@ import {
   type ReviewPublishOptions,
   resolveReviewPublishRef,
   reviewPublishCommand,
+  reviewSnapshotIdempotencyKey,
 } from "../../../src/cli/commands/review.js";
 import { schemaCommand } from "../../../src/cli/commands/schema.js";
 import { boardReadyVersion } from "../../../src/generated/version.js";
@@ -109,9 +110,138 @@ function createCommittedPcbReviewFixture(): { root: string; base: string; head: 
   return { root, base, head: run("rev-parse", "HEAD") };
 }
 
+describe("source-derived idempotency prevents old markerless Reviews", () => {
+  const baseSnapshot = {
+    name: "kicad_native_F_Cu.svg",
+    sha256: "c".repeat(64),
+    anchors: [] as Array<{ id: string; kind: "finding"; x: number; y: number; metadata: Record<string, string> }>,
+  };
+  it("keeps the same committed source and unchanged drawings idempotent", () => {
+    const key = reviewSnapshotIdempotencyKey(headSha, "a".repeat(64), [baseSnapshot]);
+    expect(key).toBe(reviewSnapshotIdempotencyKey(headSha, "a".repeat(64), [baseSnapshot]));
+    expect(key).toMatch(/^publish-[a-f0-9]{40}-[a-f0-9]{16}-[a-f0-9]{16}$/u);
+  });
+  it("makes a newly source-verified KiCad marker a new Run even when source SHA and finding digest are unchanged", () => {
+    const original = reviewSnapshotIdempotencyKey(headSha, "a".repeat(64), [baseSnapshot]);
+    const anchored = {
+      ...baseSnapshot,
+      anchors: [
+        {
+          id: "actual-kicad-uuid",
+          kind: "finding" as const,
+          x: 0.2,
+          y: 0.4,
+          metadata: { provenance: "kicad-json-object-position", sourceUuid: "5d98b95c-d01d-4e88-8c2c-83c62e48cb07" },
+        },
+      ],
+    };
+    const updated = reviewSnapshotIdempotencyKey(headSha, "a".repeat(64), [anchored]);
+    expect(updated).not.toBe(original);
+    expect(updated).toBe(reviewSnapshotIdempotencyKey(headSha, "a".repeat(64), [anchored]));
+    expect(reviewSnapshotIdempotencyKey(headSha, "a".repeat(64), [{ ...anchored, sha256: "d".repeat(64) }])).not.toBe(
+      updated,
+    );
+  });
+});
+
 describe("CLI review publish command", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("exports a local source-bound Review bundle without an API token or network call", async () => {
+    const { root, head } = createCommittedPcbReviewFixture();
+    execFileSync("git", ["-C", root, "remote", "add", "origin", "https://github.com/test-org/test-repo.git"]);
+    const bundlePath = path.join(os.tmpdir(), `bro-review-bundle-${process.pid}-${Date.now()}.json`);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({
+          project: "safe-basic.kicad_pro",
+          head,
+          repo: "test-org/test-repo",
+          token: undefined,
+          bundle: bundlePath,
+        }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code, stderr.output).toBe(0);
+      const envelope = JSON.parse(fs.readFileSync(bundlePath, "utf8"));
+      expect(envelope).toMatchObject({
+        format: "boardreadyops-review-bundle-v1",
+        repository: "test-org/test-repo",
+        commitSha: head,
+        uploadMode: "metadata",
+        payload: {
+          repositoryId: "test-org/test-repo",
+          commitSha: head,
+          triggerKind: "manual",
+          findings: expect.any(Array),
+          snapshots: expect.any(Array),
+        },
+      });
+      expect(envelope.payload.snapshots).toHaveLength(2);
+      expect(envelope.payload.evidenceDigest).toMatch(/^[a-f0-9]{64}$/u);
+      expect(stdout.output).toContain("https://cloud.example/reviews/publish");
+      expect(stdout.output).not.toContain("<svg");
+      expect(fetchMock).not.toHaveBeenCalled();
+      if (process.platform !== "win32") expect(fs.statSync(bundlePath).mode & 0o777).toBe(0o600);
+    } finally {
+      fs.rmSync(bundlePath, { force: true });
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("never exports a Review bundle with ambiguous origin, dirty source, or conflicting publish options", async () => {
+    const { root, head } = createCommittedPcbReviewFixture();
+    execFileSync("git", ["-C", root, "remote", "add", "origin", "https://github.com/test-org/test-repo.git"]);
+    const bundlePath = path.join(os.tmpdir(), `bro-bundle-reject-${process.pid}-${Date.now()}.json`);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      for (const overrides of [
+        { repo: "wrong/../repo" },
+        { repo: "local-repo" },
+        { repo: "other-org/other-repo" },
+        { token: "bearer-must-not-be-sent" },
+        { dryRun: true },
+        { head: "1".repeat(40) },
+      ]) {
+        const stdout = createMockStream();
+        const stderr = createMockStream();
+        const code = await reviewPublishCommand(
+          root,
+          liveOptions({
+            project: "safe-basic.kicad_pro",
+            head,
+            token: undefined,
+            bundle: bundlePath,
+            ...overrides,
+          }),
+          { stdout: stdout.stream, stderr: stderr.stream },
+        );
+        expect(code, `override ${JSON.stringify(overrides)} ${stderr.output}`).not.toBe(0);
+        expect(fs.existsSync(bundlePath)).toBe(false);
+      }
+      fs.appendFileSync(path.join(root, "safe-basic.kicad_pcb"), "\n; uncommitted board edit\n");
+      const stdout = createMockStream();
+      const stderr = createMockStream();
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({ head, project: "safe-basic.kicad_pro", token: undefined, bundle: bundlePath }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code).not.toBe(0);
+      expect(fs.existsSync(bundlePath)).toBe(false);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(bundlePath, { force: true });
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("requires explicit opt-in and both revisions before sending PCB-derived summary fields", async () => {

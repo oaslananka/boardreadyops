@@ -426,6 +426,7 @@ export function registerAllCommands(
       .option("--share-footprint-summary", "opt in to publishing PCB change counts and source hashes")
       .option("--pcb <path>", "tracked PCB path required for opted-in change summary")
       .option("--dry-run", "simulate review publish without uploading")
+      .option("--bundle <file>", "save an opt-in Review evidence file for signed-in browser publication (no upload)")
       .option("--token <token>", "workspace API token")
       .option("--server <url>", "BoardReadyOps cloud server URL")
       .option("--title <title>", "review title")

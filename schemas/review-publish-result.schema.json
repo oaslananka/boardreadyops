@@ -20,7 +20,8 @@
     "dryRun": { "type": "boolean" },
     "evidenceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "reviewUrl": { "type": "string", "minLength": 1 },
-    "runId": { "type": "string", "minLength": 1 }
+    "runId": { "type": "string", "minLength": 1 },
+    "bundlePath": { "type": "string", "minLength": 1 }
   },
   "allOf": [
     {

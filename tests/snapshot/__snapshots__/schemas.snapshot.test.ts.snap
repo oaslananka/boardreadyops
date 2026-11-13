@@ -3819,6 +3819,10 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
       },
     ],
     "properties": {
+      "bundlePath": {
+        "minLength": 1,
+        "type": "string",
+      },
       "dryRun": {
         "type": "boolean",
       },

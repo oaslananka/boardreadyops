@@ -136,6 +136,20 @@ export async function resolveRepositoryApiContext(
     return Response.json({ ok: false, error: "repositoryId is required" }, { status: 400 });
   }
 
+  // The local CLI knows the Git remote as owner/name, not our private database UUID.
+  // Resolve that public identity only within the signed-in viewer's installation scope.
+  // A mismatching query/body alias must never silently choose a different repository.
+  const sessionSlug = auth.authType === "session" && repositoryId.includes("/") ? repositoryId : undefined;
+  if (
+    (sessionSlug && !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/iu.test(sessionSlug)) ||
+    (auth.authType === "session" &&
+      explicitRepositoryId !== undefined &&
+      queryRepositoryId !== undefined &&
+      explicitRepositoryId !== queryRepositoryId)
+  ) {
+    return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+  }
+
   const config = resolveCloudPersistenceConfiguration();
   if (config.mode !== "postgres") {
     return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
@@ -144,10 +158,10 @@ export async function resolveRepositoryApiContext(
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const result = await executor.query(
-      `select installations.github_installation_id
+      `select repositories.id, installations.github_installation_id
          from repositories
          join installations on installations.id = repositories.installation_id
-        where repositories.id = $1
+        where ${sessionSlug ? "lower(repositories.owner || '/' || repositories.name) = lower($1)" : "repositories.id = $1"}
           and repositories.disabled_at is null
           and installations.suspended_at is null
           ${alias ? "and lower(repositories.owner || '/' || repositories.name) = lower($2)" : ""}
@@ -167,7 +181,13 @@ export async function resolveRepositoryApiContext(
       return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
     }
 
-    return { repositoryId, executor };
+    const canonicalId = sessionSlug ? parseSafeString(rows[0]?.id) : repositoryId;
+    if (!canonicalId) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+    }
+
+    return { repositoryId: canonicalId, executor };
   } catch (error) {
     await executor.close();
     throw error;

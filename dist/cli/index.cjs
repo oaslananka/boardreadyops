@@ -82045,6 +82045,7 @@ async function gitState2(root) {
 // src/cli/commands/review.ts
 var import_node_child_process5 = require("node:child_process");
 var import_node_crypto21 = require("node:crypto");
+var import_node_fs11 = require("node:fs");
 var import_node_path74 = __toESM(require("node:path"), 1);
 
 // packages/cloud-core/src/archive-sanitizer.ts
@@ -83741,10 +83742,10 @@ function resolveReviewPublishRef(sourceRoot, headSha) {
     return headSha;
   }
 }
-function getGitOriginRepo() {
+function getGitOriginRepo(root) {
   try {
     const gitExec = resolveGitExecutable();
-    const url3 = (0, import_node_child_process5.execFileSync)(gitExec, ["remote", "get-url", "origin"], {
+    const url3 = (0, import_node_child_process5.execFileSync)(gitExec, ["-C", root, "remote", "get-url", "origin"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
@@ -83777,9 +83778,87 @@ function nativeVisualSourceError(root, headSha) {
   }
   return void 0;
 }
+function reviewSnapshotIdempotencyKey(headSha, evidenceDigest, snapshots) {
+  const snapshotDigest = (0, import_node_crypto21.createHash)("sha256").update(
+    JSON.stringify(
+      snapshots.map((snapshot) => ({
+        name: snapshot.name,
+        sha256: snapshot.sha256,
+        anchors: snapshot.anchors
+      }))
+    )
+  ).digest("hex");
+  return `publish-${headSha}-${evidenceDigest.slice(0, 16)}-${snapshotDigest.slice(0, 16)}`;
+}
+function invalidLocalBundleOptions(root, options) {
+  if (!options.bundle) return void 0;
+  if (options.dryRun || options.token !== void 0 || !options.bundle.trim() || options.bundle === "-" || options.upload === "source" || !options.repo || !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/iu.test(options.repo)) {
+    return "A local Review bundle requires --repo owner/name and --bundle FILE.json; do not combine it with --token, --dry-run or --upload source.";
+  }
+  const sourceRepository = getGitOriginRepo(root);
+  if (!sourceRepository || sourceRepository.toLowerCase() !== options.repo.toLowerCase()) {
+    return "Review bundle repository must match the source checkout's Git origin.";
+  }
+  return void 0;
+}
+function saveLocalReviewBundle(input3) {
+  const {
+    filename,
+    repositoryId,
+    headSha,
+    uploadMode,
+    nativeVisuals,
+    idempotencyKey,
+    payload,
+    evidenceDigest,
+    server,
+    jsonOutput,
+    stdout,
+    stderr
+  } = input3;
+  const file3 = import_node_path74.default.resolve(filename);
+  const exportObject = {
+    format: "boardreadyops-review-bundle-v1",
+    repository: repositoryId,
+    commitSha: headSha,
+    uploadMode,
+    sourceArtIncluded: nativeVisuals,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    idempotencyKey,
+    payload
+  };
+  const encoded = JSON.stringify(exportObject);
+  if (Buffer.byteLength(encoded, "utf8") > 64 * 1024 * 1024) {
+    stderr.write("Review evidence bundle exceeds the 64 MiB browser upload limit.\n");
+    return 2;
+  }
+  try {
+    (0, import_node_fs11.writeFileSync)(file3, encoded, { encoding: "utf8", flag: "wx", mode: 384 });
+  } catch {
+    stderr.write("Could not create Review evidence file; choose a writable unused path.\n");
+    return 2;
+  }
+  if (jsonOutput) {
+    writePublishResult({ ...publishResult(evidenceDigest, true), bundlePath: file3 }, { stdout });
+  } else {
+    stdout.write(`\u2714 Local Review bundle saved: ${file3}
+`);
+    stdout.write(`\u{1F50E} Source: ${repositoryId} @ ${headSha.slice(0, 12)}
+`);
+    stdout.write(`\u{1F512} No network upload. Open ${server}/reviews/publish and select this file to review and publish.
+`);
+  }
+  return 0;
+}
 async function reviewPublishCommand(target, options, streams) {
   const root = target ?? process.cwd();
   const jsonOutput = options.format === "json";
+  const bundleError = invalidLocalBundleOptions(root, options);
+  if (bundleError) {
+    streams.stderr.write(`${bundleError}
+`);
+    return 2;
+  }
   const loaded = await loadConfig(root, options.config);
   const config3 = loaded.config;
   let headSha = options.head ?? getGitCommitSha(root, "HEAD");
@@ -83825,7 +83904,7 @@ async function reviewPublishCommand(target, options, streams) {
     streams.stderr.write("--pcb requires --share-footprint-summary; nothing uploaded.\n");
     return 2;
   }
-  if (options.nativeVisuals && !options.dryRun) {
+  if (options.nativeVisuals && !options.dryRun || options.bundle) {
     const provenanceError = nativeVisualSourceError(root, headSha);
     if (provenanceError) {
       streams.stderr.write(`${provenanceError}
@@ -83833,7 +83912,7 @@ async function reviewPublishCommand(target, options, streams) {
       return 2;
     }
   }
-  const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
+  const repositoryId = options.repo ?? getGitOriginRepo(root) ?? "local-repo";
   const uploadMode = options.nativeVisuals && (!options.upload || options.upload === "metadata") ? "snapshots" : options.upload ?? "metadata";
   const server = (options.server ?? process.env.BOARDREADYOPS_SERVER_URL ?? "https://app.boardreadyops.com").replace(
     /\/$/,
@@ -83936,7 +84015,7 @@ async function reviewPublishCommand(target, options, streams) {
 `);
     return 0;
   }
-  if (!token) {
+  if (!token && !options.bundle) {
     streams.stderr.write(
       `\u274C Error: BOARDREADYOPS_TOKEN is required for review publish. Pass --token or set env var.
 `
@@ -83944,6 +84023,37 @@ async function reviewPublishCommand(target, options, streams) {
     return 1;
   }
   snapshots ??= await renderReviewSnapshots();
+  const payload = {
+    repositoryId,
+    commitSha: headSha,
+    ref: resolveReviewPublishRef(root, headSha),
+    pullRequestNumber: options.pr,
+    triggerKind: "manual",
+    findings,
+    artifacts: [],
+    snapshots,
+    evidenceDigest,
+    title: options.title ?? `Review for ${headSha.slice(0, 8)}`,
+    ...baseSha ? { baseCommitSha: baseSha } : {},
+    ...pcbFootprintSummary ? { pcbFootprintSummary, pcbFootprintSummaryConsent: true } : {}
+  };
+  const idempotencyKey = reviewSnapshotIdempotencyKey(headSha, evidenceDigest, snapshots);
+  if (options.bundle) {
+    return saveLocalReviewBundle({
+      filename: options.bundle,
+      repositoryId,
+      headSha,
+      uploadMode,
+      nativeVisuals: options.nativeVisuals === true,
+      idempotencyKey,
+      payload,
+      evidenceDigest,
+      server,
+      jsonOutput,
+      stdout: streams.stdout,
+      stderr: streams.stderr
+    });
+  }
   if (!jsonOutput) streams.stdout.write(`\u{1F680} Publishing review to ${server}...
 `);
   try {
@@ -83952,22 +84062,9 @@ async function reviewPublishCommand(target, options, streams) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
-        "Idempotency-Key": `publish-${headSha}-${evidenceDigest.slice(0, 16)}`
+        "Idempotency-Key": idempotencyKey
       },
-      body: JSON.stringify({
-        repositoryId,
-        commitSha: headSha,
-        ref: resolveReviewPublishRef(root, headSha),
-        pullRequestNumber: options.pr,
-        triggerKind: "manual",
-        findings,
-        artifacts: [],
-        snapshots,
-        evidenceDigest,
-        title: options.title ?? `Review for ${headSha.slice(0, 8)}`,
-        ...baseSha ? { baseCommitSha: baseSha } : {},
-        ...pcbFootprintSummary ? { pcbFootprintSummary, pcbFootprintSummaryConsent: true } : {}
-      })
+      body: JSON.stringify(payload)
     });
     if (!response.ok) {
       streams.stderr.write(`\u274C Server error (${response.status}).
@@ -85283,7 +85380,7 @@ init_src();
 
 // src/runner/customer-artifacts.ts
 var import_node_crypto26 = require("node:crypto");
-var import_node_fs11 = require("node:fs");
+var import_node_fs12 = require("node:fs");
 var import_promises35 = require("node:fs/promises");
 var import_node_path78 = __toESM(require("node:path"), 1);
 var maximumLocalArtifactBytes = 64 * 1024 * 1024;
@@ -85347,7 +85444,7 @@ async function persistCustomerRunnerArtifacts(input3) {
         input3.signal?.throwIfAborted();
         const realSource = await (0, import_promises35.realpath)(artifact.filePath);
         if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-        const handle = await (0, import_promises35.open)(artifact.filePath, import_node_fs11.constants.O_RDONLY | (import_node_fs11.constants.O_NOFOLLOW ?? 0));
+        const handle = await (0, import_promises35.open)(artifact.filePath, import_node_fs12.constants.O_RDONLY | (import_node_fs12.constants.O_NOFOLLOW ?? 0));
         let content;
         try {
           const stats = await handle.stat();
@@ -85400,7 +85497,7 @@ async function persistCustomerRunnerArtifacts(input3) {
 
 // src/runner/draft-attestation.ts
 var import_node_crypto27 = require("node:crypto");
-var import_node_fs12 = require("node:fs");
+var import_node_fs13 = require("node:fs");
 var import_promises36 = require("node:fs/promises");
 var import_node_path79 = __toESM(require("node:path"), 1);
 var domain3 = "boardreadyops-runner-draft-receipt-v1\n";
@@ -85447,7 +85544,7 @@ async function createManufacturingDraftReceiptArtifact(input3) {
   if (!relative || relative.startsWith("..") || import_node_path79.default.isAbsolute(relative) || relative.split(import_node_path79.default.sep).includes("..")) {
     throw new Error("draft archive escaped the disposable runner checkout");
   }
-  const handle = await (0, import_promises36.open)(archivePath, import_node_fs12.constants.O_RDONLY | (import_node_fs12.constants.O_NOFOLLOW ?? 0));
+  const handle = await (0, import_promises36.open)(archivePath, import_node_fs13.constants.O_RDONLY | (import_node_fs13.constants.O_NOFOLLOW ?? 0));
   let data;
   try {
     const stats = await handle.stat();
@@ -88270,7 +88367,8 @@ var review_publish_result_schema_default = {
     dryRun: { type: "boolean" },
     evidenceDigest: { type: "string", pattern: "^[a-f0-9]{64}$" },
     reviewUrl: { type: "string", minLength: 1 },
-    runId: { type: "string", minLength: 1 }
+    runId: { type: "string", minLength: 1 },
+    bundlePath: { type: "string", minLength: 1 }
   },
   allOf: [
     {
@@ -88572,7 +88670,7 @@ function registerAllCommands(program2, streams) {
     review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option(
       "--native-visuals",
       "explicitly upload KiCad-native PCB/schematic artwork (may disclose detailed design IP)"
-    ).option("--share-footprint-summary", "opt in to publishing PCB change counts and source hashes").option("--pcb <path>", "tracked PCB path required for opted-in change summary").option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
+    ).option("--share-footprint-summary", "opt in to publishing PCB change counts and source hashes").option("--pcb <path>", "tracked PCB path required for opted-in change summary").option("--dry-run", "simulate review publish without uploading").option("--bundle <file>", "save an opt-in Review evidence file for signed-in browser publication (no upload)").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
   ).action(async (pathInput, options) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
   });
