@@ -38,7 +38,7 @@ export function RunDesignView({
   totalFindings?: number;
   repository?: string;
   commitSha?: string;
-  serverOrigin?: string;
+  serverOrigin?: string | undefined;
 }>) {
   const publishServer = trustedReviewServerOrigin(serverOrigin);
   const native = snapshots.filter((item) => item.name.startsWith("kicad_native_")).length;
