@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
 import { ChangesTab } from "../../../apps/web/components/review/changes-tab.js";
 import { ChecklistApprovalsTab } from "../../../apps/web/components/review/checklist-approvals-tab.js";
 import { EvidenceTab } from "../../../apps/web/components/review/evidence-tab.js";
+import { ManufacturingHandoffPath } from "../../../apps/web/components/review/manufacturing-handoff-path.js";
 import { OverviewTab, ReviewRevisionEvidence } from "../../../apps/web/components/review/overview-tab.js";
 import { ReviewHeader } from "../../../apps/web/components/review/review-header.js";
 import { ReviewView } from "../../../apps/web/components/review/review-view.js";
@@ -339,6 +340,41 @@ describe("Review Detail Tabs", () => {
     expect(requested).toContain("Changes Requested — Review Blocked");
   });
 
+  it("shows an actionable evidence-first manufacturing path on a blocked real Review", () => {
+    const html = renderToStaticMarkup(
+      createElement(ManufacturingHandoffPath, {
+        review: { id: "review-42", decision: "changes_requested", headRunId: "source-run-42" },
+        blockingCount: 57,
+        reviewChecksMet: false,
+      }),
+    );
+    expect(html).toContain("Manufacturing handoff path");
+    expect(html).toContain("Changes requested");
+    expect(html).toContain("57 recorded blocking finding(s)");
+    expect(html).toContain('href="/reviews/review-42?tab=findings"');
+    expect(html).toContain('href="/runs/source-run-42/artifacts"');
+    expect(html).toContain('href="/parts"');
+    expect(html).toContain('href="/deliveries"');
+    expect(html).toContain("Team or higher");
+    expect(html).toContain("this Review does not grant either");
+    expect(html).not.toContain("Ready for fabrication");
+  });
+
+  it("never promotes a fully checked Review to an eligible manufacturing package", () => {
+    const html = renderToStaticMarkup(
+      createElement(ManufacturingHandoffPath, {
+        review: { id: "review-99", decision: "approved" },
+        blockingCount: 0,
+        reviewChecksMet: true,
+      }),
+    );
+    expect(html).toContain("Review checks met");
+    expect(html).toContain("release readiness remains unverified");
+    expect(html).toContain("Not verified by this Review");
+    expect(html).toContain("Separate release authorization required");
+    expect(html).toContain('href="/runs"');
+    expect(html).not.toContain("/runs/undefined/artifacts");
+  });
   it("renders OverviewTab with readiness gate status and metadata", () => {
     const overview = OverviewTab({ review });
     expect(overview).toBeDefined();

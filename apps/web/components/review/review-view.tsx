@@ -686,6 +686,7 @@ export function ReviewView({
         {rawActiveTab === "overview" ? (
           <OverviewTab
             review={review}
+            onOpenFindings={() => setActiveTab("findings")}
             onOpenChanges={() => {
               setOverviewMarkerFingerprint(undefined);
               setActiveTab("changes");
