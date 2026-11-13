@@ -12,11 +12,13 @@ import {
 } from "../../../src/cli/commands/review.js";
 import { schemaCommand } from "../../../src/cli/commands/schema.js";
 import { boardReadyVersion } from "../../../src/generated/version.js";
+import { detectKicadCli } from "../../../src/kicad/cli.js";
 
 const fixtureRoot = path.resolve("tests/fixtures/projects/safe-basic");
 const headSha = "1234567890abcdef1234567890abcdef12345678";
 const server = "https://cloud.example";
 const leakedSecret = "private-token-value-that-must-not-leak";
+const nativeCli = await detectKicadCli();
 
 function createMockStream(): { stream: NodeJS.WritableStream; output: string } {
   const chunks: string[] = [];
@@ -271,30 +273,33 @@ describe("CLI review publish command", () => {
     }
   });
 
-  it("publishes opted-in native artwork from clean committed source despite KiCad local editor state", async () => {
-    const { root, head } = createCommittedPcbReviewFixture();
-    const stdout = createMockStream();
-    const stderr = createMockStream();
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(successResponse({ ok: true, runId: "native-run", reviewUrl: "/reviews/native" }));
-    vi.stubGlobal("fetch", fetchMock);
-    try {
-      fs.writeFileSync(path.join(root, "safe-basic.kicad_prl"), "editor state (not design geometry)");
-      const code = await reviewPublishCommand(root, liveOptions({ nativeVisuals: true, head }), {
-        stdout: stdout.stream,
-        stderr: stderr.stream,
-      });
-      expect(code, stderr.output).toBe(0);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-      const body = JSON.parse(String(init.body)) as { commitSha: string; snapshots: unknown[] };
-      expect(body.commitSha).toBe(head);
-      expect(body.snapshots.length).toBeGreaterThan(0);
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-    }
-  });
+  it.skipIf(!nativeCli.found)(
+    "publishes opted-in native artwork from clean committed source despite KiCad local editor state",
+    async () => {
+      const { root, head } = createCommittedPcbReviewFixture();
+      const stdout = createMockStream();
+      const stderr = createMockStream();
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(successResponse({ ok: true, runId: "native-run", reviewUrl: "/reviews/native" }));
+      vi.stubGlobal("fetch", fetchMock);
+      try {
+        fs.writeFileSync(path.join(root, "safe-basic.kicad_prl"), "editor state (not design geometry)");
+        const code = await reviewPublishCommand(root, liveOptions({ nativeVisuals: true, head }), {
+          stdout: stdout.stream,
+          stderr: stderr.stream,
+        });
+        expect(code, stderr.output).toBe(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        const body = JSON.parse(String(init.body)) as { commitSha: string; snapshots: unknown[] };
+        expect(body.commitSha).toBe(head);
+        expect(body.snapshots.length).toBeGreaterThan(0);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("resolves default review head from the target repository, not CLI process cwd", async () => {
     const { root, head } = createCommittedPcbReviewFixture();
@@ -389,8 +394,13 @@ describe("CLI review publish command", () => {
       stdout: stdout.stream,
       stderr: stderr.stream,
     });
-    expect(exitCode).toBe(0);
-    expect(stdout.output).toContain("Upload Mode: snapshots");
+    expect(exitCode).toBe(nativeCli.found ? 0 : 1);
+    if (nativeCli.found) {
+      expect(stdout.output).toContain("Upload Mode: snapshots");
+      expect(stdout.output).toContain("Verified KiCad artwork:");
+    } else {
+      expect(stderr.output).toContain("Native visual preflight failed");
+    }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

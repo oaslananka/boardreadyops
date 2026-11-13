@@ -273,6 +273,45 @@ export async function reviewPublishCommand(
     streams.stdout.write(`📊 Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)\n`);
   }
 
+  const schematicFiles = result.projects.flatMap((p) => p.schematicFiles.map((f) => path.resolve(root, f)));
+  const pcbFiles = result.projects.flatMap((p) => p.boardFiles.map((f) => path.resolve(root, f)));
+  const renderReviewSnapshots = () =>
+    generateSnapshots({
+      ...(options.nativeVisuals ? {} : { nativeCli: false }),
+      schematicFiles,
+      pcbFiles,
+      // Keep finding positions tied to native source objects, not inferred centers.
+      findings: result.findings.map((f) => ({
+        fingerprint: f.fingerprint,
+        ruleId: f.ruleId,
+        severity: f.severity,
+        message: f.message,
+        ...(f.details ? { details: f.details } : {}),
+      })),
+    });
+
+  // In a native opt-in dry run, actually render and validate the same artwork
+  // that the live command would send. Never substitute diagram-like summaries.
+  const validateNativeArtwork = (snapshots: SnapshotArtifact[]): boolean => {
+    const hasKind = (kind: SnapshotArtifact["kind"]) => snapshots.some((snapshot) => snapshot.kind === kind);
+    return (
+      snapshots.length > 0 &&
+      snapshots.every((snapshot) => snapshot.name.startsWith("kicad_native_")) &&
+      (!schematicFiles.length || hasKind("schematic")) &&
+      (!pcbFiles.length || hasKind("pcb_layer"))
+    );
+  };
+  let snapshots: SnapshotArtifact[] | undefined;
+  if (options.nativeVisuals) {
+    snapshots = await renderReviewSnapshots();
+    if (!validateNativeArtwork(snapshots)) {
+      streams.stderr.write(
+        "Native visual preflight failed: genuine PCB/schematic artwork is missing or incomplete. No review was uploaded. Check KiCad CLI, source files, and SVG size limits.\n",
+      );
+      return 1;
+    }
+  }
+
   if (options.dryRun) {
     if (jsonOutput) {
       writePublishResult(publishResult(evidenceDigest, true), streams);
@@ -283,6 +322,11 @@ export async function reviewPublishCommand(
     streams.stdout.write(`  Commit:     ${headSha.slice(0, 8)}\n`);
     if (baseSha) streams.stdout.write(`  Base:       ${baseSha.slice(0, 8)}\n`);
     streams.stdout.write(`  Upload Mode: ${uploadMode}\n`);
+    if (options.nativeVisuals && snapshots) {
+      const pcbCount = snapshots.filter((snapshot) => snapshot.kind === "pcb_layer").length;
+      const schematicCount = snapshots.filter((snapshot) => snapshot.kind === "schematic").length;
+      streams.stdout.write(`  Verified KiCad artwork: ${pcbCount} PCB layers, ${schematicCount} schematic sheets\n`);
+    }
     streams.stdout.write(`  Findings:   ${findings.length}\n`);
     streams.stdout.write(`  Digest:     ${evidenceDigest}\n`);
     if (pcbFootprintSummary) streams.stdout.write("  PCB summary: explicit opt-in (counts and source hashes)\n");
@@ -297,20 +341,7 @@ export async function reviewPublishCommand(
     return 1;
   }
 
-  const snapshots: SnapshotArtifact[] = await generateSnapshots({
-    ...(options.nativeVisuals ? {} : { nativeCli: false }),
-    schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => path.resolve(root, f))),
-    pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => path.resolve(root, f))),
-    // The Cloud wire format intentionally omits native KiCad diagnostic details.
-    // Snapshot linking needs the original trusted run findings before that projection.
-    findings: result.findings.map((f) => ({
-      fingerprint: f.fingerprint,
-      ruleId: f.ruleId,
-      severity: f.severity,
-      message: f.message,
-      ...(f.details ? { details: f.details } : {}),
-    })),
-  });
+  snapshots ??= await renderReviewSnapshots();
 
   if (!jsonOutput) streams.stdout.write(`🚀 Publishing review to ${server}...\n`);
 

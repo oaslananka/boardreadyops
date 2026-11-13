@@ -83130,7 +83130,7 @@ var import_node_crypto19 = require("node:crypto");
 var import_promises30 = __toESM(require("node:fs/promises"), 1);
 var import_node_os4 = __toESM(require("node:os"), 1);
 var import_node_path73 = __toESM(require("node:path"), 1);
-var MAX_SVG_BYTES = 2 * 1024 * 1024;
+var MAX_SVG_BYTES = 4 * 1024 * 1024;
 var MAX_SHEETS = 16;
 var EXPORT_TIMEOUT_MS = 45e3;
 var PROCESS_LIMITS = { timeoutMs: EXPORT_TIMEOUT_MS, maxStdoutBytes: 8192, maxStderrBytes: 8192 };
@@ -83285,10 +83285,12 @@ async function pcbLayer(cliPath, input3, original, beforeSha, tempRoot, label, l
   return collectSvg(output3, beforeSha, original, "pcb_layer", `${label} / ${layer}`).catch(() => void 0);
 }
 async function pcbSnapshots(cliPath, input3, original, beforeSha, tempRoot, label, layers) {
+  const selectedLayers = [...new Set(layers)].filter((layer) => /^(?:F|B|In\d+)\.Cu$/u.test(layer));
+  if (selectedLayers.length > MAX_SHEETS) return [];
   const found = await Promise.all(
-    [...new Set(layers)].slice(0, MAX_SHEETS).map((layer) => pcbLayer(cliPath, input3, original, beforeSha, tempRoot, label, layer))
+    selectedLayers.map((layer) => pcbLayer(cliPath, input3, original, beforeSha, tempRoot, label, layer))
   );
-  return found.filter((artifact) => artifact !== void 0);
+  return found.every((artifact) => artifact !== void 0) ? found : [];
 }
 async function schematicSnapshots(cliPath, input3, original, beforeSha, tempRoot, label) {
   const outputDirectory2 = import_node_path73.default.join(tempRoot, "sheets");
@@ -83299,7 +83301,8 @@ async function schematicSnapshots(cliPath, input3, original, beforeSha, tempRoot
     PROCESS_LIMITS
   );
   if (result.code !== 0 || result.timedOut) return [];
-  const names = (await import_promises30.default.readdir(outputDirectory2)).filter((name) => name.endsWith(".svg")).sort().slice(0, MAX_SHEETS);
+  const names = (await import_promises30.default.readdir(outputDirectory2)).filter((name) => name.endsWith(".svg")).sort();
+  if (!names.length || names.length > MAX_SHEETS) return [];
   const found = await Promise.all(
     names.map(
       (name) => collectSvg(
@@ -83311,7 +83314,7 @@ async function schematicSnapshots(cliPath, input3, original, beforeSha, tempRoot
       ).catch(() => void 0)
     )
   );
-  return found.filter((artifact) => artifact !== void 0);
+  return found.every((artifact) => artifact !== void 0) ? found : [];
 }
 async function exportNativeKicadSnapshots(cliPath, sourceFile, kind, layers = []) {
   const beforeSha = await sourceDigest(sourceFile).catch(() => void 0);
@@ -83754,6 +83757,35 @@ async function reviewPublishCommand(target, options, streams) {
     streams.stdout.write(`\u{1F4CA} Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)
 `);
   }
+  const schematicFiles = result.projects.flatMap((p) => p.schematicFiles.map((f) => import_node_path74.default.resolve(root, f)));
+  const pcbFiles = result.projects.flatMap((p) => p.boardFiles.map((f) => import_node_path74.default.resolve(root, f)));
+  const renderReviewSnapshots = () => generateSnapshots({
+    ...options.nativeVisuals ? {} : { nativeCli: false },
+    schematicFiles,
+    pcbFiles,
+    // Keep finding positions tied to native source objects, not inferred centers.
+    findings: result.findings.map((f) => ({
+      fingerprint: f.fingerprint,
+      ruleId: f.ruleId,
+      severity: f.severity,
+      message: f.message,
+      ...f.details ? { details: f.details } : {}
+    }))
+  });
+  const validateNativeArtwork = (snapshots2) => {
+    const hasKind = (kind) => snapshots2.some((snapshot) => snapshot.kind === kind);
+    return snapshots2.length > 0 && snapshots2.every((snapshot) => snapshot.name.startsWith("kicad_native_")) && (!schematicFiles.length || hasKind("schematic")) && (!pcbFiles.length || hasKind("pcb_layer"));
+  };
+  let snapshots;
+  if (options.nativeVisuals) {
+    snapshots = await renderReviewSnapshots();
+    if (!validateNativeArtwork(snapshots)) {
+      streams.stderr.write(
+        "Native visual preflight failed: genuine PCB/schematic artwork is missing or incomplete. No review was uploaded. Check KiCad CLI, source files, and SVG size limits.\n"
+      );
+      return 1;
+    }
+  }
   if (options.dryRun) {
     if (jsonOutput) {
       writePublishResult(publishResult(evidenceDigest, true), streams);
@@ -83770,6 +83802,12 @@ async function reviewPublishCommand(target, options, streams) {
 `);
     streams.stdout.write(`  Upload Mode: ${uploadMode}
 `);
+    if (options.nativeVisuals && snapshots) {
+      const pcbCount = snapshots.filter((snapshot) => snapshot.kind === "pcb_layer").length;
+      const schematicCount = snapshots.filter((snapshot) => snapshot.kind === "schematic").length;
+      streams.stdout.write(`  Verified KiCad artwork: ${pcbCount} PCB layers, ${schematicCount} schematic sheets
+`);
+    }
     streams.stdout.write(`  Findings:   ${findings.length}
 `);
     streams.stdout.write(`  Digest:     ${evidenceDigest}
@@ -83786,20 +83824,7 @@ async function reviewPublishCommand(target, options, streams) {
     );
     return 1;
   }
-  const snapshots = await generateSnapshots({
-    ...options.nativeVisuals ? {} : { nativeCli: false },
-    schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => import_node_path74.default.resolve(root, f))),
-    pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => import_node_path74.default.resolve(root, f))),
-    // The Cloud wire format intentionally omits native KiCad diagnostic details.
-    // Snapshot linking needs the original trusted run findings before that projection.
-    findings: result.findings.map((f) => ({
-      fingerprint: f.fingerprint,
-      ruleId: f.ruleId,
-      severity: f.severity,
-      message: f.message,
-      ...f.details ? { details: f.details } : {}
-    }))
-  });
+  snapshots ??= await renderReviewSnapshots();
   if (!jsonOutput) streams.stdout.write(`\u{1F680} Publishing review to ${server}...
 `);
   try {
