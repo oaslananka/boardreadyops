@@ -83,6 +83,12 @@ describe("signed-in browser Review bundle parsing", () => {
     expect(() => parseReviewBundle(source)).toThrow();
   });
 
+  it("does not mistake a malformed tag prefix for a genuine SVG root", () => {
+    const source = bundle();
+    source.payload.snapshots[0].content = "this is not real art: <svgfake";
+    expect(() => parseReviewBundle(source)).toThrow();
+  });
+
   it("rejects a malformed or dangerously oversized snapshot listing before review display", () => {
     const source = bundle();
     source.payload.snapshots = Array.from({ length: 65 }, (_, i) => ({

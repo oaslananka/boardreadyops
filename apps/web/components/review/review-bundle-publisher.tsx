@@ -181,7 +181,9 @@ export function ReviewBundlePublisher() {
                 <input
                   type="checkbox"
                   checked={consent}
-                  onChange={(event) => setConsent(event.target.checked)}
+                  onChange={(event) => {
+                    setConsent(event.target.checked);
+                  }}
                   className="mt-1 size-4 shrink-0 accent-primary"
                 />
                 <span>

@@ -119,7 +119,7 @@ function validSnapshot(snapshot: unknown, nativeArtwork: boolean): snapshot is R
     sha64.test(snapshot.sha256) &&
     snapshot.format === "svg" &&
     typeof snapshot.content === "string" &&
-    snapshot.content.includes("<svg") &&
+    /<svg(?:\s|>)/iu.test(snapshot.content) &&
     Array.isArray(snapshot.anchors)
   );
 }
