@@ -6,6 +6,7 @@ import { displayReviewAuthor } from "../../lib/review-author-display.js";
 import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { Button } from "../ui/button.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "../ui.js";
+import { ManufacturingHandoffPath } from "./manufacturing-handoff-path.js";
 import { ReviewCanvas } from "./review-canvas.js";
 
 /** Source-only GitHub diff navigation. Never infer structural/BOM changes from text diffs. */
@@ -205,11 +206,14 @@ export function ReviewRevisionEvidence({ review }: Readonly<{ review: DemoReview
 export function OverviewTab({
   review,
   onOpenChanges,
+  onOpenFindings,
   onInspectFinding,
 }: {
   readonly review: DemoReview;
   /** Switches to the Changes tab, where the schematic and PCB canvas lives. */
   readonly onOpenChanges?: (() => void) | undefined;
+  /** Opens the findings tab for the next engineering action. */
+  readonly onOpenFindings?: (() => void) | undefined;
   /** Opens the full Changes inspector for the marker's exact recorded finding. */
   readonly onInspectFinding?: ((fingerprint: string) => void) | undefined;
 }) {
@@ -346,6 +350,13 @@ export function OverviewTab({
           </span>
         </div>
       </section>
+
+      <ManufacturingHandoffPath
+        review={review}
+        blockingCount={blockingFindings.length}
+        reviewChecksMet={reviewChecksMet}
+        onOpenFindings={onOpenFindings}
+      />
 
       <ReviewRevisionEvidence review={review} />
 
