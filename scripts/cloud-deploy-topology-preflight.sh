@@ -41,6 +41,9 @@ while IFS= read -r container; do
         esac
       fi
       ;;
+    # Unrelated Docker images are intentionally ignored; only this product's
+    # runtime image is governed by the commissioned-owner preflight.
+    *) ;;
   esac
 done <<< "$containers"
 
