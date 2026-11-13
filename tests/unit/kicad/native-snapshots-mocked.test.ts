@@ -111,6 +111,20 @@ describe("KiCad-native offline exporter without requiring installed KiCad", () =
     expect(await fs.readFile(child, "utf8")).toContain("nested/detail");
   });
 
+  it.skipIf(process.platform === "win32")("accepts a project reached through an in-root filesystem alias", async () => {
+    const aliasDir = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-source-alias-"));
+    const link = path.join(aliasDir, "project-link");
+    await fs.symlink(root, link, "dir");
+    try {
+      successfulPlot();
+      const images = await exportNativeKicadSnapshots("cli", path.join(link, "alpha.kicad_pcb"), "pcb_layer", ["F.Cu"]);
+      expect(images).toHaveLength(1);
+      expect(mockProcess).toHaveBeenCalledOnce();
+    } finally {
+      await fs.rm(aliasDir, { recursive: true, force: true });
+    }
+  });
+
   it("refuses missing and outside-project hierarchical sheets before launching KiCad", async () => {
     const master = path.join(root, "alpha.kicad_sch");
     await fs.writeFile(master, '(kicad_sch (sheet (property "Sheetfile" "sch/missing.kicad_sch")))');

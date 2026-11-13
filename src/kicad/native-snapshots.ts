@@ -204,7 +204,8 @@ interface StagedSource {
 }
 
 interface StagingContext {
-  sourceRoot: string;
+  sourceRootInput: string;
+  sourceRootCanonical: string;
   directory: string;
   originals: Map<string, string>;
 }
@@ -212,12 +213,12 @@ interface StagingContext {
 async function copyStagedSource(context: StagingContext, file: string): Promise<string | undefined> {
   const absolute = path.resolve(file);
   const canonical = await fs.realpath(absolute).catch(() => undefined);
-  if (!canonical || !isInside(context.sourceRoot, absolute) || !isInside(context.sourceRoot, canonical))
+  if (!canonical || !isInside(context.sourceRootInput, absolute) || !isInside(context.sourceRootCanonical, canonical))
     return undefined;
   const stat = await fs.stat(canonical);
   if (!stat.isFile() || stat.size > MAX_SVG_BYTES * 4) return undefined;
   const sha256 = await sourceDigest(canonical);
-  const target = path.join(context.directory, path.relative(context.sourceRoot, absolute));
+  const target = path.join(context.directory, path.relative(context.sourceRootInput, absolute));
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.copyFile(canonical, target);
   if ((await sourceDigest(target)) !== sha256) return undefined;
@@ -257,21 +258,24 @@ async function stageHierarchicalSheets(context: StagingContext, master: string):
 
 async function stageSource(sourceFile: string, tempRoot: string, sourceSha: string): Promise<StagedSource | undefined> {
   const context: StagingContext = {
-    sourceRoot: await fs.realpath(path.dirname(sourceFile)),
+    // macOS aliases /var to /private/var; keep the caller's lexical root for
+    // staging paths and use its realpath only to reject escaping symlinks.
+    sourceRootInput: path.resolve(path.dirname(sourceFile)),
+    sourceRootCanonical: await fs.realpath(path.dirname(sourceFile)),
     directory: path.join(tempRoot, "source"),
     originals: new Map(),
   };
   await fs.mkdir(context.directory);
   const input = await copyStagedSource(context, sourceFile);
   if (!input || (await sourceDigest(input)) !== sourceSha) return undefined;
-  const adjacent = (await fs.readdir(context.sourceRoot, { withFileTypes: true }))
+  const adjacent = (await fs.readdir(context.sourceRootInput, { withFileTypes: true }))
     .filter(
       (entry) =>
         entry.isFile() && /\.(kicad_sch|kicad_pro)$/iu.test(entry.name) && entry.name !== path.basename(sourceFile),
     )
     .slice(0, 32);
   for (const { name } of adjacent) {
-    if (!(await copyStagedSource(context, path.join(context.sourceRoot, name)))) return undefined;
+    if (!(await copyStagedSource(context, path.join(context.sourceRootInput, name)))) return undefined;
   }
   if (/\.kicad_sch$/iu.test(sourceFile) && !(await stageHierarchicalSheets(context, sourceFile))) return undefined;
   return {

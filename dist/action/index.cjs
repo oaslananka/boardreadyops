@@ -125542,12 +125542,12 @@ async function collectSvg(output3, beforeSha, sourceFile, kind, label) {
 async function copyStagedSource(context5, file3) {
   const absolute = import_node_path49.default.resolve(file3);
   const canonical = await import_promises18.default.realpath(absolute).catch(() => void 0);
-  if (!canonical || !isInside(context5.sourceRoot, absolute) || !isInside(context5.sourceRoot, canonical))
+  if (!canonical || !isInside(context5.sourceRootInput, absolute) || !isInside(context5.sourceRootCanonical, canonical))
     return void 0;
   const stat3 = await import_promises18.default.stat(canonical);
   if (!stat3.isFile() || stat3.size > MAX_SVG_BYTES * 4) return void 0;
   const sha256 = await sourceDigest(canonical);
-  const target = import_node_path49.default.join(context5.directory, import_node_path49.default.relative(context5.sourceRoot, absolute));
+  const target = import_node_path49.default.join(context5.directory, import_node_path49.default.relative(context5.sourceRootInput, absolute));
   await import_promises18.default.mkdir(import_node_path49.default.dirname(target), { recursive: true });
   await import_promises18.default.copyFile(canonical, target);
   if (await sourceDigest(target) !== sha256) return void 0;
@@ -125581,18 +125581,21 @@ async function stageHierarchicalSheets(context5, master) {
 }
 async function stageSource(sourceFile, tempRoot, sourceSha) {
   const context5 = {
-    sourceRoot: await import_promises18.default.realpath(import_node_path49.default.dirname(sourceFile)),
+    // macOS aliases /var to /private/var; keep the caller's lexical root for
+    // staging paths and use its realpath only to reject escaping symlinks.
+    sourceRootInput: import_node_path49.default.resolve(import_node_path49.default.dirname(sourceFile)),
+    sourceRootCanonical: await import_promises18.default.realpath(import_node_path49.default.dirname(sourceFile)),
     directory: import_node_path49.default.join(tempRoot, "source"),
     originals: /* @__PURE__ */ new Map()
   };
   await import_promises18.default.mkdir(context5.directory);
   const input3 = await copyStagedSource(context5, sourceFile);
   if (!input3 || await sourceDigest(input3) !== sourceSha) return void 0;
-  const adjacent = (await import_promises18.default.readdir(context5.sourceRoot, { withFileTypes: true })).filter(
+  const adjacent = (await import_promises18.default.readdir(context5.sourceRootInput, { withFileTypes: true })).filter(
     (entry) => entry.isFile() && /\.(kicad_sch|kicad_pro)$/iu.test(entry.name) && entry.name !== import_node_path49.default.basename(sourceFile)
   ).slice(0, 32);
   for (const { name } of adjacent) {
-    if (!await copyStagedSource(context5, import_node_path49.default.join(context5.sourceRoot, name))) return void 0;
+    if (!await copyStagedSource(context5, import_node_path49.default.join(context5.sourceRootInput, name))) return void 0;
   }
   if (/\.kicad_sch$/iu.test(sourceFile) && !await stageHierarchicalSheets(context5, sourceFile)) return void 0;
   return {
