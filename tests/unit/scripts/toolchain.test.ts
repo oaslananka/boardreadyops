@@ -210,6 +210,11 @@ describe("reproducible contributor toolchain", () => {
     expect(security).toContain("gitleaks detect --source . --redact --verbose");
     const gitleaksInstall = security.split("      - name: Install Gitleaks")[1]?.split("      - name: Run Gitleaks")[0];
     expect(gitleaksInstall).toBeDefined();
+    // Public GitHub release API can rate-limit anonymous CI runners (HTTP 403).
+    // Authenticate with the existing read-only job token, not a stored secret.
+    expect(gitleaksInstall).toContain("GH_TOKEN: ${{ github.token }}");
+    expect(gitleaksInstall).toContain('"Authorization: Bearer ${GH_TOKEN}"');
+    expect(gitleaksInstall).toContain("sha256sum -c -");
     expect(gitleaksInstall).not.toContain("continue-on-error");
     const webDockerfile = await repositoryFile("apps/web/Dockerfile");
     expect(webDockerfile).toContain(`# Node ${config.node.preferred}-slim (digest-pinned)`);
