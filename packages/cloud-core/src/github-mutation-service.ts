@@ -1,3 +1,5 @@
+import { defaultReadinessWorkflowTemplate } from "./readiness-workflow-template.js";
+
 export type RepositoryMutationIntent =
   | "release-preparation"
   | "remediation"
@@ -304,15 +306,29 @@ export class SetupFileConflictError extends Error {
   }
 }
 
+/**
+ * Reuse the exact canonical variable-origin runner already installed in this repository
+ * when the setup generator proposes only the same trusted workflow with a fixed HTTPS
+ * origin. Custom workflows remain protected by the original fail-closed byte check.
+ */
+function isCanonicalVariableOriginWorkflow(existing: Buffer, proposed: string): boolean {
+  if (!existing.equals(Buffer.from(defaultReadinessWorkflowTemplate, "utf8"))) return false;
+  const origin = proposed.match(/CLOUD_ORIGIN: (https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?)(?:\r?\n)/u)?.[1];
+  if (!origin) return false;
+  return (
+    proposed === defaultReadinessWorkflowTemplate.replaceAll("$" + "{{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}", origin)
+  );
+}
+
 /** Check the pinned default-branch tree before any Git mutation. Unknown provider results fail closed. */
 async function preserveInitialSetupFiles(
   client: GitHubMutationApiClient,
   repoPath: string,
   baseCommitSha: string,
   files: MutationFile[],
-): Promise<void> {
-  await Promise.all(
-    files.map(async (file) => {
+): Promise<Set<string>> {
+  const preserved = await Promise.all(
+    files.map(async (file): Promise<string | undefined> => {
       const encodedPath = file.path.split("/").map(encodeURIComponent).join("/");
       const response = await client.request<{ type?: string; encoding?: string; content?: string }>(
         `${repoPath}/contents/${encodedPath}?ref=${encodeURIComponent(baseCommitSha)}`,
@@ -327,11 +343,17 @@ async function preserveInitialSetupFiles(
         throw new Error(`unable to verify existing setup file "${file.path}" against the default branch`);
       }
       const existingBytes = Buffer.from(response.data.content, "base64");
-      if (!existingBytes.equals(Buffer.from(file.content, "utf8"))) {
-        throw new SetupFileConflictError(file.path);
+      if (existingBytes.equals(Buffer.from(file.content, "utf8"))) return undefined;
+      if (
+        file.path === ".github/workflows/readiness-runner.yml" &&
+        isCanonicalVariableOriginWorkflow(existingBytes, file.content)
+      ) {
+        return file.path;
       }
+      throw new SetupFileConflictError(file.path);
     }),
   );
+  return new Set(preserved.filter((path): path is string => path !== undefined));
 }
 
 export function createGitHubMutationService(dependencies: GitHubMutationServiceDependencies): GitHubMutationService {
@@ -369,8 +391,9 @@ export function createGitHubMutationService(dependencies: GitHubMutationServiceD
         input.defaultBranch,
         input.expectedBaseCommitSha,
       );
+      let preservedExistingWorkflowPaths = new Set<string>();
       if (input.intent === "setup") {
-        await preserveInitialSetupFiles(client, repoPath, baseCommitSha, input.files);
+        preservedExistingWorkflowPaths = await preserveInitialSetupFiles(client, repoPath, baseCommitSha, input.files);
         // Reject a default-branch race before writing a tree or PR.
         if ((await resolveDefaultBranchCommitSha(client, repoPath, input.defaultBranch)) !== baseCommitSha) {
           throw new Error("default branch changed during setup file verification; retry from the new base");
@@ -383,12 +406,14 @@ export function createGitHubMutationService(dependencies: GitHubMutationServiceD
       );
       const existingPr = await resolveOpenPr(client, repoPath, input.owner, input.branchName, input.defaultBranch);
 
-      const treeItems = input.files.map((f) => ({
-        path: f.path,
-        mode: "100644",
-        type: "blob",
-        content: f.content,
-      }));
+      const treeItems = input.files
+        .filter((file) => !preservedExistingWorkflowPaths.has(file.path))
+        .map((f) => ({
+          path: f.path,
+          mode: "100644",
+          type: "blob",
+          content: f.content,
+        }));
 
       const newTreeRes = await client.request<{ sha: string }>(`${repoPath}/git/trees`, {
         method: "POST",

@@ -5,6 +5,7 @@ import {
   type GitHubMutationApiClient,
   isAllowedMutationPath,
 } from "../../../packages/cloud-core/src/github-mutation-service.js";
+import { defaultReadinessWorkflowTemplate } from "../../../packages/cloud-core/src/readiness-workflow-template.js";
 
 describe("GitHub Mutation Service", () => {
   describe("path allowlist & traversal validation", () => {
@@ -348,12 +349,12 @@ describe("GitHub Mutation Service", () => {
       existing: Record<string, string>,
       options: { lookupStatus?: number; changedBase?: boolean } = {},
     ) {
-      const requests: Array<{ path: string; method: string }> = [];
+      const requests: Array<{ path: string; method: string; body?: unknown }> = [];
       let baseLookups = 0;
       const client: GitHubMutationApiClient = {
         async request<T>(path: string, init?: RequestInit): Promise<{ status: number; ok: boolean; data: T }> {
           const method = init?.method ?? "GET";
-          requests.push({ path, method });
+          requests.push({ path, method, ...(init?.body ? { body: JSON.parse(init.body as string) } : {}) });
           const make = (status: number, data: unknown) => ({
             status,
             ok: status >= 200 && status < 300,
@@ -406,6 +407,73 @@ describe("GitHub Mutation Service", () => {
       const outcome = await createGitHubMutationService({ client }).execute(validMutationInput);
       expect(outcome.outcome).toBe("created");
       expect(requests.filter((request) => request.path.includes("/contents/"))).toHaveLength(2);
+    });
+
+    it("preserves exact canonical variable-origin workflow while adding only missing setup config", async () => {
+      const generatedWorkflow = defaultReadinessWorkflowTemplate.replaceAll(
+        "$" + "{{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}",
+        "https://boardreadyops.com",
+      );
+      const { client, requests } = snapshotClient({
+        ".github/workflows/readiness-runner.yml": defaultReadinessWorkflowTemplate,
+      });
+      const result = await createGitHubMutationService({ client }).execute({
+        ...validMutationInput,
+        files: [
+          ...validMutationInput.files.slice(0, 1),
+          { path: ".github/workflows/readiness-runner.yml", content: generatedWorkflow },
+        ],
+      });
+      expect(result.outcome).toBe("created");
+      const tree = requests.find((request) => request.path.endsWith("/git/trees"));
+      expect((tree?.body as { tree?: Array<{ path: string }> })?.tree?.map((file) => file.path)).toEqual([
+        "boardreadyops.yml",
+      ]);
+    });
+
+    it("rejects noncanonical existing workflow without any Git mutation", async () => {
+      const generatedWorkflow = defaultReadinessWorkflowTemplate.replaceAll(
+        "$" + "{{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}",
+        "https://boardreadyops.com",
+      );
+      const { client, requests } = snapshotClient({
+        ".github/workflows/readiness-runner.yml": defaultReadinessWorkflowTemplate.replace(
+          "  contents: read",
+          "  contents: write",
+        ),
+      });
+      await expect(
+        createGitHubMutationService({ client }).execute({
+          ...validMutationInput,
+          files: [
+            ...validMutationInput.files.slice(0, 1),
+            { path: ".github/workflows/readiness-runner.yml", content: generatedWorkflow },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        name: "SetupFileConflictError",
+        filePath: ".github/workflows/readiness-runner.yml",
+      });
+      expect(requests.filter((request) => request.method !== "GET")).toEqual([]);
+    });
+
+    it("rejects arbitrary proposed workflow bytes even with canonical existing source", async () => {
+      const { client, requests } = snapshotClient({
+        ".github/workflows/readiness-runner.yml": defaultReadinessWorkflowTemplate,
+      });
+      await expect(
+        createGitHubMutationService({ client }).execute({
+          ...validMutationInput,
+          files: [
+            ...validMutationInput.files.slice(0, 1),
+            {
+              path: ".github/workflows/readiness-runner.yml",
+              content: defaultReadinessWorkflowTemplate.replace("  contents: read", "  contents: write"),
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ name: "SetupFileConflictError" });
+      expect(requests.filter((request) => request.method !== "GET")).toEqual([]);
     });
 
     it("allows a genuinely new repository with both setup paths absent", async () => {
