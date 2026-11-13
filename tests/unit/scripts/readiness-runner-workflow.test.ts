@@ -52,7 +52,9 @@ describe("readiness runner workflow security contract", () => {
   it("publishes findings, metrics, and the GitHub Actions run link", async () => {
     const workflow = await readFile(workflowPath, "utf8");
 
-    expect(workflow).toContain('const reportPath = "boardreadyops.findings.json"');
+    expect(workflow).toContain("id: stage-readiness-reports");
+    expect(workflow).toContain("steps.stage-readiness-reports.outcome == 'success'");
+    expect(workflow).toContain("const reportPath = `$" + "{process.env.RUNNER_TEMP}/boardreadyops.findings.json`");
     expect(workflow).toContain("version: 1");
     expect(workflow).toContain("executionAttemptId");
     expect(workflow).toContain("const reportAvailable =");
