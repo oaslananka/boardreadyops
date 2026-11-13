@@ -255,7 +255,7 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(String(steps[stageIndex]?.if)).toContain("steps.readiness.outcome != 'skipped'");
     expect(String(steps[exportIndex]?.if)).toContain("steps.stage-readiness-reports.outcome == 'success'");
     expect(String((steps[publishIndex]?.with as { script?: string } | undefined)?.script)).toContain(
-      'require("node:path").join(process.env.RUNNER_TEMP, "boardreadyops.findings.json")',
+      "const reportPath = `${process.env.RUNNER_TEMP}/boardreadyops.findings.json`;",
     );
     const stagingScript = String(steps[stageIndex]?.run);
     expect(stagingScript).toContain("git ls-files --error-unmatch");

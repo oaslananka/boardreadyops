@@ -344,7 +344,7 @@ jobs:
             const readinessOutcome = process.env.READINESS_OUTCOME;
             const trustMode = process.env.SAFE_MODE === "true" ? "safe" : "standard";
             const safeModeReasons = process.env.SAFE_MODE_REASONS ?? "";
-            const reportPath = require("node:path").join(process.env.RUNNER_TEMP, "boardreadyops.findings.json");
+            const reportPath = `${process.env.RUNNER_TEMP}/boardreadyops.findings.json`;
 
             let report;
             try {
