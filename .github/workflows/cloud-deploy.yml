@@ -235,6 +235,13 @@ jobs:
           git reset --hard origin/main
           cd "${deploy_root}"
 
+          # Verify the real deployment owner before resource reclamation, image
+          # pinning, or database migrations. Never mistake a provider-managed
+          # legacy worker for this commissioned Docker Compose project.
+          if [ "${deploy_args}" = "up -d --build migrate web worker" ]; then
+            "${repo_dir}/scripts/cloud-deploy-topology-preflight.sh" boardreadyops-cloud "${quiesced_worker}"
+          fi
+
           docker_root="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || printf '/var/lib/docker')"
           free_mib() { df -Pm "$1" | awk 'NR==2 {print $4}'; }
           required_mib=12288
