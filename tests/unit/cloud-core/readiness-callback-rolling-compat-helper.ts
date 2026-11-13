@@ -59,7 +59,12 @@ export async function executePublisher(responses: CallbackResponse[]) {
   const context = createContext({
     require(name: string) {
       expect(name).toBe("node:fs");
-      return { readFileSync: () => JSON.stringify(report) };
+      return {
+        readFileSync: (filename: string) => {
+          expect(filename).toBe("/tmp/boardreadyops-fixture/boardreadyops.findings.json");
+          return JSON.stringify(report);
+        },
+      };
     },
     core: {
       async getIDToken(audience: string) {
@@ -82,6 +87,7 @@ export async function executePublisher(responses: CallbackResponse[]) {
     },
     process: {
       env: {
+        RUNNER_TEMP: "/tmp/boardreadyops-fixture",
         RUN_ID: "a6e4d1d2-2a20-44d1-81f4-7680ffa583b7",
         EXECUTION_ATTEMPT_ID: "0cc0bf41-8a31-4afa-aac2-ccb7efa7c47d",
         HEAD_SHA: "395ca695c10d7e990dd49315784541dfeac1c943",

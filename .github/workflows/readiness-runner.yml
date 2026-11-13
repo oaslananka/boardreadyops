@@ -184,11 +184,34 @@ jobs:
           upload-artifacts: "true"
           comment-pr: "false"
 
+      # The readiness Action writes JSON/SARIF/Markdown into GITHUB_WORKSPACE.
+      # Its completed artifact upload already retains the reports for users.
+      # Move only these known untracked reports out before the manufacturing
+      # exporter independently checks the entire reviewed source checkout.
+      - name: Stage readiness reports outside reviewed source
+        id: stage-readiness-reports
+        if: always() && steps.validate.outcome == 'success' && steps.readiness.outcome != 'skipped'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in boardreadyops.findings.json boardreadyops.sarif.json boardreadyops.report.md; do
+            if [[ -e "$name" || -L "$name" ]]; then
+              if [[ ! -f "$name" || -L "$name" ]] || git ls-files --error-unmatch -- "$name" > /dev/null 2>&1; then
+                echo "::error::Readiness report must be an untracked regular file: $name"
+                exit 1
+              fi
+              if [[ -e "$RUNNER_TEMP/$name" || -L "$RUNNER_TEMP/$name" ]]; then
+                echo "::error::Readiness report destination already exists: $name"
+                exit 1
+              fi
+              mv -- "$name" "$RUNNER_TEMP/$name"
+            fi
+          done
       # Optional source-bound manufacturing evidence. The readiness run remains
       # usable without this project setting; no delivery or share is authorized here.
       - name: Export manufacturing artifacts from the exact reviewed source
         id: manufacturing-export
-        if: always() && steps.validate.outcome == 'success' && steps.kicad.outcome == 'success' && vars.BOARDREADYOPS_PROJECT != ''
+        if: always() && steps.validate.outcome == 'success' && steps.kicad.outcome == 'success' && steps.stage-readiness-reports.outcome == 'success' && vars.BOARDREADYOPS_PROJECT != ''
         continue-on-error: true
         uses: oaslananka/boardreadyops/.github/actions/manufacturing-attested-export@bbdfd58631d5c8daca1179a10f74b45533903b58
         with:
@@ -321,7 +344,7 @@ jobs:
             const readinessOutcome = process.env.READINESS_OUTCOME;
             const trustMode = process.env.SAFE_MODE === "true" ? "safe" : "standard";
             const safeModeReasons = process.env.SAFE_MODE_REASONS ?? "";
-            const reportPath = "boardreadyops.findings.json";
+            const reportPath = `${process.env.RUNNER_TEMP}/boardreadyops.findings.json`;
 
             let report;
             try {

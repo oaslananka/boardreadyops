@@ -12,6 +12,13 @@ const fixtureRoot = path.resolve("tests/fixtures/projects/safe-basic");
 const ownedRoots: string[] = [];
 const SHA_REGEX = /^[0-9a-f]{40}$/u;
 
+function runnerTempInBash(value: string): string {
+  if (process.platform !== "win32") return value;
+  return value
+    .replace(/^([A-Za-z]):[\\/]/u, (_match, drive: string) => `/${drive.toLowerCase()}/`)
+    .replace(/\\/gu, "/");
+}
+
 interface ActionSpec {
   inputs: Record<string, { required: boolean }>;
   runs: { using: string; steps: Array<{ id: string; run: string }> };
@@ -233,6 +240,92 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(raw).not.toContain("artifact-metadata: write");
   });
 
+  it("restores the clean reviewed checkout before optional manufacturing signing without losing its readiness report", async () => {
+    const raw = await fs.readFile(".github/workflows/readiness-runner.yml", "utf8");
+    const workflow = load(raw) as TargetSpec;
+    const steps = workflow.jobs.readiness?.steps ?? [];
+    const readinessIndex = steps.findIndex((step) => step.id === "readiness");
+    const stageIndex = steps.findIndex((step) => step.id === "stage-readiness-reports");
+    const exportIndex = steps.findIndex((step) => step.id === "manufacturing-export");
+    const publishIndex = steps.findIndex((step) => String(step.name).startsWith("Publish OIDC-authenticated"));
+    expect(readinessIndex).toBeGreaterThan(-1);
+    expect(stageIndex).toBeGreaterThan(readinessIndex);
+    expect(exportIndex).toBeGreaterThan(stageIndex);
+    expect(publishIndex).toBeGreaterThan(exportIndex);
+    expect(String(steps[stageIndex]?.if)).toContain("steps.readiness.outcome != 'skipped'");
+    expect(String(steps[exportIndex]?.if)).toContain("steps.stage-readiness-reports.outcome == 'success'");
+    expect(String((steps[publishIndex]?.with as { script?: string } | undefined)?.script)).toContain(
+      "const reportPath = `$" + "{process.env.RUNNER_TEMP}/boardreadyops.findings.json`;",
+    );
+    const stagingScript = String(steps[stageIndex]?.run);
+    expect(stagingScript).toContain("git ls-files --error-unmatch");
+    expect(stagingScript).toContain("mv --");
+    // The signed export still verifies the actual checkout, not a staged report or an ignored source tree.
+    const exporter = await loadAction();
+    expect(exporter.runs.steps[0]?.run).toContain("git status --porcelain=v1 --untracked-files=all");
+    const f = await fixture();
+    const reports = {
+      "boardreadyops.findings.json": '{"schemaVersion":1,"findings":[]}',
+      "boardreadyops.sarif.json": '{"version":"2.1.0"}',
+      "boardreadyops.report.md": "# Readiness report\n",
+    };
+    for (const [name, value] of Object.entries(reports)) await fs.writeFile(path.join(f.root, name), value);
+    expect(
+      execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: f.root, encoding: "utf8" }),
+    ).toContain("boardreadyops.findings.json");
+    const staged = spawnSync("bash", ["-e", "-c", stagingScript], {
+      cwd: f.root,
+      encoding: "utf8",
+      env: { ...process.env, RUNNER_TEMP: runnerTempInBash(f.runnerTemp) },
+    });
+    expect(staged.status, staged.stderr).toBe(0);
+    for (const [name, value] of Object.entries(reports)) {
+      await expect(fs.readFile(path.join(f.root, name), "utf8")).rejects.toThrow();
+      expect(await fs.readFile(path.join(f.runnerTemp, name), "utf8")).toBe(value);
+    }
+    expect(
+      execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: f.root, encoding: "utf8" }).trim(),
+    ).toBe("");
+    // A separate untracked or modified source file is never hidden by the report staging.
+    await fs.writeFile(path.join(f.root, "unrelated.kicad_pcb"), "unreviewed source");
+    expect(
+      execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: f.root, encoding: "utf8" }),
+    ).toContain("unrelated.kicad_pcb");
+  });
+
+  it("refuses to move a tracked readiness output from the reviewed source", async () => {
+    const raw = await fs.readFile(".github/workflows/readiness-runner.yml", "utf8");
+    const workflow = load(raw) as TargetSpec;
+    const stage = workflow.jobs.readiness?.steps.find((step) => step.id === "stage-readiness-reports");
+    expect(stage).toBeDefined();
+    const f = await fixture();
+    const filename = "boardreadyops.findings.json";
+    await fs.writeFile(path.join(f.root, filename), '{"schemaVersion":1}');
+    execFileSync("git", ["add", "--", filename], { cwd: f.root });
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "track report",
+      ],
+      { cwd: f.root },
+    );
+    const refused = spawnSync("bash", ["-e", "-c", String(stage?.run)], {
+      cwd: f.root,
+      encoding: "utf8",
+      env: { ...process.env, RUNNER_TEMP: runnerTempInBash(f.runnerTemp) },
+    });
+    expect(refused.status).not.toBe(0);
+    expect(refused.stdout).toContain("must be an untracked regular file");
+    expect(await fs.readFile(path.join(f.root, filename), "utf8")).toContain("schemaVersion");
+    await expect(fs.readFile(path.join(f.runnerTemp, filename))).rejects.toThrow();
+  });
   it("exports REAL KiCad Gerbers, drill, BOM and CPL from the exact clean SHA and inventories all bytes", async (ctx) => {
     const cli = await detectKicadCli();
     if (!process.env.CI) ctx.skip(!cli.found || !/^10\.0\./u.test(cli.version ?? ""), "Requires KiCad 10");
