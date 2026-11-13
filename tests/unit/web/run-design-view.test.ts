@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { RunDesignView } from "../../../apps/web/components/run-design-view.js";
+import { RunDesignView, trustedReviewServerOrigin } from "../../../apps/web/components/run-design-view.js";
 
 const visual = {
   id: "svg1",
@@ -190,12 +190,47 @@ describe("run design visual inspection", () => {
     expect(overlayMode).toContain("disabled");
   });
 
+  it("uses only the configured service origin, not the vendor host, for native artwork upload guidance", () => {
+    const custom = "https://reviews.customer.example";
+    const html = renderToStaticMarkup(
+      createElement(RunDesignView, {
+        runId: "private",
+        snapshots: [],
+        serverOrigin: custom,
+      }),
+    );
+    expect(html).toContain("boardreadyops review publish . --native-visuals --server https://reviews.customer.example");
+    expect(html).not.toContain("https://boardreadyops.com");
+    expect(html).toContain("Verify this is the intended server");
+
+    expect(trustedReviewServerOrigin("https://boardreadyops.com/")).toBe("https://boardreadyops.com");
+    expect(trustedReviewServerOrigin("https://reviews.example;echo%20bad")).toBeUndefined();
+    expect(trustedReviewServerOrigin("https://reviews.example/path")).toBeUndefined();
+    expect(trustedReviewServerOrigin("http://reviews.example")).toBeUndefined();
+  });
+
+  it("identifies the exact recorded source commit before offering opt-in native publishing", () => {
+    const sha = "a".repeat(40);
+    const html = renderToStaticMarkup(
+      createElement(RunDesignView, { runId: "run-commit", snapshots: [], commitSha: sha }),
+    );
+    expect(html).toContain(sha);
+    expect(html).toContain("git rev-parse HEAD");
+    expect(html).toContain("--project path/to/board.kicad_pro");
+    expect(html).toContain("separate source-bound run and Review");
+  });
+
   it("does not misrepresent a run with no published design IP", () => {
     const html = renderToStaticMarkup(createElement(RunDesignView, { runId: "run-1", snapshots: [] }));
     expect(html).toContain("No PCB or schematic preview published for this run");
     expect(html).toContain("--native-visuals");
     expect(html).toContain('href="/reviews#publish-review"');
-    expect(html).toContain("How to publish source-derived visuals");
+    expect(html).toContain("Publish source-derived PCB and schematic views");
+    expect(html).toContain(
+      "boardreadyops review publish . --native-visuals --server https://YOUR-BOARDREADYOPS-SERVER",
+    );
+    expect(html).toContain("does not attach images to this earlier run");
+    expect(html).toContain("BOARDREADYOPS_TOKEN");
     expect(html).not.toContain("Investigate 0 recorded findings");
     expect(html).toContain("0 KiCad-native");
     expect(html).not.toContain("pcb-copper");

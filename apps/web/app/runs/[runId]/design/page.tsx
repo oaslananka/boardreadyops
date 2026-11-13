@@ -57,6 +57,7 @@ export default async function RunDesignPage({ params, searchParams }: Readonly<R
         totalFindings={result.run.findingsPage.total}
         repository={result.run.repository}
         commitSha={result.run.commitSha}
+        serverOrigin={process.env.BOARDREADYOPS_PUBLIC_URL ?? process.env.NEXT_PUBLIC_APP_URL}
         {...(result.run.reviewId ? { reviewId: result.run.reviewId } : {})}
       />
     </RunPageFrame>
