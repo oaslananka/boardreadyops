@@ -83632,6 +83632,29 @@ function getGitOriginRepo() {
     return void 0;
   }
 }
+function nativeVisualSourceError(root, headSha) {
+  const checkedOutHead = getGitCommitSha(root, "HEAD");
+  if (!/^[0-9a-f]{40}$/u.test(headSha) || checkedOutHead !== headSha || /^0{40}$/u.test(headSha)) {
+    return "Native visual publishing requires --head to match the checked-out Git HEAD; nothing uploaded.";
+  }
+  try {
+    const status = (0, import_node_child_process5.execFileSync)(
+      resolveGitExecutable(),
+      ["-C", root, "status", "--porcelain", "--untracked-files=all"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 1e4
+      }
+    );
+    if (status.split("\n").some((line) => line.length > 0 && !/\.kicad_prl"?$/u.test(line))) {
+      return "Native visual publishing requires a clean committed working tree; nothing uploaded.";
+    }
+  } catch {
+    return "Could not verify native visual Git provenance; nothing uploaded.";
+  }
+  return void 0;
+}
 async function reviewPublishCommand(target, options, streams) {
   const root = target ?? process.cwd();
   const jsonOutput = options.format === "json";
@@ -83679,6 +83702,14 @@ async function reviewPublishCommand(target, options, streams) {
   } else if (options.pcb) {
     streams.stderr.write("--pcb requires --share-footprint-summary; nothing uploaded.\n");
     return 2;
+  }
+  if (options.nativeVisuals && !options.dryRun) {
+    const provenanceError = nativeVisualSourceError(root, headSha);
+    if (provenanceError) {
+      streams.stderr.write(`${provenanceError}
+`);
+      return 2;
+    }
   }
   const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
   const uploadMode = options.nativeVisuals && (!options.upload || options.upload === "metadata") ? "snapshots" : options.upload ?? "metadata";

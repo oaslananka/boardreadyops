@@ -39,7 +39,15 @@ When publishing from a multi-project workspace, use `--project <path>` to restri
 boardreadyops review publish . --project hardware/mainboard/mainboard.kicad_pro --native-visuals
 ```
 
-**Native PCB and schematic visuals require explicit opt-in.** Use boardreadyops review publish . --native-visuals only when your organization permits detailed source-derived design geometry to be stored by the configured BoardReadyOps server. The option changes the effective upload mode to snapshots when it would otherwise be metadata; the exported SVG can reveal copper routing, component arrangement, net labels, and schematics even though raw KiCad source files are not uploaded. Without the flag, Review publishing retains the existing lightweight summary snapshots and does **not** upload native design artwork. This option neither certifies manufacturing readiness nor links plotted geometry independently to the reviewed commit.
+**Native PCB and schematic visuals require explicit opt-in.** Use boardreadyops review publish . --native-visuals only when your organization permits detailed source-derived design geometry to be stored by the configured BoardReadyOps server. The option changes the effective upload mode to snapshots when it would otherwise be metadata; the exported SVG can reveal copper routing, component arrangement, net labels, and schematics even though raw KiCad source files are not uploaded. Without the flag, Review publishing retains the existing lightweight summary snapshots and does **not** upload native design artwork. This option neither certifies manufacturing readiness nor independently verifies the geometry server-side. To avoid attributing edited CAD files to an immutable Git commit, native publishing requires the published head SHA to match checked-out `HEAD` and a clean committed working tree. Generated `.kicad_prl` editor state is exempt; other tracked or untracked changes are not. A mismatch exits with status 2 before uploading. Dry runs remain network-free.
+
+To publish native views on the hosted service, choose the intended KiCad project and configure a repository-scoped `BOARDREADYOPS_TOKEN` with `runs:write`:
+
+```bash
+boardreadyops review publish . --project hardware/mainboard/mainboard.kicad_pro --native-visuals --server https://boardreadyops.com
+```
+
+This creates a separate source-bound run and Review. It does not add visual evidence to a previous GitHub App readiness run or approve manufacturing.
 
 **Optional PCB footprint-count publishing requires a separate explicit opt-in.** With two exact Git revisions and a tracked KiCad PCB, use:
 

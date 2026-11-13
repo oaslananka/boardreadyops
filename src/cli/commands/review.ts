@@ -132,6 +132,31 @@ function getGitOriginRepo(): string | undefined {
   }
 }
 
+/** Ensure published native artwork corresponds to the checked-out Git source. */
+function nativeVisualSourceError(root: string, headSha: string): string | undefined {
+  const checkedOutHead = getGitCommitSha(root, "HEAD");
+  if (!/^[0-9a-f]{40}$/u.test(headSha) || checkedOutHead !== headSha || /^0{40}$/u.test(headSha)) {
+    return "Native visual publishing requires --head to match the checked-out Git HEAD; nothing uploaded.";
+  }
+  try {
+    const status = execFileSync(
+      resolveGitExecutable(),
+      ["-C", root, "status", "--porcelain", "--untracked-files=all"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 10_000,
+      },
+    );
+    if (status.split("\n").some((line) => line.length > 0 && !/\.kicad_prl"?$/u.test(line))) {
+      return "Native visual publishing requires a clean committed working tree; nothing uploaded.";
+    }
+  } catch {
+    return "Could not verify native visual Git provenance; nothing uploaded.";
+  }
+  return undefined;
+}
+
 export async function reviewPublishCommand(
   target: string | undefined,
   options: ReviewPublishOptions,
@@ -186,6 +211,13 @@ export async function reviewPublishCommand(
   } else if (options.pcb) {
     streams.stderr.write("--pcb requires --share-footprint-summary; nothing uploaded.\n");
     return 2;
+  }
+  if (options.nativeVisuals && !options.dryRun) {
+    const provenanceError = nativeVisualSourceError(root, headSha);
+    if (provenanceError) {
+      streams.stderr.write(`${provenanceError}\n`);
+      return 2;
+    }
   }
   const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
   // Native artwork contains source-derived design IP even though it is SVG, not

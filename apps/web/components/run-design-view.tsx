@@ -4,6 +4,19 @@ import type { RunDetail } from "../lib/run-dashboard.js";
 import { RunDesignWorkspace } from "./run-design-workspace.js";
 import { Pagination } from "./ui.js";
 
+/** Never direct a self-hosted user's private PCB artwork to a different service. */
+export function trustedReviewServerOrigin(configured?: string): string | undefined {
+  if (!configured || !/^https:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?\/?$/u.test(configured)) {
+    return undefined;
+  }
+  try {
+    const parsed = new URL(configured);
+    return parsed.hostname && !parsed.hostname.startsWith("-") ? parsed.origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function RunDesignView({
   runId,
   snapshots,
@@ -14,6 +27,7 @@ export function RunDesignView({
   totalFindings = 0,
   repository = "",
   commitSha = "",
+  serverOrigin,
 }: Readonly<{
   runId: string;
   snapshots: SnapshotArtifact[];
@@ -24,7 +38,9 @@ export function RunDesignView({
   totalFindings?: number;
   repository?: string;
   commitSha?: string;
+  serverOrigin?: string | undefined;
 }>) {
+  const publishServer = trustedReviewServerOrigin(serverOrigin);
   const native = snapshots.filter((item) => item.name.startsWith("kicad_native_")).length;
   const baseNative = baseSnapshots.filter((item) => item.name.startsWith("kicad_native_")).length;
   const hasHeadArtwork = snapshots.length > 0;
@@ -123,12 +139,55 @@ export function RunDesignView({
               Investigate {totalFindings} recorded findings →
             </Link>
           ) : null}
-          <Link
-            href="/reviews#publish-review"
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-2"
-          >
-            How to publish source-derived visuals →
-          </Link>
+          <details className="w-full max-w-2xl rounded-lg border border-border bg-background p-4 text-left">
+            <summary className="min-h-11 cursor-pointer text-sm font-semibold text-primary">
+              Publish source-derived PCB and schematic views
+            </summary>
+            <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm text-muted-foreground">
+              <li>
+                Check out the exact KiCad design you intend to publish and commit your changes. Verify{" "}
+                <code>git rev-parse HEAD</code>
+                {commitSha && /^[0-9a-f]{40}$/u.test(commitSha) ? (
+                  <>
+                    {" "}
+                    against this run&apos;s commit <code className="break-all">{commitSha}</code>
+                  </>
+                ) : (
+                  <> against the source revision you intend to publish</>
+                )}
+                .
+              </li>
+              <li>
+                Configure a repository-scoped <code>BOARDREADYOPS_TOKEN</code> with <code>runs:write</code>. Native
+                artwork discloses PCB and schematic geometry. It is not uploaded without <code>--native-visuals</code>.
+              </li>
+              <li>
+                Publish from the authorized local project:
+                <code className="mt-2 block max-w-full overflow-x-auto rounded-md bg-muted px-3 py-2 text-xs text-foreground">
+                  {publishServer
+                    ? `boardreadyops review publish . --native-visuals --server ${publishServer}`
+                    : "boardreadyops review publish . --native-visuals --server https://YOUR-BOARDREADYOPS-SERVER"}
+                </code>
+                <span className="mt-2 block text-xs">
+                  {publishServer
+                    ? "Verify this is the intended server before uploading your private design. "
+                    : "Replace YOUR-BOARDREADYOPS-SERVER with your actual instance origin before running. "}
+                  If the repository contains multiple boards, add <code>--project path/to/board.kicad_pro</code> to
+                  restrict which design is uploaded.
+                </span>
+              </li>
+            </ol>
+            <p className="mt-3 text-xs text-muted-foreground">
+              This publishes a separate source-bound run and Review. It does not attach images to this earlier run,
+              approve a board or certify manufacturing readiness.
+            </p>
+            <Link
+              href="/reviews#publish-review"
+              className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline"
+            >
+              Review publishing requirements →
+            </Link>
+          </details>
         </div>
       )}
       <section

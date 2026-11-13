@@ -297,7 +297,7 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("No PCB or schematic preview published for this run");
     expect(markup).toContain("Investigate 19 recorded findings");
     expect(markup).toContain('href="/runs/run-accessible/findings#finding-results"');
-    expect(markup).toContain("How to publish source-derived visuals");
+    expect(markup).toContain("Publish source-derived PCB and schematic views");
     expect(markup).not.toContain("PCB geometry verified");
   });
 
