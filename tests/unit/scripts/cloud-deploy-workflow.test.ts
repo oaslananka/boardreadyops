@@ -285,4 +285,25 @@ describe("cloud-deploy topology preflight", () => {
     expect(documentation).toContain("do not create the missing production tree automatically");
     expect(documentation).not.toContain("The current production host does not run");
   });
+
+  it("rejects wrong production runtime ownership before disk pruning or compose up", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+    const script = fs.readFileSync("scripts/cloud-deploy-topology-preflight.sh", "utf8");
+    const guard = workflow.indexOf("scripts/cloud-deploy-topology-preflight.sh");
+    const fetched = workflow.indexOf("git reset --hard origin/main");
+    const cachePrune = workflow.indexOf("            reclaim_build_cache_for_preflight");
+    const build = workflow.indexOf("run_deploy up -d --build migrate web worker");
+
+    expect(guard).toBeGreaterThan(fetched);
+    expect(guard).toBeLessThan(cachePrune);
+    expect(guard).toBeLessThan(build);
+    const deployArgs = "$" + "{deploy_args}";
+    const quiescedWorker = "$" + "{quiesced_worker}";
+    expect(workflow).toContain(`if [ "${deployArgs}" = "up -d --build migrate web worker" ]; then`);
+    expect(workflow).toContain(`boardreadyops-cloud "${quiescedWorker}"`);
+    expect(script).toContain("different container owner");
+    expect(script).toContain("expected exactly one running web process");
+    expect(documentation).toContain("Early live ownership preflight");
+  });
 });
