@@ -1,5 +1,6 @@
 "use client";
 
+import type { CanvasAnchor, SnapshotArtifact } from "@boardreadyops/contracts";
 import { useState } from "react";
 import type { DemoFinding, DemoReview } from "../../lib/demo-data.js";
 import { recordedVirtualBomNotice } from "../../lib/finding-guidance.js";
@@ -25,12 +26,18 @@ function isLinkedInSnapshot(review: DemoReview, fingerprint: string): boolean {
   );
 }
 
-type FindingFilter = "blocking" | "all";
+type FindingFilter = "blocking" | "all" | "located";
 
-export function visibleReviewFindings(findings: readonly DemoFinding[], filter: FindingFilter, query: string) {
+export function visibleReviewFindings(
+  findings: readonly DemoFinding[],
+  filter: FindingFilter,
+  query: string,
+  locatedFingerprints: ReadonlySet<string> = new Set(),
+) {
   const search = query.trim().toLowerCase();
   return findings.filter((finding) => {
     if (filter === "blocking" && !isBlocking(finding)) return false;
+    if (filter === "located" && !locatedFingerprints.has(finding.fingerprint)) return false;
     if (!search) return true;
     return [finding.ruleId, finding.message, finding.component, finding.path].some((value) =>
       value?.toLowerCase().includes(search),
@@ -48,19 +55,63 @@ export function groupReviewFindings(findings: readonly DemoFinding[]): { ruleId:
   return Array.from(groups, ([ruleId, entries]) => ({ ruleId, findings: entries }));
 }
 
-function hasNativeObjectPosition(review: DemoReview, fingerprint: string): boolean {
-  return Boolean(
-    review.headSnapshots?.some(
-      (snapshot) =>
-        snapshot.name.startsWith("kicad_native_") &&
-        snapshot.anchors.some(
-          (anchor) =>
-            anchor.kind === "finding" &&
-            anchor.metadata?.fingerprint === fingerprint &&
-            anchor.metadata.provenance === "kicad-json-object-position",
-        ),
-    ),
+/** Native object identity and plot-normalized coordinates are required
+ * before a finding may claim an inspectable physical reference. */
+function isVerifiedSourceObjectAnchor(anchor: CanvasAnchor): boolean {
+  const metadata = anchor.metadata;
+  if (
+    anchor.kind !== "finding" ||
+    metadata?.provenance !== "kicad-json-object-position" ||
+    typeof metadata.sourceUuid !== "string"
+  )
+    return false;
+  return (
+    /^[a-f0-9-]{36}$/iu.test(metadata.sourceUuid) &&
+    Number.isFinite(anchor.x) &&
+    Number.isFinite(anchor.y) &&
+    anchor.x >= 0 &&
+    anchor.x <= 1 &&
+    anchor.y >= 0 &&
+    anchor.y <= 1
   );
+}
+
+/** A native source object cannot be shown on an unrelated copper side. */
+function isOnMatchingCopperLayer(snapshot: SnapshotArtifact, anchor: CanvasAnchor): boolean {
+  const layer = anchor.layer;
+  return (
+    (layer === "F.Cu" || layer === "B.Cu") &&
+    (snapshot.sheetOrLayer === layer || snapshot.sheetOrLayer.endsWith(`/ ${layer}`))
+  );
+}
+
+/**
+ * A board-location shortcut is only valid for a KiCad-native, in-bounds
+ * source-object anchor linked to exactly one persisted finding. A summary
+ * component marker or a DRC diagnostic without a verified location does not
+ * qualify as a physical PCB position.
+ */
+function locatedSourceFindings(review: DemoReview): Set<string> {
+  const counts = new Map<string, number>();
+  for (const finding of review.findings) {
+    counts.set(finding.fingerprint, (counts.get(finding.fingerprint) ?? 0) + 1);
+  }
+  const located = new Set<string>();
+  for (const snapshot of review.headSnapshots ?? []) {
+    if (snapshot.kind !== "pcb_layer" || !snapshot.name.startsWith("kicad_native_")) continue;
+    for (const anchor of snapshot.anchors) {
+      const fingerprint = anchor.metadata?.fingerprint;
+      if (
+        typeof fingerprint !== "string" ||
+        counts.get(fingerprint) !== 1 ||
+        !isVerifiedSourceObjectAnchor(anchor) ||
+        !isOnMatchingCopperLayer(snapshot, anchor)
+      )
+        continue;
+      located.add(fingerprint);
+    }
+  }
+  return located;
 }
 
 /**
@@ -78,15 +129,20 @@ export function ReviewDesignWorkspace({
 }>) {
   const findings = [...review.findings].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
   const blocking = findings.filter(isBlocking).length;
+  const located = locatedSourceFindings(review);
   const requested = findings.find((finding) => finding.fingerprint === initialFindingFingerprint);
   const [filter, setFilter] = useState<FindingFilter>(
     requested && !isBlocking(requested) ? "all" : blocking > 0 ? "blocking" : "all",
   );
   const [query, setQuery] = useState("");
   const [focusCanvas, setFocusCanvas] = useState(false);
-  const visibleFindings = visibleReviewFindings(findings, filter, query);
+  const visibleFindings = visibleReviewFindings(findings, filter, query, located);
   const [selectedFingerprint, setSelectedFingerprint] = useState<string | undefined>(
-    requested?.fingerprint ?? findings.find(isBlocking)?.fingerprint ?? findings[0]?.fingerprint,
+    requested?.fingerprint ??
+      findings.find((finding) => isBlocking(finding) && located.has(finding.fingerprint))?.fingerprint ??
+      findings.find(isBlocking)?.fingerprint ??
+      findings.find((finding) => located.has(finding.fingerprint))?.fingerprint ??
+      findings[0]?.fingerprint,
   );
   const selected = visibleFindings.find((finding) => finding.fingerprint === selectedFingerprint) ?? visibleFindings[0];
   // Filter changes can hide the stored fingerprint; the inspector, row and canvas
@@ -197,15 +253,26 @@ export function ReviewDesignWorkspace({
                   <button
                     type="button"
                     aria-pressed={filter === "blocking"}
-                    className={`rounded-md border px-2.5 py-1.5 text-xs ${filter === "blocking" ? "border-danger text-danger" : "border-border text-muted-foreground"}`}
+                    className={`rounded-md border min-h-11 px-2.5 py-1.5 text-xs ${filter === "blocking" ? "border-danger text-danger" : "border-border text-muted-foreground"}`}
                     onClick={() => setFilter("blocking")}
                   >
                     Blockers ({blocking})
                   </button>
+                  {located.size > 0 ? (
+                    <button
+                      type="button"
+                      aria-pressed={filter === "located"}
+                      title="Filter to verified KiCad source-object positions, not violation centers"
+                      className={`rounded-md border min-h-11 px-2.5 py-1.5 text-xs ${filter === "located" ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
+                      onClick={() => setFilter("located")}
+                    >
+                      On board ({located.size})
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     aria-pressed={filter === "all"}
-                    className={`rounded-md border px-2.5 py-1.5 text-xs ${filter === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
+                    className={`rounded-md border min-h-11 px-2.5 py-1.5 text-xs ${filter === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
                     onClick={() => setFilter("all")}
                   >
                     All ({findings.length})
@@ -269,6 +336,7 @@ export function ReviewDesignWorkspace({
             <>
               <ReviewCanvas
                 compactMobile
+                preferPcbLayer
                 immersive={focusCanvas}
                 headSnapshots={snapshots}
                 {...optionalBaseSnapshots}
@@ -345,7 +413,7 @@ export function ReviewDesignWorkspace({
                 <dd className="mt-1">{selected.disposition.replaceAll("_", " ")}</dd>
               </div>
               <div className="rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground">
-                {hasNativeObjectPosition(review, selected.fingerprint)
+                {located.has(selected.fingerprint)
                   ? "Marker identifies a source object recorded by KiCad DRC, not the exact violation geometry. Open KiCad to verify the fault."
                   : isLinkedInSnapshot(review, selected.fingerprint)
                     ? "Reference mapped in a published summary snapshot; verify location in native KiCad."

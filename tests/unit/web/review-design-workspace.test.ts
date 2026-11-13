@@ -88,6 +88,48 @@ describe("Zaptrace-inspired BoardReadyOps review workspace", () => {
     expect(html).toContain('class="mt-1 break-words">Insufficient clearance on U1');
   });
 
+  it("starts full finding inspection on real front copper, even when schematic and B.Cu appear first", () => {
+    const source = review.headSnapshots[0];
+    if (!source) throw new Error("Missing snapshot fixture");
+    const schematic = {
+      ...source,
+      id: "real-schematic",
+      name: "kicad_native_schematic.svg",
+      kind: "schematic" as const,
+      sheetOrLayer: "Board / Connectors",
+      anchors: [],
+    };
+    const rear = {
+      ...source,
+      id: "real-back",
+      name: "kicad_native_board_B.Cu.svg",
+      kind: "pcb_layer" as const,
+      sheetOrLayer: "Board / B.Cu",
+      anchors: [],
+    };
+    const front = {
+      ...source,
+      id: "real-front",
+      name: "kicad_native_board_F.Cu.svg",
+      kind: "pcb_layer" as const,
+      sheetOrLayer: "Board / F.Cu",
+      anchors: [],
+    };
+    const withBoard = renderToStaticMarkup(
+      createElement(ReviewDesignWorkspace, {
+        review: { ...review, headSnapshots: [schematic, rear, front] },
+      }),
+    );
+    expect(withBoard).toContain('value="Board / F.Cu" selected=""');
+    expect(withBoard).not.toContain('value="Board / Connectors" selected=""');
+    expect(withBoard).not.toContain("On board (");
+
+    const onlySchematic = renderToStaticMarkup(
+      createElement(ReviewDesignWorkspace, { review: { ...review, headSnapshots: [schematic] } }),
+    );
+    expect(onlySchematic).toContain('value="Board / Connectors" selected=""');
+  });
+
   it("keeps a virtual BOM warning's original evidence and shows corrective context in the list", () => {
     const legacy = {
       ...u1,

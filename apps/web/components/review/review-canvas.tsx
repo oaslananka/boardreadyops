@@ -393,6 +393,16 @@ function StackedLayersView({
   );
 }
 
+/** Start investigations on an actual source-derived board before schematic
+ * summaries. Prefer the front copper layer whenever that native view exists. */
+function preferredBoardSnapshot(snapshots: readonly SnapshotArtifact[]): SnapshotArtifact | undefined {
+  const pcb = snapshots.filter((snapshot) => snapshot.kind === "pcb_layer");
+  const native = pcb.filter((snapshot) => snapshot.name.startsWith("kicad_native_"));
+  const front = (snapshot: SnapshotArtifact) =>
+    snapshot.sheetOrLayer === "F.Cu" || snapshot.sheetOrLayer.endsWith("/ F.Cu");
+  return native.find(front) ?? native[0] ?? pcb.find(front) ?? pcb[0];
+}
+
 export function ReviewCanvas({
   headSnapshots,
   baseSnapshots = [],
@@ -409,7 +419,7 @@ export function ReviewCanvas({
 }: Readonly<ReviewCanvasProps>) {
   const [selectedSheetOrLayer, setSelectedSheetOrLayer] = useState<string>(
     () =>
-      (preferPcbLayer ? headSnapshots.find((snapshot) => snapshot.kind === "pcb_layer") : undefined)?.sheetOrLayer ??
+      (preferPcbLayer ? preferredBoardSnapshot(headSnapshots) : undefined)?.sheetOrLayer ??
       headSnapshots[0]?.sheetOrLayer ??
       baseSnapshots[0]?.sheetOrLayer ??
       "Main",
