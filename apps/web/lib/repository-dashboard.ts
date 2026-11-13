@@ -75,11 +75,14 @@ export type ViewerDesignEvidence = {
   repository: string;
   hasPcb: boolean;
   hasSchematic: boolean;
+  /** Native source-backed views only; legacy summary diagrams remain text-only. */
+  hasNativePcb?: boolean;
+  hasNativeSchematic?: boolean;
 };
 
 /**
  * Select actual published design evidence from a run the session could already
- * see on Dashboard. Fetch ONLY booleans, never SVG content or finding anchors:
+ * see on Dashboard. Fetch ONLY booleans (including native artwork availability), never SVG content or finding anchors:
  * those belong on the separately authorized run-design route.
  */
 export async function loadViewerDesignEvidence(
@@ -101,7 +104,9 @@ export async function loadViewerDesignEvidence(
       `select release_runs.id as run_id,
               release_runs.repository_id,
               bool_or(s.kind = 'pcb_layer') as has_pcb,
-              bool_or(s.kind = 'schematic') as has_schematic
+              bool_or(s.kind = 'schematic') as has_schematic,
+              bool_or(s.kind = 'pcb_layer' and left(s.name, 13) = 'kicad_native_' and s.format = 'svg') as has_native_pcb,
+              bool_or(s.kind = 'schematic' and left(s.name, 13) = 'kicad_native_' and s.format = 'svg') as has_native_schematic
          from unnest($1::text[], $2::text[]) as candidate(run_id, repository_id)
          join release_runs on release_runs.id = candidate.run_id
                           and release_runs.repository_id = candidate.repository_id
@@ -131,6 +136,8 @@ export async function loadViewerDesignEvidence(
       repository: `${matching.owner}/${matching.name}`,
       hasPcb: row.has_pcb === true,
       hasSchematic: row.has_schematic === true,
+      ...(row.has_native_pcb === true ? { hasNativePcb: true } : {}),
+      ...(row.has_native_schematic === true ? { hasNativeSchematic: true } : {}),
     };
   } finally {
     await executor.close();
