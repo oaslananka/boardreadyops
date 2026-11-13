@@ -125426,7 +125426,7 @@ var import_node_crypto7 = require("node:crypto");
 var import_promises18 = __toESM(require("node:fs/promises"), 1);
 var import_node_os3 = __toESM(require("node:os"), 1);
 var import_node_path49 = __toESM(require("node:path"), 1);
-var MAX_SVG_BYTES = 2 * 1024 * 1024;
+var MAX_SVG_BYTES = 4 * 1024 * 1024;
 var MAX_SHEETS = 16;
 var EXPORT_TIMEOUT_MS = 45e3;
 var PROCESS_LIMITS = { timeoutMs: EXPORT_TIMEOUT_MS, maxStdoutBytes: 8192, maxStderrBytes: 8192 };
@@ -125581,10 +125581,12 @@ async function pcbLayer(cliPath, input3, original, beforeSha, tempRoot, label, l
   return collectSvg(output3, beforeSha, original, "pcb_layer", `${label} / ${layer}`).catch(() => void 0);
 }
 async function pcbSnapshots(cliPath, input3, original, beforeSha, tempRoot, label, layers) {
+  const selectedLayers = [...new Set(layers)].filter((layer) => /^(?:F|B|In\d+)\.Cu$/u.test(layer));
+  if (selectedLayers.length > MAX_SHEETS) return [];
   const found = await Promise.all(
-    [...new Set(layers)].slice(0, MAX_SHEETS).map((layer) => pcbLayer(cliPath, input3, original, beforeSha, tempRoot, label, layer))
+    selectedLayers.map((layer) => pcbLayer(cliPath, input3, original, beforeSha, tempRoot, label, layer))
   );
-  return found.filter((artifact) => artifact !== void 0);
+  return found.every((artifact) => artifact !== void 0) ? found : [];
 }
 async function schematicSnapshots(cliPath, input3, original, beforeSha, tempRoot, label) {
   const outputDirectory = import_node_path49.default.join(tempRoot, "sheets");
@@ -125595,7 +125597,8 @@ async function schematicSnapshots(cliPath, input3, original, beforeSha, tempRoot
     PROCESS_LIMITS
   );
   if (result.code !== 0 || result.timedOut) return [];
-  const names = (await import_promises18.default.readdir(outputDirectory)).filter((name) => name.endsWith(".svg")).sort().slice(0, MAX_SHEETS);
+  const names = (await import_promises18.default.readdir(outputDirectory)).filter((name) => name.endsWith(".svg")).sort();
+  if (!names.length || names.length > MAX_SHEETS) return [];
   const found = await Promise.all(
     names.map(
       (name) => collectSvg(
@@ -125607,7 +125610,7 @@ async function schematicSnapshots(cliPath, input3, original, beforeSha, tempRoot
       ).catch(() => void 0)
     )
   );
-  return found.filter((artifact) => artifact !== void 0);
+  return found.every((artifact) => artifact !== void 0) ? found : [];
 }
 async function exportNativeKicadSnapshots(cliPath, sourceFile, kind, layers = []) {
   const beforeSha = await sourceDigest(sourceFile).catch(() => void 0);

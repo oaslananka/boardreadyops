@@ -107,10 +107,32 @@ describe("KiCad-native offline exporter without requiring installed KiCad", () =
     expect(await exportNativeKicadSnapshots("cli", original, "pcb_layer", ["F.Cu"])).toEqual([]);
     mockProcess.mockImplementation(async (_cmd, args) => {
       const output = args[args.indexOf("--output") + 1] ?? "";
-      await fs.writeFile(output, VALID + " ".repeat(2 * 1024 * 1024));
+      await fs.writeFile(output, VALID + " ".repeat(4 * 1024 * 1024));
       return result;
     });
     expect(await exportNativeKicadSnapshots("cli", original, "pcb_layer", ["F.Cu"])).toEqual([]);
+  });
+
+  it("rejects an incomplete schematic when one generated sheet is invalid", async () => {
+    const sch = path.join(root, "alpha.kicad_sch");
+    await fs.writeFile(sch, "schematic");
+    successfulPlot();
+    mockProcess.mockImplementationOnce(async (_cmd, args) => {
+      const dir = args[args.indexOf("--output") + 1] ?? "";
+      await fs.writeFile(path.join(dir, "sheet-a.svg"), VALID);
+      await fs.writeFile(path.join(dir, "sheet-b.svg"), "<svg><script /></svg>");
+      return result;
+    });
+    expect(await exportNativeKicadSnapshots("cli", sch, "schematic")).toEqual([]);
+  });
+
+  it("rejects an incomplete PCB when one selected layer cannot be exported", async () => {
+    mockProcess.mockImplementation(async (_cmd, args) => {
+      const file = args[args.indexOf("--output") + 1] ?? "";
+      if (file.includes("F_Cu")) await fs.writeFile(file, VALID);
+      return result;
+    });
+    expect(await exportNativeKicadSnapshots("cli", original, "pcb_layer", ["F.Cu", "B.Cu"])).toEqual([]);
   });
 
   it("rejects a source changed during rendering", async () => {
@@ -128,11 +150,12 @@ describe("KiCad-native offline exporter without requiring installed KiCad", () =
     expect(mockProcess).not.toHaveBeenCalled();
   });
 
-  it("bounds snapshots to 16 layers and skips invalid layers", async () => {
+  it("rejects an incomplete layer stack instead of silently publishing 16 of 25 layers", async () => {
     successfulPlot();
     const layers = Array.from({ length: 25 }, (_, i) => `In${i}.Cu`);
     const art = await exportNativeKicadSnapshots("cli", original, "pcb_layer", layers);
-    expect(art).toHaveLength(16);
+    expect(art).toEqual([]);
+    expect(mockProcess).not.toHaveBeenCalled();
   });
 
   it("permits only locally referenced SVG href/fill URLs and rejects active or malformed output", () => {
@@ -150,9 +173,11 @@ describe("KiCad-native offline exporter without requiring installed KiCad", () =
     expect(normalizeKicadSvg('<svg viewBox="0 0 -3 4"></svg>')).toBeUndefined();
     expect(normalizeKicadSvg('<svg viewBox="0 0 4"></svg>')).toBeUndefined();
     expect(normalizeKicadSvg('<svg width="3" height="4"></svg>')).toBeUndefined();
+    // Genuine multi-sheet KiCad 10 drawings can exceed the previous 2 MiB bound.
+    expect(normalizeKicadSvg(`<svg viewBox="0 0 3 4"><text>${"X".repeat(3 * 1024 * 1024)}</text></svg>`)).toBeDefined();
     expect(normalizeKicadSvg("")).toBeUndefined();
     expect(
-      normalizeKicadSvg(`<svg viewBox='0 0 3 4'><text>${"X".repeat(2 * 1024 * 1024)}</text></svg>`),
+      normalizeKicadSvg(`<svg viewBox='0 0 3 4'><text>${"X".repeat(4 * 1024 * 1024)}</text></svg>`),
     ).toBeUndefined();
   });
 });

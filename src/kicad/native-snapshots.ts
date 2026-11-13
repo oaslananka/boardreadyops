@@ -6,7 +6,7 @@ import type { CanvasAnchor, SnapshotArtifact, SnapshotFinding } from "@boardread
 import { runProcess } from "../util/process.js";
 import type { PcbOutlineBounds } from "./pcb.js";
 
-const MAX_SVG_BYTES = 2 * 1024 * 1024;
+const MAX_SVG_BYTES = 4 * 1024 * 1024;
 const MAX_SHEETS = 16;
 const EXPORT_TIMEOUT_MS = 45_000;
 const PROCESS_LIMITS = { timeoutMs: EXPORT_TIMEOUT_MS, maxStdoutBytes: 8192, maxStderrBytes: 8192 };
@@ -256,12 +256,13 @@ async function pcbSnapshots(
   label: string,
   layers: string[],
 ): Promise<SnapshotArtifact[]> {
+  const selectedLayers = [...new Set(layers)].filter((layer) => /^(?:F|B|In\d+)\.Cu$/u.test(layer));
+  // An incomplete layer stack would make the Review look more complete than it is.
+  if (selectedLayers.length > MAX_SHEETS) return [];
   const found = await Promise.all(
-    [...new Set(layers)]
-      .slice(0, MAX_SHEETS)
-      .map((layer) => pcbLayer(cliPath, input, original, beforeSha, tempRoot, label, layer)),
+    selectedLayers.map((layer) => pcbLayer(cliPath, input, original, beforeSha, tempRoot, label, layer)),
   );
-  return found.filter((artifact): artifact is SnapshotArtifact => artifact !== undefined);
+  return found.every((artifact) => artifact !== undefined) ? (found as SnapshotArtifact[]) : [];
 }
 
 async function schematicSnapshots(
@@ -280,10 +281,9 @@ async function schematicSnapshots(
     PROCESS_LIMITS,
   );
   if (result.code !== 0 || result.timedOut) return [];
-  const names = (await fs.readdir(outputDirectory))
-    .filter((name) => name.endsWith(".svg"))
-    .sort()
-    .slice(0, MAX_SHEETS);
+  const names = (await fs.readdir(outputDirectory)).filter((name) => name.endsWith(".svg")).sort();
+  // Do not silently drop a sheet just because its SVG exceeds our budget.
+  if (!names.length || names.length > MAX_SHEETS) return [];
   const found = await Promise.all(
     names.map((name) =>
       collectSvg(
@@ -295,7 +295,7 @@ async function schematicSnapshots(
       ).catch(() => undefined),
     ),
   );
-  return found.filter((artifact): artifact is SnapshotArtifact => artifact !== undefined);
+  return found.every((artifact) => artifact !== undefined) ? (found as SnapshotArtifact[]) : [];
 }
 
 /** Locally plot in an isolated, temporary KiCad project copy. */
