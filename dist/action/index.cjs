@@ -73450,7 +73450,7 @@ async function parsePcb(file3) {
   const text = await readDesignFile(file3) ?? "";
   const model = parseKicadDocument(text, "pcb");
   const copperLayerNames = copperLayers(model);
-  const outlineBounds = rectangularOutlineBounds(model);
+  const outlineBounds = rectangularOutlineBounds(model) ?? roundedRectangleOutlineBounds(model);
   return {
     footprints: footprints(model),
     revision: revision(model),
@@ -73572,6 +73572,72 @@ function rectangularOutlineBounds(model) {
   const maxX = Math.max(rect.start.x, rect.end.x);
   const maxY = Math.max(rect.start.y, rect.end.y);
   return maxX > minX && maxY > minY ? { minX, minY, maxX, maxY } : void 0;
+}
+function straightRoundedRectangleSides(lines) {
+  const horizontal = [];
+  const vertical = [];
+  for (const block of lines) {
+    const segment2 = startEndFromList(block);
+    if (!segment2) return void 0;
+    if (Math.abs(segment2.start.y - segment2.end.y) < 1e-4 && Math.abs(segment2.start.x - segment2.end.x) > 1e-3) {
+      horizontal.push(segment2);
+    } else if (Math.abs(segment2.start.x - segment2.end.x) < 1e-4 && Math.abs(segment2.start.y - segment2.end.y) > 1e-3) {
+      vertical.push(segment2);
+    } else {
+      return void 0;
+    }
+  }
+  return horizontal.length === 2 && vertical.length === 2 ? { horizontal, vertical } : void 0;
+}
+function completeRoundedRectangleSides(horizontal, vertical, bounds) {
+  const near = (a, b) => Math.abs(a - b) < 1e-4;
+  return bounds.maxX > bounds.minX && bounds.maxY > bounds.minY && horizontal.every((line) => near(line.start.y, bounds.minY) || near(line.start.y, bounds.maxY)) && vertical.every((line) => near(line.start.x, bounds.minX) || near(line.start.x, bounds.maxX)) && horizontal.some((line) => near(line.start.y, bounds.minY)) && horizontal.some((line) => near(line.start.y, bounds.maxY)) && vertical.some((line) => near(line.start.x, bounds.minX)) && vertical.some((line) => near(line.start.x, bounds.maxX));
+}
+function registerVerifiedQuarterCorner(arc, hEnds, vEnds, bounds, used, corners) {
+  const start = pointFromChild(arc, "start");
+  const mid = pointFromChild(arc, "mid");
+  const end = pointFromChild(arc, "end");
+  if (!start || !mid || !end) return false;
+  const h = hEnds.find((point) => samePoint(point, start)) ?? hEnds.find((point) => samePoint(point, end));
+  const v = vEnds.find((point) => samePoint(point, start)) ?? vEnds.find((point) => samePoint(point, end));
+  if (!h || !v || used.has(h) || used.has(v) || samePoint(start, h) === samePoint(start, v)) return false;
+  const rX = Math.abs(v.x - h.x);
+  const rY = Math.abs(h.y - v.y);
+  if (!(rX > 1e-3 && rX < Math.min(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2)) return false;
+  if (Math.abs(rX - rY) > 2e-3) return false;
+  if (Math.abs(mid.x - (h.x + (v.x - h.x) / Math.SQRT2)) > 2e-3 || Math.abs(mid.y - (v.y + (h.y - v.y) / Math.SQRT2)) > 2e-3)
+    return false;
+  const corner = `${Math.abs(h.y - bounds.minY) < 1e-4 ? "top" : "bottom"}:${Math.abs(v.x - bounds.minX) < 1e-4 ? "left" : "right"}`;
+  if (corners.has(corner)) return false;
+  corners.add(corner);
+  used.add(h);
+  used.add(v);
+  return true;
+}
+function roundedRectangleOutlineBounds(model) {
+  const lines = edgePrimitiveLists(model, "gr_line");
+  const arcs = edgePrimitiveLists(model, "gr_arc");
+  if (lines.length !== 4 || arcs.length !== 4 || ["gr_rect", "gr_circle", "gr_poly", "gr_curve"].some((name) => edgePrimitiveLists(model, name).length > 0))
+    return void 0;
+  const sides2 = straightRoundedRectangleSides(lines);
+  if (!sides2) return void 0;
+  const hEnds = sides2.horizontal.flatMap((segment2) => [segment2.start, segment2.end]);
+  const vEnds = sides2.vertical.flatMap((segment2) => [segment2.start, segment2.end]);
+  const ends = [...hEnds, ...vEnds];
+  if (ends.some((point, index) => ends.slice(index + 1).some((other) => samePoint(point, other)))) return void 0;
+  const bounds = {
+    minX: Math.min(...ends.map((point) => point.x)),
+    maxX: Math.max(...ends.map((point) => point.x)),
+    minY: Math.min(...ends.map((point) => point.y)),
+    maxY: Math.max(...ends.map((point) => point.y))
+  };
+  if (!completeRoundedRectangleSides(sides2.horizontal, sides2.vertical, bounds)) return void 0;
+  const used = /* @__PURE__ */ new Set();
+  const corners = /* @__PURE__ */ new Set();
+  for (const arc of arcs) {
+    if (!registerVerifiedQuarterCorner(arc, hEnds, vEnds, bounds, used, corners)) return void 0;
+  }
+  return corners.size === 4 && used.size === 8 ? bounds : void 0;
 }
 function boardArea(model) {
   const rect = edgePrimitiveLists(model, "gr_rect").map((block) => startEndFromList(block)).find((segment2) => Boolean(segment2));
