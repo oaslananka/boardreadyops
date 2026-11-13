@@ -169,7 +169,7 @@ export function generateSetupPrPlan(input: GenerateSetupFilesInput): SetupPrPlan
     ``,
     `### Included files`,
     `1. \`boardreadyops.yml\`: Defines project scope, rule policies, report exports, and gate thresholds.`,
-    `2. \`.github/workflows/readiness-runner.yml\`: Target-repository runner workflow that executes automated checks when hardware PRs are opened.`,
+    `2. \`.github/workflows/readiness-runner.yml\`: Target-repository runner workflow, reused unchanged when the exact canonical variable-origin source is already installed.`,
     ``,
     `### Workflow security & permissions`,
     `- \`id-token: write\`: Generates short-lived GitHub Actions OIDC tokens to authenticate results with BoardReadyOps cloud without storing API keys or secrets in repository settings.`,
