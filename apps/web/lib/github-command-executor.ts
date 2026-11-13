@@ -98,7 +98,7 @@ export function createGitHubCommandLifecycleExecutor(
   dependencies: GitHubCommandLifecycleExecutorDependencies,
 ): GitHubCommandLifecycleExecutor {
   return {
-    async executeGitHubCommand(action, _context) {
+    async executeGitHubCommand(action, context) {
       const command = parseGitHubCommand(action.commentBody);
       if (!command) throw new Error("GitHub command payload is no longer parseable");
 
@@ -160,7 +160,18 @@ export function createGitHubCommandLifecycleExecutor(
         await postResponse(action, api, capabilities, plan.body);
         return [];
       }
-      if (plan.kind === "action") return [plan.action];
+      if (plan.kind === "action") {
+        if (command.kind === "rerun" && plan.action.type === "release_run.enqueue") {
+          return [
+            {
+              ...plan.action,
+              deliveryId: context.deliveryId,
+              idempotencyScope: `comment-rerun:${action.commentId}`,
+            },
+          ];
+        }
+        return [plan.action];
+      }
       return plan.actions;
     },
   };
