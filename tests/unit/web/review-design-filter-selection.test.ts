@@ -3,6 +3,7 @@
  */
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ReviewDesignWorkspace } from "../../../apps/web/components/review/review-design-workspace.js";
 import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
@@ -39,6 +40,134 @@ const review = {
 };
 
 describe("Review finding filter and canvas selection", () => {
+  it("opens the source-linked board and filters only uniquely verified KiCad object locations", async () => {
+    const first = {
+      ...blocker,
+      fingerprint: "unmapped-blocker",
+      ruleId: "drc.unmapped",
+      message: "Unmapped DRC rule",
+    };
+    const located = {
+      ...blocker,
+      fingerprint: "verified-board-object",
+      ruleId: "drc.hole_clearance",
+      message: "Reported KiCad copper track",
+    };
+    const basis = review.headSnapshots[0];
+    if (!basis) throw new Error("Review snapshot missing");
+    const marker = {
+      id: "reported-track",
+      kind: "finding" as const,
+      targetRef: "Track",
+      x: 0.2,
+      y: 0.6,
+      layer: "B.Cu",
+      metadata: {
+        fingerprint: located.fingerprint,
+        provenance: "kicad-json-object-position",
+        sourceUuid: "5d98b95c-d01d-4e88-8c2c-83c62e48cb07",
+        severity: "error",
+        ruleId: located.ruleId,
+        message: located.message,
+      },
+    };
+    const schematic = {
+      ...basis,
+      id: "real-sheet",
+      name: "kicad_native_schematic.svg",
+      kind: "schematic" as const,
+      sheetOrLayer: "Board / Connectors",
+      anchors: [],
+    };
+    const front = {
+      ...basis,
+      id: "real-front",
+      name: "kicad_native_board_F.Cu.svg",
+      sheetOrLayer: "Board / F.Cu",
+      anchors: [],
+    };
+    const back = {
+      ...basis,
+      id: "real-back",
+      name: "kicad_native_board_B.Cu.svg",
+      sheetOrLayer: "Board / B.Cu",
+      anchors: [marker],
+    };
+    const sourceReview = {
+      ...review,
+      findings: [first, located],
+      headSnapshots: [schematic, front, back],
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    try {
+      await act(async () => root.render(createElement(ReviewDesignWorkspace, { review: sourceReview })));
+      const select = container.querySelector<HTMLSelectElement>("select#sheet-select");
+      // The default source-linked finding sends the user directly to its real B.Cu layer.
+      expect(select?.value).toBe("Board / B.Cu");
+      const inspector = container.querySelector('aside[aria-label="Selected finding inspector"]');
+      expect(inspector?.textContent).toContain(located.message);
+      expect(container.textContent).toContain("On board (1)");
+      const locatedButton = [...container.querySelectorAll("button")].find(
+        (button) => button.textContent?.trim() === "On board (1)",
+      );
+      await act(async () => locatedButton?.click());
+      expect(locatedButton?.getAttribute("aria-pressed")).toBe("true");
+      expect(container.textContent).toContain("1 of 2 findings shown");
+      expect(container.textContent).not.toContain(first.message);
+
+      const blockersButton = [...container.querySelectorAll("button")].find(
+        (button) => button.textContent?.trim() === "Blockers (2)",
+      );
+      await act(async () => blockersButton?.click());
+      expect(container.textContent).toContain("2 of 2 findings shown");
+      expect(container.textContent).toContain(first.message);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+    }
+
+    // A summary image or ambiguous/invalid source metadata cannot claim a physical position.
+    const summary = renderToStaticMarkup(
+      createElement(ReviewDesignWorkspace, {
+        review: { ...sourceReview, headSnapshots: [{ ...back, name: "summary.svg" }] },
+      }),
+    );
+    expect(summary).not.toContain("On board (");
+    const invalid = renderToStaticMarkup(
+      createElement(ReviewDesignWorkspace, {
+        review: {
+          ...sourceReview,
+          headSnapshots: [
+            { ...back, anchors: [{ ...marker, metadata: { ...marker.metadata, sourceUuid: "invalid" } }] },
+          ],
+        },
+      }),
+    );
+    expect(invalid).not.toContain("On board (");
+    const wrongLayer = renderToStaticMarkup(
+      createElement(ReviewDesignWorkspace, {
+        review: { ...sourceReview, headSnapshots: [{ ...back, anchors: [{ ...marker, layer: "F.Cu" }] }] },
+      }),
+    );
+    expect(wrongLayer).not.toContain("On board (");
+    const outside = renderToStaticMarkup(
+      createElement(ReviewDesignWorkspace, {
+        review: { ...sourceReview, headSnapshots: [{ ...back, anchors: [{ ...marker, x: 1.2 }] }] },
+      }),
+    );
+    expect(outside).not.toContain("On board (");
+    const duplicate = renderToStaticMarkup(
+      createElement(ReviewDesignWorkspace, {
+        review: { ...sourceReview, findings: [located, { ...located }], headSnapshots: [back] },
+      }),
+    );
+    expect(duplicate).not.toContain("On board (");
+  });
+
   it("keeps a grouped native KiCad marker highlighted while cycling distinct findings", async () => {
     const secondary = {
       ...blocker,
