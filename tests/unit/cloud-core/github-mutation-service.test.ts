@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { defaultReadinessWorkflowTemplate } from "../../../packages/cloud-core/src/readiness-workflow-template.js";
 import {
   createGitHubMutationService,
   type ExecuteMutationInput,
   type GitHubMutationApiClient,
   isAllowedMutationPath,
 } from "../../../packages/cloud-core/src/github-mutation-service.js";
+import { defaultReadinessWorkflowTemplate } from "../../../packages/cloud-core/src/readiness-workflow-template.js";
 
 describe("GitHub Mutation Service", () => {
   describe("path allowlist & traversal validation", () => {
@@ -411,7 +411,7 @@ describe("GitHub Mutation Service", () => {
 
     it("preserves exact canonical variable-origin workflow while adding only missing setup config", async () => {
       const generatedWorkflow = defaultReadinessWorkflowTemplate.replaceAll(
-        "${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}",
+        "$" + "{{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}",
         "https://boardreadyops.com",
       );
       const { client, requests } = snapshotClient({
@@ -420,7 +420,7 @@ describe("GitHub Mutation Service", () => {
       const result = await createGitHubMutationService({ client }).execute({
         ...validMutationInput,
         files: [
-          validMutationInput.files[0]!,
+          ...validMutationInput.files.slice(0, 1),
           { path: ".github/workflows/readiness-runner.yml", content: generatedWorkflow },
         ],
       });
@@ -433,7 +433,7 @@ describe("GitHub Mutation Service", () => {
 
     it("rejects noncanonical existing workflow without any Git mutation", async () => {
       const generatedWorkflow = defaultReadinessWorkflowTemplate.replaceAll(
-        "${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}",
+        "$" + "{{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}",
         "https://boardreadyops.com",
       );
       const { client, requests } = snapshotClient({
@@ -446,7 +446,7 @@ describe("GitHub Mutation Service", () => {
         createGitHubMutationService({ client }).execute({
           ...validMutationInput,
           files: [
-            validMutationInput.files[0]!,
+            ...validMutationInput.files.slice(0, 1),
             { path: ".github/workflows/readiness-runner.yml", content: generatedWorkflow },
           ],
         }),
@@ -465,7 +465,7 @@ describe("GitHub Mutation Service", () => {
         createGitHubMutationService({ client }).execute({
           ...validMutationInput,
           files: [
-            validMutationInput.files[0]!,
+            ...validMutationInput.files.slice(0, 1),
             {
               path: ".github/workflows/readiness-runner.yml",
               content: defaultReadinessWorkflowTemplate.replace("  contents: read", "  contents: write"),

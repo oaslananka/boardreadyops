@@ -315,7 +315,9 @@ function isCanonicalVariableOriginWorkflow(existing: Buffer, proposed: string): 
   if (!existing.equals(Buffer.from(defaultReadinessWorkflowTemplate, "utf8"))) return false;
   const origin = proposed.match(/CLOUD_ORIGIN: (https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?)(?:\r?\n)/u)?.[1];
   if (!origin) return false;
-  return proposed === defaultReadinessWorkflowTemplate.replaceAll("${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}", origin);
+  return (
+    proposed === defaultReadinessWorkflowTemplate.replaceAll("$" + "{{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}", origin)
+  );
 }
 
 /** Check the pinned default-branch tree before any Git mutation. Unknown provider results fail closed. */
