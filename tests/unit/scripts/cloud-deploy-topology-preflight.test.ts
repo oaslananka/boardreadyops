@@ -8,12 +8,9 @@ const script = path.resolve("scripts/cloud-deploy-topology-preflight.sh");
 const web = "boardreadyops-web-runtime:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const worker = "boardreadyops-web-runtime:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const target = "boardreadyops-cloud";
+type DockerRecord = readonly [string, string, string, string];
 
-function check(
-  records: readonly [string, string, string, string][],
-  mode: "0" | "1" = "0",
-  failDocker?: "ps" | "inspect",
-) {
+function check(records: readonly DockerRecord[], mode: "0" | "1" = "0", failDocker?: "ps" | "inspect") {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "bro-topology-preflight-"));
   const mock = path.join(scratch, "docker");
   fs.writeFileSync(
@@ -65,24 +62,26 @@ describe("cloud-deploy early runtime topology guard", () => {
   });
 
   it("rejects a foreign web service, an unlabeled runtime, and an unexpected commissioned process", () => {
-    for (const record of [
+    const invalidExtra: readonly DockerRecord[] = [
       ["foreign-web", web, "coolify-project", "web"],
       ["orphan", web, "<no value>", "<no value>"],
       ["migrating", web, target, "migrate"],
-    ]) {
+    ];
+    for (const record of invalidExtra) {
       const result = check([...healthy, record]);
       expect(result.status).toBe(78);
     }
   });
 
   it("rejects absent or duplicate commissioned web/worker services", () => {
-    for (const records of [
+    const invalidServices: readonly (readonly DockerRecord[])[] = [
       [],
       [healthy[0]],
       [healthy[1]],
       [...healthy, ["duplicate-worker", worker, target, "worker"]],
       [...healthy, ["duplicate-web", web, target, "web"]],
-    ]) {
+    ];
+    for (const records of invalidServices) {
       expect(check(records).status).toBe(78);
     }
   });
