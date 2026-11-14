@@ -78301,7 +78301,7 @@ function matchesVerifiedResult(value, e, inventory) {
   const san = cert?.subjectAlternativeName;
   const signerSAN = typeof san === "string" ? san : recordAt(cert, "subjectAlternativeName")?.value;
   const runUri = `https://github.com/${e.repository}/actions/runs/${e.runId}/attempts/${e.runAttempt}`;
-  if (cert?.issuer !== oidcIssuer || cert.sourceRepositoryURI !== `https://github.com/${e.repository}` || cert.sourceRepositoryIdentifier !== e.repositoryId || cert.sourceRepositoryDigest !== e.reviewedSha || cert.githubWorkflowSHA !== (e.signerSha ?? e.reviewedSha) || cert.sourceRepositoryRef !== e.sourceRef || cert.runInvocationURI !== runUri || cert.buildSignerURI !== workflowUri || cert.buildSignerDigest !== (e.signerSha ?? e.reviewedSha) || cert.runnerEnvironment !== "github-hosted" || cert.buildTrigger !== e.event || signerSAN !== workflowUri || statement?.predicateType !== slsaPredicate || !Array.isArray(subjects) || subjects.length !== inventory.names.size)
+  if (cert?.issuer !== oidcIssuer || cert.sourceRepositoryURI !== `https://github.com/${e.repository}` || cert.sourceRepositoryIdentifier !== e.repositoryId || cert.sourceRepositoryDigest !== (e.signerSha ?? e.reviewedSha) || cert.githubWorkflowSHA !== (e.signerSha ?? e.reviewedSha) || cert.sourceRepositoryRef !== e.sourceRef || cert.runInvocationURI !== runUri || cert.buildSignerURI !== workflowUri || cert.buildSignerDigest !== (e.signerSha ?? e.reviewedSha) || cert.runnerEnvironment !== "github-hosted" || cert.buildTrigger !== e.event || signerSAN !== workflowUri || statement?.predicateType !== slsaPredicate || !Array.isArray(subjects) || subjects.length !== inventory.names.size)
     return false;
   const remaining = new Map(inventory.names);
   for (const subject of subjects) {
@@ -78331,7 +78331,7 @@ async function verifyReviewedExportAttestation(options) {
     "--signer-workflow",
     `${e.repository}/${e.workflowPath}`,
     "--source-digest",
-    e.reviewedSha,
+    e.signerSha ?? e.reviewedSha,
     "--signer-digest",
     e.signerSha ?? e.reviewedSha,
     "--source-ref",
