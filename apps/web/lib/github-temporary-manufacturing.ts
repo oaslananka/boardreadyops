@@ -2,7 +2,7 @@ import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createAppAuth } from "@octokit/auth-app";
 import type { ResultOidcExpectations } from "./result-oidc-expectations.js";
 
-export const temporaryManufacturingRetentionDays = 3;
+const temporaryManufacturingRetentionDays = 3;
 const githubIdPattern = /^[1-9]\d{0,19}$/u;
 const githubStoragePath = /^github-actions\/([1-9]\d{0,19})\/([1-9]\d{0,19})$/u;
 const safeRepository = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
