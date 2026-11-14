@@ -23,6 +23,9 @@ vi.mock("../../../apps/web/components/deliveries/manufacturing-share-authorizati
 
 // The server-page tests only need to know whether the action is offered. The
 // separately tested client form uses useActionState and cannot render via static SSR.
+vi.mock("../../../apps/web/components/deliveries/validated-revision-register-form.js", () => ({
+  ValidatedRevisionRegisterForm: () => createElement("span", null, "Run-backed revision registration"),
+}));
 vi.mock("../../../apps/web/components/deliveries/delivery-create-form.js", () => ({
   DeliveryCreateForm: () => createElement("span", null, "Create guest link"),
 }));
@@ -318,10 +321,13 @@ describe("DeliveriesListPage", () => {
 
     const markup = await render();
     expect(markup).toContain("No run-backed revisions to share yet");
+    expect(markup).toContain("No manufacturing package revision is registered in this workspace");
+    expect(markup).toContain('href="/reviews"');
+    expect(markup).not.toContain("Register an eligible Run");
     expect(markup).toContain('href="/runs"');
     expect(markup).toContain("Inspect runs");
     expect(markup).toContain("A passing readiness run or runner-generated draft archive cannot be shared directly.");
-    expect(markup).toContain("an accepted runner result with a stored manufacturing archive");
+    expect(markup).toContain("an accepted runner result and a stored archive");
     expect(markup).not.toContain(
       "Run BoardReadyOps on a connected GitHub project until it completes with a passing manufacturing archive",
     );
@@ -329,6 +335,22 @@ describe("DeliveriesListPage", () => {
     expect(markup).not.toContain("Create guest link");
   });
 
+  it("links an eligible run candidate to registration without implying fabrication approval", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [{ runId: "run_a", artifactId: "artifact_a" }],
+      revisions: [],
+      deliveries: [],
+    });
+    const markup = await render();
+    expect(markup).toContain('href="#register-run-backed-revision"');
+    expect(markup).toContain('id="register-run-backed-revision"');
+    expect(markup).toContain("Register an eligible Run");
+    expect(markup).toContain("this does not approve fabrication");
+    expect(markup).not.toContain("Create guest link");
+  });
   it("links an editor with a validated revision to the authorized share form", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",

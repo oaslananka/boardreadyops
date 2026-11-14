@@ -222,15 +222,26 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                   <EmptyState
                     title="No package revisions yet"
                     action={
-                      <Button asChild variant="outline">
-                        <Link href="/runs">Inspect runs</Link>
-                      </Button>
+                      result.selected.role !== "viewer" && result.revisionCandidates.length > 0 ? (
+                        <Button asChild variant="outline">
+                          <a href="#register-run-backed-revision">Register an eligible Run</a>
+                        </Button>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          <Button asChild variant="outline">
+                            <Link href="/reviews">Review boards</Link>
+                          </Button>
+                          <Button asChild variant="ghost">
+                            <Link href="/runs">Inspect runs</Link>
+                          </Button>
+                        </div>
+                      )
                     }
                   >
                     <p>
-                      A passing readiness run is not a shareable manufacturing package. Runners may upload draft
-                      archives, but sharing requires an accepted runner result with a stored manufacturing archive and a
-                      validated package revision.
+                      {result.revisionCandidates.length > 0
+                        ? "A run-backed archive candidate is available in this workspace. Inspect its source and validation evidence before registering a revision; this does not approve fabrication."
+                        : "No manufacturing package revision is registered in this workspace. A passing Run, including one from another repository, does not automatically become a delivery. Inspect its evidence and resolve outstanding Review blockers first."}
                     </p>
                   </EmptyState>
                 }
@@ -239,6 +250,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
 
             {result.selected.role !== "viewer" && result.revisionCandidates.length > 0 ? (
               <Panel
+                id="register-run-backed-revision"
                 title="Register run-backed revision"
                 description="Register a stored manufacturing archive from an accepted passing runner result. The source-to-export status is shown per package; legacy/manual packages remain usable without being promoted to source-bound verified."
               >
