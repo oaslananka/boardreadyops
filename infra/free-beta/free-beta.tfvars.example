@@ -4,4 +4,7 @@
 provision = false
 vercel_project_name = "boardreadyops-free-beta"
 neon_project_name   = "boardreadyops-free-beta"
-neon_region         = "aws-us-east-2"
+neon_region         = "aws-eu-central-1"
+# For future authorized staging provisioning only:
+vercel_team_id = ""
+neon_org_id    = ""
