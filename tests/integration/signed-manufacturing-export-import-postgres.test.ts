@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { handleResultRequest } from "../../apps/web/app/api/v1/runs/result/route.js";
 import {
   handleSignedManufacturingExportImport,
   type SignedExportImportDependencies,
@@ -177,6 +178,54 @@ describePg("signed export HTTP bytes after real PostgreSQL TCP acknowledgement l
         [runId],
       )) as { rows: Array<{ count: number }> };
       expect(count.rows[0]?.count).toBe(1);
+      // Regression: GitHub uploads the independently signed archive BEFORE its
+      // terminal readiness callback. That callback must preserve the signed
+      // archive and its immutable audit-event artifact reference.
+      const terminalResponse = await handleResultRequest(
+        new Request(`https://boardreadyops.test/api/v1/runs/result?run_id=${runId}&attempt_id=${attemptId}`, {
+          method: "POST",
+          headers: { authorization: "Bearer synthetic.github.oidc", "content-type": "application/json" },
+          body: JSON.stringify({
+            version: 1,
+            executionAttemptId: attemptId,
+            status: "completed",
+            conclusion: "success",
+            decision: "pass",
+            findings: [],
+            artifacts: [],
+            metrics: { durationMs: 400, readinessScore: 100 },
+            reportLinks: [],
+          }),
+        }),
+        {
+          queryExecutor: () => db,
+          checkRunClient: () => undefined,
+          detailsUrl: (id) => `https://boardreadyops.test/runs/${id}`,
+          now: () => new Date(now.valueOf() + 5000),
+          verifyOidcToken: async (_token, rid, aid) => rid === runId && aid === attemptId,
+        },
+      );
+      expect(terminalResponse.status).toBe(202);
+      const finalized = (await db.query(
+        `select a.id, a.sha256, a.bytes, a.role, e.artifact_id, r.status,
+                (select count(*)::int from audit_events where release_run_id = $1
+                  and artifact_id = e.artifact_id and event_type = 'manufacturing.export.attested') as attestation_audits
+           from signed_manufacturing_export_evidence e
+           join artifacts a on a.id = e.artifact_id
+           join release_runs r on r.id = e.run_id
+          where e.run_id = $1 and e.execution_attempt_id = $2`,
+        [runId, attemptId],
+      )) as { rows: Array<Record<string, unknown>> };
+      expect(finalized.rows).toHaveLength(1);
+      expect(finalized.rows[0]).toMatchObject({
+        artifact_id: finalized.rows[0]?.id,
+        sha256,
+        bytes: archive.length,
+        role: "manufacturing",
+        status: "completed",
+        attestation_audits: 1,
+      });
+      expect(await readFile(stored)).toEqual(archive);
     } finally {
       await interrupted?.close();
       await proxy?.close();
