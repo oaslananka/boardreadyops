@@ -79,6 +79,7 @@ export function createExclusiveNeonScheduledWorkerHandler(
         // Do not relinquish exclusivity until the final in-flight task settles.
         await ownership.release();
       }
+      if (abort.signal.aborted) throw new Error("worker_ownership_lost");
     },
   });
 }

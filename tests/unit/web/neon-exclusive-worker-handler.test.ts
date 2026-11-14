@@ -207,6 +207,24 @@ describe("Neon scheduled worker with exclusive database ownership", () => {
     expect(response.status).toBe(503);
     expect(JSON.stringify(await response.json())).not.toContain("SECRET_LOCK_DETAILS");
   });
+  it("does not report success if ownership is lost during session release", async () => {
+    let lost!: () => void;
+    const acquireOwnership = vi.fn(async (options: { onLost(): void }) => {
+      lost = options.onLost;
+      return {
+        release: async () => {
+          lost();
+        },
+      };
+    });
+    const handler = createExclusiveNeonScheduledWorkerHandler({
+      triggerId,
+      connectionString,
+      acquireOwnership,
+      createOperations: () => tasks([]),
+    });
+    expect((await handler(request())).status).toBe(503);
+  });
   it("rejects pooled Neon connections without exposing credentials", () => {
     expect(() =>
       createExclusiveNeonScheduledWorkerHandler({
