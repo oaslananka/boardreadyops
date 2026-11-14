@@ -350,8 +350,24 @@ function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
       <Panel id="boards" title="Board BOM evidence">
         <p className="text-sm text-muted-foreground">
           No per-board BOM snapshots were captured for this run. This does not establish that the repository has no
-          boards. Use the run findings and execution evidence to inspect the source revision.
+          boards or BOM. The Review and visual evidence cannot substitute for a Run-backed component snapshot.
         </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href={`/runs/${encodeURIComponent(run.id)}/artifacts`}>Inspect Run artifacts</Link>
+          </Button>
+          {/^[0-9a-f]{40}$/iu.test(run.commitSha) ? (
+            <Button asChild variant="ghost">
+              <a
+                href={`${githubRepositoryBaseUrl(run)}/tree/${run.commitSha}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Inspect exact source
+              </a>
+            </Button>
+          ) : null}
+        </div>
       </Panel>
     );
   }
