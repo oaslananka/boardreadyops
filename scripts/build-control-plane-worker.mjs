@@ -33,6 +33,15 @@ const workerMetadataPath = join(outputDirectory, "worker-meta.json");
 await writeFile(workerMetadataPath, `${JSON.stringify(workerBuild.metafile, null, 2)}\n`, "utf8");
 verifyControlPlaneWorkerBoundary(workerBuild.metafile);
 
+// Build the opt-in Neon Function with the same ESM-compatible yaml alias as
+// the production worker. The source is disabled until explicit staging setup.
+await build({
+  ...nodeBundleOptions,
+  alias: { yaml: yamlBrowserEntry },
+  entryPoints: [join(root, "functions/boardreadyops-lifecycle.ts")],
+  outfile: join(outputDirectory, "neon-lifecycle.mjs"),
+});
+
 const migrationsDirectory = join(root, "packages/db/migrations");
 const migrationFiles = (await readdir(migrationsDirectory)).filter((file) => /^\d+_.+\.sql$/u.test(file)).sort();
 const migrations = await Promise.all(
