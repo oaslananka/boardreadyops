@@ -19,7 +19,7 @@ function jsonError(error: string, status: number): Response {
 
 export interface CheckoutRouteDependencies {
   billingMode(): BillingMode;
-  retiredMarketplaceFreeResponse(request: Request): Promise<Response>;
+  retiredMarketplaceFreeResponse(request: Request, mode?: "marketplace_free" | "beta_free"): Promise<Response>;
   authorizeViewer(): Promise<{ login: string } | undefined>;
   priceConfig(): StripePriceConfig | null;
   stripeSecretKey(): string | undefined;
@@ -64,8 +64,9 @@ export async function handleCheckoutRequest(
   request: Request,
   dependencies: CheckoutRouteDependencies = defaultDependencies,
 ): Promise<Response> {
-  if (dependencies.billingMode() === "marketplace_free") {
-    return dependencies.retiredMarketplaceFreeResponse(request);
+  const billingMode = dependencies.billingMode();
+  if (billingMode === "marketplace_free" || billingMode === "beta_free") {
+    return dependencies.retiredMarketplaceFreeResponse(request, billingMode);
   }
 
   const viewer = await dependencies.authorizeViewer();

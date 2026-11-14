@@ -18,7 +18,7 @@ function jsonError(error: string, status: number): Response {
 
 export interface PortalRouteDependencies {
   billingMode(): BillingMode;
-  retiredMarketplaceFreeResponse(request: Request): Promise<Response>;
+  retiredMarketplaceFreeResponse(request: Request, mode?: "marketplace_free" | "beta_free"): Promise<Response>;
   authorizeViewer(): Promise<{ login: string } | undefined>;
   stripeSecretKey(): string | undefined;
   databaseUrl(): string | undefined;
@@ -60,8 +60,9 @@ export async function handlePortalRequest(
   request: Request,
   dependencies: PortalRouteDependencies = defaultDependencies,
 ): Promise<Response> {
-  if (dependencies.billingMode() === "marketplace_free") {
-    return dependencies.retiredMarketplaceFreeResponse(request);
+  const billingMode = dependencies.billingMode();
+  if (billingMode === "marketplace_free" || billingMode === "beta_free") {
+    return dependencies.retiredMarketplaceFreeResponse(request, billingMode);
   }
 
   const viewer = await dependencies.authorizeViewer();

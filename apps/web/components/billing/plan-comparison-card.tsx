@@ -97,7 +97,8 @@ export function PlanComparisonCard({
   hasStripeCustomer = false,
   billingMode = "stripe",
 }: PlanComparisonCardProps) {
-  const selfServeEnabled = billingMode !== "marketplace_free";
+  const selfServeEnabled = billingMode === "stripe" || billingMode === "both";
+  const visiblePlans = billingMode === "beta_free" ? PLANS.filter((plan) => plan.key === "community") : PLANS;
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const toast = useToast();
@@ -154,18 +155,25 @@ export function PlanComparisonCard({
 
   return (
     <div className="plan-comparison-container flex flex-col gap-4">
-      <div role="note" className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
-        <strong>Hosted ZIP uploads are not available on any plan.</strong> Upgrading to a paid tier does not enable
-        hosted manufacturing-package upload. Use the{" "}
-        <Link href="/setup" className="underline underline-offset-2">
-          GitHub App
-        </Link>{" "}
-        or the{" "}
-        <Link href="/projects/new" className="underline underline-offset-2">
-          local CLI workflow
-        </Link>{" "}
-        for supported source checks today.
-      </div>
+      {billingMode === "beta_free" ? (
+        <div role="note" className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
+          <strong>Free beta: no upgrades, invoices, or payment methods.</strong> Core Community features are available
+          within their current limits; manufacturing approval is not implied.
+        </div>
+      ) : (
+        <div role="note" className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
+          <strong>Hosted ZIP uploads are not available on any plan.</strong> Upgrading to a paid tier does not enable
+          hosted manufacturing-package upload. Use the{" "}
+          <Link href="/setup" className="underline underline-offset-2">
+            GitHub App
+          </Link>{" "}
+          or the{" "}
+          <Link href="/projects/new" className="underline underline-offset-2">
+            local CLI workflow
+          </Link>{" "}
+          for supported source checks today.
+        </div>
+      )}
       {hasStripeCustomer && selfServeEnabled && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted p-3">
           <div>
@@ -184,9 +192,15 @@ export function PlanComparisonCard({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {PLANS.map((plan) => {
-          const isCurrent = plan.key === currentTier;
+      <div
+        className={
+          billingMode === "beta_free"
+            ? "grid grid-cols-1 gap-4 sm:max-w-md"
+            : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        }
+      >
+        {visiblePlans.map((plan) => {
+          const isCurrent = plan.key === (billingMode === "beta_free" ? "community" : currentTier);
           const canUpgrade = !isCurrent && (plan.key === "team" || plan.key === "business");
 
           return (
