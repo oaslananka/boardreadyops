@@ -7,6 +7,7 @@ import { processControlPlaneJob } from "./control-plane-worker.js";
 import { createProductionGitHubCommandLifecycleExecutor } from "./github-command-executor.js";
 import { createExclusiveNeonScheduledWorkerHandler } from "./neon-exclusive-worker-handler.js";
 import { createProductionNeonOutboxOperation } from "./neon-production-outbox.js";
+import { createProductionNeonReconciliationOperation } from "./neon-production-reconciliation.js";
 import { createProductionRepositorySetupLifecycleExecutor } from "./repository-setup-automation.js";
 
 type BatchOptions = {
@@ -40,6 +41,7 @@ export type ProductionNeonLifecycleOptions = {
   workerId: string;
   batchLimit?: number;
   enableOutbox?: boolean;
+  enableGitHubReconciliation?: boolean;
   environment?: Readonly<Record<string, string | undefined>>;
 };
 
@@ -72,6 +74,14 @@ export function createProductionNeonLifecycleHandler(
         })
       : undefined;
 
+  const githubReconciliationPass =
+    options.enableGitHubReconciliation === true
+      ? createProductionNeonReconciliationOperation({
+          workerId: options.workerId,
+          connectionString: options.workerConnectionString,
+          environment,
+        })
+      : undefined;
   return createExclusiveNeonScheduledWorkerHandler({
     triggerId: options.triggerId,
     connectionString: options.connectionString,
@@ -112,7 +122,7 @@ export function createProductionNeonLifecycleHandler(
         artifactDeletion: noop,
         stripe: noop,
         lifecycleReconciliation: noop,
-        githubReconciliation: noop,
+        githubReconciliation: githubReconciliationPass ? () => githubReconciliationPass(signal) : noop,
         maintenance: noop,
       };
     },

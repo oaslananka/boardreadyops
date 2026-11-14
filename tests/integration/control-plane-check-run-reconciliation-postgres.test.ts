@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { readinessCheckName } from "../../apps/web/lib/github-app-check-run-client.js";
+import { runClaimedGitHubReconciliationPass } from "../../apps/web/lib/neon-production-reconciliation.js";
 import { createSqlControlPlaneOperationsStore } from "../../packages/db/src/control-plane-operations-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
@@ -101,6 +103,40 @@ async function createTerminalFixture(
 }
 
 describeDatabase("GitHub Check Run PostgreSQL reconciliation", () => {
+  it("Neon pass marks an already-completed bound Check Run as published only once", async () => {
+    const fixture = await createTerminalFixture("neon-current", "success");
+    const store = createSqlControlPlaneOperationsStore(database(), { now: () => new Date(), leaseSeconds: 60 });
+    const readCheckRun = vi.fn(async () => ({
+      kind: "present" as const,
+      name: readinessCheckName,
+      externalId: fixture.releaseRunId,
+      headSha: "a".repeat(40),
+      status: "completed",
+      conclusion: "success",
+    }));
+    const completeCheckRun = vi.fn(async () => undefined);
+    const run = async () =>
+      runClaimedGitHubReconciliationPass({
+        workerId: `${testPrefix}-neon`,
+        limit: 2,
+        signal: new AbortController().signal,
+        operations: store,
+        workflowGitHub: { readWorkflowRun: vi.fn() },
+        checkRunGitHub: { readCheckRun, completeCheckRun },
+      });
+    await run();
+    const published = rows(
+      await database().query(
+        "select github_check_published_at is not null as published from release_run_results where run_id = $1",
+        [fixture.releaseRunId],
+      ),
+    )[0];
+    expect(published).toEqual({ published: true });
+    await run();
+    expect(readCheckRun).toHaveBeenCalledTimes(1);
+    expect(completeCheckRun).not.toHaveBeenCalled();
+  });
+
   it("derives the exact neutral Check conclusion for accepted at-risk results", async () => {
     const fixture = await createTerminalFixture("at-risk", "success", {
       status: "completed",

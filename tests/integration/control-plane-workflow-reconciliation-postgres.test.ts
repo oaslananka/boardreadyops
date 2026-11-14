@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { runClaimedGitHubReconciliationPass } from "../../apps/web/lib/neon-production-reconciliation.js";
 import { createSqlControlPlaneOperationsStore } from "../../packages/db/src/control-plane-operations-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
@@ -136,6 +137,36 @@ afterAll(async () => {
 });
 
 describeDatabase("GitHub workflow PostgreSQL reconciliation", () => {
+  it("Neon pass records a failed GitHub workflow without pretending a missing signed result is successful", async () => {
+    const fixture = await createFixture("neon-workflow-failure");
+    const readWorkflowRun = vi.fn(async () => ({ kind: "completed" as const, conclusion: "failure" }));
+    const run = async () =>
+      runClaimedGitHubReconciliationPass({
+        workerId: `${testPrefix}-neon`,
+        limit: 2,
+        signal: new AbortController().signal,
+        operations: fixture.store,
+        workflowGitHub: { readWorkflowRun },
+        checkRunGitHub: { readCheckRun: vi.fn(), completeCheckRun: vi.fn() },
+      });
+    await run();
+    expect(
+      rows(await database().query("select status from release_runs where id = $1", [fixture.releaseRunId]))[0]?.status,
+    ).toBe("failed");
+    expect(
+      rows(
+        await database().query("select status, failure_class from release_run_attempts where id = $1", [
+          fixture.executionAttemptId,
+        ]),
+      )[0],
+    ).toMatchObject({
+      status: "failed",
+      failure_class: "github_workflow_failure",
+    });
+    await run();
+    expect(readWorkflowRun).toHaveBeenCalledTimes(1);
+  });
+
   it("detects, leases, reschedules, and guarded-terminalizes a missed callback", async () => {
     const fixture = await createFixture("successful");
     const workerId = `${testPrefix}-worker`;
