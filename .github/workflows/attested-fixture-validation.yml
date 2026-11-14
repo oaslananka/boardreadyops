@@ -93,17 +93,32 @@ jobs:
           console.log('GitHub-internal signed SLSA bundle created for '+subjects.length+' fixture subjects (no attestations API storage).');
           JSCODE
           node "$RUNNER_TEMP/attest-tools/sign.mjs"
-      - name: Retain test-only Sigstore bundle for offline verification
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      # Match the shape of the short-lived user download: GitHub Actions
+      # stores a ZIP wrapping a signed TAR.GZ, not permanent cloud disk bytes.
+      - name: Assemble signed three-day manufacturing fixture archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          export_dir="$GITHUB_WORKSPACE/build/boardreadyops-attested"
+          bundle="$RUNNER_TEMP/boardreadyops-internal-export.sigstore.json"
+          test -f "$export_dir/manifest.json"
+          test -f "$bundle"
+          cp -- "$bundle" "$RUNNER_TEMP/bundle.sigstore.json"
+          tar -cf "$RUNNER_TEMP/boardreadyops-manufacturing-export.tar" -C "$GITHUB_WORKSPACE" build/boardreadyops-attested
+          tar -rf "$RUNNER_TEMP/boardreadyops-manufacturing-export.tar" -C "$RUNNER_TEMP" bundle.sigstore.json
+          gzip -f "$RUNNER_TEMP/boardreadyops-manufacturing-export.tar"
+          archive="$RUNNER_TEMP/boardreadyops-manufacturing-export.tar.gz"
+          bytes="$(stat -c '%s' "$archive")"
+          test "$bytes" -gt 0 && test "$bytes" -le 134217728
+          tar -tzf "$archive" | grep -Fx 'build/boardreadyops-attested/manifest.json'
+          tar -tzf "$archive" | grep -Fx 'bundle.sigstore.json'
+          echo "Synthetic signed archive SHA-256: $(sha256sum "$archive" | cut -d' ' -f1)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain one signed manufacturing fixture archive for three days
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: test-fixture-sigstore-bundle
-          path: ${{ runner.temp }}/boardreadyops-internal-export.sigstore.json
+          name: test-fixture-temporary-manufacturing-archive
+          path: ${{ runner.temp }}/boardreadyops-manufacturing-export.tar.gz
           if-no-files-found: error
-          retention-days: 7
-      - name: Retain test-only export for independent byte verification
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: test-fixture-attested-manufacturing-export
-          path: ${{ steps.export.outputs.export-directory }}/
-          if-no-files-found: error
-          retention-days: 7
+          retention-days: 3
+          compression-level: 0

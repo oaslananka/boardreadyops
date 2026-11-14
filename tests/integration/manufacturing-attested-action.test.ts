@@ -195,8 +195,33 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(sign?.run).toContain("sigstore:'github'");
     expect(sign?.run).toContain("skipWrite:true");
     expect(sign?.run).toContain("rfc3161Timestamps");
-    expect(steps.filter((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"))).toHaveLength(2);
-    expect(steps.some((step) => JSON.stringify(step).includes("test-fixture-sigstore-bundle"))).toBe(true);
+    const packaging = steps.find((step) =>
+      String(step.name ?? "").startsWith("Assemble signed three-day manufacturing fixture archive"),
+    );
+    expect(String(packaging?.run)).toContain("tar -cf");
+    expect(String(packaging?.run)).toContain("build/boardreadyops-attested");
+    expect(String(packaging?.run)).toContain("bundle.sigstore.json");
+    expect(String(packaging?.run)).toContain("134217728");
+    const uploads = steps.filter((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"));
+    expect(uploads).toHaveLength(1);
+    expect(uploads[0]?.uses).toBe("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a");
+    expect(uploads[0]?.with).toMatchObject({
+      name: "test-fixture-temporary-manufacturing-archive",
+      path: "$" + "{{ runner.temp }}/boardreadyops-manufacturing-export.tar.gz",
+      "if-no-files-found": "error",
+      "retention-days": 3,
+      "compression-level": 0,
+    });
+    const signIndex = steps.findIndex((step) => step.id === "internal");
+    const packageIndex = steps.findIndex((step) =>
+      String(step.name ?? "").startsWith("Assemble signed three-day manufacturing fixture archive"),
+    );
+    const uploadIndex = steps.findIndex((step) =>
+      String(step.name ?? "").startsWith("Retain one signed manufacturing fixture archive"),
+    );
+    expect(signIndex).toBeGreaterThan(-1);
+    expect(packageIndex).toBeGreaterThan(signIndex);
+    expect(uploadIndex).toBeGreaterThan(packageIndex);
     expect(raw).not.toContain("attestations: write");
     expect(raw).not.toContain("artifact-metadata: write");
     expect(raw).toContain("TEST FIXTURE ONLY");
