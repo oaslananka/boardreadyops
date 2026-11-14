@@ -31,6 +31,7 @@ export default {
         workerId: `neon-lifecycle-${randomUUID()}`,
         batchLimit: 2,
         enableOutbox: process.env.BOARDREADYOPS_NEON_OUTBOX_ENABLED === "true",
+        enableGitHubReconciliation: process.env.BOARDREADYOPS_NEON_GITHUB_RECONCILIATION_ENABLED === "true",
       });
       return await handler(request);
     } catch {

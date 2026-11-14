@@ -107,6 +107,22 @@ describe("Neon lifecycle work from durable GitHub webhook jobs", () => {
       }),
     ).toThrow("github-actions");
   });
+  it("fails closed before schedule admission if GitHub reconciliation is enabled without a supported runner", () => {
+    expect(() =>
+      createProductionNeonLifecycleHandler({
+        triggerId: "trigger-1a2b3c4d-5e6f-7890-abcd-ef1234567890",
+        connectionString: "postgresql://worker@localhost:5432/test",
+        workerConnectionString: "postgresql://worker@localhost:5432/test",
+        workerId: "neon-reconcile-1",
+        enableGitHubReconciliation: true,
+        environment: {
+          GITHUB_APP_ID: "123",
+          GITHUB_APP_PRIVATE_KEY: "unused",
+          BOARDREADYOPS_RUNNER_MODE: "self-hosted",
+        },
+      }),
+    ).toThrow("github-actions");
+  });
   it("requires a small bounded batch and authenticated GitHub App configuration", () => {
     const opts = {
       triggerId: "trigger-1a2b3c4d-5e6f-7890-abcd-ef1234567890",
