@@ -3,11 +3,13 @@ import {
   findingSchema,
   isUnattestedManufacturingArchive,
   releaseRunArtifactSchema,
+  releaseRunBoardBomSchema,
   snapshotArtifactSchema,
   triggerKindSchema,
 } from "@boardreadyops/contracts";
 import { type PcbFootprintSummary, pcbFootprintSummarySchema } from "@boardreadyops/contracts/pcb-footprint-summary";
 import { ReviewStore, storeRunPcbFootprintSummary } from "@boardreadyops/db";
+import { createSqlBoardBomStore } from "@boardreadyops/db/board-bom-store";
 import { z } from "zod";
 import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
 import { resolveReviewEffectivePolicy } from "../../../../lib/review-readiness.js";
@@ -16,6 +18,28 @@ import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
 export const runtime = "nodejs";
 
+/** Validate explicitly disclosed publisher-observed BOMs independently of other Review evidence gates. */
+function observedBomValidationIssue(payload: {
+  boms?: readonly z.infer<typeof releaseRunBoardBomSchema>[] | undefined;
+  bomConsent?: true | undefined;
+  bomSha256?: string | undefined;
+  commitSha: string;
+  evidenceDigest?: string | undefined;
+}): string | undefined {
+  if (!payload.boms) {
+    return payload.bomConsent || payload.bomSha256 ? "Observed BOM data is required" : undefined;
+  }
+  const observedDigest = createHash("sha256").update(JSON.stringify(payload.boms)).digest("hex");
+  if (
+    payload.bomConsent !== true ||
+    !payload.evidenceDigest ||
+    !/^[a-f0-9]{40}$/u.test(payload.commitSha) ||
+    payload.bomSha256 !== observedDigest
+  ) {
+    return "Observed BOM requires explicit consent, exact commit and matching SHA-256 evidence";
+  }
+  return undefined;
+}
 // Exported for consumer-driven contract tests covering the CLI->Cloud and Action->Cloud
 // boundaries (`src/cli/commands/review.ts` and `src/action/cloud-publish.ts` both POST here):
 // see tests/unit/contracts/cli-cloud-forward-compat.test.ts.
@@ -59,8 +83,20 @@ export const ingestRunRequestSchema = z
     baseCommitSha: z.string().optional(),
     pcbFootprintSummary: pcbFootprintSummarySchema.optional(),
     pcbFootprintSummaryConsent: z.literal(true).optional(),
+    // Explicitly disclosed and publisher-observed; not independent source
+    // attestation or manufacturing approval. Never enrol supply watch here.
+    boms: z.array(releaseRunBoardBomSchema).min(1).max(50).optional(),
+    bomConsent: z.literal(true).optional(),
+    bomSha256: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/u)
+      .optional(),
   })
   .superRefine((payload, ctx) => {
+    const bomIssue = observedBomValidationIssue(payload);
+    if (bomIssue) {
+      ctx.addIssue({ code: "custom", path: ["boms"], message: bomIssue });
+    }
     const summary = payload.pcbFootprintSummary;
     if (!summary) {
       if (payload.pcbFootprintSummaryConsent) {
@@ -120,6 +156,7 @@ async function checkIdempotentRun(
   repositoryId: string,
   idempotencyKey?: string,
   summary?: PcbFootprintSummary,
+  observedBom?: { commitSha: string; boms: readonly { project: string }[] },
 ): Promise<Response | undefined> {
   if (!idempotencyKey) return undefined;
   const existing = await executor.query(
@@ -144,6 +181,26 @@ async function checkIdempotentRun(
         return Response.json({ ok: false, error: "Idempotent PCB summary evidence mismatch" }, { status: 409 });
       }
     }
+    if (observedBom) {
+      const saved = await executor.query(
+        [
+          "select boards.project_path from board_bom_snapshots as snapshot",
+          "join boards on boards.id = snapshot.board_id",
+          "where snapshot.run_id = $1 and snapshot.commit_sha = $2 and boards.repository_id = $3",
+          "order by boards.project_path",
+        ].join(" "),
+        [previous.id, observedBom.commitSha, repositoryId],
+      );
+      const stored = ((saved as { rows?: { project_path: string }[] }).rows ?? [])
+        .map((row) => row.project_path)
+        .sort((left, right) => left.localeCompare(right));
+      const expected = [...new Set(observedBom.boms.map((bom) => bom.project))].sort((left, right) =>
+        left.localeCompare(right),
+      );
+      if (JSON.stringify(stored) !== JSON.stringify(expected)) {
+        return Response.json({ ok: false, error: "Idempotent observed BOM evidence mismatch" }, { status: 409 });
+      }
+    }
     return Response.json(
       {
         ok: true,
@@ -151,6 +208,7 @@ async function checkIdempotentRun(
         status: rows[0].status,
         deduplicated: true,
         ...(summary ? { acceptedFootprintSummary: true } : {}),
+        ...(observedBom ? { acceptedObservedBom: true } : {}),
       },
       { status: 200 },
     );
@@ -202,6 +260,18 @@ async function insertRunEntities(
       ) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [artifactId, runId, a.kind, a.name, a.storagePath, a.sha256, a.bytes, a.role],
     );
+  }
+
+  if (payload.boms) {
+    await createSqlBoardBomStore(executor).recordSnapshots({
+      runId,
+      repositoryId,
+      commitSha: payload.commitSha,
+      boms: payload.boms,
+      // Publishing a manual Review must not silently enrol supply watch or
+      // promote it to runner-signed fabrication evidence.
+      watchedBoardLimit: 0,
+    });
   }
 
   if (payload.pcbFootprintSummary) {
@@ -302,6 +372,15 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const payload = parsed.data;
+  // A browser bundle's existing consent screen does not disclose BOM rows.
+  // Until that UI explicitly covers commercial part identities, only a
+  // repository-scoped API token may exercise the separate BOM opt-in.
+  if (payload.boms && auth.authType !== "bearer_token") {
+    return Response.json(
+      { ok: false, error: "Observed BOM upload requires a repository-scoped API token" },
+      { status: 403 },
+    );
+  }
   const ctx = await resolveRepositoryApiContext(auth, request, payload.repositoryId);
   if (ctx instanceof Response) return ctx;
   const { repositoryId, executor } = ctx;
@@ -314,6 +393,7 @@ export async function POST(request: Request): Promise<Response> {
         repositoryId,
         idempotencyKey,
         payload.pcbFootprintSummary,
+        ...(payload.boms ? [{ commitSha: payload.commitSha, boms: payload.boms }] : []),
       );
       if (existingResponse) return existingResponse;
 
@@ -336,6 +416,7 @@ export async function POST(request: Request): Promise<Response> {
           decision,
           ...(reviewUrl ? { reviewUrl } : {}),
           ...(payload.pcbFootprintSummary ? { acceptedFootprintSummary: true } : {}),
+          ...(payload.boms ? { acceptedObservedBom: true } : {}),
         },
         { status: 201 },
       );

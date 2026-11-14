@@ -82957,6 +82957,9 @@ function signRunnerRequest(input3) {
 // packages/cloud-core/src/xml-sanitizer.ts
 var ATTRIBUTE_NAME_CHARS = new Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:_-".split(""));
 
+// src/cli/commands/review.ts
+init_src();
+
 // src/core/cloud-findings.ts
 function mapFindingForCloud(finding2, categoryByRuleId) {
   const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
@@ -83882,6 +83885,12 @@ async function reviewPublishCommand(target, options, streams) {
 `);
     return 2;
   }
+  if (options.bundle && options.shareBom) {
+    streams.stderr.write(
+      "Observed BOM sharing requires token-authenticated CLI publication; browser bundles cannot carry it.\n"
+    );
+    return 2;
+  }
   const loaded = await loadConfig(root, options.config);
   const config3 = loaded.config;
   let headSha = options.head ?? getGitCommitSha(root, "HEAD");
@@ -83927,6 +83936,16 @@ async function reviewPublishCommand(target, options, streams) {
     streams.stderr.write("--pcb requires --share-footprint-summary; nothing uploaded.\n");
     return 2;
   }
+  if (options.shareBom && !options.dryRun) {
+    const provenanceError = nativeVisualSourceError(root, headSha);
+    if (provenanceError) {
+      streams.stderr.write(
+        `BOM sharing requires the exact clean committed Git HEAD; nothing uploaded. ${provenanceError}
+`
+      );
+      return 2;
+    }
+  }
   if (options.nativeVisuals && !options.dryRun || options.bundle) {
     const provenanceError = nativeVisualSourceError(root, headSha);
     if (provenanceError) {
@@ -83957,9 +83976,31 @@ async function reviewPublishCommand(target, options, streams) {
     executionPolicy: options.executionPolicy ?? "safe",
     failOn: "never"
   });
+  if (options.shareBom && !options.dryRun) {
+    const provenanceError = nativeVisualSourceError(root, headSha);
+    if (provenanceError) {
+      streams.stderr.write("Git source changed during BOM analysis; nothing uploaded.\n");
+      return 2;
+    }
+  }
+  const parsedObservedBoms = options.shareBom ? releaseRunBoardBomSchema.array().min(1).max(50).safeParse(result.boms ?? []) : void 0;
+  if (options.shareBom && !parsedObservedBoms?.success && !options.dryRun) {
+    streams.stderr.write("BOM sharing selected, but no valid board BOM was observed; nothing uploaded.\n");
+    return 2;
+  }
+  const observedBoms = parsedObservedBoms?.success ? parsedObservedBoms.data : [];
+  const bomSha256 = observedBoms.length ? (0, import_node_crypto21.createHash)("sha256").update(JSON.stringify(observedBoms)).digest("hex") : void 0;
   const findings = mapFindingsForCloud(result.findings);
   const rulePackDigest = (0, import_node_crypto21.createHash)("sha256").update("boardreadyops-v1").digest("hex");
   const configDigest = (0, import_node_crypto21.createHash)("sha256").update(JSON.stringify(config3)).digest("hex");
+  const artifactDigests = [];
+  if (bomSha256) artifactDigests.push({ name: "observed-board-bom.v1.json", sha256: bomSha256 });
+  if (pcbFootprintSummary) {
+    artifactDigests.push({
+      name: "pcb-footprint-summary.v1.json",
+      sha256: (0, import_node_crypto21.createHash)("sha256").update(JSON.stringify(pcbFootprintSummary)).digest("hex")
+    });
+  }
   const evidenceDigest = computeEvidenceDigest({
     toolVersion: boardReadyVersion,
     rulePackDigest,
@@ -83967,12 +84008,7 @@ async function reviewPublishCommand(target, options, streams) {
     headCommitSha: headSha,
     ...baseSha ? { baseCommitSha: baseSha } : {},
     findingFingerprints: findings.map((f) => f.fingerprint),
-    artifactDigests: pcbFootprintSummary ? [
-      {
-        name: "pcb-footprint-summary.v1.json",
-        sha256: (0, import_node_crypto21.createHash)("sha256").update(JSON.stringify(pcbFootprintSummary)).digest("hex")
-      }
-    ] : []
+    artifactDigests
   });
   if (!jsonOutput) {
     streams.stdout.write(`\u{1F4CA} Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)
@@ -84034,6 +84070,7 @@ async function reviewPublishCommand(target, options, streams) {
     streams.stdout.write(`  Digest:     ${evidenceDigest}
 `);
     if (pcbFootprintSummary) streams.stdout.write("  PCB summary: explicit opt-in (counts and source hashes)\n");
+    if (options.shareBom) streams.stdout.write("  Observed BOM: explicit opt-in; never fabrication approval\n");
     streams.stdout.write(`\u2714 Dry run completed successfully without network transmission.
 `);
     return 0;
@@ -84058,7 +84095,8 @@ async function reviewPublishCommand(target, options, streams) {
     evidenceDigest,
     title: options.title ?? `Review for ${headSha.slice(0, 8)}`,
     ...baseSha ? { baseCommitSha: baseSha } : {},
-    ...pcbFootprintSummary ? { pcbFootprintSummary, pcbFootprintSummaryConsent: true } : {}
+    ...pcbFootprintSummary ? { pcbFootprintSummary, pcbFootprintSummaryConsent: true } : {},
+    ...bomSha256 ? { boms: observedBoms, bomConsent: true, bomSha256 } : {}
   };
   const idempotencyKey = reviewSnapshotIdempotencyKey(headSha, evidenceDigest, snapshots);
   if (options.bundle) {
@@ -84104,6 +84142,10 @@ async function reviewPublishCommand(target, options, streams) {
     }
     if (pcbFootprintSummary && (!data || typeof data !== "object" || data.acceptedFootprintSummary !== true)) {
       streams.stderr.write("Server did not acknowledge PCB summary evidence.\n");
+      return 1;
+    }
+    if (bomSha256 && (!data || typeof data !== "object" || data.acceptedObservedBom !== true)) {
+      streams.stderr.write("Server did not acknowledge the observed BOM upload.\n");
       return 1;
     }
     const published = resolvePublishedReview(server, data);
@@ -88693,7 +88735,7 @@ function registerAllCommands(program2, streams) {
     review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option(
       "--native-visuals",
       "explicitly upload KiCad-native PCB/schematic artwork (may disclose detailed design IP)"
-    ).option("--share-footprint-summary", "opt in to publishing PCB change counts and source hashes").option("--pcb <path>", "tracked PCB path required for opted-in change summary").option("--dry-run", "simulate review publish without uploading").option("--bundle <file>", "save an opt-in Review evidence file for signed-in browser publication (no upload)").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
+    ).option("--share-bom", "explicitly share the committed project's observed BOM (not fabrication approval)").option("--share-footprint-summary", "opt in to publishing PCB change counts and source hashes").option("--pcb <path>", "tracked PCB path required for opted-in change summary").option("--dry-run", "simulate review publish without uploading").option("--bundle <file>", "save an opt-in Review evidence file for signed-in browser publication (no upload)").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
   ).action(async (pathInput, options) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
   });
