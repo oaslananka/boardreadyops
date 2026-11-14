@@ -931,7 +931,8 @@ async function persistRunnerResult(
        from artifacts as artifact
        join updated on updated.id = artifact.run_id
        join repositories as repository on repository.id = updated.repository_id
-       where $15::text is null
+       where (
+          $15::text is null
           or not exists (
             select 1
             from runner_artifact_upload_capabilities as verified_capability
@@ -941,6 +942,14 @@ async function persistRunnerResult(
               and verified_capability.lease_id = $15
               and verified_capability.status = 'uploaded'
           )
+        )
+        -- Signed manufacturing archives have independent verification and immutable audit references.
+        -- They are never replaceable runner-reported artifacts.
+        and not exists (
+          select 1
+          from signed_manufacturing_export_evidence as attested
+          where attested.artifact_id = artifact.id
+        )
      ),
      queued_artifact_deletions as (
        insert into artifact_deletion_jobs (
