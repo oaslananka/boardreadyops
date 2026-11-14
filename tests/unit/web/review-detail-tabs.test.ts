@@ -374,7 +374,7 @@ describe("Review Detail Tabs", () => {
     expect(html).toContain("Not verified by this Review");
     expect(html).toContain("Separate release authorization required");
     expect(html).toContain('href="/runs"');
-    expect(html).toContain("Browse Runs for BOM evidence");
+    expect(html).toContain("Browse Runs");
     expect(html).not.toContain("/runs/undefined#boards");
     expect(html).not.toContain("/runs/undefined/artifacts");
   });

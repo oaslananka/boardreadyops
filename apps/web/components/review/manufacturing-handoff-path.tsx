@@ -82,7 +82,7 @@ export function ManufacturingHandoffPath({
             </Button>
             <Button asChild variant="ghost" size="sm">
               <Link href={review.headRunId ? `/runs/${encodeURIComponent(review.headRunId)}#boards` : "/runs"}>
-                {review.headRunId ? "Inspect Run BOM evidence" : "Browse Runs for BOM evidence"}
+                {review.headRunId ? "Check BOM risk" : "Browse Runs"}
               </Link>
             </Button>
           </div>
