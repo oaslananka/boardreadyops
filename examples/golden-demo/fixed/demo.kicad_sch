@@ -1,1 +1,370 @@
-(kicad_sch)
+(kicad_sch
+  (version 20250114)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "a0447c25-8990-4ba2-8123-2d9efb946bb9")
+  (paper "A4")
+  (lib_symbols
+    (symbol "Device:R"
+        (pin_numbers
+          (hide yes)
+        )
+        (pin_names
+          (offset 0)
+        )
+        (exclude_from_sim no)
+        (in_bom yes)
+        (on_board yes)
+        (in_pos_files yes)
+        (duplicate_pin_numbers_are_jumpers no)
+        (property "Reference" "R"
+          (at 2.032 0 90)
+          (show_name no)
+          (do_not_autoplace no)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "Value" "R"
+          (at 0 0 90)
+          (show_name no)
+          (do_not_autoplace no)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "Footprint" ""
+          (at -1.778 0 90)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "Datasheet" ""
+          (at 0 0 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "Description" "Resistor"
+          (at 0 0 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "ki_keywords" "R res resistor"
+          (at 0 0 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "ki_fp_filters" "R_*"
+          (at 0 0 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (symbol "R_0_1"
+          (rectangle
+            (start -1.016 -2.54)
+            (end 1.016 2.54)
+            (stroke
+              (width 0.254)
+              (type default)
+            )
+            (fill
+              (type none)
+            )
+          )
+        )
+        (symbol "R_1_1"
+          (pin passive line
+            (at 0 3.81 270)
+            (length 1.27)
+            (name ""
+              (effects
+                (font
+                  (size 1.27 1.27)
+                )
+              )
+            )
+            (number "1"
+              (effects
+                (font
+                  (size 1.27 1.27)
+                )
+              )
+            )
+          )
+          (pin passive line
+            (at 0 -3.81 90)
+            (length 1.27)
+            (name ""
+              (effects
+                (font
+                  (size 1.27 1.27)
+                )
+              )
+            )
+            (number "2"
+              (effects
+                (font
+                  (size 1.27 1.27)
+                )
+              )
+            )
+          )
+        )
+        (embedded_fonts no)
+      )
+    (symbol "Device:C"
+        (pin_numbers
+          (hide yes)
+        )
+        (pin_names
+          (offset 0.254)
+        )
+        (exclude_from_sim no)
+        (in_bom yes)
+        (on_board yes)
+        (in_pos_files yes)
+        (duplicate_pin_numbers_are_jumpers no)
+        (property "Reference" "C"
+          (at 0.635 2.54 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+            (justify left)
+          )
+        )
+        (property "Value" "C"
+          (at 0.635 -2.54 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+            (justify left)
+          )
+        )
+        (property "Footprint" ""
+          (at 0.9652 -3.81 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "Datasheet" ""
+          (at 0 0 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "Description" "Unpolarized capacitor"
+          (at 0 0 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "ki_keywords" "cap capacitor"
+          (at 0 0 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (property "ki_fp_filters" "C_*"
+          (at 0 0 0)
+          (show_name no)
+          (do_not_autoplace no)
+          (hide yes)
+          (effects
+            (font
+              (size 1.27 1.27)
+            )
+          )
+        )
+        (symbol "C_0_1"
+          (polyline
+            (pts
+              (xy -2.032 0.762) (xy 2.032 0.762)
+            )
+            (stroke
+              (width 0.508)
+              (type default)
+            )
+            (fill
+              (type none)
+            )
+          )
+          (polyline
+            (pts
+              (xy -2.032 -0.762) (xy 2.032 -0.762)
+            )
+            (stroke
+              (width 0.508)
+              (type default)
+            )
+            (fill
+              (type none)
+            )
+          )
+        )
+        (symbol "C_1_1"
+          (pin passive line
+            (at 0 3.81 270)
+            (length 2.794)
+            (name ""
+              (effects
+                (font
+                  (size 1.27 1.27)
+                )
+              )
+            )
+            (number "1"
+              (effects
+                (font
+                  (size 1.27 1.27)
+                )
+              )
+            )
+          )
+          (pin passive line
+            (at 0 -3.81 90)
+            (length 2.794)
+            (name ""
+              (effects
+                (font
+                  (size 1.27 1.27)
+                )
+              )
+            )
+            (number "2"
+              (effects
+                (font
+                  (size 1.27 1.27)
+                )
+              )
+            )
+          )
+        )
+        (embedded_fonts no)
+      )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 76.2 55.88 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "43a645af-5416-4894-aa53-e522c1220e77")
+    (property "Reference" "R1" (at 80.2 53.88 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "10k" (at 80.2 57.88 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0603" (at 76.2 55.88 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Manufacturer" "Yageo" (at 76.2 55.88 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "MPN" "RC0603FR-0710KL" (at 76.2 55.88 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (pin "1" (uuid "50b7e523-2d62-45a6-bc9a-790bacaf515b"))
+    (pin "2" (uuid "8701856f-0a5f-44d6-abb7-ac5fd6eef415"))
+    (instances
+      (project "demo"
+        (path "/a0447c25-8990-4ba2-8123-2d9efb946bb9" (reference "R1") (unit 1))
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 91.44 55.88 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "4b80b12b-1680-4d7a-a8e4-d867d72eb0de")
+    (property "Reference" "R2" (at 95.44 53.88 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "10k" (at 95.44 57.88 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0603" (at 91.44 55.88 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Manufacturer" "Yageo" (at 91.44 55.88 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "MPN" "RC0603FR-0710KL" (at 91.44 55.88 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (pin "1" (uuid "52f5c047-7f71-4894-9d54-ecdbd0d881ee"))
+    (pin "2" (uuid "899d762b-eb73-4a02-b6f5-0004cf9f257c"))
+    (instances
+      (project "demo"
+        (path "/a0447c25-8990-4ba2-8123-2d9efb946bb9" (reference "R2") (unit 1))
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:C")
+    (at 106.68 55.88 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "fca96561-236a-4d2b-869e-e29079249489")
+    (property "Reference" "C1" (at 110.68 53.88 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "100nF" (at 110.68 57.88 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0603" (at 106.68 55.88 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Manufacturer" "Murata" (at 106.68 55.88 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "MPN" "GRM188R71H104KA93D" (at 106.68 55.88 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (pin "1" (uuid "afae518f-ba49-479b-9010-9f15ec92deca"))
+    (pin "2" (uuid "d12bd0e5-68a2-404e-86f3-00ab97d3a716"))
+    (instances
+      (project "demo"
+        (path "/a0447c25-8990-4ba2-8123-2d9efb946bb9" (reference "C1") (unit 1))
+      )
+    )
+  )
+)
