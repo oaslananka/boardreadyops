@@ -81,7 +81,9 @@ export function ManufacturingHandoffPath({
               <Link href={artifactsHref}>{review.headRunId ? "Inspect Run artifacts" : "Browse Runs"}</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/parts">Check BOM risk</Link>
+              <Link href={review.headRunId ? `/runs/${encodeURIComponent(review.headRunId)}#boards` : "/runs"}>
+                {review.headRunId ? "Check BOM risk" : "Browse Runs"}
+              </Link>
             </Button>
           </div>
         </li>
