@@ -353,7 +353,8 @@ describe("Review Detail Tabs", () => {
     expect(html).toContain("57 recorded blocking finding(s)");
     expect(html).toContain('href="/reviews/review-42?tab=findings"');
     expect(html).toContain('href="/runs/source-run-42/artifacts"');
-    expect(html).toContain('href="/parts"');
+    expect(html).toContain('href="/runs/source-run-42#boards"');
+    expect(html).not.toContain('href="/parts"');
     expect(html).toContain('href="/deliveries"');
     expect(html).toContain("Team or higher");
     expect(html).toContain("this Review does not grant either");
@@ -373,6 +374,8 @@ describe("Review Detail Tabs", () => {
     expect(html).toContain("Not verified by this Review");
     expect(html).toContain("Separate release authorization required");
     expect(html).toContain('href="/runs"');
+    expect(html).toContain("Browse Runs for BOM evidence");
+    expect(html).not.toContain("/runs/undefined#boards");
     expect(html).not.toContain("/runs/undefined/artifacts");
   });
   it("renders OverviewTab with readiness gate status and metadata", () => {
