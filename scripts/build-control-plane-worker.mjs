@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,10 +37,18 @@ verifyControlPlaneWorkerBoundary(workerBuild.metafile);
 // the production worker. The source is disabled until explicit staging setup.
 await build({
   ...nodeBundleOptions,
+  // Neon Functions load only the uploaded ZIP; there is no workspace
+  // node_modules tree to resolve the worker's external PostgreSQL driver.
+  external: [],
+  // Bundled CJS dependencies may require Node built-ins from ESM.
+  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
   alias: { yaml: yamlBrowserEntry },
   entryPoints: [join(root, "functions/boardreadyops-lifecycle.ts")],
   outfile: join(outputDirectory, "neon-lifecycle.mjs"),
 });
+const neonPackageDirectory = join(outputDirectory, "neon");
+await mkdir(neonPackageDirectory, { recursive: true });
+await copyFile(join(outputDirectory, "neon-lifecycle.mjs"), join(neonPackageDirectory, "index.mjs"));
 
 const migrationsDirectory = join(root, "packages/db/migrations");
 const migrationFiles = (await readdir(migrationsDirectory)).filter((file) => /^\d+_.+\.sql$/u.test(file)).sort();
