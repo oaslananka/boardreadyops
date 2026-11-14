@@ -173,6 +173,40 @@ describe("Neon scheduled worker with exclusive database ownership", () => {
     expect(release).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects a lost connection during ownership acquisition before creating any queue operations", async () => {
+    const release = vi.fn(async () => undefined);
+    const acquireOwnership = vi.fn(async (options: { onLost(): void }) => {
+      options.onLost();
+      return { release };
+    });
+    const createOperations = vi.fn(() => tasks([]));
+    const handler = createExclusiveNeonScheduledWorkerHandler({
+      triggerId,
+      connectionString,
+      acquireOwnership,
+      createOperations,
+    });
+    expect((await handler(request())).status).toBe(503);
+    expect(createOperations).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not acknowledge a completed pass if the exclusive lock cannot be released", async () => {
+    const acquireOwnership = vi.fn(async () => ({
+      release: async () => {
+        throw new Error("SECRET_LOCK_DETAILS");
+      },
+    }));
+    const handler = createExclusiveNeonScheduledWorkerHandler({
+      triggerId,
+      connectionString,
+      acquireOwnership,
+      createOperations: () => tasks([]),
+    });
+    const response = await handler(request());
+    expect(response.status).toBe(503);
+    expect(JSON.stringify(await response.json())).not.toContain("SECRET_LOCK_DETAILS");
+  });
   it("rejects pooled Neon connections without exposing credentials", () => {
     expect(() =>
       createExclusiveNeonScheduledWorkerHandler({
