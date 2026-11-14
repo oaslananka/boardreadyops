@@ -30,6 +30,7 @@ export default {
         workerConnectionString: process.env.DATABASE_URL ?? "",
         workerId: `neon-lifecycle-${randomUUID()}`,
         batchLimit: 2,
+        enableOutbox: process.env.BOARDREADYOPS_NEON_OUTBOX_ENABLED === "true",
       });
       return await handler(request);
     } catch {

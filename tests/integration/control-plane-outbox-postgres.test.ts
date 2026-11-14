@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { processControlPlaneOutboxEffect } from "../../apps/web/lib/control-plane-outbox-worker.js";
+import { runClaimedOutboxBatch } from "../../apps/web/lib/neon-production-outbox.js";
 import {
   type ControlPlaneOutboxEffectType,
   type ControlPlaneOutboxPayload,
@@ -321,6 +323,73 @@ describeDatabase("control-plane PostgreSQL transactional outbox", () => {
     ).resolves.toHaveLength(1);
   });
 
+  it("Neon bounded pass dispatches one stored workflow and does not dispatch it twice", async () => {
+    const outboxId = await insertEffect({ effectType: "github.workflow.dispatch" });
+    const workerId = `${testPrefix}-neon-workflow-worker`;
+    const outbox = store(at(0));
+    const dispatch = vi.fn(async () => ({
+      workflowDispatchId: "421234",
+      workflowRunUrl: "https://github.com/octo/repo/actions/runs/421234",
+    }));
+    const checkRuns = {
+      ensurePullRequestCheckRun: async () => ({ id: 789 }),
+      completeCheckRun: async () => undefined,
+    };
+    const run = async () =>
+      runClaimedOutboxBatch({
+        workerId,
+        limit: 1,
+        signal: new AbortController().signal,
+        claimEffects: (input) => outbox.claimEffects(input),
+        process: (effect) =>
+          processControlPlaneOutboxEffect(effect, {
+            workerId,
+            outbox,
+            dispatchMode: "github-actions",
+            checkRuns,
+            workflowDispatch: { dispatchReleaseRunWorkflow: dispatch },
+          }),
+      });
+    await run();
+    await run();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const row = rows(
+      await database().query("select status, attempt_count from control_plane_outbox where id = $1", [outboxId]),
+    )[0];
+    expect(row).toMatchObject({ status: "completed", attempt_count: 1 });
+  });
+
+  it("Neon bounded pass quarantines an uncertain dispatch instead of duplicate sending", async () => {
+    const outboxId = await insertEffect({ effectType: "github.workflow.dispatch" });
+    const workerId = `${testPrefix}-neon-uncertain-worker`;
+    const outbox = store(at(0));
+    const dispatch = vi.fn(async (): Promise<{ workflowDispatchId: string }> => {
+      throw Object.assign(new Error("delivery status unknown"), { deliveryUncertain: true });
+    });
+    const run = async () =>
+      runClaimedOutboxBatch({
+        workerId,
+        limit: 1,
+        signal: new AbortController().signal,
+        claimEffects: (input) => outbox.claimEffects(input),
+        process: (effect) =>
+          processControlPlaneOutboxEffect(effect, {
+            workerId,
+            outbox,
+            dispatchMode: "github-actions",
+            checkRuns: {
+              ensurePullRequestCheckRun: async () => ({ id: 789 }),
+              completeCheckRun: async () => undefined,
+            },
+            workflowDispatch: { dispatchReleaseRunWorkflow: dispatch },
+          }),
+      });
+    await run();
+    await run();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const row = rows(await database().query("select status from control_plane_outbox where id = $1", [outboxId]))[0];
+    expect(row).toMatchObject({ status: "reconciliation_required" });
+  });
   it("rolls back an outbox write with its surrounding statement", async () => {
     const id = `${testPrefix}-${randomUUID()}`;
     const releaseRunId = await createCheckRunBinding(id);
