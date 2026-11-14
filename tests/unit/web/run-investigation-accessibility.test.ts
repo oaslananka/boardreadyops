@@ -754,7 +754,12 @@ describe("run investigation accessibility", () => {
     run.boards = [];
     const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
     expect(markup).toContain("No per-board BOM snapshots were captured");
-    expect(markup).toContain("does not establish that the repository has no boards");
+    expect(markup).toContain("does not establish that the repository has no");
+    expect(markup).toContain("The Review and visual evidence cannot substitute");
+    expect(markup).toContain('href="/runs/run-accessible/artifacts"');
+    expect(markup).toContain(
+      'href="https://github.com/oaslananka/boardreadyops/tree/0123456789abcdef0123456789abcdef01234567"',
+    );
     expect(markup).not.toContain("Board record:");
     run.boards = [
       {
