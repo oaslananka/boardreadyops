@@ -6,6 +6,7 @@ import type { ControlPlaneWorkerDependencies } from "./control-plane-worker.js";
 import { processControlPlaneJob } from "./control-plane-worker.js";
 import { createProductionGitHubCommandLifecycleExecutor } from "./github-command-executor.js";
 import { createExclusiveNeonScheduledWorkerHandler } from "./neon-exclusive-worker-handler.js";
+import { createProductionNeonLifecycleReconciliationOperation } from "./neon-production-lifecycle-reconciliation.js";
 import { createProductionNeonOutboxOperation } from "./neon-production-outbox.js";
 import { createProductionNeonReconciliationOperation } from "./neon-production-reconciliation.js";
 import { createProductionRepositorySetupLifecycleExecutor } from "./repository-setup-automation.js";
@@ -42,6 +43,7 @@ export type ProductionNeonLifecycleOptions = {
   batchLimit?: number;
   enableOutbox?: boolean;
   enableGitHubReconciliation?: boolean;
+  enableLifecycleReconciliation?: boolean;
   environment?: Readonly<Record<string, string | undefined>>;
 };
 
@@ -80,6 +82,14 @@ export function createProductionNeonLifecycleHandler(
           workerId: options.workerId,
           connectionString: options.workerConnectionString,
           environment,
+        })
+      : undefined;
+  const lifecycleReconciliationPass =
+    options.enableLifecycleReconciliation === true
+      ? createProductionNeonLifecycleReconciliationOperation({
+          workerId: options.workerId,
+          connectionString: options.workerConnectionString,
+          batchLimit: limit,
         })
       : undefined;
   return createExclusiveNeonScheduledWorkerHandler({
@@ -121,7 +131,7 @@ export function createProductionNeonLifecycleHandler(
         outbox: outboxPass ? () => outboxPass(signal) : noop,
         artifactDeletion: noop,
         stripe: noop,
-        lifecycleReconciliation: noop,
+        lifecycleReconciliation: lifecycleReconciliationPass ? () => lifecycleReconciliationPass(signal) : noop,
         githubReconciliation: githubReconciliationPass ? () => githubReconciliationPass(signal) : noop,
         maintenance: noop,
       };
