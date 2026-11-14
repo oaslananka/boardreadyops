@@ -90,6 +90,23 @@ describe("Neon lifecycle work from durable GitHub webhook jobs", () => {
     expect(process).not.toHaveBeenCalled();
   });
 
+  it("refuses enabled outbox operation when GitHub Actions execution is not configured", () => {
+    expect(() =>
+      createProductionNeonLifecycleHandler({
+        triggerId: "trigger-1a2b3c4d-5e6f-7890-abcd-ef1234567890",
+        connectionString: "postgresql://worker@localhost:5432/test",
+        workerConnectionString: "postgresql://worker@localhost:5432/test",
+        workerId: "neon-lifecycle-1",
+        enableOutbox: true,
+        environment: {
+          GITHUB_APP_ID: "1",
+          GITHUB_APP_PRIVATE_KEY: "test",
+          BOARDREADYOPS_RUNNER_MODE: "self-hosted",
+          BOARDREADYOPS_PUBLIC_URL: "https://example.com",
+        },
+      }),
+    ).toThrow("github-actions");
+  });
   it("requires a small bounded batch and authenticated GitHub App configuration", () => {
     const opts = {
       triggerId: "trigger-1a2b3c4d-5e6f-7890-abcd-ef1234567890",

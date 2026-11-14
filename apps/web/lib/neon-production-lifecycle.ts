@@ -6,6 +6,7 @@ import type { ControlPlaneWorkerDependencies } from "./control-plane-worker.js";
 import { processControlPlaneJob } from "./control-plane-worker.js";
 import { createProductionGitHubCommandLifecycleExecutor } from "./github-command-executor.js";
 import { createExclusiveNeonScheduledWorkerHandler } from "./neon-exclusive-worker-handler.js";
+import { createProductionNeonOutboxOperation } from "./neon-production-outbox.js";
 import { createProductionRepositorySetupLifecycleExecutor } from "./repository-setup-automation.js";
 
 type BatchOptions = {
@@ -38,6 +39,7 @@ export type ProductionNeonLifecycleOptions = {
   workerConnectionString: string;
   workerId: string;
   batchLimit?: number;
+  enableOutbox?: boolean;
   environment?: Readonly<Record<string, string | undefined>>;
 };
 
@@ -58,6 +60,17 @@ export function createProductionNeonLifecycleHandler(
     throw new Error("A bounded worker ID is required");
   }
   if (!options.workerConnectionString.trim()) throw new Error("A PostgreSQL work queue URL is required");
+
+  // The outbox is an independent opt-in. Validate its configuration before
+  // accepting a schedule or opening the exclusive PostgreSQL owner session.
+  const outboxPass =
+    options.enableOutbox === true
+      ? createProductionNeonOutboxOperation({
+          workerId: options.workerId,
+          connectionString: options.workerConnectionString,
+          environment,
+        })
+      : undefined;
 
   return createExclusiveNeonScheduledWorkerHandler({
     triggerId: options.triggerId,
@@ -95,7 +108,7 @@ export function createProductionNeonLifecycleHandler(
         },
         // This is a dedicated lifecycle-only schedule, not a claim that the
         // remaining six continuous-worker queues have moved to Neon.
-        outbox: noop,
+        outbox: outboxPass ? () => outboxPass(signal) : noop,
         artifactDeletion: noop,
         stripe: noop,
         lifecycleReconciliation: noop,
