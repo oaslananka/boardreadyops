@@ -8,6 +8,43 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.73.0](https://github.com/oaslananka/boardreadyops/compare/v1.72.0...v1.73.0) (2026-11-14)
+
+
+### Features
+
+* **review:** opt in to observed BOM publication ([#1527](https://github.com/oaslananka/boardreadyops/issues/1527)) ([ec5aee3](https://github.com/oaslananka/boardreadyops/commit/ec5aee3ac534111bdb9729764fff2b721d7860ee))
+* **review:** publish source-bound KiCad evidence from a signed-in browser ([#1511](https://github.com/oaslananka/boardreadyops/issues/1511)) ([8238d62](https://github.com/oaslananka/boardreadyops/commit/8238d621451e1383c49294c77103b7e94d4e5e48))
+* **web:** guide hardware reviewers through manufacturing handoff ([#1515](https://github.com/oaslananka/boardreadyops/issues/1515)) ([00fcff7](https://github.com/oaslananka/boardreadyops/commit/00fcff71c540af54a71ab4f387846a00fa1796e3))
+* **web:** preview authorized KiCad artwork in first-use panels ([#1512](https://github.com/oaslananka/boardreadyops/issues/1512)) ([f7e4361](https://github.com/oaslananka/boardreadyops/commit/f7e4361d35626d62537efb2f7aacb6d0530b5afe))
+
+
+### Bug Fixes
+
+* **ci:** gate container builds on shared npm readiness ([#1495](https://github.com/oaslananka/boardreadyops/issues/1495)) ([2bca450](https://github.com/oaslananka/boardreadyops/commit/2bca4503b844a0408412a246bb977bf69e3d77ae))
+* **ci:** preserve clean source for signed manufacturing export ([#1516](https://github.com/oaslananka/boardreadyops/issues/1516)) ([246d37f](https://github.com/oaslananka/boardreadyops/commit/246d37fdcdf99e4a26487b050f4395c55b0c769f))
+* **cloud:** reject foreign production runtime ownership before deploy ([#1500](https://github.com/oaslananka/boardreadyops/issues/1500)) ([b5db8a5](https://github.com/oaslananka/boardreadyops/commit/b5db8a5331e7af827c701623b6da194477126682))
+* **cloud:** require a matching persisted callback receipt ([#1498](https://github.com/oaslananka/boardreadyops/issues/1498)) ([ac25afa](https://github.com/oaslananka/boardreadyops/commit/ac25afa91cd08d65efc87ea9498bc8d7c46c8526))
+* **db:** recover legacy callback dead letters with guarded operator flow ([#1497](https://github.com/oaslananka/boardreadyops/issues/1497)) ([880252f](https://github.com/oaslananka/boardreadyops/commit/880252f0e0c3893ab809950f350117e39a92b848))
+* **demo:** restore real KiCad golden schematic BOM evidence ([#1520](https://github.com/oaslananka/boardreadyops/issues/1520)) ([7aa6646](https://github.com/oaslananka/boardreadyops/commit/7aa664609c1ac24d51c19bbf7e94216b5576a4ef))
+* **kicad:** map native DRC anchors on verified rounded boards ([#1509](https://github.com/oaslananka/boardreadyops/issues/1509)) ([f2d1381](https://github.com/oaslananka/boardreadyops/commit/f2d13819c234803f6ed47554e37058b9ade010dc))
+* **onboarding:** preserve compatible existing readiness workflow ([#1502](https://github.com/oaslananka/boardreadyops/issues/1502)) ([4479a2f](https://github.com/oaslananka/boardreadyops/commit/4479a2f9ca6ed26607e543c57ffaa3eef4de40d9))
+* **release:** bind attestation signer to workflow SHA, source to reviewed SHA ([#1521](https://github.com/oaslananka/boardreadyops/issues/1521)) ([c608852](https://github.com/oaslananka/boardreadyops/commit/c6088520662e967ae6e6c7c8c86c63de0f0c7b7c))
+* **review:** bind native PCB previews to committed source ([#1505](https://github.com/oaslananka/boardreadyops/issues/1505)) ([07d7a85](https://github.com/oaslananka/boardreadyops/commit/07d7a85e6d3dc70e0c87512c7a7356e4b2973c7b))
+* **review:** render complete KiCad hierarchical schematic sheets ([#1508](https://github.com/oaslananka/boardreadyops/issues/1508)) ([2b6d69d](https://github.com/oaslananka/boardreadyops/commit/2b6d69de3a7adbf394949c275ea2760d57f33be3))
+* **review:** show native PCB first and surface verified board findings ([#1510](https://github.com/oaslananka/boardreadyops/issues/1510)) ([f25ee86](https://github.com/oaslananka/boardreadyops/commit/f25ee86a8b326d61c5ddaad6e1291f1db397a6ff))
+* **review:** validate opted-in native artwork before publish ([#1507](https://github.com/oaslananka/boardreadyops/issues/1507)) ([0ea560e](https://github.com/oaslananka/boardreadyops/commit/0ea560eb38b4ce63ebceac83810b04047a24b8cb))
+* **web:** give explicit readiness reruns fresh idempotency scope ([#1518](https://github.com/oaslananka/boardreadyops/issues/1518)) ([8c4688c](https://github.com/oaslananka/boardreadyops/commit/8c4688c04b03f5c5733e172c9b7f6d92311303af))
+* **web:** guide empty deliveries to the next eligible step ([#1525](https://github.com/oaslananka/boardreadyops/issues/1525)) ([1593bf6](https://github.com/oaslananka/boardreadyops/commit/1593bf6613284a5e6dc3ecda366e9e17d358c335))
+* **web:** link Review BOM checks to the source Run ([#1524](https://github.com/oaslananka/boardreadyops/issues/1524)) ([61ed7fb](https://github.com/oaslananka/boardreadyops/commit/61ed7fb2e9b964686fb785e0e1da61c80dcbecef))
+* **web:** make missing BOM run evidence actionable ([#1526](https://github.com/oaslananka/boardreadyops/issues/1526)) ([906ab09](https://github.com/oaslananka/boardreadyops/commit/906ab096936b216760d4000793b0aa7bc51e9c42))
+* **web:** preserve attested archives across terminal results ([#1522](https://github.com/oaslananka/boardreadyops/issues/1522)) ([3c5021f](https://github.com/oaslananka/boardreadyops/commit/3c5021f4d1d819dc6aa3273e6edecdcd0ab2d830))
+* **web:** prioritize findings in run investigation ([#1499](https://github.com/oaslananka/boardreadyops/issues/1499)) ([3c517a7](https://github.com/oaslananka/boardreadyops/commit/3c517a7ef200a00f4fa588e88f7ed9900ba72cb1))
+* **web:** ship vulnerability-clean Alpine runtime with verified GitHub CLI ([#1514](https://github.com/oaslananka/boardreadyops/issues/1514)) ([96d879e](https://github.com/oaslananka/boardreadyops/commit/96d879e2cf4fad9d38afa14d9f0bea5e4a491180))
+* **web:** show outcome-aware review guidance after readiness ([#1523](https://github.com/oaslananka/boardreadyops/issues/1523)) ([26cff44](https://github.com/oaslananka/boardreadyops/commit/26cff441af69d2a94340fabdea1a788d8297f697))
+* **web:** show truthful first-run actions during Cloud rollout ([#1496](https://github.com/oaslananka/boardreadyops/issues/1496)) ([9cd2102](https://github.com/oaslananka/boardreadyops/commit/9cd21027b7ed2b2fb0e6c45d699b75c5c85946ec))
+* **web:** surface hosted rollout limits before setup PR ([#1501](https://github.com/oaslananka/boardreadyops/issues/1501)) ([4816cec](https://github.com/oaslananka/boardreadyops/commit/4816cec6c952c842e1dcad847176c25590f01d75))
+
 ## [1.72.0](https://github.com/oaslananka/boardreadyops/compare/v1.71.1...v1.72.0) (2026-11-12)
 
 
