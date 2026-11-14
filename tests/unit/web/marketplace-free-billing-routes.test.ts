@@ -16,7 +16,7 @@ const stripeEnvironment = [
   "STRIPE_BUSINESS_MONTHLY_PRICE_ID",
   "STRIPE_BUSINESS_YEARLY_PRICE_ID",
 ] as const;
-const originalEnvironment = new Map(stripeEnvironment.map((name) => [name, process.env[name]]));
+const originalEnvironment = new Map([...stripeEnvironment, "BILLING_MODE"].map((name) => [name, process.env[name]]));
 
 beforeEach(() => {
   viewerAuthorization.mockResolvedValue({
@@ -31,6 +31,7 @@ beforeEach(() => {
     authorizeInstallation: vi.fn().mockResolvedValue(true),
   });
 
+  process.env.BILLING_MODE = "marketplace_free";
   process.env.STRIPE_SECRET_KEY = "sk_test_not_real";
   process.env.STRIPE_TEAM_MONTHLY_PRICE_ID = "price_team_month";
   process.env.STRIPE_TEAM_YEARLY_PRICE_ID = "price_team_year";
@@ -40,7 +41,7 @@ beforeEach(() => {
 
 afterEach(() => {
   viewerAuthorization.mockReset();
-  for (const name of stripeEnvironment) {
+  for (const name of [...stripeEnvironment, "BILLING_MODE"]) {
     const value = originalEnvironment.get(name);
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
@@ -84,6 +85,27 @@ describe("free-only Marketplace billing routes", () => {
     });
   });
 
+  it("rejects both checkout and customer portal without external redirects during free beta", async () => {
+    process.env.BILLING_MODE = "beta_free";
+    for (const [path, body] of [
+      ["/api/v1/billing/checkout", { tier: "team", interval: "month" }],
+      ["/api/v1/billing/portal", {}],
+    ] as const) {
+      const req = new Request(`https://boardreadyops.test${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = path.includes("checkout") ? await checkoutPost(req) : await portalPost(req);
+      expect(result.status).toBe(410);
+      expect(result.headers.get("cache-control")).toBe("private, no-store");
+      expect(await result.json()).toMatchObject({
+        ok: false,
+        error: "Paid upgrades and checkout are unavailable during the free beta",
+        code: "free_beta_only",
+      });
+    }
+  });
   it("preserves authentication requirements on the retired paid billing routes", async () => {
     const signedOut = {
       session: undefined,

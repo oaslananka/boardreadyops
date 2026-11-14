@@ -1,4 +1,4 @@
-export type BillingMode = "marketplace_free" | "stripe" | "both";
+export type BillingMode = "marketplace_free" | "beta_free" | "stripe" | "both";
 
 /**
  * Which billing surface `/api/v1/billing/checkout` and `/portal` serve.
@@ -12,6 +12,6 @@ export function resolveBillingMode(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): BillingMode {
   const raw = environment.BILLING_MODE?.trim().toLowerCase();
-  if (raw === "stripe" || raw === "both") return raw;
+  if (raw === "stripe" || raw === "both" || raw === "beta_free") return raw;
   return "marketplace_free";
 }

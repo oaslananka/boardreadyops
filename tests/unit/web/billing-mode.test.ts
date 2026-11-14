@@ -10,6 +10,10 @@ describe("resolveBillingMode", () => {
     expect(resolveBillingMode({ BILLING_MODE: "enterprise-invoice" })).toBe("marketplace_free");
   });
 
+  it("enables explicitly configured free beta without changing existing production defaults", () => {
+    expect(resolveBillingMode({ BILLING_MODE: " beta_free " })).toBe("beta_free");
+  });
+
   it("accepts stripe", () => {
     expect(resolveBillingMode({ BILLING_MODE: "stripe" })).toBe("stripe");
   });

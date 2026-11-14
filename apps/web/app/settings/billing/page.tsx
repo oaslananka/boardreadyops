@@ -31,6 +31,23 @@ export default async function BillingSettingsPage() {
   // without a database; the plan tier and the tier comparison still render.
   const config = optionalCloudPersistenceConfiguration();
   const billingMode = resolveBillingMode();
+  if (billingMode === "beta_free") {
+    return (
+      <section className="flex flex-col gap-4" aria-labelledby="free-beta-heading">
+        <div className="rounded-md border border-border bg-card p-5 shadow-e2">
+          <h2 id="free-beta-heading" className="text-lg font-bold text-foreground">
+            BoardReadyOps Free Beta
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            All payment and upgrade paths are closed during this beta. You can use the available Community features
+            without entering payment details. Signed evidence still needs independent verification before any
+            manufacturing decision.
+          </p>
+        </div>
+        <PlanComparisonCard currentTier="community" billingMode="beta_free" />
+      </section>
+    );
+  }
   let current = 0;
   let forecast = 0;
   let hasStripeCustomer = false;

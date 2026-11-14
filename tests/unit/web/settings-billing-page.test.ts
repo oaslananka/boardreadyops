@@ -127,6 +127,35 @@ describe("PlanComparisonCard", () => {
     expect(portalBtn?.textContent).toContain("Manage Subscription");
   });
 
+  it("shows one Community tier and no paid or Marketplace upsell in free beta", async () => {
+    await act(async () => {
+      root.render(
+        createElement(
+          ToastProvider,
+          null,
+          createElement(PlanComparisonCard, {
+            currentTier: "team",
+            hasStripeCustomer: true,
+            billingMode: "beta_free",
+          }),
+        ),
+      );
+    });
+
+    expect(container.querySelectorAll(".plan-tier-card")).toHaveLength(1);
+    expect(container.querySelectorAll(".upgrade-checkout-button")).toHaveLength(0);
+    expect(container.querySelector(".manage-portal-button")).toBeNull();
+    const text = container.querySelector(".plan-comparison-container")?.textContent ?? "";
+    expect(text).toContain("Free beta");
+    expect(text).toContain("Community");
+    expect(text).not.toContain("Paid Pilot");
+    expect(text).not.toContain("GitHub Marketplace");
+    expect(text).not.toContain("$29");
+    expect(text).not.toContain("$149");
+    expect(text).not.toContain("$450");
+    expect(container.querySelector('a[href^="mailto:"]')).toBeNull();
+  });
+
   it("routes upgrades to GitHub Marketplace when self-serve checkout is not enabled", async () => {
     // Under the default BILLING_MODE the checkout and portal endpoints return HTTP 410, so a
     // checkout button could only ever fail. The tiers still render; only the CTA changes.

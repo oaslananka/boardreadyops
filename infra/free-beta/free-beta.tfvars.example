@@ -1,0 +1,7 @@
+# Read-only by default. Never set true until both provider accounts have
+# been verified as FREE, a private remote state backend is configured and
+# the isolated staging deployment passes operator approval.
+provision = false
+vercel_project_name = "boardreadyops-free-beta"
+neon_project_name   = "boardreadyops-free-beta"
+neon_region         = "aws-us-east-2"
