@@ -9,6 +9,7 @@ import { createExclusiveNeonScheduledWorkerHandler } from "./neon-exclusive-work
 import { createProductionNeonLifecycleReconciliationOperation } from "./neon-production-lifecycle-reconciliation.js";
 import { createProductionNeonOutboxOperation } from "./neon-production-outbox.js";
 import { createProductionNeonReconciliationOperation } from "./neon-production-reconciliation.js";
+import { createProductionNeonSqlMaintenanceOperation } from "./neon-production-sql-maintenance.js";
 import { createProductionRepositorySetupLifecycleExecutor } from "./repository-setup-automation.js";
 
 type BatchOptions = {
@@ -44,6 +45,7 @@ export type ProductionNeonLifecycleOptions = {
   enableOutbox?: boolean;
   enableGitHubReconciliation?: boolean;
   enableLifecycleReconciliation?: boolean;
+  enableSqlMaintenance?: boolean;
   environment?: Readonly<Record<string, string | undefined>>;
 };
 
@@ -92,6 +94,14 @@ export function createProductionNeonLifecycleHandler(
           batchLimit: limit,
         })
       : undefined;
+  const sqlMaintenancePass =
+    options.enableSqlMaintenance === true
+      ? createProductionNeonSqlMaintenanceOperation({
+          connectionString: options.workerConnectionString,
+          batchLimit: 50,
+          environment,
+        })
+      : undefined;
   return createExclusiveNeonScheduledWorkerHandler({
     triggerId: options.triggerId,
     connectionString: options.connectionString,
@@ -133,7 +143,7 @@ export function createProductionNeonLifecycleHandler(
         stripe: noop,
         lifecycleReconciliation: lifecycleReconciliationPass ? () => lifecycleReconciliationPass(signal) : noop,
         githubReconciliation: githubReconciliationPass ? () => githubReconciliationPass(signal) : noop,
-        maintenance: noop,
+        maintenance: sqlMaintenancePass ? () => sqlMaintenancePass(signal) : noop,
       };
     },
   });

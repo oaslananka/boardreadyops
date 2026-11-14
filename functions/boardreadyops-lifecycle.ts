@@ -33,6 +33,7 @@ export default {
         enableOutbox: process.env.BOARDREADYOPS_NEON_OUTBOX_ENABLED === "true",
         enableGitHubReconciliation: process.env.BOARDREADYOPS_NEON_GITHUB_RECONCILIATION_ENABLED === "true",
         enableLifecycleReconciliation: process.env.BOARDREADYOPS_NEON_LIFECYCLE_RECONCILIATION_ENABLED === "true",
+        enableSqlMaintenance: process.env.BOARDREADYOPS_NEON_SQL_MAINTENANCE_ENABLED === "true",
       });
       return await handler(request);
     } catch {
