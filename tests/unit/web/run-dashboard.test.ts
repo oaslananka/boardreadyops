@@ -648,7 +648,8 @@ describe("run dashboard data", () => {
     expect(artifactSql).toContain("limit $5");
     expect(artifactSql).toContain("offset $6");
     expect(query.mock.calls[7]?.[1]).toEqual(["run-123", "%release%", "primary", "release-archive", 10, 0]);
-    expect(artifactSql).not.toContain("storage_path");
+    expect(artifactSql).toContain("else null end as temporary_storage_ref");
+    expect(artifactSql).not.toContain("artifacts.storage_path as storage_path");
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
     expect(categoryBreakdownSql).toContain("$2::jsonb ->> rule_id");
     const registeredCategories = JSON.parse(String(query.mock.calls[8]?.[1]?.[1])) as Record<string, string>;
@@ -714,5 +715,54 @@ describe("run dashboard formatting", () => {
     expect(formatArtifactBytes(512)).toBe("512 B");
     expect(formatArtifactBytes(2048)).toBe("2.0 KB");
     expect(formatArtifactBytes(2 * 1024 * 1024)).toBe("2.0 MB");
+  });
+});
+
+describe("temporary manufacturing GitHub Actions downloads", () => {
+  const artifact = {
+    id: "d8f820a4-4f6b-4de8-a7ca-1b79d2837290",
+    kind: "archive",
+    name: "signed-manufacturing-export.tar.gz",
+    role: "manufacturing",
+    content_type: "application/gzip",
+    temporary_storage_ref: "github-actions/29121986402/54321",
+    sha256: "b".repeat(64),
+    bytes: 2345,
+    execution_attempt_id: "7559e99b-4998-4e02-a94a-7a7a4686ae11",
+    uploaded_at: "2026-11-03T12:00:00.000Z",
+    retention_until: null,
+  };
+
+  async function load(now: string) {
+    const results = emptyDashboardRows();
+    results[1] = { rows: [{ total: 1 }] };
+    results[6] = { rows: [artifact] };
+    return await lookupRunDashboard("run-state", executorWithResults([{ rows: [baseRunRow()] }, ...results]).executor, {
+      now: () => new Date(now),
+    });
+  }
+
+  it("shows a GitHub login-bound URL and three-day retention while downloadable", async () => {
+    const result = await load("2026-11-04T12:00:00.000Z");
+    expect(result.state).toBe("found");
+    if (result.state !== "found") return;
+    expect(result.run.artifacts[0]).toMatchObject({
+      availability: "temporary",
+      retention: "retained-until",
+      retentionUntil: "2026-11-06T12:00:00.000Z",
+      downloadUrl: "https://github.com/octo/board/actions/runs/29121986402/artifacts/54321",
+    });
+  });
+
+  it("removes stale download links without misrepresenting the historical signed evidence", async () => {
+    const result = await load("2026-11-07T12:00:00.000Z");
+    expect(result.state).toBe("found");
+    if (result.state !== "found") return;
+    expect(result.run.artifacts[0]).toMatchObject({
+      availability: "expired",
+      downloadUrl: undefined,
+      sha256: "b".repeat(64),
+      retentionUntil: "2026-11-06T12:00:00.000Z",
+    });
   });
 });

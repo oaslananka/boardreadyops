@@ -310,3 +310,57 @@ describe("signed manufacturing export import boundary", () => {
     expect(deps.loadExpectedRun).not.toHaveBeenCalled();
   });
 });
+
+describe("opt-in temporary GitHub Actions manufacturing archives", () => {
+  it("records independently verified signed metadata without retaining the submitted archive", async () => {
+    const deps = dependencies();
+    deps.environment = { MANUFACTURING_ARCHIVE_STORAGE: "github-actions" };
+    const verify = vi.fn(async () => true);
+    deps.verifyTemporaryArtifact = verify;
+    const uploaded = request(await archiveFixture());
+    uploaded.headers.set("x-boardreadyops-github-artifact-id", "54321");
+    const result = await handleSignedManufacturingExportImport(uploaded, { runId, attemptId }, deps);
+    expect(result.status).toBe(201);
+    expect(await result.json()).toMatchObject({ ok: true, storage: "github-actions", subjects: 29 });
+    expect(verify).toHaveBeenCalledWith(expect.anything(), expectedRun(), "54321");
+    expect(deps.verifyArchive).toHaveBeenCalledOnce();
+    expect(deps.query).toHaveBeenCalledOnce();
+    const values = deps.query.mock.calls[0]?.[1] as unknown[];
+    expect(values?.[4]).toBe("github-actions/29121986402/54321");
+    // The request uses a disposable extraction directory; no final disk root exists.
+    expect(await filesBelow(roots.at(-1) ?? "")).toHaveLength(0);
+  });
+
+  it("refuses mismatched client-side temporary upload versus server local storage mode", async () => {
+    const deps = dependencies();
+    const uploaded = request(await archiveFixture());
+    uploaded.headers.set("x-boardreadyops-github-artifact-id", "54321");
+    const response = await handleSignedManufacturingExportImport(uploaded, { runId, attemptId }, deps);
+    expect(response.status).toBe(409);
+    expect(deps.query).not.toHaveBeenCalled();
+    expect(deps.verifyArchive).not.toHaveBeenCalled();
+    expect(await filesBelow(roots.at(-1) ?? "")).toHaveLength(0);
+  });
+
+  it("denies a missing, unbound or replayed temporary artifact", async () => {
+    const archive = await archiveFixture();
+    for (const artifactId of ["", "zero", "54321"]) {
+      const deps = dependencies();
+      deps.environment = { MANUFACTURING_ARCHIVE_STORAGE: "github-actions" };
+      deps.verifyTemporaryArtifact = vi.fn(async () => false);
+      const uploaded = request(archive);
+      if (artifactId) uploaded.headers.set("x-boardreadyops-github-artifact-id", artifactId);
+      const response = await handleSignedManufacturingExportImport(uploaded, { runId, attemptId }, deps);
+      expect(response.status).toBe(artifactId === "54321" ? 422 : 400);
+      expect(deps.query).not.toHaveBeenCalled();
+    }
+    const deps = dependencies("replayed");
+    deps.environment = { MANUFACTURING_ARCHIVE_STORAGE: "github-actions" };
+    deps.verifyTemporaryArtifact = vi.fn(async () => true);
+    const uploaded = request(archive);
+    uploaded.headers.set("x-boardreadyops-github-artifact-id", "54321");
+    const response = await handleSignedManufacturingExportImport(uploaded, { runId, attemptId }, deps);
+    expect(response.status).toBe(409);
+    expect(await filesBelow(roots.at(-1) ?? "")).toHaveLength(0);
+  });
+});

@@ -4,6 +4,11 @@ import {
   artifactDownloadUrl,
   configuredArtifactDownloadSigningKey,
 } from "./artifact-downloads.js";
+import {
+  temporaryManufacturingArtifactReference,
+  temporaryManufacturingDownloadUrl,
+  temporaryManufacturingExpiresAt,
+} from "./github-temporary-manufacturing.js";
 import { catalogRules } from "./rule-catalog.js";
 
 const registeredRuleCategoriesJson = JSON.stringify(
@@ -63,7 +68,7 @@ type CategoryBreakdownEntry = {
   info: number;
 };
 
-type ArtifactAvailability = "available";
+type ArtifactAvailability = "available" | "expired" | "temporary";
 
 type ArtifactLifecycleSummary = {
   deleted: number;
@@ -598,6 +603,7 @@ export async function lookupRunDashboard(
   executor: RunDashboardQueryExecutor,
   options: RunDashboardOptions = {},
 ): Promise<RunLookupResult> {
+  const now = options.now?.() ?? new Date();
   const filters = normalizeFilters(options.filters);
   if (!validScope(options.scope)) return { state: "not-found" };
   const runParameters: unknown[] = [runId];
@@ -813,6 +819,8 @@ export async function lookupRunDashboard(
     executor.query(
       `select artifacts.id, artifacts.kind, artifacts.name, artifacts.sha256,
               artifacts.bytes, artifacts.role, artifacts.content_type,
+              case when artifacts.storage_path like 'github-actions/%' then artifacts.storage_path
+                else null end as temporary_storage_ref,
               artifacts.execution_attempt_id, artifacts.retention_until, artifacts.uploaded_at
        from artifacts
        where ${artifactScope.sql}
@@ -1006,10 +1014,21 @@ export async function lookupRunDashboard(
     }),
   );
 
+  const repositoryName = `${repository.owner}/${repository.name}`;
   const artifacts = rows(artifactsResult).map((row): ArtifactDetail => {
     const artifactId = requiredString(row, "id");
-    const downloadUrl = options.artifactDownloadUrl?.({ runId, artifactId });
-    const retentionUntil = stringValue(row, "retention_until");
+    const storagePath = stringValue(row, "temporary_storage_ref") ?? "";
+    const temporary = temporaryManufacturingArtifactReference(storagePath);
+    const uploadedAt = requiredString(row, "uploaded_at");
+    const retentionUntil = temporary
+      ? temporaryManufacturingExpiresAt(uploadedAt)
+      : stringValue(row, "retention_until");
+    const expired = Boolean(temporary && (!retentionUntil || Date.parse(retentionUntil) <= now.getTime()));
+    const downloadUrl = temporary
+      ? expired
+        ? undefined
+        : temporaryManufacturingDownloadUrl(repositoryName, storagePath)
+      : options.artifactDownloadUrl?.({ runId, artifactId });
     return {
       id: artifactId,
       kind: requiredString(row, "kind"),
@@ -1019,15 +1038,14 @@ export async function lookupRunDashboard(
       role: requiredString(row, "role"),
       contentType: stringValue(row, "content_type") ?? "application/octet-stream",
       executionAttemptId: stringValue(row, "execution_attempt_id"),
-      uploadedAt: requiredString(row, "uploaded_at"),
+      uploadedAt,
       downloadUrl,
-      availability: "available",
+      availability: expired ? "expired" : temporary ? "temporary" : "available",
       retention: retentionUntil ? "retained-until" : "no-automatic-expiry",
       retentionUntil,
     };
   });
 
-  const repositoryName = `${repository.owner}/${repository.name}`;
   const attempts = rows(attemptsResult).map((row): AttemptDetail => {
     const workflowDispatchId = stringValue(row, "github_workflow_dispatch_id");
     return {
@@ -1166,7 +1184,6 @@ export async function lookupRunDashboard(
   const setupWorkflowContractVersion = numberValue(runRow, "setup_workflow_contract_version");
   const setupWorkflowStatus = stringValue(runRow, "setup_workflow_status");
   const setupConfigStatus = stringValue(runRow, "setup_config_status");
-  const now = options.now?.() ?? new Date();
 
   return {
     state: "found",

@@ -10,6 +10,11 @@ import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { verifyReviewedExportAttestation } from "../../../src/release/export-attestation.js";
 import { safeLocalArtifactPath } from "./artifact-downloads.js";
 import type { VerifiedGitHubActionsOidcClaims } from "./github-actions-oidc.js";
+import {
+  createTemporaryManufacturingArtifactVerifier,
+  type TemporaryManufacturingArtifactVerifier,
+  temporaryManufacturingStoragePath,
+} from "./github-temporary-manufacturing.js";
 import type { ResultOidcExpectations } from "./result-oidc-expectations.js";
 
 const execFileAsync = promisify(execFile);
@@ -45,6 +50,7 @@ export type SignedExportImportDependencies = {
       runAttempt: number;
     };
   }): Promise<{ status: "eligible" | "rejected"; reason: string; subjects?: number }>;
+  verifyTemporaryArtifact?: TemporaryManufacturingArtifactVerifier;
   now(): Date;
   id(): string;
 };
@@ -335,6 +341,53 @@ async function recordVerifiedExport(
   return "stale";
 }
 
+async function persistTemporaryVerifiedArchive(
+  extractionRoot: string,
+  archive: { bytes: number; sha256: string },
+  params: { runId: string; attemptId: string },
+  dependencies: SignedExportImportDependencies,
+  executor: SqlQueryExecutor,
+  expected: ResultOidcExpectations,
+  claims: VerifiedGitHubActionsOidcClaims,
+  subjects: number,
+  temporaryArtifactId: string,
+): Promise<Response> {
+  const artifactId = dependencies.id();
+  const storagePath = temporaryManufacturingStoragePath(expected.githubRunId, temporaryArtifactId);
+  if (!uuid(artifactId) || !storagePath) {
+    return jsonError("temporary manufacturing artifact reference is invalid", 400);
+  }
+  try {
+    const fs = await import("node:fs/promises");
+    const manifestBytes = await fs.readFile(path.join(extractionRoot, manifestPath));
+    const bundleBytes = await fs.readFile(path.join(extractionRoot, bundlePath));
+    const outcome = await recordVerifiedExport(
+      executor,
+      params,
+      dependencies,
+      expected,
+      claims,
+      { id: artifactId, name: storagePath, sha256: archive.sha256, bytes: archive.bytes },
+      manifestBytes,
+      bundleBytes,
+      subjects,
+    );
+    if (outcome !== "accepted") {
+      return outcome === "replayed"
+        ? jsonError("a signed manufacturing export already exists for this run attempt", 409)
+        : jsonError("the run attempt is no longer eligible for signed export ingestion", 409);
+    }
+    // Only signed provenance and SHA-256 are retained in the DB. The archive
+    // remains a short-lived GitHub Actions artifact; temp request bytes go away.
+    return Response.json(
+      { ok: true, artifactId, sha256: archive.sha256, bytes: archive.bytes, subjects, storage: "github-actions" },
+      { status: 201, headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } },
+    );
+  } catch {
+    return jsonError("signed manufacturing export metadata could not be recorded", 503);
+  }
+}
+
 async function persistVerifiedArchive(
   extractionRoot: string,
   archive: { bytes: number; sha256: string },
@@ -415,6 +468,7 @@ async function importArchive(
   executor: SqlQueryExecutor,
   expected: ResultOidcExpectations,
   claims: VerifiedGitHubActionsOidcClaims,
+  temporaryArtifactId?: string,
 ): Promise<Response> {
   const temporaryRoot = await import("node:fs/promises").then(({ mkdtemp }) =>
     mkdtemp(path.join(os.tmpdir(), "boardreadyops-signed-export-")),
@@ -435,6 +489,19 @@ async function importArchive(
     const verification = await dependencies.verifyArchive(archiveVerificationInput(extractionRoot, expected, claims));
     if (verification.status !== "eligible" || !verification.subjects) {
       return jsonError("signed manufacturing export could not be independently verified", 422);
+    }
+    if (temporaryArtifactId) {
+      return await persistTemporaryVerifiedArchive(
+        extractionRoot,
+        archive,
+        params,
+        dependencies,
+        executor,
+        expected,
+        claims,
+        verification.subjects,
+        temporaryArtifactId,
+      );
     }
     return await persistVerifiedArchive(
       extractionRoot,
@@ -477,7 +544,28 @@ export async function handleSignedManufacturingExportImport(
     const authentication = await authenticateExportRequest(request, params, dependencies, executor);
     if (authentication instanceof Response) return authentication;
     const { expected, claims } = authentication;
+    const archiveMode = dependencies.environment.MANUFACTURING_ARCHIVE_STORAGE ?? "local";
+    if (archiveMode !== "github-actions" && request.headers.get("x-boardreadyops-github-artifact-id")) {
+      return jsonError("temporary GitHub artifact storage is not enabled in this deployment", 409);
+    }
+    if (archiveMode === "github-actions") {
+      const temporaryArtifactId = request.headers.get("x-boardreadyops-github-artifact-id") ?? "";
+      if (!temporaryManufacturingStoragePath(expected.githubRunId, temporaryArtifactId)) {
+        return jsonError("valid temporary GitHub Actions artifact reference is required", 400);
+      }
+      const verify =
+        dependencies.verifyTemporaryArtifact ?? createTemporaryManufacturingArtifactVerifier(dependencies.environment);
+      let verified = false;
+      try {
+        verified = await verify(executor, expected, temporaryArtifactId);
+      } catch {
+        return jsonError("temporary GitHub artifact verification is temporarily unavailable", 503);
+      }
+      if (!verified) return jsonError("temporary GitHub Actions artifact does not match this run", 422);
+      return await importArchive(request, params, dependencies, executor, expected, claims, temporaryArtifactId);
+    }
     if (
+      archiveMode !== "local" ||
       !dependencies.environment.ARTIFACT_STORAGE_ROOT ||
       (dependencies.environment.ARTIFACT_STORAGE_DRIVER ?? "local") !== "local"
     ) {

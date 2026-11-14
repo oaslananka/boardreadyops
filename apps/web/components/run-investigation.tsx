@@ -1470,7 +1470,12 @@ export function ArtifactsView({
   const normalizedArtifactSort = filtersFromSearchParameters(searchParameters).artifactSort ?? "newest";
   const hasArtifactFilters = Boolean(current.artifactSearch || current.artifactRole || current.artifactKind);
   const hasNoStoredArtifacts = !hasArtifactFilters && run.artifactsPage.total === 0 && run.artifacts.length === 0;
-  const hasUnavailableSignedDownload = run.artifacts.some((artifact) => !artifact.downloadUrl);
+  const hasUnavailableSignedDownload = run.artifacts.some(
+    (artifact) => artifact.availability !== "expired" && !artifact.downloadUrl,
+  );
+  const hasTemporaryGitHubArtifacts = run.artifacts.some((artifact) =>
+    artifact.downloadUrl?.startsWith("https://github.com/"),
+  );
   const artifactLifecycleTotal =
     run.artifactLifecycle.deleted +
     run.artifactLifecycle.missing +
@@ -1537,6 +1542,19 @@ export function ArtifactsView({
           </Link>
         </div>
       </form>
+      {hasTemporaryGitHubArtifacts ? (
+        <div className="mt-3">
+          <Alert title="Temporary GitHub Actions manufacturing packages" tone="info">
+            <p>
+              Signed manufacturing downloads are hosted by the repository&apos;s GitHub Actions for at most 3 days.
+              GitHub repository access is required. Download the ZIP and check the SHA-256 against the .tar.gz inside it
+              before using the archive. Repository retention settings or deletion of the workflow can make it
+              unavailable sooner. GitHub checks actual availability at download time. After expiry, regenerate from the
+              reviewed source commit. This is not manufacturing approval.
+            </p>
+          </Alert>
+        </div>
+      ) : null}
       {hasUnavailableSignedDownload ? (
         <div className="mt-3">
           <Alert title="Signed artifact download is unavailable" tone="warning">
@@ -1626,10 +1644,16 @@ function ArtifactRow({ artifact }: Readonly<{ artifact: ArtifactDetail }>) {
       <td className="py-2 pr-3">
         {artifact.downloadUrl ? (
           <a href={artifact.downloadUrl} className={buttonVariants({ variant: "secondary", size: "sm" })}>
-            Download signed copy
+            {artifact.downloadUrl.startsWith("https://github.com/")
+              ? "Download temporary copy in GitHub"
+              : "Download signed copy"}
           </a>
         ) : (
-          <span className="text-xs text-muted-foreground">Signed download unavailable</span>
+          <span className="text-xs text-muted-foreground">
+            {artifact.availability === "expired"
+              ? "Temporary copy expired — regenerate from source"
+              : "Signed download unavailable"}
+          </span>
         )}
       </td>
     </tr>
