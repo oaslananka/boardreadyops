@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ingestRunRequestSchema, POST as postRun } from "../../../apps/web/app/api/v1/runs/route.js";
 import * as apiAuth from "../../../apps/web/lib/api-auth.js";
 import * as cloudConfig from "../../../apps/web/lib/cloud-runtime-config.js";
+import { ReviewStore } from "../../../packages/db/src/review-store.js";
 
 const mockQuery = vi.fn();
 const mockClose = vi.fn();
@@ -213,6 +215,141 @@ describe("POST /api/v1/runs persists review-canvas snapshots", () => {
     expect(params[8]).toBe(116);
   });
 
+  it("refuses BOM upload without opt-in, matching checksum or exact commit before writing", async () => {
+    const boms = [{ project: "mainboard.kicad_pro", components: [{ reference: "R1", mpn: "ABC-123" }] }];
+    const bomSha256 = createHash("sha256").update(JSON.stringify(boms)).digest("hex");
+    const base = {
+      repositoryId: "repo-1",
+      commitSha: "a".repeat(40),
+      ref: "refs/heads/main",
+      evidenceDigest: "b".repeat(64),
+      boms,
+      bomSha256,
+      bomConsent: true,
+    };
+    for (const invalid of [
+      { ...base, bomConsent: undefined },
+      { ...base, bomSha256: "c".repeat(64) },
+      { ...base, commitSha: "a".repeat(7) },
+      { ...base, evidenceDigest: undefined },
+      { ...base, boms: undefined },
+    ]) {
+      const response = await postRun(
+        new Request("https://boardreadyops.test/api/v1/runs", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(invalid),
+        }),
+      );
+      expect(response.status).toBe(400);
+    }
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects BOM-bearing browser bundles without a separate disclosure acknowledgment", async () => {
+    vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
+      ok: true,
+      actorId: "review-owner",
+      scopes: ["runs:write"],
+      authType: "session",
+      installationIds: [4242],
+      githubUserId: 123,
+    });
+    const boms = [{ project: "mainboard.kicad_pro", components: [{ reference: "R1" }] }];
+    const response = await postRun(
+      new Request("https://boardreadyops.test/api/v1/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          repositoryId: "repo-1",
+          commitSha: "a".repeat(40),
+          ref: "refs/heads/main",
+          evidenceDigest: "b".repeat(64),
+          boms,
+          bomConsent: true,
+          bomSha256: createHash("sha256").update(JSON.stringify(boms)).digest("hex"),
+        }),
+      }),
+    );
+    expect(response.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+  it("stores explicitly disclosed observed BOM in the same Run transaction without enabling supply watch", async () => {
+    const boms = [{ project: "mainboard.kicad_pro", components: [{ reference: "R1", mpn: "ABC-123" }] }];
+    const bomSha256 = createHash("sha256").update(JSON.stringify(boms)).digest("hex");
+    vi.spyOn(ReviewStore.prototype, "upsertReviewForRun").mockResolvedValue({ review: { id: "review-test" } } as never);
+    mockQuery.mockImplementation(async (sql: string) => {
+      const normalized = sql.toLowerCase().replace(/\s+/gu, " ");
+      if (normalized.includes("installations.account_login as tenant")) return { rows: [{ tenant: "review-owner" }] };
+      if (normalized.includes("from repositories")) return { rows: [{ github_installation_id: 4242 }] };
+      if (normalized.includes("as run_matches")) {
+        return {
+          rows: [
+            { run_matches: 1, boards_touched: 1, snapshots_written: 1, components_written: 1, boards_enrolled: 0 },
+          ],
+        };
+      }
+      return { rows: [] };
+    });
+    const response = await postRun(
+      new Request("https://boardreadyops.test/api/v1/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          repositoryId: "repo-1",
+          commitSha: "a".repeat(40),
+          ref: "refs/heads/main",
+          evidenceDigest: "b".repeat(64),
+          boms,
+          bomConsent: true,
+          bomSha256,
+        }),
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect((await response.json()).acceptedObservedBom).toBe(true);
+    const write = mockQuery.mock.calls.find(([sql]) => String(sql).includes("insert into board_bom_snapshots"));
+    expect(write).toBeDefined();
+    expect(write?.[1]?.[2]).toBe("a".repeat(40));
+    expect(write?.[1]?.[5]).toBe(0);
+    // The shared SQL has a watch CTE; its passed limit of zero prevents enrollment.
+    expect(write?.[1]?.[5]).toBe(0);
+  });
+  it("acknowledges only an actually recorded BOM on idempotent Review publication", async () => {
+    const boms = [{ project: "mainboard.kicad_pro", components: [{ reference: "R1" }] }];
+    const bomSha256 = createHash("sha256").update(JSON.stringify(boms)).digest("hex");
+    let storedProject = "mainboard.kicad_pro";
+    mockQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes("from repositories")) return { rows: [{ github_installation_id: 4242 }] };
+      if (sql.includes("from release_runs where repository_id"))
+        return { rows: [{ id: "already-published", status: "completed" }] };
+      if (sql.includes("from board_bom_snapshots as snapshot")) return { rows: [{ project_path: storedProject }] };
+      return { rows: [] };
+    });
+    const body = {
+      repositoryId: "repo-1",
+      commitSha: "a".repeat(40),
+      ref: "refs/heads/main",
+      evidenceDigest: "b".repeat(64),
+      boms,
+      bomConsent: true,
+      bomSha256,
+    };
+    const request = () =>
+      new Request("https://boardreadyops.test/api/v1/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json", "idempotency-key": "stable-review-evidence" },
+        body: JSON.stringify(body),
+      });
+    const valid = await postRun(request());
+    expect(valid.status).toBe(200);
+    expect(await valid.json()).toMatchObject({ deduplicated: true, acceptedObservedBom: true });
+    expect(mockQuery.mock.calls.some(([sql]) => String(sql).includes("insert into release_runs"))).toBe(false);
+    storedProject = "different-board.kicad_pro";
+    const mismatch = await postRun(request());
+    expect(mismatch.status).toBe(409);
+    expect((await mismatch.json()).error).toContain("observed BOM evidence mismatch");
+  });
   it("rejects out-of-range SVG dimensions before inserting any run", async () => {
     const request = new Request("https://boardreadyops.test/api/v1/runs", {
       method: "POST",

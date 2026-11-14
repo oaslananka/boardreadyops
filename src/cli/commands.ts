@@ -423,6 +423,7 @@ export function registerAllCommands(
         "--native-visuals",
         "explicitly upload KiCad-native PCB/schematic artwork (may disclose detailed design IP)",
       )
+      .option("--share-bom", "explicitly share the committed project's observed BOM (not fabrication approval)")
       .option("--share-footprint-summary", "opt in to publishing PCB change counts and source hashes")
       .option("--pcb <path>", "tracked PCB path required for opted-in change summary")
       .option("--dry-run", "simulate review publish without uploading")

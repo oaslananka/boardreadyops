@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -208,6 +209,7 @@ describe("CLI review publish command", () => {
         { repo: "local-repo" },
         { repo: "other-org/other-repo" },
         { token: "bearer-must-not-be-sent" },
+        { shareBom: true },
         { dryRun: true },
         { head: "1".repeat(40) },
       ]) {
@@ -244,6 +246,83 @@ describe("CLI review publish command", () => {
     }
   });
 
+  it("publishes observed BOM rows only with explicit opt-in and exact clean Git source", async () => {
+    const { root, head } = createCommittedPcbReviewFixture();
+    const fetchMock = vi.fn().mockResolvedValue(
+      successResponse({
+        ok: true,
+        runId: "run-with-bom",
+        reviewUrl: "/reviews/bom-review",
+        acceptedObservedBom: true,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({ project: "safe-basic.kicad_pro", shareBom: true, head }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code, stderr.output).toBe(0);
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const body = JSON.parse(String(init.body)) as {
+        commitSha: string;
+        boms: Array<{ project: string; components: unknown[] }>;
+        bomConsent: boolean;
+        bomSha256: string;
+        evidenceDigest: string;
+      };
+      expect(body.commitSha).toBe(head);
+      expect(body.bomConsent).toBe(true);
+      expect(body.boms.length).toBeGreaterThan(0);
+      expect(body.boms[0]?.project).toContain("safe-basic");
+      expect(body.bomSha256).toBe(createHash("sha256").update(JSON.stringify(body.boms)).digest("hex"));
+      expect(body.evidenceDigest).toMatch(/^[a-f0-9]{64}$/u);
+
+      fs.appendFileSync(path.join(root, "safe-basic.kicad_pcb"), "\n; uncommitted BOM edit\n");
+      fetchMock.mockClear();
+      const rejected = createMockStream();
+      const rejectedErr = createMockStream();
+      expect(
+        await reviewPublishCommand(root, liveOptions({ project: "safe-basic.kicad_pro", shareBom: true, head }), {
+          stdout: rejected.stream,
+          stderr: rejectedErr.stream,
+        }),
+      ).toBe(2);
+      expect(rejectedErr.output).toContain("clean committed Git HEAD");
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("never silently accepts a BOM upload when the server omits its acknowledgment", async () => {
+    const { root, head } = createCommittedPcbReviewFixture();
+    const fetchMock = vi.fn().mockResolvedValue(
+      successResponse({
+        ok: true,
+        runId: "unacknowledged-bom",
+        reviewUrl: "/reviews/not-acknowledged",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({ project: "safe-basic.kicad_pro", shareBom: true, head }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code).toBe(1);
+      expect(stderr.output).toContain("did not acknowledge the observed BOM");
+      expect(stdout.output).not.toContain("published successfully");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
   it("requires explicit opt-in and both revisions before sending PCB-derived summary fields", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -469,6 +548,8 @@ describe("CLI review publish command", () => {
     const body = JSON.parse(requestInit.body as string) as { snapshots?: unknown[] };
 
     expect(body.snapshots?.length).toBeGreaterThan(0);
+    expect(body).not.toHaveProperty("boms");
+    expect(body).not.toHaveProperty("bomConsent");
     const schematicSnapshot = body.snapshots?.find(
       (snapshot): snapshot is { kind: string; content: string } => (snapshot as { kind?: string }).kind === "schematic",
     );

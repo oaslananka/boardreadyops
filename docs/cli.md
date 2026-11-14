@@ -72,6 +72,15 @@ boardreadyops review publish . --project hardware/mainboard/mainboard.kicad_pro 
 
 This creates a separate source-bound run and Review. It does not add visual evidence to a previous GitHub App readiness run or approve manufacturing.
 
+**Optional observed BOM publication requires separate explicit opt-in.** By default `review publish` does **not** send component references, manufacturer names, MPNs or BOM rows. When disclosure is authorized by the repository owner, run this from a *clean committed* KiCad project:
+
+```bash
+boardreadyops review publish . --project hardware/mainboard/mainboard.kicad_pro --share-bom --server https://boardreadyops.com
+```
+
+`--share-bom` requires the exact checked-out 40-character Git `HEAD` and a clean worktree before **and after** analysis. Observed BOM rows are normalized through the shared schema, SHA-256 checked, then recorded for that exact Run. The server must acknowledge the stored BOM. No supply-watch enrollment, manufacturing archive or fabrication approval is created; BOM rows remain **publisher-reported**, not independently attested against remote Git source. Use `--project` in multi-board repositories to avoid unrelated design disclosure. A repository-scoped `runs:write` token is required; `--dry-run` does not upload anything.
+
+BOM data can reveal commercial part numbers and hardware design IP. The signed-in-browser evidence bundle path (`--bundle`) intentionally **rejects** `--share-bom`, because its current approval UI has no separate BOM disclosure acknowledgment. Until that exists, publish observed BOMs only through the token-authenticated CLI. A passing Review or a stored BOM never by itself approves a board for fabrication.
 **Optional PCB footprint-count publishing requires a separate explicit opt-in.** With two exact Git revisions and a tracked KiCad PCB, use:
 
 ```bash
