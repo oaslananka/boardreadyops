@@ -329,6 +329,9 @@ function matchesVerifiedResult(value: unknown, e: TrustedExportExpectation, inve
   const cert = recordAt(verification, "signature", "certificate");
   const statement = recordAt(verification, "statement");
   const subjects = statement?.subject;
+  // A workflow_dispatch signs from its protected workflow revision, while the
+  // separately reviewed PR commit is bound by the signed manifest + subject bytes.
+  // Never mistake GitHub certificate sourceRepositoryDigest for the PR checkout SHA.
   const workflowUri = `https://github.com/${e.repository}/${e.workflowPath}@${e.sourceRef}`;
   // gh attestation verify 2.102 exposes the certified SAN as a string.
   // Older parsed verifier results may wrap it in { value }; both must
@@ -340,7 +343,7 @@ function matchesVerifiedResult(value: unknown, e: TrustedExportExpectation, inve
     cert?.issuer !== oidcIssuer ||
     cert.sourceRepositoryURI !== `https://github.com/${e.repository}` ||
     cert.sourceRepositoryIdentifier !== e.repositoryId ||
-    cert.sourceRepositoryDigest !== e.reviewedSha ||
+    cert.sourceRepositoryDigest !== (e.signerSha ?? e.reviewedSha) ||
     cert.githubWorkflowSHA !== (e.signerSha ?? e.reviewedSha) ||
     cert.sourceRepositoryRef !== e.sourceRef ||
     cert.runInvocationURI !== runUri ||
@@ -396,7 +399,7 @@ export async function verifyReviewedExportAttestation(
     "--signer-workflow",
     `${e.repository}/${e.workflowPath}`,
     "--source-digest",
-    e.reviewedSha,
+    e.signerSha ?? e.reviewedSha,
     "--signer-digest",
     e.signerSha ?? e.reviewedSha,
     "--source-ref",

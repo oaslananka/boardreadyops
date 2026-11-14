@@ -261,14 +261,61 @@ describe("opt-in trusted export attestation prerequisites (not GA)", () => {
   it("binds the reviewed source SHA separately from the immutable signer workflow SHA", async () => {
     const f = await fixture();
     const signerSha = "b".repeat(40);
-    succeed(verifiedResult(f, { cert: { buildSignerDigest: signerSha, githubWorkflowSHA: signerSha } }));
+    succeed(
+      verifiedResult(f, {
+        cert: { sourceRepositoryDigest: signerSha, buildSignerDigest: signerSha, githubWorkflowSHA: signerSha },
+      }),
+    );
     const result = await verify(f, { ...expectation, signerSha });
     expect(result.status).toBe("eligible");
     const [, args] = mockedRun.mock.calls[0] ?? [];
     expect(args).toContain("--source-digest");
-    expect(args).toContain(sha);
+    expect(args?.[args.indexOf("--source-digest") + 1]).toBe(signerSha);
     expect(args).toContain("--signer-digest");
     expect(args).toContain(signerSha);
+  });
+
+  it("accepts an offline signed PR-source archive only when the protected workflow signer digest matches", async () => {
+    const f = await signedArchiveFixture();
+    const signerSha = "b".repeat(40);
+    // The workflow_dispatch certificate is issued for the protected workflow revision,
+    // not the different PR commit whose bytes are bound by the signed manifest.
+    succeed(
+      verifiedResult(f, {
+        cert: { sourceRepositoryDigest: signerSha, githubWorkflowSHA: signerSha, buildSignerDigest: signerSha },
+      }),
+    );
+    const result = await verifyReviewedExportAttestation({
+      root: f.root,
+      manifestPath: f.manifestPath,
+      expected: { ...expectation, signerSha },
+      sourceCheckout: false,
+      bundlePath: path.join(f.root, "bundle.sigstore.json"),
+    });
+    expect(result.status).toBe("eligible");
+    expect(result.sourceSha).toBe(sha);
+    expect(result.subjects).toBe(5);
+    const [, args] = mockedRun.mock.calls[0] ?? [];
+    expect(args?.[args.indexOf("--source-digest") + 1]).toBe(signerSha);
+    expect(args?.[args.indexOf("--signer-digest") + 1]).toBe(signerSha);
+    expect(args?.[args.indexOf("--source-ref") + 1]).toBe(expectation.sourceRef);
+  });
+
+  it("rejects an alleged source digest from the PR instead of the trusted signer workflow", async () => {
+    const f = await signedArchiveFixture();
+    const signerSha = "b".repeat(40);
+    succeed(verifiedResult(f, { cert: { githubWorkflowSHA: signerSha, buildSignerDigest: signerSha } }));
+    expect(
+      (
+        await verifyReviewedExportAttestation({
+          root: f.root,
+          manifestPath: f.manifestPath,
+          expected: { ...expectation, signerSha },
+          sourceCheckout: false,
+          bundlePath: path.join(f.root, "bundle.sigstore.json"),
+        })
+      ).status,
+    ).toBe("rejected");
   });
 
   it("rejects a signer SHA that differs from the verified workflow certificate", async () => {
