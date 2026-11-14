@@ -326,6 +326,42 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(await fs.readFile(path.join(f.root, filename), "utf8")).toContain("schemaVersion");
     await expect(fs.readFile(path.join(f.runnerTemp, filename))).rejects.toThrow();
   });
+  it("exports a real BOM from the fixed golden demo used by hosted manufacturing", async (ctx) => {
+    const schematic = path.resolve("examples/golden-demo/fixed/demo.kicad_sch");
+    const source = await fs.readFile(schematic, "utf8");
+    expect(source).toContain("(version 20250114)");
+    for (const ref of ["R1", "R2", "C1"]) {
+      expect(source).toContain(`(property "Reference" "${ref}"`);
+    }
+    // KiCad writes local project session state; it must not dirty the exact-SHA signer checkout.
+    const sessionFile = spawnSync("git", ["check-ignore", "-q", "examples/golden-demo/fixed/demo.kicad_prl"], {
+      encoding: "utf8",
+    });
+    expect(sessionFile.status).toBe(0);
+    const cli = await detectKicadCli();
+    if (!process.env.CI) ctx.skip(!cli.found || !/^10\.0\./u.test(cli.version ?? ""), "Requires KiCad 10");
+    expect(cli.found).toBe(true);
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-golden-demo-bom-"));
+    ownedRoots.push(dir);
+    const output = path.join(dir, "bom.csv");
+    const result = spawnSync(cli.path ?? "kicad-cli", ["sch", "export", "bom", "--output", output, schematic], {
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    const csv = await fs.readFile(output, "utf8");
+    for (const ref of ["R1", "R2", "C1"]) expect(csv).toContain(ref);
+    // This is a visible design schematic, not only a CSV-shaped placeholder.
+    const svgDir = path.join(dir, "svg");
+    await fs.mkdir(svgDir);
+    const svg = spawnSync(cli.path ?? "kicad-cli", ["sch", "export", "svg", "--output", svgDir, schematic], {
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+    expect(svg.status, svg.stderr || svg.stdout).toBe(0);
+    const artwork = await fs.readFile(path.join(svgDir, "demo.svg"), "utf8");
+    for (const ref of ["R1", "R2", "C1"]) expect(artwork).toContain(ref);
+  });
   it("exports REAL KiCad Gerbers, drill, BOM and CPL from the exact clean SHA and inventories all bytes", async (ctx) => {
     const cli = await detectKicadCli();
     if (!process.env.CI) ctx.skip(!cli.found || !/^10\.0\./u.test(cli.version ?? ""), "Requires KiCad 10");
