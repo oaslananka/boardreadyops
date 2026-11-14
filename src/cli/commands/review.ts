@@ -409,6 +409,14 @@ export async function reviewPublishCommand(
   const rulePackDigest = createHash("sha256").update("boardreadyops-v1").digest("hex");
   const configDigest = createHash("sha256").update(JSON.stringify(config)).digest("hex");
 
+  const artifactDigests: { name: string; sha256: string }[] = [];
+  if (bomSha256) artifactDigests.push({ name: "observed-board-bom.v1.json", sha256: bomSha256 });
+  if (pcbFootprintSummary) {
+    artifactDigests.push({
+      name: "pcb-footprint-summary.v1.json",
+      sha256: createHash("sha256").update(JSON.stringify(pcbFootprintSummary)).digest("hex"),
+    });
+  }
   const evidenceDigest = computeEvidenceDigest({
     toolVersion: boardReadyVersion,
     rulePackDigest,
@@ -416,26 +424,7 @@ export async function reviewPublishCommand(
     headCommitSha: headSha,
     ...(baseSha ? { baseCommitSha: baseSha } : {}),
     findingFingerprints: findings.map((f) => f.fingerprint),
-    artifactDigests: bomSha256
-      ? [
-          { name: "observed-board-bom.v1.json", sha256: bomSha256 },
-          ...(pcbFootprintSummary
-            ? [
-                {
-                  name: "pcb-footprint-summary.v1.json",
-                  sha256: createHash("sha256").update(JSON.stringify(pcbFootprintSummary)).digest("hex"),
-                },
-              ]
-            : []),
-        ]
-      : pcbFootprintSummary
-        ? [
-            {
-              name: "pcb-footprint-summary.v1.json",
-              sha256: createHash("sha256").update(JSON.stringify(pcbFootprintSummary)).digest("hex"),
-            },
-          ]
-        : [],
+    artifactDigests,
   });
 
   if (!jsonOutput) {

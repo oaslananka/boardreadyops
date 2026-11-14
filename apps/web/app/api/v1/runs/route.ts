@@ -18,6 +18,28 @@ import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
 export const runtime = "nodejs";
 
+/** Validate explicitly disclosed publisher-observed BOMs independently of other Review evidence gates. */
+function observedBomValidationIssue(payload: {
+  boms?: readonly z.infer<typeof releaseRunBoardBomSchema>[] | undefined;
+  bomConsent?: true | undefined;
+  bomSha256?: string | undefined;
+  commitSha: string;
+  evidenceDigest?: string | undefined;
+}): string | undefined {
+  if (!payload.boms) {
+    return payload.bomConsent || payload.bomSha256 ? "Observed BOM data is required" : undefined;
+  }
+  const observedDigest = createHash("sha256").update(JSON.stringify(payload.boms)).digest("hex");
+  if (
+    payload.bomConsent !== true ||
+    !payload.evidenceDigest ||
+    !/^[a-f0-9]{40}$/u.test(payload.commitSha) ||
+    payload.bomSha256 !== observedDigest
+  ) {
+    return "Observed BOM requires explicit consent, exact commit and matching SHA-256 evidence";
+  }
+  return undefined;
+}
 // Exported for consumer-driven contract tests covering the CLI->Cloud and Action->Cloud
 // boundaries (`src/cli/commands/review.ts` and `src/action/cloud-publish.ts` both POST here):
 // see tests/unit/contracts/cli-cloud-forward-compat.test.ts.
@@ -71,22 +93,9 @@ export const ingestRunRequestSchema = z
       .optional(),
   })
   .superRefine((payload, ctx) => {
-    if (payload.boms) {
-      const observedDigest = createHash("sha256").update(JSON.stringify(payload.boms)).digest("hex");
-      if (
-        payload.bomConsent !== true ||
-        !payload.evidenceDigest ||
-        !/^[a-f0-9]{40}$/u.test(payload.commitSha) ||
-        payload.bomSha256 !== observedDigest
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["boms"],
-          message: "Observed BOM requires explicit consent, exact commit and matching SHA-256 evidence",
-        });
-      }
-    } else if (payload.bomConsent || payload.bomSha256) {
-      ctx.addIssue({ code: "custom", path: ["boms"], message: "Observed BOM data is required" });
+    const bomIssue = observedBomValidationIssue(payload);
+    if (bomIssue) {
+      ctx.addIssue({ code: "custom", path: ["boms"], message: bomIssue });
     }
     const summary = payload.pcbFootprintSummary;
     if (!summary) {
@@ -182,8 +191,12 @@ async function checkIdempotentRun(
         ].join(" "),
         [previous.id, observedBom.commitSha, repositoryId],
       );
-      const stored = ((saved as { rows?: { project_path: string }[] }).rows ?? []).map((row) => row.project_path);
-      const expected = [...new Set(observedBom.boms.map((bom) => bom.project))].sort();
+      const stored = ((saved as { rows?: { project_path: string }[] }).rows ?? [])
+        .map((row) => row.project_path)
+        .sort((left, right) => left.localeCompare(right));
+      const expected = [...new Set(observedBom.boms.map((bom) => bom.project))].sort((left, right) =>
+        left.localeCompare(right),
+      );
       if (JSON.stringify(stored) !== JSON.stringify(expected)) {
         return Response.json({ ok: false, error: "Idempotent observed BOM evidence mismatch" }, { status: 409 });
       }
