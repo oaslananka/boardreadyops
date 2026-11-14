@@ -552,8 +552,24 @@ function ReviewLifecyclePanel({ run }: Readonly<{ run: RunDetail }>) {
               </span>
             </li>
             <li>
-              Fix the source locally, push a new commit, and re-run readiness. Confirm <code>git rev-parse HEAD</code>{" "}
-              matches the exact commit you intend to review; an older run cannot prove a newer fix.
+              {run.status === "completed" && run.decision === "pass" ? (
+                <>
+                  This readiness run passed for the recorded commit. No source fix is required by this result. Confirm{" "}
+                  <code>git rev-parse HEAD</code> matches the commit you intend to review. If you change the source,
+                  re-run readiness: an older result cannot validate a newer revision.
+                </>
+              ) : run.status === "failed" || run.decision === "fail" ? (
+                <>
+                  Fix the source locally, push a new commit, and re-run readiness. Confirm{" "}
+                  <code>git rev-parse HEAD</code> matches the exact commit you intend to review; an older run cannot
+                  prove a newer fix.
+                </>
+              ) : (
+                <>
+                  Check the readiness result and findings when this run finishes. Confirm{" "}
+                  <code>git rev-parse HEAD</code> matches the source commit before publishing Review evidence.
+                </>
+              )}
             </li>
             <li>
               Publish Review evidence <strong>explicitly</strong> from the checked-out project using the configured CLI
