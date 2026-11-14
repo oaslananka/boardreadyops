@@ -520,6 +520,32 @@ describe("run investigation accessibility", () => {
     expect(markup).not.toContain("Approve review");
   });
 
+  it("does not tell users to repair a completed passing run with no findings", () => {
+    const run = sampleRun();
+    run.findings = [];
+    run.findingsPage = { page: 1, pageSize: 25, total: 0, totalPages: 1 };
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("This readiness run passed for the recorded commit");
+    expect(markup).toContain("No source fix is required by this result");
+    expect(markup).not.toContain("Fix the source locally");
+    expect(markup).toContain("boardreadyops review publish");
+    expect(markup).not.toContain("Manufacturing approved");
+  });
+
+  it("retains source-fix instructions for a failed readiness run", () => {
+    const run = { ...sampleRun(), status: "failed", decision: "fail", investigationState: "failed" as const };
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("Fix the source locally");
+    expect(markup).not.toContain("No source fix is required");
+  });
+
+  it("does not ask for repairs before a dispatched run has a result", () => {
+    const run = { ...sampleRun(), status: "dispatched", decision: undefined, investigationState: "current" as const };
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("Check the readiness result and findings when this run finishes");
+    expect(markup).not.toContain("Fix the source locally");
+    expect(markup).not.toContain("No source fix is required");
+  });
   it("links only an explicitly associated published review without suggesting re-publication", () => {
     const run = { ...sampleRun(), reviewId: "review-42" };
     const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
