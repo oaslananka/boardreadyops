@@ -4,6 +4,13 @@ Customer-operated execution workers are deployed separately from the control pla
 
 This guide describes a generic self-hosted BoardReadyOps Cloud control-plane deployment. It intentionally does not name a current production machine or IP address. Select the deployment host and the **operator-selected HTTPS origin** before commissioning, and keep those environment-specific values in the operations system rather than in the public repository.
 
+### Single-pass worker mode (isolated migration testing only)
+
+The built control-plane worker can process one finite batch per queue instead of opening a health listener and polling indefinitely. For isolated tests invoke: `BOARDREADYOPS_WORKER_MODE=once node apps/web/.next/worker.mjs`
+
+The default mode is continuous; existing production services are unchanged. Single-pass mode still needs normal worker credentials and PostgreSQL access. It acquires the existing exclusive PostgreSQL worker ownership lock before processing, reuses durable leases and idempotent outbox transitions, processes one bounded claim batch in each configured category, runs one maintenance pass, releases the lock and closes the database connection. It exits nonzero on invalid configuration, a claim failure, or an uncaught batch error. Do not overlap with an existing production worker.
+
+Not yet a serverless deployment contract: one pass might leave backlog; external requests or maintenance can exceed short function time limits. Periodic reconciliation, notifications, retries, object storage, idle wakeups and real-user latency still require independently verified scheduling and staging acceptance. Do not turn off the production worker or move DNS merely because this mode exists.
 ### Quiesced worker release for artifact fencing
 
 For a planned local-storage fencing migration, an operator may stop the **old worker** only after recording an encrypted backup, confirming no active artifact deletion or unresolved legal hold, and enumerating all old unlink actors. Select **`dry_run=false` and `pre_quiesced_worker=true`** in the production `cloud-deploy` dispatch. Choosing `pre_quiesced_worker=true` with `dry_run=true` is rejected by the first workflow step **before** loading deployment secrets or connecting Tailscale, and again by the remote preflight; it never runs a deployment. The default remains `false`: ordinary releases still require one running, healthy web and worker on the same immutable image.

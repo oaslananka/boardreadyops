@@ -308,3 +308,28 @@ export async function waitForAllWorkerLoops(loops: readonly Promise<void>[], onF
   const failed = settled.find((result) => result.status === "rejected");
   if (failed?.status === "rejected") throw failed.reason;
 }
+
+/**
+ * A scheduled invocation claims at most one already-bounded batch per queue.
+ * The caller owns the database lease and closes the connection after return.
+ * This deliberately does not replace the continuous worker's retry scheduler.
+ */
+export type WorkerSinglePassOperations = {
+  lifecycle: () => Promise<void>;
+  outbox: () => Promise<void>;
+  artifactDeletion: () => Promise<void>;
+  stripe: () => Promise<void>;
+  lifecycleReconciliation: () => Promise<void>;
+  githubReconciliation: () => Promise<void>;
+  maintenance: () => Promise<void>;
+};
+
+export async function runOneWorkerPass(operations: WorkerSinglePassOperations): Promise<void> {
+  await operations.lifecycle();
+  await operations.outbox();
+  await operations.artifactDeletion();
+  await operations.stripe();
+  await operations.lifecycleReconciliation();
+  await operations.githubReconciliation();
+  await operations.maintenance();
+}

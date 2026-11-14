@@ -4,6 +4,7 @@ import {
   createScopedConcurrencyGate,
   jobCorrelation,
   outboxCorrelation,
+  runOneWorkerPass,
   sanitizeWorkerLogFields,
   waitForAllWorkerLoops,
   workerScopeFromJob,
@@ -336,5 +337,57 @@ describe("exclusive-worker shutdown loop draining", () => {
     const stopNewClaims = vi.fn();
     await expect(waitForAllWorkerLoops([Promise.resolve(), Promise.resolve()], stopNewClaims)).resolves.toBeUndefined();
     expect(stopNewClaims).not.toHaveBeenCalled();
+  });
+});
+
+describe("one-shot worker pass", () => {
+  function operations(record: string[]): Parameters<typeof runOneWorkerPass>[0] {
+    const once = (name: string) => async () => {
+      record.push(name);
+    };
+    return {
+      lifecycle: once("lifecycle"),
+      outbox: once("outbox"),
+      artifactDeletion: once("artifactDeletion"),
+      stripe: once("stripe"),
+      lifecycleReconciliation: once("lifecycleReconciliation"),
+      githubReconciliation: once("githubReconciliation"),
+      maintenance: once("maintenance"),
+    };
+  }
+
+  it("keeps continuous polling as default and skips the health listener in one-shot mode", () => {
+    const source = workerSource();
+    expect(source).toContain('process.env.BOARDREADYOPS_WORKER_MODE?.trim() || "continuous"');
+    expect(source).toContain('if (workerRunMode === "once") throw error;');
+    const start = source.indexOf('if (workerRunMode === "once") {\n    log("info", "worker.single_pass_started"');
+    expect(start).toBeGreaterThan(0);
+    const onceBranch = source.slice(start, source.indexOf("  } else {\n    await startHealthServer();", start));
+    expect(onceBranch).toContain("await runSinglePassWorker()");
+    expect(onceBranch).toContain('await shutdown("single_pass_complete")');
+    expect(onceBranch).not.toContain("await startHealthServer()");
+  });
+  it("processes one bounded batch for each worker category and returns", async () => {
+    const processed: string[] = [];
+    await runOneWorkerPass(operations(processed));
+    expect(processed).toEqual([
+      "lifecycle",
+      "outbox",
+      "artifactDeletion",
+      "stripe",
+      "lifecycleReconciliation",
+      "githubReconciliation",
+      "maintenance",
+    ]);
+  });
+
+  it("does not silently report success after a failed batch", async () => {
+    const processed: string[] = [];
+    const tasks = operations(processed);
+    tasks.outbox = async () => {
+      throw new Error("outbox unavailable");
+    };
+    await expect(runOneWorkerPass(tasks)).rejects.toThrow("outbox unavailable");
+    expect(processed).toEqual(["lifecycle"]);
   });
 });

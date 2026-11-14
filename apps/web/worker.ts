@@ -46,6 +46,7 @@ import {
   createScopedConcurrencyGate,
   jobCorrelation,
   outboxCorrelation,
+  runOneWorkerPass,
   sanitizeWorkerLogFields,
   waitForAllWorkerLoops,
   workerScopeFromJob,
@@ -74,6 +75,11 @@ import { type AffectedBoardsResult, affectedPartKeys, composeSupplyAnnouncement 
 // Opt-in only: sends nothing unless SENTRY_DSN is set. See lib/sentry-worker-client.ts.
 const sentryDsn = process.env.SENTRY_DSN?.trim();
 const sentryEnvironment = process.env.SENTRY_ENVIRONMENT?.trim() || process.env.NODE_ENV;
+
+const workerRunMode = process.env.BOARDREADYOPS_WORKER_MODE?.trim() || "continuous";
+if (workerRunMode !== "continuous" && workerRunMode !== "once") {
+  throw new Error("BOARDREADYOPS_WORKER_MODE must be continuous or once");
+}
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL is required for the control-plane worker");
@@ -865,6 +871,7 @@ async function claimAvailableJobs(): Promise<ClaimedControlPlaneJob[]> {
     return jobs.claimJobs({ workerId, limit: concurrency });
   } catch (error) {
     log("error", "worker.claim_failed", { workerId, errorClass: errorClass(error) });
+    if (workerRunMode === "once") throw error;
     return [];
   }
 }
@@ -875,6 +882,7 @@ async function claimAvailableOutboxEffects(): Promise<ClaimedControlPlaneOutboxE
     return outbox.claimEffects({ workerId, limit: outboxConcurrency });
   } catch (error) {
     log("error", "worker.outbox_claim_failed", { workerId, errorClass: errorClass(error) });
+    if (workerRunMode === "once") throw error;
     return [];
   }
 }
@@ -885,6 +893,7 @@ async function claimArtifactDeletions(): Promise<ClaimedArtifactDeletion[]> {
     return artifactDeletions.claimDeletions({ workerId, limit: artifactDeletionConcurrency });
   } catch (error) {
     log("error", "worker.artifact_deletion_claim_failed", { workerId, errorClass: errorClass(error) });
+    if (workerRunMode === "once") throw error;
     return [];
   }
 }
@@ -895,6 +904,7 @@ async function claimLifecycleReconciliationItems(): Promise<ClaimedControlPlaneR
     return operations.claimLifecycleReconciliationItems({ workerId, limit: reconciliationConcurrency });
   } catch (error) {
     log("error", "worker.lifecycle_reconciliation_claim_failed", { workerId, errorClass: errorClass(error) });
+    if (workerRunMode === "once") throw error;
     return [];
   }
 }
@@ -905,6 +915,7 @@ async function claimWorkflowReconciliationItems(): Promise<ClaimedControlPlaneRe
     return operations.claimWorkflowReconciliationItems({ workerId, limit: reconciliationConcurrency });
   } catch (error) {
     log("error", "worker.reconciliation_claim_failed", { workerId, errorClass: errorClass(error) });
+    if (workerRunMode === "once") throw error;
     return [];
   }
 }
@@ -915,6 +926,7 @@ async function claimCheckRunReconciliationItems(): Promise<ClaimedControlPlaneRe
     return operations.claimCheckRunReconciliationItems({ workerId, limit: reconciliationConcurrency });
   } catch (error) {
     log("error", "worker.check_run_reconciliation_claim_failed", { workerId, errorClass: errorClass(error) });
+    if (workerRunMode === "once") throw error;
     return [];
   }
 }
@@ -1131,17 +1143,21 @@ async function runArtifactDeletionLoop(): Promise<void> {
   }
 }
 
+async function runStripeReconciliationPass(): Promise<void> {
+  try {
+    const summary = await processStripeEntitlementPass(executor, { limit: stripeReconciliationBatchSize });
+    if (Object.values(summary).some((count) => count > 0)) {
+      // Aggregate only: never log customer identifiers or Stripe event payloads.
+      log(summary.failed > 0 || summary.dead_letter > 0 ? "warn" : "info", "worker.stripe_reconciliation", summary);
+    }
+  } catch (error) {
+    log("warn", "worker.stripe_reconciliation_failed", { errorClass: errorClass(error) });
+    if (workerRunMode === "once") throw error;
+  }
+}
 async function runStripeReconciliationLoop(): Promise<void> {
   while (!shuttingDown) {
-    try {
-      const summary = await processStripeEntitlementPass(executor, { limit: stripeReconciliationBatchSize });
-      if (Object.values(summary).some((count) => count > 0)) {
-        // Aggregate only: never log customer identifiers or Stripe event payloads.
-        log(summary.failed > 0 || summary.dead_letter > 0 ? "warn" : "info", "worker.stripe_reconciliation", summary);
-      }
-    } catch (error) {
-      log("warn", "worker.stripe_reconciliation_failed", { errorClass: errorClass(error) });
-    }
+    await runStripeReconciliationPass();
     await sleep(stripeReconciliationPollMilliseconds);
   }
 }
@@ -1200,21 +1216,55 @@ async function prepareOptInExportArchive(currentTime: number): Promise<void> {
   }
 }
 
+async function runMaintenancePass(currentTime: number): Promise<void> {
+  await collectQueueMetrics(currentTime);
+  await detectLifecycleReconciliationCandidates(currentTime);
+  await detectWorkflowReconciliationCandidates(currentTime);
+  await detectCheckRunReconciliationCandidates(currentTime);
+  await runSupplyWatch(currentTime);
+  await runFirmwareAdvisoryWatch(currentTime);
+  await scanForTimeBasedNotifications(currentTime);
+  await deliverNotifications(currentTime);
+  await purgeExpiredRetentionData(currentTime);
+  await prepareOptInExportArchive(currentTime);
+}
+
 async function runMaintenanceLoop(): Promise<void> {
   while (!shuttingDown) {
-    const currentTime = Date.now();
-    await collectQueueMetrics(currentTime);
-    await detectLifecycleReconciliationCandidates(currentTime);
-    await detectWorkflowReconciliationCandidates(currentTime);
-    await detectCheckRunReconciliationCandidates(currentTime);
-    await runSupplyWatch(currentTime);
-    await runFirmwareAdvisoryWatch(currentTime);
-    await scanForTimeBasedNotifications(currentTime);
-    await deliverNotifications(currentTime);
-    await purgeExpiredRetentionData(currentTime);
-    await prepareOptInExportArchive(currentTime);
+    await runMaintenancePass(Date.now());
     await sleep(1000);
   }
+}
+
+async function runSinglePassWorker(): Promise<void> {
+  if (!controlPlaneConfigurationValid) {
+    throw new Error("One-shot worker requires valid control-plane configuration");
+  }
+  await runOneWorkerPass({
+    lifecycle: async () => processClaimedJobs(await claimAvailableJobs()),
+    outbox: async () => {
+      if (outboxConfigurationValid) await processClaimedOutboxEffects(await claimAvailableOutboxEffects());
+    },
+    artifactDeletion: async () => {
+      if (artifactDeletionLoopEnabled) await processClaimedArtifactDeletions(await claimArtifactDeletions());
+    },
+    stripe: runStripeReconciliationPass,
+    lifecycleReconciliation: async () =>
+      processClaimedLifecycleReconciliations(await claimLifecycleReconciliationItems()),
+    githubReconciliation: async () => {
+      if (workflowReconciliation && checkRunReconciliation) {
+        const [workflows, checks] = await Promise.all([
+          claimWorkflowReconciliationItems(),
+          claimCheckRunReconciliationItems(),
+        ]);
+        await Promise.all([
+          processClaimedWorkflowReconciliations(workflows),
+          processClaimedCheckRunReconciliations(checks),
+        ]);
+      }
+    },
+    maintenance: async () => runMaintenancePass(Date.now()),
+  });
 }
 
 let activeLoops: Promise<unknown> = Promise.resolve();
@@ -1274,23 +1324,29 @@ try {
       process.exit(1);
     },
   });
-  await startHealthServer();
-  activeLoops = waitForAllWorkerLoops(
-    [
-      runLifecycleLoop(),
-      runOutboxLoop(),
-      runArtifactDeletionLoop(),
-      runStripeReconciliationLoop(),
-      runLifecycleReconciliationLoop(),
-      runGitHubReconciliationLoop(),
-      runMaintenanceLoop(),
-    ],
-    () => {
-      shuttingDown = true;
-      ready = false;
-    },
-  );
-  await activeLoops;
+  if (workerRunMode === "once") {
+    log("info", "worker.single_pass_started", { workerId });
+    await runSinglePassWorker();
+    await shutdown("single_pass_complete");
+  } else {
+    await startHealthServer();
+    activeLoops = waitForAllWorkerLoops(
+      [
+        runLifecycleLoop(),
+        runOutboxLoop(),
+        runArtifactDeletionLoop(),
+        runStripeReconciliationLoop(),
+        runLifecycleReconciliationLoop(),
+        runGitHubReconciliationLoop(),
+        runMaintenanceLoop(),
+      ],
+      () => {
+        shuttingDown = true;
+        ready = false;
+      },
+    );
+    await activeLoops;
+  }
 } catch (error) {
   shuttingDown = true;
   ready = false;
