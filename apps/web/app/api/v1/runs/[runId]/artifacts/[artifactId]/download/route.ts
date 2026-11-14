@@ -9,6 +9,7 @@ import {
   resolveLocalArtifactFile,
   verifyArtifactDownloadSignature,
 } from "../../../../../../../../lib/artifact-downloads.js";
+import { temporaryManufacturingArtifactReference } from "../../../../../../../../lib/github-temporary-manufacturing.js";
 
 export const runtime = "nodejs";
 
@@ -279,6 +280,9 @@ export async function streamVerifiedArtifactDownload(
   artifact: ArtifactDownloadRecord,
   dependencies: Pick<ArtifactDownloadRouteDependencies, "environment" | "recordDownloadStarted">,
 ): Promise<Response> {
+  if (temporaryManufacturingArtifactReference(artifact.storagePath)) {
+    return jsonError("temporary manufacturing archives require repository access through GitHub Actions", 410);
+  }
   const driver = dependencies.environment.ARTIFACT_STORAGE_DRIVER ?? "local";
   if (driver !== "local") {
     return jsonError("artifact storage driver is not supported by this route", 501);

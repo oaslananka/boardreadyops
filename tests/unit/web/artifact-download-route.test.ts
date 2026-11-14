@@ -461,3 +461,26 @@ describe("signed artifact download route", () => {
     expect(recordDownloadStarted).not.toHaveBeenCalled();
   });
 });
+
+describe("temporary GitHub Actions manufacturing artifacts", () => {
+  it("does not pretend to stream an ephemeral GitHub archive from the local disk", async () => {
+    const recordDownloadStarted = vi.fn(async () => undefined);
+    const response = await handleArtifactDownloadRequest(
+      signedRequest("run-123", "artifact-456"),
+      { runId: "run-123", artifactId: "artifact-456" },
+      dependencies(
+        "/unmounted/ephemeral-artifacts",
+        vi.fn(async () => ({
+          state: "found",
+          artifact: artifact({ storagePath: "github-actions/29121986402/54321", role: "manufacturing" }),
+        })),
+        {},
+        recordDownloadStarted,
+      ),
+    );
+    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({ ok: false });
+    expect(recordDownloadStarted).not.toHaveBeenCalled();
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+});

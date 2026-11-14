@@ -288,9 +288,38 @@ jobs:
           tar -rf "$RUNNER_TEMP/boardreadyops-manufacturing-export.tar" -C "$RUNNER_TEMP" bundle.sigstore.json
           gzip -f "$RUNNER_TEMP/boardreadyops-manufacturing-export.tar"
 
+      # The Actions upload cannot exceed the same 128 MiB archive import limit.
+      - name: Check temporary signed archive size
+        id: manufacturing-temporary-budget
+        if: steps.manufacturing-attestation.outcome == 'success' && vars.BOARDREADYOPS_MANUFACTURING_TEMP_ARTIFACTS == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/boardreadyops-manufacturing-export.tar.gz"
+          test -f "$archive" && test ! -L "$archive" && test -s "$archive"
+          bytes="$(stat -c '%s' "$archive")"
+          if (( bytes > 134217728 )); then
+            echo "::error::Signed manufacturing archive exceeds 128 MiB import limit"
+            exit 1
+          fi
+
+      # Opt-in only. This temporary download is not manufacturing approval.
+      - name: Keep signed manufacturing archive temporarily in GitHub Actions
+        id: manufacturing-temporary-artifact
+        if: steps.manufacturing-temporary-budget.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: boardreadyops-manufacturing-${{ inputs.run_id }}-${{ inputs.execution_attempt_id }}
+          path: ${{ runner.temp }}/boardreadyops-manufacturing-export.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+
       - name: Import verified manufacturing evidence into this run
         id: manufacturing-export-import
-        if: steps.manufacturing-attestation.outcome == 'success'
+        if: steps.manufacturing-attestation.outcome == 'success' && (vars.BOARDREADYOPS_MANUFACTURING_TEMP_ARTIFACTS != 'true' || steps.manufacturing-temporary-artifact.outcome == 'success')
         continue-on-error: true
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
@@ -298,6 +327,7 @@ jobs:
           EXECUTION_ATTEMPT_ID: ${{ inputs.execution_attempt_id }}
           HEAD_SHA: ${{ inputs.head_sha }}
           CLOUD_ORIGIN: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}
+          GH_ARTIFACT_ID: ${{ steps.manufacturing-temporary-artifact.outputs.artifact-id }}
           TRUST_MODE: ${{ inputs.safe_mode == 'true' && 'safe' || 'standard' }}
           SAFE_MODE_REASONS: ${{ inputs.safe_mode_reasons }}
         with:
@@ -314,7 +344,7 @@ jobs:
             const archive = fs.readFileSync(process.env.RUNNER_TEMP + "/boardreadyops-manufacturing-export.tar.gz");
             const response = await fetch(url, {
               method: "POST",
-              headers: { authorization: `Bearer ${token}`, "content-type": "application/gzip" },
+              headers: { authorization: `Bearer ${token}`, "content-type": "application/gzip", "x-boardreadyops-github-artifact-id": process.env.GH_ARTIFACT_ID || "" },
               body: archive,
             });
             if (!response.ok) throw new Error("Signed manufacturing evidence import returned HTTP " + response.status);
