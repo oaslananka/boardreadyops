@@ -15,7 +15,11 @@ terraform {
   }
 }
 
-provider "vercel" {}
+provider "vercel" {
+  # Without an explicit account, automatic provisioning could land in the
+  # operator's personal workspace instead of the intended staging team.
+  team = var.vercel_team_id != "" ? var.vercel_team_id : null
+}
 provider "neon" {}
 
 # Intentionally no Git auto-deploy, custom production domain, or Vercel deployment.
@@ -24,6 +28,7 @@ provider "neon" {}
 resource "vercel_project" "web" {
   count          = var.provision ? 1 : 0
   name           = var.vercel_project_name
+  team_id        = var.vercel_team_id
   framework      = "nextjs"
   root_directory = "apps/web"
 }
@@ -42,5 +47,6 @@ resource "vercel_project_environment_variable" "beta_mode" {
 resource "neon_project" "db" {
   count     = var.provision ? 1 : 0
   name      = var.neon_project_name
+  org_id    = var.neon_org_id
   region_id = var.neon_region
 }
