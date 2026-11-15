@@ -1,5 +1,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { runProductionBoundedPass } from "../../../../lib/serverless-worker-production.js";
+import {
+  runProductionBoundedPass,
+  verifyProductionBoundedWorkerReadiness,
+} from "../../../../lib/serverless-worker-production.js";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -32,7 +35,14 @@ export async function POST(request: Request): Promise<Response> {
 
   // Validate the private Vercel route and Doppler sync without claiming stale
   // snapshot work or issuing GitHub mutations before the final cutover.
-  if (process.env.BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY === "1") return json({ ok: true, mode: "verify-only" }, 200);
+  if (process.env.BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY === "1") {
+    try {
+      const checks = await verifyProductionBoundedWorkerReadiness();
+      return json({ ok: true, mode: "verify-only", checks }, 200);
+    } catch {
+      return json({ ok: false, error: "worker_preflight_unavailable" }, 503);
+    }
+  }
 
   try {
     const processed = await runProductionBoundedPass();

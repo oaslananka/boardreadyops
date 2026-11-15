@@ -4,6 +4,7 @@ import { createSqlControlPlaneOperationsStore } from "@boardreadyops/db/control-
 import { createSqlControlPlaneOutboxStore } from "@boardreadyops/db/control-plane-outbox-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
+import { createAppAuth } from "@octokit/auth-app";
 import { processControlPlaneCheckRunReconciliation } from "./control-plane-check-run-reconciliation-worker.js";
 import { processControlPlaneLifecycleReconciliation } from "./control-plane-lifecycle-reconciliation-worker.js";
 import { processControlPlaneOutboxEffect } from "./control-plane-outbox-worker.js";
@@ -20,6 +21,83 @@ import {
   detectBoundedReconciliationCandidates,
   drainBoundedQueues,
 } from "./serverless-worker-pass.js";
+
+/**
+ * Authenticated, read-only acceptance for the isolated serverless runtime.
+ * Verifies actual PostgreSQL connectivity, worker prerequisites and GitHub
+ * App credentials. Never claims jobs, dispatches Actions or mutates Check Runs.
+ */
+export async function verifyProductionBoundedWorkerReadiness(): Promise<{
+  database: "pass";
+  githubApp: "pass";
+  runner: "pass";
+}> {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const runner = runnerModeSummary();
+  const appId = process.env.GITHUB_APP_ID?.trim();
+  const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
+  const checks = createGitHubAppCheckRunClient();
+  const dispatch = runnerWorkflowDispatchClient(runner, createRunnerClient);
+  if (
+    !databaseUrl ||
+    !runner.configurationValid ||
+    runner.mode !== "github-actions" ||
+    !appId ||
+    !privateKey ||
+    !checks?.readCheckRun ||
+    !checks.completeCheckRun ||
+    !dispatch
+  ) {
+    throw new Error("bounded worker prerequisites unavailable");
+  }
+
+  const database = createPgQueryExecutor({ connectionString: databaseUrl, max: 1 });
+  try {
+    const result = await database.withTransaction(
+      async (tx) =>
+        await tx.query(
+          `select
+             to_regclass('public.control_plane_jobs') is not null as jobs_ready,
+             to_regclass('public.control_plane_outbox') is not null as outbox_ready,
+             exists(
+               select 1 from cloud_schema_migrations where version = $1
+             ) as migration_ready`,
+          ["0130_completed_safe_mode_check_run_reconciliation"],
+        ),
+      { consistentRead: true, statementTimeoutMs: 5000 },
+    );
+    const row = result.rows[0] as
+      | { jobs_ready?: boolean; outbox_ready?: boolean; migration_ready?: boolean }
+      | undefined;
+    if (row?.jobs_ready !== true || row.outbox_ready !== true || row.migration_ready !== true) {
+      throw new Error("bounded worker PostgreSQL schema unavailable");
+    }
+  } finally {
+    await database.close();
+  }
+
+  const apiBaseUrl = process.env.GITHUB_API_BASE_URL?.trim() || "https://api.github.com";
+  const apiUrl = new URL("/app", apiBaseUrl);
+  if (apiUrl.protocol !== "https:" || apiUrl.username || apiUrl.password || apiUrl.search || apiUrl.hash) {
+    throw new Error("GitHub API origin unavailable");
+  }
+  const auth = createAppAuth({ appId, privateKey: privateKey.replaceAll(String.raw`\n`, "\n") });
+  const credentials = await auth({ type: "app" });
+  const response = await fetch(apiUrl, {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${credentials.token}`,
+      accept: "application/vnd.github+json",
+      "x-github-api-version": "2022-11-28",
+    },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error("GitHub App identity not accepted");
+  const identity = (await response.json()) as { id?: number };
+  if (String(identity.id) !== appId) throw new Error("GitHub App identity mismatch");
+
+  return { database: "pass", githubApp: "pass", runner: "pass" };
+}
 
 /**
  * Safe for short-lived serverless invocations. The same SQL leases and

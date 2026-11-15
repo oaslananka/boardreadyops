@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const readiness = vi.hoisted(() =>
+  vi.fn(async () => ({ database: "pass" as const, githubApp: "pass" as const, runner: "pass" as const })),
+);
 const run = vi.hoisted(() =>
   vi.fn(async () => ({
     jobs: 1,
@@ -12,6 +15,7 @@ const run = vi.hoisted(() =>
 
 vi.mock("../../../apps/web/lib/serverless-worker-production.js", () => ({
   runProductionBoundedPass: run,
+  verifyProductionBoundedWorkerReadiness: readiness,
 }));
 
 import { POST } from "../../../apps/web/app/api/internal/worker/route.js";
@@ -35,6 +39,7 @@ afterEach(() => {
     else process.env[key] = value;
   }
   run.mockClear();
+  readiness.mockClear();
 });
 
 describe("private serverless worker endpoint", () => {
@@ -71,8 +76,26 @@ describe("private serverless worker endpoint", () => {
 
     const response = await POST(request("test-secret"));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, mode: "verify-only" });
+    expect(await response.json()).toEqual({
+      ok: true,
+      mode: "verify-only",
+      checks: { database: "pass", githubApp: "pass", runner: "pass" },
+    });
+    expect(readiness).toHaveBeenCalledOnce();
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it("does not report preflight success when database or GitHub App cannot be verified", async () => {
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_ENABLED = "1";
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_SECRET = "test-secret";
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY = "1";
+    readiness.mockRejectedValueOnce(new Error("sensitive-failure"));
+    const response = await POST(request("test-secret"));
+    expect(response.status).toBe(503);
+    const body = await response.text();
+    expect(JSON.parse(body)).toEqual({ ok: false, error: "worker_preflight_unavailable" });
+    expect(run).not.toHaveBeenCalled();
+    expect(body).not.toContain("sensitive-failure");
   });
 
   it("processes a bounded pass only with the exact private token and does not return secrets", async () => {
