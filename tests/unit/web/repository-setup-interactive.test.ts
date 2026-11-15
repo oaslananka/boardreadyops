@@ -638,6 +638,56 @@ describe("repository setup readiness controls", () => {
     expect(link?.getAttribute("href")).toBe("https://github.test/octo/board-one/actions/runs/987");
   });
 
+  it("shows an expired probe's exact GitHub run and the next recovery step", async () => {
+    const repository = {
+      ...readyForProbe,
+      setupProbeStatus: "expired",
+      setupProbeWorkflowRunId: "43390025786",
+      setupProbeExpiresAt: "2026-11-13T08:16:47Z",
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, { ...baseProps, signedIn: true, repositories: [repository] }),
+      );
+    });
+
+    expect(button(container, "Retry readiness").disabled).toBe(false);
+    const diagnostic = container.querySelector('[role="status"]');
+    expect(diagnostic?.textContent).toContain("No verified setup result arrived");
+    expect(diagnostic?.textContent).toContain("submodule");
+    const run = [...container.querySelectorAll("a")].find((link) =>
+      link.textContent?.includes("Inspect last probe run"),
+    );
+    expect(run?.getAttribute("href")).toBe("https://github.com/octo/board-one/actions/runs/43390025786");
+  });
+
+  it("explains a failed probe without marking an unrelated completed probe as failed", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...readyForProbe, setupProbeStatus: "failed", setupProbeWorkflowRunId: "999" }],
+        }),
+      );
+    });
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("The setup probe reported a failure");
+    expect(container.textContent).toContain("Inspect last probe run");
+
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...readyForProbe, setupProbeStatus: "completed", setupProbeWorkflowRunId: "1000" }],
+        }),
+      );
+    });
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.textContent).toContain("Open Actions");
+    expect(container.textContent).not.toContain("Inspect last probe run");
+  });
+
   it("surfaces the installation remedy when GitHub permissions block validation", async () => {
     vi.stubGlobal(
       "fetch",

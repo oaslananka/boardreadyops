@@ -149,7 +149,7 @@ export default async function PartsPage({ searchParams }: Readonly<PartsPageProp
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/dashboard", label: "Dashboard" }, { label: "Parts" }]}>
-      <main id="main-content" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
+      <main id="main-content" className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-8">
         <header>
           <h1 className="text-2xl font-bold text-foreground">Component Intelligence &amp; Parts</h1>
           <p className="mt-1 text-sm text-muted-foreground">
