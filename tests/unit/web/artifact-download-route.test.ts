@@ -11,6 +11,7 @@ import {
   handleArtifactDownloadRequest,
   lookupArtifactDownload,
   recordArtifactDownloadStarted,
+  streamVerifiedArtifactDownload,
 } from "../../../apps/web/app/api/v1/runs/[runId]/artifacts/[artifactId]/download/route.js";
 import { artifactDownloadExpiry, signArtifactDownload } from "../../../apps/web/lib/artifact-downloads.js";
 
@@ -482,5 +483,61 @@ describe("temporary GitHub Actions manufacturing artifacts", () => {
     expect(await response.json()).toMatchObject({ ok: false });
     expect(recordDownloadStarted).not.toHaveBeenCalled();
     expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+});
+
+describe("private Neon manufacturing archive delivery", () => {
+  const verifiedPath =
+    "neon-s3/verified/5dc4193b-5c7e-4df8-b86f-e4d3266fc22d/7559e99b-4998-4e02-a94a-7a7a4686ae11/e2dca950-85e0-4f7e-8d48-e5599d85a3a1.tar.gz";
+  const storageEnv = {
+    NEON_OBJECT_STORAGE_ENDPOINT: "https://br-unit.storage.c-2.eu-central-1.aws.neon.tech",
+    NEON_OBJECT_STORAGE_BUCKET: "private-manufacturing",
+    NEON_OBJECT_STORAGE_ACCESS_KEY_ID: "example-id",
+    NEON_OBJECT_STORAGE_SECRET_ACCESS_KEY: "example-key",
+    NEON_OBJECT_STORAGE_REGION: "eu-central-1",
+  };
+
+  it("redirects to a 60-second private GET only after auditing the authorized download", async () => {
+    const audit = vi.fn(async () => undefined);
+    const response = await streamVerifiedArtifactDownload(
+      artifact({ storagePath: verifiedPath, kind: "archive", role: "manufacturing" }),
+      { environment: storageEnv, recordDownloadStarted: audit },
+    );
+    expect(response.status).toBe(303);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    const target = new URL(response.headers.get("location") ?? "");
+    expect(target.hostname).toBe("br-unit.storage.c-2.eu-central-1.aws.neon.tech");
+    expect(target.searchParams.get("X-Amz-Expires")).toBe("60");
+    expect(audit).toHaveBeenCalledOnce();
+  });
+
+  it("does not expose pending or unrelated artifact paths", async () => {
+    const audit = vi.fn(async () => undefined);
+    for (const record of [
+      artifact({ storagePath: verifiedPath.replace("verified/", "pending/"), kind: "archive", role: "manufacturing" }),
+      artifact({ storagePath: verifiedPath, kind: "log", role: "primary" }),
+    ]) {
+      const result = await streamVerifiedArtifactDownload(record, {
+        environment: storageEnv,
+        recordDownloadStarted: audit,
+      });
+      expect(result.status).toBeGreaterThanOrEqual(400);
+      expect(result.headers.has("location")).toBe(false);
+    }
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("fails closed if download auditing is unavailable", async () => {
+    const result = await streamVerifiedArtifactDownload(
+      artifact({ storagePath: verifiedPath, kind: "archive", role: "manufacturing" }),
+      {
+        environment: storageEnv,
+        recordDownloadStarted: vi.fn(async () => {
+          throw new Error("offline");
+        }),
+      },
+    );
+    expect(result.status).toBe(503);
+    expect(result.headers.has("location")).toBe(false);
   });
 });

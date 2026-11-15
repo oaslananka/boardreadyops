@@ -10,6 +10,10 @@ import {
   verifyArtifactDownloadSignature,
 } from "../../../../../../../../lib/artifact-downloads.js";
 import { temporaryManufacturingArtifactReference } from "../../../../../../../../lib/github-temporary-manufacturing.js";
+import {
+  createPrivateManufacturingObjectStore,
+  parseVerifiedManufacturingStoragePath,
+} from "../../../../../../../../lib/private-manufacturing-object-store.js";
 
 export const runtime = "nodejs";
 
@@ -271,6 +275,49 @@ export async function handleArtifactDownloadRequest(
   return await streamVerifiedArtifactDownload(lookup.artifact, dependencies);
 }
 
+async function nonLocalManufacturingDelivery(
+  artifact: ArtifactDownloadRecord,
+  dependencies: Pick<ArtifactDownloadRouteDependencies, "environment" | "recordDownloadStarted">,
+): Promise<Response | undefined> {
+  if (temporaryManufacturingArtifactReference(artifact.storagePath)) {
+    return jsonError("temporary manufacturing archives require repository access through GitHub Actions", 410);
+  }
+  if (artifact.storagePath.startsWith("neon-s3/")) {
+    if (
+      !parseVerifiedManufacturingStoragePath(artifact.storagePath) ||
+      artifact.kind !== "archive" ||
+      artifact.role !== "manufacturing"
+    ) {
+      return jsonError("private manufacturing object reference is invalid", 403);
+    }
+
+    let downloadUrl: string;
+    try {
+      const storage = createPrivateManufacturingObjectStore(dependencies.environment);
+      downloadUrl = await storage.signVerifiedDownload(artifact.storagePath);
+    } catch {
+      return jsonError("private manufacturing artifact storage is unavailable", 503);
+    }
+    try {
+      await dependencies.recordDownloadStarted(artifact);
+    } catch {
+      return jsonError("artifact access audit is temporarily unavailable", 503);
+    }
+    // The existing signed first-party URL or guest capability is checked by the
+    // caller. A private 60-second object URL avoids proxying up to 128 MiB
+    // through web function response limits; the bucket must remain private.
+    return new Response(null, {
+      status: 303,
+      headers: {
+        location: downloadUrl,
+        "cache-control": "private, no-store",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  }
+  return undefined;
+}
+
 /**
  * Common first-party file delivery: authentication happens in the caller.
  * The signed run URL and guest delivery token both reach the exact same
@@ -280,9 +327,8 @@ export async function streamVerifiedArtifactDownload(
   artifact: ArtifactDownloadRecord,
   dependencies: Pick<ArtifactDownloadRouteDependencies, "environment" | "recordDownloadStarted">,
 ): Promise<Response> {
-  if (temporaryManufacturingArtifactReference(artifact.storagePath)) {
-    return jsonError("temporary manufacturing archives require repository access through GitHub Actions", 410);
-  }
+  const externalDelivery = await nonLocalManufacturingDelivery(artifact, dependencies);
+  if (externalDelivery) return externalDelivery;
   const driver = dependencies.environment.ARTIFACT_STORAGE_DRIVER ?? "local";
   if (driver !== "local") {
     return jsonError("artifact storage driver is not supported by this route", 501);

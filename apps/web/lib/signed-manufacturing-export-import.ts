@@ -196,7 +196,7 @@ function configuredQueryExecutor(
   return createPgQueryExecutor({ connectionString, max: Number(environment.DATABASE_POOL_MAX ?? 5) });
 }
 
-function createSignedExportImportDependencies(
+export function createSignedExportImportDependencies(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): SignedExportImportDependencies {
   return {
@@ -235,7 +235,7 @@ type AuthenticatedExport = {
   claims: VerifiedGitHubActionsOidcClaims;
 };
 
-async function authenticateExportRequest(
+export async function authenticateExportRequest(
   request: Request,
   params: { runId: string; attemptId: string },
   dependencies: SignedExportImportDependencies,
@@ -247,7 +247,11 @@ async function authenticateExportRequest(
   } catch {
     return jsonError("signed export authorization is temporarily unavailable", 503);
   }
-  if (!expected?.executionAttemptId || expected.executionAttemptId !== params.attemptId) {
+  if (
+    !expected?.executionAttemptId ||
+    expected.runId !== params.runId ||
+    expected.executionAttemptId !== params.attemptId
+  ) {
     return jsonError("run or execution attempt is not eligible for a signed export", 409);
   }
 
@@ -388,6 +392,58 @@ async function persistTemporaryVerifiedArchive(
   }
 }
 
+async function persistVerifiedObjectArchive(
+  extractionRoot: string,
+  archive: { bytes: number; sha256: string },
+  context: {
+    params: { runId: string; attemptId: string };
+    dependencies: SignedExportImportDependencies;
+    executor: SqlQueryExecutor;
+    expected: ResultOidcExpectations;
+    claims: VerifiedGitHubActionsOidcClaims;
+    subjects: number;
+    target: { artifactId: string; storagePath: string };
+  },
+): Promise<Response> {
+  const { params, dependencies, executor, expected, claims, subjects, target } = context;
+  if (!uuid(target.artifactId)) return jsonError("invalid verified object identity", 400);
+  try {
+    const fs = await import("node:fs/promises");
+    const manifestBytes = await fs.readFile(path.join(extractionRoot, manifestPath));
+    const bundleBytes = await fs.readFile(path.join(extractionRoot, bundlePath));
+    const outcome = await recordVerifiedExport(
+      executor,
+      params,
+      dependencies,
+      expected,
+      claims,
+      { id: target.artifactId, name: target.storagePath, sha256: archive.sha256, bytes: archive.bytes },
+      manifestBytes,
+      bundleBytes,
+      subjects,
+    );
+    if (outcome !== "accepted") {
+      return outcome === "replayed"
+        ? jsonError("a signed manufacturing export already exists for this run attempt", 409)
+        : jsonError("the run attempt is no longer eligible for signed export ingestion", 409);
+    }
+    return Response.json(
+      {
+        ok: true,
+        artifactId: target.artifactId,
+        sha256: archive.sha256,
+        bytes: archive.bytes,
+        subjects,
+        storage: "neon-s3",
+      },
+      { status: 201, headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } },
+    );
+  } catch {
+    // Ambiguous SQL acknowledgement cannot be interpreted as a safe rollback.
+    return jsonError("verified object metadata could not be recorded", 503);
+  }
+}
+
 async function persistVerifiedArchive(
   extractionRoot: string,
   archive: { bytes: number; sha256: string },
@@ -461,15 +517,19 @@ async function persistVerifiedArchive(
   }
 }
 
-async function importArchive(
+export async function importArchive(
   request: Request,
   params: { runId: string; attemptId: string },
   dependencies: SignedExportImportDependencies,
   executor: SqlQueryExecutor,
   expected: ResultOidcExpectations,
   claims: VerifiedGitHubActionsOidcClaims,
-  temporaryArtifactId?: string,
+  mode?: {
+    temporaryArtifactId?: string;
+    objectTarget?: { artifactId: string; storagePath: string; sha256: string; bytes: number };
+  },
 ): Promise<Response> {
+  const { temporaryArtifactId, objectTarget } = mode ?? {};
   const temporaryRoot = await import("node:fs/promises").then(({ mkdtemp }) =>
     mkdtemp(path.join(os.tmpdir(), "boardreadyops-signed-export-")),
   );
@@ -478,6 +538,9 @@ async function importArchive(
   try {
     const archive = await writeRequestArchive(request, archivePath);
     if (!archive) return jsonError("signed export archive is empty, too large or unreadable", 413);
+    if (objectTarget && (archive.sha256 !== objectTarget.sha256 || archive.bytes !== objectTarget.bytes)) {
+      return jsonError("verified storage object does not match the signed upload ticket", 422);
+    }
     if (!(await inspectTar(archivePath)))
       return jsonError("signed export archive contains unsafe or unsupported entries", 400);
     await mkdir(extractionRoot, { mode: 0o700 });
@@ -502,6 +565,17 @@ async function importArchive(
         verification.subjects,
         temporaryArtifactId,
       );
+    }
+    if (objectTarget) {
+      return await persistVerifiedObjectArchive(extractionRoot, archive, {
+        params,
+        dependencies,
+        executor,
+        expected,
+        claims,
+        subjects: verification.subjects,
+        target: objectTarget,
+      });
     }
     return await persistVerifiedArchive(
       extractionRoot,
@@ -562,7 +636,7 @@ export async function handleSignedManufacturingExportImport(
         return jsonError("temporary GitHub artifact verification is temporarily unavailable", 503);
       }
       if (!verified) return jsonError("temporary GitHub Actions artifact does not match this run", 422);
-      return await importArchive(request, params, dependencies, executor, expected, claims, temporaryArtifactId);
+      return await importArchive(request, params, dependencies, executor, expected, claims, { temporaryArtifactId });
     }
     if (
       archiveMode !== "local" ||
