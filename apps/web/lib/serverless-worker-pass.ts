@@ -4,7 +4,7 @@
  *
  * No timers, independent worker ownership, or API mutations happen at import time.
  */
-export type BoundedWorkQueue<T> = {
+type BoundedWorkQueue<T> = {
   claim(limit: number): Promise<readonly T[]>;
   process(item: T): Promise<unknown>;
 };
