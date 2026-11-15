@@ -891,6 +891,14 @@ function SourceRuntimePanel({ run }: Readonly<{ run: RunDetail }>) {
 }
 
 export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
+  const signedManufacturingArchive = run.artifacts.find(
+    (artifact) =>
+      artifact.kind === "archive" &&
+      artifact.role === "manufacturing" &&
+      artifact.availability === "available" &&
+      Boolean(artifact.downloadUrl) &&
+      artifact.downloadUrl !== "#",
+  );
   return (
     <>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -935,6 +943,24 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
             </Link>
           }
         >
+          {signedManufacturingArchive ? (
+            <div className="mb-3 flex flex-col gap-2 rounded-lg border border-primary/25 bg-primary/5 p-4">
+              <p className="text-sm font-semibold text-foreground">Signed manufacturing package available</p>
+              <a
+                href={signedManufacturingArchive.downloadUrl}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                Download signed manufacturing archive
+              </a>
+              <p className="text-xs text-muted-foreground">
+                SHA-256: <code className="break-all font-mono">{signedManufacturingArchive.sha256}</code>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Download is not fabrication approval. Compare this checksum with the downloaded file before any
+                manufacturing decision.
+              </p>
+            </div>
+          ) : null}
           {run.artifacts.length === 0 ? (
             <EmptyState title="No artifacts">
               <p>No managed artifact metadata is attached to this run.</p>
