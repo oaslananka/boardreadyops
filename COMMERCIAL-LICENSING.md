@@ -1,19 +1,12 @@
-# Commercial Licensing
+# Historical Commercial Licensing Notice
 
-The PolyForm Noncommercial License 1.0.0 does not grant permission for
-commercial use of current BoardReadyOps project-authored source code.
+Current project-authored source is licensed under [GNU AGPL v3.0](LICENSE)
+(AGPL-3.0-only). Commercial use is permitted under that license without obtaining a
+separate commercial software license.
 
-Organizations or individuals that want to use, deploy, redistribute, embed, or
-otherwise exploit the current project-authored code commercially must obtain a
-separate written commercial license from the copyright holder.
+Some earlier versions were released with different licensing terms, including
+PolyForm Noncommercial. Those historical releases retain their original
+terms. Third-party components keep their own applicable licenses.
 
-Hosted BoardReadyOps services and GitHub Marketplace offerings may also be
-subject to separate service terms. A commercial software license does not by
-itself grant hosted-service access, support, warranties, or service-level terms
-unless a written agreement expressly says so.
-
-For licensing inquiries, contact the maintainer through:
-`https://github.com/oaslananka`.
-
-This document is informational and does not itself grant a commercial license
-or alter any third-party license.
+This document records historical licensing information only and does not add
+restrictions to the current GNU license.

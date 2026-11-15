@@ -3,7 +3,7 @@
   "version": "1.72.0",
   "description": "BoardReadyOps checks KiCad hardware repositories for production readiness before fabrication.",
   "type": "module",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "AGPL-3.0-only",
   "author": "Osman Aslan",
   "repository": {
     "type": "git",
