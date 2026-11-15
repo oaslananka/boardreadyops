@@ -9,12 +9,10 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 [![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
 [![Security](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
-[![GitGem](https://gitgem.org/api/badge/github/oaslananka/boardreadyops.svg)](https://gitgem.org/github/oaslananka/boardreadyops)
 
 [![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
-[![npm downloads](https://img.shields.io/npm/dt/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-BoardReadyOps-blue?logo=github)](https://github.com/marketplace/actions/boardreadyops)
-[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL-3.0-only-blue.svg)](LICENSE)
 
 [Repository Maturity](docs/repo-maturity-report.md) ·
 [OpenSSF Evidence](docs/openssf-evidence.md) ·
@@ -23,7 +21,16 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 [DeepWiki](https://deepwiki.com/oaslananka/boardreadyops) ·
 [Support](SUPPORT.md)
 
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-ffdd00?logo=buymeacoffee&logoColor=black&labelColor=ffdd00&color=111111)](https://www.buymeacoffee.com/oaslananka)
+<p align="center">
+  <a href="https://www.npmjs.com/package/boardreadyops"><img src="https://img.shields.io/npm/dt/boardreadyops?label=total%20downloads" alt="npm total downloads" /></a>
+  <a href="https://gitgem.org/github/oaslananka/boardreadyops"><img src="https://gitgem.org/api/badge/github/oaslananka/boardreadyops.svg" alt="GitGem" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/sponsors/oaslananka"><img src="https://img.shields.io/badge/GitHub-Sponsors-ea4aaa?logo=githubsponsors" alt="GitHub Sponsors" /></a>
+  <a href="https://www.buymeacoffee.com/oaslananka"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support-ffdd00?logo=buymeacoffee&amp;logoColor=black" alt="Buy Me a Coffee" /></a>
+  <a href="https://github.com/oaslananka/boardreadyops"><img src="https://img.shields.io/github/stars/oaslananka/boardreadyops?label=Stars&amp;color=8e65d3" alt="Stars" /></a>
+</p>
 
 </div>
 
@@ -43,7 +50,7 @@ Generate → Validate → Decide → Package → Optional Attestation → Review
 npm i -g boardreadyops
 ```
 
-**Repository-prepared version:** `boardreadyops@1.72.0`. This is the package version
+**Repository-prepared version:** `boardreadyops@1.73.0`. This is the package version
 in this source revision, **not evidence that it has been published**.
 Check [npm](https://www.npmjs.com/package/boardreadyops) and
 [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) for the
@@ -280,6 +287,6 @@ BoardReadyOps is evolving from a validation gate into a full hardware release OS
 
 ## License
 
-Current project-authored source is licensed under [PolyForm Noncommercial 1.0.0](LICENSE). Commercial use requires a separate written license; see [Commercial Licensing](COMMERCIAL-LICENSING.md). Earlier MIT releases retain the MIT rights that applied when they were published; see [Licensing](LICENSING.md).
+Current project-authored source is licensed under [GNU AGPL v3.0](LICENSE), which permits commercial use under its terms. See [Licensing](LICENSING.md) for third-party and historical notices.
 
 Third-party notices are generated in `NOTICE`. The full container image redistributes KiCad under its applicable GPL terms and preserves the KiCad license text inside the image.

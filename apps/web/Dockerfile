@@ -53,7 +53,7 @@ RUN set -eux; \
 LABEL org.opencontainers.image.title="BoardReadyOps Cloud" \
       org.opencontainers.image.description="Self-hosted BoardReadyOps cloud control plane" \
       org.opencontainers.image.source="https://github.com/oaslananka/boardreadyops" \
-      org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.version="${VERSION}"

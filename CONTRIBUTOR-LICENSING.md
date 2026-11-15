@@ -1,20 +1,11 @@
-# Contributor Licensing Policy
+# Contributor Licensing
 
-Forks, issues, and pull requests remain welcome.
+Contributions to project-authored code are welcomed under
+[GNU AGPL v3.0](LICENSE) (AGPL-3.0-only) through ordinary GitHub pull requests.
 
-Because BoardReadyOps is source-available for noncommercial use and may also be
-licensed commercially, non-trivial external code contributions must not be
-merged until the maintainer has a reviewed Contributor License Agreement (CLA)
-on record that preserves the project's ability to offer both community and
-commercial licensing options.
+Contributors retain their own copyright and confirm they have the right to
+submit the contribution under AGPL-3.0-only. There is **no** Contributor License
+Agreement (CLA), DCO sign-off, `Signed-off-by` trailer, external registration,
+or copyright assignment requirement.
 
-A CLA is separate from ordinary Git authorship and review. If a future workflow
-also requires Developer Certificate of Origin (DCO) sign-off, that sign-off
-documents contribution provenance but does not replace the CLA requirement.
-
-Contributors retain copyright in their contributions unless a separate written
-agreement explicitly states otherwise.
-
-Documentation-only typo fixes and similarly trivial contributions may be handled
-without a CLA at the maintainer's discretion, subject to applicable law and the
-repository contribution rules.
+Preserve attribution and license notices for included third-party material.

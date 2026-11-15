@@ -1,28 +1,31 @@
 # Licensing
 
-Current BoardReadyOps project-authored source code is licensed under the
-[PolyForm Noncommercial License 1.0.0](LICENSE).
+Project-authored source code in the current revision is licensed under the
+[GNU Affero General Public License v3.0 (AGPL-3.0-only)](LICENSE).
 
-This is a source-available, noncommercial license, not an OSI-approved
-open-source license. Commercial use of current project-authored code requires a
-separate written commercial license from the copyright holder. See
-[COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md).
+Copyright © 2026 Osman Aslan (GitHub: [oaslananka](https://github.com/oaslananka)).
+This notice does not replace or remove copyright held by contributors or third parties.
 
-## Earlier MIT releases
-
-Versions and source revisions already released under the MIT License remain
-available under the MIT terms that applied when they were published. This
-change is prospective and does not revoke rights already granted for those
-previously published MIT-licensed versions.
-
-## Third-party material
-
-Third-party dependencies and bundled materials keep their own licenses. The full
-container image also redistributes KiCad under its applicable GPL terms and
-preserves KiCad notices separately. See [NOTICE](NOTICE) and the release/container
-documentation for the applicable third-party notices.
+Commercial use is permitted under the GNU license, subject to its terms.
+Distributing covered software has source-sharing obligations. For software
+licensed under AGPL, modified versions used to serve users over a network
+also have source-offer obligations as described in the complete license text.
 
 ## Contributions
 
-See [CONTRIBUTOR-LICENSING.md](CONTRIBUTOR-LICENSING.md) before submitting a
-non-trivial external code contribution.
+Contributions can be proposed with ordinary GitHub pull requests. No separate
+contributor agreement (CLA), Developer Certificate of Origin (DCO) sign-off,
+or copyright assignment is required. Contributors keep copyright to their work
+and must have the rights needed to submit it under AGPL-3.0-only.
+
+## Previously released material
+
+Older revisions and previously distributed artifacts may have used PolyForm Noncommercial 1.0.0
+or other licenses. Their original notices and permissions remain applicable
+to those historical artifacts.
+
+## Third-party material
+
+Dependencies, vendored material, fixtures, and embedded third-party assets retain
+their own applicable notices and licenses. Refer to repository-specific third-party
+notices, attribution files, and dependency metadata.
