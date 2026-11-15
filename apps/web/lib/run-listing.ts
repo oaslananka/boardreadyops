@@ -75,7 +75,30 @@ export function normalizedRunListingLimit(value: number | undefined): number {
   return Math.min(Math.max(value, 1), maxPageSize);
 }
 
-const runListingQuery = `
+const signedManufacturingEvidenceFilter = `
+     and exists (
+       select 1
+         from signed_manufacturing_export_evidence as signed_evidence
+         join artifacts as archive
+           on archive.id = signed_evidence.artifact_id
+          and archive.run_id = signed_evidence.run_id
+          and archive.execution_attempt_id = signed_evidence.execution_attempt_id
+        where signed_evidence.run_id = release_runs.id
+          and release_runs.status = 'completed'
+          and signed_evidence.execution_attempt_id = release_runs.execution_attempt_id
+          and signed_evidence.repository_id = repositories.id
+          and signed_evidence.installation_id = installations.id
+          and signed_evidence.github_repository_id = repositories.github_repo_id
+          and signed_evidence.source_sha = release_runs.commit_sha
+          and archive.role = 'manufacturing'
+          and archive.kind = 'archive'
+          and archive.storage_path is not null
+          and archive.storage_path <> ''
+          and archive.storage_path not like 'github-actions/%'
+          and (archive.retention_until is null or archive.retention_until > now())
+     )`;
+
+const runListingQuery = (signedManufacturingOnly: boolean) => `
   select release_runs.id,
          release_runs.repository_id,
          repositories.owner,
@@ -95,6 +118,7 @@ const runListingQuery = `
      and repositories.disabled_at is null
      and installations.suspended_at is null
      and ${notCancelledSubscription}
+     ${signedManufacturingOnly ? signedManufacturingEvidenceFilter : ""}
      and ($3::timestamptz is null or (release_runs.started_at, release_runs.id) < ($3::timestamptz, $4::text))
    order by release_runs.started_at desc, release_runs.id desc
    limit $5`;
@@ -107,7 +131,7 @@ const runListingQuery = `
  */
 export async function loadViewerRuns(
   session: UserSession | undefined,
-  options: { cursor?: RunListingCursor; limit?: number } = {},
+  options: { cursor?: RunListingCursor; limit?: number; signedManufacturingOnly?: boolean } = {},
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<RunListingResult> {
   if (!session || session.installationIds.length === 0) return { state: "ok", runs: [], next: undefined };
@@ -123,7 +147,7 @@ export async function loadViewerRuns(
   const { createPgQueryExecutor } = await import("@boardreadyops/db/pg-executor");
   const executor = createPgQueryExecutor({ connectionString, max: 1 });
   try {
-    const result = await executor.query(runListingQuery, [
+    const result = await executor.query(runListingQuery(options.signedManufacturingOnly === true), [
       session.installationIds,
       verifiedRepoIds,
       options.cursor?.startedAt ?? null,

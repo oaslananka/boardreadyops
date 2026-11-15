@@ -14,6 +14,7 @@ import { Alert, EmptyState, Pagination, Panel, StatusBadge } from "../../compone
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../lib/delivery-listing.js";
+import { loadViewerRuns, type RunListingEntry } from "../../lib/run-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 import {
   authorizeManufacturingShareAction,
@@ -184,6 +185,13 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
     parameters.page,
   );
 
+  // Signed Run evidence is repository-scoped, never a delivery from the
+  // selected workspace. Reuse the live GitHub installation grant checks.
+  const signedRunListing =
+    viewer.session && (result.state === "ok" || result.state === "no-workspaces")
+      ? await loadViewerRuns(viewer.session, { limit: 3, signedManufacturingOnly: true }, process.env)
+      : undefined;
+
   // The copied value has to be a URL the recipient can open, so the origin comes from the request
   // rather than being assumed.
   const requestHeaders = await headers();
@@ -200,10 +208,14 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
         <header>
           <h1 className="text-2xl font-bold text-foreground">Release Deliveries</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Guest links that let a manufacturing partner download the stored evidence-backed package without an account.
-            Anyone holding one can open it until it expires, so this is the list of what is currently outstanding.
+            Inspect signed Run archives from repositories you can access, then manage package revisions and guest links
+            in the selected workspace. A verified archive is not a delivery or fabrication approval.
           </p>
         </header>
+
+        {signedRunListing?.state === "ok" && signedRunListing.runs.length > 0 ? (
+          <SignedRunArchivesPanel runs={signedRunListing.runs} />
+        ) : null}
 
         {result.state === "ok" ? (
           <>
@@ -329,6 +341,45 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
         )}
       </main>
     </AppShell>
+  );
+}
+
+/**
+ * Browser-facing discovery only. This never creates a workspace revision,
+ * shares a package, or mints download capabilities.
+ */
+function SignedRunArchivesPanel({ runs }: Readonly<{ runs: readonly RunListingEntry[] }>) {
+  return (
+    <Panel
+      title="Signed Run archives — not deliveries"
+      description="Source-bound manufacturing evidence from GitHub repositories your current installations can access, including other workspaces."
+    >
+      <ul className="space-y-3" aria-label="Signed manufacturing Run evidence">
+        {runs.map((run) => (
+          <li
+            key={run.id}
+            className="flex min-w-0 flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="min-w-0 space-y-1">
+              <p className="break-words text-sm font-semibold text-foreground">{run.repository}</p>
+              <p className="text-xs text-muted-foreground">
+                Source commit <code className="break-all font-mono">{run.commitSha.slice(0, 12)}</code>
+                {" · "}
+                <StatusBadge value={run.decision} label={run.decision ?? "Not verified"} />
+              </p>
+            </div>
+            <Button asChild variant="outline" className="min-h-11">
+              <Link href={`/runs/${encodeURIComponent(run.id)}`}>Inspect signed Run evidence</Link>
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-sm text-muted-foreground">
+        These records are not package revisions in the selected workspace and are not fabrication approval. Inspect the
+        exact source and archive, then register an eligible revision and obtain explicit owner permission before issuing
+        a guest link.
+      </p>
+    </Panel>
   );
 }
 

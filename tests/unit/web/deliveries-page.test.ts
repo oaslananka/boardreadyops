@@ -30,6 +30,11 @@ vi.mock("../../../apps/web/components/deliveries/delivery-create-form.js", () =>
   DeliveryCreateForm: () => createElement("span", null, "Create guest link"),
 }));
 
+const loadViewerRuns = vi.hoisted(() => vi.fn(async () => ({ state: "ok" as const, runs: [], next: undefined })));
+vi.mock("../../../apps/web/lib/run-listing.js", () => ({
+  loadViewerRuns,
+}));
+
 const loadWorkspaceDeliveries = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/web/lib/delivery-listing.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -513,5 +518,96 @@ describe("DeliveriesListPage", () => {
     const markup = await render();
 
     expect(markup).toContain("Deliveries are not configured");
+  });
+  it("reveals an authorized signed Run archive without implying delivery eligibility or guest sharing", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisions: [],
+      revisionCandidates: [],
+      deliveries: [],
+    });
+    loadViewerRuns.mockResolvedValueOnce({
+      state: "ok",
+      runs: [
+        {
+          id: "signed-run-123",
+          repositoryId: "repo-other",
+          repository: "other-owner/verified-board",
+          status: "completed",
+          decision: "pass",
+          commitSha: "a".repeat(40),
+          ref: "refs/heads/main",
+          pullRequestNumber: 17,
+          startedAt: "2026-11-15T10:00:00.000Z",
+        },
+      ],
+      next: undefined,
+    });
+
+    const markup = await render();
+    expect(markup).toContain("Signed Run archives — not deliveries");
+    expect(markup).toContain("other-owner/verified-board");
+    expect(markup).toContain('href="/runs/signed-run-123"');
+    expect(markup).toContain("Inspect signed Run evidence");
+    expect(markup).toContain("No package revisions yet");
+    expect(markup).toContain("No guest links yet");
+    expect(markup).not.toContain("Ready for fabrication");
+    expect(loadViewerRuns).toHaveBeenCalledWith(
+      expect.objectContaining({ login: "octocat" }),
+      { limit: 3, signedManufacturingOnly: true },
+      expect.anything(),
+    );
+  });
+
+  it("does not invent a signed archive or a cross-tenant delivery when grants cannot be verified", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisions: [],
+      revisionCandidates: [],
+      deliveries: [],
+    });
+    loadViewerRuns.mockResolvedValueOnce({ state: "access-unavailable" });
+    const markup = await render();
+    expect(markup).not.toContain("Signed Run archives — not deliveries");
+    expect(markup).not.toContain("Inspect signed Run evidence");
+    expect(markup).toContain("No package revisions yet");
+  });
+
+  it("does not query signed Runs when the viewer is signed out or deliveries are not configured", async () => {
+    loadViewerRuns.mockClear();
+    loadWorkspaceDeliveries.mockResolvedValueOnce({ state: "signed-out" });
+    expect(await render()).toContain("Sign in to see your delivery links");
+    loadWorkspaceDeliveries.mockResolvedValueOnce({ state: "not-configured" });
+    expect(await render()).toContain("Deliveries are not configured");
+    expect(loadViewerRuns).not.toHaveBeenCalled();
+  });
+  it("lets a repository user discover signed Runs before creating any CAD workspace", async () => {
+    loadWorkspaceDeliveries.mockResolvedValueOnce({ state: "no-workspaces" });
+    loadViewerRuns.mockResolvedValueOnce({
+      state: "ok",
+      runs: [
+        {
+          id: "signed-run-first-use",
+          repositoryId: "repo-first-use",
+          repository: "first-owner/first-board",
+          status: "completed",
+          decision: "pass",
+          commitSha: "d".repeat(40),
+          ref: "refs/heads/main",
+          pullRequestNumber: 7,
+          startedAt: "2026-11-15T10:00:00.000Z",
+        },
+      ],
+      next: undefined,
+    });
+    const markup = await render();
+    expect(markup).toContain("Signed Run archives — not deliveries");
+    expect(markup).toContain('href="/runs/signed-run-first-use"');
+    expect(markup).toContain("Prepare a manufacturing delivery");
+    expect(markup).not.toContain("Create guest link");
   });
 });
