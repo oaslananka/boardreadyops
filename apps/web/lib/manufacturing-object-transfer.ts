@@ -84,7 +84,7 @@ function validTicket(input: TicketPayload, actual: string, key: string | undefin
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-async function boundedJson(request: Request): Promise<unknown | Response> {
+async function boundedJson(request: Request): Promise<unknown> {
   if (request.headers.get("content-type")?.split(";")[0] !== "application/json")
     return responseError("a JSON upload request is required", 415);
   const lengthHeader = request.headers.get("content-length");
@@ -190,11 +190,14 @@ async function completeUpload(
   body: Commit,
   dependencies: ManufacturingObjectTransferDependencies,
   store: ObjectStore,
-  key: string,
-  executor: SqlQueryExecutor,
-  expected: NonNullable<Awaited<ReturnType<SignedExportImportDependencies["loadExpectedRun"]>>>,
-  claims: NonNullable<Awaited<ReturnType<SignedExportImportDependencies["verifyOidc"]>>>,
+  context: {
+    key: string;
+    executor: SqlQueryExecutor;
+    expected: NonNullable<Awaited<ReturnType<SignedExportImportDependencies["loadExpectedRun"]>>>;
+    claims: NonNullable<Awaited<ReturnType<SignedExportImportDependencies["verifyOidc"]>>>;
+  },
 ): Promise<Response> {
+  const { key, executor, expected, claims } = context;
   if (
     !validTicket(
       { ...params, uploadId: body.uploadId, sha256: body.sha256, bytes: body.bytes, expiresAt: body.expiresAt },
@@ -226,11 +229,13 @@ async function completeUpload(
       body: object.body,
       duplex: "half",
     } as RequestInit & { duplex: "half" });
-    result = await importArchive(streamed, params, dependencies, executor, expected, claims, undefined, {
-      artifactId,
-      storagePath,
-      sha256: body.sha256,
-      bytes: body.bytes,
+    result = await importArchive(streamed, params, dependencies, executor, expected, claims, {
+      objectTarget: {
+        artifactId,
+        storagePath,
+        sha256: body.sha256,
+        bytes: body.bytes,
+      },
     });
   } catch {
     await store.deleteVerified(storagePath).catch(() => undefined);
@@ -282,16 +287,12 @@ export async function handleManufacturingObjectTransfer(
     const authenticated = await authenticateExportRequest(request, params, dependencies, executor);
     if (authenticated instanceof Response) return authenticated;
     if (body.operation === "prepare") return await prepareUpload(params, body, dependencies, store, key);
-    return await completeUpload(
-      params,
-      body,
-      dependencies,
-      store,
+    return await completeUpload(params, body, dependencies, store, {
       key,
       executor,
-      authenticated.expected,
-      authenticated.claims,
-    );
+      expected: authenticated.expected,
+      claims: authenticated.claims,
+    });
   } catch {
     return responseError("private manufacturing object operation is temporarily unavailable", 503);
   } finally {

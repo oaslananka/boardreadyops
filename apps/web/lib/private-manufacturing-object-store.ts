@@ -6,7 +6,7 @@ const pendingPrefix = "pending";
 const verifiedPrefix = "verified";
 const storagePrefix = "neon-s3/";
 const maximumArchiveBytes = 128 * 1024 * 1024;
-const storageEndpointPattern = /^[a-z0-9-]+\.storage\.c-[0-9]+\.[a-z0-9-]+\.aws\.neon\.tech$/u;
+const storageEndpointPattern = /^[a-z0-9-]+\.storage\.c-\d+\.[a-z0-9-]+\.aws\.neon\.tech$/u;
 const bucketPattern = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/u;
 
 type ManufacturingObjectScope = {

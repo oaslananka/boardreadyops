@@ -275,15 +275,10 @@ export async function handleArtifactDownloadRequest(
   return await streamVerifiedArtifactDownload(lookup.artifact, dependencies);
 }
 
-/**
- * Common first-party file delivery: authentication happens in the caller.
- * The signed run URL and guest delivery token both reach the exact same
- * on-disk digest, audit and streaming implementation.
- */
-export async function streamVerifiedArtifactDownload(
+async function nonLocalManufacturingDelivery(
   artifact: ArtifactDownloadRecord,
   dependencies: Pick<ArtifactDownloadRouteDependencies, "environment" | "recordDownloadStarted">,
-): Promise<Response> {
+): Promise<Response | undefined> {
   if (temporaryManufacturingArtifactReference(artifact.storagePath)) {
     return jsonError("temporary manufacturing archives require repository access through GitHub Actions", 410);
   }
@@ -320,6 +315,20 @@ export async function streamVerifiedArtifactDownload(
       },
     });
   }
+  return undefined;
+}
+
+/**
+ * Common first-party file delivery: authentication happens in the caller.
+ * The signed run URL and guest delivery token both reach the exact same
+ * on-disk digest, audit and streaming implementation.
+ */
+export async function streamVerifiedArtifactDownload(
+  artifact: ArtifactDownloadRecord,
+  dependencies: Pick<ArtifactDownloadRouteDependencies, "environment" | "recordDownloadStarted">,
+): Promise<Response> {
+  const externalDelivery = await nonLocalManufacturingDelivery(artifact, dependencies);
+  if (externalDelivery) return externalDelivery;
   const driver = dependencies.environment.ARTIFACT_STORAGE_DRIVER ?? "local";
   if (driver !== "local") {
     return jsonError("artifact storage driver is not supported by this route", 501);

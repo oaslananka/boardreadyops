@@ -395,14 +395,17 @@ async function persistTemporaryVerifiedArchive(
 async function persistVerifiedObjectArchive(
   extractionRoot: string,
   archive: { bytes: number; sha256: string },
-  params: { runId: string; attemptId: string },
-  dependencies: SignedExportImportDependencies,
-  executor: SqlQueryExecutor,
-  expected: ResultOidcExpectations,
-  claims: VerifiedGitHubActionsOidcClaims,
-  subjects: number,
-  target: { artifactId: string; storagePath: string },
+  context: {
+    params: { runId: string; attemptId: string };
+    dependencies: SignedExportImportDependencies;
+    executor: SqlQueryExecutor;
+    expected: ResultOidcExpectations;
+    claims: VerifiedGitHubActionsOidcClaims;
+    subjects: number;
+    target: { artifactId: string; storagePath: string };
+  },
 ): Promise<Response> {
+  const { params, dependencies, executor, expected, claims, subjects, target } = context;
   if (!uuid(target.artifactId)) return jsonError("invalid verified object identity", 400);
   try {
     const fs = await import("node:fs/promises");
@@ -521,9 +524,12 @@ export async function importArchive(
   executor: SqlQueryExecutor,
   expected: ResultOidcExpectations,
   claims: VerifiedGitHubActionsOidcClaims,
-  temporaryArtifactId?: string,
-  objectTarget?: { artifactId: string; storagePath: string; sha256: string; bytes: number },
+  mode?: {
+    temporaryArtifactId?: string;
+    objectTarget?: { artifactId: string; storagePath: string; sha256: string; bytes: number };
+  },
 ): Promise<Response> {
+  const { temporaryArtifactId, objectTarget } = mode ?? {};
   const temporaryRoot = await import("node:fs/promises").then(({ mkdtemp }) =>
     mkdtemp(path.join(os.tmpdir(), "boardreadyops-signed-export-")),
   );
@@ -561,17 +567,15 @@ export async function importArchive(
       );
     }
     if (objectTarget) {
-      return await persistVerifiedObjectArchive(
-        extractionRoot,
-        archive,
+      return await persistVerifiedObjectArchive(extractionRoot, archive, {
         params,
         dependencies,
         executor,
         expected,
         claims,
-        verification.subjects,
-        objectTarget,
-      );
+        subjects: verification.subjects,
+        target: objectTarget,
+      });
     }
     return await persistVerifiedArchive(
       extractionRoot,
@@ -632,7 +636,7 @@ export async function handleSignedManufacturingExportImport(
         return jsonError("temporary GitHub artifact verification is temporarily unavailable", 503);
       }
       if (!verified) return jsonError("temporary GitHub Actions artifact does not match this run", 422);
-      return await importArchive(request, params, dependencies, executor, expected, claims, temporaryArtifactId);
+      return await importArchive(request, params, dependencies, executor, expected, claims, { temporaryArtifactId });
     }
     if (
       archiveMode !== "local" ||
