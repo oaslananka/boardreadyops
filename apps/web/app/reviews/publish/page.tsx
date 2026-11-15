@@ -17,7 +17,7 @@ export default async function PublishReviewPage() {
       viewerNav={<ViewerNav />}
       breadcrumbs={[{ href: "/", label: "Home" }, { href: "/reviews", label: "Reviews" }, { label: "Publish" }]}
     >
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-7 sm:px-6 sm:py-9" id="main-content">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-7 sm:px-6 sm:py-9" id="main-content">
         <header className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Review · Create</p>
           <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">

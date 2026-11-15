@@ -117,7 +117,7 @@ export default async function BoardHistoryPage({ params }: Readonly<PageProps>) 
         { label: board.displayName },
       ]}
     >
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-8" id="main-content">
         <header>
           <h1 className="text-2xl font-bold text-foreground">{board.displayName}</h1>
           <p className="mt-2 break-all text-sm text-muted-foreground">

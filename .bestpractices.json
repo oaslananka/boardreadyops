@@ -7,5 +7,5 @@
   "gold_claim": false,
   "evidence": ["docs/openssf-evidence.md", "docs/openssf-gap-analysis.md", "docs/repo-maturity-report.md"],
   "last_local_audit": "2026-07-02",
-  "notes": "Historical OpenSSF Best Practices evidence from the MIT-licensed period. Current project-authored source is PolyForm Noncommercial 1.0.0 and source-available, not OSI-approved open source; BadgeApp status must not be presented as a current FLOSS licensing claim."
+  "notes": "Historical OpenSSF Best Practices evidence from the MIT-licensed period. Current project-authored source is AGPL-3.0-only; historic BadgeApp status is not automatically a current certification."
 }

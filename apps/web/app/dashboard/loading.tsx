@@ -4,7 +4,7 @@ import { AppShell } from "../../components/ui.js";
 export default function Loading() {
   return (
     <AppShell breadcrumbs={[{ label: "Dashboard" }]}>
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content" aria-busy="true">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-8" id="main-content" aria-busy="true">
         <p className="sr-only">Loading your dashboard</p>
         <div className="flex flex-col gap-2">
           <Skeleton className="h-8 w-full max-w-72" />

@@ -75,7 +75,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
   if (listing.state === "signed-out") {
     return (
       <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Reviews" }]}>
-        <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
+        <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-8" id="main-content">
           <header>
             <h1 className="text-2xl font-bold text-foreground">Hardware Reviews</h1>
           </header>
@@ -138,7 +138,7 @@ export default async function ReviewsListPage({ searchParams }: Readonly<Reviews
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Reviews" }]}>
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-8" id="main-content">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
