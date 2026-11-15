@@ -26,7 +26,9 @@ function json(result: unknown, status: number): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (process.env.BOARDREADYOPS_BOUNDED_WORKER_ENABLED !== "1") {
+  const verifyOnly = process.env.BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY === "1";
+  // Private connectivity preflight must not require enabling queue processing.
+  if (!verifyOnly && process.env.BOARDREADYOPS_BOUNDED_WORKER_ENABLED !== "1") {
     return json({ ok: false, error: "not_found" }, 404);
   }
   const secret = process.env.BOARDREADYOPS_BOUNDED_WORKER_SECRET;
@@ -35,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
 
   // Validate the private Vercel route and Doppler sync without claiming stale
   // snapshot work or issuing GitHub mutations before the final cutover.
-  if (process.env.BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY === "1") {
+  if (verifyOnly) {
     try {
       const checks = await verifyProductionBoundedWorkerReadiness();
       return json({ ok: true, mode: "verify-only", checks }, 200);

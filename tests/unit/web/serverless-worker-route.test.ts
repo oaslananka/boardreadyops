@@ -85,6 +85,34 @@ describe("private serverless worker endpoint", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it("permits authenticated preflight while real worker activation is disabled", async () => {
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_ENABLED = "0";
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY = "1";
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_SECRET = "test-secret";
+
+    expect((await POST(request())).status).toBe(401);
+    expect((await POST(request("wrong"))).status).toBe(401);
+
+    const response = await POST(request("test-secret"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      mode: "verify-only",
+      checks: { database: "pass", githubApp: "pass", runner: "pass" },
+    });
+    expect(readiness).toHaveBeenCalledOnce();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("cannot start processing when activation is disabled even if verify-only is switched off", async () => {
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_ENABLED = "0";
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY = "0";
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_SECRET = "test-secret";
+    expect((await POST(request("test-secret"))).status).toBe(404);
+    expect(readiness).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+  });
+
   it("does not report preflight success when database or GitHub App cannot be verified", async () => {
     process.env.BOARDREADYOPS_BOUNDED_WORKER_ENABLED = "1";
     process.env.BOARDREADYOPS_BOUNDED_WORKER_SECRET = "test-secret";
