@@ -22,16 +22,13 @@ import {
   drainBoundedQueues,
 } from "./serverless-worker-pass.js";
 
-/**
- * Authenticated, read-only acceptance for the isolated serverless runtime.
- * Verifies actual PostgreSQL connectivity, worker prerequisites and GitHub
- * App credentials. Never claims jobs, dispatches Actions or mutates Check Runs.
- */
-export async function verifyProductionBoundedWorkerReadiness(): Promise<{
-  database: "pass";
-  githubApp: "pass";
-  runner: "pass";
-}> {
+type WorkerPreflightConfiguration = {
+  databaseUrl: string;
+  appId: string;
+  privateKey: string;
+};
+
+function workerPreflightConfiguration(): WorkerPreflightConfiguration {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const runner = runnerModeSummary();
   const appId = process.env.GITHUB_APP_ID?.trim();
@@ -50,7 +47,10 @@ export async function verifyProductionBoundedWorkerReadiness(): Promise<{
   ) {
     throw new Error("bounded worker prerequisites unavailable");
   }
+  return { databaseUrl, appId, privateKey };
+}
 
+async function verifyBoundedWorkerDatabase(databaseUrl: string): Promise<void> {
   const database = createPgQueryExecutor({ connectionString: databaseUrl, max: 1 });
   try {
     const result = await database.withTransaction(
@@ -77,7 +77,9 @@ export async function verifyProductionBoundedWorkerReadiness(): Promise<{
   } finally {
     await database.close();
   }
+}
 
+async function verifyBoundedWorkerGitHubApp(appId: string, privateKey: string): Promise<void> {
   const apiBaseUrl = process.env.GITHUB_API_BASE_URL?.trim() || "https://api.github.com";
   const apiUrl = new URL("/app", apiBaseUrl);
   if (apiUrl.protocol !== "https:" || apiUrl.username || apiUrl.password || apiUrl.search || apiUrl.hash) {
@@ -97,7 +99,21 @@ export async function verifyProductionBoundedWorkerReadiness(): Promise<{
   if (!response.ok) throw new Error("GitHub App identity not accepted");
   const identity = (await response.json()) as { id?: number };
   if (String(identity.id) !== appId) throw new Error("GitHub App identity mismatch");
+}
 
+/**
+ * Authenticated, read-only acceptance for the isolated serverless runtime.
+ * Verifies actual PostgreSQL connectivity, worker prerequisites and GitHub
+ * App credentials. Never claims jobs, dispatches Actions or mutates Check Runs.
+ */
+export async function verifyProductionBoundedWorkerReadiness(): Promise<{
+  database: "pass";
+  githubApp: "pass";
+  runner: "pass";
+}> {
+  const { databaseUrl, appId, privateKey } = workerPreflightConfiguration();
+  await verifyBoundedWorkerDatabase(databaseUrl);
+  await verifyBoundedWorkerGitHubApp(appId, privateKey);
   return { database: "pass", githubApp: "pass", runner: "pass" };
 }
 
