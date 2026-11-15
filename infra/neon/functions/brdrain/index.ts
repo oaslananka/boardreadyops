@@ -40,11 +40,16 @@ function approvedWorkerEndpoint(raw: string | undefined): string | undefined {
 /** Bounded ISO UTC timestamp validation without a backtracking regexp. */
 function scheduledUtcTimestamp(value: unknown): boolean {
   if (typeof value !== "string" || ![20, 22, 23, 24].includes(value.length) || !value.endsWith("Z")) return false;
-  const separators: Record<number, string> = { 4: "-", 7: "-", 10: "T", 13: ":", 16: ":", 19: "." };
   for (let index = 0; index < value.length - 1; index++) {
-    const separator = separators[index];
-    if (separator) {
-      if (value[index] !== separator) return false;
+    const character = value.charAt(index);
+    if (index === 4 || index === 7) {
+      if (character !== "-") return false;
+    } else if (index === 10) {
+      if (character !== "T") return false;
+    } else if (index === 13 || index === 16) {
+      if (character !== ":") return false;
+    } else if (index === 19) {
+      if (character !== ".") return false;
     } else {
       const code = value.charCodeAt(index);
       if (code < 48 || code > 57) return false;
