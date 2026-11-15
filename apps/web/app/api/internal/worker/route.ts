@@ -30,6 +30,10 @@ export async function POST(request: Request): Promise<Response> {
   if (!secret) return json({ ok: false, error: "not_configured" }, 503);
   if (!authorized(request, secret)) return json({ ok: false, error: "unauthorized" }, 401);
 
+  // Validate the private Vercel route and Doppler sync without claiming stale
+  // snapshot work or issuing GitHub mutations before the final cutover.
+  if (process.env.BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY === "1") return json({ ok: true, mode: "verify-only" }, 200);
+
   try {
     const processed = await runProductionBoundedPass();
     return json({ ok: true, claimed: processed }, 200);
