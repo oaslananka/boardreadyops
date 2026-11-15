@@ -103,6 +103,52 @@ async function createTerminalFixture(
 }
 
 describeDatabase("GitHub Check Run PostgreSQL reconciliation", () => {
+  it("preserves a completed neutral draft skip only with exact Check Run outbox proof", async () => {
+    const fixture = await createTerminalFixture("success", "success");
+    await database().query("delete from release_run_results where run_id = $1", [fixture.releaseRunId]);
+    await database().query(
+      `update release_runs
+          set status = 'completed', decision = 'neutral', trust_mode = 'safe',
+              safe_mode_reasons = array['draft-pull-request']::text[]
+        where id = $1`,
+      [fixture.releaseRunId],
+    );
+    const skipOutboxId = randomUUID();
+    await database().query(
+      `insert into control_plane_outbox (
+         id, release_run_id, effect_type, idempotency_key, payload,
+         status, available_at, created_at, completed_at, external_result
+       ) values (
+         $1, $2, 'github.check_run.complete', $3,
+         jsonb_build_object('type', 'github.check_run.complete', 'input',
+           jsonb_build_object('checkRunId', $4::bigint, 'conclusion', 'neutral')),
+         'completed', now(), now(), now(),
+         jsonb_build_object('githubCheckRunId', $4::bigint, 'conclusion', 'neutral')
+       )`,
+      [skipOutboxId, fixture.releaseRunId, `${testPrefix}:safe-skip:${skipOutboxId}`, fixture.githubCheckRunId],
+    );
+
+    const store = createSqlControlPlaneOperationsStore(database(), { now: () => new Date(), leaseSeconds: 60 });
+    await expect(
+      store.detectCheckRunReconciliationCandidates({
+        observationDelaySeconds: 300,
+        terminalDeadlineSeconds: 1800,
+        limit: 10,
+      }),
+    ).resolves.toBe(0);
+
+    // Without persisted, completed, exact-check neutral evidence a missing
+    // signed result is still suspicious; never blanket-ignore neutral runs.
+    await database().query("delete from control_plane_outbox where id = $1", [skipOutboxId]);
+    await expect(
+      store.detectCheckRunReconciliationCandidates({
+        observationDelaySeconds: 300,
+        terminalDeadlineSeconds: 1800,
+        limit: 10,
+      }),
+    ).resolves.toBe(1);
+  });
+
   it("Neon pass marks an already-completed bound Check Run as published only once", async () => {
     const fixture = await createTerminalFixture("neon-current", "success");
     const store = createSqlControlPlaneOperationsStore(database(), { now: () => new Date(), leaseSeconds: 60 });
