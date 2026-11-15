@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import HomePage from "../../../apps/web/app/page.js";
 import SettingsLayout from "../../../apps/web/app/settings/layout.js";
+import SettingsLoading from "../../../apps/web/app/settings/loading.js";
 import { ReviewView } from "../../../apps/web/components/review/review-view.js";
 import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
 
@@ -67,6 +68,12 @@ describe("Product App Accessibility", () => {
     const html = renderToStaticMarkup(createElement(ReviewView, { initialReview: review }));
     const violations = await axeViolations(html, `/reviews/${review.id}`);
     expect(violations).toEqual([]);
+  });
+
+  it("has no WCAG A/AA violations while a Settings section is loading", async () => {
+    const html = renderToStaticMarkup(createElement(SettingsLayout, null, createElement(SettingsLoading)));
+    expect(html.match(/<main\b/g) ?? []).toHaveLength(1);
+    expect(await axeViolations(html, "/settings/tokens")).toEqual([]);
   });
 
   it("has no WCAG A/AA violations in the settings layout", async () => {

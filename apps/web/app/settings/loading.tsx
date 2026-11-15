@@ -1,22 +1,21 @@
 import { Skeleton } from "../../components/ui/skeleton.js";
-import { AppShell } from "../../components/ui.js";
 
 export default function Loading() {
+  // The parent SettingsLayout already renders AppShell, the page heading,
+  // the Settings navigation, and the sole main landmark.
   return (
-    <AppShell breadcrumbs={[{ href: "/dashboard", label: "Dashboard" }, { label: "Settings" }]}>
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content" aria-busy="true">
-        <p className="sr-only">Loading settings</p>
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-full max-w-72" />
-          <Skeleton className="h-4 w-full max-w-96" />
-        </div>
-        <Skeleton className="h-10 rounded-md" />
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2, 3, 4].map((slot) => (
-            <Skeleton key={slot} className="h-14 rounded-md" />
-          ))}
-        </div>
-      </main>
-    </AppShell>
+    <div className="flex min-w-0 w-full flex-col gap-5" aria-busy="true">
+      <p className="sr-only" role="status">
+        Loading settings section
+      </p>
+      <Skeleton className="h-6 w-full max-w-56" />
+      <Skeleton className="h-4 w-full max-w-80" />
+      <Skeleton className="h-10 w-full rounded-md" />
+      <div className="flex flex-col gap-3">
+        {[0, 1, 2, 3].map((slot) => (
+          <Skeleton key={slot} className="h-14 w-full rounded-md" />
+        ))}
+      </div>
+    </div>
   );
 }

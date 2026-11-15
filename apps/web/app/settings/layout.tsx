@@ -17,7 +17,7 @@ export default function SettingsLayout({ children }: Readonly<{ children: ReactN
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
           <SettingsNav />
 
-          <section>{children}</section>
+          <section className="min-w-0">{children}</section>
         </div>
       </main>
     </AppShell>
