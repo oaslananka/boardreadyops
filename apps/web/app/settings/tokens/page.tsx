@@ -123,18 +123,26 @@ export default async function TokensPage({ searchParams }: Readonly<TokensPagePr
         description="Tokens are shown once at creation, stored as SHA-256 digests, and scoped to one repository."
         actions={
           scope.repositories.length > 1 ? (
-            <form method="get" className="flex items-center gap-2">
+            <form
+              method="get"
+              className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center"
+            >
               <label className="text-meta text-muted-foreground" htmlFor="token-repository">
                 Repository
               </label>
-              <NativeSelect id="token-repository" name="repositoryId" defaultValue={repositoryId} className="w-auto">
+              <NativeSelect
+                id="token-repository"
+                name="repositoryId"
+                defaultValue={repositoryId}
+                className="min-w-0 w-full max-w-full sm:w-64"
+              >
                 {scope.repositories.map((repository) => (
                   <option key={repository.id} value={repository.id}>
                     {repository.owner}/{repository.name}
                   </option>
                 ))}
               </NativeSelect>
-              <Button type="submit" variant="outline" size="sm">
+              <Button type="submit" variant="outline" size="sm" className="min-h-11 w-full sm:min-h-9 sm:w-auto">
                 Show
               </Button>
             </form>
