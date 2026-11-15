@@ -37,14 +37,46 @@ function approvedWorkerEndpoint(raw: string | undefined): string | undefined {
   }
 }
 
+/** Bounded ISO UTC timestamp validation without a backtracking regexp. */
+function scheduledUtcTimestamp(value: unknown): boolean {
+  if (typeof value !== "string" || ![20, 22, 23, 24].includes(value.length) || !value.endsWith("Z")) return false;
+  const separators: Record<number, string> = { 4: "-", 7: "-", 10: "T", 13: ":", 16: ":", 19: "." };
+  for (let index = 0; index < value.length - 1; index++) {
+    const separator = separators[index];
+    if (separator) {
+      if (value[index] !== separator) return false;
+    } else {
+      const code = value.charCodeAt(index);
+      if (code < 48 || code > 57) return false;
+    }
+  }
+  return Number.isFinite(Date.parse(value));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validateSchedule(payload: unknown, invocationId: string): "valid" | "invalid" | "mismatch" {
+  if (!isRecord(payload) || !isRecord(payload.data) || !isRecord(payload.trigger)) return "invalid";
+  if (
+    !scheduledUtcTimestamp(payload.data.scheduled_at) ||
+    payload.version !== 1 ||
+    typeof payload.invocation_id !== "string" ||
+    payload.trigger.type !== "schedule"
+  ) {
+    return "invalid";
+  }
+  // Neon strips client-supplied x-neon-* headers before invoking Functions.
+  return payload.invocation_id === invocationId ? "valid" : "mismatch";
+}
+
 async function fetchScheduled(request: Request): Promise<Response> {
   if (request.method !== "POST") return result({ ok: false, error: "method_not_allowed" }, 405);
 
-  // The public function URL is not an authorization credential. Keep the real
-  // control-plane credentials only in the Vercel route, not in client responses.
-  if (!request.headers.get("x-neon-trigger-invocation-id")) {
-    return result({ ok: false, error: "trigger_required" }, 403);
-  }
+  // A public Function URL is not authority to call the private Vercel worker.
+  const invocationId = request.headers.get("x-neon-trigger-invocation-id");
+  if (!invocationId) return result({ ok: false, error: "trigger_required" }, 403);
 
   let payload: unknown;
   try {
@@ -52,38 +84,11 @@ async function fetchScheduled(request: Request): Promise<Response> {
   } catch {
     return result({ ok: false, error: "invalid_schedule" }, 400);
   }
-  const data =
-    typeof payload === "object" && payload !== null && "data" in payload
-      ? (payload as { data?: unknown }).data
-      : undefined;
-  const scheduledAt =
-    typeof data === "object" && data !== null && "scheduled_at" in data
-      ? (data as { scheduled_at?: unknown }).scheduled_at
-      : undefined;
-  if (
-    typeof scheduledAt !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/u.test(scheduledAt) ||
-    !Number.isFinite(Date.parse(scheduledAt))
-  ) {
-    return result({ ok: false, error: "invalid_schedule" }, 400);
-  }
-
-  // Neon strips client-supplied x-neon-* headers before invoking Functions.
-  // Correlate the surviving trigger header with Neon's scheduled JSON body.
-  const envelope = payload as { version?: unknown; invocation_id?: unknown; trigger?: unknown };
-  const trigger = envelope.trigger;
-  if (
-    envelope.version !== 1 ||
-    typeof envelope.invocation_id !== "string" ||
-    typeof trigger !== "object" ||
-    trigger === null ||
-    !("type" in trigger) ||
-    trigger.type !== "schedule"
-  ) {
-    return result({ ok: false, error: "invalid_schedule" }, 400);
-  }
-  if (envelope.invocation_id !== request.headers.get("x-neon-trigger-invocation-id")) {
-    return result({ ok: false, error: "trigger_mismatch" }, 403);
+  const schedule = validateSchedule(payload, invocationId);
+  if (schedule !== "valid") {
+    return schedule === "mismatch"
+      ? result({ ok: false, error: "trigger_mismatch" }, 403)
+      : result({ ok: false, error: "invalid_schedule" }, 400);
   }
 
   const endpoint = approvedWorkerEndpoint(process.env.BOARDREADYOPS_WORKER_ENDPOINT);

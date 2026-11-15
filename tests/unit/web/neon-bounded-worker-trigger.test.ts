@@ -65,6 +65,46 @@ describe("Neon bounded-worker scheduled trigger", () => {
     expect(mocked).not.toHaveBeenCalled();
   });
 
+  it("rejects invalid or unbounded timestamps without dispatching a worker", async () => {
+    process.env.BOARDREADYOPS_WORKER_ENDPOINT = "https://project-eubao.vercel.app/api/internal/worker";
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_SECRET = "private-worker-secret";
+    const mocked = vi.fn();
+    vi.stubGlobal("fetch", mocked);
+    for (const scheduledAt of [
+      "2026-11-15T14:00:00.1234Z",
+      "2026-11-15T14:00:00Z".repeat(300),
+      "2026-11-15 14:00:00Z",
+      "2026-11-15T14:00:00+00:00",
+      "2026-11-15T99:99:99Z",
+    ]) {
+      const body = JSON.stringify({
+        version: 1,
+        invocation_id: "test-invocation-1",
+        trigger: { type: "schedule" },
+        data: { scheduled_at: scheduledAt },
+      });
+      expect((await workerTrigger.fetch(call(true, body))).status).toBe(400);
+    }
+    expect(mocked).not.toHaveBeenCalled();
+  });
+
+  it("accepts bounded UTC timestamps with one to three fractional digits", async () => {
+    process.env.BOARDREADYOPS_WORKER_ENDPOINT = "https://project-eubao.vercel.app/api/internal/worker";
+    process.env.BOARDREADYOPS_BOUNDED_WORKER_SECRET = "private-worker-secret";
+    const mocked = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", mocked);
+    for (const scheduledAt of ["2026-11-15T14:00:00.1Z", "2026-11-15T14:00:00.123Z"]) {
+      const body = JSON.stringify({
+        version: 1,
+        invocation_id: "test-invocation-1",
+        trigger: { type: "schedule" },
+        data: { scheduled_at: scheduledAt },
+      });
+      expect((await workerTrigger.fetch(call(true, body))).status).toBe(200);
+    }
+    expect(mocked).toHaveBeenCalledTimes(2);
+  });
+
   it("passes the private token directly to the bounded endpoint on a valid schedule", async () => {
     process.env.BOARDREADYOPS_WORKER_ENDPOINT = "https://project-eubao.vercel.app/api/internal/worker";
     process.env.BOARDREADYOPS_BOUNDED_WORKER_SECRET = "private-worker-secret";
