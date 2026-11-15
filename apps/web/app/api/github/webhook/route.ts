@@ -4,9 +4,12 @@ import type { GitHubAppLifecycleAction, GitHubAppLifecycleResult } from "@boardr
 import { normalizeGitHubAppWebhook } from "@boardreadyops/cloud-core/lifecycle";
 import { emptyGitHubAppLifecycleExecutionResult } from "@boardreadyops/cloud-core/lifecycle-executor";
 import type { AcceptGitHubWebhookResult } from "@boardreadyops/db/control-plane-job-store";
+import { after } from "next/server";
 import { RequestBodyTooLargeError, readBoundedRequestBody } from "../../../../lib/bounded-request-body.js";
 import { CloudRuntimeConfigurationError } from "../../../../lib/cloud-runtime-config.js";
 import { runnerModeSummary } from "../../../../lib/runner-mode.js";
+import { runProductionBoundedPass } from "../../../../lib/serverless-worker-production.js";
+import { scheduleBoundedWorkerWakeup } from "../../../../lib/serverless-worker-wakeup.js";
 import { emitWebhookIntakeTelemetry, webhookEventClass } from "../../../../lib/webhook-intake-telemetry.js";
 import { checkWebhookRateLimit } from "../../../../lib/webhook-rate-limit.js";
 import { getControlPlaneJobStore } from "./intake-store.js";
@@ -258,6 +261,12 @@ export async function POST(request: Request): Promise<Response> {
     outcome: intake.outcome,
     eventClass: webhookEventClass(verified.event),
     latencyMs: performance.now() - startedAt,
+  });
+  scheduleBoundedWorkerWakeup({
+    queued: intake.queued,
+    enabled: process.env.BOARDREADYOPS_BOUNDED_WORKER_ENABLED === "1",
+    schedule: after,
+    work: runProductionBoundedPass,
   });
   return acceptedResponse(verified, lifecycle, intake);
 }
