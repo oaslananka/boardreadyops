@@ -121,7 +121,11 @@ describe("artifact download signatures", () => {
     });
 
     expect(url).toBeDefined();
-    const parsed = new URL(url ?? "https://invalid.test");
+    // A signed artifact always downloads from the current application origin:
+    // staging, custom domains and the eventual cutover must never send users
+    // to a different deployment just because a public URL env var is stale.
+    expect(url?.startsWith("/api/v1/runs/")).toBe(true);
+    const parsed = new URL(url ?? "/invalid", "https://current-deployment.test");
     expect(parsed.pathname).toBe("/api/v1/runs/run%2Fwith%20spaces/artifacts/artifact%3F%231/download");
     expect(parsed.searchParams.get("exp")).toBe(String(expiresAt));
     expect(parsed.searchParams.get("sig")).toMatch(/^[A-Za-z0-9_-]{43}$/);

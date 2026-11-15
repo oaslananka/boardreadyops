@@ -97,7 +97,10 @@ export function artifactDownloadUrl(input) {
 
   url.searchParams.set("exp", String(input.expiresAt));
   url.searchParams.set("sig", signature);
-  return url.toString();
+  // Signed URLs are only for this application's own download endpoint.
+  // An origin baked into the response can point a user back to the old VPS
+  // during a Vercel/Neon rollout; the browser must stay on its current host.
+  return `${url.pathname}${url.search}`;
 }
 
 export function safeLocalArtifactPath(storageRoot, storagePath) {
