@@ -825,7 +825,7 @@ describe("run overview direct manufacturing archive handoff", () => {
   it("offers an immediately accessible existing signed download for a verified manufacturing archive", () => {
     const markup = renderToStaticMarkup(createElement(SummaryView, { run: withManufacturingArchive() }));
     expect(markup).toContain("Download signed manufacturing archive");
-    expect(markup).toContain(`href="${archiveUrl.replace("&", "&amp;")}"`);
+    expect(markup).toContain(`href="${archiveUrl.replaceAll("&", "&amp;")}"`);
     expect(markup).toContain("min-h-11");
     expect(markup).toContain("SHA-256");
     expect(markup).toContain("Download is not fabrication approval");
@@ -864,7 +864,7 @@ describe("run overview direct manufacturing archive handoff", () => {
     run.artifactsPage.total = run.artifacts.length;
     const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
     expect(markup).toContain("Download signed manufacturing archive");
-    expect(markup).toContain(archiveUrl.replace("&", "&amp;"));
+    expect(markup).toContain(archiveUrl.replaceAll("&", "&amp;"));
   });
 
   it("does not mislabel unrelated available artifacts as signed manufacturing packages", () => {
