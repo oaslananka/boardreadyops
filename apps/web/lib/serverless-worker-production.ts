@@ -66,9 +66,11 @@ export async function verifyProductionBoundedWorkerReadiness(): Promise<{
         ),
       { consistentRead: true, statementTimeoutMs: 5000 },
     );
-    const row = result.rows[0] as
-      | { jobs_ready?: boolean; outbox_ready?: boolean; migration_ready?: boolean }
-      | undefined;
+    const rows =
+      typeof result === "object" && result !== null && "rows" in result && Array.isArray(result.rows)
+        ? result.rows
+        : [];
+    const row = rows[0] as { jobs_ready?: boolean; outbox_ready?: boolean; migration_ready?: boolean } | undefined;
     if (row?.jobs_ready !== true || row.outbox_ready !== true || row.migration_ready !== true) {
       throw new Error("bounded worker PostgreSQL schema unavailable");
     }
