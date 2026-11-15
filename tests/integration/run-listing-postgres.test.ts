@@ -95,6 +95,128 @@ beforeAll(async () => {
      values ($1, $2, 1, 'completed', 'success', 'pass', '{}'::jsonb, $3)`,
     [signedRun, attemptId, digest],
   );
+  // Add three independent signed-evidence shapes: one authoritative current
+  // attempt, one unrelated tenant, and one stale attempt that must not surface.
+  async function recordFixtureArchive(
+    runId: string,
+    attemptId: string,
+    repoId: string,
+    installationId: string,
+    githubRepositoryId: number,
+    sourceSha: string,
+    artifactId: string,
+    role: "manufacturing" | "report" = "manufacturing",
+  ) {
+    await database().query(
+      `insert into artifacts
+         (id, run_id, execution_attempt_id, content_type, kind, name, storage_path, sha256, bytes, role)
+       values ($1, $2, $3, 'application/gzip', 'archive', 'signed-manufacturing-export.tar.gz',
+               $4, $5, 9325, $6)`,
+      [artifactId, runId, attemptId, `fixtures/${artifactId}.tar.gz`, "e".repeat(64), role],
+    );
+    await database().query(
+      `insert into signed_manufacturing_export_evidence
+         (run_id, execution_attempt_id, repository_id, installation_id, artifact_id,
+          github_repository_id, github_run_id, run_attempt, source_sha, signer_sha,
+          source_ref, workflow_path, manifest_sha256, bundle_sha256, subject_count)
+       values ($1, $2, $3, $4, $5, $6, '987654321', 1, $7, $8,
+               'refs/heads/main', '.github/workflows/readiness-runner.yml', $9, $10, 29)`,
+      [
+        runId,
+        attemptId,
+        repoId,
+        installationId,
+        artifactId,
+        githubRepositoryId,
+        sourceSha,
+        "a".repeat(40),
+        "b".repeat(64),
+        "c".repeat(64),
+      ],
+    );
+  }
+  await recordFixtureArchive(
+    signedRun,
+    attemptId,
+    mineRepository,
+    mineInstallation,
+    49301,
+    "4".repeat(40),
+    "9e100000-0000-4000-8000-000000000071",
+  );
+
+  const foreignAttemptId = "9e100000-0000-4000-8000-000000000061";
+  await database().query(
+    `insert into release_run_attempts (id, run_id, attempt_number, status, completed_at)
+     values ($1, $2, 1, 'completed', now())`,
+    [foreignAttemptId, theirsRunId],
+  );
+  await database().query(
+    "update release_runs set execution_attempt_id = $2, execution_attempt_started_at = now() where id = $1",
+    [theirsRunId, foreignAttemptId],
+  );
+  await recordFixtureArchive(
+    theirsRunId,
+    foreignAttemptId,
+    theirsRepository,
+    theirsInstallation,
+    49302,
+    "f".repeat(40),
+    "9e100000-0000-4000-8000-000000000072",
+  );
+
+  const staleAttemptId = "9e100000-0000-4000-8000-000000000062";
+  await database().query(
+    `insert into release_run_attempts (id, run_id, attempt_number, status, completed_at)
+     values ($1, $2, 1, 'completed', now())`,
+    [staleAttemptId, runIds[0]],
+  );
+  const staleRunId = runIds[0];
+  if (!staleRunId) throw new Error("Missing stale-run fixture");
+  await recordFixtureArchive(
+    staleRunId,
+    staleAttemptId,
+    mineRepository,
+    mineInstallation,
+    49301,
+    "0".repeat(40),
+    "9e100000-0000-4000-8000-000000000073",
+  );
+
+  // Adversarial records are separate immutable fixtures. Never mutate an
+  // accepted manufacturing evidence row after insertion.
+  for (const [runIndex, attemptId, artifactId, sourceSha, role] of [
+    [
+      1,
+      "9e100000-0000-4000-8000-000000000063",
+      "9e100000-0000-4000-8000-000000000074",
+      "8".repeat(40),
+      "manufacturing",
+    ],
+    [2, "9e100000-0000-4000-8000-000000000064", "9e100000-0000-4000-8000-000000000075", "2".repeat(40), "report"],
+  ] as const) {
+    const mismatchedRun = runIds[runIndex];
+    if (!mismatchedRun) throw new Error("Missing adversarial run fixture");
+    await database().query(
+      `insert into release_run_attempts (id, run_id, attempt_number, status, completed_at)
+       values ($1, $2, 1, 'completed', now())`,
+      [attemptId, mismatchedRun],
+    );
+    await database().query(
+      "update release_runs set execution_attempt_id = $2, execution_attempt_started_at = now() where id = $1",
+      [mismatchedRun, attemptId],
+    );
+    await recordFixtureArchive(
+      mismatchedRun,
+      attemptId,
+      mineRepository,
+      mineInstallation,
+      49301,
+      sourceSha,
+      artifactId,
+      role,
+    );
+  }
 });
 
 afterAll(async () => {
@@ -216,5 +338,88 @@ describeDatabase("viewer run listing", () => {
   it("reports not-configured rather than an empty page when DATABASE_URL is absent", async () => {
     const result = await loadViewerRuns(session([mineGithubInstallation]), {}, { DATABASE_URL: undefined });
     expect(result).toEqual({ state: "not-configured" });
+  });
+  it("lists only source-bound manufacturing archives tied to the latest authoritative attempt", async () => {
+    const mine = await loadViewerRuns(
+      session([mineGithubInstallation]),
+      { limit: 10, signedManufacturingOnly: true },
+      environment,
+    );
+    if (mine.state !== "ok") throw new Error(`expected ok, got ${mine.state}`);
+    expect(mine.runs.map(({ id }) => id)).toEqual([runIds.at(-1)]);
+    // The ordinary run listing must still include every allowed history row.
+    const all = await loadViewerRuns(session([mineGithubInstallation]), { limit: 10 }, environment);
+    expect(all.state).toBe("ok");
+    if (all.state === "ok") expect(all.runs).toHaveLength(runIds.length);
+  });
+
+  it("prevents tenant B's real stored archive metadata from leaking into tenant A's signed-only list", async () => {
+    const mine = await loadViewerRuns(
+      session([mineGithubInstallation]),
+      { limit: 10, signedManufacturingOnly: true },
+      environment,
+    );
+    const theirs = await loadViewerRuns(
+      session([theirsGithubInstallation]),
+      { limit: 10, signedManufacturingOnly: true },
+      environment,
+    );
+    const both = await loadViewerRuns(
+      session([mineGithubInstallation, theirsGithubInstallation]),
+      { limit: 10, signedManufacturingOnly: true },
+      environment,
+    );
+    if (mine.state !== "ok" || theirs.state !== "ok" || both.state !== "ok") {
+      throw new Error("expected scoped signed Run records");
+    }
+    expect(mine.runs.map(({ id }) => id)).toEqual([runIds.at(-1)]);
+    expect(theirs.runs.map(({ id }) => id)).toEqual([theirsRunId]);
+    expect(both.runs.map(({ id }) => id)).toEqual(expect.arrayContaining([runIds.at(-1), theirsRunId]));
+    expect(both.runs).toHaveLength(2);
+  });
+
+  it("fails closed for signed archives when the repository grant is revoked or installation is suspended", async () => {
+    liveRepoIds.mockResolvedValueOnce([49303]);
+    const revoked = await loadViewerRuns(
+      session([mineGithubInstallation]),
+      { limit: 10, signedManufacturingOnly: true },
+      environment,
+    );
+    expect(revoked).toEqual({ state: "ok", runs: [], next: undefined });
+
+    await database().query("update installations set suspended_at = now() where id = $1", [mineInstallation]);
+    try {
+      const suspended = await loadViewerRuns(
+        session([mineGithubInstallation]),
+        { limit: 10, signedManufacturingOnly: true },
+        environment,
+      );
+      expect(suspended).toEqual({ state: "ok", runs: [], next: undefined });
+    } finally {
+      await database().query("update installations set suspended_at = null where id = $1", [mineInstallation]);
+    }
+  });
+  it("ignores immutable evidence with a forged source identity or unrelated artifact role", async () => {
+    const result = await loadViewerRuns(
+      session([mineGithubInstallation]),
+      { limit: 5, signedManufacturingOnly: true },
+      environment,
+    );
+    if (result.state !== "ok") throw new Error("Expected signed Run access");
+    expect(result.runs.map(({ id }) => id)).toEqual([runIds.at(-1)]);
+  });
+
+  it("excludes signed archives immediately when their repository is disabled", async () => {
+    await database().query("update repositories set disabled_at = now() where id = $1", [mineRepository]);
+    try {
+      const result = await loadViewerRuns(
+        session([mineGithubInstallation]),
+        { limit: 3, signedManufacturingOnly: true },
+        environment,
+      );
+      expect(result).toEqual({ state: "ok", runs: [], next: undefined });
+    } finally {
+      await database().query("update repositories set disabled_at = null where id = $1", [mineRepository]);
+    }
   });
 });
