@@ -795,3 +795,88 @@ describe("run investigation accessibility", () => {
     await expect(axeViolations(viewMarkup(view), path)).resolves.toEqual([]);
   });
 });
+
+describe("run overview direct manufacturing archive handoff", () => {
+  const archiveUrl =
+    "https://boardreadyops.example/api/v1/runs/run-accessible/artifacts/artifact-manufacturing/download?exp=1990000000&sig=example";
+
+  function withManufacturingArchive(overrides: Partial<RunDetail["artifacts"][number]> = {}): RunDetail {
+    const run = sampleRun();
+    run.artifacts.push({
+      id: "artifact-manufacturing",
+      kind: "archive",
+      name: "signed-manufacturing-export.tar.gz",
+      sha256: "b".repeat(64),
+      bytes: 9325,
+      role: "manufacturing",
+      contentType: "application/gzip",
+      executionAttemptId: "attempt-123",
+      uploadedAt: "2026-11-14T06:26:37.000Z",
+      downloadUrl: archiveUrl,
+      availability: "available",
+      retention: "no-automatic-expiry",
+      retentionUntil: undefined,
+      ...overrides,
+    });
+    run.artifactsPage.total = run.artifacts.length;
+    return run;
+  }
+
+  it("offers an immediately accessible existing signed download for a verified manufacturing archive", () => {
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run: withManufacturingArchive() }));
+    expect(markup).toContain("Download signed manufacturing archive");
+    expect(markup).toContain(`href="${archiveUrl.replace("&", "&amp;")}"`);
+    expect(markup).toContain("min-h-11");
+    expect(markup).toContain("SHA-256");
+    expect(markup).toContain("Download is not fabrication approval");
+    expect(markup).toContain('href="/runs/run-accessible/artifacts"');
+  });
+
+  it("does not offer a download for an expired, temporary, or linkless manufacturing artifact", () => {
+    const unavailable = [
+      { availability: "expired" as const },
+      { availability: "temporary" as const },
+      { downloadUrl: undefined },
+      { downloadUrl: "#" },
+    ];
+    for (const override of unavailable) {
+      const markup = renderToStaticMarkup(createElement(SummaryView, { run: withManufacturingArchive(override) }));
+      expect(markup).not.toContain("Download signed manufacturing archive");
+      expect(markup).not.toContain(archiveUrl);
+      expect(markup).toContain('href="/runs/run-accessible/artifacts"');
+    }
+  });
+
+  it("keeps the direct archive handoff accessible to keyboard and assistive-technology users", async () => {
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run: withManufacturingArchive() }));
+    expect(await axeViolations(markup, "/runs/run-accessible")).toEqual([]);
+  });
+
+  it("keeps the package one click away even when more than five other artifacts are recorded", () => {
+    const run = withManufacturingArchive();
+    const archive = run.artifacts.pop();
+    const ordinary = run.artifacts[0];
+    if (!archive || !ordinary) throw new Error("Expected manufacturing and report fixture artifacts");
+    for (let index = 0; index < 6; index++) {
+      run.artifacts.unshift({ ...ordinary, id: `report-${index}` });
+    }
+    run.artifacts.push(archive);
+    run.artifactsPage.total = run.artifacts.length;
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).toContain("Download signed manufacturing archive");
+    expect(markup).toContain(archiveUrl.replace("&", "&amp;"));
+  });
+
+  it("does not mislabel unrelated available artifacts as signed manufacturing packages", () => {
+    const run = sampleRun();
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).not.toContain("Download signed manufacturing archive");
+
+    const wrongRole = withManufacturingArchive({ role: "evidence" });
+    const wrongKind = withManufacturingArchive({ kind: "report" });
+    for (const candidate of [wrongRole, wrongKind]) {
+      const view = renderToStaticMarkup(createElement(SummaryView, { run: candidate }));
+      expect(view).not.toContain("Download signed manufacturing archive");
+    }
+  });
+});
