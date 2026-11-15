@@ -233,7 +233,7 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
       viewerNav={<ViewerNav />}
       breadcrumbs={[{ href: "/dashboard", label: "Dashboard" }, { label: "Projects" }]}
     >
-      <main id="main-content" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
+      <main id="main-content" className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-8">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-foreground">Hardware Projects</h1>

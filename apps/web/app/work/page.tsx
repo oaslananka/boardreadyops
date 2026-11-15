@@ -106,7 +106,7 @@ export default async function MyWorkPage() {
   if (listing.state === "signed-out") {
     return (
       <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "My Work" }]}>
-        <main className="flex w-full flex-col gap-5 px-6 py-6" id="main-content">
+        <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-6 py-6" id="main-content">
           <header>
             <h1 className="text-2xl font-bold text-foreground">My Work</h1>
           </header>
@@ -249,7 +249,7 @@ export default async function MyWorkPage() {
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "My Work" }]}>
-      <main className="flex w-full flex-col gap-5 px-6 py-6" id="main-content">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-6 py-6" id="main-content">
         <header>
           <h1 className="text-2xl font-bold text-foreground">My Work</h1>
           <p className="text-sm text-muted-foreground">

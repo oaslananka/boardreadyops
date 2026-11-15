@@ -92,7 +92,7 @@ export default async function EvidencePage() {
       viewerNav={<ViewerNav />}
       breadcrumbs={[{ href: "/dashboard", label: "Dashboard" }, { label: "Evidence" }]}
     >
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-8" id="main-content">
         <header>
           <h1 className="text-2xl font-bold text-foreground">Releases &amp; Evidence</h1>
           <p className="mt-1 text-sm text-muted-foreground">

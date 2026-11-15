@@ -119,7 +119,7 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Repository setup" }]}>
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-8" id="main-content">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs uppercase text-muted-foreground">Repository setup</p>

@@ -760,7 +760,9 @@ function SetupReadinessActions({
           rel="noreferrer"
           className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-primary underline underline-offset-2"
         >
-          Open Actions
+          {view.effectiveProbeStatus === "failed" || view.effectiveProbeStatus === "expired"
+            ? "Inspect last probe run"
+            : "Open Actions"}
         </a>
       ) : null}
     </div>
@@ -773,13 +775,25 @@ function SetupReadinessStatus({
 }: Readonly<{ repository: SetupTargetRepository | undefined; status: string | undefined }>) {
   if (!repository) return null;
   return (
-    <DefinitionGrid>
-      <Definition label="Repository">{repository.fullName}</Definition>
-      <Definition label="Probe status">{status ? customerStatusLabel(status) : "Not dispatched"}</Definition>
-      <Definition label="Probe expires">
-        {repository.setupProbeExpiresAt ? new Date(repository.setupProbeExpiresAt).toLocaleString() : "Not scheduled"}
-      </Definition>
-    </DefinitionGrid>
+    <div className="space-y-3">
+      <DefinitionGrid>
+        <Definition label="Repository">{repository.fullName}</Definition>
+        <Definition label="Probe status">{status ? customerStatusLabel(status) : "Not dispatched"}</Definition>
+        <Definition label="Probe expires">
+          {repository.setupProbeExpiresAt ? new Date(repository.setupProbeExpiresAt).toLocaleString() : "Not scheduled"}
+        </Definition>
+      </DefinitionGrid>
+      {status === "expired" ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          No verified setup result arrived before this probe's deadline. Inspect its GitHub Actions run for checkout or
+          submodule errors before retrying.
+        </p>
+      ) : status === "failed" ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          The setup probe reported a failure. Inspect the failing GitHub Actions step before retrying.
+        </p>
+      ) : null}
+    </div>
   );
 }
 

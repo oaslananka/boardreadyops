@@ -721,7 +721,7 @@ export default async function DashboardPage() {
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Dashboard" }]}>
-      <main id="main-content" className="flex flex-col gap-5 px-6 py-6">
+      <main id="main-content" className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-6 py-6">
         <header>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Your connected boards and what to do next.</p>
