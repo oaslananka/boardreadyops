@@ -12,7 +12,6 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 
 [![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-BoardReadyOps-blue?logo=github)](https://github.com/marketplace/actions/boardreadyops)
-[![License](https://img.shields.io/badge/license-AGPL-3.0-only-blue.svg)](LICENSE)
 
 [Repository Maturity](docs/repo-maturity-report.md) ·
 [OpenSSF Evidence](docs/openssf-evidence.md) ·
@@ -22,6 +21,7 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 [Support](SUPPORT.md)
 
 <p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-blue" alt="AGPL-3.0-only license" /></a>
   <a href="https://www.npmjs.com/package/boardreadyops"><img src="https://img.shields.io/npm/dt/boardreadyops?label=total%20downloads" alt="npm total downloads" /></a>
   <a href="https://gitgem.org/github/oaslananka/boardreadyops"><img src="https://gitgem.org/api/badge/github/oaslananka/boardreadyops.svg" alt="GitGem" /></a>
 </p>
