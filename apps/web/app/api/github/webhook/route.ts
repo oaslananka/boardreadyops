@@ -210,16 +210,6 @@ export async function POST(request: Request): Promise<Response> {
   const verified = await verifiedRequest(request);
   if (verified instanceof Response) return verified;
 
-  // The isolated Vercel deployment must not accumulate production deliveries
-  // before GitHub App webhook ownership and the single worker are handed off.
-  // Self-hosted VPS intake stays active until the operator completes cutover.
-  if (process.env.VERCEL === "1" && process.env.BOARDREADYOPS_WEBHOOK_INTAKE_ENABLED !== "1") {
-    return Response.json(
-      { ok: false, error: "webhook intake is not active on this origin" },
-      { status: 503, headers: { "cache-control": "no-store", "retry-after": "60" } },
-    );
-  }
-
   const lifecycle = normalizeGitHubAppWebhook({
     event: verified.event,
     delivery: verified.delivery,
@@ -250,6 +240,16 @@ export async function POST(request: Request): Promise<Response> {
       latencyMs: performance.now() - startedAt,
     });
     return acceptedResponse(verified, lifecycle);
+  }
+
+  // A signed webhook with no lifecycle actions can be acknowledged without
+  // claiming a database job. Reject only actionable deliveries while standby.
+  // This avoids needless failed GitHub deliveries during a reversible cutover.
+  if (process.env.VERCEL === "1" && process.env.BOARDREADYOPS_WEBHOOK_INTAKE_ENABLED !== "1") {
+    return Response.json(
+      { ok: false, error: "webhook intake is not active on this origin" },
+      { status: 503, headers: { "cache-control": "no-store", "retry-after": "60" } },
+    );
   }
 
   const store = configuredStore(startedAt);

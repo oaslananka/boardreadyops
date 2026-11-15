@@ -107,6 +107,32 @@ describe("GitHub webhook route lifecycle persistence", () => {
     // The disabled path is also independent of any database configuration.
   });
 
+  it("acknowledges signed no-action events while Vercel's mutating intake is disabled", async () => {
+    process.env.VERCEL = "1";
+    process.env.BOARDREADYOPS_WEBHOOK_INTAKE_ENABLED = "0";
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    delete process.env.DATABASE_URL;
+    delete process.env.BOARDREADYOPS_PERSISTENCE_MODE;
+
+    const ping = await POST(signedGitHubRequest("ping", { zen: "pong" }));
+    expect(ping.status).toBe(202);
+    await expect(ping.json()).resolves.toMatchObject({ ok: true, lifecycleActions: [] });
+
+    const event = await POST(
+      signedGitHubRequest("check_run", {
+        ...installationPayload(),
+        action: "completed",
+        repository: (installationPayload().repositories as Record<string, unknown>[])[0],
+        check_run: { id: 12345 },
+      }),
+    );
+    expect(event.status).toBe(202);
+    await expect(event.json()).resolves.toMatchObject({ ok: true, lifecycleActions: [] });
+
+    const mutating = await POST(signedGitHubRequest("installation", installationPayload()));
+    expect(mutating.status).toBe(503);
+  });
+
   it("accepts signed deliveries only after explicitly enabling Vercel webhook intake", async () => {
     process.env.VERCEL = "1";
     process.env.BOARDREADYOPS_WEBHOOK_INTAKE_ENABLED = "1";
