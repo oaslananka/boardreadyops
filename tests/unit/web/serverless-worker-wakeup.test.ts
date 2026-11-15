@@ -1,7 +1,31 @@
 import { describe, expect, it, vi } from "vitest";
-import { scheduleBoundedWorkerWakeup } from "../../../apps/web/lib/serverless-worker-wakeup.js";
+import {
+  boundedWorkerMayProcess,
+  scheduleBoundedWorkerWakeup,
+} from "../../../apps/web/lib/serverless-worker-wakeup.js";
 
 describe("serverless webhook wakeup", () => {
+  it("never runs webhook jobs during verify-only acceptance", () => {
+    expect(
+      boundedWorkerMayProcess({
+        BOARDREADYOPS_BOUNDED_WORKER_ENABLED: "1",
+        BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY: "1",
+      }),
+    ).toBe(false);
+    expect(
+      boundedWorkerMayProcess({
+        BOARDREADYOPS_BOUNDED_WORKER_ENABLED: "0",
+        BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY: "0",
+      }),
+    ).toBe(false);
+    expect(
+      boundedWorkerMayProcess({
+        BOARDREADYOPS_BOUNDED_WORKER_ENABLED: "1",
+        BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY: "0",
+      }),
+    ).toBe(true);
+  });
+
   it("does not schedule a wakeup for duplicate or disabled webhook intake", () => {
     const schedule = vi.fn();
     const work = vi.fn(async () => undefined);

@@ -2,6 +2,13 @@
  * Wake the durable worker after a webhook has been accepted in PostgreSQL.
  * An independent Neon scheduled trigger recovers work if this callback fails.
  */
+export function boundedWorkerMayProcess(environment: Readonly<Record<string, string | undefined>>): boolean {
+  return (
+    environment.BOARDREADYOPS_BOUNDED_WORKER_ENABLED === "1" &&
+    environment.BOARDREADYOPS_BOUNDED_WORKER_VERIFY_ONLY !== "1"
+  );
+}
+
 export function scheduleBoundedWorkerWakeup(input: {
   queued: boolean;
   enabled: boolean;
