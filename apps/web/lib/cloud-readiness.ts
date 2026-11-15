@@ -9,6 +9,7 @@ import {
 
 const service = "boardreadyops-cloud" as const;
 const defaultTimeoutMs = 2_000;
+const serverlessColdStartTimeoutMs = 8_000;
 const defaultDrainMarkerPath = "/run/boardreadyops/draining";
 
 export type CloudReadinessResult =
@@ -119,7 +120,9 @@ export async function checkCloudReadiness(
   }
 
   const query = options.query ?? defaultPostgresQuery(configuration.databaseUrl);
-  const timeoutMs = options.timeoutMs ?? defaultTimeoutMs;
+  // Neon Free can resume from scale-to-zero when Vercel first connects.
+  // Preserve the fast 2s readiness deadline for always-on self-hosted workers.
+  const timeoutMs = options.timeoutMs ?? (environment.VERCEL === "1" ? serverlessColdStartTimeoutMs : defaultTimeoutMs);
   let timeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
