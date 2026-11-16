@@ -41,13 +41,15 @@ export function ManufacturingArchivePreview({
       bytes: archive.bytes,
       sourceSha,
     })
-      .then((contents) => setState({ status: "ready", contents }))
-      .catch((error: unknown) =>
+      .then((contents) => {
+        setState({ status: "ready", contents });
+      })
+      .catch((error: unknown) => {
         setState({
           status: "error",
           error: error instanceof Error ? error.message : "This archive could not be opened for review.",
-        }),
-      );
+        });
+      });
   };
 
   return (
@@ -203,9 +205,12 @@ function ArchiveContents({ contents, runId }: Readonly<{ contents: Manufacturing
               <tbody>
                 {contents.bomRows.map((row) => (
                   <tr key={row.join("\u001f")} className="border-t border-border">
-                    {contents.bomHeaders.map((header, column) => (
-                      <td key={header} className="max-w-64 break-words px-3 py-3 text-foreground">
-                        {row[column] ?? "—"}
+                    {row.map((cell, column) => (
+                      <td
+                        key={contents.bomHeaders.at(column) ?? `column-${column}`}
+                        className="max-w-64 break-words px-3 py-3 text-foreground"
+                      >
+                        {cell || "—"}
                       </td>
                     ))}
                   </tr>

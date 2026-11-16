@@ -50,15 +50,15 @@ async function inflateGzip(compressed: ArrayBuffer): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   let bytes = 0;
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
+    let chunk = await reader.read();
+    while (!chunk.done) {
+      bytes += chunk.value.byteLength;
       if (bytes > maxExpandedBytes) {
         await reader.cancel();
         return invalid("Expanded manufacturing archive is too large for a safe browser preview.");
       }
-      chunks.push(value);
+      chunks.push(chunk.value);
+      chunk = await reader.read();
     }
   } catch (error) {
     if (error instanceof Error && error.message.includes("too large for a safe browser preview")) {
@@ -202,9 +202,9 @@ function parseCsv(text: string): { header: string[]; rows: string[][]; total: nu
   let cell = "";
   let quoted = false;
   for (let i = 0; i < data.length; i++) {
-    const character = data[i];
+    const character = data.charAt(i);
     if (character === '"') {
-      if (quoted && data[i + 1] === '"') {
+      if (quoted && data.charAt(i + 1) === '"') {
         cell += '"';
         i++;
       } else {
@@ -218,7 +218,7 @@ function parseCsv(text: string): { header: string[]; rows: string[][]; total: nu
       if (row.some((item) => item.trim().length > 0)) rows.push(row);
       row = [];
       cell = "";
-      if (character === "\r" && data[i + 1] === "\n") i++;
+      if (character === "\r" && data.charAt(i + 1) === "\n") i++;
     } else {
       cell += character;
     }
@@ -229,7 +229,10 @@ function parseCsv(text: string): { header: string[]; rows: string[][]; total: nu
   if (row.some((item) => item.trim().length > 0)) rows.push(row);
   const header = rows.shift() ?? [];
   if (!header.length || header.length > 24) invalid("Invalid BOM headers.");
-  return { header, rows: rows.slice(0, 20), total: rows.length };
+  const previewRows = rows
+    .slice(0, 20)
+    .map((entry) => Array.from({ length: header.length }, (_, column) => entry.at(column) ?? ""));
+  return { header, rows: previewRows, total: rows.length };
 }
 
 /** No network request or upload. Matching an ingested digest is not a browser-side signature verification. */
