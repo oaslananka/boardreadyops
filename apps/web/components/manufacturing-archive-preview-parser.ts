@@ -113,7 +113,7 @@ function tarFiles(bytes: Uint8Array): Map<string, Uint8Array> {
     if (seen.size >= maxTarMembers) invalid("Too many manufacturing archive members.");
     const prefix = tarText(bytes, offset + 345, 155);
     const base = tarText(bytes, offset, 100);
-    const rawName = (prefix ? prefix + "/" : "") + base;
+    const rawName = (prefix ? `${prefix}/` : "") + base;
     const type = String.fromCharCode(bytes[offset + 156] ?? 0);
     const name = type === "5" && rawName.endsWith("/") ? rawName.slice(0, -1) : rawName;
     const size = tarSize(bytes, offset + 124);
@@ -134,6 +134,29 @@ function tarFiles(bytes: Uint8Array): Map<string, Uint8Array> {
 }
 
 type ManifestArtifact = Readonly<{ path: string; kind: string; bytes: number; sha256: string }>;
+
+/** Validate each individual untrusted output before it joins the trusted inventory. */
+function manifestArtifact(value: unknown, paths: Set<string>): ManifestArtifact {
+  if (!value || typeof value !== "object") invalid("Invalid manufacturing inventory entry.");
+  const record = value as Record<string, unknown>;
+  const { path, sha256, kind, bytes } = record;
+  if (
+    typeof path !== "string" ||
+    !allowedName(root + path) ||
+    path.startsWith("/") ||
+    typeof sha256 !== "string" ||
+    !hexDigest.test(sha256) ||
+    typeof kind !== "string" ||
+    typeof bytes !== "number" ||
+    !Number.isSafeInteger(bytes) ||
+    bytes < 0 ||
+    paths.has(path)
+  ) {
+    invalid("Unsafe or duplicate manufacturing output inventory entry.");
+  }
+  paths.add(path);
+  return { path, kind, bytes, sha256 };
+}
 
 function parseManifest(bytes: Uint8Array, expectedSource: string): ManifestArtifact[] {
   let value: unknown;
@@ -158,33 +181,17 @@ function parseManifest(bytes: Uint8Array, expectedSource: string): ManifestArtif
   }
   const result: ManifestArtifact[] = [];
   const paths = new Set<string>();
-  for (const entry of artifacts) {
-    if (!entry || typeof entry !== "object") invalid("Invalid manufacturing inventory entry.");
-    const record = entry as Record<string, unknown>;
-    const path = record.path;
-    const sha256 = record.sha256;
-    const kind = record.kind;
-    const bytes = record.bytes;
-    if (
-      typeof path !== "string" ||
-      !allowedName(root + path) ||
-      path.startsWith("/") ||
-      typeof sha256 !== "string" ||
-      !hexDigest.test(sha256) ||
-      typeof kind !== "string" ||
-      typeof bytes !== "number" ||
-      !Number.isSafeInteger(bytes) ||
-      bytes < 0 ||
-      paths.has(path)
-    )
-      invalid("Unsafe or duplicate manufacturing output inventory entry.");
-    paths.add(path);
-    result.push({ path, kind, bytes, sha256 });
-  }
+  for (const entry of artifacts) result.push(manifestArtifact(entry, paths));
   if (!result.some((entry) => entry.kind === "gerber") || !result.some((entry) => entry.kind === "drill")) {
     invalid("The archive does not contain the required Gerber and drill evidence.");
   }
   return result;
+}
+
+function checkCsvPreviewLimits(row: readonly string[], rows: readonly string[][], cell: string): void {
+  if (row.length > 24 || rows.length > 5000 || cell.length > 2048) {
+    invalid("BOM exceeds the supported preview limits.");
+  }
 }
 
 function parseCsv(text: string): { header: string[]; rows: string[][]; total: number } {
@@ -215,9 +222,7 @@ function parseCsv(text: string): { header: string[]; rows: string[][]; total: nu
     } else {
       cell += character;
     }
-    if (row.length > 24 || rows.length > 5000 || cell.length > 2048) {
-      invalid("BOM exceeds the supported preview limits.");
-    }
+    checkCsvPreviewLimits(row, rows, cell);
   }
   if (quoted) invalid("Malformed quoted BOM field.");
   row.push(cell);
@@ -246,7 +251,7 @@ export async function inspectDownloadedManufacturingArchive(
     return invalid("SHA-256 mismatch. Select the .tar.gz from this Run's GitHub artifact ZIP.");
   }
   const files = tarFiles(await inflateGzip(compressed));
-  const manifestBytes = files.get(root + "manifest.json");
+  const manifestBytes = files.get(`${root}manifest.json`);
   if (!manifestBytes || !files.has("bundle.sigstore.json")) {
     return invalid("Signed archive metadata is incomplete.");
   }

@@ -21,14 +21,14 @@ function tarFile(name: string, data: Uint8Array, type = "0"): Buffer {
   header.write("0000644\0", 100, 8);
   header.write("0000000\0", 108, 8);
   header.write("0000000\0", 116, 8);
-  header.write(data.length.toString(8).padStart(11, "0") + "\0", 124, 12);
+  header.write(`${data.length.toString(8).padStart(11, "0")}\0`, 124, 12);
   header.write("00000000000\0", 136, 12);
   header.fill(32, 148, 156);
   header.write(type, 156, 1);
   header.write("ustar\0", 257, 6);
   header.write("00", 263, 2);
   const checksum = header.reduce((sum, byte) => sum + byte, 0);
-  header.write(checksum.toString(8).padStart(6, "0") + "\0 ", 148, 8);
+  header.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148, 8);
   const pad = Buffer.alloc((512 - (data.length % 512)) % 512);
   return Buffer.concat([header, Buffer.from(data), pad]);
 }
@@ -77,10 +77,10 @@ function archiveFixture(
   };
   const entries = [
     ...outputs.map((item) => tarFile(prefix + item.path, item.data)),
-    tarFile(prefix + "manifest.json", encode(JSON.stringify(manifest))),
+    tarFile(`${prefix}manifest.json`, encode(JSON.stringify(manifest))),
     tarFile("bundle.sigstore.json", encode('{"bundle":"recorded"}')),
     ...(options.extraPath ? [tarFile(options.extraPath, encode("unsafe"))] : []),
-    ...(options.symlink ? [tarFile(prefix + "link", new Uint8Array(), "2")] : []),
+    ...(options.symlink ? [tarFile(`${prefix}link`, new Uint8Array(), "2")] : []),
   ];
   const compressed = gzipSync(Buffer.concat([...entries, Buffer.alloc(1024)]));
   return {
@@ -127,11 +127,11 @@ describe("downloaded manufacturing preview: integrity and source-bound BOM", () 
     await expect(inspectDownloadedManufacturingArchive(invalidDigest.file, invalidDigest.expected)).rejects.toThrow(
       "does not match the manifest digest",
     );
-    const hidden = archiveFixture({ extraPath: prefix + "unexpected.txt" });
+    const hidden = archiveFixture({ extraPath: `${prefix}unexpected.txt` });
     await expect(inspectDownloadedManufacturingArchive(hidden.file, hidden.expected)).rejects.toThrow(
       "unrecorded files",
     );
-    const traversed = archiveFixture({ extraPath: prefix + "../secret.txt" });
+    const traversed = archiveFixture({ extraPath: `${prefix}../secret.txt` });
     await expect(inspectDownloadedManufacturingArchive(traversed.file, traversed.expected)).rejects.toThrow(
       "unsafe manufacturing archive path",
     );

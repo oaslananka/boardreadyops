@@ -52,7 +52,7 @@ export function ManufacturingArchivePreview({
 
   return (
     <section
-      aria-labelledby={id + "-title"}
+      aria-labelledby={`${id}-title`}
       className="mt-5 overflow-hidden rounded-2xl border border-border bg-card shadow-e1"
     >
       <header className="flex flex-wrap items-start gap-3 border-b border-border bg-muted/30 px-5 py-5 sm:px-6">
@@ -63,7 +63,7 @@ export function ManufacturingArchivePreview({
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
             Source-bound manufacturing package
           </p>
-          <h2 id={id + "-title"} className="mt-1 font-display text-xl font-semibold tracking-tight text-foreground">
+          <h2 id={`${id}-title`} className="mt-1 font-display text-xl font-semibold tracking-tight text-foreground">
             Preview your downloaded BOM and fabrication files
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
@@ -99,23 +99,23 @@ export function ManufacturingArchivePreview({
           </li>
           <li className="rounded-xl border border-border bg-background/60 p-4">
             <label
-              htmlFor={id + "-file"}
+              htmlFor={`${id}-file`}
               className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
             >
               2 · Inspect the .tar.gz locally
             </label>
             <input
-              id={id + "-file"}
+              id={`${id}-file`}
               type="file"
               accept=".gz,.tgz,application/gzip"
-              aria-describedby={id + "-description"}
+              aria-describedby={`${id}-description`}
               className="mt-2 block min-h-11 w-full min-w-0 cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-semibold file:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               onChange={(event) => {
                 inspectFile(event.currentTarget.files?.[0]);
                 event.currentTarget.value = "";
               }}
             />
-            <p id={id + "-description"} className="mt-2 text-xs text-muted-foreground">
+            <p id={`${id}-description`} className="mt-2 text-xs text-muted-foreground">
               Checks the exact archive bytes against this Run. No new cloud storage or fabrication request.
             </p>
           </li>
