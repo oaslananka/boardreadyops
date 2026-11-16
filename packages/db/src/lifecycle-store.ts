@@ -36,6 +36,7 @@ export type GitHubAppMetadataStore = Pick<
 
 export const releaseRepositoryRolloutEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES";
 export const releaseRepositoryRolloutFileEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES_FILE";
+export const releaseRepositoryPilotEnvName = "BOARDREADYOPS_RELEASE_PILOT_REPOSITORY";
 
 const maximumReleaseRepositoryRolloutFileBytes = 64 * 1024;
 
@@ -198,7 +199,14 @@ export function releaseRepositoryRolloutPolicyFromEnvironment(env: Environment):
   if (configuredFile) {
     return parseReleaseRepositoryRolloutPolicy(releaseRepositoryRolloutFile(configuredFile));
   }
-  return parseReleaseRepositoryRolloutPolicy(env[releaseRepositoryRolloutEnvName]);
+  const policy = parseReleaseRepositoryRolloutPolicy(env[releaseRepositoryRolloutEnvName]);
+  // Add exactly one canary repository without replacing the existing (possibly sensitive)
+  // allowlist. Do not interpret commas, whitespace, or "*" as a wider rollout.
+  const pilot = env[releaseRepositoryPilotEnvName]?.trim().toLowerCase();
+  if (!pilot || !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/u.test(pilot) || policy.allowAllRepositories) {
+    return policy;
+  }
+  return { repositories: [...new Set([...(policy.repositories ?? []), pilot])] };
 }
 
 export function createSqlGitHubAppMetadataStore(

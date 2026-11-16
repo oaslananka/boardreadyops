@@ -13,6 +13,18 @@ describe("release repository rollout visibility", () => {
     ).toEqual({ enabled: true });
   });
 
+  it("enables only the selected canary in both product and worker rollout logic", () => {
+    const environment = {
+      BOARDREADYOPS_RELEASE_REPOSITORIES: "acme/existing-board",
+      BOARDREADYOPS_RELEASE_PILOT_REPOSITORY: "oaslananka/boardreadyops",
+    };
+    expect(releaseRepositoryDispatchAvailability("oaslananka/boardreadyops", environment)).toEqual({ enabled: true });
+    expect(releaseRepositoryDispatchAvailability("acme/existing-board", environment)).toEqual({ enabled: true });
+    expect(releaseRepositoryDispatchAvailability("oaslananka/another-board", environment)).toMatchObject({
+      enabled: false,
+    });
+  });
+
   it("explains a rollout-disabled repository without exposing internal configuration", () => {
     const result = releaseRepositoryDispatchAvailability("acme/not-enabled", {
       BOARDREADYOPS_RELEASE_REPOSITORIES: "acme/power-board",
