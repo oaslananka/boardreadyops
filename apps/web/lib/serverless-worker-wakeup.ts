@@ -26,3 +26,27 @@ export function scheduleBoundedWorkerWakeup(input: {
   });
   return true;
 }
+
+/**
+ * Dashboard reruns share the same event-driven, lease-protected worker as
+ * GitHub webhooks. Only a genuinely accepted, queued API response can trigger
+ * a post-response pass. A scheduling failure never changes durable intake.
+ */
+export async function scheduleRepositoryActionWorkerWakeup(input: {
+  response: Response;
+  environment: Readonly<Record<string, string | undefined>>;
+  schedule: (work: () => Promise<void>) => void;
+  work: () => Promise<unknown>;
+}): Promise<Response> {
+  const { response, environment, schedule, work } = input;
+  if (response.status !== 202 || !boundedWorkerMayProcess(environment)) return response;
+  try {
+    const receipt: unknown = await response.clone().json();
+    const queued = typeof receipt === "object" && receipt !== null && "queued" in receipt && receipt.queued === true;
+    scheduleBoundedWorkerWakeup({ queued, enabled: true, schedule, work });
+  } catch {
+    // Already queued work is recovered via the existing scheduled worker.
+    // Never replace the authoritative accepted response with an error.
+  }
+  return response;
+}
