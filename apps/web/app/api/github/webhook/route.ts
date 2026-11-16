@@ -4,9 +4,12 @@ import type { GitHubAppLifecycleAction, GitHubAppLifecycleResult } from "@boardr
 import { normalizeGitHubAppWebhook } from "@boardreadyops/cloud-core/lifecycle";
 import { emptyGitHubAppLifecycleExecutionResult } from "@boardreadyops/cloud-core/lifecycle-executor";
 import type { AcceptGitHubWebhookResult } from "@boardreadyops/db/control-plane-job-store";
+import { after } from "next/server";
 import { RequestBodyTooLargeError, readBoundedRequestBody } from "../../../../lib/bounded-request-body.js";
 import { CloudRuntimeConfigurationError } from "../../../../lib/cloud-runtime-config.js";
 import { runnerModeSummary } from "../../../../lib/runner-mode.js";
+import { runProductionBoundedPass } from "../../../../lib/serverless-worker-production.js";
+import { boundedWorkerMayProcess, scheduleBoundedWorkerWakeup } from "../../../../lib/serverless-worker-wakeup.js";
 import { emitWebhookIntakeTelemetry, webhookEventClass } from "../../../../lib/webhook-intake-telemetry.js";
 import { checkWebhookRateLimit } from "../../../../lib/webhook-rate-limit.js";
 import { getControlPlaneJobStore } from "./intake-store.js";
@@ -239,6 +242,16 @@ export async function POST(request: Request): Promise<Response> {
     return acceptedResponse(verified, lifecycle);
   }
 
+  // A signed webhook with no lifecycle actions can be acknowledged without
+  // claiming a database job. Reject only actionable deliveries while standby.
+  // This avoids needless failed GitHub deliveries during a reversible cutover.
+  if (process.env.VERCEL === "1" && process.env.BOARDREADYOPS_WEBHOOK_INTAKE_ENABLED !== "1") {
+    return Response.json(
+      { ok: false, error: "webhook intake is not active on this origin" },
+      { status: 503, headers: { "cache-control": "no-store", "retry-after": "60" } },
+    );
+  }
+
   const store = configuredStore(startedAt);
   if (store instanceof Response) return store;
 
@@ -258,6 +271,12 @@ export async function POST(request: Request): Promise<Response> {
     outcome: intake.outcome,
     eventClass: webhookEventClass(verified.event),
     latencyMs: performance.now() - startedAt,
+  });
+  scheduleBoundedWorkerWakeup({
+    queued: intake.queued,
+    enabled: boundedWorkerMayProcess(process.env),
+    schedule: after,
+    work: runProductionBoundedPass,
   });
   return acceptedResponse(verified, lifecycle, intake);
 }

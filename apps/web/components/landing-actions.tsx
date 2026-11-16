@@ -27,7 +27,7 @@ export async function LandingNavActions() {
   if (isMarketingSurface()) {
     return (
       <>
-        <ViewerControls login={undefined} />
+        <ViewerControls login={undefined} signInHref={applicationHref("/api/auth/github/login")} />
         <a className={navCtaClass} href={installUrl}>
           Install on GitHub
         </a>
@@ -72,6 +72,12 @@ export async function LandingHeroActions({
         <a className={secondaryClass} href={applicationHref("/setup")}>
           {setupLabel}
         </a>
+        <a
+          className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4"
+          href={applicationHref("/api/auth/github/login")}
+        >
+          Already connected? Sign in with GitHub
+        </a>
       </>
     );
   }
@@ -87,6 +93,12 @@ export async function LandingHeroActions({
         <Link className={secondaryClass} href="/setup">
           {setupLabel}
         </Link>
+        <a
+          className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4"
+          href="/api/auth/github/login"
+        >
+          Already connected? Sign in with GitHub
+        </a>
       </>
     );
   }

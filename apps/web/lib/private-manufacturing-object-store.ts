@@ -156,6 +156,12 @@ export function createPrivateManufacturingObjectStore(
       const destination = verifiedKey(input);
       const response = await signedResponse(destination, "PUT", {
         "x-amz-copy-source": `/${bucket}/${source}`,
+        // Neon does not honor S3 response-content-disposition query overrides.
+        // Set the filename on the verified object itself so direct private
+        // downloads retain the human-readable archive name.
+        "x-amz-metadata-directive": "REPLACE",
+        "content-type": "application/gzip",
+        "content-disposition": 'attachment; filename="signed-manufacturing-export.tar.gz"',
       }).catch(() => undefined);
       if (!response?.ok) throw new Error("private_object_store_promote_failed");
       await response.arrayBuffer().catch(() => undefined);

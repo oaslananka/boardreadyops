@@ -95,6 +95,12 @@ describe("HomePage", () => {
     expect(text).toContain("Back to the source");
   });
 
+  it("explains the returning-customer path without asking them to reinstall", () => {
+    const text = collectText(HomePage());
+    expect(text).toContain("Already using BoardReadyOps?");
+    expect(text).toContain("without reinstalling the GitHub App");
+  });
+
   it("offers a signed-out reader somewhere to install from", () => {
     const links = collectLinks(HomePage());
     const installLinks = links.filter((href) => href === "https://github.com/apps/boardreadyops/installations/new");

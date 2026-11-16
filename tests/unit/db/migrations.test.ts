@@ -181,6 +181,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0127_historical_user_live_oauth_verified_proof.sql",
       "0128_reused_github_repository_name_identity.sql",
       "0129_legacy_callback_dead_letter_recovery.sql",
+      "0130_completed_safe_mode_check_run_reconciliation.sql",
     ]);
   });
 

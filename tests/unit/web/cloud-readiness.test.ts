@@ -134,6 +134,42 @@ describe("cloud readiness", () => {
     expect(JSON.stringify(result)).not.toContain("db.internal");
   });
 
+  it("allows a bounded Vercel cold start beyond the self-hosted two-second deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      let complete: ((value: unknown) => void) | undefined;
+      const query = vi.fn(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve;
+          }),
+      );
+      const readiness = checkCloudReadiness({
+        environment: {
+          VERCEL: "1",
+          DATABASE_URL: "postgresql://example.invalid/boardreadyops",
+          GITHUB_WEBHOOK_SECRET: "secret",
+        },
+        query,
+      });
+      await vi.advanceTimersByTimeAsync(2_500);
+      complete?.({ rows: [{ ready: 1 }] });
+      await expect(readiness).resolves.toMatchObject({ ok: true, checks: { database: "pass" } });
+
+      const alwaysOn = checkCloudReadiness({
+        environment: {
+          DATABASE_URL: "postgresql://example.invalid/boardreadyops",
+          GITHUB_WEBHOOK_SECRET: "secret",
+        },
+        query: () => new Promise(() => undefined),
+      });
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(alwaysOn).resolves.toMatchObject({ ok: false, reason: "database-timeout" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reports database-timeout when the query exceeds the timeout", async () => {
     const query = vi.fn(() => new Promise(() => undefined));
 

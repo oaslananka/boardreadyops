@@ -60,3 +60,7 @@ reports/mutation
 
 # Test-only source-bound manufacturing attestation output (never a release).
 /build/boardreadyops-attested/
+
+# Vercel linking and local runtime credentials must never be committed.
+/.vercel/
+/.env.local

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { BrandMarkIcon } from "../components/brand-mark.js";
 import { installUrl, LandingHeroActions, LandingNavActions } from "../components/landing-actions.js";
 import { PublicStructuredData } from "../components/public-structured-data.js";
+import { SignInFeedbackFromUrl } from "../components/sign-in-feedback.js";
 import { ThemeToggle } from "../components/theme-toggle.js";
 import { buttonVariants } from "../components/ui/button.js";
 import { applicationHref } from "../lib/marketing-surface.js";
@@ -328,6 +329,10 @@ export default function HomePage() {
       </header>
 
       <main id="main-content">
+        {/* Keep the marketing landing static while showing bounded OAuth callback feedback. */}
+        <Suspense fallback={null}>
+          <SignInFeedbackFromUrl />
+        </Suspense>
         <section className="border-b border-border py-20" aria-labelledby="landing-heading">
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 lg:grid-cols-[3fr_2fr] lg:items-center">
             <div>
@@ -337,7 +342,8 @@ export default function HomePage() {
               </h1>
               <p className="mt-4 text-lg text-muted-foreground">
                 Connect a GitHub repository, check the exact design revision, and open visual findings. Your source and
-                branch protections stay in GitHub.
+                branch protections stay in GitHub. Already using BoardReadyOps? Sign in to revisit your connected
+                repositories and review their existing results without reinstalling the GitHub App.
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Suspense

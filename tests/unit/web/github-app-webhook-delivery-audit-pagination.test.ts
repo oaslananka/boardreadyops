@@ -76,6 +76,22 @@ describe("GitHub App webhook delivery safety audit", () => {
       }),
     ).rejects.toThrow("invalid_github_delivery");
   });
+  it("retains GitHub action metadata and rejects invalid actions", async () => {
+    const result = await fetchRecentAppWebhookDeliveries({
+      token: "test-only",
+      since: time,
+      request: async () => mockResponse([{ ...delivery(10, guidA, 202), event: "check_run", action: "completed" }]),
+    });
+    expect(result.attempts[0]?.action).toBe("completed");
+    await expect(
+      fetchRecentAppWebhookDeliveries({
+        token: "test-only",
+        since: time,
+        request: async () => mockResponse([{ ...delivery(10, guidA, 202), action: 123 }]),
+      }),
+    ).rejects.toThrow("invalid_github_delivery");
+  });
+
   it("rejects malformed event metadata instead of silently missing acknowledged installations", async () => {
     const { event: _event, ...missingEvent } = delivery(10, guidA, 202);
     await expect(
@@ -92,6 +108,25 @@ describe("GitHub App webhook delivery safety audit", () => {
         request: async () => mockResponse([{ ...delivery(10, guidA, 202), installation_id: -1 }]),
       }),
     ).rejects.toThrow("invalid_github_delivery");
+  });
+
+  it("preserves GitHub delivery IDs beyond JavaScript safe integers", async () => {
+    const raw =
+      '[{"id":3854264288417939499,"guid":"' +
+      guidA +
+      '","status":"failed","status_code":503,"delivered_at":"' +
+      time +
+      '","event":"workflow_run","installation_id":123}]';
+    const result = await fetchRecentAppWebhookDeliveries({
+      token: "test-only",
+      since: time,
+      request: async () => new Response(raw, { status: 200 }),
+    });
+    expect(result.attempts).toHaveLength(1);
+    expect(result.attempts[0]?.id).toBe("3854264288417939499");
+    expect(deliveryGapSummary(result.attempts, new Set(), true).review).toEqual([
+      { deliveryId: "3854264288417939499", guid: guidA, category: "failed_not_stored" },
+    ]);
   });
 
   it("does not count deliveries outside the requested window", async () => {

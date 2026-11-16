@@ -88,8 +88,11 @@ async function fetchViewer(
   return { userId: body.id, login: body.login };
 }
 
-async function fetchInstallationIds(token: string, dependencies: GitHubUserAccessDependencies): Promise<number[]> {
-  const ids: number[] = [];
+async function fetchInstallationIds(
+  token: string,
+  dependencies: GitHubUserAccessDependencies,
+): Promise<number[] | undefined> {
+  const ids = new Set<number>();
   for (let page = 1; page <= maximumInstallationPages; page += 1) {
     const response = await dependencies.fetch(
       `https://api.github.com/user/installations?per_page=${perPage}&page=${page}`,
@@ -97,17 +100,23 @@ async function fetchInstallationIds(token: string, dependencies: GitHubUserAcces
         headers: { accept: "application/vnd.github+json", authorization: `Bearer ${token}`, "user-agent": userAgent },
       },
     );
-    if (!response.ok) break;
+    // Never create a session with a partial installation list when GitHub errors or
+    // throttles a later page. The dashboard would silently hide accessible repositories.
+    if (!response.ok) return undefined;
 
     const body = (await response.json()) as { installations?: unknown };
-    const installations = Array.isArray(body.installations) ? body.installations : [];
-    for (const installation of installations) {
-      const id = (installation as { id?: unknown })?.id;
-      if (typeof id === "number" && Number.isSafeInteger(id) && id > 0) ids.push(id);
+    if (!Array.isArray(body.installations) || body.installations.length > perPage) return undefined;
+    for (const installation of body.installations) {
+      const id = (installation as { id?: unknown } | null)?.id;
+      if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) return undefined;
+      ids.add(id);
     }
-    if (installations.length < perPage) break;
+    if (body.installations.length < perPage) return [...ids];
   }
-  return [...new Set(ids)];
+
+  // A full final page means there may be more installations than the bounded
+  // lookup permits; fail closed rather than dropping any from the session.
+  return undefined;
 }
 
 /**
@@ -123,12 +132,19 @@ export async function resolveGitHubUserIdentity(
   redirectUri: string,
   dependencies: GitHubUserAccessDependencies,
 ): Promise<GitHubUserIdentity | undefined> {
-  const token = await exchangeCodeForToken(configuration, code, redirectUri, dependencies);
-  if (!token) return undefined;
+  try {
+    const token = await exchangeCodeForToken(configuration, code, redirectUri, dependencies);
+    if (!token) return undefined;
 
-  const viewer = await fetchViewer(token, dependencies);
-  if (!viewer) return undefined;
+    const viewer = await fetchViewer(token, dependencies);
+    if (!viewer) return undefined;
 
-  const installationIds = await fetchInstallationIds(token, dependencies);
-  return { ...viewer, installationIds };
+    const installationIds = await fetchInstallationIds(token, dependencies);
+    if (!installationIds) return undefined;
+    return { ...viewer, installationIds };
+  } catch {
+    // A transient GitHub/network error must not create a misleading partial
+    // session or surface a raw provider failure through the callback route.
+    return undefined;
+  }
 }

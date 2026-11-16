@@ -18,7 +18,10 @@ import {
  * form POST — inside the menu item rather than replacing it — so a third-party page cannot sign
  * someone out by embedding a link to it.
  */
-export function ViewerControls({ login }: Readonly<{ login: string | undefined }>) {
+export function ViewerControls({
+  login,
+  signInHref = "/api/auth/github/login",
+}: Readonly<{ login: string | undefined; signInHref?: string }>) {
   if (!login) {
     return (
       <a
@@ -27,7 +30,7 @@ export function ViewerControls({ login }: Readonly<{ login: string | undefined }
           size: "sm",
           className: "min-h-11 shrink-0 whitespace-nowrap md:min-h-8",
         })}
-        href="/api/auth/github/login"
+        href={signInHref}
       >
         Sign in<span className="hidden sm:inline">{" with GitHub"}</span>
       </a>

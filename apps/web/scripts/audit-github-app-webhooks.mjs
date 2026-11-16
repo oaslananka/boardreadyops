@@ -62,12 +62,13 @@ function validatedDelivery(item) {
     status_code: statusCode,
     delivered_at: deliveredAt,
     event,
+    action,
     installation_id: installationId,
   } = item;
   const date = typeof deliveredAt === "string" ? Date.parse(deliveredAt) : Number.NaN;
   if (
-    !Number.isSafeInteger(id) ||
-    id <= 0 ||
+    typeof id !== "string" ||
+    !/^[1-9]\d{0,19}$/u.test(id) ||
     typeof guid !== "string" ||
     !guidPattern.test(guid) ||
     typeof status !== "string" ||
@@ -78,17 +79,36 @@ function validatedDelivery(item) {
     !Number.isFinite(date) ||
     typeof event !== "string" ||
     !event.trim() ||
+    (action !== undefined && action !== null && (typeof action !== "string" || !action.trim())) ||
     (installationId !== null && (!Number.isSafeInteger(installationId) || installationId <= 0))
   ) {
     throw new Error("invalid_github_delivery");
   }
-  return { id, guid, status, statusCode, deliveredAt: date, event, installationId };
+  return {
+    id,
+    guid,
+    status,
+    statusCode,
+    deliveredAt: date,
+    event,
+    ...(typeof action === "string" ? { action } : {}),
+    installationId,
+  };
 }
 async function readGitHubDeliveryPage(response) {
   if (!response.ok) throw new Error(`github_delivery_request_failed_${response.status}`);
   let rows;
   try {
-    rows = await response.json();
+    // GitHub delivery IDs exceed Number.MAX_SAFE_INTEGER. Preserve their exact
+    // decimal source instead of rounding an identifier before reconciliation.
+    const body = await response.text();
+    rows = JSON.parse(body, (key, value, context) => {
+      if (key === "id" && typeof value === "number") {
+        if (typeof context?.source !== "string") throw new Error("invalid_github_delivery");
+        return context.source;
+      }
+      return value;
+    });
   } catch {
     throw new Error("invalid_github_delivery_response");
   }
@@ -126,6 +146,7 @@ export async function fetchRecentAppWebhookDeliveries({ token, since, maxPages =
           prior.statusCode !== delivery.statusCode ||
           prior.status !== delivery.status ||
           prior.event !== delivery.event ||
+          prior.action !== delivery.action ||
           prior.installationId !== delivery.installationId)
       ) {
         throw new Error("conflicting_github_delivery_identity");
@@ -137,16 +158,34 @@ export async function fetchRecentAppWebhookDeliveries({ token, since, maxPages =
   }
   return { attempts: [...seen.values()], complete: false, pages };
 }
+function firstDeliveryId(current, candidate) {
+  const candidateId = String(candidate);
+  return current === undefined || BigInt(candidateId) < BigInt(current) ? candidateId : current;
+}
+
+function definitelyAcknowledgedWithoutPersistence(attempt) {
+  // These exact actions cannot produce lifecycle work in normalizeGitHubAppWebhook.
+  // Other actions (including issue_comment.created and check_run.requested_action)
+  // may be consequential and must still have durable evidence or manual review.
+  return (
+    (attempt.event === "check_run" && ["created", "completed"].includes(attempt.action)) ||
+    (attempt.event === "issue_comment" && ["edited", "deleted"].includes(attempt.action))
+  );
+}
+
 export function deliveryGapSummary(attempts, inboxGuids, complete) {
   const groups = new Map();
   let failedAttempts = 0;
   for (const attempt of attempts) {
+    const attemptId = String(attempt.id);
     const existing = groups.get(attempt.guid) ?? {
       failures: [],
       successful: false,
+      noActionOnEveryAttempt: true,
       installationAckId: undefined,
       repositorySelectionAckId: undefined,
     };
+    existing.noActionOnEveryAttempt &&= definitelyAcknowledgedWithoutPersistence(attempt);
     if (attempt.status === "OK" && attempt.statusCode >= 200 && attempt.statusCode < 300) {
       existing.successful = true;
       // A genuine installation lifecycle event should enqueue durable work. Other
@@ -156,21 +195,23 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
         Number.isSafeInteger(attempt.installationId) &&
         attempt.installationId > 0
       ) {
-        existing.installationAckId = Math.min(existing.installationAckId ?? attempt.id, attempt.id);
+        existing.installationAckId = firstDeliveryId(existing.installationAckId, attemptId);
       }
       if (
         attempt.event === "installation_repositories" &&
         Number.isSafeInteger(attempt.installationId) &&
         attempt.installationId > 0
       ) {
-        existing.repositorySelectionAckId = Math.min(existing.repositorySelectionAckId ?? attempt.id, attempt.id);
+        existing.repositorySelectionAckId = firstDeliveryId(existing.repositorySelectionAckId, attemptId);
       }
     } else {
-      existing.failures.push(attempt.id);
+      existing.failures.push(attemptId);
       failedAttempts += 1;
     }
     groups.set(attempt.guid, existing);
   }
+  let failedEvents = 0;
+  let recoveredNoAction = 0;
   let failuresAlreadyStored = 0;
   let failuresWithNoInbox = 0;
   let unresolvedAfterSuccess = 0;
@@ -199,22 +240,38 @@ export function deliveryGapSummary(attempts, inboxGuids, complete) {
       }
       continue;
     }
+    failedEvents += 1;
     if (inboxGuids.has(guid)) {
       failuresAlreadyStored += 1;
+    } else if (outcome.successful && outcome.noActionOnEveryAttempt) {
+      recoveredNoAction += 1;
     } else if (outcome.successful) {
       unresolvedAfterSuccess += 1;
-      review.push({ deliveryId: Math.min(...outcome.failures), guid, category: "successful_retry_without_inbox" });
+      review.push({
+        deliveryId: outcome.failures.reduce(firstDeliveryId, undefined),
+        guid,
+        category: "successful_retry_without_inbox",
+      });
     } else {
       failuresWithNoInbox += 1;
-      review.push({ deliveryId: Math.min(...outcome.failures), guid, category: "failed_not_stored" });
+      review.push({
+        deliveryId: outcome.failures.reduce(firstDeliveryId, undefined),
+        guid,
+        category: "failed_not_stored",
+      });
     }
   }
-  review.sort((a, b) => a.deliveryId - b.deliveryId);
+  review.sort((a, b) => {
+    const left = BigInt(a.deliveryId);
+    const right = BigInt(b.deliveryId);
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
   return {
     complete,
     attempts: attempts.length,
     failedAttempts,
-    failedEvents: failuresAlreadyStored + failuresWithNoInbox + unresolvedAfterSuccess,
+    failedEvents,
+    recoveredNoAction,
     failuresAlreadyStored,
     failuresWithNoInbox,
     unresolvedAfterSuccess,

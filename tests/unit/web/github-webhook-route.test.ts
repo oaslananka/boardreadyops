@@ -8,6 +8,8 @@ import { resetWebhookRateLimitForTests } from "../../../apps/web/lib/webhook-rat
 import { createGitHubSignatureHeader } from "../../../packages/cloud-core/src/index.js";
 
 const trackedEnvironmentNames = [
+  "VERCEL",
+  "BOARDREADYOPS_WEBHOOK_INTAKE_ENABLED",
   "GITHUB_WEBHOOK_SECRET",
   "DATABASE_URL",
   "BOARDREADYOPS_PERSISTENCE_MODE",
@@ -86,6 +88,61 @@ afterEach(() => {
 });
 
 describe("GitHub webhook route lifecycle persistence", () => {
+  it("does not accept signed webhook deliveries on isolated Vercel until explicit cutover", async () => {
+    process.env.VERCEL = "1";
+    delete process.env.BOARDREADYOPS_WEBHOOK_INTAKE_ENABLED;
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+    const unsigned = signedGitHubRequest("installation", installationPayload(), "wrong-secret");
+    expect((await POST(unsigned)).status).toBe(401);
+
+    const response = await POST(signedGitHubRequest("installation", installationPayload()));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: "webhook intake is not active on this origin",
+    });
+    // Valid signed input is rejected before the persistence adapter is touched.
+    // The disabled path is also independent of any database configuration.
+  });
+
+  it("acknowledges signed no-action events while Vercel's mutating intake is disabled", async () => {
+    process.env.VERCEL = "1";
+    process.env.BOARDREADYOPS_WEBHOOK_INTAKE_ENABLED = "0";
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    delete process.env.DATABASE_URL;
+    delete process.env.BOARDREADYOPS_PERSISTENCE_MODE;
+
+    const ping = await POST(signedGitHubRequest("ping", { zen: "pong" }));
+    expect(ping.status).toBe(202);
+    await expect(ping.json()).resolves.toMatchObject({ ok: true, lifecycleActions: [] });
+
+    const event = await POST(
+      signedGitHubRequest("check_run", {
+        ...installationPayload(),
+        action: "completed",
+        repository: (installationPayload().repositories as Record<string, unknown>[])[0],
+        check_run: { id: 12345 },
+      }),
+    );
+    expect(event.status).toBe(202);
+    await expect(event.json()).resolves.toMatchObject({ ok: true, lifecycleActions: [] });
+
+    const mutating = await POST(signedGitHubRequest("installation", installationPayload()));
+    expect(mutating.status).toBe(503);
+  });
+
+  it("accepts signed deliveries only after explicitly enabling Vercel webhook intake", async () => {
+    process.env.VERCEL = "1";
+    process.env.BOARDREADYOPS_WEBHOOK_INTAKE_ENABLED = "1";
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+
+    const response = await POST(signedGitHubRequest("installation", installationPayload()));
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ intake: { queued: true } });
+  });
   it("durably accepts normalized lifecycle actions without executing them in the request", async () => {
     process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
     delete process.env.DATABASE_URL;

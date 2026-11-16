@@ -1,0 +1,57 @@
+name: vercel-production-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/vercel-production-deploy.yml"
+      - "apps/web/**"
+      - "packages/cloud-core/**"
+      - "packages/contracts/**"
+      - "packages/db/**"
+      - "infra/neon/functions/**"
+      - "scripts/vercel-production-deploy.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.repository == 'oaslananka/boardreadyops' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    environment: production
+    steps:
+      - name: Checkout protected main commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Verify exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || exit 78
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || exit 78
+      - name: Set up Node 24
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73
+      - name: Deploy exact GitHub main commit to existing Vercel Hobby project
+        shell: bash
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$DOPPLER_TOKEN"
+          doppler run --project boardreadyops --config deploy -- node scripts/vercel-production-deploy.mjs

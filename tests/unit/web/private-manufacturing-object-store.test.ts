@@ -111,6 +111,11 @@ describe("private manufacturing artifact storage", () => {
     expect(request.headers.get("x-amz-copy-source")).toBe(
       `/boardreadyops-manufacturing/pending/${runId}/${attemptId}/${uploadId}.tar.gz`,
     );
+    expect(request.headers.get("x-amz-metadata-directive")).toBe("REPLACE");
+    expect(request.headers.get("content-type")).toBe("application/gzip");
+    expect(request.headers.get("content-disposition")).toBe(
+      'attachment; filename="signed-manufacturing-export.tar.gz"',
+    );
     expect(request.headers.has("authorization")).toBe(true);
   });
 
