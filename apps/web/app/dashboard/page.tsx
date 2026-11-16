@@ -17,6 +17,7 @@ import {
   summarizeViewerRepositories,
   type ViewerDesignEvidence,
 } from "../../lib/repository-dashboard.js";
+import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
 export const metadata = {
@@ -538,6 +539,7 @@ function ConnectedBoardNextAction({
         {priority.slice(0, 3).map((repo) => {
           const needsReview = repo.openFindings > 0 && Boolean(repo.latestRunId);
           const needsSetup = !repo.latestRunId;
+          const reviewRepository = canonicalRepositoryName(`${repo.owner}/${repo.name}`);
           let action = "Open latest review";
           let stateLabel = "Recent review available";
           let href = `/runs/${repo.latestRunId}`;
@@ -578,6 +580,24 @@ function ConnectedBoardNextAction({
               >
                 {action} <ArrowUpRight className="size-4" aria-hidden="true" />
               </Link>
+              {repo.latestRunId ? (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3">
+                  <Link
+                    href={`/runs/${encodeURIComponent(repo.latestRunId)}/design`}
+                    className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
+                  >
+                    View PCB / schematic
+                  </Link>
+                  {reviewRepository ? (
+                    <Link
+                      href={`/reviews?repository=${encodeURIComponent(reviewRepository)}`}
+                      className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
+                    >
+                      Review decisions
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
             </article>
           );
         })}

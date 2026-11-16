@@ -550,6 +550,8 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("Signed Run archives — not deliveries");
     expect(markup).toContain("other-owner/verified-board");
     expect(markup).toContain('href="/runs/signed-run-123"');
+    expect(markup).toContain('href="/runs/signed-run-123/design"');
+    expect(markup).toContain('href="/reviews?repository=other-owner%2Fverified-board"');
     expect(markup).toContain("Inspect signed Run evidence");
     expect(markup).toContain("No package revisions yet");
     expect(markup).toContain("No guest links yet");

@@ -14,6 +14,7 @@ import { Alert, EmptyState, Pagination, Panel, StatusBadge } from "../../compone
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../lib/delivery-listing.js";
+import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { loadViewerRuns, type RunListingEntry } from "../../lib/run-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 import {
@@ -368,9 +369,25 @@ function SignedRunArchivesPanel({ runs }: Readonly<{ runs: readonly RunListingEn
                 <StatusBadge value={run.decision} label={run.decision ?? "Not verified"} />
               </p>
             </div>
-            <Button asChild variant="outline" className="min-h-11">
-              <Link href={`/runs/${encodeURIComponent(run.id)}`}>Inspect signed Run evidence</Link>
-            </Button>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button asChild variant="outline" className="min-h-11">
+                <Link href={`/runs/${encodeURIComponent(run.id)}`}>Inspect signed Run evidence</Link>
+              </Button>
+              <Link
+                href={`/runs/${encodeURIComponent(run.id)}/design`}
+                className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
+              >
+                Inspect PCB / schematic
+              </Link>
+              {canonicalRepositoryName(run.repository) ? (
+                <Link
+                  href={`/reviews?repository=${encodeURIComponent(canonicalRepositoryName(run.repository) ?? "")}`}
+                  className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
+                >
+                  Review decisions
+                </Link>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>

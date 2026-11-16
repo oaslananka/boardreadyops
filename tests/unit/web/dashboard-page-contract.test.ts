@@ -524,6 +524,8 @@ describe("dashboard operational hierarchy", () => {
     expect(markup).toContain("octocat/widgets");
     expect(markup).toContain("overflow-x-auto");
     expect(markup).toContain('href="/runs/run-1"');
+    expect(markup).toContain('href="/runs/run-1/design"');
+    expect(markup).toContain('href="/reviews?repository=octocat%2Fwidgets"');
     expect(markup).toContain('aria-label="Open latest run for octocat/widgets"');
   });
 

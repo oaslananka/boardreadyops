@@ -3,6 +3,7 @@ import { CopyButton } from "../../components/copy-button.js";
 import { firstRunSetupSteps } from "../../components/first-run-steps.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
 import { RunLiveRefresh } from "../../components/run-live-refresh.js";
+import { RunReviewQueue } from "../../components/run-review-queue.js";
 import { RunStateIndicators } from "../../components/run-state-indicators.js";
 import { Button } from "../../components/ui/button.js";
 import { CursorPagination, type DataColumn, DataTable } from "../../components/ui/data-table.js";
@@ -178,6 +179,7 @@ export default async function RunsPage({ searchParams }: Readonly<RunsPageProps>
         </header>
 
         {shouldLiveRefreshRunListing(runs.map((run) => run.status)) ? <RunLiveRefresh enabled /> : null}
+        {listing.state === "ok" && runs.length > 0 && !cursor ? <RunReviewQueue runs={runs} /> : null}
 
         <Panel
           title={listing.state === "not-configured" ? "Run history" : "Recent runs"}

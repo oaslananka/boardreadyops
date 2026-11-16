@@ -123,6 +123,36 @@ describe("RunsPage status hierarchy", () => {
     },
   );
 
+  it("shows current authorized work first without repeating action cards on older history pages", async () => {
+    loadViewerRuns.mockResolvedValue({
+      state: "ok",
+      next: undefined,
+      runs: [
+        {
+          id: "owner-run-1",
+          repositoryId: "repo-1",
+          repository: "acme/board",
+          status: "completed",
+          decision: "pass",
+          commitSha: "a".repeat(40),
+          ref: "refs/heads/main",
+          startedAt: "2026-11-04T08:00:00.000Z",
+        },
+      ],
+    });
+    const latest = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({}) }));
+    expect(latest).toContain("Continue a hardware review");
+    expect(latest).toContain('href="/runs/owner-run-1/artifacts"');
+    expect(latest).toContain('href="/reviews?repository=acme%2Fboard"');
+
+    const cursor = Buffer.from(JSON.stringify({ startedAt: "2026-11-01T10:00:00.000Z", id: "older" })).toString(
+      "base64url",
+    );
+    const older = renderToStaticMarkup(await RunsPage({ searchParams: Promise.resolve({ cursor }) }));
+    expect(older).not.toContain("Continue a hardware review");
+    expect(older).toContain("Recent runs");
+  });
+
   it("keeps execution and readiness decisions separately visible", async () => {
     loadViewerRuns.mockResolvedValue({
       state: "ok",
@@ -155,6 +185,8 @@ describe("RunsPage status hierarchy", () => {
     expect(html).toContain("Execution: Completed");
     expect(html).toContain("Decision: Fail");
     expect(html).toContain("Execution: Queued");
-    expect(html.match(/Decision:/gu)).toHaveLength(1);
+    // The current decision is visible in both the action cards and the detailed table; queued runs have none.
+    expect(html.match(/Decision: Fail/gu)).toHaveLength(2);
+    expect(html).not.toContain("Decision: Queued");
   });
 });
