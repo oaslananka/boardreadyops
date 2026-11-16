@@ -10,10 +10,10 @@ vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
 }));
 vi.mock("../../../apps/web/lib/marketing-surface.js", () => ({
   isMarketingSurface: () => context.marketing,
-  applicationHref: (href: string) => href,
+  applicationHref: (href: string) => (context.marketing ? `https://app.boardreadyops.example${href}` : href),
 }));
 
-import { LandingHeroActions } from "../../../apps/web/components/landing-actions.js";
+import { LandingHeroActions, LandingNavActions } from "../../../apps/web/components/landing-actions.js";
 
 beforeEach(() => {
   context.session = null;
@@ -39,6 +39,24 @@ describe("Returning-customer landing CTAs (#446)", () => {
     expect(markup).toContain('href="/setup"');
     expect(markup).toContain("Review setup first");
     expect(markup).not.toContain("Open dashboard");
+  });
+
+  it("lets returning but signed-out customers sign in without reinstalling the GitHub App", async () => {
+    const markup = renderToStaticMarkup(await LandingHeroActions());
+    expect(markup).toContain("Already connected? Sign in with GitHub");
+    expect(markup).toContain('href="/api/auth/github/login"');
+    expect(markup).toContain("Install on GitHub");
+  });
+
+  it("routes a public-only marketing visitor to the application instead of a 404 sign-in endpoint", async () => {
+    context.marketing = true;
+    const nav = renderToStaticMarkup(await LandingNavActions());
+    const hero = renderToStaticMarkup(await LandingHeroActions());
+    expect(nav).toContain('href="https://app.boardreadyops.example/api/auth/github/login"');
+    expect(hero).toContain('href="https://app.boardreadyops.example/api/auth/github/login"');
+    expect(hero).toContain('href="https://app.boardreadyops.example/setup"');
+    expect(hero).toContain("Already connected? Sign in with GitHub");
+    expect(nav).not.toContain('href="/api/auth/github/login"');
   });
 
   it("keeps the existing hero behavior for returning users", async () => {
