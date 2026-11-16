@@ -12,13 +12,35 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("ref: $" + "{{ inputs.head_sha }}");
     expect(workflow).toContain("persist-credentials: false");
     expect(workflow).toContain('actual_sha="$(git rev-parse HEAD)"');
-    expect(workflow).toContain("ppa:kicad/kicad-10.0-releases");
+    expect(workflow).toContain("source .boardreadyops-trusted-tooling/scripts/install-kicad-ci.sh");
+    expect(workflow).toContain("BRO_KICAD_INSTALL_MODE: oci");
+    expect(workflow).not.toContain("sudo add-apt-repository");
     expect(workflow).toContain('require-kicad: "true"');
     expect(workflow).toContain("project: $" + "{{ vars.BOARDREADYOPS_PROJECT || '' }}");
     expect(workflow).toContain("config: $" + "{{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}");
     expect(workflow).toContain("uses: oaslananka/boardreadyops@6d3b721c3f8307a517d360b28f4d50b824d81278 # v1.24.1");
     expect(workflow).toContain("safe-mode: $" + "{{ inputs.safe_mode }}");
     expect(workflow).not.toContain("runner-ready");
+  });
+
+  it("installs KiCad from trusted protected-branch tooling before checking out untrusted PR content", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+    const trusted = workflow.indexOf("- name: Check out trusted runner tooling");
+    const installer = workflow.indexOf("- name: Install KiCad 10");
+    const untrusted = workflow.indexOf("- name: Check out exact target commit");
+
+    expect(trusted).toBeGreaterThan(0);
+    expect(installer).toBeGreaterThan(trusted);
+    expect(untrusted).toBeGreaterThan(installer);
+    expect(workflow.slice(trusted, installer)).toContain("repository: oaslananka/boardreadyops");
+    expect(workflow.slice(trusted, installer)).toContain("ref: f942b9a4aa881ad0e8b868cb4922fc3e9f91652b");
+    expect(workflow.slice(trusted, installer)).toContain("path: .boardreadyops-trusted-tooling");
+    expect(workflow.slice(trusted, installer)).toContain("persist-credentials: false");
+    expect(workflow.slice(installer, untrusted)).toContain(
+      "source .boardreadyops-trusted-tooling/scripts/install-kicad-ci.sh",
+    );
+    expect(workflow.slice(installer, untrusted)).toContain("BRO_KICAD_INSTALL_MODE: oci");
+    expect(workflow.slice(installer, untrusted)).not.toContain("add-apt-repository");
   });
 
   it("pins the setup probe to the current verified release", async () => {
