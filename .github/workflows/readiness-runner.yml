@@ -126,6 +126,37 @@ jobs:
             done
           fi
 
+      # Install trusted tooling from the protected default branch, never from
+      # untrusted PR content. The official KiCad image is pinned by digest in
+      # scripts/install-kicad-ci.sh and its CLI version is verified below.
+      - name: Check out trusted runner tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Install KiCad 10
+        id: kicad
+        env:
+          BRO_KICAD_VERSION: "10.0"
+          BRO_KICAD_PPA_SERIES: "10.0"
+          BRO_KICAD_INSTALL_MODE: oci
+        run: |
+          source scripts/install-kicad-ci.sh
+          version="$(kicad-cli version)"
+          case "$version" in
+            10.0.*) ;;
+            *)
+              echo "Expected KiCad 10.0.*, got $version" >&2
+              exit 1
+              ;;
+          esac
+          if [ "${#version}" -gt 64 ] || ! [[ "$version" =~ ^10\.0\.[0-9]+([.+-][0-9A-Za-z.+-]+)?$ ]]; then
+            echo "KiCad version is not safely reportable" >&2
+            exit 1
+          fi
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
       - name: Check out exact target commit
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -141,26 +172,6 @@ jobs:
             echo "checkout SHA mismatch: expected $HEAD_SHA, got $actual_sha" >&2
             exit 1
           fi
-
-      - name: Install KiCad 10
-        id: kicad
-        run: |
-          sudo add-apt-repository --yes ppa:kicad/kicad-10.0-releases
-          sudo apt-get update -qq
-          sudo apt-get install --yes kicad
-          version="$(kicad-cli version)"
-          case "$version" in
-            10.0.*) ;;
-            *)
-              echo "Expected KiCad 10.0.*, got $version" >&2
-              exit 1
-              ;;
-          esac
-          if [ "${#version}" -gt 64 ] || ! [[ "$version" =~ ^10\.0\.[0-9]+([.+-][0-9A-Za-z.+-]+)?$ ]]; then
-            echo "KiCad version is not safely reportable" >&2
-            exit 1
-          fi
-          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
 
       - name: Run BoardReadyOps
         id: readiness
