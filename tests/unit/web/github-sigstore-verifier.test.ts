@@ -43,7 +43,7 @@ function signerIdentity() {
       oid(18, workflowUri),
       oid(19, workflowSha),
       oid(20, "workflow_dispatch"),
-      oid(21, "https://github.com/oaslananka/boardreadyops/actions/runs/" + runId + "/attempts/1"),
+      oid(21, `https://github.com/oaslananka/boardreadyops/actions/runs/${runId}/attempts/1`),
     ],
   };
 }

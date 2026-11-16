@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { verify } from "sigstore";
-import githubTufRoot from "./github-tuf-root.json";
+import githubTufRoot from "./github-tuf-root.json" with { type: "json" };
 
 type VerificationIdentity = {
   extensions?: { issuer?: string };
@@ -40,8 +40,7 @@ export function verifiedAttestationFromSigner(
   payload: string,
   expected: TrustedSignedExportIdentity,
 ): unknown[] {
-  const workflowUri =
-    "https://github.com/" + expected.repository + "/" + expected.workflowPath + "@" + expected.sourceRef;
+  const workflowUri = `https://github.com/${expected.repository}/${expected.workflowPath}@${expected.sourceRef}`;
   if (identity.extensions?.issuer !== githubOidcIssuer || identity.subjectAlternativeName !== workflowUri) {
     throw new Error("signed GitHub workflow identity mismatch");
   }
@@ -75,10 +74,9 @@ export async function verifyGitHubSigstoreBundle(
   bundlePath: string,
   expected: TrustedSignedExportIdentity,
 ): Promise<unknown[]> {
-  const workflowUri =
-    "https://github.com/" + expected.repository + "/" + expected.workflowPath + "@" + expected.sourceRef;
+  const workflowUri = `https://github.com/${expected.repository}/${expected.workflowPath}@${expected.sourceRef}`;
   const escapedUri = [...workflowUri]
-    .map((character) => (".*+?^$()[]{}|\\".includes(character) ? "\\" + character : character))
+    .map((character) => (".*+?^$()[]{}|\\".includes(character) ? `\\${character}` : character))
     .join("");
   const raw = await readFile(bundlePath);
   if (raw.length === 0 || raw.length > maximumBundleBytes) throw new Error("untrusted attestation bundle");
@@ -111,7 +109,7 @@ export async function verifyGitHubSigstoreBundle(
       tlogThreshold: 0,
       ctLogThreshold: 0,
       certificateIssuer: githubOidcIssuer,
-      certificateIdentityURI: "^" + escapedUri + "$",
+      certificateIdentityURI: `^${escapedUri}$`,
       timeout: 10_000,
     });
     return verifiedAttestationFromSigner(
