@@ -211,6 +211,35 @@ describeDatabase("control-plane PostgreSQL jobs", () => {
     expect(state).toEqual({ inbox_state: "dead_letter", job_status: "dead_letter", attempt_count: 2 });
   });
 
+  it("claims security revocations before PR lifecycle, preserving the order inside each class", async () => {
+    const now = at(310);
+    const events = [
+      { name: "workflow", eventType: "workflow_run", eventAction: "requested" },
+      { name: "pr-opened", eventType: "pull_request", eventAction: "opened" },
+      { name: "pr-closed", eventType: "pull_request", eventAction: "closed" },
+      { name: "revoked", eventType: "installation", eventAction: "deleted" },
+    ];
+    for (const [index, event] of events.entries()) {
+      const receivedAt = new Date(now.valueOf() + index * 1000);
+      await store(receivedAt).acceptGitHubWebhook({
+        ...input(`${testPrefix}-priority-${event.name}`, receivedAt),
+        eventType: event.eventType,
+        eventAction: event.eventAction,
+      });
+    }
+
+    const claimed = await store(new Date(now.valueOf() + 6000)).claimJobs({
+      workerId: `${testPrefix}-priority-worker`,
+      limit: 4,
+    });
+    expect(claimed.map((job) => job.deliveryId)).toEqual([
+      `${testPrefix}-priority-revoked`,
+      `${testPrefix}-priority-pr-opened`,
+      `${testPrefix}-priority-pr-closed`,
+      `${testPrefix}-priority-workflow`,
+    ]);
+  });
+
   it("rolls back the inbox when durable job creation violates its contract", async () => {
     const now = at(300);
     const deliveryId = `${testPrefix}-rollback`;
