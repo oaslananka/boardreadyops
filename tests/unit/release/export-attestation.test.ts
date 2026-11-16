@@ -177,6 +177,48 @@ async function verify(f: Fixture, expected = expectation) {
 }
 
 describe("opt-in trusted export attestation prerequisites (not GA)", () => {
+  it("accepts an independently verified serverless result without executing gh", async () => {
+    const f = await signedArchiveFixture();
+    const trustedVerifier = vi.fn(async () => [verifiedResult(f)]);
+    const result = await verifyReviewedExportAttestation({
+      root: f.root,
+      manifestPath: f.manifestPath,
+      sourceCheckout: false,
+      expected: expectation,
+      verifyTrustedBundle: trustedVerifier,
+    });
+    expect(result.status).toBe("eligible");
+    expect(trustedVerifier).toHaveBeenCalledOnce();
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects a verified serverless result that mismatches the exact repository identity", async () => {
+    const f = await signedArchiveFixture();
+    const result = await verifyReviewedExportAttestation({
+      root: f.root,
+      manifestPath: f.manifestPath,
+      sourceCheckout: false,
+      expected: expectation,
+      verifyTrustedBundle: async () => [verifiedResult(f, { cert: { sourceRepositoryIdentifier: "000000" } })],
+    });
+    expect(result.status).toBe("rejected");
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the serverless cryptographic verifier cannot establish trust", async () => {
+    const f = await signedArchiveFixture();
+    const result = await verifyReviewedExportAttestation({
+      root: f.root,
+      manifestPath: f.manifestPath,
+      sourceCheckout: false,
+      expected: expectation,
+      verifyTrustedBundle: async () => {
+        throw new Error("no verified timestamp");
+      },
+    });
+    expect(result.status).toBe("rejected");
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
   it("prepares an exact and sorted manifest-plus-output checksums set", async () => {
     const f = await fixture();
     const checksums = await prepareExportAttestationChecksums({

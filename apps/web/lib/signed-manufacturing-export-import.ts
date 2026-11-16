@@ -9,6 +9,7 @@ import { extract as extractTar, list as listTar } from "tar";
 import { verifyReviewedExportAttestation } from "../../../src/release/export-attestation.js";
 import { safeLocalArtifactPath } from "./artifact-downloads.js";
 import type { VerifiedGitHubActionsOidcClaims } from "./github-actions-oidc.js";
+import { verifyGitHubSigstoreBundle } from "./github-sigstore-verifier.js";
 import {
   createTemporaryManufacturingArtifactVerifier,
   type TemporaryManufacturingArtifactVerifier,
@@ -246,6 +247,7 @@ export function createSignedExportImportDependencies(
         bundlePath: input.bundlePath,
         sourceCheckout: false,
         expected: input.expected,
+        verifyTrustedBundle: () => verifyGitHubSigstoreBundle(input.bundlePath, input.expected),
       }),
     now: () => new Date(),
     id: randomUUID,
