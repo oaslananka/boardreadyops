@@ -70,14 +70,15 @@ describe("dependency security overrides", () => {
     expect(lockfile).not.toContain("qs@6.16.0:");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("ip-address@10.7.1");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("next@16.3.8");
-    expect(workspace.overrides?.["next@<16.4.1"]).toBe("16.4.1");
-    expect(lockfile).toContain("next@16.4.1:");
+    expect(workspace.overrides?.["next@<16.4.5"]).toBe("16.4.5");
+    expect(lockfile).toContain("next@16.4.5:");
+    expect(lockfile).not.toContain("next@16.4.1:");
     expect(lockfile).not.toContain("next@16.3.8:");
     expect(lockfile).not.toContain("ip-address@10.7.3:");
     const web = JSON.parse(await readFile("apps/web/package.json", "utf8")) as {
       dependencies?: Record<string, string>;
     };
-    expect(web.dependencies?.next).toBe("16.4.1");
+    expect(web.dependencies?.next).toBe("16.4.5");
     expect(web.dependencies?.["@sentry/nextjs"]).toBe("^10.75.2");
     expect(lockfile).toContain("'@sentry/nextjs@10.76.2':");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("brace-expansion@5.0.9");

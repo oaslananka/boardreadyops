@@ -644,7 +644,7 @@ describe("dependency and security automation configuration", () => {
       "'brace-expansion@>=5 <5.0.12':",
       "'fast-uri@>=3 <3.1.9':",
       "'ip-address@<10.7.4':",
-      "'next@<16.4.1':",
+      "'next@<16.4.5':",
       "'undici@>=8.0.0 <8.11.0':",
       "'qs@>=6.7.0 <6.16.1':",
       "js-yaml@>=4 <4.3.2:",
