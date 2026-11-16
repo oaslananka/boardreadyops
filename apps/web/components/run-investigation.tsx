@@ -15,6 +15,7 @@ import { CopyButton } from "./copy-button.js";
 import { FindingWaiverButton } from "./finding-waiver-button.js";
 import { RunActionBar } from "./run-action-bar.js";
 import { RunLiveRefresh } from "./run-live-refresh.js";
+import { RunReviewPath } from "./run-review-queue.js";
 import { Button, buttonVariants } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { NativeSelect } from "./ui/native-select.js";
@@ -901,6 +902,7 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
   );
   return (
     <>
+      <RunReviewPath run={run} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel
           title="Findings"
