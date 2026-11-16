@@ -13,6 +13,7 @@ import { buildRunEvidenceGraph } from "../lib/run-evidence-graph.js";
 import { runVerdict } from "../lib/run-verdict.js";
 import { CopyButton } from "./copy-button.js";
 import { FindingWaiverButton } from "./finding-waiver-button.js";
+import { ManufacturingArchivePreview } from "./manufacturing-archive-preview.js";
 import { RunActionBar } from "./run-action-bar.js";
 import { RunLiveRefresh } from "./run-live-refresh.js";
 import { RunReviewPath } from "./run-review-queue.js";
@@ -1504,6 +1505,13 @@ export function ArtifactsView({
   const hasTemporaryGitHubArtifacts = run.artifacts.some((artifact) =>
     artifact.downloadUrl?.startsWith("https://github.com/"),
   );
+  const previewableManufacturingArchive = run.artifacts.find(
+    (artifact) =>
+      artifact.name.endsWith(".tar.gz") &&
+      artifact.role === "manufacturing" &&
+      artifact.kind === "archive" &&
+      /^[a-f0-9]{64}$/u.test(artifact.sha256),
+  );
   const artifactLifecycleTotal =
     run.artifactLifecycle.deleted +
     run.artifactLifecycle.missing +
@@ -1582,6 +1590,14 @@ export function ArtifactsView({
             </p>
           </Alert>
         </div>
+      ) : null}
+      {previewableManufacturingArchive ? (
+        <ManufacturingArchivePreview
+          key={previewableManufacturingArchive.id}
+          archive={previewableManufacturingArchive}
+          sourceSha={run.commitSha}
+          runId={run.id}
+        />
       ) : null}
       {hasUnavailableSignedDownload ? (
         <div className="mt-3">

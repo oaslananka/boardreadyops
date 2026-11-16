@@ -822,6 +822,41 @@ describe("run overview direct manufacturing archive handoff", () => {
     return run;
   }
 
+  it("offers an optional local package preview only for source-bound manufacturing archives", () => {
+    const matching = renderToStaticMarkup(
+      createElement(ArtifactsView, { run: withManufacturingArchive(), searchParameters: {} }),
+    );
+    expect(matching).toContain("Preview your downloaded BOM and fabrication files");
+    expect(matching).toContain("The browser checks");
+    expect(matching).toContain("Extract");
+    expect(matching).toContain("Open the GitHub artifact ZIP");
+
+    const expired = renderToStaticMarkup(
+      createElement(ArtifactsView, {
+        run: withManufacturingArchive({ availability: "expired", downloadUrl: undefined }),
+        searchParameters: {},
+      }),
+    );
+    expect(expired).toContain("already downloaded copy can still be checked");
+
+    const unsupported = renderToStaticMarkup(
+      createElement(ArtifactsView, {
+        run: withManufacturingArchive({ role: "report" }),
+        searchParameters: {},
+      }),
+    );
+    expect(unsupported).not.toContain("Preview your downloaded BOM");
+  });
+
+  it("preserves accessible archive selection and source-bound evidence labels", async () => {
+    const markup = renderToStaticMarkup(
+      createElement(ArtifactsView, { run: withManufacturingArchive(), searchParameters: {} }),
+    );
+    await expect(axeViolations(markup, "/runs/run-accessible/artifacts")).resolves.toEqual([]);
+    expect(markup).toContain("aria-describedby");
+    expect(markup).toContain("Source-bound manufacturing package");
+  });
+
   it("offers an immediately accessible existing signed download for a verified manufacturing archive", () => {
     const markup = renderToStaticMarkup(createElement(SummaryView, { run: withManufacturingArchive() }));
     expect(markup).toContain("Download signed manufacturing archive");
