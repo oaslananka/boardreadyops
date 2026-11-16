@@ -147,12 +147,20 @@ describe("IPC-2581 XML Ingestion & Normalization", () => {
       return performance.now() - start;
     };
 
-    time(5_000); // warm up the JIT before timing
-    const small = time(20_000);
-    const large = time(80_000); // 4x the input
+    // Warm up both sizes so the JIT does not favor just one measurement.
+    time(5_000);
+    time(20_000);
+    time(80_000);
 
-    // Quadratic backtracking would show up as ~16x, not ~4x; allow generous slack for
-    // machine noise while still catching a real regression back to super-linear behavior.
-    expect(large / small).toBeLessThan(8);
+    const ratios = Array.from({ length: 5 }, () => {
+      const small = time(20_000);
+      const large = time(80_000); // 4x the input
+      return large / small;
+    }).sort((a, b) => a - b);
+
+    // Quadratic backtracking would scale near 16x, rather than 4x.
+    // Use the median to reject sporadic scheduling/GC stalls without relaxing
+    // the original 8x security-regression threshold.
+    expect(ratios[2]).toBeLessThan(8);
   });
 });
