@@ -2,32 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 
-function messageForReason(reason: string | null): { title: string; detail: string } | undefined {
-  switch (reason) {
-    case "unavailable":
-      return {
-        title: "GitHub sign-in is temporarily unavailable",
-        detail: "We couldn't start or finish your sign-in. Your repository access hasn't been changed.",
-      };
-    case "expired":
-      return {
-        title: "Your GitHub sign-in expired",
-        detail: "This sign-in link is no longer valid. Start again to securely reconnect your account.",
-      };
-    case "denied":
-      return {
-        title: "GitHub sign-in could not be completed",
-        detail: "The sign-in was cancelled or GitHub couldn't verify the request. You can safely try again.",
-      };
-    default:
-      return undefined;
-  }
-}
-
-export function SignInFailureNotice({ reason }: Readonly<{ reason: string | null }>) {
-  const message = messageForReason(reason);
-  if (!message) return null;
-
+function SignInNoticeFrame({ title, detail }: Readonly<{ title: string; detail: string }>) {
   return (
     <section
       aria-label="GitHub sign-in status"
@@ -35,8 +10,8 @@ export function SignInFailureNotice({ reason }: Readonly<{ reason: string | null
       className="mx-auto mt-6 flex w-full max-w-6xl flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
-        <h2 className="font-semibold text-foreground">{message.title}</h2>
-        <p className="mt-1 text-muted-foreground">{message.detail}</p>
+        <h2 className="font-semibold text-foreground">{title}</h2>
+        <p className="mt-1 text-muted-foreground">{detail}</p>
       </div>
       <a
         className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-border bg-background px-4 py-2 font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -46,6 +21,34 @@ export function SignInFailureNotice({ reason }: Readonly<{ reason: string | null
       </a>
     </section>
   );
+}
+
+export function SignInFailureNotice({ reason }: Readonly<{ reason: string | null }>) {
+  switch (reason) {
+    case "unavailable":
+      return (
+        <SignInNoticeFrame
+          title="GitHub sign-in is temporarily unavailable"
+          detail="We couldn't start or finish your sign-in. Your repository access hasn't been changed."
+        />
+      );
+    case "expired":
+      return (
+        <SignInNoticeFrame
+          title="Your GitHub sign-in expired"
+          detail="This sign-in link is no longer valid. Start again to securely reconnect your account."
+        />
+      );
+    case "denied":
+      return (
+        <SignInNoticeFrame
+          title="GitHub sign-in could not be completed"
+          detail="The sign-in was cancelled or GitHub couldn't verify the request. You can safely try again."
+        />
+      );
+    default:
+      return null;
+  }
 }
 
 export function SignInFeedbackFromUrl() {
