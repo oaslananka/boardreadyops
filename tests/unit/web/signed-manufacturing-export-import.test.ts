@@ -7,8 +7,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   handleSignedManufacturingExportImport,
   type SignedExportImportDependencies,
-  tarEntryExpandedBytes,
-  tarListingLines,
 } from "../../../apps/web/lib/signed-manufacturing-export-import.js";
 
 const runId = "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d";
@@ -143,26 +141,6 @@ async function filesBelow(root: string): Promise<string[]> {
   return found;
 }
 
-describe("portable tar metadata parsing", () => {
-  it("accepts CRLF listing terminators but preserves embedded unsafe carriage returns", () => {
-    expect(tarListingLines("build/\r\nbuild/boardreadyops-attested/manifest.json\r\nbundle.sigstore.json\r\n")).toEqual(
-      ["build/", "build/boardreadyops-attested/manifest.json", "bundle.sigstore.json"],
-    );
-    expect(tarListingLines("build/unsafe\rname\n")).toEqual(["build/unsafe\rname"]);
-    expect(tarListingLines("build/unsafe\r\r\n")).toEqual(["build/unsafe\r"]);
-  });
-
-  it("reads expanded sizes from GNU tar and BSD tar verbose listings", () => {
-    expect(tarEntryExpandedBytes("-rw-r--r-- 0/0 19 2026-11-03 00:00 build/manifest.json")).toBe(19);
-    expect(
-      tarEntryExpandedBytes("-rw-r--r--  0 boardreadyops boardreadyops  29 Nov  3 00:00 build/manifest.json"),
-    ).toBe(29);
-    expect(tarEntryExpandedBytes("drwxr-xr-x  0 boardreadyops boardreadyops   0 Nov  3 00:00 build/")).toBe(0);
-    expect(tarEntryExpandedBytes("lrwxrwxrwx 0/0 12 2026-11-03 00:00 unsafe-link")).toBeUndefined();
-    expect(tarEntryExpandedBytes("not a tar verbose entry")).toBeUndefined();
-  });
-});
-
 describe("signed manufacturing export import boundary", () => {
   it("validates the exact persisted attempt, GitHub OIDC claims and Sigstore inventory before storing", async () => {
     const deps = dependencies();
@@ -191,6 +169,24 @@ describe("signed manufacturing export import boundary", () => {
     expect(archivePath).toBeDefined();
     if (!archivePath) throw new Error("stored artifact file is missing");
     expect(await fs.readFile(archivePath)).toEqual(Buffer.from(archive));
+  });
+
+  it("imports signed evidence without requiring a system tar executable", async () => {
+    const deps = dependencies();
+    const savedPath = process.env.PATH;
+    try {
+      // The Vercel function runtime must not depend on system tar/gzip binaries.
+      process.env.PATH = "/nonexistent/boardreadyops-binaries";
+      const response = await handleSignedManufacturingExportImport(
+        request(await archiveFixture()),
+        { runId, attemptId },
+        deps,
+      );
+      expect(response.status).toBe(201);
+      expect(deps.verifyArchive).toHaveBeenCalledOnce();
+    } finally {
+      process.env.PATH = savedPath;
+    }
   });
 
   it("rejects a token from a different workflow run, attempt or signer before accepting bytes", async () => {
@@ -227,6 +223,25 @@ describe("signed manufacturing export import boundary", () => {
         expected: expect.objectContaining({ signerSha }),
       }),
     );
+    expect(deps.query).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsafe traversal paths before cryptographic verification", async () => {
+    const deps = dependencies();
+    const tar = Buffer.concat([
+      tarEntry("build/boardreadyops-attested/", Buffer.alloc(0), "5"),
+      tarEntry("build/boardreadyops-attested/manifest.json", Buffer.from("{}")),
+      tarEntry("bundle.sigstore.json", Buffer.from("{}")),
+      tarEntry("build/boardreadyops-attested/../../outside.txt", Buffer.from("unsafe")),
+      Buffer.alloc(1024),
+    ]);
+    const response = await handleSignedManufacturingExportImport(
+      request(new Uint8Array(gzipSync(tar))),
+      { runId, attemptId },
+      deps,
+    );
+    expect(response.status).toBe(400);
+    expect(deps.verifyArchive).not.toHaveBeenCalled();
     expect(deps.query).not.toHaveBeenCalled();
   });
 
