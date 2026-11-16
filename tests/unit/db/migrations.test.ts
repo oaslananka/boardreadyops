@@ -182,6 +182,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0128_reused_github_repository_name_identity.sql",
       "0129_legacy_callback_dead_letter_recovery.sql",
       "0130_completed_safe_mode_check_run_reconciliation.sql",
+      "0131_customer_webhook_queue_priority.sql",
     ]);
   });
 
@@ -810,6 +811,19 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("boardreadyops_purge_expired_webhook_inbox");
     expect(sql).toContain("retention_until <= p_now");
     expect(sql).toContain("security invoker");
+  });
+
+  it("prioritizes customer PR and permission revocations without changing durable claims", async () => {
+    const sql = await readFile(join(migrationsDir, "0131_customer_webhook_queue_priority.sql"), "utf8");
+    expect(sql).toContain("create or replace function boardreadyops_accept_github_webhook");
+    expect(sql).toContain("p_event_type = 'pull_request'");
+    expect(sql).toContain("p_event_type = 'installation'");
+    expect(sql).toContain("p_event_type = 'installation_repositories'");
+    expect(sql).toContain("security invoker");
+    expect(sql).toContain("cpj.status = 'available'");
+    expect(sql).toContain("cpj.priority = 100");
+    expect(sql).toContain("on conflict (provider, delivery_id) do nothing");
+    expect(sql).not.toContain("delete from control_plane_jobs");
   });
 
   it("stores tenant-scoped execution routing policies in schema v14", async () => {
