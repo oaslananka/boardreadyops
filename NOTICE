@@ -130,6 +130,24 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@sidvind/better-ajv-errors@7.0.0`
   - Description: JSON Schema validation for Human
   - Homepage: https://github.com/ext/better-ajv-errors
+- `@sigstore/bundle@5.0.1`
+  - Description: Sigstore bundle type
+  - Homepage: https://github.com/sigstore/sigstore-js/tree/main/packages/bundle#readme
+- `@sigstore/core@4.0.1`
+  - Description: Base library for Sigstore
+  - Homepage: https://github.com/sigstore/sigstore-js/tree/main/packages/core#readme
+- `@sigstore/protobuf-specs@0.5.2`
+  - Description: code-signing for npm packages
+  - Homepage: https://github.com/sigstore/protobuf-specs#readme
+- `@sigstore/sign@5.1.0`
+  - Description: Sigstore signing library
+  - Homepage: https://github.com/sigstore/sigstore-js/tree/main/packages/sign#readme
+- `@sigstore/tuf@5.0.1`
+  - Description: Client for the Sigstore TUF repository
+  - Homepage: https://github.com/sigstore/sigstore-js/tree/main/packages/tuf#readme
+- `@sigstore/verify@4.1.3`
+  - Description: Verification of Sigstore signatures
+  - Homepage: https://github.com/sigstore/sigstore-js/tree/main/packages/verify#readme
 - `@stryker-mutator/api@9.6.1`
   - Description: The api for the extendable JavaScript mutation testing framework Stryker
   - Homepage: https://stryker-mutator.io/
@@ -266,6 +284,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `sharp@0.35.5`
   - Description: High performance Node.js image processing, the fastest module to resize JPEG, PNG, WebP, GIF, AVIF and TIFF images
   - Homepage: https://sharp.pixelplumbing.com
+- `sigstore@5.0.1`
+  - Description: code-signing for npm packages
+  - Homepage: https://github.com/sigstore/sigstore-js/tree/main/packages/client#readme
 - `text-decoder@1.2.7`
   - Description: Streaming text decoder that preserves multibyte Unicode characters
   - Homepage: https://github.com/holepunchto/text-decoder#readme
@@ -306,6 +327,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `minipass@7.1.3`
   - Description: minimal implementation of a PassThrough stream
   - Homepage: https://github.com/isaacs/minipass#readme
+- `minipass-flush@1.0.7`
+  - Description: A Minipass stream that calls a flush function before emitting 'end'
+  - Homepage: https://github.com/isaacs/minipass-flush#readme
 - `path-scurry@3.0.0`
   - Description: walk paths fast and efficiently
   - Homepage: https://github.com/isaacs/path-scurry#readme
@@ -336,6 +360,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `estraverse@4.3.0`, `estraverse@5.3.0`
   - Description: ECMAScript JS AST traversal functions
   - Homepage: https://github.com/estools/estraverse
+- `http-cache-semantics@4.3.0`
+  - Description: Parses Cache-Control and other headers. Helps building correct HTTP caches and proxies
+  - Homepage: https://github.com/kornelski/http-cache-semantics#readme
 - `json-schema-typed@8.0.2`
   - Description: JSON Schema TypeScript definitions with complete inline documentation.
   - Homepage: https://github.com/RemyRylan/json-schema-typed/tree/main/dist/node
@@ -418,8 +445,20 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@isaacs/fs-minipass@4.0.1`
   - Description: fs read and write streams based on minipass
   - Homepage: https://github.com/npm/fs-minipass#readme
+- `@npmcli/agent@5.0.2`
+  - Description: the http/https agent used by the npm cli
+  - Homepage: https://github.com/npm/agent#readme
+- `@npmcli/fs@6.0.0`
+  - Description: filesystem utilities for the npm cli
+  - Homepage: https://github.com/npm/fs#readme
+- `@npmcli/redact@5.0.0`
+  - Description: Redact sensitive npm information from output
+  - Homepage: https://github.com/npm/redact#readme
 - `@prisma/dev@0.24.17`
   - Description: A local Prisma Postgres server for development and testing
+- `cacache@21.0.1`
+  - Description: Fast, fault-tolerant, cross-platform, disk-based, data-agnostic, content-addressable cache.
+  - Homepage: https://github.com/npm/cacache#readme
 - `cli-width@4.1.0`
   - Description: Get stdout window width, with two fallbacks, tty and then a default.
   - Homepage: https://github.com/knownasilya/cli-width
@@ -474,6 +513,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `foreground-child@3.3.1`
   - Description: Run a child as if it's the foreground process. Give it stdio. Exit when it exits.
   - Homepage: https://github.com/tapjs/foreground-child#readme
+- `fs-minipass@3.0.3`
+  - Description: fs read and write streams based on minipass
+  - Homepage: https://github.com/npm/fs-minipass#readme
 - `get-caller-file@2.0.5`
   - Homepage: https://github.com/stefanpenner/get-caller-file#readme
 - `graceful-fs@4.2.11`
@@ -500,9 +542,23 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `lucide-react@1.35.0`
   - Description: A Lucide icon library package for React applications.
   - Homepage: https://lucide.dev
+- `make-fetch-happen@16.0.1`
+  - Description: Opinionated, caching, retrying fetch client
+  - Homepage: https://github.com/npm/make-fetch-happen#readme
 - `minimalistic-assert@1.0.1`
   - Description: minimalistic-assert ===
   - Homepage: https://github.com/calvinmetcalf/minimalistic-assert
+- `minipass@3.3.6`
+  - Description: minimal implementation of a PassThrough stream
+  - Homepage: https://github.com/isaacs/minipass#readme
+- `minipass-collect@2.0.1`
+  - Description: A Minipass stream that collects all the data into a single chunk
+  - Homepage: https://github.com/isaacs/minipass-collect#readme
+- `minipass-pipeline@1.2.4`
+  - Description: create a pipeline of streams using Minipass
+- `minipass-sized@2.0.0`
+  - Description: A Minipass stream that raises an error if you get a different number of bytes than expected
+  - Homepage: https://github.com/isaacs/minipass-sized#readme
 - `mute-stream@3.0.0`
   - Description: Bytes go in, but they don't come out (when muted).
   - Homepage: https://github.com/npm/mute-stream#readme
@@ -515,6 +571,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `picocolors@1.1.1`
   - Description: The tiniest and the fastest library for terminal output formatting with ANSI colors
   - Homepage: https://github.com/alexeyraspopov/picocolors#readme
+- `proc-log@7.0.0`
+  - Description: just emit 'log' events on the process object
+  - Homepage: https://github.com/npm/proc-log#readme
 - `semver@6.3.1`, `semver@7.7.4`, `semver@7.8.5`
   - Description: The semantic version parser used by npm.
   - Homepage: https://github.com/npm/node-semver#readme
@@ -530,6 +589,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `split2@4.2.0`
   - Description: split a Text Stream into a Line Stream, using Stream 3
   - Homepage: https://github.com/mcollina/split2#readme
+- `ssri@14.0.0`
+  - Description: Standard Subresource Integrity library -- parses, serializes, generates, and verifies integrity metadata according to the SRI spec.
+  - Homepage: https://github.com/npm/ssri#readme
 - `unbash@4.0.10`
   - Description: Fast 0-deps bash parser written in TypeScript
   - Homepage: https://github.com/webpro-nl/unbash#readme
@@ -548,7 +610,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `y18n@5.0.8`
   - Description: the bare-bones internationalization library used by yargs
   - Homepage: https://github.com/yargs/y18n
-- `yallist@3.1.1`
+- `yallist@3.1.1`, `yallist@4.0.0`
   - Description: Yet Another Linked List
   - Homepage: https://github.com/isaacs/yallist#readme
 - `yaml@2.9.0`
@@ -812,6 +874,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@formatjs/intl-localematcher@0.6.2`
   - Description: Intl.LocaleMatcher ponyfill
   - Homepage: https://github.com/formatjs/formatjs#readme
+- `@gar/promise-retry@1.0.3`
+  - Description: Retries a function that returns a promise, leveraging the power of the retry module.
+  - Homepage: https://github.com/wraithgar/node-promise-retry#readme
 - `@gerrit0/mini-shiki@3.23.0`
   - Homepage: https://github.com/Gerrit0/mini-shiki#readme
 - `@hono/node-server@2.1.6`
@@ -1171,6 +1236,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@tailwindcss/postcss@4.3.3`
   - Description: PostCSS plugin for Tailwind CSS, a utility-first CSS framework for rapidly building custom user interfaces
   - Homepage: https://tailwindcss.com
+- `@tufjs/canonical-json@2.0.0`
+  - Description: OLPC JSON canonicalization
+  - Homepage: https://github.com/theupdateframework/tuf-js/tree/main/packages/canonical-json#readme
+- `@tufjs/models@5.0.2`
+  - Description: TUF metadata models
+  - Homepage: https://github.com/theupdateframework/tuf-js/tree/main/packages/models#readme
 - `@types/chai@5.2.3`
   - Description: TypeScript definitions for chai
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/chai
@@ -1353,7 +1424,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `acorn@8.18.0`
   - Description: ECMAScript parser
   - Homepage: https://github.com/acornjs/acorn
-- `agent-base@6.0.2`, `agent-base@7.1.4`
+- `agent-base@6.0.2`, `agent-base@7.1.4`, `agent-base@9.0.0`
   - Description: Turn a function into an `http.Agent` instance
   - Homepage: https://github.com/TooTallNate/proxy-agents#readme
 - `ajv@8.18.0`, `ajv@8.20.0`
@@ -1799,10 +1870,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `http-link-header@1.1.4`
   - Description: Parse & format HTTP link headers according to RFC 8288
   - Homepage: https://codeberg.org/jhermsmeier/node-http-link-header
-- `http-proxy-agent@7.0.2`
+- `http-proxy-agent@7.0.2`, `http-proxy-agent@9.1.0`
   - Description: An HTTP(s) proxy `http.Agent` implementation for HTTP
   - Homepage: https://github.com/TooTallNate/proxy-agents#readme
-- `https-proxy-agent@5.0.1`, `https-proxy-agent@7.0.6`
+- `https-proxy-agent@5.0.1`, `https-proxy-agent@7.0.6`, `https-proxy-agent@9.1.0`
   - Description: An HTTP(s) proxy `http.Agent` implementation for HTTPS
   - Homepage: https://github.com/TooTallNate/proxy-agents#readme
 - `husky@9.1.7`
@@ -1981,6 +2052,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `minimizer-webpack-plugin@5.6.1`
   - Description: Minimizer plugin for webpack
   - Homepage: https://github.com/webpack/minimizer-webpack-plugin
+- `minipass-fetch@6.0.0`
+  - Description: An implementation of window.fetch in Node.js using Minipass streams
+  - Homepage: https://github.com/npm/minipass-fetch#readme
 - `minizlib@3.1.0`
   - Description: A small fast zlib stream built on [minipass](http://npm.im/minipass) and Node.js's zlib binding.
   - Homepage: https://github.com/isaacs/minizlib#readme
@@ -2064,6 +2138,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `p-locate@5.0.0`
   - Description: Get the first fulfilled promise that satisfies the provided testing function
   - Homepage: https://github.com/sindresorhus/p-locate#readme
+- `p-map@7.1.1`
+  - Description: Map over promises concurrently
+  - Homepage: https://github.com/sindresorhus/p-map#readme
 - `parent-module@1.0.1`
   - Description: Get the path of the parent module
   - Homepage: https://github.com/sindresorhus/parent-module#readme
@@ -2159,6 +2236,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `proxy-addr@2.0.8`
   - Description: Determine address of proxied request
   - Homepage: https://github.com/jshttp/proxy-addr#readme
+- `proxy-agent-negotiate@1.1.0`
+  - Description: Negotiate/SPNEGO proxy authentication for proxy-agents
+  - Homepage: https://github.com/TooTallNate/proxy-agents#readme
 - `proxy-from-env@1.1.0`
   - Description: Offers getProxyForUrl to get the proxy URL for a URL, respecting the *_PROXY (e.g. HTTP_PROXY) and NO_PROXY environment variables.
   - Homepage: https://github.com/Rob--W/proxy-from-env#readme
@@ -2278,6 +2358,15 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `sisteransi@1.0.5`
   - Description: ANSI escape codes for some terminal swag
   - Homepage: https://github.com/terkelg/sisteransi#readme
+- `smart-buffer@4.2.0`
+  - Description: smart-buffer is a Buffer wrapper that adds automatic read & write offset tracking, string operations, data insertions, and more.
+  - Homepage: https://github.com/JoshGlazebrook/smart-buffer/
+- `socks@2.8.10`
+  - Description: Fully featured SOCKS proxy client supporting SOCKSv4, SOCKSv4a, and SOCKSv5. Includes Bind and Associate functionality.
+  - Homepage: https://github.com/JoshGlazebrook/socks/
+- `socks-proxy-agent@10.1.0`
+  - Description: A SOCKS proxy `http.Agent` implementation for HTTP and HTTPS
+  - Homepage: https://github.com/TooTallNate/proxy-agents#readme
 - `source-map-support@0.5.21`
   - Description: Fixes stack traces for files with source maps
   - Homepage: https://github.com/evanw/node-source-map-support#readme
@@ -2388,6 +2477,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `tryer@1.0.1`
   - Description: Because everyone loves a tryer! Conditional and repeated task invocation for node and browser.
   - Homepage: https://gitlab.com/philbooth/tryer
+- `tuf-js@6.0.2`
+  - Description: JavaScript implementation of The Update Framework (TUF)
+  - Homepage: https://github.com/theupdateframework/tuf-js/tree/main/packages/client#readme
 - `tunnel@0.0.6`
   - Description: Node HTTP/HTTPS Agents for tunneling proxies
   - Homepage: https://github.com/koichik/node-tunnel/

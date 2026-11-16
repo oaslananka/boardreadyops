@@ -78322,46 +78322,54 @@ async function verifyReviewedExportAttestation(options) {
   } catch {
     return rejected("Export source, manifest or output inventory failed closed.");
   }
-  const args = [
-    "attestation",
-    "verify",
-    inventory.manifestPath,
-    "--repo",
-    e.repository,
-    "--signer-workflow",
-    `${e.repository}/${e.workflowPath}`,
-    "--source-digest",
-    e.signerSha ?? e.reviewedSha,
-    "--signer-digest",
-    e.signerSha ?? e.reviewedSha,
-    "--source-ref",
-    e.sourceRef,
-    "--cert-oidc-issuer",
-    oidcIssuer,
-    "--deny-self-hosted-runners",
-    "--format",
-    "json"
-  ];
-  if (options.bundlePath) args.push("--bundle", options.bundlePath);
-  let response;
-  try {
-    response = await runProcess("gh", args, {
-      cwd: options.root,
-      timeoutMs: 45e3,
-      maxStdoutBytes: 4 * 1024 * 1024,
-      maxStderrBytes: 4096
-    });
-  } catch {
-    return rejected("Cryptographic attestation verification could not run.");
-  }
-  if (response.code !== 0 || response.timedOut || response.error) {
-    return rejected("GitHub/Sigstore attestation verification failed or is unavailable.");
-  }
   let results;
-  try {
-    results = JSON.parse(response.stdout);
-  } catch {
-    return rejected("Attestation verifier returned malformed or truncated JSON.");
+  if (options.verifyTrustedBundle) {
+    try {
+      results = await options.verifyTrustedBundle();
+    } catch {
+      return rejected("Cryptographic attestation verification could not run.");
+    }
+  } else {
+    const args = [
+      "attestation",
+      "verify",
+      inventory.manifestPath,
+      "--repo",
+      e.repository,
+      "--signer-workflow",
+      `${e.repository}/${e.workflowPath}`,
+      "--source-digest",
+      e.signerSha ?? e.reviewedSha,
+      "--signer-digest",
+      e.signerSha ?? e.reviewedSha,
+      "--source-ref",
+      e.sourceRef,
+      "--cert-oidc-issuer",
+      oidcIssuer,
+      "--deny-self-hosted-runners",
+      "--format",
+      "json"
+    ];
+    if (options.bundlePath) args.push("--bundle", options.bundlePath);
+    let response;
+    try {
+      response = await runProcess("gh", args, {
+        cwd: options.root,
+        timeoutMs: 45e3,
+        maxStdoutBytes: 4 * 1024 * 1024,
+        maxStderrBytes: 4096
+      });
+    } catch {
+      return rejected("Cryptographic attestation verification could not run.");
+    }
+    if (response.code !== 0 || response.timedOut || response.error) {
+      return rejected("GitHub/Sigstore attestation verification failed or is unavailable.");
+    }
+    try {
+      results = JSON.parse(response.stdout);
+    } catch {
+      return rejected("Attestation verifier returned malformed or truncated JSON.");
+    }
   }
   if (!Array.isArray(results) || !results.some((v) => matchesVerifiedResult(v, e, inventory))) {
     return rejected(
