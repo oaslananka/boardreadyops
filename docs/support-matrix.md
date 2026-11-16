@@ -11,7 +11,7 @@ Minimum supported KiCad: **9.0**. Recommended KiCad line: **10.0**. Latest verif
 | Runtime | Version | Status | Latest verified | Notes |
 | --- | --- | --- | --- | --- |
 | KiCad | 9.0 | Minimum supported, upstream EOL, not CI-tested |  | Upstream EOL since April 2026. Removed from CI in May 2026 — may still work but is untested. |
-| KiCad | 10.0 | Recommended CI-tested line | 10.0.8 | Current recommended stable line. CI installs ppa:kicad/kicad-10.0-releases and asserts kicad-cli 10.0.x. |
+| KiCad | 10.0 | Recommended CI-tested line | 10.0.8 | Current recommended stable line. Hosted readiness CI uses the official digest-pinned KiCad 10 OCI image and verifies kicad-cli 10.0.x. |
 
 ## Node.js
 
@@ -19,8 +19,8 @@ Minimum supported Node.js: **24.0.0**. Recommended Node.js major: **24**.
 
 | Runtime | Version | Status | Tested latest | Latest upstream | Policy |
 | --- | --- | --- | --- | --- | --- |
-| Node.js | 24 | Minimum supported and recommended LTS runtime | 24.22.1 | 24.22.2 | Maintenance LTS and recommended runtime. Used by default CI jobs, binary builds, GitHub Action runtime, and KiCad 10.0 integration jobs. |
-| Node.js | 26 | LTS, validation pending (not supported) |  | 26.13.0 | Upstream LTS since October 2026; not supported until dependency/toolchain and cross-platform CI validation. Keep Node 24 as the only supported major. |
+| Node.js | 24 | Minimum supported and recommended LTS runtime | 24.22.1 | 24.22.3 | Maintenance LTS and recommended runtime. Used by default CI jobs, binary builds, GitHub Action runtime, and KiCad 10.0 integration jobs. |
+| Node.js | 26 | LTS, validation pending (not supported) |  | 26.13.1 | Upstream LTS since October 2026; not supported until dependency/toolchain and cross-platform CI validation. Keep Node 24 as the only supported major. |
 
 ## CycloneDX HBOM
 

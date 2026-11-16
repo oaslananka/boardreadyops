@@ -4,7 +4,7 @@ source_checked:
     releases: "https://nodejs.org/en/about/previous-releases"
     schedule: "https://github.com/nodejs/Release#release-schedule"
     index: "https://nodejs.org/dist/index.json"
-    checkedAt: "2026-11-03"
+    checkedAt: "2026-11-16"
   kicad:
     release: "https://www.kicad.org/blog/2026/10/KiCad-10.0.8-Release/"
     linux_packages: "https://www.kicad.org/download/linux-distros/"
@@ -25,7 +25,7 @@ kicad:
     - "10.0"
   notes:
     "9.0": "Upstream EOL since April 2026. Removed from CI in May 2026 — may still work but is untested."
-    "10.0": "Current recommended stable line. CI installs ppa:kicad/kicad-10.0-releases and asserts kicad-cli 10.0.x."
+    "10.0": "Current recommended stable line. Hosted readiness CI uses the official digest-pinned KiCad 10 OCI image and verifies kicad-cli 10.0.x."
 node:
   minimum: "24"
   minimumVersion: "24.0.0"
@@ -34,8 +34,8 @@ node:
   current: []
   ltsPending: ["26"]
   upstreamLatest:
-    "24": "24.22.2"
-    "26": "26.13.0"
+    "24": "24.22.3"
+    "26": "26.13.1"
   tested:
     "24": "24.22.1"
   policy:

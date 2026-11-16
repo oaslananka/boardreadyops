@@ -81,14 +81,14 @@ describe("compatibility matrix", () => {
     expect(config.node.supported).toEqual(["24"]);
     expect(config.node.current).toEqual([]);
     expect(config.node.ltsPending).toEqual(["26"]);
-    expect(config.node.upstreamLatest).toEqual({ "24": "24.22.2", "26": "26.13.0" });
+    expect(config.node.upstreamLatest).toEqual({ "24": "24.22.3", "26": "26.13.1" });
     expect(config.node.tested).toEqual({
       "24": "24.22.1",
     });
     const verifiedNodeSource = config.source_checked as typeof config.source_checked & {
       node: { checkedAt: string };
     };
-    expect(verifiedNodeSource.node.checkedAt).toBe("2026-11-03");
+    expect(verifiedNodeSource.node.checkedAt).toBe("2026-11-16");
     expect(toolchain.node.preferred).toBe("24.22.1");
     expect(toolchain.node.engines).toBe("^24.0.0");
     expect(toolchain.node.supportedMajors).toEqual([24]);
@@ -108,7 +108,7 @@ describe("compatibility matrix", () => {
     expect(supportMatrix).not.toContain("| KiCad | 10.1 | Supported |");
     expect(supportMatrix).not.toContain("| Node.js | 22 |");
     expect(supportMatrix).toContain("| Node.js | 24 | Minimum supported and recommended LTS runtime |");
-    expect(supportMatrix).toContain("| Node.js | 26 | LTS, validation pending (not supported) |  | 26.13.0 |");
+    expect(supportMatrix).toContain("| Node.js | 26 | LTS, validation pending (not supported) |  | 26.13.1 |");
     expect(supportMatrix).toContain("| CycloneDX JSON | 1.7 | Pinned HBOM contract |");
     expect(config.cyclonedx.schemaUrl).toBe("https://cyclonedx.org/schema/bom-1.7.schema.json");
     expect(config.cyclonedx.hbomSchema).toBe("schemas/hbom.schema.json");
@@ -227,8 +227,8 @@ describe("compatibility matrix", () => {
     const baseline = findCompatibilityDrift(config, {
       kicadReleases: ["10.0.8", "10.0.7"],
       nodeReleases: [
-        { version: "v24.22.2", lts: "Krypton" },
-        { version: "v26.13.0", lts: "Lithium" },
+        { version: "v24.22.3", lts: "Krypton" },
+        { version: "v26.13.1", lts: "Lithium" },
       ],
       cycloneDxSchema,
     });
@@ -236,17 +236,17 @@ describe("compatibility matrix", () => {
     const next = findCompatibilityDrift(config, {
       kicadReleases: ["10.0.9"],
       nodeReleases: [
-        { version: "v24.22.3", lts: "Krypton" },
-        { version: "v26.13.1", lts: "Lithium" },
+        { version: "v24.22.4", lts: "Krypton" },
+        { version: "v26.13.2", lts: "Lithium" },
       ],
       cycloneDxSchema,
     });
     expect(next.kicad).toEqual([{ series: "10.0", latest: "10.0.9", tested: "10.0.8", reason: "new-verified-patch" }]);
     expect(next.node).toEqual([
-      { major: "24", latest: "24.22.3", tested: "24.22.1", reviewed: "24.22.2", reason: "new-release" },
-      { major: "26", latest: "26.13.1", tested: "26.13.0", reason: "new-pending-lts" },
+      { major: "24", latest: "24.22.4", tested: "24.22.1", reviewed: "24.22.3", reason: "new-release" },
+      { major: "26", latest: "26.13.2", tested: "26.13.1", reason: "new-pending-lts" },
     ]);
-    expect(buildDriftReport(next)).toContain("newer than reviewed 24.22.2");
+    expect(buildDriftReport(next)).toContain("newer than reviewed 24.22.3");
     expect(buildDriftReport(next)).toContain("unsupported major 26");
   });
 
@@ -514,7 +514,7 @@ describe("compatibility matrix", () => {
     expect(config.node.supported).toEqual(["24"]);
     expect(config.node.current).toEqual([]);
     expect(config.node.ltsPending).toEqual(["26"]);
-    expect(config.node.upstreamLatest).toEqual({ "24": "24.22.2", "26": "26.13.0" });
+    expect(config.node.upstreamLatest).toEqual({ "24": "24.22.3", "26": "26.13.1" });
     expect(crossPlatform?.strategy?.matrix?.os).toEqual(["ubuntu-24.04", "macos-latest", "windows-2025-vs2026"]);
     expect(lintRuns).toContain("pnpm run compatibility:check");
   });
