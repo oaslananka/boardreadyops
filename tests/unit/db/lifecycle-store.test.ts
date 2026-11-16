@@ -7,6 +7,7 @@ import {
   lifecycleAuditEventForAction,
   parseReleaseRepositoryRolloutPolicy,
   releaseRepositoryEnabled,
+  releaseRepositoryPilotEnvName,
   releaseRepositoryRolloutEnvName,
   releaseRepositoryRolloutFileEnvName,
   releaseRepositoryRolloutPolicyFromEnvironment,
@@ -74,6 +75,50 @@ describe("SQL GitHub App metadata store", () => {
       releaseRepositoryRolloutPolicyFromEnvironment({
         [releaseRepositoryRolloutEnvName]: "all",
         [releaseRepositoryRolloutFileEnvName]: "/missing/boardreadyops-rollout-policy",
+      }),
+    ).toEqual({ repositories: [] });
+  });
+
+  it("adds exactly one pilot repository while preserving the existing rollout list", () => {
+    expect(releaseRepositoryPilotEnvName).toBe("BOARDREADYOPS_RELEASE_PILOT_REPOSITORY");
+    expect(
+      releaseRepositoryRolloutPolicyFromEnvironment({
+        [releaseRepositoryRolloutEnvName]: "acme/existing-board",
+        [releaseRepositoryPilotEnvName]: " Oaslananka/BoardReadyOps ",
+      }),
+    ).toEqual({ repositories: ["acme/existing-board", "oaslananka/boardreadyops"] });
+    expect(
+      releaseRepositoryRolloutPolicyFromEnvironment({
+        [releaseRepositoryRolloutEnvName]: "oaslananka/boardreadyops",
+        [releaseRepositoryPilotEnvName]: "oaslananka/boardreadyops",
+      }),
+    ).toEqual({ repositories: ["oaslananka/boardreadyops"] });
+    expect(
+      releaseRepositoryRolloutPolicyFromEnvironment({
+        [releaseRepositoryPilotEnvName]: "oaslananka/boardreadyops",
+      }),
+    ).toEqual({ repositories: ["oaslananka/boardreadyops"] });
+  });
+
+  it("never expands a single-repository pilot to wildcards or multiple names", () => {
+    for (const invalid of ["all", "*", "acme/one,acme/two", "acme/one acme/two", "acme/../two", "not-a-repository"]) {
+      expect(
+        releaseRepositoryRolloutPolicyFromEnvironment({
+          [releaseRepositoryRolloutEnvName]: "acme/existing",
+          [releaseRepositoryPilotEnvName]: invalid,
+        }),
+      ).toEqual({ repositories: ["acme/existing"] });
+    }
+    expect(
+      releaseRepositoryRolloutPolicyFromEnvironment({
+        [releaseRepositoryRolloutEnvName]: "all",
+        [releaseRepositoryPilotEnvName]: "oaslananka/boardreadyops",
+      }),
+    ).toEqual({ allowAllRepositories: true });
+    expect(
+      releaseRepositoryRolloutPolicyFromEnvironment({
+        [releaseRepositoryRolloutFileEnvName]: "/missing/boardreadyops-rollout-policy",
+        [releaseRepositoryPilotEnvName]: "oaslananka/boardreadyops",
       }),
     ).toEqual({ repositories: [] });
   });
