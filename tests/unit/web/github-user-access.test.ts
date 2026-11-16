@@ -97,6 +97,88 @@ describe("github user access", () => {
     }
   });
 
+  it("refuses a partial identity when a later GitHub installations page fails", async () => {
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/login/oauth/access_token")) return jsonResponse({ access_token: "user-token" });
+      if (url.endsWith("/user")) return jsonResponse({ id: 4711, login: "octo-dev" });
+      if (new URL(url).searchParams.get("page") === "1") {
+        return jsonResponse({ installations: Array.from({ length: 100 }, (_, i) => ({ id: i + 1 })) });
+      }
+      if (new URL(url).searchParams.get("page") === "2") return jsonResponse({}, false);
+      throw new Error(`unexpected request to ${url}`);
+    }) as unknown as typeof fetch;
+
+    await expect(resolveGitHubUserIdentity(configuration, "code", redirectUri, { fetch })).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not create a partial session when GitHub stops responding during pagination", async () => {
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/login/oauth/access_token")) return jsonResponse({ access_token: "user-token" });
+      if (url.endsWith("/user")) return jsonResponse({ id: 4711, login: "octo-dev" });
+      if (new URL(url).searchParams.get("page") === "1") {
+        return jsonResponse({ installations: Array.from({ length: 100 }, (_, i) => ({ id: i + 1 })) });
+      }
+      throw new Error("GitHub connection timed out");
+    }) as unknown as typeof fetch;
+
+    await expect(resolveGitHubUserIdentity(configuration, "code", redirectUri, { fetch })).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("retains every installation across successful GitHub pages", async () => {
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/login/oauth/access_token")) return jsonResponse({ access_token: "user-token" });
+      if (url.endsWith("/user")) return jsonResponse({ id: 4711, login: "octo-dev" });
+      if (new URL(url).searchParams.get("page") === "1") {
+        return jsonResponse({ installations: Array.from({ length: 100 }, (_, i) => ({ id: i + 1 })) });
+      }
+      if (new URL(url).searchParams.get("page") === "2")
+        return jsonResponse({ installations: [{ id: 101 }, { id: 100 }] });
+      throw new Error(`unexpected request to ${url}`);
+    }) as unknown as typeof fetch;
+
+    const identity = await resolveGitHubUserIdentity(configuration, "code", redirectUri, { fetch });
+    expect(identity?.installationIds).toEqual(Array.from({ length: 101 }, (_, i) => i + 1));
+  });
+
+  it("refuses missing or malformed installation data instead of treating it as an empty account", async () => {
+    for (const payload of [
+      {},
+      { installations: null },
+      { installations: [{ id: "123" }] },
+      { installations: [{ id: -1 }] },
+    ]) {
+      const fetch = fetchStub({
+        "https://github.com/login/oauth/access_token": () => jsonResponse({ access_token: "user-token" }),
+        "https://api.github.com/user/installations": () => jsonResponse(payload),
+        "https://api.github.com/user": () => jsonResponse({ id: 4711, login: "octo-dev" }),
+      });
+      await expect(resolveGitHubUserIdentity(configuration, "code", redirectUri, { fetch })).resolves.toBeUndefined();
+    }
+  });
+
+  it("refuses a truncated installation list at the configured pagination limit", async () => {
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/login/oauth/access_token")) return jsonResponse({ access_token: "user-token" });
+      if (url.endsWith("/user")) return jsonResponse({ id: 4711, login: "octo-dev" });
+      if (url.includes("/user/installations")) {
+        const page = Number(new URL(url).searchParams.get("page"));
+        return jsonResponse({
+          installations: Array.from({ length: 100 }, (_, i) => ({ id: (page - 1) * 100 + i + 1 })),
+        });
+      }
+      throw new Error(`unexpected request to ${url}`);
+    }) as unknown as typeof fetch;
+
+    await expect(resolveGitHubUserIdentity(configuration, "code", redirectUri, { fetch })).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(12);
+  });
+
   it("tolerates an account with no installations without failing sign-in", async () => {
     const fetch = fetchStub({
       "https://github.com/login/oauth/access_token": () => jsonResponse({ access_token: "user-token" }),
