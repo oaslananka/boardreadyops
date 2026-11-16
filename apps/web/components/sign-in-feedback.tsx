@@ -19,13 +19,22 @@ const messages: Record<SignInFailureReason, { title: string; detail: string }> =
   },
 };
 
-function knownReason(value: string | null): value is SignInFailureReason {
-  return value === "unavailable" || value === "expired" || value === "denied";
+function messageForReason(reason: string | null) {
+  switch (reason) {
+    case "unavailable":
+      return messages.unavailable;
+    case "expired":
+      return messages.expired;
+    case "denied":
+      return messages.denied;
+    default:
+      return undefined;
+  }
 }
 
 export function SignInFailureNotice({ reason }: Readonly<{ reason: string | null }>) {
-  if (!knownReason(reason)) return null;
-  const message = messages[reason];
+  const message = messageForReason(reason);
+  if (!message) return null;
 
   return (
     <section
