@@ -342,7 +342,8 @@ export default function HomePage() {
               </h1>
               <p className="mt-4 text-lg text-muted-foreground">
                 Connect a GitHub repository, check the exact design revision, and open visual findings. Your source and
-                branch protections stay in GitHub.
+                branch protections stay in GitHub. Already using BoardReadyOps? Sign in to revisit your connected
+                repositories and review their existing results without reinstalling the GitHub App.
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Suspense
