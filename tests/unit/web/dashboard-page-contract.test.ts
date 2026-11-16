@@ -200,7 +200,12 @@ describe("dashboard operational hierarchy", () => {
     const html = renderToStaticMarkup(await DashboardPage());
     expect(html).toContain("Hosted checks awaiting rollout");
     expect(html).toContain("Cloud readiness runs are not enabled for these repositories");
-    expect(html).toContain("Check your PCB locally");
+    expect(html).toContain("Explore a passing example");
+    expect(html).toContain("Explore a blocked example");
+    expect(html).toContain('href="/runs/9ab5ab15-0db0-4b22-b923-ac434da4ebee"');
+    expect(html).toContain('href="/runs/74c7f60f-0779-4f48-bfe0-2fc07360565b"');
+    expect(html).toContain("public synthetic demo boards, not results for your repositories");
+    expect(html).toContain("Check your own PCB locally");
     expect(html).toContain("Check this board locally");
     expect(html).toContain("A local finding is not an OIDC-signed hosted Check Run");
     expect(html).toContain("docs/quickstart.md");
