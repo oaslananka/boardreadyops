@@ -658,11 +658,7 @@ function DashboardBody({
 
   const firstRun = firstRunAvailability(groups);
   const showRolloutBlockerFirst =
-    firstRun.gated > 0 &&
-    firstRun.eligible === 0 &&
-    firstRun.withoutRuns === summary.repositoriesWithoutRuns &&
-    summary.repositoriesWithOpenFindings === 0 &&
-    summary.supplyAlerts === 0;
+    firstRun.gated > 0 && firstRun.eligible === 0 && firstRun.withoutRuns === summary.repositoriesWithoutRuns;
 
   const latestRunsCompleted = groups.every((group) =>
     group.repositories.every((repository) => !repository.latestRunId || repository.latestRunStatus === "completed"),

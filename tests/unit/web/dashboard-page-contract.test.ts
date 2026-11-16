@@ -214,6 +214,42 @@ describe("dashboard operational hierarchy", () => {
     expect(html.match(/aria-label="Hosted first-run availability"/gu)).toHaveLength(1);
   });
 
+  it("keeps public example links visible before board choices even when a past run has findings", async () => {
+    vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES", "");
+    vi.mocked(loadViewerRepositories).mockResolvedValueOnce([
+      {
+        accountLogin: "octocat",
+        repositories: [
+          {
+            id: "older-run",
+            owner: "octocat",
+            name: "older-board",
+            latestRunId: "run-with-findings",
+            latestRunStatus: "completed",
+            openFindings: 4,
+          },
+          { id: "gated-board", owner: "octocat", name: "new-board", latestRunId: undefined, openFindings: 0 },
+        ],
+      },
+    ]);
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 2,
+      repositoriesWithOpenFindings: 1,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 1,
+      watchedBoards: 0,
+    });
+
+    const html = renderToStaticMarkup(await DashboardPage());
+    expect(html).toContain("Hosted checks awaiting rollout");
+    expect(html).toContain("Explore a passing example");
+    expect(html).toContain("Explore a blocked example");
+    expect(html.indexOf('aria-label="Hosted first-run availability"')).toBeLessThan(
+      html.indexOf('aria-label="Advanced engineering details"'),
+    );
+    expect(html.match(/aria-label="Hosted first-run availability"/gu)).toHaveLength(1);
+  });
+
   it("routes a mixed rollout to the enabled repository rather than a blocked one", async () => {
     vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES", "octocat/enabled");
     vi.mocked(loadViewerRepositories).mockResolvedValueOnce([
