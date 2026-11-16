@@ -38,7 +38,7 @@ describe("GitHub App webhook delivery safety audit", () => {
       unresolvedAfterSuccess: 0,
       needsReview: true,
     });
-    expect(result.review).toEqual([{ deliveryId: 3, guid: guidB, category: "failed_not_stored" }]);
+    expect(result.review).toEqual([{ deliveryId: "3", guid: guidB, category: "failed_not_stored" }]);
   });
   it("reviews a successful installation with no durable inbox, without claiming definite loss", () => {
     const install = { ...delivery(11, guidA, 202), event: "installation", action: "created", installationId: 123 };
@@ -51,7 +51,7 @@ describe("GitHub App webhook delivery safety audit", () => {
       needsReview: true,
     });
     expect(report.review).toEqual([
-      { deliveryId: 11, guid: guidA, category: "acknowledged_installation_without_inbox" },
+      { deliveryId: "11", guid: guidA, category: "acknowledged_installation_without_inbox" },
     ]);
     const stored = deliveryGapSummary([install], new Set([guidA]), true);
     expect(stored.acknowledgedInstallationsWithoutInbox).toBe(0);
@@ -72,7 +72,7 @@ describe("GitHub App webhook delivery safety audit", () => {
       needsReview: true,
     });
     expect(report.review).toEqual([
-      { deliveryId: 21, guid: guidA, category: "acknowledged_repository_selection_without_inbox" },
+      { deliveryId: "21", guid: guidA, category: "acknowledged_repository_selection_without_inbox" },
     ]);
     const stored = deliveryGapSummary([selection], new Set([guidA]), true);
     expect(stored.acknowledgedRepositorySelectionsWithoutInbox).toBe(0);
@@ -87,7 +87,20 @@ describe("GitHub App webhook delivery safety audit", () => {
     const report = deliveryGapSummary(attempts, new Set(), true);
     expect(report.acknowledgedRepositorySelectionsWithoutInbox).toBe(0);
     expect(report.unresolvedAfterSuccess).toBe(1);
-    expect(report.review).toEqual([{ deliveryId: 22, guid: guidB, category: "successful_retry_without_inbox" }]);
+    expect(report.review).toEqual([{ deliveryId: "22", guid: guidB, category: "successful_retry_without_inbox" }]);
+  });
+
+  it("orders and selects unsafe-integer delivery IDs exactly", () => {
+    const attempts = [
+      { ...delivery(1, guidA, 503), id: "1000000000000000000" },
+      { ...delivery(2, guidA, 502), id: "999999999999999998" },
+      { ...delivery(3, guidB, 500), id: "999999999999999999" },
+    ];
+    const report = deliveryGapSummary(attempts, new Set(), true);
+    expect(report.review).toEqual([
+      { deliveryId: "999999999999999998", guid: guidA, category: "failed_not_stored" },
+      { deliveryId: "999999999999999999", guid: guidB, category: "failed_not_stored" },
+    ]);
   });
 
   it("does not require an inbox for successful ping, non-lifecycle or missing-installation events", () => {
@@ -110,11 +123,11 @@ describe("GitHub App webhook delivery safety audit", () => {
       failuresWithNoInbox: 1,
       needsReview: true,
     });
-    expect(result.review).toEqual([{ deliveryId: 9, guid: guidB, category: "failed_not_stored" }]);
+    expect(result.review).toEqual([{ deliveryId: "9", guid: guidB, category: "failed_not_stored" }]);
   });
   it("flags successful retries with no database record as review, not definite loss", () => {
     const result = deliveryGapSummary([delivery(1, guidA, 500), delivery(2, guidA, 204)], new Set(), true);
-    expect(result.review).toEqual([{ deliveryId: 1, guid: guidA, category: "successful_retry_without_inbox" }]);
+    expect(result.review).toEqual([{ deliveryId: "1", guid: guidA, category: "successful_retry_without_inbox" }]);
     expect(result.unresolvedAfterSuccess).toBe(1);
   });
   it("treats redirects as failed deliveries, even when a later attempt succeeds", () => {
@@ -131,8 +144,8 @@ describe("GitHub App webhook delivery safety audit", () => {
       needsReview: true,
     });
     expect(result.review).toEqual([
-      { deliveryId: 1, guid: guidA, category: "successful_retry_without_inbox" },
-      { deliveryId: 3, guid: guidB, category: "failed_not_stored" },
+      { deliveryId: "1", guid: guidA, category: "successful_retry_without_inbox" },
+      { deliveryId: "3", guid: guidB, category: "failed_not_stored" },
     ]);
   });
 });
