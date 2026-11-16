@@ -1,12 +1,11 @@
-import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, constants as fsConstants } from "node:fs";
 import { copyFile, mkdir, open, realpath, rm, stat, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { extract as extractTar, list as listTar } from "tar";
 import { verifyReviewedExportAttestation } from "../../../src/release/export-attestation.js";
 import { safeLocalArtifactPath } from "./artifact-downloads.js";
 import type { VerifiedGitHubActionsOidcClaims } from "./github-actions-oidc.js";
@@ -17,7 +16,6 @@ import {
 } from "./github-temporary-manufacturing.js";
 import type { ResultOidcExpectations } from "./result-oidc-expectations.js";
 
-const execFileAsync = promisify(execFile);
 const maximumArchiveBytes = 128 * 1024 * 1024;
 const maximumArchiveEntries = 1100;
 const manifestPath = "build/boardreadyops-attested/manifest.json";
@@ -131,61 +129,85 @@ async function fileDigest(filePath: string): Promise<string> {
   return hash.digest("hex");
 }
 
-// Windows tar emits CRLF listing separators. Normalize only the line terminator;
-// embedded carriage returns must remain visible to the entry-name guard.
-export function tarListingLines(output: string): string[] {
-  return output.split(/\r?\n/u).filter(Boolean);
+// Parse the signed archive with the same pinned Node library on Vercel and CI.
+// Do not depend on a system tar executable, which is not portable to Functions.
+function archiveEntryName(pathname: string): string {
+  return pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
 }
 
-export function tarEntryExpandedBytes(detail: string): number | undefined {
-  const gnu = /^[-d][rwxStTs-]{9}\s+\S+\s+(\d+)\s/u.exec(detail);
-  const bsd = /^[-d][rwxStTs-]{9}\s+\d+\s+\S+\s+\S+\s+(\d+)\s/u.exec(detail);
-  const match = gnu ?? bsd;
-  if (!match) return undefined;
-  const size = Number(match[1]);
-  return Number.isSafeInteger(size) && size >= 0 ? size : undefined;
+function allowedArchiveEntry(pathname: string, type: string): boolean {
+  if (!safeArchiveEntry(pathname)) return false;
+  const name = archiveEntryName(pathname);
+  if (name === "build" || name === "build/boardreadyops-attested") return type === "Directory";
+  if (name !== bundlePath && !name.startsWith(allowedExportRoot)) return false;
+  return type === "Directory" || type === "File" || type === "OldFile";
 }
 
-function safeArchiveHeaders(details: string[]): boolean {
-  let expandedBytes = 0;
-  for (const detail of details) {
-    const size = tarEntryExpandedBytes(detail);
-    if (size === undefined) return false;
-    expandedBytes += size;
-    if (!Number.isSafeInteger(expandedBytes) || expandedBytes > 512 * 1024 * 1024) return false;
-  }
-  return true;
-}
-
-function safeArchiveNames(entries: string[], details: string[]): boolean {
+async function inspectTar(archive: string): Promise<ReadonlySet<string> | undefined> {
   const seen = new Set<string>();
-  for (let index = 0; index < entries.length; index++) {
-    const name = entries[index];
-    const detail = details[index];
-    if (!name || !detail || !safeArchiveEntry(name) || seen.has(name)) return false;
-    seen.add(name);
-    const type = detail[0];
-    if (type !== "-" && type !== "d") return false;
-    const isRoot =
-      name === "build/" || name === "build" || name === allowedExportRoot || name === allowedExportRoot.slice(0, -1);
-    if (name !== bundlePath && !isRoot && !name.startsWith(allowedExportRoot)) return false;
+  let expandedBytes = 0;
+  let rejected = false;
+  try {
+    // preservePaths is safe for a *read-only listing* so we can reject raw
+    // traversal names before using the extract API's default path protection.
+    await listTar({
+      file: archive,
+      gzip: true,
+      strict: true,
+      preservePaths: true,
+      onReadEntry: (entry) => {
+        const pathname = entry.path;
+        const name = archiveEntryName(pathname);
+        const size = entry.size;
+        if (
+          seen.size >= maximumArchiveEntries ||
+          seen.has(name) ||
+          !allowedArchiveEntry(pathname, entry.type) ||
+          !Number.isSafeInteger(size) ||
+          size < 0 ||
+          expandedBytes + size > 512 * 1024 * 1024
+        ) {
+          rejected = true;
+          return;
+        }
+        expandedBytes += size;
+        seen.add(name);
+      },
+    });
+    return !rejected && seen.size >= 2 && seen.has(bundlePath) && seen.has(manifestPath) ? seen : undefined;
+  } catch {
+    return undefined;
   }
-  return seen.has(bundlePath) && seen.has(manifestPath);
 }
 
-async function inspectTar(archive: string): Promise<boolean> {
-  try {
-    const [names, verbose] = await Promise.all([
-      execFileAsync("tar", ["-tzf", archive], { maxBuffer: 2 * 1024 * 1024, timeout: 15_000 }),
-      execFileAsync("tar", ["-tvzf", archive], { maxBuffer: 2 * 1024 * 1024, timeout: 15_000 }),
-    ]);
-    const entries = tarListingLines(names.stdout);
-    const details = tarListingLines(verbose.stdout);
-    if (entries.length < 2 || entries.length > maximumArchiveEntries || entries.length !== details.length) return false;
-    return safeArchiveHeaders(details) && safeArchiveNames(entries, details);
-  } catch {
-    return false;
-  }
+async function extractCheckedTar(
+  archive: string,
+  destination: string,
+  acceptedNames: ReadonlySet<string>,
+): Promise<void> {
+  let rejected = false;
+  await extractTar({
+    file: archive,
+    cwd: destination,
+    gzip: true,
+    strict: true,
+    noMtime: true,
+    noChmod: true,
+    preservePaths: false,
+    filter: (pathname, entry) => {
+      if (
+        !("type" in entry) ||
+        typeof entry.type !== "string" ||
+        !acceptedNames.has(archiveEntryName(pathname)) ||
+        !allowedArchiveEntry(pathname, entry.type)
+      ) {
+        rejected = true;
+        return false;
+      }
+      return true;
+    },
+  });
+  if (rejected) throw new Error("untrusted manufacturing archive member");
 }
 
 function configuredQueryExecutor(
@@ -541,14 +563,10 @@ export async function importArchive(
     if (objectTarget && (archive.sha256 !== objectTarget.sha256 || archive.bytes !== objectTarget.bytes)) {
       return jsonError("verified storage object does not match the signed upload ticket", 422);
     }
-    if (!(await inspectTar(archivePath)))
-      return jsonError("signed export archive contains unsafe or unsupported entries", 400);
+    const acceptedNames = await inspectTar(archivePath);
+    if (!acceptedNames) return jsonError("signed export archive contains unsafe or unsupported entries", 400);
     await mkdir(extractionRoot, { mode: 0o700 });
-    await execFileAsync(
-      "tar",
-      ["--no-same-owner", "--no-same-permissions", "-xzf", archivePath, "-C", extractionRoot],
-      { maxBuffer: 2 * 1024 * 1024 },
-    );
+    await extractCheckedTar(archivePath, extractionRoot, acceptedNames);
     const verification = await dependencies.verifyArchive(archiveVerificationInput(extractionRoot, expected, claims));
     if (verification.status !== "eligible" || !verification.subjects) {
       return jsonError("signed manufacturing export could not be independently verified", 422);
