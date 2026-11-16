@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { BrandMarkIcon } from "../components/brand-mark.js";
 import { installUrl, LandingHeroActions, LandingNavActions } from "../components/landing-actions.js";
 import { PublicStructuredData } from "../components/public-structured-data.js";
+import { SignInFeedbackFromUrl } from "../components/sign-in-feedback.js";
 import { ThemeToggle } from "../components/theme-toggle.js";
 import { buttonVariants } from "../components/ui/button.js";
 import { applicationHref } from "../lib/marketing-surface.js";
@@ -328,6 +329,10 @@ export default function HomePage() {
       </header>
 
       <main id="main-content">
+        {/* Keep the marketing landing static while showing bounded OAuth callback feedback. */}
+        <Suspense fallback={null}>
+          <SignInFeedbackFromUrl />
+        </Suspense>
         <section className="border-b border-border py-20" aria-labelledby="landing-heading">
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 lg:grid-cols-[3fr_2fr] lg:items-center">
             <div>
