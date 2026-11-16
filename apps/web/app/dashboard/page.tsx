@@ -310,17 +310,29 @@ function SetupInProgressBanner({
             start a hosted PCB review while rollout is restricted.
           </p>
         </div>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <a
-            href={localQuickstartUrl}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+          <Link
+            href="/runs/9ab5ab15-0db0-4b22-b923-ac434da4ebee"
             className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary/90"
           >
-            Check your PCB locally →
-          </a>
+            Explore a passing example →
+          </Link>
           <Link
-            href="/setup"
+            href="/runs/74c7f60f-0779-4f48-bfe0-2fc07360565b"
             className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
           >
+            Explore a blocked example
+          </Link>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          These are real recorded Check Runs for public synthetic demo boards, not results for your repositories. Hosted
+          checks remain unavailable for your connected boards until rollout is enabled.
+        </p>
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+          <a href={localQuickstartUrl} className="inline-flex min-h-11 items-center text-primary underline">
+            Check your own PCB locally
+          </a>
+          <Link href="/setup" className="inline-flex min-h-11 items-center text-primary underline">
             Inspect repository setup
           </Link>
         </div>
@@ -646,11 +658,7 @@ function DashboardBody({
 
   const firstRun = firstRunAvailability(groups);
   const showRolloutBlockerFirst =
-    firstRun.gated > 0 &&
-    firstRun.eligible === 0 &&
-    firstRun.withoutRuns === summary.repositoriesWithoutRuns &&
-    summary.repositoriesWithOpenFindings === 0 &&
-    summary.supplyAlerts === 0;
+    firstRun.gated > 0 && firstRun.eligible === 0 && firstRun.withoutRuns === summary.repositoriesWithoutRuns;
 
   const latestRunsCompleted = groups.every((group) =>
     group.repositories.every((repository) => !repository.latestRunId || repository.latestRunStatus === "completed"),

@@ -200,12 +200,53 @@ describe("dashboard operational hierarchy", () => {
     const html = renderToStaticMarkup(await DashboardPage());
     expect(html).toContain("Hosted checks awaiting rollout");
     expect(html).toContain("Cloud readiness runs are not enabled for these repositories");
-    expect(html).toContain("Check your PCB locally");
+    expect(html).toContain("Explore a passing example");
+    expect(html).toContain("Explore a blocked example");
+    expect(html).toContain('href="/runs/9ab5ab15-0db0-4b22-b923-ac434da4ebee"');
+    expect(html).toContain('href="/runs/74c7f60f-0779-4f48-bfe0-2fc07360565b"');
+    expect(html).toContain("public synthetic demo boards, not results for your repositories");
+    expect(html).toContain("Check your own PCB locally");
     expect(html).toContain("Check this board locally");
     expect(html).toContain("A local finding is not an OIDC-signed hosted Check Run");
     expect(html).toContain("docs/quickstart.md");
     expect(html).not.toContain("Review setup and run the first check");
     expect(html.indexOf("Hosted checks awaiting rollout")).toBeLessThan(html.indexOf("Choose a board to review"));
+    expect(html.match(/aria-label="Hosted first-run availability"/gu)).toHaveLength(1);
+  });
+
+  it("keeps public example links visible before board choices even when a past run has findings", async () => {
+    vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES", "");
+    vi.mocked(loadViewerRepositories).mockResolvedValueOnce([
+      {
+        accountLogin: "octocat",
+        repositories: [
+          {
+            id: "older-run",
+            owner: "octocat",
+            name: "older-board",
+            latestRunId: "run-with-findings",
+            latestRunStatus: "completed",
+            openFindings: 4,
+          },
+          { id: "gated-board", owner: "octocat", name: "new-board", latestRunId: undefined, openFindings: 0 },
+        ],
+      },
+    ]);
+    vi.mocked(summarizeViewerRepositories).mockReturnValueOnce({
+      repositories: 2,
+      repositoriesWithOpenFindings: 1,
+      supplyAlerts: 0,
+      repositoriesWithoutRuns: 1,
+      watchedBoards: 0,
+    });
+
+    const html = renderToStaticMarkup(await DashboardPage());
+    expect(html).toContain("Hosted checks awaiting rollout");
+    expect(html).toContain("Explore a passing example");
+    expect(html).toContain("Explore a blocked example");
+    expect(html.indexOf('aria-label="Hosted first-run availability"')).toBeLessThan(
+      html.indexOf('aria-label="Advanced engineering details"'),
+    );
     expect(html.match(/aria-label="Hosted first-run availability"/gu)).toHaveLength(1);
   });
 
