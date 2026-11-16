@@ -79,6 +79,61 @@ describe("GitHub App webhook delivery safety audit", () => {
     expect(stored.needsReview).toBe(false);
   });
 
+  it("recognizes successful no-action redeliveries without expecting a durable inbox", () => {
+    const attempts = [
+      { ...delivery(1, guidA, 503), event: "check_run", action: "created" },
+      { ...delivery(2, guidA, 202), event: "check_run", action: "created" },
+      { ...delivery(3, guidB, 520), event: "check_run", action: "completed" },
+      { ...delivery(4, guidB, 202), event: "check_run", action: "completed" },
+      { ...delivery(5, guidC, 503), event: "issue_comment", action: "edited" },
+      { ...delivery(6, guidC, 202), event: "issue_comment", action: "edited" },
+    ];
+    const result = deliveryGapSummary(attempts, new Set(), true);
+    expect(result).toMatchObject({
+      failedAttempts: 3,
+      failedEvents: 3,
+      recoveredNoAction: 3,
+      unresolvedAfterSuccess: 0,
+      needsReview: false,
+    });
+    expect(result.review).toEqual([]);
+  });
+
+  it("keeps potentially actionable redeliveries under review without durable evidence", () => {
+    const cases = [
+      { event: "workflow_run", action: "completed" },
+      { event: "pull_request", action: "synchronize" },
+      { event: "check_run", action: "requested_action" },
+      { event: "issue_comment", action: "created" },
+      { event: "check_run", action: undefined },
+    ];
+    for (const candidate of cases) {
+      const attempts = [
+        { ...delivery(7, guidA, 503), ...candidate },
+        { ...delivery(8, guidA, 202), ...candidate },
+      ];
+      const result = deliveryGapSummary(attempts, new Set(), true);
+      expect(result).toMatchObject({
+        failedEvents: 1,
+        recoveredNoAction: 0,
+        unresolvedAfterSuccess: 1,
+        needsReview: true,
+      });
+    }
+  });
+
+  it("does not trust inconsistent event actions across attempts as safely acknowledged", () => {
+    const result = deliveryGapSummary(
+      [
+        { ...delivery(7, guidA, 503), event: "check_run", action: "completed" },
+        { ...delivery(8, guidA, 202), event: "check_run", action: "requested_action" },
+      ],
+      new Set(),
+      true,
+    );
+    expect(result).toMatchObject({ recoveredNoAction: 0, unresolvedAfterSuccess: 1, needsReview: true });
+  });
+
   it("treats a repository-selection failed delivery with a later 2xx as retry review only", () => {
     const attempts = [
       { ...delivery(22, guidB, 503), event: "installation_repositories", installationId: 123 },
