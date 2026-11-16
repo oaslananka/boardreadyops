@@ -126,13 +126,14 @@ jobs:
             done
           fi
 
-      # Install trusted tooling from the protected default branch, never from
-      # untrusted PR content. The official KiCad image is pinned by digest in
-      # scripts/install-kicad-ci.sh and its CLI version is verified below.
+      # Install pinned trusted tooling from BoardReadyOps, not from the
+      # target repository's untrusted branch or default branch.
       - name: Check out trusted runner tooling
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          repository: oaslananka/boardreadyops
+          ref: f942b9a4aa881ad0e8b868cb4922fc3e9f91652b
+          path: .boardreadyops-trusted-tooling
           persist-credentials: false
 
       - name: Install KiCad 10
@@ -142,7 +143,7 @@ jobs:
           BRO_KICAD_PPA_SERIES: "10.0"
           BRO_KICAD_INSTALL_MODE: oci
         run: |
-          source scripts/install-kicad-ci.sh
+          source .boardreadyops-trusted-tooling/scripts/install-kicad-ci.sh
           version="$(kicad-cli version)"
           case "$version" in
             10.0.*) ;;

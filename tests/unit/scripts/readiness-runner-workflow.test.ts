@@ -12,7 +12,7 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("ref: $" + "{{ inputs.head_sha }}");
     expect(workflow).toContain("persist-credentials: false");
     expect(workflow).toContain('actual_sha="$(git rev-parse HEAD)"');
-    expect(workflow).toContain("source scripts/install-kicad-ci.sh");
+    expect(workflow).toContain("source .boardreadyops-trusted-tooling/scripts/install-kicad-ci.sh");
     expect(workflow).toContain("BRO_KICAD_INSTALL_MODE: oci");
     expect(workflow).not.toContain("sudo add-apt-repository");
     expect(workflow).toContain('require-kicad: "true"');
@@ -32,9 +32,13 @@ describe("readiness runner workflow security contract", () => {
     expect(trusted).toBeGreaterThan(0);
     expect(installer).toBeGreaterThan(trusted);
     expect(untrusted).toBeGreaterThan(installer);
-    expect(workflow.slice(trusted, installer)).toContain("ref: $" + "{{ github.event.repository.default_branch }}");
+    expect(workflow.slice(trusted, installer)).toContain("repository: oaslananka/boardreadyops");
+    expect(workflow.slice(trusted, installer)).toContain("ref: f942b9a4aa881ad0e8b868cb4922fc3e9f91652b");
+    expect(workflow.slice(trusted, installer)).toContain("path: .boardreadyops-trusted-tooling");
     expect(workflow.slice(trusted, installer)).toContain("persist-credentials: false");
-    expect(workflow.slice(installer, untrusted)).toContain("source scripts/install-kicad-ci.sh");
+    expect(workflow.slice(installer, untrusted)).toContain(
+      "source .boardreadyops-trusted-tooling/scripts/install-kicad-ci.sh",
+    );
     expect(workflow.slice(installer, untrusted)).toContain("BRO_KICAD_INSTALL_MODE: oci");
     expect(workflow.slice(installer, untrusted)).not.toContain("add-apt-repository");
   });
