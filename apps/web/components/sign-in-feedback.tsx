@@ -2,31 +2,23 @@
 
 import { useSearchParams } from "next/navigation";
 
-type SignInFailureReason = "unavailable" | "expired" | "denied";
-
-const messages: Record<SignInFailureReason, { title: string; detail: string }> = {
-  unavailable: {
-    title: "GitHub sign-in is temporarily unavailable",
-    detail: "We couldn't start or finish your sign-in. Your repository access hasn't been changed.",
-  },
-  expired: {
-    title: "Your GitHub sign-in expired",
-    detail: "This sign-in link is no longer valid. Start again to securely reconnect your account.",
-  },
-  denied: {
-    title: "GitHub sign-in could not be completed",
-    detail: "The sign-in was cancelled or GitHub couldn't verify the request. You can safely try again.",
-  },
-};
-
-function messageForReason(reason: string | null) {
+function messageForReason(reason: string | null): { title: string; detail: string } | undefined {
   switch (reason) {
     case "unavailable":
-      return messages.unavailable;
+      return {
+        title: "GitHub sign-in is temporarily unavailable",
+        detail: "We couldn't start or finish your sign-in. Your repository access hasn't been changed.",
+      };
     case "expired":
-      return messages.expired;
+      return {
+        title: "Your GitHub sign-in expired",
+        detail: "This sign-in link is no longer valid. Start again to securely reconnect your account.",
+      };
     case "denied":
-      return messages.denied;
+      return {
+        title: "GitHub sign-in could not be completed",
+        detail: "The sign-in was cancelled or GitHub couldn't verify the request. You can safely try again.",
+      };
     default:
       return undefined;
   }
