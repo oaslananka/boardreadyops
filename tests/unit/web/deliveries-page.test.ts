@@ -440,6 +440,18 @@ describe("DeliveriesListPage", () => {
     expect(markup).toContain("Guest links require Team or higher");
     expect(markup).toContain("No guest links yet");
     expect(markup).not.toContain("Create guest link");
+
+    vi.stubEnv("BILLING_MODE", "beta_free");
+    try {
+      const freeBetaMarkup = await render();
+      expect(freeBetaMarkup).toContain("Guest links are unavailable during free beta");
+      expect(freeBetaMarkup).toContain("Review signed Run archives");
+      expect(freeBetaMarkup).toContain('href="/runs"');
+      expect(freeBetaMarkup).not.toContain("Guest links require Team or higher");
+      expect(freeBetaMarkup).not.toContain("Create guest link");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it.each(["team", "business", "pilot"] as const)(
@@ -549,10 +561,10 @@ describe("DeliveriesListPage", () => {
     const markup = await render();
     expect(markup).toContain("Signed Run archives — not deliveries");
     expect(markup).toContain("other-owner/verified-board");
-    expect(markup).toContain('href="/runs/signed-run-123"');
+    expect(markup).toContain('href="/runs/signed-run-123/artifacts"');
     expect(markup).toContain('href="/runs/signed-run-123/design"');
     expect(markup).toContain('href="/reviews?repository=other-owner%2Fverified-board"');
-    expect(markup).toContain("Inspect signed Run evidence");
+    expect(markup).toContain("Inspect BOM and Gerber files");
     expect(markup).toContain("No package revisions yet");
     expect(markup).toContain("No guest links yet");
     expect(markup).not.toContain("Ready for fabrication");
@@ -575,7 +587,7 @@ describe("DeliveriesListPage", () => {
     loadViewerRuns.mockResolvedValueOnce({ state: "access-unavailable" });
     const markup = await render();
     expect(markup).not.toContain("Signed Run archives — not deliveries");
-    expect(markup).not.toContain("Inspect signed Run evidence");
+    expect(markup).not.toContain("Inspect BOM and Gerber files");
     expect(markup).toContain("No package revisions yet");
   });
 
@@ -608,7 +620,7 @@ describe("DeliveriesListPage", () => {
     });
     const markup = await render();
     expect(markup).toContain("Signed Run archives — not deliveries");
-    expect(markup).toContain('href="/runs/signed-run-first-use"');
+    expect(markup).toContain('href="/runs/signed-run-first-use/artifacts"');
     expect(markup).toContain("Prepare a manufacturing delivery");
     expect(markup).not.toContain("Create guest link");
   });

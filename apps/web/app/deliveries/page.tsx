@@ -13,6 +13,7 @@ import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { Alert, EmptyState, Pagination, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
+import { resolveBillingMode } from "../../lib/billing-mode.js";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../lib/delivery-listing.js";
 import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { loadViewerRuns, type RunListingEntry } from "../../lib/run-listing.js";
@@ -371,7 +372,7 @@ function SignedRunArchivesPanel({ runs }: Readonly<{ runs: readonly RunListingEn
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <Button asChild variant="outline" className="min-h-11">
-                <Link href={`/runs/${encodeURIComponent(run.id)}`}>Inspect signed Run evidence</Link>
+                <Link href={`/runs/${encodeURIComponent(run.id)}/artifacts`}>Inspect BOM and Gerber files</Link>
               </Button>
               <Link
                 href={`/runs/${encodeURIComponent(run.id)}/design`}
@@ -417,11 +418,31 @@ function CreatePanel({
   );
 
   if (!hasWorkspaceEntitlement(result.selected.planTier, "canCreateDeliveryLink")) {
+    const freeBeta = resolveBillingMode() === "beta_free";
     return (
       <Panel id="share-package" title="Share a package">
-        <Alert tone="info" title="Guest links require Team or higher">
-          Your workspace can still inspect revisions and existing deliveries, but its current plan does not include
-          creating new guest links.
+        <Alert
+          tone="info"
+          title={freeBeta ? "Guest links are unavailable during free beta" : "Guest links require Team or higher"}
+        >
+          {freeBeta ? (
+            <>
+              New guest links are not offered with the Community plan during free beta, and paid upgrades are
+              unavailable. You can still inspect signed manufacturing evidence and download repository-owned GitHub
+              Actions artifacts while your GitHub access and their retention permit. These are not guest deliveries or
+              fabrication approval.
+              <div className="mt-3">
+                <Button asChild variant="outline">
+                  <Link href="/runs">Review signed Run archives</Link>
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              Your workspace can still inspect revisions and existing deliveries, but its current plan does not include
+              creating new guest links.
+            </>
+          )}
         </Alert>
       </Panel>
     );
