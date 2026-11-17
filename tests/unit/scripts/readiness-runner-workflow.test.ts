@@ -18,20 +18,26 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain('require-kicad: "true"');
     expect(workflow).toContain("project: $" + "{{ vars.BOARDREADYOPS_PROJECT || '' }}");
     expect(workflow).toContain("config: $" + "{{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}");
-    expect(workflow).toContain("uses: oaslananka/boardreadyops@6b41a224869f9a0ae646566663a914a89402fb47 # v1.72.0");
+    expect(workflow).toContain(
+      "uses: oaslananka/boardreadyops@d07f7af1fa9f18796274eff8debcdb1603de63f1 # reviewed main, release pending",
+    );
     expect(workflow).toContain("safe-mode: $" + "{{ inputs.safe_mode }}");
     expect(workflow).not.toContain("runner-ready");
   });
 
-  it("uses the immutable published Action with project BOM report support, not the v1.24.1 producer", async () => {
+  it("uses a reviewed immutable Action including per-project manufacturing scoping and BOM attribution", async () => {
     const workflow = await readFile(workflowPath, "utf8");
     const actionStep = workflow.slice(
       workflow.indexOf("- name: Run BoardReadyOps"),
       workflow.indexOf("- name: Stage readiness reports outside reviewed source"),
     );
-    expect(actionStep).toContain("uses: oaslananka/boardreadyops@6b41a224869f9a0ae646566663a914a89402fb47 # v1.72.0");
+    expect(actionStep).toContain(
+      "uses: oaslananka/boardreadyops@d07f7af1fa9f18796274eff8debcdb1603de63f1 # reviewed main, release pending",
+    );
     expect(actionStep).not.toContain("6d3b721c3f8307a517d360b28f4d50b824d81278");
-    // GitHub's signed callback already forwards report.boms; the old released Action never produced it.
+    expect(actionStep).not.toContain("6b41a224869f9a0ae646566663a914a89402fb47");
+    // The 1.72.0 release produced BOMs but also attributed unrelated fixture Gerbers to the chosen board.
+    // The reviewed main SHA is immutable and includes the per-project output scoping fix.
     expect(workflow).toContain("const rawBoms = reportAvailable && Array.isArray(report.boms) ? report.boms : [];");
     expect(workflow).toContain("payload.metrics.boms_transmitted = boms.length;");
   });
