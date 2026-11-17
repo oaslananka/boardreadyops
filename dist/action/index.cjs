@@ -73848,6 +73848,20 @@ var import_promises4 = __toESM(require("node:fs/promises"), 1);
 var import_node_path6 = __toESM(require("node:path"), 1);
 var import_picomatch = __toESM(require_picomatch2(), 1);
 var ignoredDirectoryNames = /* @__PURE__ */ new Set(["node_modules", ".git", "dist", "coverage"]);
+function assertSafeGlobPatterns(patterns) {
+  for (const pattern of patterns) {
+    for (let index = 0; index < pattern.length - 1; index++) {
+      const token = pattern[index];
+      if (token === "\\") {
+        index++;
+        continue;
+      }
+      if ((token === "+" || token === "*") && pattern[index + 1] === "(") {
+        throw new Error("Unsafe repeated extglob pattern rejected.");
+      }
+    }
+  }
+}
 var SymlinkedGlobInputError = class extends Error {
   constructor() {
     super("Symlinked source input rejected.");
@@ -73889,6 +73903,7 @@ async function collectFiles(root, directory, output3, strictSourceMatcher) {
   }
 }
 async function globFiles(root, patterns, options = {}) {
+  assertSafeGlobPatterns(patterns);
   const absoluteRoot = import_node_path6.default.resolve(root);
   const relativeFiles = [];
   const matches = (0, import_picomatch.default)(patterns, { dot: false });

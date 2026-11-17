@@ -52,6 +52,27 @@ fail-on: never
     expect(findings.every((finding) => finding.details?.vendorProfile === "jlcpcb")).toBe(true);
   });
 
+  it("rejects repository-configured repeated extglobs before manufacturing output matching", async () => {
+    const root = await writeFixture({
+      "unsafe.kicad_pro": "{}",
+      "unsafe.kicad_pcb": "(kicad_pcb)",
+      "unsafe.kicad_sch": "(kicad_sch)",
+      "boardreadyops.yml": `version: 1
+rules:
+  manufacturing.outputs-present:
+    enabled: true
+    required: [gerber]
+    patterns:
+      gerber: ["**/+(*a).gbr"]
+fail-on: never
+`,
+    });
+
+    await expect(
+      runPipeline({ path: root, rules: ["manufacturing.outputs-present"], failOn: "never" }),
+    ).rejects.toThrow("Unsafe repeated extglob pattern rejected");
+  });
+
   it("does not treat unrelated XML files as BOM outputs", async () => {
     const root = await writeFixture({
       "xml-no-bom.kicad_pro": "{}",

@@ -40,6 +40,20 @@ describe("globFiles", () => {
     expect(files.map((file) => path.basename(file))).toEqual(["board.drl", "bottom.gbl", "top.gbr"]);
   });
 
+  it.each(["+(*a)", "**/+(*a).gbr", "**/+(a)/*.gbr", "**/*(*)"])(
+    "rejects repeated extglob input %s before matching repository files",
+    async (pattern) => {
+      const root = await fixture(["fab/top.gbr", "fab/aaa.gbr"]);
+      await expect(globFiles(root, [pattern])).rejects.toThrow("Unsafe repeated extglob pattern rejected");
+    },
+  );
+
+  it("retains supported alternative extglob and brace patterns", async () => {
+    const root = await fixture(["fab/top.gbr", "fab/bottom.gbl", "fab/board.drl"]);
+    const files = await globFiles(root, ["**/*.@(gbr|gbl)", "**/board.{drl,xln}"]);
+    expect(files.map((file) => path.basename(file))).toEqual(["board.drl", "bottom.gbl", "top.gbr"]);
+  });
+
   it("excludes hidden, dependency, build, and coverage trees", async () => {
     const root = await fixture([
       "visible/report.json",

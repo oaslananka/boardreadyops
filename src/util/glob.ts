@@ -6,6 +6,27 @@ import { toPosixPath } from "./path.js";
 
 const ignoredDirectoryNames = new Set(["node_modules", ".git", "dist", "coverage"]);
 
+/**
+ * Reject repeated extglobs before picomatch compiles repository-controlled patterns.
+ * Picomatch 4.0.7 can exhibit catastrophic backtracking for single-branch
+ * repetitions (CVE-2026-112366). This file-enumeration helper does not need
+ * repeating extglobs; braces, ordinary wildcards and @(a|b) remain supported.
+ */
+function assertSafeGlobPatterns(patterns: readonly string[]): void {
+  for (const pattern of patterns) {
+    for (let index = 0; index < pattern.length - 1; index++) {
+      const token = pattern[index];
+      if (token === "\\") {
+        index++;
+        continue;
+      }
+      if ((token === "+" || token === "*") && pattern[index + 1] === "(") {
+        throw new Error("Unsafe repeated extglob pattern rejected.");
+      }
+    }
+  }
+}
+
 export class SymlinkedGlobInputError extends Error {
   constructor() {
     super("Symlinked source input rejected.");
@@ -68,6 +89,7 @@ export async function globFiles(
   patterns: string[],
   options: { rejectMatchingSymlinks?: boolean } = {},
 ): Promise<string[]> {
+  assertSafeGlobPatterns(patterns);
   const absoluteRoot = path.resolve(root);
   const relativeFiles: string[] = [];
   const matches = picomatch(patterns, { dot: false });
