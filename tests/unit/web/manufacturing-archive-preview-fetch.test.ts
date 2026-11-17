@@ -10,6 +10,31 @@ const direct = `${source}/api/v1/runs/${runId}/artifacts/11111111-1111-4111-8111
 const bytes = new Uint8Array([31, 139, 8, 0, 1, 2, 3, 4]);
 
 describe("first-party manufacturing archive preview download", () => {
+  it("previews recorded same-origin root-relative download URLs without file re-selection", async () => {
+    const relative = direct.slice(source.length);
+    expect(isRecordedArchivePreviewUrl(relative, runId)).toBe(true);
+    const request = vi.fn(async () => new Response(bytes));
+    const archive = await loadRecordedArchiveForPreview(relative, runId, bytes.byteLength, source, request);
+    expect(request).toHaveBeenCalledWith(relative, { credentials: "same-origin", cache: "no-store" });
+    expect(new Uint8Array(await archive.arrayBuffer())).toEqual(bytes);
+  });
+
+  it("rejects protocol-relative or deceptive non-rooted download URLs before fetching", async () => {
+    const relative = direct.slice(source.length);
+    const request = vi.fn();
+    for (const candidate of [
+      `//other.example${relative}`,
+      `/${String.fromCharCode(92)}other.example${relative}`,
+      relative.slice(1),
+    ]) {
+      expect(isRecordedArchivePreviewUrl(candidate, runId)).toBe(false);
+      await expect(loadRecordedArchiveForPreview(candidate, runId, bytes.byteLength, source, request)).rejects.toThrow(
+        "not eligible",
+      );
+    }
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("recognizes only recorded download paths for the exact run", () => {
     expect(isRecordedArchivePreviewUrl(direct, runId)).toBe(true);
     expect(isRecordedArchivePreviewUrl("https://github.com/octo/board/actions/runs/123/artifacts/5", runId)).toBe(

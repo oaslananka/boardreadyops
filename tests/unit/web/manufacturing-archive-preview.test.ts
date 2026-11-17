@@ -290,6 +290,13 @@ describe("manufacturing package review affordance", () => {
     expect(page).toContain("Inspect BOM and Gerber inventory");
     expect(page).toContain("Use a downloaded copy instead");
     expect(page).toContain('type="file"');
+    const relativePage = renderToStaticMarkup(
+      createElement(ManufacturingArchivePreview, {
+        ...props,
+        archive: { ...props.archive, downloadUrl: directUrl.slice("https://boardreadyops.example".length) },
+      }),
+    );
+    expect(relativePage).toContain("Inspect BOM and Gerber inventory");
     const external = renderToStaticMarkup(
       createElement(ManufacturingArchivePreview, {
         ...props,
