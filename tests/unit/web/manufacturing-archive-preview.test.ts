@@ -264,13 +264,123 @@ describe("manufacturing package review affordance", () => {
         runId: "run-1",
       }),
     );
-    expect(html).toContain("Preview your downloaded BOM and fabrication files");
+    expect(html).toContain("Preview verified BOM and fabrication files");
     expect(html).toContain("file");
     expect(html).toContain("never uploaded to BoardReadyOps");
     expect(html).toContain("Open the GitHub artifact ZIP");
     expect(html).toContain("Select the downloaded ZIP directly");
     expect(html).toContain(".zip,.gz,.tgz");
     expect(html).toContain("not a fabrication approval"); // initial summary must never assert approval
+  });
+
+  it("offers direct preview only for a recorded archive download route, never an arbitrary GitHub URL", () => {
+    const directUrl =
+      "https://boardreadyops.example/api/v1/runs/run-1/artifacts/11111111-1111-4111-8111-111111111111/download?exp=123&sig=test";
+    const props = {
+      sourceSha,
+      runId: "run-1",
+      archive: {
+        name: "signed-manufacturing-export.tar.gz",
+        sha256: "e".repeat(64),
+        bytes: 2048,
+        downloadUrl: directUrl,
+      },
+    };
+    const page = renderToStaticMarkup(createElement(ManufacturingArchivePreview, props));
+    expect(page).toContain("Inspect BOM and Gerber inventory");
+    expect(page).toContain("Use a downloaded copy instead");
+    expect(page).toContain('type="file"');
+    const external = renderToStaticMarkup(
+      createElement(ManufacturingArchivePreview, {
+        ...props,
+        archive: { ...props.archive, downloadUrl: "https://github.com/octo/board/actions/runs/12/artifacts/45" },
+      }),
+    );
+    expect(external).not.toContain("Inspect BOM and Gerber inventory");
+    expect(external).toContain("Select the downloaded ZIP directly");
+  });
+
+  it("keeps the signed download lazy until the user selects a one-click browser preview", async () => {
+    const { file, expected } = archiveFixture();
+    const url =
+      "https://boardreadyops.example/api/v1/runs/run-1/artifacts/11111111-1111-4111-8111-111111111111/download?exp=123&sig=test";
+    const win = new Window({ url: "https://boardreadyops.example" });
+    const keys = [
+      "window",
+      "self",
+      "document",
+      "Node",
+      "Element",
+      "HTMLElement",
+      "IS_REACT_ACT_ENVIRONMENT",
+      "fetch",
+    ] as const;
+    const saved = Object.fromEntries(keys.map((key) => [key, Reflect.get(globalThis, key)]));
+    const request = vi.fn(
+      async () =>
+        new Response(await file.arrayBuffer(), {
+          status: 200,
+          headers: { "content-type": "application/gzip", "content-length": String(expected.bytes) },
+        }),
+    );
+    Object.assign(globalThis, {
+      window: win,
+      self: win,
+      document: win.document,
+      Node: win.Node,
+      Element: win.Element,
+      HTMLElement: win.HTMLElement,
+      IS_REACT_ACT_ENVIRONMENT: true,
+      fetch: request,
+    });
+    const host = win.document.createElement("div");
+    win.document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => {
+        root.render(
+          createElement(ManufacturingArchivePreview, {
+            archive: {
+              name: "signed-manufacturing-export.tar.gz",
+              sha256: expected.sha256,
+              bytes: expected.bytes,
+              downloadUrl: url,
+            },
+            sourceSha,
+            runId: "run-1",
+          }),
+        );
+      });
+      expect(request).not.toHaveBeenCalled();
+      const button = [...host.querySelectorAll("button")].find((item) =>
+        item.textContent?.includes("Inspect BOM and Gerber inventory"),
+      );
+      expect(button).toBeDefined();
+      await act(async () => {
+        button?.click();
+      });
+      await vi.waitFor(
+        async () => {
+          await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          });
+          expect(host.textContent).toContain("Recorded SHA-256 and source commit match");
+        },
+        { timeout: 10_000, interval: 20 },
+      );
+      expect(request).toHaveBeenCalledOnce();
+      expect(host.textContent).toContain("Bill of materials");
+      expect(host.textContent).toContain("R1,R2");
+      expect(host.textContent).toContain("This is not a fabrication approval");
+    } finally {
+      await act(async () => root.unmount());
+      for (const key of keys) {
+        const prior = saved[key];
+        if (prior === undefined) Reflect.deleteProperty(globalThis, key);
+        else Reflect.set(globalThis, key, prior);
+      }
+      await win.happyDOM.abort();
+    }
   });
 
   it("opens the selected file in the browser without a network request or server upload", async () => {

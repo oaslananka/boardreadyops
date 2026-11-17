@@ -826,7 +826,7 @@ describe("run overview direct manufacturing archive handoff", () => {
     const matching = renderToStaticMarkup(
       createElement(ArtifactsView, { run: withManufacturingArchive(), searchParameters: {} }),
     );
-    expect(matching).toContain("Preview your downloaded BOM and fabrication files");
+    expect(matching).toContain("Preview verified BOM and fabrication files");
     expect(matching).toContain("The browser checks");
     expect(matching).toContain("Select the downloaded ZIP directly");
     expect(matching).toContain("Open the GitHub artifact ZIP");
