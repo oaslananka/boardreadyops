@@ -9,6 +9,7 @@ import type { FabricationSnapshot } from "../core/diff/fabrication.js";
 import { parseSchematic } from "../kicad/schematic.js";
 import { globFiles } from "../util/glob.js";
 import { toPosixPath } from "../util/path.js";
+import { projectScopedOutputFiles } from "./output-scope.js";
 
 const manufacturingPatterns: Record<string, string[]> = {
   gerber: ["**/*.gbr", "**/*.gbrjob"],
@@ -29,7 +30,7 @@ export async function captureFabricationSnapshot(
     [
       loadedBoms.paths.length > 0 ? outputFromFiles(root, "bom", loadedBoms.paths) : outputFromRows("bom", snapshotBom),
       ...Object.entries(manufacturingPatterns).map(async ([kind, patterns]) =>
-        outputFromFiles(root, kind, await projectScopedFiles(root, projects, patterns)),
+        outputFromFiles(root, kind, await projectScopedOutputFiles(root, projects, patterns)),
       ),
     ].filter((entry): entry is Promise<FabricationSnapshot["outputs"][number]> => Boolean(entry)),
   );
@@ -91,11 +92,6 @@ function snapshotBomRow(root: string, row: BomRow): FabricationSnapshot["bom"][n
     quantity: row.quantity,
     compliance: row.compliance,
   };
-}
-
-async function projectScopedFiles(root: string, projects: ProjectContext[], patterns: string[]): Promise<string[]> {
-  const files = await Promise.all(projects.map((project) => globFiles(path.resolve(root, project.root), patterns)));
-  return [...new Set(files.flat())].sort((a, b) => a.localeCompare(b));
 }
 
 function sourcePath(root: string, source: string): string {

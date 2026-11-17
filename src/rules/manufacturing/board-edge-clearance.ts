@@ -7,9 +7,9 @@ import {
   segmentToSegmentDistanceMm,
 } from "../../multicad/gerber-geometry.js";
 import { type GerberParseResult, parseGerber } from "../../multicad/gerber-parser.js";
-import { globFiles } from "../../util/glob.js";
 import { findVendorProfile, vendorProfileAssurance } from "../../vendor/profiles.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
+import { projectScopedOutputFiles } from "../output-scope.js";
 import { DEFAULT_GERBER_PATTERNS, loadGerberStackup } from "./shared.js";
 
 type GerberPrimitive = GerberGeometry["primitives"][number];
@@ -68,7 +68,7 @@ export const boardEdgeClearanceRule = rule(
   async (context) => {
     if (!shouldRun(context, "manufacturing.board-edge-clearance")) return [];
 
-    const files = await globFiles(context.root, DEFAULT_GERBER_PATTERNS);
+    const files = await projectScopedOutputFiles(context.root, context.projects, DEFAULT_GERBER_PATTERNS);
     if (files.length === 0) return [];
 
     const parsedFiles = await parseLayers(context.root, files);

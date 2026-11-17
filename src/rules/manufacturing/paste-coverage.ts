@@ -2,8 +2,8 @@ import { type Severity, severityRankValue } from "../../core/findings.js";
 import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import type { PcbFootprint } from "../../kicad/pcb.js";
 import type { LayerIdentitySummary } from "../../multicad/gerber-normalizer.js";
-import { globFiles } from "../../util/glob.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
+import { projectScopedOutputFiles } from "../output-scope.js";
 import {
   assemblyFootprints,
   DEFAULT_GERBER_PATTERNS,
@@ -72,7 +72,7 @@ export const pasteCoverageRule = rule(
       return [];
     }
 
-    const files = await globFiles(context.root, DEFAULT_GERBER_PATTERNS);
+    const files = await projectScopedOutputFiles(context.root, context.projects, DEFAULT_GERBER_PATTERNS);
     if (files.length === 0) {
       return [];
     }

@@ -2,8 +2,8 @@ import path from "node:path";
 import { verifyExportProvenance } from "../../core/provenance.js";
 import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { readTextFile } from "../../util/fs.js";
-import { globFiles } from "../../util/glob.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
+import { projectScopedOutputFiles } from "../output-scope.js";
 
 const gerberPatterns = [
   "**/*.gbr",
@@ -47,7 +47,7 @@ export const artifactProvenanceRule = rule(
       return [];
     }
 
-    const artifactFiles = await globFiles(context.root, gerberPatterns);
+    const artifactFiles = await projectScopedOutputFiles(context.root, context.projects, gerberPatterns);
     if (artifactFiles.length === 0) {
       return [];
     }
@@ -59,12 +59,16 @@ export const artifactProvenanceRule = rule(
     if (configuredPath) {
       manifestRelPath = configuredPath;
     } else {
-      for (const candidate of MANIFEST_CANDIDATES) {
-        const text = await readTextFile(path.resolve(context.root, candidate)).catch(() => undefined);
-        if (text) {
-          manifestRelPath = candidate;
-          break;
+      for (const project of context.projects) {
+        for (const candidate of MANIFEST_CANDIDATES) {
+          const relative = path.posix.join(project.root.replaceAll("\\", "/"), candidate);
+          const text = await readTextFile(path.resolve(context.root, relative)).catch(() => undefined);
+          if (text) {
+            manifestRelPath = relative;
+            break;
+          }
         }
+        if (manifestRelPath) break;
       }
     }
 

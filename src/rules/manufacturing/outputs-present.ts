@@ -8,6 +8,7 @@ import { normalizeRelative } from "../../util/path.js";
 import { vendorOutputPatterns } from "../../vendor/outputs.js";
 import { resolveVendorProfile } from "../../vendor/profiles.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
+import { projectScopedOutputFiles } from "../output-scope.js";
 
 interface OutputInspection {
   required: string;
@@ -85,23 +86,28 @@ async function inspectRequiredOutputs(context: RuleContext): Promise<OutputInspe
       )
     ).filter((value): value is number => typeof value === "number"),
   );
-  const inspections = [];
-  for (const requiredOutput of required) {
-    const outputPatterns = patternsFor(config.patterns, requiredOutput);
-    const found = await globFiles(context.root, outputPatterns);
-    const fresh =
-      newestBoard === 0 ||
-      (await Promise.all(found.map(fileMtimeMs))).some((mtime) => typeof mtime === "number" && mtime >= newestBoard);
-    inspections.push({
-      required: requiredOutput,
-      patterns: outputPatterns,
-      found,
-      fresh,
-      vendorProfile: vendor?.profile.id,
-      vendorAssumptions: vendor?.assumptions ?? [],
-    });
-  }
-  return inspections;
+  return Promise.all(
+    required.map(async (requiredOutput): Promise<OutputInspection> => {
+      const outputPatterns = patternsFor(config.patterns, requiredOutput);
+      // Explicit configured patterns are repository-relative so teams may use shared output
+      // directories. Defaults must not attribute another project's fabrication files.
+      const explicitlyConfigured = isPatternMap(config.patterns) && Boolean(config.patterns[requiredOutput]?.length);
+      const found = explicitlyConfigured
+        ? await globFiles(context.root, outputPatterns)
+        : await projectScopedOutputFiles(context.root, context.projects, outputPatterns);
+      const fresh =
+        newestBoard === 0 ||
+        (await Promise.all(found.map(fileMtimeMs))).some((mtime) => typeof mtime === "number" && mtime >= newestBoard);
+      return {
+        required: requiredOutput,
+        patterns: outputPatterns,
+        found,
+        fresh,
+        vendorProfile: vendor?.profile.id,
+        vendorAssumptions: vendor?.assumptions ?? [],
+      };
+    }),
+  );
 }
 
 async function explainOutputsPresent(context: RuleContext): Promise<RuleExplanation> {
