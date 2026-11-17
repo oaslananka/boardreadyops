@@ -158,6 +158,81 @@ describe("run dashboard environment loader", () => {
     expect(mocks.close).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    {
+      label: "shows the signed 100/100 source score when the legacy run column is null",
+      row: {
+        readiness_score: null,
+        reported_readiness_present: true,
+        reported_readiness_score: "100",
+        reported_readiness_status: "ready",
+      },
+      expected: 100,
+    },
+    {
+      label: "keeps an absent signed assessment unverified",
+      row: { readiness_score: null, reported_readiness_present: false, reported_readiness_score: null },
+      expected: undefined,
+    },
+    {
+      label: "keeps an invalid signed score unverified, even if a legacy score exists",
+      row: {
+        readiness_score: 95,
+        reported_readiness_present: true,
+        reported_readiness_score: "101",
+        reported_readiness_status: "ready",
+      },
+      expected: undefined,
+    },
+    {
+      label: "rejects an unknown signed status even for an in-range score",
+      row: {
+        readiness_score: null,
+        reported_readiness_present: true,
+        reported_readiness_score: "80",
+        reported_readiness_status: "fabrication-approved",
+      },
+      expected: undefined,
+    },
+    {
+      label: "preserves an older recorded score when no signed readiness was reported",
+      row: {
+        readiness_score: 97,
+        reported_readiness_present: false,
+        reported_readiness_score: null,
+        reported_readiness_status: null,
+      },
+      expected: 97,
+    },
+  ])("$label", async ({ row, expected }) => {
+    mocks.configuredArtifactDownloadSigningKey.mockReturnValue(undefined);
+    for (const response of [
+      { rows: [runRow(row)] },
+      { rows: [{ total: 0 }] },
+      { rows: [{ total: 0 }] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+    ]) {
+      mocks.query.mockResolvedValueOnce(response);
+    }
+
+    const result = await loadRunDashboard(
+      "run-load",
+      { DATABASE_URL: "postgresql://boardreadyops.test/database" },
+      {},
+      dependencies,
+    );
+    expect(result.state).toBe("found");
+    if (result.state !== "found") throw new Error("Run was not found");
+    expect(result.run.readinessScore).toBe(expected);
+    // This is the signed terminal payload, not an arbitrary metric or guessed score.
+    expect(String(mocks.query.mock.calls[0]?.[0])).toContain("release_run_results.payload #>>");
+    expect(mocks.close).toHaveBeenCalledOnce();
+  });
+
   it("surfaces the review linked to the loaded run", async () => {
     mocks.configuredArtifactDownloadSigningKey.mockReturnValue(undefined);
     for (const result of [
