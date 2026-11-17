@@ -1,3 +1,5 @@
+import { unwrapGitHubArtifactZip } from "./manufacturing-archive-zip.js";
+
 /** Browser-only, bounded inspection of an already recorded manufacturing archive.
  * This checks integrity against server-provided evidence; it does NOT independently
  * authenticate GitHub/Sigstore signatures or approve fabrication.
@@ -243,13 +245,22 @@ export async function inspectDownloadedManufacturingArchive(
   if (!hexDigest.test(expected.sha256) || !commitId.test(expected.sourceSha)) {
     return invalid("The recorded artifact is missing a valid digest or source revision.");
   }
-  if (!Number.isSafeInteger(expected.bytes) || file.size !== expected.bytes) {
-    return invalid("The selected file size does not match the recorded archive.");
+  if (!Number.isSafeInteger(expected.bytes) || expected.bytes < 1 || expected.bytes > maxArchiveBytes) {
+    return invalid("The recorded manufacturing archive size is invalid.");
   }
-  if (file.size === 0 || file.size > maxArchiveBytes) {
+  if (file.size === 0 || file.size > maxArchiveBytes + 2 * 1024 * 1024) {
     return invalid("Archive is outside the supported browser preview size; download and inspect it locally.");
   }
-  const compressed = await file.arrayBuffer();
+  const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const isZip = signature.length === 4 && signature[0] === 0x50 && signature[1] === 0x4b;
+  if (!isZip && file.size !== expected.bytes) {
+    return invalid("The selected file size does not match the recorded archive.");
+  }
+  // GitHub Actions downloads one ZIP. The verified .tar.gz can also be inspected directly.
+  const compressed = isZip ? await unwrapGitHubArtifactZip(file, expected.bytes) : await file.arrayBuffer();
+  if (compressed.byteLength !== expected.bytes) {
+    return invalid("The selected file size does not match the recorded archive.");
+  }
   if ((await digest(compressed)) !== expected.sha256) {
     return invalid("SHA-256 mismatch. Select the .tar.gz from this Run's GitHub artifact ZIP.");
   }

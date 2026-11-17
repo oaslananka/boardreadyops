@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { gzipSync } from "node:zlib";
+import { deflateRawSync, gzipSync } from "node:zlib";
 import { Window } from "happy-dom";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -88,6 +88,93 @@ function archiveFixture(
     expected: { bytes: compressed.length, sha256: sha256(compressed), sourceSha },
   };
 }
+
+/** A GitHub Actions-style ZIP wrapper, including the streaming data descriptor. */
+async function githubArtifactZip(
+  entries: readonly { name: string; data: Uint8Array; method?: 0 | 8 }[],
+): Promise<Blob> {
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name, "utf8");
+    const raw = Buffer.from(entry.data);
+    const method = entry.method ?? 8;
+    const compressed = method === 8 ? deflateRawSync(raw) : raw;
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0);
+    header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(8, 6); // data descriptor
+    header.writeUInt16LE(method, 8);
+    header.writeUInt16LE(name.length, 26);
+    const descriptor = Buffer.alloc(16);
+    descriptor.writeUInt32LE(0x08074b50, 0);
+    descriptor.writeUInt32LE(compressed.length, 8);
+    descriptor.writeUInt32LE(raw.length, 12);
+    locals.push(header, name, compressed, descriptor);
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 8);
+    central.writeUInt16LE(method, 10);
+    central.writeUInt32LE(compressed.length, 20);
+    central.writeUInt32LE(raw.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(offset, 42);
+    centrals.push(central, name);
+    offset += header.length + name.length + compressed.length + descriptor.length;
+  }
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return new Blob([new Uint8Array(Buffer.concat([...locals, directory, end]))]);
+}
+
+describe("GitHub Actions ZIP manufacturing preview", () => {
+  it.each([0, 8] as const)(
+    "accepts the downloaded GitHub ZIP with compression method %i and checks inner source and digests",
+    async (method) => {
+      const { file, expected } = archiveFixture();
+      const zip = await githubArtifactZip([
+        {
+          name: "boardreadyops-manufacturing-export.tar.gz",
+          data: new Uint8Array(await file.arrayBuffer()),
+          method,
+        },
+      ]);
+      const result = await inspectDownloadedManufacturingArchive(zip, expected);
+      expect(result).toMatchObject({ sourceSha, sha256: expected.sha256, totalBomRows: 2, outputCount: 5 });
+    },
+  );
+
+  it("rejects extra files and unsafe paths in the downloaded ZIP", async () => {
+    const { file, expected } = archiveFixture();
+    const data = new Uint8Array(await file.arrayBuffer());
+    const extra = await githubArtifactZip([
+      { name: "boardreadyops-manufacturing-export.tar.gz", data },
+      { name: "unrelated.txt", data: new Uint8Array([1]) },
+    ]);
+    await expect(inspectDownloadedManufacturingArchive(extra, expected)).rejects.toThrow(
+      /ZIP.*(one|single|unexpected)/i,
+    );
+    const traversal = await githubArtifactZip([{ name: "../boardreadyops-manufacturing-export.tar.gz", data }]);
+    await expect(inspectDownloadedManufacturingArchive(traversal, expected)).rejects.toThrow(/ZIP.*(path|name)/i);
+  });
+
+  it("never trusts an inner gzip that differs from the recorded run digest", async () => {
+    const { file, expected } = archiveFixture();
+    const corrupt = new Uint8Array(await file.arrayBuffer());
+    corrupt[corrupt.length - 3] ^= 0x01;
+    const zip = await githubArtifactZip([{ name: "boardreadyops-manufacturing-export.tar.gz", data: corrupt }]);
+    await expect(inspectDownloadedManufacturingArchive(zip, expected)).rejects.toThrow("SHA-256 mismatch");
+  });
+});
 
 describe("downloaded manufacturing preview: integrity and source-bound BOM", () => {
   it("checks the recorded archive and every manifest-listed Gerber, drill, BOM and placement file", async () => {
@@ -181,6 +268,8 @@ describe("manufacturing package review affordance", () => {
     expect(html).toContain("file");
     expect(html).toContain("never uploaded to BoardReadyOps");
     expect(html).toContain("Open the GitHub artifact ZIP");
+    expect(html).toContain("Select the downloaded ZIP directly");
+    expect(html).toContain(".zip,.gz,.tgz");
     expect(html).toContain("not a fabrication approval"); // initial summary must never assert approval
   });
 
