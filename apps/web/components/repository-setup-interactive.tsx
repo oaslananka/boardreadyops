@@ -409,6 +409,7 @@ export function RepositorySetupInteractive({
   const displayedRepository = selectedRepository
     ? { ...selectedRepository, ...(setupOverrides[repositoryId] ?? {}) }
     : undefined;
+  const setupNeedsRepair = needsReviewableSetupRepair(displayedRepository);
 
   return (
     <>
@@ -469,14 +470,18 @@ export function RepositorySetupInteractive({
             title={
               displayedRepository && deriveRepositorySetupState(displayedRepository).id === "ready"
                 ? "Setup is already verified"
-                : "Open a setup pull request"
+                : setupNeedsRepair
+                  ? "Repair existing setup"
+                  : "Open a setup pull request"
             }
             description={
               displayedRepository && deriveRepositorySetupState(displayedRepository).id === "ready"
                 ? "Continue to your runs, or explicitly choose to update the verified repository configuration."
-                : "Recommended starting policy: " +
-                  activePreset.name +
-                  ". You can review or change it below before opening the PR."
+                : setupNeedsRepair
+                  ? "The last setup probe failed or expired. Review a setup repair pull request before retrying."
+                  : "Recommended starting policy: " +
+                    activePreset.name +
+                    ". You can review or change it below before opening the PR."
             }
           >
             <OneClickSetup
@@ -1160,6 +1165,19 @@ type OneClickSetupProps = {
  * once and we do the rest" promise had no visible entry point at all. Each state now says what
  * it is and what the next move is.
  */
+/** A failed persisted setup may need a reviewed workflow update, not a first-time setup. */
+function needsReviewableSetupRepair(repository: SetupTargetRepository | undefined): boolean {
+  const revision = repository?.setupRevision;
+  return (
+    repository !== undefined &&
+    typeof revision === "number" &&
+    Number.isSafeInteger(revision) &&
+    revision > 0 &&
+    deriveRepositorySetupState(repository).id !== "ready" &&
+    (repository.setupProbeStatus === "expired" || repository.setupProbeStatus === "failed")
+  );
+}
+
 function OneClickSetup({
   signedIn,
   repositories,
@@ -1173,6 +1191,7 @@ function OneClickSetup({
   result,
 }: Readonly<OneClickSetupProps>) {
   const setupVerified = repository !== undefined && deriveRepositorySetupState(repository).id === "ready";
+  const setupNeedsRepair = needsReviewableSetupRepair(repository);
 
   if (!signedIn) {
     return (
@@ -1206,6 +1225,13 @@ function OneClickSetup({
           <p className="mt-1.5 text-meta text-muted-foreground">
             {setupVerified ? (
               "No new setup pull request is needed. The repository workflow and configuration are already verified."
+            ) : setupNeedsRepair ? (
+              <>
+                Your previous probe did not complete. A repair pull request proposes updated{" "}
+                <code>boardreadyops.yml</code> and <code>.github/workflows/{workflowPath}</code>. Existing files may be
+                replaced in that proposal; review its changes before merging. Your default branch stays untouched until
+                you merge.
+              </>
             ) : (
               <>
                 Creates branch <code>boardreadyops/setup</code> with <code>boardreadyops.yml</code> and{" "}
@@ -1226,10 +1252,14 @@ function OneClickSetup({
           <button
             type="button"
             disabled={isCreating || blockedReason !== undefined || !repositoryId}
-            onClick={onCreate}
+            onClick={setupNeedsRepair ? onUpdate : onCreate}
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
           >
-            {isCreating ? "Opening pull request…" : "Open setup pull request"}
+            {isCreating
+              ? "Opening pull request…"
+              : setupNeedsRepair
+                ? "Review setup repair PR"
+                : "Open setup pull request"}
           </button>
         )}
       </div>
