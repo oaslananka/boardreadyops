@@ -638,6 +638,79 @@ describe("repository setup readiness controls", () => {
     expect(link?.getAttribute("href")).toBe("https://github.test/octo/board-one/actions/runs/987");
   });
 
+  it.each(["expired", "failed"])(
+    "offers a reviewed setup repair when a previously configured repository probe is %s",
+    async (setupProbeStatus) => {
+      const fetchMock = vi.fn(async () =>
+        jsonResponse({
+          ok: true,
+          outcome: "created",
+          pullRequestNumber: 43,
+          pullRequestUrl: "https://github.test/octo/board-one/pull/43",
+          setupRevision: 2,
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      await act(async () => {
+        root.render(
+          createElement(RepositorySetupInteractive, {
+            ...baseProps,
+            signedIn: true,
+            repositories: [{ ...readyForProbe, setupProbeStatus }],
+          }),
+        );
+      });
+
+      expect(container.textContent).toContain("Repair existing setup");
+      expect(container.textContent).toContain("review its changes before merging");
+      expect(() => button(container, "Open setup pull request")).toThrow("button not found");
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      await act(async () => {
+        button(container, "Review setup repair PR").click();
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+        action: "setup",
+        updateExistingSetup: true,
+      });
+      expect(container.textContent).toContain("Setup pull request #43");
+    },
+  );
+
+  it("does not offer to overwrite an existing workflow without a persisted setup revision", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: false, error: "Setup already exists" }, false));
+    vi.stubGlobal("fetch", fetchMock);
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...readyForProbe, setupRevision: 0, setupProbeStatus: "expired" }],
+        }),
+      );
+    });
+    expect(() => button(container, "Review setup repair PR")).toThrow("button not found");
+    await act(async () => {
+      button(container, "Open setup pull request").click();
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).not.toHaveProperty("updateExistingSetup");
+  });
+
+  it("does not replace in-progress setup with a repair PR", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...readyForProbe, setupProbeStatus: "dispatched" }],
+        }),
+      );
+    });
+    expect(() => button(container, "Review setup repair PR")).toThrow("button not found");
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+  });
+
   it("shows an expired probe's exact GitHub run and the next recovery step", async () => {
     const repository = {
       ...readyForProbe,
