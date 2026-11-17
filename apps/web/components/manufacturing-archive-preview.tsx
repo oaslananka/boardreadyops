@@ -3,10 +3,12 @@
 import { ArrowUpRight, CheckCircle2, FileArchive, FileSpreadsheet, Layers3, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
+import { isRecordedArchivePreviewUrl, loadRecordedArchiveForPreview } from "./manufacturing-archive-preview-fetch.js";
 import {
   inspectDownloadedManufacturingArchive,
   type ManufacturingArchiveContents,
 } from "./manufacturing-archive-preview-parser.js";
+import { Button } from "./ui/button.js";
 
 type ArchiveEvidence = Readonly<{
   sha256: string;
@@ -33,23 +35,32 @@ export function ManufacturingArchivePreview({
   const id = useId();
   const [state, setState] = useState<PreviewState>({ status: "idle" });
 
-  const inspectFile = (file: File | undefined) => {
-    if (!file) return;
+  const canPreviewDirect = isRecordedArchivePreviewUrl(archive.downloadUrl, runId);
+  const inspectBlob = (loadBlob: () => Promise<Blob>) => {
     setState({ status: "loading" });
-    void inspectDownloadedManufacturingArchive(file, {
-      sha256: archive.sha256,
-      bytes: archive.bytes,
-      sourceSha,
-    })
-      .then((contents) => {
-        setState({ status: "ready", contents });
-      })
-      .catch((error: unknown) => {
+    void loadBlob()
+      .then((blob) =>
+        inspectDownloadedManufacturingArchive(blob, {
+          sha256: archive.sha256,
+          bytes: archive.bytes,
+          sourceSha,
+        }),
+      )
+      .then((contents) => setState({ status: "ready", contents }))
+      .catch((error: unknown) =>
         setState({
           status: "error",
           error: error instanceof Error ? error.message : "This archive could not be opened for review.",
-        });
-      });
+        }),
+      );
+  };
+  const inspectFile = (file: File | undefined) => {
+    if (file) inspectBlob(() => Promise.resolve(file));
+  };
+  const inspectDirect = () => {
+    const url = archive.downloadUrl;
+    if (!url) return;
+    inspectBlob(() => loadRecordedArchiveForPreview(url, runId, archive.bytes, window.location.origin));
   };
 
   return (
@@ -66,7 +77,7 @@ export function ManufacturingArchivePreview({
             Source-bound manufacturing package
           </p>
           <h2 id={`${id}-title`} className="mt-1 font-display text-xl font-semibold tracking-tight text-foreground">
-            Preview your downloaded BOM and fabrication files
+            Preview verified BOM and fabrication files
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
             Inspect the real file inventory and BOM before handing anything to a manufacturer. The browser checks the
@@ -77,51 +88,81 @@ export function ManufacturingArchivePreview({
       </header>
 
       <div className="space-y-4 px-5 py-5 sm:px-6">
-        <ol className="grid gap-3 text-sm sm:grid-cols-2">
-          <li className="rounded-xl border border-border bg-background/60 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              1 · Download the archive
+        {canPreviewDirect ? (
+          <div className="rounded-xl border border-primary/25 bg-primary/5 p-4">
+            <p className="text-sm font-semibold text-foreground">Inspect this Run without downloading a file first</p>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              Only when you choose to inspect, your browser reads the authorized signed archive and verifies its
+              checksum, source commit and individual output files. This shows BOM rows and a Gerber/drill file list, not
+              plotted Gerber images. No file upload or fabrication approval occurs.
             </p>
-            {archive.downloadUrl ? (
-              <a
-                href={archive.downloadUrl}
-                className="mt-2 inline-flex min-h-11 items-center gap-2 font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                Open the GitHub artifact ZIP <ArrowUpRight className="size-4" aria-hidden="true" />
-              </a>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">
-                The recorded download is unavailable or expired. An already downloaded copy can still be checked.
-              </p>
-            )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              Select the downloaded ZIP directly in step 2. No extraction is needed, and an existing{" "}
-              <code>.tar.gz</code> file also works.
-            </p>
-          </li>
-          <li className="rounded-xl border border-border bg-background/60 p-4">
-            <label
-              htmlFor={`${id}-file`}
-              className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              2 · Inspect the downloaded ZIP or .tar.gz locally
-            </label>
-            <input
-              id={`${id}-file`}
-              type="file"
-              accept=".zip,.gz,.tgz,application/zip,application/gzip"
-              aria-describedby={`${id}-description`}
-              className="mt-2 block min-h-11 w-full min-w-0 cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-semibold file:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              onChange={(event) => {
-                inspectFile(event.currentTarget.files?.[0]);
-                event.currentTarget.value = "";
-              }}
-            />
-            <p id={`${id}-description`} className="mt-2 text-xs text-muted-foreground">
-              Checks the inner .tar.gz SHA-256 against this Run. No upload or fabrication request.
-            </p>
-          </li>
-        </ol>
+            <div className="mt-3">
+              <Button type="button" disabled={state.status === "loading"} onClick={inspectDirect}>
+                <FileArchive className="size-4" aria-hidden="true" />
+                Inspect BOM and Gerber inventory
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        <details className="rounded-xl border border-border" open={!canPreviewDirect}>
+          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold text-foreground">
+            Use a downloaded copy instead
+          </summary>
+          <div className="border-t border-border p-3">
+            <ol className="grid gap-3 text-sm sm:grid-cols-2">
+              <li className="rounded-xl border border-border bg-background/60 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  1 · Download the archive
+                </p>
+                {archive.downloadUrl ? (
+                  <a
+                    href={archive.downloadUrl}
+                    className="mt-2 inline-flex min-h-11 items-center gap-2 font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    {canPreviewDirect ? "Download signed .tar.gz" : "Open the GitHub artifact ZIP"}{" "}
+                    <ArrowUpRight className="size-4" aria-hidden="true" />
+                  </a>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    The recorded download is unavailable or expired. An already downloaded copy can still be checked.
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {canPreviewDirect ? (
+                    "Select a downloaded .tar.gz file below to verify an offline copy."
+                  ) : (
+                    <>
+                      Select the downloaded ZIP directly in step 2. No extraction is needed, and an existing{" "}
+                      <code>.tar.gz</code> file also works.
+                    </>
+                  )}
+                </p>
+              </li>
+              <li className="rounded-xl border border-border bg-background/60 p-4">
+                <label
+                  htmlFor={`${id}-file`}
+                  className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                  2 · Inspect the downloaded ZIP or .tar.gz locally
+                </label>
+                <input
+                  id={`${id}-file`}
+                  type="file"
+                  accept=".zip,.gz,.tgz,application/zip,application/gzip"
+                  aria-describedby={`${id}-description`}
+                  className="mt-2 block min-h-11 w-full min-w-0 cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-semibold file:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  onChange={(event) => {
+                    inspectFile(event.currentTarget.files?.[0]);
+                    event.currentTarget.value = "";
+                  }}
+                />
+                <p id={`${id}-description`} className="mt-2 text-xs text-muted-foreground">
+                  Checks the inner .tar.gz SHA-256 against this Run. No upload or fabrication request.
+                </p>
+              </li>
+            </ol>
+          </div>
+        </details>
 
         <div aria-live="polite" aria-atomic="true">
           {state.status === "loading" ? (
