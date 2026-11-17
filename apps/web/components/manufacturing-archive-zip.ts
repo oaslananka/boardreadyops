@@ -7,6 +7,16 @@ const maxZipBytes = 34 * 1024 * 1024;
 const maxGzipBytes = 32 * 1024 * 1024;
 const utf8 = new TextDecoder("utf-8", { fatal: true });
 
+type ZipMember = Readonly<{
+  name: string;
+  flags: number;
+  method: number;
+  packedSize: number;
+  unpackedSize: number;
+  localOffset: number;
+  directoryOffset: number;
+}>;
+
 function invalidZip(detail: string): never {
   throw new Error(`Invalid GitHub artifact ZIP: ${detail}`);
 }
@@ -21,91 +31,137 @@ function uint32(view: DataView, offset: number): number {
   return view.getUint32(offset, true);
 }
 
-function unzipHeader(bytes: Uint8Array): { offset: number; size: number; method: number } {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  // The end-of-central-directory record has an optional bounded comment.
-  let eocd = -1;
-  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65_557); i--) {
-    if (uint32(view, i) === 0x06054b50 && i + 22 + uint16(view, i + 20) === bytes.length) {
-      eocd = i;
-      break;
+function findDirectoryEnd(view: DataView, length: number): number {
+  for (let offset = length - 22; offset >= Math.max(0, length - 65_557); offset--) {
+    if (uint32(view, offset) === 0x06054b50 && offset + 22 + uint16(view, offset + 20) === length) {
+      return offset;
     }
   }
-  if (eocd < 0) invalidZip("missing ZIP directory.");
-  if (uint16(view, eocd + 4) !== 0 || uint16(view, eocd + 6) !== 0) invalidZip("multi-disk ZIP is unsupported.");
-  const members = uint16(view, eocd + 10);
-  if (members !== 1 || uint16(view, eocd + 8) !== members) invalidZip("expected one archive file.");
-  const size = uint32(view, eocd + 12);
-  const directory = uint32(view, eocd + 16);
-  if (size === 0xffffffff || directory === 0xffffffff || directory + size !== eocd || size < 46) {
-    invalidZip("unsafe ZIP directory.");
-  }
-  if (uint32(view, directory) !== 0x02014b50) invalidZip("invalid central header.");
-  const flags = uint16(view, directory + 8);
-  const method = uint16(view, directory + 10);
-  if ((flags & ~(0x0008 | 0x0800)) !== 0 || (method !== 0 && method !== 8)) {
-    invalidZip("unsupported encryption or compression.");
-  }
-  const packedSize = uint32(view, directory + 20);
-  const unpackedSize = uint32(view, directory + 24);
-  const nameLength = uint16(view, directory + 28);
-  const extraLength = uint16(view, directory + 30);
-  const commentLength = uint16(view, directory + 32);
-  const localOffset = uint32(view, directory + 42);
-  if (
-    packedSize === 0xffffffff ||
-    unpackedSize === 0xffffffff ||
-    unpackedSize <= 0 ||
-    unpackedSize > maxGzipBytes ||
-    directory + 46 + nameLength + extraLength + commentLength !== eocd ||
-    localOffset + 30 > directory
-  ) {
-    invalidZip("unsafe member size or header.");
-  }
+  return invalidZip("missing ZIP directory.");
+}
+
+function readMemberName(bytes: Uint8Array, offset: number, size: number): string {
   let name: string;
   try {
-    name = utf8.decode(bytes.subarray(directory + 46, directory + 46 + nameLength));
+    name = utf8.decode(bytes.subarray(offset, offset + size));
   } catch {
-    invalidZip("unreadable archive name.");
+    return invalidZip("unreadable archive name.");
   }
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.tar\.gz$/u.test(name)) {
     invalidZip("unsafe ZIP member path or name.");
   }
-  if (uint32(view, localOffset) !== 0x04034b50) invalidZip("missing local header.");
-  const localFlags = uint16(view, localOffset + 6);
-  const localNameLength = uint16(view, localOffset + 26);
-  const localExtraLength = uint16(view, localOffset + 28);
-  const localNameStart = localOffset + 30;
-  const dataStart = localNameStart + localNameLength + localExtraLength;
-  const dataEnd = dataStart + packedSize;
-  if (
-    localFlags !== flags ||
-    uint16(view, localOffset + 8) !== method ||
-    localNameLength !== nameLength ||
-    dataEnd > directory ||
-    utf8.decode(bytes.subarray(localNameStart, localNameStart + localNameLength)) !== name
-  ) {
-    invalidZip("local header does not match the directory.");
+  return name;
+}
+
+function validateCentralBounds(view: DataView, eocd: number, directoryOffset: number): void {
+  const directorySize = uint32(view, eocd + 12);
+  if (directorySize === 0xffffffff || directoryOffset === 0xffffffff) {
+    invalidZip("ZIP64 is unsupported.");
   }
-  const descriptorSize = directory - dataEnd;
-  if (flags & 0x0008) {
-    const descriptorStart = dataEnd + (descriptorSize === 16 ? 4 : 0);
-    if (
-      (descriptorSize !== 12 && descriptorSize !== 16) ||
-      (descriptorSize === 16 && uint32(view, dataEnd) !== 0x08074b50) ||
-      uint32(view, descriptorStart + 4) !== packedSize ||
-      uint32(view, descriptorStart + 8) !== unpackedSize
-    ) {
+  if (directorySize < 46 || directoryOffset + directorySize !== eocd) {
+    invalidZip("unsafe ZIP directory.");
+  }
+  if (uint32(view, directoryOffset) !== 0x02014b50) {
+    invalidZip("invalid central header.");
+  }
+}
+
+function readCentralMember(view: DataView, bytes: Uint8Array, eocd: number): ZipMember {
+  if (uint16(view, eocd + 4) !== 0 || uint16(view, eocd + 6) !== 0) {
+    invalidZip("multi-disk ZIP is unsupported.");
+  }
+  const memberCount = uint16(view, eocd + 10);
+  if (memberCount !== 1 || uint16(view, eocd + 8) !== memberCount) {
+    invalidZip("expected one archive file.");
+  }
+  const directoryOffset = uint32(view, eocd + 16);
+  validateCentralBounds(view, eocd, directoryOffset);
+  const flags = uint16(view, directoryOffset + 8);
+  const method = uint16(view, directoryOffset + 10);
+  if ((flags & ~(0x0008 | 0x0800)) !== 0 || (method !== 0 && method !== 8)) {
+    invalidZip("unsupported encryption or compression.");
+  }
+  const packedSize = uint32(view, directoryOffset + 20);
+  const unpackedSize = uint32(view, directoryOffset + 24);
+  if (packedSize === 0xffffffff || unpackedSize === 0xffffffff) invalidZip("ZIP64 is unsupported.");
+  if (unpackedSize < 1 || unpackedSize > maxGzipBytes) invalidZip("unsafe member size.");
+  const nameLength = uint16(view, directoryOffset + 28);
+  const extraLength = uint16(view, directoryOffset + 30);
+  const commentLength = uint16(view, directoryOffset + 32);
+  if (directoryOffset + 46 + nameLength + extraLength + commentLength !== eocd) {
+    invalidZip("unexpected central directory contents.");
+  }
+  const localOffset = uint32(view, directoryOffset + 42);
+  if (localOffset + 30 > directoryOffset) invalidZip("unsafe local header offset.");
+  const name = readMemberName(bytes, directoryOffset + 46, nameLength);
+  return { name, flags, method, packedSize, unpackedSize, localOffset, directoryOffset };
+}
+
+function validateDescriptor(view: DataView, member: ZipMember, dataEnd: number): void {
+  const descriptorSize = member.directoryOffset - dataEnd;
+  if (member.flags & 0x0008) {
+    if (descriptorSize !== 12 && descriptorSize !== 16) invalidZip("invalid ZIP data descriptor.");
+    const start = dataEnd + (descriptorSize === 16 ? 4 : 0);
+    if (descriptorSize === 16 && uint32(view, dataEnd) !== 0x08074b50) {
       invalidZip("invalid ZIP data descriptor.");
     }
-  } else if (
-    descriptorSize !== 0 ||
-    uint32(view, localOffset + 18) !== packedSize ||
-    uint32(view, localOffset + 22) !== unpackedSize
-  ) {
-    invalidZip("unexpected ZIP data.");
+    if (uint32(view, start + 4) !== member.packedSize || uint32(view, start + 8) !== member.unpackedSize) {
+      invalidZip("invalid ZIP data descriptor.");
+    }
+    return;
   }
-  return { offset: dataStart, size: packedSize, method };
+  if (descriptorSize !== 0) invalidZip("unexpected ZIP data.");
+  if (
+    uint32(view, member.localOffset + 18) !== member.packedSize ||
+    uint32(view, member.localOffset + 22) !== member.unpackedSize
+  ) {
+    invalidZip("local sizes do not match the directory.");
+  }
+}
+
+function readLocalDataOffset(view: DataView, bytes: Uint8Array, member: ZipMember): number {
+  const { localOffset, directoryOffset, packedSize, name, flags, method } = member;
+  if (uint32(view, localOffset) !== 0x04034b50) invalidZip("missing local header.");
+  const nameLength = uint16(view, localOffset + 26);
+  const extraLength = uint16(view, localOffset + 28);
+  const dataStart = localOffset + 30 + nameLength + extraLength;
+  const dataEnd = dataStart + packedSize;
+  if (dataEnd > directoryOffset) invalidZip("unsafe compressed member span.");
+  if (uint16(view, localOffset + 6) !== flags || uint16(view, localOffset + 8) !== method) {
+    invalidZip("local header does not match the directory.");
+  }
+  if (readMemberName(bytes, localOffset + 30, nameLength) !== name) {
+    invalidZip("local header does not match the directory.");
+  }
+  validateDescriptor(view, member, dataEnd);
+  return dataStart;
+}
+
+function unzipHeader(bytes: Uint8Array): { offset: number; size: number; method: number } {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const member = readCentralMember(view, bytes, findDirectoryEnd(view, bytes.length));
+  return { offset: readLocalDataOffset(view, bytes, member), size: member.packedSize, method: member.method };
+}
+
+async function inflateDeflateRaw(data: ArrayBuffer, expectedBytes: number): Promise<ArrayBuffer> {
+  if (typeof DecompressionStream === "undefined") invalidZip("this browser cannot decompress ZIP files.");
+  let length = 0;
+  const bounded = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      length += chunk.byteLength;
+      if (length > expectedBytes) invalidZip("decompressed member exceeds the recorded size.");
+      controller.enqueue(chunk);
+    },
+  });
+  try {
+    const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw")).pipeThrough(bounded);
+    const output = await new Response(stream).arrayBuffer();
+    if (output.byteLength !== expectedBytes) invalidZip("decompressed member size mismatch.");
+    return output;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Invalid GitHub artifact ZIP:")) throw error;
+    return invalidZip("ZIP member cannot be safely decompressed.");
+  }
 }
 
 /** ZIP is only a transport wrapper, not a trusted signed artifact. */
@@ -120,34 +176,5 @@ export async function unwrapGitHubArtifactZip(file: Blob, expectedGzipBytes: num
     if (packed.byteLength !== expectedGzipBytes) invalidZip("wrong stored member size.");
     return packed.buffer;
   }
-  if (typeof DecompressionStream === "undefined") {
-    invalidZip("this browser cannot decompress ZIP files.");
-  }
-  const reader = new Blob([packed.buffer]).stream().pipeThrough(new DecompressionStream("deflate-raw")).getReader();
-  const parts: Uint8Array[] = [];
-  let length = 0;
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      length += value.byteLength;
-      if (length > expectedGzipBytes) {
-        await reader.cancel();
-        invalidZip("decompressed member exceeds the recorded size.");
-      }
-      parts.push(value);
-    }
-  } catch {
-    invalidZip("ZIP member cannot be safely decompressed.");
-  } finally {
-    reader.releaseLock();
-  }
-  if (length !== expectedGzipBytes) invalidZip("decompressed member size mismatch.");
-  const output = new Uint8Array(length);
-  let cursor = 0;
-  for (const part of parts) {
-    output.set(part, cursor);
-    cursor += part.byteLength;
-  }
-  return output.buffer;
+  return inflateDeflateRaw(packed.buffer, expectedGzipBytes);
 }

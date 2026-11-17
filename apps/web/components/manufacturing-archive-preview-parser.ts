@@ -237,14 +237,8 @@ function parseCsv(text: string): { header: string[]; rows: string[][]; total: nu
   return { header, rows: previewRows, total: rows.length };
 }
 
-/** No network request or upload. Matching an ingested digest is not a browser-side signature verification. */
-export async function inspectDownloadedManufacturingArchive(
-  file: Blob,
-  expected: ExpectedArchive,
-): Promise<ManufacturingArchiveContents> {
-  if (!hexDigest.test(expected.sha256) || !commitId.test(expected.sourceSha)) {
-    return invalid("The recorded artifact is missing a valid digest or source revision.");
-  }
+/** Keep transport parsing separate from the run's manifest/digest verification. */
+async function readDownloadedGzip(file: Blob, expected: ExpectedArchive): Promise<ArrayBuffer> {
   if (!Number.isSafeInteger(expected.bytes) || expected.bytes < 1 || expected.bytes > maxArchiveBytes) {
     return invalid("The recorded manufacturing archive size is invalid.");
   }
@@ -256,13 +250,25 @@ export async function inspectDownloadedManufacturingArchive(
   if (!isZip && file.size !== expected.bytes) {
     return invalid("The selected file size does not match the recorded archive.");
   }
-  // GitHub Actions downloads one ZIP. The verified .tar.gz can also be inspected directly.
+  // GitHub Actions downloads a ZIP. Previously extracted .tar.gz files still work.
   const compressed = isZip ? await unwrapGitHubArtifactZip(file, expected.bytes) : await file.arrayBuffer();
   if (compressed.byteLength !== expected.bytes) {
     return invalid("The selected file size does not match the recorded archive.");
   }
+  return compressed;
+}
+
+/** No network request or upload. Matching an ingested digest is not browser-side signature verification. */
+export async function inspectDownloadedManufacturingArchive(
+  file: Blob,
+  expected: ExpectedArchive,
+): Promise<ManufacturingArchiveContents> {
+  if (!hexDigest.test(expected.sha256) || !commitId.test(expected.sourceSha)) {
+    return invalid("The recorded artifact is missing a valid digest or source revision.");
+  }
+  const compressed = await readDownloadedGzip(file, expected);
   if ((await digest(compressed)) !== expected.sha256) {
-    return invalid("SHA-256 mismatch. Select the .tar.gz from this Run's GitHub artifact ZIP.");
+    return invalid("SHA-256 mismatch. Select this Run's GitHub ZIP or its verified .tar.gz.");
   }
   const files = tarFiles(await inflateGzip(compressed));
   const manifestBytes = files.get(`${root}manifest.json`);
