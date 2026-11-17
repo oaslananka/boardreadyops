@@ -3,7 +3,6 @@ import type { WorkspaceDeliveryRecord, WorkspaceRevisionRecord } from "@boardrea
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { AppShell } from "../../components/app-shell.js";
 import { DeliveryCreateForm } from "../../components/deliveries/delivery-create-form.js";
 import { DeliveryRevokeButton } from "../../components/deliveries/delivery-revoke-button.js";
@@ -17,7 +16,7 @@ import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { resolveBillingMode } from "../../lib/billing-mode.js";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../lib/delivery-listing.js";
 import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
-import { loadViewerRuns, type RunListingEntry } from "../../lib/run-listing.js";
+import { loadViewerRuns, type RunListingEntry, type RunListingResult } from "../../lib/run-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 import {
   authorizeManufacturingShareAction,
@@ -178,6 +177,68 @@ function deliveryColumns(
   ];
 }
 
+/** Repository-scoped signed evidence; workspace delivery records are a separate view. */
+function SignedRunArchiveStatus({
+  invalidRepositoryFilter,
+  selectedRepository,
+  signedRunListing,
+}: Readonly<{
+  invalidRepositoryFilter: boolean;
+  selectedRepository: string | undefined;
+  signedRunListing: RunListingResult | undefined;
+}>) {
+  if (invalidRepositoryFilter) {
+    return (
+      <Panel title="Invalid repository filter">
+        <p className="text-sm text-muted-foreground">
+          The requested repository is not a valid GitHub owner/name. No signed Run archives were loaded.{" "}
+          <Link href="/deliveries" className="font-semibold text-primary underline underline-offset-2">
+            Browse authorized signed archives
+          </Link>
+        </p>
+      </Panel>
+    );
+  }
+  if (signedRunListing?.state === "ok" && signedRunListing.runs.length > 0) {
+    return (
+      <SignedRunArchivesPanel
+        runs={signedRunListing.runs}
+        {...(selectedRepository ? { repository: selectedRepository } : {})}
+      />
+    );
+  }
+  if (!selectedRepository) return null;
+  if (signedRunListing?.state !== "ok") {
+    return (
+      <Panel title="Signed archive eligibility cannot be verified">
+        <p className="text-sm text-muted-foreground">
+          Your repository access or archive listing is temporarily unavailable. Do not interpret missing evidence as a
+          passing manufacturing result.
+        </p>
+      </Panel>
+    );
+  }
+  return (
+    <Panel title={`No signed manufacturing archive for ${selectedRepository}`}>
+      <p className="text-sm text-muted-foreground">
+        There is no currently accessible, stored, signed manufacturing Run archive for this repository. A Review,
+        findings or an unsigned Run can still exist; this is not evidence that the board is ready for fabrication.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-3 text-sm">
+        <Link
+          href={`/reviews?repository=${encodeURIComponent(selectedRepository)}`}
+          className="font-semibold text-primary underline underline-offset-2"
+        >
+          Return to this repository&apos;s Reviews
+        </Link>
+        <Link href="/deliveries" className="font-semibold text-primary underline underline-offset-2">
+          Browse all authorized signed archives
+        </Link>
+      </div>
+    </Panel>
+  );
+}
+
 export default async function DeliveriesListPage({ searchParams }: Readonly<DeliveriesPageProps>) {
   const parameters = await searchParams;
   const requestedRepository = first(parameters.repository);
@@ -215,60 +276,6 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = host ? `${protocol}://${host}` : "";
 
-  // Repository-scoped signed evidence and workspace delivery records are separate views.
-  // Never allow a malformed repository scope to reveal unrelated signed archives.
-  let signedArchiveContent: ReactNode = null;
-  if (invalidRepositoryFilter) {
-    signedArchiveContent = (
-      <Panel title="Invalid repository filter">
-        <p className="text-sm text-muted-foreground">
-          The requested repository is not a valid GitHub owner/name. No signed Run archives were loaded.{" "}
-          <Link href="/deliveries" className="font-semibold text-primary underline underline-offset-2">
-            Browse authorized signed archives
-          </Link>
-        </p>
-      </Panel>
-    );
-  } else if (signedRunListing?.state === "ok" && signedRunListing.runs.length > 0) {
-    signedArchiveContent = (
-      <SignedRunArchivesPanel
-        runs={signedRunListing.runs}
-        {...(selectedRepository ? { repository: selectedRepository } : {})}
-      />
-    );
-  } else if (selectedRepository) {
-    let statusTitle = "Signed archive eligibility cannot be verified";
-    let statusBody: ReactNode = (
-      <p className="text-sm text-muted-foreground">
-        Your repository access or archive listing is temporarily unavailable. Do not interpret missing evidence as a
-        passing manufacturing result.
-      </p>
-    );
-    if (signedRunListing?.state === "ok") {
-      statusTitle = `No signed manufacturing archive for ${selectedRepository}`;
-      statusBody = (
-        <>
-          <p className="text-sm text-muted-foreground">
-            There is no currently accessible, stored, signed manufacturing Run archive for this repository. A Review,
-            findings or an unsigned Run can still exist; this is not evidence that the board is ready for fabrication.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-3 text-sm">
-            <Link
-              href={`/reviews?repository=${encodeURIComponent(selectedRepository)}`}
-              className="font-semibold text-primary underline underline-offset-2"
-            >
-              Return to this repository&apos;s Reviews
-            </Link>
-            <Link href="/deliveries" className="font-semibold text-primary underline underline-offset-2">
-              Browse all authorized signed archives
-            </Link>
-          </div>
-        </>
-      );
-    }
-    signedArchiveContent = <Panel title={statusTitle}>{statusBody}</Panel>;
-  }
-
   return (
     <AppShell
       viewerNav={<ViewerNav />}
@@ -283,7 +290,11 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
           </p>
         </header>
 
-        {signedArchiveContent}
+        <SignedRunArchiveStatus
+          invalidRepositoryFilter={invalidRepositoryFilter}
+          selectedRepository={selectedRepository}
+          signedRunListing={signedRunListing}
+        />
 
         {selectedRepository && result.state === "ok" ? (
           <p className="text-sm text-muted-foreground">
