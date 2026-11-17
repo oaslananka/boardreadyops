@@ -52,6 +52,25 @@ describe("progressive disclosure PR comment formatting", () => {
     detailsUrl: "https://app.boardreadyops.com/runs/run-123",
   };
 
+  it.each([
+    { name: "failed", status: "failed", decision: "fail", expected: "Release blocked" },
+    { name: "cancelled", status: "cancelled", decision: null, expected: "Run cancelled" },
+    { name: "timed out", status: "timed_out", decision: "error", expected: "Run timed out" },
+    { name: "superseded", status: "superseded", decision: null, expected: "Run superseded" },
+  ])("does not declare a $name run release-ready when no findings were recorded", ({ status, decision, expected }) => {
+    const comment = buildProgressiveReadinessComment({
+      status,
+      decision,
+      findings: [],
+      artifacts: [],
+      metrics: {},
+    });
+    expect(comment).toContain(expected);
+    expect(comment).not.toContain("Ready for release");
+    expect(comment).not.toContain("required fabrication packages verified");
+    expect(comment).not.toContain("proceed with the release workflow");
+  });
+
   it("renders a verdict banner with confidence score and executive summary", () => {
     const comment = buildProgressiveReadinessComment(baseInput);
 

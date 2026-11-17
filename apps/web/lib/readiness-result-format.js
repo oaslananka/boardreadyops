@@ -15,6 +15,7 @@ const safeModeReasonLabels = {
 
 const terminalPresentations = {
   success: { emoji: "✅", label: "Ready to release" },
+  unverified: { emoji: "✅", label: "Checks passed · readiness unverified" },
   warning: { emoji: "⚠️", label: "Review warnings" },
   failure: { emoji: "❌", label: "Release blocked" },
   cancelled: { emoji: "⏹️", label: "Run cancelled" },
@@ -145,6 +146,7 @@ function terminalOutcome(input) {
   if (input.status === "timed_out") return "timedOut";
   if (failureLike(input)) return "failure";
   if (warningLike(input)) return "warning";
+  if (input.status === "completed" && input.decision === "pass" && !input.readiness) return "unverified";
   return "success";
 }
 
@@ -443,6 +445,11 @@ function nextSteps(input) {
         "Review warnings and active waivers before approving the release.",
         "Re-run after addressing any risk that should not be accepted.",
       ];
+    case "unverified":
+      return [
+        "No readiness assessment was reported; passing checks and a signed archive do not verify manufacturing readiness.",
+        "Review the source-linked run evidence and obtain a readiness assessment before deciding on release.",
+      ];
     case "cancelled":
       return ["Start a new BoardReadyOps run when the change is ready for evaluation."];
     case "timedOut":
@@ -529,6 +536,11 @@ export function buildProgressiveReadinessComment(input) {
       "> ℹ️ **Review recommended:** Design has warnings or temporary waivers that should be reviewed before release.",
       "",
     );
+  } else if (terminalOutcome(input) === "unverified") {
+    lines.push("> ✅ **Checks passed; readiness unverified:** Review the source-linked evidence before release.", "");
+  } else if (terminalOutcome(input) !== "success") {
+    const outcome = presentation(input);
+    lines.push(`> ${outcome.emoji} **${outcome.label}:** No verified release approval; inspect the recorded run.`, "");
   } else {
     lines.push(
       "> ✅ **Ready for release:** All hardware checks passed and required fabrication packages verified.",
