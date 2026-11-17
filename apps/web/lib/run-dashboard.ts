@@ -382,6 +382,25 @@ function numberValue(row: Record<string, unknown>, key: string): number | undefi
   return undefined;
 }
 
+/** The OIDC result records the measured readiness in its signed terminal payload.
+ * Keep legacy run columns for older runs, but never substitute a stale score when
+ * the signed result explicitly contains an invalid readiness assessment.
+ */
+function runReadinessScore(row: Record<string, unknown>): number | undefined {
+  if (row.reported_readiness_present === true) {
+    const score = numberValue(row, "reported_readiness_score");
+    const status = stringValue(row, "reported_readiness_status");
+    return score !== undefined &&
+      Number.isInteger(score) &&
+      score >= 0 &&
+      score <= 100 &&
+      (status === "ready" || status === "at-risk" || status === "blocked")
+      ? score
+      : undefined;
+  }
+  return numberValue(row, "readiness_score");
+}
+
 function repositoryPrivateValue(row: Record<string, unknown>, key: string): boolean {
   const value = row[key];
   if (value === false || value === 0) return false;
@@ -627,6 +646,11 @@ export async function lookupRunDashboard(
        release_runs.kicad_version,
        release_runs.github_check_run_id,
        release_runs.readiness_score,
+       -- Signed hosted results store the readiness assessment in their terminal payload.
+       -- This is intentionally scoped to the joined run, never inferred from metrics.
+       (release_run_results.payload ? 'readiness') as reported_readiness_present,
+       release_run_results.payload #>> '{readiness,score}' as reported_readiness_score,
+       release_run_results.payload #>> '{readiness,status}' as reported_readiness_status,
        release_run_results.contract_version,
        release_run_results.conclusion,
        release_run_results.metrics,
@@ -1201,7 +1225,7 @@ export async function lookupRunDashboard(
       boardReadyOpsVersion: stringValue(runRow, "board_ready_ops_version"),
       kicadVersion: stringValue(runRow, "kicad_version"),
       githubCheckRunId: stringValue(runRow, "github_check_run_id"),
-      readinessScore: numberValue(runRow, "readiness_score"),
+      readinessScore: runReadinessScore(runRow),
       resultContractVersion,
       conclusion: stringValue(runRow, "conclusion"),
       metrics: metricsValue(runRow, "metrics"),

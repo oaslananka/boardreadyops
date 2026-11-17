@@ -96,6 +96,49 @@ afterAll(async () => {
 });
 
 describeDatabase("run dashboard PostgreSQL integration", () => {
+  it("shows the source-bound OIDC readiness saved in the terminal result, without relying on a legacy column", async () => {
+    const legacyPayload = { schemaVersion: 1 };
+    const measuredPayload = {
+      version: 1,
+      status: "completed",
+      decision: "pass",
+      readiness: {
+        score: 100,
+        status: "ready",
+        blocking: 0,
+        nonBlocking: 0,
+        missingRequired: [],
+        missingRecommended: [],
+        warnings: [],
+      },
+    };
+    const legacy = await lookupRunDashboard(runId, database());
+    expect(legacy.state === "found" && legacy.run.readinessScore).toBe(97);
+    try {
+      await database().query("update release_runs set readiness_score = null where id = $1", [runId]);
+      await database().query("update release_run_results set payload = $2::jsonb where run_id = $1", [
+        runId,
+        JSON.stringify(measuredPayload),
+      ]);
+      const measured = await lookupRunDashboard(runId, database());
+      expect(measured.state === "found" && measured.run.readinessScore).toBe(100);
+      await database().query("update release_run_results set payload = $2::jsonb where run_id = $1", [
+        runId,
+        JSON.stringify({ ...measuredPayload, readiness: { ...measuredPayload.readiness, score: 101 } }),
+      ]);
+      const invalid = await lookupRunDashboard(runId, database());
+      expect(invalid.state).toBe("found");
+      if (invalid.state !== "found") throw new Error("Run was not found");
+      expect(invalid.run.readinessScore).toBeUndefined();
+    } finally {
+      await database().query("update release_run_results set payload = $2::jsonb where run_id = $1", [
+        runId,
+        JSON.stringify(legacyPayload),
+      ]);
+      await database().query("update release_runs set readiness_score = 97 where id = $1", [runId]);
+    }
+  });
+
   it("fails closed when a run is presented under another installation or repository scope", async () => {
     await expect(
       lookupRunDashboard(runId, database(), {
