@@ -40,11 +40,11 @@ These are **product sequence** groupings, not engineering execution phases. The 
 
 ### Product sequence 1 — Release trust
 
-Goal: make the release gate trustworthy enough to authorize real manufacturing output.
+Goal: provide reliable evidence for an explicit, human-controlled manufacturing release decision; automated checks alone do not authorize fabrication.
 
-- [#753](https://github.com/oaslananka/boardreadyops/issues/753) — fabrication artifact parsing, mask/paste and measured board-edge clearance are implemented; independently trusted source-to-export provenance is still outstanding.
+- [#753](https://github.com/oaslananka/boardreadyops/issues/753) — fabrication artifact parsing, mask/paste and measured board-edge clearance implementation is complete; live customer source-to-export acceptance is tracked separately.
 - [#770](https://github.com/oaslananka/boardreadyops/issues/770) — paste/stencil, mask and board-edge manufacturing closure. **Complete.**
-- [#771](https://github.com/oaslananka/boardreadyops/issues/771) — bind the exact approved source SHA to an independently attested, same-run KiCad export. **Open:** design is documented, self-reported manifest verification hardened; trusted execution attestation and acceptance remain pending.
+- [#771](https://github.com/oaslananka/boardreadyops/issues/771) — source-to-export attestation implementation tracking **closed**; independent customer-run and signed-handoff acceptance remains open under [#1197](https://github.com/oaslananka/boardreadyops/issues/1197), [#154](https://github.com/oaslananka/boardreadyops/issues/154), and [#1161](https://github.com/oaslananka/boardreadyops/issues/1161).
 
 Exit condition: exact parsed evidence may block, heuristic evidence warns by default, and retained release evidence can be tied to the approved source revision.
 
@@ -63,8 +63,8 @@ Goal: connect what was approved to what was actually manufactured.
 
 - [#448](https://github.com/oaslananka/boardreadyops/issues/448) — verifiable Hardware Release Passport v1. **Complete.**
 - [#450](https://github.com/oaslananka/boardreadyops/issues/450) — release-linked production outcome ingestion pilot. **Complete.**
-- [#756](https://github.com/oaslananka/boardreadyops/issues/756) — reconcile approved versus as-built composition.
-- [#447](https://github.com/oaslananka/boardreadyops/issues/447) — PR-native hardware change impact v1; currently blocked.
+- [#756](https://github.com/oaslananka/boardreadyops/issues/756) — approved-versus-as-built reconciliation implementation **complete**; independent real-production acceptance remains a separate task.
+- [#447](https://github.com/oaslananka/boardreadyops/issues/447) — PR-native hardware change-impact implementation tracking **closed**; real customer-facing Review completion remains open under [#1161](https://github.com/oaslananka/boardreadyops/issues/1161).
 
 Exit condition: an approved release can be linked to manufacturer handoff, batch/as-built data, substitutions, and production outcomes without requiring a deep MES integration.
 
@@ -75,7 +75,7 @@ Goal: project the release record into the governance and evidence views customer
 - [#757](https://github.com/oaslananka/boardreadyops/issues/757) — clause-oriented audit evidence projection.
 - [#45](https://github.com/oaslananka/boardreadyops/issues/45) — organization policy inheritance and repository overrides.
 - [#41](https://github.com/oaslananka/boardreadyops/issues/41) — customer-hosted execution hardening.
-- [#451](https://github.com/oaslananka/boardreadyops/issues/451) — release-to-production Evidence Graph.
+- [#451](https://github.com/oaslananka/boardreadyops/issues/451) — release-to-production Evidence Graph foundation **complete**.
 
 These remain downstream of release trust and manufacturing truth unless a live production security or correctness blocker requires an earlier bounded change.
 
@@ -114,6 +114,8 @@ Those changes require measured operational or contractual triggers. The current 
 - **P3** — maintenance, polish, or intentionally deferred work.
 
 The next proof is not “more features.” It is a trustworthy release authority used on real hardware releases, followed by continuous impact, as-built traceability, production outcomes, and evidence/compliance workflows.
+
+Current external acceptance remains tracked in [#1161](https://github.com/oaslananka/boardreadyops/issues/1161) (end-to-end user journey), [#154](https://github.com/oaslananka/boardreadyops/issues/154) (cross-installation execution isolation), and [#1197](https://github.com/oaslananka/boardreadyops/issues/1197) (customer-run signed artifact verification). Closed source-tracking issues do not constitute independent fabrication approval.
 
 ## Contributing
 
