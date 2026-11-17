@@ -82266,7 +82266,7 @@ var defaultReadinessWorkflowTemplate = [
   "          GITHUB_TOKEN: ${{ github.token }}\n",
   "          BOARDREADYOPS_PR_HEAD_SHA: ${{ inputs.head_sha }}\n",
   "          BOARDREADYOPS_CLOUD_RUN_ID: ${{ inputs.run_id }}\n",
-  "        uses: oaslananka/boardreadyops@6d3b721c3f8307a517d360b28f4d50b824d81278 # v1.24.1\n",
+  "        uses: oaslananka/boardreadyops@6b41a224869f9a0ae646566663a914a89402fb47 # v1.72.0\n",
   "        with:\n",
   "          project: ${{ vars.BOARDREADYOPS_PROJECT || '' }}\n",
   "          config: ${{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}\n",

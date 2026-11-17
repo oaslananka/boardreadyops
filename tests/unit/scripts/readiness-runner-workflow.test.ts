@@ -18,9 +18,22 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain('require-kicad: "true"');
     expect(workflow).toContain("project: $" + "{{ vars.BOARDREADYOPS_PROJECT || '' }}");
     expect(workflow).toContain("config: $" + "{{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}");
-    expect(workflow).toContain("uses: oaslananka/boardreadyops@6d3b721c3f8307a517d360b28f4d50b824d81278 # v1.24.1");
+    expect(workflow).toContain("uses: oaslananka/boardreadyops@6b41a224869f9a0ae646566663a914a89402fb47 # v1.72.0");
     expect(workflow).toContain("safe-mode: $" + "{{ inputs.safe_mode }}");
     expect(workflow).not.toContain("runner-ready");
+  });
+
+  it("uses the immutable published Action with project BOM report support, not the v1.24.1 producer", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+    const actionStep = workflow.slice(
+      workflow.indexOf("- name: Run BoardReadyOps"),
+      workflow.indexOf("- name: Stage readiness reports outside reviewed source"),
+    );
+    expect(actionStep).toContain("uses: oaslananka/boardreadyops@6b41a224869f9a0ae646566663a914a89402fb47 # v1.72.0");
+    expect(actionStep).not.toContain("6d3b721c3f8307a517d360b28f4d50b824d81278");
+    // GitHub's signed callback already forwards report.boms; the old released Action never produced it.
+    expect(workflow).toContain("const rawBoms = reportAvailable && Array.isArray(report.boms) ? report.boms : [];");
+    expect(workflow).toContain("payload.metrics.boms_transmitted = boms.length;");
   });
 
   it("installs KiCad from trusted protected-branch tooling before checking out untrusted PR content", async () => {
