@@ -4,9 +4,12 @@ import { ExternalReviewStore, ReviewStore } from "@boardreadyops/db";
 import { createPgQueryExecutor, type PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
+import { RequestBodyTooLargeError, readBoundedRequestBody } from "../../../../lib/bounded-request-body.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
 
 export const runtime = "nodejs";
+
+const maximumLinkBodyBytes = 64 * 1024;
 
 /**
  * The plan tier gating this feature (`handoffLinksEnabled`) is unread until now: creating an
@@ -95,14 +98,16 @@ export async function POST(request: Request): Promise<Response> {
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
-  const ctx = await resolveRepositoryApiContext(auth, request);
-  if (ctx instanceof Response) return ctx;
-  const { repositoryId, executor } = ctx;
-
+  // Validate before repository authorization allocates an executor; malformed
+  // and oversized bodies must not consume database connections.
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    const rawBody = (await readBoundedRequestBody(request, maximumLinkBodyBytes)).toString("utf8");
+    body = JSON.parse(rawBody);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return Response.json({ ok: false, error: "External review link payload too large" }, { status: 413 });
+    }
     return Response.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
@@ -110,12 +115,13 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) {
     return Response.json(
       { ok: false, error: "Invalid external review link payload", issues: parsed.error.issues },
-      {
-        status: 400,
-      },
+      { status: 400 },
     );
   }
 
+  const ctx = await resolveRepositoryApiContext(auth, request);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
   try {
     const reviewStore = new ReviewStore(executor);
     const review = await reviewStore.getReviewById(repositoryId, parsed.data.reviewId);
