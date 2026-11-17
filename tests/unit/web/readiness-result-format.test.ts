@@ -100,6 +100,51 @@ describe("readiness result formatting", () => {
     expect(progressive).toContain("BoardReadyOps: Checks passed · readiness unverified");
   });
 
+  it("does not authorize manufacturing on a 100/100 signed run without verified BOM/Gerber evidence", () => {
+    const input = {
+      status: "completed",
+      decision: "pass",
+      readiness: {
+        score: 100,
+        status: "ready",
+        blocking: 0,
+        nonBlocking: 0,
+        missingRequired: [],
+        missingRecommended: [],
+        warnings: [],
+      },
+      findings: [],
+      artifacts: [
+        {
+          kind: "archive",
+          name: "signed-manufacturing-export.tar.gz",
+          storagePath: "runs/example/signed-manufacturing-export.tar.gz",
+          sha256: "b".repeat(64),
+          bytes: 9000,
+          role: "manufacturing",
+        },
+      ],
+      detailsUrl: "https://boardreadyops.test/runs/example",
+    } as const;
+
+    const check = buildReadinessCheckOutput(input);
+    const standard = buildReadinessPrComment(input);
+    const progressive = buildProgressiveReadinessComment(input);
+    expect(check.title).toBe("\u2705 BoardReadyOps: Checks passed \u00b7 review evidence");
+    expect(standard).toContain("| Readiness | 100/100 \u00b7 Ready |");
+    for (const message of [check.title, check.summary, standard, progressive]) {
+      expect(message).not.toContain("Ready to release");
+      expect(message).not.toContain("Ready for release");
+      expect(message).not.toContain("required fabrication packages verified");
+      expect(message).not.toContain("proceed with the release workflow");
+    }
+    for (const message of [check.summary, standard, progressive]) {
+      expect(message).toContain("Verify the source-linked BOM, Gerber, and signed fabrication evidence");
+      expect(message).toContain("A passing readiness score or signed archive is not manufacturing approval");
+    }
+    expect(progressive).toContain("Checks passed; verify fabrication evidence");
+  });
+
   it("renders the same structured hardware impact semantics in Check Run and PR output", () => {
     const input = {
       status: "completed",
@@ -241,7 +286,7 @@ describe("readiness result formatting", () => {
   const templateCases = [
     {
       name: "success",
-      expectedTitle: "✅ BoardReadyOps: Ready to release",
+      expectedTitle: "✅ BoardReadyOps: Checks passed · review evidence",
       input: {
         status: "completed",
         decision: "pass",
