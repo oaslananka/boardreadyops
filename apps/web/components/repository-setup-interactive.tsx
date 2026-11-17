@@ -714,8 +714,8 @@ function SetupReadinessSteps() {
       <li>Confirm GitHub Actions is enabled and the workflow is active on the default branch.</li>
       <li>Dispatch the setup probe with a persisted deadline and idempotency key.</li>
       <li>
-        The workflow checks out its own default branch without persisted credentials and validates{" "}
-        <code>boardreadyops.yml</code> with a pinned BoardReadyOps CLI.
+        Current setup workflows read the exact commit's tracked configuration without a full source checkout. Older
+        installed workflows may still need a reviewed update.
       </li>
       <li>
         The result is posted with GitHub Actions OIDC bound to the repository ID, workflow ref, branch ref, and probe
@@ -785,8 +785,8 @@ function SetupReadinessStatus({
       </DefinitionGrid>
       {status === "expired" ? (
         <p role="status" className="text-sm text-muted-foreground">
-          No verified setup result arrived before this probe's deadline. Inspect its GitHub Actions run for checkout or
-          submodule errors before retrying.
+          No verified setup result arrived before this probe's deadline. Inspect its GitHub Actions run for
+          source-access, configuration, or submodule errors before retrying.
         </p>
       ) : status === "failed" ? (
         <p role="status" className="text-sm text-muted-foreground">

@@ -20,7 +20,9 @@ describe("repository setup workflow probe", () => {
     expect(source).toContain(
       'node "$GITHUB_WORKSPACE/.boardreadyops-tool/dist/cli/index.cjs" doctor --check repository --format json',
     );
-    expect(source).toContain("CONFIG_PATH must stay within the checked-out repository");
+    expect(source).toContain("CONFIG_PATH must be a normalized repository-relative file path");
+    expect(source).not.toContain("name: Check out default branch");
+    expect(source).toContain("Read configuration from authenticated GitHub commit");
     expect(source).not.toContain("npm exec");
     expect(source).not.toContain("boardreadyops@1.23.0");
     expect(source).toContain(`boardreadyops-setup:$${"{probeId}"}`);
