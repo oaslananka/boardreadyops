@@ -508,6 +508,39 @@ jobs:
                 ? { path: boundedText(finding.resource.path, "unknown", 1024) }
                 : {}),
             }));
+            // Forward only the already-computed, source-bound readiness verdict.
+            // An untrusted or older report without a valid assessment stays unverified:
+            // never synthesize 100/100, drop warnings, or forward profile/evidence metadata.
+            const observedReadiness = reportAvailable ? report.readiness : undefined;
+            const boundedCount = (value, maximum) =>
+              Number.isInteger(value) && value >= 0 && value <= maximum;
+            const boundedStrings = (values, maximumLength) =>
+              Array.isArray(values) &&
+              values.length <= 100 &&
+              values.every((value) =>
+                typeof value === "string" &&
+                value.trim().length > 0 &&
+                value.trim().length <= maximumLength);
+            const readiness =
+              observedReadiness &&
+              typeof observedReadiness === "object" &&
+              boundedCount(observedReadiness.score, 100) &&
+              ["ready", "at-risk", "blocked"].includes(observedReadiness.status) &&
+              boundedCount(observedReadiness.blocking, 10000) &&
+              boundedCount(observedReadiness.nonBlocking, 10000) &&
+              boundedStrings(observedReadiness.missingRequired, 256) &&
+              boundedStrings(observedReadiness.missingRecommended, 256) &&
+              boundedStrings(observedReadiness.warnings, 1000)
+                ? {
+                    score: observedReadiness.score,
+                    status: observedReadiness.status,
+                    blocking: observedReadiness.blocking,
+                    nonBlocking: observedReadiness.nonBlocking,
+                    missingRequired: observedReadiness.missingRequired.map((value) => value.trim()),
+                    missingRecommended: observedReadiness.missingRecommended.map((value) => value.trim()),
+                    warnings: observedReadiness.warnings.map((value) => value.trim()),
+                  }
+                : undefined;
             const rawBoms = reportAvailable && Array.isArray(report.boms) ? report.boms : [];
             const componentText = (value, maximum) => {
               const normalized = String(value ?? "").trim();
@@ -576,6 +609,7 @@ jobs:
               reportLinks,
               ...(Object.keys(toolVersions).length > 0 ? { toolVersions } : {}),
               ...(hardwareImpact ? { hardwareImpact } : {}),
+              ...(readiness ? { readiness } : {}),
               ...(boms.length > 0 ? { boms } : {}),
             };
             const payloadTooLarge = () => Buffer.byteLength(JSON.stringify(payload), "utf8") > 900 * 1024;

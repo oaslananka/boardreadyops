@@ -50,7 +50,7 @@ function mockResponse({ status, body }: CallbackResponse) {
   };
 }
 
-export async function executePublisher(responses: CallbackResponse[]) {
+export async function executePublisher(responses: CallbackResponse[], reportOverride?: Record<string, unknown>) {
   const requests: CapturedRequest[] = [];
   const failedMessages: string[] = [];
   let responseIndex = 0;
@@ -62,7 +62,7 @@ export async function executePublisher(responses: CallbackResponse[]) {
       return {
         readFileSync: (filename: string) => {
           expect(filename).toBe("/tmp/boardreadyops-fixture/boardreadyops.findings.json");
-          return JSON.stringify(report);
+          return JSON.stringify(reportOverride ?? report);
         },
       };
     },

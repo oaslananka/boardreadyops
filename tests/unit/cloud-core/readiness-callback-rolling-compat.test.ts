@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { buildReadinessCheckOutput, buildReadinessPrComment } from "../../../apps/web/lib/readiness-result-format.js";
+import { releaseRunResultSchema } from "../../../packages/contracts/src/index.js";
 import { assertSameSignedContext, executePublisher } from "./readiness-callback-rolling-compat-helper.js";
 
 const receipt = {
@@ -10,6 +12,79 @@ const receipt = {
 };
 
 describe("canonical GitHub Actions callback against rolling Cloud v1 receivers", () => {
+  const readinessReport = {
+    schemaVersion: 1,
+    tool: { name: "boardreadyops", version: "1.24.1" },
+    summary: { failed: false, total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+    findings: [],
+    readiness: {
+      profile: { id: "sample", name: "Demo", service: "manufacturing" },
+      score: 100,
+      status: "ready",
+      blocking: 0,
+      nonBlocking: 0,
+      evidence: [{ output: "bom", importance: "recommended", present: true }],
+      missingRequired: [],
+      missingRecommended: [],
+      warnings: [],
+    },
+  };
+
+  it("forwards actual Action readiness without profile or evidence claims, preserving signed context", async () => {
+    const result = await executePublisher([{ status: 202, body: receipt }], readinessReport);
+    expect(result.failure).toBeUndefined();
+    expect(result.requests).toHaveLength(1);
+    const payload = result.requests[0]?.payload;
+    expect(payload?.readiness).toEqual({
+      score: 100,
+      status: "ready",
+      blocking: 0,
+      nonBlocking: 0,
+      missingRequired: [],
+      missingRecommended: [],
+      warnings: [],
+    });
+    const parsed = releaseRunResultSchema.safeParse(payload);
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) throw new Error("Readiness result schema rejected the producer payload");
+    const check = buildReadinessCheckOutput(parsed.data);
+    const comment = buildReadinessPrComment(parsed.data);
+    expect(check.summary).toContain("100/100");
+    expect(comment).toContain("100/100");
+    expect(comment).not.toContain("| Readiness | Not reported |");
+    assertSameSignedContext(result.requests);
+  });
+
+  it("keeps transmitted readiness unchanged across a signed retry of the exact callback", async () => {
+    const result = await executePublisher(
+      [
+        { status: 400, body: { error: "invalid runner result" } },
+        { status: 202, body: receipt },
+      ],
+      readinessReport,
+    );
+    expect(result.failure).toBeUndefined();
+    expect(result.requests).toHaveLength(2);
+    expect(result.requests[0]?.payload.readiness).toEqual(result.requests[1]?.payload.readiness);
+    expect(releaseRunResultSchema.safeParse(result.requests[1]?.payload).success).toBe(true);
+    assertSameSignedContext(result.requests);
+  });
+
+  it.each([
+    { description: "out-of-range score", change: { score: 101 } },
+    { description: "unknown status", change: { status: "fabrication-approved" } },
+    { description: "invalid count", change: { blocking: -1 } },
+    { description: "oversized warning", change: { warnings: ["x".repeat(1001)] } },
+    { description: "oversized missing-output list", change: { missingRequired: Array(101).fill("gerber") } },
+  ])("does not publish an invented readiness for $description", async ({ change }) => {
+    const report = { ...readinessReport, readiness: { ...readinessReport.readiness, ...change } };
+    const result = await executePublisher([{ status: 202, body: receipt }], report);
+    expect(result.failure).toBeUndefined();
+    expect(result.requests).toHaveLength(1);
+    expect(result.requests[0]?.payload).not.toHaveProperty("readiness");
+    expect(releaseRunResultSchema.safeParse(result.requests[0]?.payload).success).toBe(true);
+  });
+
   it("preserves signed tool observations on a compatible receiver", async () => {
     const result = await executePublisher([{ status: 202, body: receipt }]);
     expect(result.failure).toBeUndefined();
