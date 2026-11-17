@@ -2,10 +2,13 @@ import { WorkspaceStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest } from "../../../../../lib/api-auth.js";
+import { RequestBodyTooLargeError, readBoundedRequestBody } from "../../../../../lib/bounded-request-body.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
 import { authorizeWorkspace, canWriteWorkspace } from "../../../../../lib/workspace-authorization.js";
 
 export const runtime = "nodejs";
+
+const maximumRevisionBodyBytes = 10 * 1024 * 1024;
 
 const createRevisionSchema = z.object({
   projectId: z.string().min(1),
@@ -24,8 +27,12 @@ export async function POST(request: Request): Promise<Response> {
 
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    const rawBody = (await readBoundedRequestBody(request, maximumRevisionBodyBytes)).toString("utf8");
+    body = JSON.parse(rawBody);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return Response.json({ ok: false, error: "Revision payload too large" }, { status: 413 });
+    }
     return Response.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
