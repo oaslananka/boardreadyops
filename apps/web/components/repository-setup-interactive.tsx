@@ -927,11 +927,35 @@ function SetupReadiness(props: Readonly<SetupReadinessProps>) {
               </p>
             </>
           ) : props.repository ? (
-            <p>
-              After the reviewed setup pull request is merged and the probe succeeds, open a pull request changing your
-              hardware project. Inspect the resulting GitHub Check Run for an actionable finding and its hosted run; an
-              empty or queued result is not a first useful finding.
-            </p>
+            <div className="flex flex-col items-start gap-2">
+              <p>
+                After the reviewed setup pull request is merged and the probe succeeds, commit a hardware change on a
+                branch and open a pull request. Inspect the resulting GitHub Check Run for an actionable finding; an
+                empty or queued result is not a first useful finding.
+              </p>
+              {view.effectiveProbeStatus === "completed" &&
+              !props.blockedReason &&
+              deriveRepositorySetupState(props.repository).id === "ready" ? (
+                <>
+                  <a
+                    href={
+                      "https://github.com/" +
+                      props.repository.fullName.split("/").map(encodeURIComponent).join("/") +
+                      "/compare"
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary/90"
+                  >
+                    Start a hardware pull request ↗
+                  </a>
+                  <p className="text-xs text-muted-foreground">
+                    Select the branch containing your board changes on GitHub. This link does not create a Check Run or
+                    approve manufacturing by itself.
+                  </p>
+                </>
+              ) : null}
+            </div>
           ) : (
             <p>Connect and select a repository to see whether full readiness runs are enabled for it.</p>
           )}

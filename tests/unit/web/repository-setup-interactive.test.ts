@@ -326,6 +326,77 @@ describe("repository setup readiness controls", () => {
     expect(notice?.querySelector('a[href="#automated-setup"]')).toBeNull();
   });
 
+  it("links a verified, rollout-enabled repository to its own GitHub pull request flow", async () => {
+    const verified = {
+      ...readyForProbe,
+      id: "ready",
+      fullName: "octo/board-one",
+      setupWorkflowStatus: "ready",
+      setupConfigStatus: "ready",
+      setupObservedSha: "a".repeat(40),
+      setupProbeStatus: "completed",
+    };
+    const blocked = {
+      ...verified,
+      id: "blocked",
+      fullName: "second/board-two",
+      readinessRunBlockedReason: "Hosted runs are restricted.",
+    };
+    const permissionsBlocked = {
+      ...verified,
+      id: "permissions",
+      fullName: "third/board-three",
+      readinessBlockedReason: "Actions permissions unavailable.",
+    };
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [verified, blocked, permissionsBlocked],
+          initialRepositoryId: "ready",
+        }),
+      );
+    });
+    const primary = container.querySelector<HTMLAnchorElement>(
+      '#readiness a[href="https://github.com/octo/board-one/compare"]',
+    );
+    expect(primary?.textContent).toContain("Start a hardware pull request");
+    expect(primary?.target).toBe("_blank");
+    expect(primary?.rel).toContain("noreferrer");
+
+    const selector = container.querySelector<HTMLSelectElement>("#one-click-setup-repository");
+    if (!selector) throw new Error("repository selector not found");
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(selector, "blocked");
+      selector.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.querySelector('#readiness a[href*="/compare"]')).toBeNull();
+    expect(container.textContent).toContain("Hosted runs are restricted.");
+
+    await act(async () => {
+      setter?.call(selector, "permissions");
+      selector.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.querySelector('#readiness a[href*="/compare"]')).toBeNull();
+    expect(container.textContent).toContain("Actions permissions unavailable.");
+  });
+
+  it("does not offer a hosted first-run PR action before setup probe completion", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...readyForProbe, setupProbeStatus: "pending" }],
+          initialRepositoryId: readyForProbe.id,
+        }),
+      );
+    });
+    expect(container.querySelector('#readiness a[href*="/compare"]')).toBeNull();
+  });
+
   it("explains rollout-gated first runs per selected repository without claiming a setup probe is a result", async () => {
     const repositories: SetupTargetRepository[] = [
       {
@@ -389,7 +460,7 @@ describe("repository setup readiness controls", () => {
     );
     expect(container.querySelector('a[href="/runs/run-a"]')).toBeNull();
     expect(container.querySelector('a[href*="/docs/quickstart.md"]')).toBeNull();
-    expect(container.textContent).toContain("open a pull request changing your");
+    expect(container.textContent).toContain("commit a hardware change on a");
     expect(container.textContent).toContain("an empty or queued result is not a first useful finding");
   });
 
