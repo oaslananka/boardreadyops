@@ -95,8 +95,8 @@ export function ManufacturingHandoffPath({
           <h3 className="mt-1 font-semibold text-foreground">Authorize a verified package</h3>
           <p className="mt-1 text-xs font-medium text-warning">Separate release authorization required</p>
           <p className="mt-2 flex-1 text-sm text-muted-foreground">
-            A source-bound verified package requires separate owner permission before guest sharing. Guest links also
-            depend on workspace entitlements and current availability; this Review never authorizes sharing.
+            Guest sharing requires verified source-bound evidence, separate owner permission and plan availability. This
+            Review never approves delivery.
           </p>
           <div className="mt-3">
             <Button asChild variant="outline" size="sm">
