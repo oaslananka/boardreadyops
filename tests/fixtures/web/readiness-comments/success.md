@@ -1,8 +1,8 @@
-## ✅ BoardReadyOps: Ready to release
+## ✅ BoardReadyOps: Checks passed · review evidence
 
 | Field | Value |
 | --- | --- |
-| Outcome | ✅ Ready to release |
+| Outcome | ✅ Checks passed · review evidence |
 | Status | Completed |
 | Decision | Pass |
 | Readiness | 100/100 · Ready |
@@ -21,7 +21,8 @@
 
 ### Next steps
 
-- Review the evidence bundle and proceed with the release workflow.
+- Verify the source-linked BOM, Gerber, and signed fabrication evidence before a release or delivery decision.
+- A passing readiness score or signed archive is not manufacturing approval; complete an explicit Review and delivery eligibility check.
 
 [Open hosted run dashboard](https://boardreadyops.test/runs/run-123)
 

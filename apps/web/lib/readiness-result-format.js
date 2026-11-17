@@ -14,7 +14,7 @@ const safeModeReasonLabels = {
 };
 
 const terminalPresentations = {
-  success: { emoji: "✅", label: "Ready to release" },
+  success: { emoji: "✅", label: "Checks passed · review evidence" },
   unverified: { emoji: "✅", label: "Checks passed · readiness unverified" },
   warning: { emoji: "⚠️", label: "Review warnings" },
   failure: { emoji: "❌", label: "Release blocked" },
@@ -457,7 +457,10 @@ function nextSteps(input) {
     case "superseded":
       return ["Open the latest run and use its result as the source of truth."];
     default:
-      return ["Review the evidence bundle and proceed with the release workflow."];
+      return [
+        "Verify the source-linked BOM, Gerber, and signed fabrication evidence before a release or delivery decision.",
+        "A passing readiness score or signed archive is not manufacturing approval; complete an explicit Review and delivery eligibility check.",
+      ];
   }
 }
 
@@ -543,7 +546,7 @@ export function buildProgressiveReadinessComment(input) {
     lines.push(`> ${outcome.emoji} **${outcome.label}:** No verified release approval; inspect the recorded run.`, "");
   } else {
     lines.push(
-      "> ✅ **Ready for release:** All hardware checks passed and required fabrication packages verified.",
+      "> ✅ **Checks passed; verify fabrication evidence:** Readiness results do not establish manufacturing approval or confirm that all required outputs are present.",
       "",
     );
   }
