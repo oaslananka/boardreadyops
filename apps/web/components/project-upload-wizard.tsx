@@ -26,21 +26,10 @@ export function ProjectUploadWizard({
   return (
     <Tabs defaultValue="github">
       <TabsList aria-label="Ingestion Source">
-        <TabsTrigger value="zip">Upload Package (Zip) — Unavailable</TabsTrigger>
         <TabsTrigger value="github">Connect GitHub Repository</TabsTrigger>
         <TabsTrigger value="cli">Run Local CLI</TabsTrigger>
+        <TabsTrigger value="zip">Upload Package (Zip) — Unavailable</TabsTrigger>
       </TabsList>
-
-      <TabsContent value="zip" className="flex flex-col gap-3 text-sm">
-        <p className="text-foreground">
-          Hosted package upload is not available yet — the ingestion backend for direct manufacturing-package uploads
-          isn&apos;t connected.
-        </p>
-        <p className="text-muted-foreground">
-          Use <strong className="text-foreground">Connect GitHub Repository</strong> or{" "}
-          <strong className="text-foreground">Run Local CLI</strong> to run a pre-flight review today.
-        </p>
-      </TabsContent>
 
       <TabsContent value="github" className="flex flex-col gap-3 text-sm">
         {accessUnavailable ? (
@@ -119,6 +108,17 @@ export function ProjectUploadWizard({
         <p className="text-muted-foreground">
           The CLI detects KiCad, Altium, EasyEDA, Fusion 360, and Gerber packages locally and generates offline HTML,
           JSON, and markdown reports.
+        </p>
+      </TabsContent>
+
+      <TabsContent value="zip" className="flex flex-col gap-3 text-sm">
+        <p className="text-foreground">
+          Hosted package upload is not available yet — the ingestion backend for direct manufacturing-package uploads
+          isn&apos;t connected.
+        </p>
+        <p className="text-muted-foreground">
+          Use <strong className="text-foreground">Connect GitHub Repository</strong> or{" "}
+          <strong className="text-foreground">Run Local CLI</strong> to run a pre-flight review today.
         </p>
       </TabsContent>
     </Tabs>

@@ -53,7 +53,7 @@ export function ReviewHeader({
   const isApproved = decision === "approved";
 
   return (
-    <header className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-e2 sm:gap-4 sm:p-5 sm:flex-row sm:items-start sm:justify-between">
+    <header className="flex min-w-0 flex-col gap-2 rounded-md border border-border bg-card p-3 shadow-e2 sm:gap-4 sm:p-5 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 flex-col gap-2">
         <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-xs text-muted-foreground sm:flex-wrap sm:overflow-visible sm:whitespace-normal sm:text-sm">
           <Link href="/reviews" className="hover:text-foreground hover:underline">

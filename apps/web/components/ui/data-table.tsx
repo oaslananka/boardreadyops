@@ -5,6 +5,7 @@ import { Button } from "./button.js";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "./table.js";
 
 export type SortDirection = "asc" | "desc";
+export type DataTableDensity = "normal" | "compact";
 
 export type DataColumn<Row> = {
   readonly id: string;
@@ -53,6 +54,7 @@ export function DataTable<Row>({
   sort,
   sortParameter = "sort",
   directionParameter = "dir",
+  density = "normal",
   empty,
 }: Readonly<{
   columns: readonly DataColumn<Row>[];
@@ -67,6 +69,7 @@ export function DataTable<Row>({
   sort?: DataTableSort | undefined;
   sortParameter?: string;
   directionParameter?: string;
+  density?: DataTableDensity;
   empty: ReactNode;
 }>) {
   if (rows.length === 0) return <>{empty}</>;
@@ -86,7 +89,11 @@ export function DataTable<Row>({
                 key={column.id}
                 scope="col"
                 aria-sort={column.sortable ? ariaSort : undefined}
-                className={cn(column.align === "end" && "text-right", column.headerClassName)}
+                className={cn(
+                  column.align === "end" && "text-right",
+                  density === "compact" && "py-1.5",
+                  column.headerClassName,
+                )}
               >
                 {column.sortable ? (
                   <Link
@@ -117,14 +124,26 @@ export function DataTable<Row>({
                 <TableCell
                   key={column.id}
                   asChild
-                  className={cn("font-medium", column.align === "end" && "text-right", column.className)}
+                  className={cn(
+                    "font-medium",
+                    column.align === "end" && "text-right",
+                    density === "compact" && "py-1.5",
+                    column.className,
+                  )}
                 >
                   <th scope="row" className="text-left">
                     {column.cell(row)}
                   </th>
                 </TableCell>
               ) : (
-                <TableCell key={column.id} className={cn(column.align === "end" && "text-right", column.className)}>
+                <TableCell
+                  key={column.id}
+                  className={cn(
+                    column.align === "end" && "text-right",
+                    density === "compact" && "py-1.5",
+                    column.className,
+                  )}
+                >
                   {column.cell(row)}
                 </TableCell>
               ),
