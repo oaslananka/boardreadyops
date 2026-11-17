@@ -119,6 +119,7 @@ const runListingQuery = (signedManufacturingOnly: boolean) => `
      and installations.suspended_at is null
      and ${notCancelledSubscription}
      ${signedManufacturingOnly ? signedManufacturingEvidenceFilter : ""}
+     and ($6::text is null or lower(repositories.owner || '/' || repositories.name) = $6::text)
      and ($3::timestamptz is null or (release_runs.started_at, release_runs.id) < ($3::timestamptz, $4::text))
    order by release_runs.started_at desc, release_runs.id desc
    limit $5`;
@@ -131,7 +132,7 @@ const runListingQuery = (signedManufacturingOnly: boolean) => `
  */
 export async function loadViewerRuns(
   session: UserSession | undefined,
-  options: { cursor?: RunListingCursor; limit?: number; signedManufacturingOnly?: boolean } = {},
+  options: { cursor?: RunListingCursor; limit?: number; signedManufacturingOnly?: boolean; repository?: string } = {},
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<RunListingResult> {
   if (!session || session.installationIds.length === 0) return { state: "ok", runs: [], next: undefined };
@@ -153,6 +154,7 @@ export async function loadViewerRuns(
       options.cursor?.startedAt ?? null,
       options.cursor?.id ?? null,
       limit + 1,
+      options.repository ?? null,
     ]);
     const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
     const page = rows.slice(0, limit);

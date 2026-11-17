@@ -4,6 +4,11 @@ const liveRepositoryIds = vi.hoisted(() => vi.fn(async () => [49301]));
 vi.mock("../../../apps/web/lib/live-installation-repositories.js", () => ({
   resolveLiveInstallationRepositoryIds: liveRepositoryIds,
 }));
+const dbQuery = vi.hoisted(() => vi.fn(async () => ({ rows: [] })));
+const dbClose = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@boardreadyops/db/pg-executor", () => ({
+  createPgQueryExecutor: vi.fn(() => ({ query: dbQuery, close: dbClose })),
+}));
 
 import {
   decodeRunListingCursor,
@@ -68,6 +73,27 @@ describe("run listing page size", () => {
 });
 
 describe("loadViewerRuns", () => {
+  it("applies repository filtering inside the existing installation and grant scoped SQL", async () => {
+    const { loadViewerRuns } = await import("../../../apps/web/lib/run-listing.js");
+    dbQuery.mockClear();
+    dbClose.mockClear();
+    const result = await loadViewerRuns(
+      { login: "alice", installationIds: [123] },
+      { limit: 3, signedManufacturingOnly: true, repository: "owner/hardware" },
+      { DATABASE_URL: "postgres://local" },
+    );
+    expect(result).toEqual({ state: "ok", runs: [], next: undefined });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining("lower(repositories.owner || '/' || repositories.name) = $6::text"),
+      [[123], [49301], null, null, 4, "owner/hardware"],
+    );
+    const sql = String(dbQuery.mock.calls[0]?.[0]);
+    expect(sql).toContain("installations.github_installation_id = any($1::bigint[])");
+    expect(sql).toContain("repositories.github_repo_id = any($2::bigint[])");
+    expect(sql).toContain("signed_manufacturing_export_evidence");
+    expect(dbClose).toHaveBeenCalledOnce();
+  });
+
   it("returns empty runs when session is undefined or has no installations", async () => {
     const { loadViewerRuns } = await import("../../../apps/web/lib/run-listing.js");
     expect(await loadViewerRuns(undefined)).toEqual({ state: "ok", runs: [], next: undefined });

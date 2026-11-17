@@ -68,6 +68,7 @@ describe("recorded Run review journey", () => {
     expect(html).toContain('href="/runs/a%2Fb/findings"');
     expect(html).toContain('href="/runs/a%2Fb/artifacts"');
     expect(html).toContain('href="/reviews?repository=owner%2Fhardware"');
+    expect(html).toContain('href="/deliveries?repository=owner%2Fhardware"');
     expect(html).toContain("Delivery requires separate authorization");
     expect(html).not.toContain("Manufacturing approved");
   });
@@ -77,6 +78,8 @@ describe("recorded Run review journey", () => {
       createElement(RunReviewPath, { run: run("safe", { repository: "invalid-repo-name" }) }),
     );
     expect(html).not.toContain("/reviews?repository=");
+    expect(html).toContain('href="/deliveries"');
+    expect(html).not.toContain("/deliveries?repository=");
     expect(html).toContain('href="/runs/safe/findings"');
   });
 });

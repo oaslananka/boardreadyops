@@ -193,6 +193,84 @@ describe("DeliveriesListPage", () => {
     role: "owner" as const,
   };
 
+  it("passes an authorized repository filter into the signed Run query instead of showing unrelated archives", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [],
+      revisions: [],
+      deliveries: [],
+    });
+    loadViewerRuns.mockClear();
+    loadViewerRuns.mockResolvedValueOnce({
+      state: "ok",
+      runs: [
+        {
+          id: "run-selected",
+          repositoryId: "repo-selected",
+          repository: "owner/hardware",
+          status: "completed",
+          decision: "pass",
+          commitSha: "a".repeat(40),
+          ref: "refs/heads/main",
+          startedAt: "2026-11-17T08:00:00.000Z",
+        },
+      ],
+      next: undefined,
+    });
+    const markup = renderToStaticMarkup(
+      await DeliveriesListPage({ searchParams: Promise.resolve({ repository: "OWNER/HARDWARE" }) }),
+    );
+    expect(loadViewerRuns).toHaveBeenCalledWith(
+      expect.anything(),
+      { limit: 3, signedManufacturingOnly: true, repository: "owner/hardware" },
+      process.env,
+    );
+    expect(markup).toContain("Signed Run archives for owner/hardware");
+    expect(markup).toContain('href="/runs/run-selected/artifacts"');
+    expect(markup).toContain("Package revisions and guest links below belong to the selected workspace");
+    expect(markup).toContain('href="/deliveries"');
+  });
+
+  it("shows a useful repository-scoped empty state without implying the board is manufacturing-ready", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [],
+      revisions: [],
+      deliveries: [],
+    });
+    loadViewerRuns.mockClear();
+    loadViewerRuns.mockResolvedValueOnce({ state: "ok", runs: [], next: undefined });
+    const markup = renderToStaticMarkup(
+      await DeliveriesListPage({ searchParams: Promise.resolve({ repository: "owner/hardware" }) }),
+    );
+    expect(markup).toContain("No signed manufacturing archive for owner/hardware");
+    expect(markup).toContain('href="/reviews?repository=owner%2Fhardware"');
+    expect(markup).toContain("not evidence that the board is ready for fabrication");
+    expect(markup).not.toContain("No signed manufacturing archives for all repositories");
+  });
+
+  it("rejects malformed repository scope instead of silently returning unfiltered evidence", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisionCandidates: [],
+      revisions: [],
+      deliveries: [],
+    });
+    loadViewerRuns.mockClear();
+    const markup = renderToStaticMarkup(
+      await DeliveriesListPage({ searchParams: Promise.resolve({ repository: "../../other" }) }),
+    );
+    expect(loadViewerRuns).not.toHaveBeenCalled();
+    expect(markup).toContain("Invalid repository filter");
+    expect(markup).not.toContain("Signed Run archives ? not deliveries");
+  });
+
   it("lists a live link with what it points at", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
