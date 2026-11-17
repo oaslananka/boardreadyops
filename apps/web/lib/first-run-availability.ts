@@ -9,11 +9,16 @@ export function firstRunAvailability(
   const withoutRuns = groups.flatMap((group) => group.repositories).filter((repository) => !repository.latestRunId);
   const gatedRepositoryIds = new Set<string>();
   let firstEnabledRepositoryId: string | undefined;
+  let firstGatedRepositoryId: string | undefined;
 
   for (const repository of withoutRuns) {
     const dispatch = releaseRepositoryDispatchAvailability(`${repository.owner}/${repository.name}`, environment);
-    if (!dispatch.enabled) gatedRepositoryIds.add(repository.id);
-    else firstEnabledRepositoryId ??= repository.id;
+    if (!dispatch.enabled) {
+      gatedRepositoryIds.add(repository.id);
+      firstGatedRepositoryId ??= repository.id;
+    } else {
+      firstEnabledRepositoryId ??= repository.id;
+    }
   }
 
   return {
@@ -22,5 +27,6 @@ export function firstRunAvailability(
     eligible: withoutRuns.length - gatedRepositoryIds.size,
     gatedRepositoryIds,
     firstEnabledRepositoryId,
+    firstGatedRepositoryId,
   };
 }

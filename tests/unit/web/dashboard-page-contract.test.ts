@@ -206,7 +206,12 @@ describe("dashboard operational hierarchy", () => {
     expect(html).toContain('href="/runs/74c7f60f-0779-4f48-bfe0-2fc07360565b"');
     expect(html).toContain("public synthetic demo boards, not results for your repositories");
     expect(html).toContain("Check your own PCB locally");
-    expect(html).toContain("Check this board locally");
+    expect(html).toContain("Review this board");
+    expect(html).toContain("next step");
+    expect(html).toContain("Open local check guide");
+    expect(html).toContain("Continue with your board");
+    expect(html).toContain('href="/setup?repositoryId=blocked-a"');
+    expect(html).toContain('href="/setup?repositoryId=blocked-b"');
     expect(html).toContain("A local finding is not an OIDC-signed hosted Check Run");
     expect(html).toContain("docs/quickstart.md");
     expect(html).not.toContain("Review setup and run the first check");
@@ -272,7 +277,9 @@ describe("dashboard operational hierarchy", () => {
     expect(html).toContain("1 repository is eligible for hosted checks");
     expect(html).toContain("1 repository is awaiting rollout");
     expect(html).toContain('href="/setup?repositoryId=enabled-id"');
-    expect(html).toContain("Check this board locally");
+    expect(html).toContain("Review this board");
+    expect(html).toContain("next step");
+    expect(html).toContain('href="/setup?repositoryId=blocked-id"');
     expect(html).toContain("Set up first hosted check");
     expect(html).not.toContain("Cloud readiness runs are not enabled for these repositories");
   });

@@ -286,6 +286,10 @@ function RecordedHardwareWork({ groups }: Readonly<{ groups: RepositoryGroup[] }
 }
 
 const localQuickstartUrl = "https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md";
+
+function setupHrefForRepository(repositoryId: string | undefined): string {
+  return repositoryId ? `/setup?repositoryId=${encodeURIComponent(repositoryId)}` : "/setup";
+}
 type FirstRunAccess = ReturnType<typeof firstRunAvailability>;
 
 function SetupInProgressBanner({
@@ -313,8 +317,14 @@ function SetupInProgressBanner({
         </div>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
           <Link
-            href="/runs/9ab5ab15-0db0-4b22-b923-ac434da4ebee"
+            href={setupHrefForRepository(access.firstGatedRepositoryId)}
             className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Continue with your board
+          </Link>
+          <Link
+            href="/runs/9ab5ab15-0db0-4b22-b923-ac434da4ebee"
+            className="inline-flex min-h-11 items-center rounded-lg border border-border bg-card px-4 py-2 font-semibold text-foreground hover:border-primary/40 hover:text-primary"
           >
             Explore a passing example →
           </Link>
@@ -548,9 +558,9 @@ function ConnectedBoardNextAction({
             stateLabel = `${repo.openFindings} recorded findings`;
             href += "/findings";
           } else if (needsSetup && firstRun.gatedRepositoryIds.has(repo.id)) {
-            action = "Check this board locally";
+            action = "Review this board's next step";
             stateLabel = "Hosted checks awaiting rollout · no recorded review";
-            href = localQuickstartUrl;
+            href = `/setup?repositoryId=${encodeURIComponent(repo.id)}`;
           } else if (needsSetup) {
             action = "Set up first hosted check";
             stateLabel = "Eligible for hosted checks · no review yet";
@@ -580,6 +590,14 @@ function ConnectedBoardNextAction({
               >
                 {action} <ArrowUpRight className="size-4" aria-hidden="true" />
               </Link>
+              {needsSetup && firstRun.gatedRepositoryIds.has(repo.id) ? (
+                <a
+                  href={localQuickstartUrl}
+                  className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
+                >
+                  Open local check guide
+                </a>
+              ) : null}
               {repo.latestRunId ? (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3">
                   <Link
