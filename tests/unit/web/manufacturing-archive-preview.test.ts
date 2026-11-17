@@ -4,7 +4,7 @@ import { Window } from "happy-dom";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ManufacturingArchivePreview } from "../../../apps/web/components/manufacturing-archive-preview.js";
 import { inspectDownloadedManufacturingArchive } from "../../../apps/web/components/manufacturing-archive-preview-parser.js";
 
@@ -221,12 +221,31 @@ describe("manufacturing package review affordance", () => {
       const localFile = new win.File([new Uint8Array(await file.arrayBuffer())], "signed-manufacturing-export.tar.gz", {
         type: "application/gzip",
       });
+      // Simulate a slow local File read so the test must wait for verification to finish,
+      // rather than assuming a fixed number of milliseconds is enough on CI runners.
+      const readFileBytes = localFile.arrayBuffer.bind(localFile);
+      Object.defineProperty(localFile, "arrayBuffer", {
+        value: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          return await readFileBytes();
+        },
+      });
       Object.defineProperty(picker, "files", { configurable: true, value: [localFile] });
       await act(async () => {
         picker?.dispatchEvent(new win.Event("change", { bubbles: true }));
-        await new Promise((resolve) => setTimeout(resolve, 25));
       });
-      expect(host.textContent).toContain("Recorded SHA-256 and source commit match");
+      expect(host.textContent).toContain("Checking archive integrity and source evidence");
+      await vi.waitFor(
+        async () => {
+          // Run asynchronous digest/decompression work inside React's act boundary
+          // and only unmount after the verified browser UI has actually rendered.
+          await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          });
+          expect(host.textContent).toContain("Recorded SHA-256 and source commit match");
+        },
+        { timeout: 10_000, interval: 20 },
+      );
       expect(host.textContent).toContain("R1,R2");
       expect(host.textContent).toContain("Bill of materials");
       expect(host.querySelector('a[href="/runs/run-1/design"]')).not.toBeNull();
