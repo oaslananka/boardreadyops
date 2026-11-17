@@ -343,7 +343,12 @@ describe("Review Detail Tabs", () => {
   it("shows an actionable evidence-first manufacturing path on a blocked real Review", () => {
     const html = renderToStaticMarkup(
       createElement(ManufacturingHandoffPath, {
-        review: { id: "review-42", decision: "changes_requested", headRunId: "source-run-42" },
+        review: {
+          id: "review-42",
+          decision: "changes_requested",
+          headRunId: "source-run-42",
+          repositoryName: "owner/review-board",
+        },
         blockingCount: 57,
         reviewChecksMet: false,
       }),
@@ -355,16 +360,16 @@ describe("Review Detail Tabs", () => {
     expect(html).toContain('href="/runs/source-run-42/artifacts"');
     expect(html).toContain('href="/runs/source-run-42#boards"');
     expect(html).not.toContain('href="/parts"');
-    expect(html).toContain('href="/deliveries"');
-    expect(html).toContain("Team or higher");
-    expect(html).toContain("this Review does not grant either");
+    expect(html).toContain('href="/deliveries?repository=owner%2Freview-board"');
+    expect(html).not.toContain("Guest links require Team or higher");
+    expect(html).toContain("separate owner permission");
     expect(html).not.toContain("Ready for fabrication");
   });
 
   it("never promotes a fully checked Review to an eligible manufacturing package", () => {
     const html = renderToStaticMarkup(
       createElement(ManufacturingHandoffPath, {
-        review: { id: "review-99", decision: "approved" },
+        review: { id: "review-99", decision: "approved", repositoryName: "owner/hardware" },
         blockingCount: 0,
         reviewChecksMet: true,
       }),

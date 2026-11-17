@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { DemoReview } from "../../lib/demo-data.js";
+import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { Button } from "../ui/button.js";
 
-type HandoffReview = Pick<DemoReview, "id" | "decision" | "headRunId">;
+type HandoffReview = Pick<DemoReview, "id" | "decision" | "headRunId" | "repositoryName">;
 
 /** A Review is evidence, never a source-to-export manufacturing authorization. */
 export function ManufacturingHandoffPath({
@@ -26,6 +27,8 @@ export function ManufacturingHandoffPath({
         ? "Review checks met"
         : "Review checks pending";
   const artifactsHref = review.headRunId ? `/runs/${encodeURIComponent(review.headRunId)}/artifacts` : "/runs";
+  const repository = canonicalRepositoryName(review.repositoryName);
+  const deliveriesHref = repository ? `/deliveries?repository=${encodeURIComponent(repository)}` : "/deliveries";
 
   return (
     <section
@@ -92,12 +95,12 @@ export function ManufacturingHandoffPath({
           <h3 className="mt-1 font-semibold text-foreground">Authorize a verified package</h3>
           <p className="mt-1 text-xs font-medium text-warning">Separate release authorization required</p>
           <p className="mt-2 flex-1 text-sm text-muted-foreground">
-            A source-bound verified package requires owner/admin permission before guest sharing. Guest links require
-            Team or higher; this Review does not grant either.
+            Guest sharing requires verified source-bound evidence, separate owner permission and plan availability. This
+            Review never approves delivery.
           </p>
           <div className="mt-3">
             <Button asChild variant="outline" size="sm">
-              <Link href="/deliveries">Check delivery eligibility</Link>
+              <Link href={deliveriesHref}>Check delivery eligibility</Link>
             </Button>
           </div>
         </li>

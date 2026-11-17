@@ -179,6 +179,11 @@ function deliveryColumns(
 
 export default async function DeliveriesListPage({ searchParams }: Readonly<DeliveriesPageProps>) {
   const parameters = await searchParams;
+  const requestedRepository = first(parameters.repository);
+  const selectedRepository =
+    requestedRepository === undefined ? undefined : canonicalRepositoryName(requestedRepository);
+  // Never silently discard an invalid scope and show unrelated repositories.
+  const invalidRepositoryFilter = requestedRepository !== undefined && selectedRepository === undefined;
   const viewer = await viewerAuthorization();
   const result = await loadWorkspaceDeliveries(
     viewer.session,
@@ -190,8 +195,16 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
   // Signed Run evidence is repository-scoped, never a delivery from the
   // selected workspace. Reuse the live GitHub installation grant checks.
   const signedRunListing =
-    viewer.session && (result.state === "ok" || result.state === "no-workspaces")
-      ? await loadViewerRuns(viewer.session, { limit: 3, signedManufacturingOnly: true }, process.env)
+    !invalidRepositoryFilter && viewer.session && (result.state === "ok" || result.state === "no-workspaces")
+      ? await loadViewerRuns(
+          viewer.session,
+          {
+            limit: 3,
+            signedManufacturingOnly: true,
+            ...(selectedRepository ? { repository: selectedRepository } : {}),
+          },
+          process.env,
+        )
       : undefined;
 
   // The copied value has to be a URL the recipient can open, so the origin comes from the request
@@ -215,8 +228,61 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
           </p>
         </header>
 
-        {signedRunListing?.state === "ok" && signedRunListing.runs.length > 0 ? (
-          <SignedRunArchivesPanel runs={signedRunListing.runs} />
+        {invalidRepositoryFilter ? (
+          <Panel title="Invalid repository filter">
+            <p className="text-sm text-muted-foreground">
+              The requested repository is not a valid GitHub owner/name. No signed Run archives were loaded.{" "}
+              <Link href="/deliveries" className="font-semibold text-primary underline underline-offset-2">
+                Browse authorized signed archives
+              </Link>
+            </p>
+          </Panel>
+        ) : signedRunListing?.state === "ok" && signedRunListing.runs.length > 0 ? (
+          <SignedRunArchivesPanel
+            runs={signedRunListing.runs}
+            {...(selectedRepository ? { repository: selectedRepository } : {})}
+          />
+        ) : selectedRepository ? (
+          <Panel
+            title={
+              signedRunListing?.state === "ok"
+                ? `No signed manufacturing archive for ${selectedRepository}`
+                : "Signed archive eligibility cannot be verified"
+            }
+          >
+            {signedRunListing?.state === "ok" ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  There is no currently accessible, stored, signed manufacturing Run archive for this repository. A
+                  Review, findings or an unsigned Run can still exist; this is not evidence that the board is ready for
+                  fabrication.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                  <Link
+                    href={`/reviews?repository=${encodeURIComponent(selectedRepository)}`}
+                    className="font-semibold text-primary underline underline-offset-2"
+                  >
+                    Return to this repository&apos;s Reviews
+                  </Link>
+                  <Link href="/deliveries" className="font-semibold text-primary underline underline-offset-2">
+                    Browse all authorized signed archives
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Your repository access or archive listing is temporarily unavailable. Do not interpret missing evidence
+                as a passing manufacturing result.
+              </p>
+            )}
+          </Panel>
+        ) : null}
+
+        {selectedRepository && result.state === "ok" ? (
+          <p className="text-sm text-muted-foreground">
+            Package revisions and guest links below belong to the selected workspace; they are not filtered by GitHub
+            repository. Verify the source and workspace before sharing anything.
+          </p>
         ) : null}
 
         {result.state === "ok" ? (
@@ -331,7 +397,10 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                   page={result.page}
                   totalPages={result.totalPages}
                   pageParameter="page"
-                  searchParameters={{ workspace: result.selected.id }}
+                  searchParameters={{
+                    workspace: result.selected.id,
+                    ...(selectedRepository ? { repository: selectedRepository } : {}),
+                  }}
                 />
               </div>
             </Panel>
@@ -350,11 +419,18 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
  * Browser-facing discovery only. This never creates a workspace revision,
  * shares a package, or mints download capabilities.
  */
-function SignedRunArchivesPanel({ runs }: Readonly<{ runs: readonly RunListingEntry[] }>) {
+function SignedRunArchivesPanel({
+  runs,
+  repository,
+}: Readonly<{ runs: readonly RunListingEntry[]; repository?: string }>) {
   return (
     <Panel
-      title="Signed Run archives — not deliveries"
-      description="Source-bound manufacturing evidence from GitHub repositories your current installations can access, including other workspaces."
+      title={repository ? `Signed Run archives for ${repository}` : "Signed Run archives \u2014 not deliveries"}
+      description={
+        repository
+          ? "Signed manufacturing Run evidence for this repository under your verified GitHub installation grants. These are not deliveries."
+          : "Source-bound manufacturing evidence from GitHub repositories your current installations can access, including other workspaces."
+      }
     >
       <ul className="space-y-3" aria-label="Signed manufacturing Run evidence">
         {runs.map((run) => (

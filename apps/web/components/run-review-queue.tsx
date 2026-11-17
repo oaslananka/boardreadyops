@@ -96,6 +96,8 @@ export function RunReviewQueue({ runs }: Readonly<{ runs: readonly RunListingEnt
 export function RunReviewPath({ run }: Readonly<{ run: ReviewPathRun }>) {
   const runHref = `/runs/${encodeURIComponent(run.id)}`;
   const reviewHref = reviewHistoryHref(run.repository);
+  const repository = canonicalRepositoryName(run.repository);
+  const deliveriesHref = repository ? `/deliveries?repository=${encodeURIComponent(repository)}` : "/deliveries";
   const steps = [
     {
       href: `${runHref}/design`,
@@ -155,7 +157,7 @@ export function RunReviewPath({ run }: Readonly<{ run: ReviewPathRun }>) {
             Open repository Reviews
           </Link>
         ) : null}
-        <Link href="/deliveries" className={linkClass}>
+        <Link href={deliveriesHref} className={linkClass}>
           Check delivery eligibility
         </Link>
       </div>
