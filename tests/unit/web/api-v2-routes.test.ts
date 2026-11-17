@@ -279,6 +279,27 @@ describe("API v2 Routes", () => {
       const res = await createRevision(req);
       expect(res.status).toBe(400);
     });
+
+    it("rejects payload exceeding maximum size limit with 413", async () => {
+      const req = new Request("https://boardreadyops.test/api/v2/revisions/upload", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": String(11 * 1024 * 1024),
+          origin: "https://boardreadyops.test",
+        },
+        body: JSON.stringify({
+          projectId: "prj_001",
+          revisionLabel: "v1.2",
+          bundleSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        }),
+      });
+
+      const res = await createRevision(req);
+      expect(res.status).toBe(413);
+      const data = (await res.json()) as { ok: boolean; error: string };
+      expect(data.error).toBe("Revision payload too large");
+    });
   });
 
   describe("deliveries", () => {

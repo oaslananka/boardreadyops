@@ -24,6 +24,7 @@ function database() {
 describeDatabase("external review links API (real Postgres)", () => {
   let reviewId: string;
   let token: string;
+  let teammateToken: string;
 
   beforeAll(async () => {
     if (!executor) return;
@@ -61,6 +62,13 @@ describeDatabase("external review links API (real Postgres)", () => {
       scopes: ["reviews:read", "reviews:write"],
     });
     token = created.token;
+
+    const teammateCreated = await tokenStore.createToken({
+      repositoryId,
+      name: "ext-review-links-teammate-token",
+      scopes: ["reviews:read", "reviews:write"],
+    });
+    teammateToken = teammateCreated.token;
   });
 
   afterAll(async () => {
@@ -69,7 +77,7 @@ describeDatabase("external review links API (real Postgres)", () => {
     await executor.close();
   });
 
-  it("creates a link, returns the raw token once, lists it, then revokes it", async () => {
+  it("creates a link, returns the raw token once, lists it across teammates, then allows teammate revocation", async () => {
     const createRequest = new Request("https://boardreadyops.com/api/v1/external-review-links", {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -93,17 +101,19 @@ describeDatabase("external review links API (real Postgres)", () => {
     // The raw token must never be derivable from what's persisted.
     expect(created.invitation.tokenHash).not.toBe(created.token);
 
+    // Teammate lists the link created by another user on the same repository review
     const listRequest = new Request(`https://boardreadyops.com/api/v1/external-review-links?reviewId=${reviewId}`, {
-      headers: { authorization: `Bearer ${token}` },
+      headers: { authorization: `Bearer ${teammateToken}` },
     });
     const listRes = await linksGet(listRequest);
     const listed = (await listRes.json()) as { ok: boolean; invitations: Array<{ id: string }> };
     expect(listed.ok).toBe(true);
     expect(listed.invitations.map((i) => i.id)).toContain(created.invitation.id);
 
+    // Teammate revokes the link created by colleague
     const deleteRequest = new Request(
       `https://boardreadyops.com/api/v1/external-review-links/${created.invitation.id}`,
-      { method: "DELETE", headers: { authorization: `Bearer ${token}` } },
+      { method: "DELETE", headers: { authorization: `Bearer ${teammateToken}` } },
     );
     const deleteRes = await linkDelete(deleteRequest, { params: Promise.resolve({ linkId: created.invitation.id }) });
     expect(deleteRes.status).toBe(200);
