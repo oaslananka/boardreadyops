@@ -99022,22 +99022,22 @@ async function inspectRequiredOutputs(context5) {
       )
     )).filter((value) => typeof value === "number")
   );
-  const inspections = [];
-  for (const requiredOutput of required3) {
-    const outputPatterns = patternsFor(config3.patterns, requiredOutput);
-    const explicitlyConfigured = isPatternMap(config3.patterns) && Boolean(config3.patterns[requiredOutput]?.length);
-    const found = explicitlyConfigured ? await globFiles(context5.root, outputPatterns) : await projectScopedOutputFiles(context5.root, context5.projects, outputPatterns);
-    const fresh = newestBoard === 0 || (await Promise.all(found.map(fileMtimeMs))).some((mtime) => typeof mtime === "number" && mtime >= newestBoard);
-    inspections.push({
-      required: requiredOutput,
-      patterns: outputPatterns,
-      found,
-      fresh,
-      vendorProfile: vendor?.profile.id,
-      vendorAssumptions: vendor?.assumptions ?? []
-    });
-  }
-  return inspections;
+  return Promise.all(
+    required3.map(async (requiredOutput) => {
+      const outputPatterns = patternsFor(config3.patterns, requiredOutput);
+      const explicitlyConfigured = isPatternMap(config3.patterns) && Boolean(config3.patterns[requiredOutput]?.length);
+      const found = explicitlyConfigured ? await globFiles(context5.root, outputPatterns) : await projectScopedOutputFiles(context5.root, context5.projects, outputPatterns);
+      const fresh = newestBoard === 0 || (await Promise.all(found.map(fileMtimeMs))).some((mtime) => typeof mtime === "number" && mtime >= newestBoard);
+      return {
+        required: requiredOutput,
+        patterns: outputPatterns,
+        found,
+        fresh,
+        vendorProfile: vendor?.profile.id,
+        vendorAssumptions: vendor?.assumptions ?? []
+      };
+    })
+  );
 }
 async function explainOutputsPresent(context5) {
   const inspections = await inspectRequiredOutputs(context5);
