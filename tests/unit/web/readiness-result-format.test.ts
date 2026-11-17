@@ -1,7 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildReadinessCheckOutput, buildReadinessPrComment } from "../../../apps/web/lib/readiness-result-format.js";
+import {
+  buildProgressiveReadinessComment,
+  buildReadinessCheckOutput,
+  buildReadinessPrComment,
+} from "../../../apps/web/lib/readiness-result-format.js";
 import type { ReleaseRunResult } from "../../../packages/contracts/src/index.js";
 
 describe("readiness result formatting", () => {
@@ -59,6 +63,43 @@ describe("readiness result formatting", () => {
     ],
   };
 
+  it("does not call a passing run release-ready when readiness was not reported", () => {
+    const input = {
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      artifacts: [
+        {
+          kind: "archive",
+          name: "signed-manufacturing-export.tar.gz",
+          storagePath: "runs/1/signed-manufacturing-export.tar.gz",
+          sha256: "a".repeat(64),
+          bytes: 1024,
+          role: "manufacturing",
+        },
+      ],
+      trustMode: "standard",
+      detailsUrl: "https://boardreadyops.test/runs/123",
+    } as const;
+
+    const check = buildReadinessCheckOutput(input);
+    const comment = buildReadinessPrComment(input);
+    const progressive = buildProgressiveReadinessComment(input);
+
+    expect(check.title).toBe("✅ BoardReadyOps: Checks passed · readiness unverified");
+    for (const text of [check.summary, comment, progressive]) {
+      expect(text).toContain("No readiness assessment was reported");
+      expect(text).toContain("passing checks and a signed archive do not verify manufacturing readiness");
+      expect(text).not.toContain("Ready to release");
+      expect(text).not.toContain("Ready for release");
+      expect(text).not.toContain("proceed with the release workflow");
+      expect(text).toContain("Review the source-linked run evidence");
+    }
+    expect(comment).toContain("| Outcome | ✅ Checks passed · readiness unverified |");
+    expect(comment).toContain("| Decision | Pass |");
+    expect(progressive).toContain("BoardReadyOps: Checks passed · readiness unverified");
+  });
+
   it("renders the same structured hardware impact semantics in Check Run and PR output", () => {
     const input = {
       status: "completed",
@@ -106,7 +147,7 @@ describe("readiness result formatting", () => {
     const check = buildReadinessCheckOutput(input);
     const comment = buildReadinessPrComment(input);
 
-    expect(check.title).toBe("✅ BoardReadyOps: Ready to release");
+    expect(check.title).toBe("✅ BoardReadyOps: Checks passed · readiness unverified");
     for (const output of [check.summary, comment]) {
       expect(output).toContain(
         "Exact base SHA evidence unavailable; the current run result is still valid, but no authoritative PR change comparison was produced.",
