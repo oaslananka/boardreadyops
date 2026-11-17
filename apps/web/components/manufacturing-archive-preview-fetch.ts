@@ -9,7 +9,13 @@ const downloadPathSuffix = "/download";
 export function isRecordedArchivePreviewUrl(url: string | undefined, runId: string): boolean {
   if (!url) return false;
   try {
-    const parsed = new URL(url);
+    // Production signs first-party downloads as root-relative paths.
+    // Never resolve protocol-relative URLs onto an untrusted host.
+    const rootRelative = url.startsWith("/");
+    if (rootRelative && url.startsWith("//")) return false;
+    const relativeOrigin = "https://boardreadyops.invalid";
+    const parsed = rootRelative ? new URL(url, relativeOrigin) : new URL(url);
+    if (rootRelative && parsed.origin !== relativeOrigin) return false;
     const prefix = `/api/v1/runs/${encodeURIComponent(runId)}/artifacts/`;
     if (!["https:", "http:"].includes(parsed.protocol) || !parsed.pathname.startsWith(prefix)) return false;
     if (!parsed.pathname.endsWith(downloadPathSuffix)) return false;
@@ -29,7 +35,7 @@ export async function loadRecordedArchiveForPreview(
 ): Promise<Blob> {
   if (
     !isRecordedArchivePreviewUrl(url, runId) ||
-    new URL(url).origin !== pageOrigin ||
+    new URL(url, pageOrigin).origin !== pageOrigin ||
     !Number.isSafeInteger(expectedBytes) ||
     expectedBytes <= 0 ||
     expectedBytes > maxPreviewBytes
