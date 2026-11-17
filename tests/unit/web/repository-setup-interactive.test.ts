@@ -278,6 +278,30 @@ describe("repository setup readiness controls", () => {
     expect(button(container, "Open setup pull request").disabled).toBe(false);
   });
 
+  it("explains that a completed setup probe deadline is not a configuration expiry", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [
+            {
+              ...readyForProbe,
+              setupWorkflowStatus: "ready",
+              setupConfigStatus: "ready",
+              setupObservedSha: "a".repeat(40),
+              setupProbeStatus: "completed",
+              setupProbeExpiresAt: "2026-11-13T13:01:44.000Z",
+            },
+          ],
+        }),
+      );
+    });
+    expect(container.textContent).toContain("Probe response deadline");
+    expect(container.textContent).toContain("A completed probe remains recorded after its response deadline");
+    expect(button(container, "Validate again").disabled).toBe(false);
+  });
+
   it("does not recommend a new setup PR when rollout is gated but setup is already verified", async () => {
     await act(async () => {
       root.render(

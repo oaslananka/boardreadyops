@@ -19,6 +19,7 @@ describe("viewer-scoped first-run availability", () => {
     expect(result).toMatchObject({ withoutRuns: 2, gated: 2, eligible: 0 });
     expect([...result.gatedRepositoryIds]).toEqual(["repo-a", "repo-b"]);
     expect(result.firstEnabledRepositoryId).toBeUndefined();
+    expect(result.firstGatedRepositoryId).toBe("repo-a");
   });
 
   it("selects only a viewer-authorized eligible repository in a mixed rollout", () => {

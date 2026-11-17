@@ -784,10 +784,16 @@ function SetupReadinessStatus({
       <DefinitionGrid>
         <Definition label="Repository">{repository.fullName}</Definition>
         <Definition label="Probe status">{status ? customerStatusLabel(status) : "Not dispatched"}</Definition>
-        <Definition label="Probe expires">
+        <Definition label="Probe response deadline">
           {repository.setupProbeExpiresAt ? new Date(repository.setupProbeExpiresAt).toLocaleString() : "Not scheduled"}
         </Definition>
       </DefinitionGrid>
+      {status === "completed" && repository.setupProbeExpiresAt ? (
+        <p className="text-sm text-muted-foreground">
+          A completed probe remains recorded after its response deadline. The date does not expire the verified
+          repository configuration or authorize a hosted hardware run.
+        </p>
+      ) : null}
       {status === "expired" ? (
         <p role="status" className="text-sm text-muted-foreground">
           No verified setup result arrived before this probe's deadline. Inspect its GitHub Actions run for
