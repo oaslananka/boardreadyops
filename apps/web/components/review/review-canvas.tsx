@@ -793,7 +793,7 @@ export function ReviewCanvas({
         // biome-ignore lint/a11y/noNoninteractiveTabindex: this interactive PCB review canvas needs keyboard focus for scoped pan/zoom shortcuts.
         tabIndex={0}
         onKeyDown={handleCanvasKeyDown}
-        className={`relative ${canvasHeightClass} overflow-hidden rounded-md border border-border bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`relative ${canvasHeightClass} overflow-hidden rounded-md border border-border bg-muted touch-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

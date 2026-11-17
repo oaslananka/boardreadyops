@@ -68,6 +68,11 @@ describe("DataTable", () => {
     const markup = render();
     expect(markup).not.toContain("sort=count");
   });
+
+  it("applies compact density vertical padding when requested", () => {
+    const markup = render({ density: "compact" });
+    expect(markup).toContain("py-1.5");
+  });
 });
 
 describe("CursorPagination", () => {
