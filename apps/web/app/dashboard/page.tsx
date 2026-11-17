@@ -286,6 +286,10 @@ function RecordedHardwareWork({ groups }: Readonly<{ groups: RepositoryGroup[] }
 }
 
 const localQuickstartUrl = "https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md";
+
+function setupHrefForRepository(repositoryId: string | undefined): string {
+  return repositoryId ? `/setup?repositoryId=${encodeURIComponent(repositoryId)}` : "/setup";
+}
 type FirstRunAccess = ReturnType<typeof firstRunAvailability>;
 
 function SetupInProgressBanner({
@@ -313,11 +317,7 @@ function SetupInProgressBanner({
         </div>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
           <Link
-            href={
-              access.firstGatedRepositoryId
-                ? `/setup?repositoryId=${encodeURIComponent(access.firstGatedRepositoryId)}`
-                : "/setup"
-            }
+            href={setupHrefForRepository(access.firstGatedRepositoryId)}
             className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary/90"
           >
             Continue with your board
