@@ -1,3 +1,5 @@
+import { unwrapGitHubArtifactZip } from "./manufacturing-archive-zip.js";
+
 /** Browser-only, bounded inspection of an already recorded manufacturing archive.
  * This checks integrity against server-provided evidence; it does NOT independently
  * authenticate GitHub/Sigstore signatures or approve fabrication.
@@ -235,7 +237,28 @@ function parseCsv(text: string): { header: string[]; rows: string[][]; total: nu
   return { header, rows: previewRows, total: rows.length };
 }
 
-/** No network request or upload. Matching an ingested digest is not a browser-side signature verification. */
+/** Keep transport parsing separate from the run's manifest/digest verification. */
+async function readDownloadedGzip(file: Blob, expected: ExpectedArchive): Promise<ArrayBuffer> {
+  if (!Number.isSafeInteger(expected.bytes) || expected.bytes < 1 || expected.bytes > maxArchiveBytes) {
+    return invalid("The recorded manufacturing archive size is invalid.");
+  }
+  if (file.size === 0 || file.size > maxArchiveBytes + 2 * 1024 * 1024) {
+    return invalid("Archive is outside the supported browser preview size; download and inspect it locally.");
+  }
+  const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const isZip = signature.length === 4 && signature[0] === 0x50 && signature[1] === 0x4b;
+  if (!isZip && file.size !== expected.bytes) {
+    return invalid("The selected file size does not match the recorded archive.");
+  }
+  // GitHub Actions downloads a ZIP. Previously extracted .tar.gz files still work.
+  const compressed = isZip ? await unwrapGitHubArtifactZip(file, expected.bytes) : await file.arrayBuffer();
+  if (compressed.byteLength !== expected.bytes) {
+    return invalid("The selected file size does not match the recorded archive.");
+  }
+  return compressed;
+}
+
+/** No network request or upload. Matching an ingested digest is not browser-side signature verification. */
 export async function inspectDownloadedManufacturingArchive(
   file: Blob,
   expected: ExpectedArchive,
@@ -243,15 +266,9 @@ export async function inspectDownloadedManufacturingArchive(
   if (!hexDigest.test(expected.sha256) || !commitId.test(expected.sourceSha)) {
     return invalid("The recorded artifact is missing a valid digest or source revision.");
   }
-  if (!Number.isSafeInteger(expected.bytes) || file.size !== expected.bytes) {
-    return invalid("The selected file size does not match the recorded archive.");
-  }
-  if (file.size === 0 || file.size > maxArchiveBytes) {
-    return invalid("Archive is outside the supported browser preview size; download and inspect it locally.");
-  }
-  const compressed = await file.arrayBuffer();
+  const compressed = await readDownloadedGzip(file, expected);
   if ((await digest(compressed)) !== expected.sha256) {
-    return invalid("SHA-256 mismatch. Select the .tar.gz from this Run's GitHub artifact ZIP.");
+    return invalid("SHA-256 mismatch. Select this Run's GitHub ZIP or its verified .tar.gz.");
   }
   const files = tarFiles(await inflateGzip(compressed));
   const manifestBytes = files.get(`${root}manifest.json`);

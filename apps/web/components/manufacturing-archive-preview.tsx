@@ -95,8 +95,8 @@ export function ManufacturingArchivePreview({
               </p>
             )}
             <p className="mt-1 text-xs text-muted-foreground">
-              Extract the <code>.tar.gz</code> file inside the GitHub ZIP (usually{" "}
-              <code>boardreadyops-manufacturing-export.tar.gz</code>), not the ZIP itself.
+              Select the downloaded ZIP directly in step 2. No extraction is needed, and an existing{" "}
+              <code>.tar.gz</code> file also works.
             </p>
           </li>
           <li className="rounded-xl border border-border bg-background/60 p-4">
@@ -104,12 +104,12 @@ export function ManufacturingArchivePreview({
               htmlFor={`${id}-file`}
               className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
             >
-              2 · Inspect the .tar.gz locally
+              2 · Inspect the downloaded ZIP or .tar.gz locally
             </label>
             <input
               id={`${id}-file`}
               type="file"
-              accept=".gz,.tgz,application/gzip"
+              accept=".zip,.gz,.tgz,application/zip,application/gzip"
               aria-describedby={`${id}-description`}
               className="mt-2 block min-h-11 w-full min-w-0 cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-semibold file:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               onChange={(event) => {
@@ -118,7 +118,7 @@ export function ManufacturingArchivePreview({
               }}
             />
             <p id={`${id}-description`} className="mt-2 text-xs text-muted-foreground">
-              Checks the exact archive bytes against this Run. No new cloud storage or fabrication request.
+              Checks the inner .tar.gz SHA-256 against this Run. No upload or fabrication request.
             </p>
           </li>
         </ol>

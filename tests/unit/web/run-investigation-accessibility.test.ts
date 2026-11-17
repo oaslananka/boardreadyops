@@ -828,7 +828,7 @@ describe("run overview direct manufacturing archive handoff", () => {
     );
     expect(matching).toContain("Preview your downloaded BOM and fabrication files");
     expect(matching).toContain("The browser checks");
-    expect(matching).toContain("Extract");
+    expect(matching).toContain("Select the downloaded ZIP directly");
     expect(matching).toContain("Open the GitHub artifact ZIP");
 
     const expired = renderToStaticMarkup(
