@@ -3,8 +3,8 @@ import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { parseExcellon } from "../../multicad/excellon-parser.js";
 import { readTextFile } from "../../util/fs.js";
-import { globFiles } from "../../util/glob.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
+import { projectScopedOutputFiles } from "../output-scope.js";
 
 /**
  * Drill diameters differing by less than this are the same tool, in millimetres.
@@ -35,7 +35,7 @@ export const drillCoverageRule = rule(
     if (!shouldRun(context, "manufacturing.drill-coverage")) {
       return [];
     }
-    const drillFiles = await globFiles(context.root, ["**/*.drl"]);
+    const drillFiles = await projectScopedOutputFiles(context.root, context.projects, ["**/*.drl"]);
     if (drillFiles.length === 0) {
       return [];
     }

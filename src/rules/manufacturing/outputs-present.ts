@@ -8,6 +8,7 @@ import { normalizeRelative } from "../../util/path.js";
 import { vendorOutputPatterns } from "../../vendor/outputs.js";
 import { resolveVendorProfile } from "../../vendor/profiles.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
+import { projectScopedOutputFiles } from "../output-scope.js";
 
 interface OutputInspection {
   required: string;
@@ -88,7 +89,12 @@ async function inspectRequiredOutputs(context: RuleContext): Promise<OutputInspe
   const inspections = [];
   for (const requiredOutput of required) {
     const outputPatterns = patternsFor(config.patterns, requiredOutput);
-    const found = await globFiles(context.root, outputPatterns);
+    // Explicit configured patterns are repository-relative so teams may use shared output
+    // directories. Defaults must not attribute another project's fabrication files.
+    const explicitlyConfigured = isPatternMap(config.patterns) && Boolean(config.patterns[requiredOutput]?.length);
+    const found = explicitlyConfigured
+      ? await globFiles(context.root, outputPatterns)
+      : await projectScopedOutputFiles(context.root, context.projects, outputPatterns);
     const fresh =
       newestBoard === 0 ||
       (await Promise.all(found.map(fileMtimeMs))).some((mtime) => typeof mtime === "number" && mtime >= newestBoard);

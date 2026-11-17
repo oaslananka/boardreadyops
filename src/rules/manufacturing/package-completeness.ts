@@ -1,8 +1,9 @@
 import path from "node:path";
+import type { RuleContext } from "../../core/context.js";
 import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { pathExists } from "../../util/fs.js";
-import { globFiles } from "../../util/glob.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
+import { projectScopedOutputFiles } from "../output-scope.js";
 
 type RequirementLevel = "base" | "production";
 
@@ -112,7 +113,7 @@ export const packageCompletenessRule = rule(
     const isProduction = context.options.releaseMode === "production";
     const categories = [...BASE_CATEGORIES, ...(isProduction ? PRODUCTION_CATEGORIES : [])];
 
-    const resolved = await resolveCategories(context.root, categories);
+    const resolved = await resolveCategories(context, categories);
     const missing = resolved.filter((category) => !category.found);
 
     if (missing.length === 0) {
@@ -149,16 +150,16 @@ export const packageCompletenessRule = rule(
 );
 
 async function resolveCategories(
-  root: string,
+  context: RuleContext,
   categories: CompletenessCategory[],
 ): Promise<Array<CompletenessCategory & { found: boolean }>> {
   return Promise.all(
     categories.map(async (category) => {
       let found: boolean;
       if (category.id === "fab-notes") {
-        found = await checkFabNotes(root);
+        found = await checkFabNotes(context);
       } else {
-        const files = await globFiles(root, category.patterns);
+        const files = await projectScopedOutputFiles(context.root, context.projects, category.patterns);
         found = files.length > 0;
       }
       return { ...category, found };
@@ -166,10 +167,10 @@ async function resolveCategories(
   );
 }
 
-async function checkFabNotes(root: string): Promise<boolean> {
-  for (const candidate of FAB_NOTES_PATHS) {
-    if (await pathExists(path.resolve(root, candidate))) {
-      return true;
+async function checkFabNotes(context: RuleContext): Promise<boolean> {
+  for (const project of context.projects) {
+    for (const candidate of FAB_NOTES_PATHS) {
+      if (await pathExists(path.resolve(context.root, project.root, candidate))) return true;
     }
   }
   return false;

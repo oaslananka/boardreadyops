@@ -1,6 +1,6 @@
 import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
-import { globFiles } from "../../util/glob.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
+import { projectScopedOutputFiles } from "../output-scope.js";
 import { DEFAULT_GERBER_PATTERNS, loadGerberStackup } from "./shared.js";
 
 /**
@@ -43,7 +43,7 @@ export const maskCoverageRule = rule(
       return [];
     }
 
-    const files = await globFiles(context.root, DEFAULT_GERBER_PATTERNS);
+    const files = await projectScopedOutputFiles(context.root, context.projects, DEFAULT_GERBER_PATTERNS);
     if (files.length === 0) {
       return [];
     }
