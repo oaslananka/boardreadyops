@@ -1229,7 +1229,7 @@ export function FindingList({
             <span className="text-xs text-muted-foreground">{entries.length} on this page</span>
           </header>
           <ul className="mt-2 flex flex-col gap-2">
-            {entries.map((finding) => (
+            {entries.slice(0, group === "rule" ? 1 : undefined).map((finding) => (
               <FindingRow
                 key={finding.id}
                 finding={finding}
@@ -1238,6 +1238,26 @@ export function FindingList({
                 commitSha={commitSha}
               />
             ))}
+            {group === "rule" && entries.length > 1 ? (
+              <li className="rounded-md border border-border bg-card">
+                <details>
+                  <summary className="flex min-h-11 cursor-pointer items-center px-3 py-2 text-sm font-medium text-primary">
+                    Show {entries.length - 1} more findings for {label} on this page
+                  </summary>
+                  <ul className="flex flex-col gap-2 border-t border-border p-2">
+                    {entries.slice(1).map((finding) => (
+                      <FindingRow
+                        key={finding.id}
+                        finding={finding}
+                        repositoryId={repositoryId}
+                        repository={repository}
+                        commitSha={commitSha}
+                      />
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            ) : null}
           </ul>
         </section>
       ))}
@@ -1260,7 +1280,11 @@ export function FindingsView({
   searchParameters,
 }: Readonly<{ run: RunDetail; searchParameters: SearchParameterMap }>) {
   const current = stringSearchParameters(searchParameters);
-  const group = filtersFromSearchParameters(searchParameters).findingGroup ?? "none";
+  const requestedGroup = firstParameter(searchParameters, "findingGroup");
+  const group =
+    requestedGroup === undefined && run.findingsPage.total > run.findingsPage.pageSize
+      ? "rule"
+      : (filtersFromSearchParameters(searchParameters).findingGroup ?? "none");
   return (
     <Panel title="Findings" description="Find what you need without loading every finding at once." id="findings">
       <details
@@ -1311,7 +1335,7 @@ export function FindingsView({
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-xs text-muted-foreground">Group</span>
-            <NativeSelect name="findingGroup" defaultValue={current.findingGroup ?? "none"}>
+            <NativeSelect name="findingGroup" defaultValue={group}>
               <option value="none">No grouping</option>
               <option value="severity">Severity</option>
               <option value="rule">Rule ID</option>
