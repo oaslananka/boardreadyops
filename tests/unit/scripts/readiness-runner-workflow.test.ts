@@ -19,7 +19,7 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("project: $" + "{{ vars.BOARDREADYOPS_PROJECT || '' }}");
     expect(workflow).toContain("config: $" + "{{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}");
     expect(workflow).toContain(
-      "uses: oaslananka/boardreadyops@d07f7af1fa9f18796274eff8debcdb1603de63f1 # reviewed main, release pending",
+      "uses: oaslananka/boardreadyops@a4f917f8fc46cb433868d5fc05daee2a7ac4aa61 # reviewed main, release pending",
     );
     expect(workflow).toContain("safe-mode: $" + "{{ inputs.safe_mode }}");
     expect(workflow).not.toContain("runner-ready");
@@ -32,7 +32,7 @@ describe("readiness runner workflow security contract", () => {
       workflow.indexOf("- name: Stage readiness reports outside reviewed source"),
     );
     expect(actionStep).toContain(
-      "uses: oaslananka/boardreadyops@d07f7af1fa9f18796274eff8debcdb1603de63f1 # reviewed main, release pending",
+      "uses: oaslananka/boardreadyops@a4f917f8fc46cb433868d5fc05daee2a7ac4aa61 # reviewed main, release pending",
     );
     expect(actionStep).not.toContain("6d3b721c3f8307a517d360b28f4d50b824d81278");
     expect(actionStep).not.toContain("6b41a224869f9a0ae646566663a914a89402fb47");
