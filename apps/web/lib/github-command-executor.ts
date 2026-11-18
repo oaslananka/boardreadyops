@@ -235,11 +235,26 @@ export async function readGitHubPullRequestContext(input: {
   }
   const pullRequestDraft = payload?.draft === true;
   const headRepository = record(head?.repo);
-  const headRepositoryName = typeof headRepository?.full_name === "string" ? headRepository.full_name : undefined;
-  // A missing/deleted PR source must not silently become trusted same-repo
-  // execution during a user-requested rerun or release preview.
+  const baseRepository = record(base?.repo);
+  const targetName = `${input.owner}/${input.repo}`.toLowerCase();
+  const headName = typeof headRepository?.full_name === "string" ? headRepository.full_name.toLowerCase() : undefined;
+  const baseName = typeof baseRepository?.full_name === "string" ? baseRepository.full_name.toLowerCase() : undefined;
+  const headId =
+    typeof headRepository?.id === "number" && Number.isSafeInteger(headRepository.id) && headRepository.id > 0
+      ? headRepository.id
+      : undefined;
+  const baseId =
+    typeof baseRepository?.id === "number" && Number.isSafeInteger(baseRepository.id) && baseRepository.id > 0
+      ? baseRepository.id
+      : undefined;
+  // The fork flag describes the repository itself, not whether this PR comes
+  // from another repository. Prefer immutable IDs when GitHub returns both.
+  // Missing, conflicting, or deleted source identity stays restricted.
+  const idsProvided = headId !== undefined || baseId !== undefined;
   const pullRequestFromFork =
-    headRepository?.fork === true || headRepositoryName?.toLowerCase() !== `${input.owner}/${input.repo}`.toLowerCase();
+    headName !== targetName ||
+    (baseName !== undefined && baseName !== targetName) ||
+    (idsProvided ? headId === undefined || baseId === undefined || headId !== baseId : headRepository?.fork === true);
   return { headCommitSha, headRef, baseCommitSha, pullRequestDraft, pullRequestFromFork };
 }
 

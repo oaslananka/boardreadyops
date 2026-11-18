@@ -279,6 +279,57 @@ describe("GitHub App lifecycle normalization", () => {
     });
   });
 
+  it("treats a PR from a repository's own branch as first-party even when the repository itself is a fork", () => {
+    const normalized = normalizeGitHubAppWebhook({
+      event: "pull_request",
+      delivery: "delivery-own-branch-of-a-fork",
+      payload: {
+        action: "opened",
+        installation,
+        repository: publicRepository,
+        pull_request: {
+          number: 42,
+          base: { sha: baseSha },
+          head: {
+            ref: "docs/badge",
+            sha: headSha,
+            repo: { id: publicRepository.id, full_name: publicRepository.full_name, fork: true },
+          },
+        },
+      },
+    });
+    expect(normalized.actions.at(-1)).toMatchObject({
+      type: "release_run.enqueue",
+      pullRequestFromFork: false,
+    });
+    expect(normalized.actions.at(-1)).not.toHaveProperty("safeMode");
+  });
+
+  it("fails closed when GitHub head repository ID differs despite a matching name", () => {
+    const normalized = normalizeGitHubAppWebhook({
+      event: "pull_request",
+      delivery: "delivery-conflicting-source-identity",
+      payload: {
+        action: "opened",
+        installation,
+        repository: publicRepository,
+        pull_request: {
+          number: 42,
+          base: { sha: baseSha },
+          head: {
+            ref: "docs/badge",
+            sha: headSha,
+            repo: { id: publicRepository.id + 1, full_name: publicRepository.full_name, fork: false },
+          },
+        },
+      },
+    });
+    expect(normalized.actions.at(-1)).toMatchObject({
+      pullRequestFromFork: true,
+      safeMode: { enabled: true, reasons: ["fork-pull-request"] },
+    });
+  });
+
   it.each([null, {}, { fork: false }, { full_name: "" }])(
     "fails safe on public PR with indeterminate head repository %j",
     (headRepo) => {
