@@ -110,6 +110,7 @@ describe("artifact download audit database operations", () => {
     expect(sql).toContain("join release_runs");
     expect(sql).toContain("join repositories");
     expect(sql).toContain("repository.installation_id");
+    expect(sql).toContain("artifact.retention_until is null or artifact.retention_until > now()");
     expect(parameters).toEqual(["artifact-456", "run-123"]);
   });
 

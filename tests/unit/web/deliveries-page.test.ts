@@ -193,9 +193,63 @@ describe("DeliveriesListPage", () => {
     role: "owner" as const,
   };
 
+  it("directs an owner with no linked CAD project to repository linking, not a fake package", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      projects: [],
+      revisions: [],
+      revisionCandidates: [],
+      deliveries: [],
+    });
+    const markup = await render();
+    expect(markup).toContain("Link a repository to a project");
+    expect(markup).toContain('href="/projects?workspace=ws_a#add-project"');
+    expect(markup).not.toContain("Check repository setup");
+    expect(markup).not.toContain("Create guest link");
+  });
+
+  it("directs an already linked owner to setup and persistent storage, never repeats the link step", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      projects: [{ id: "prj-1", githubRepoFullName: "owner/board" }],
+      revisions: [],
+      revisionCandidates: [],
+      deliveries: [],
+    });
+    const markup = await render();
+    expect(markup).toContain("Check repository setup");
+    expect(markup).toContain('href="/setup"');
+    expect(markup).toContain("no currently stored, signed manufacturing archive is eligible yet");
+    expect(markup).toContain("Temporary GitHub Actions artifacts remain inspect-only");
+    expect(markup).not.toContain("Link a repository to a project");
+    expect(markup).not.toContain("Create guest link");
+  });
+
+  it("keeps a linked workspace viewer read-only with a truthful next step", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [{ ...workspace, role: "viewer" }],
+      selected: { ...workspace, role: "viewer" },
+      projects: [{ id: "prj-1", githubRepoFullName: "owner/board" }],
+      revisions: [],
+      revisionCandidates: [],
+      deliveries: [],
+    });
+    const markup = await render();
+    expect(markup).toContain("View repository setup");
+    expect(markup).toContain("Ask a workspace owner to check repository setup");
+    expect(markup).not.toContain("Check repository setup");
+    expect(markup).not.toContain("Create guest link");
+  });
+
   it("passes an authorized repository filter into the signed Run query instead of showing unrelated archives", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisionCandidates: [],
@@ -236,6 +290,7 @@ describe("DeliveriesListPage", () => {
   it("shows a useful repository-scoped empty state without implying the board is manufacturing-ready", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisionCandidates: [],
@@ -256,6 +311,7 @@ describe("DeliveriesListPage", () => {
   it("rejects malformed repository scope instead of silently returning unfiltered evidence", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisionCandidates: [],
@@ -274,6 +330,7 @@ describe("DeliveriesListPage", () => {
   it("lists a live link with what it points at", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       authorizedRevisionIds: ["rev_a"],
@@ -305,6 +362,7 @@ describe("DeliveriesListPage", () => {
     const namedWorkspace = { ...workspace, name: "test" };
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [namedWorkspace],
       selected: namedWorkspace,
       revisionCandidates: [],
@@ -321,6 +379,7 @@ describe("DeliveriesListPage", () => {
   it("does not show an unexpired delivery as Live after sharing authorization is revoked", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       authorizedRevisionIds: [],
@@ -346,6 +405,7 @@ describe("DeliveriesListPage", () => {
   it("renders first-party artifact status for deliveries without a legacy external URL", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisionCandidates: [],
@@ -370,6 +430,7 @@ describe("DeliveriesListPage", () => {
   it("marks a link whose window has closed rather than showing it as live", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisionCandidates: [],
@@ -395,6 +456,7 @@ describe("DeliveriesListPage", () => {
   it("says why there is nothing to share instead of offering an empty picker", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisionCandidates: [],
@@ -421,6 +483,7 @@ describe("DeliveriesListPage", () => {
   it("links an eligible run candidate to registration without implying fabrication approval", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisionCandidates: [{ runId: "run_a", artifactId: "artifact_a" }],
@@ -437,6 +500,7 @@ describe("DeliveriesListPage", () => {
   it("links an editor with a validated revision to the authorized share form", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisionCandidates: [],
@@ -465,6 +529,7 @@ describe("DeliveriesListPage", () => {
   it("does not imply independent source attestation from runner-backed archive metadata", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisionCandidates: [],
@@ -495,6 +560,7 @@ describe("DeliveriesListPage", () => {
     const communityWorkspace = { ...workspace, planTier: "community" as const };
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [communityWorkspace],
       selected: communityWorkspace,
       revisionCandidates: [],
@@ -538,6 +604,7 @@ describe("DeliveriesListPage", () => {
       const paidWorkspace = { ...workspace, planTier };
       loadWorkspaceDeliveries.mockResolvedValue({
         state: "ok",
+        projects: [],
         workspaces: [paidWorkspace],
         selected: paidWorkspace,
         revisionCandidates: [],
@@ -566,6 +633,7 @@ describe("DeliveriesListPage", () => {
   it("offers no create form to a viewer, who is refused server-side anyway", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [{ ...workspace, role: "viewer" as const }],
       selected: { ...workspace, role: "viewer" as const },
       revisionCandidates: [],
@@ -612,6 +680,7 @@ describe("DeliveriesListPage", () => {
   it("reveals an authorized signed Run archive without implying delivery eligibility or guest sharing", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisions: [],
@@ -656,6 +725,7 @@ describe("DeliveriesListPage", () => {
   it("does not invent a signed archive or a cross-tenant delivery when grants cannot be verified", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",
+      projects: [],
       workspaces: [workspace],
       selected: workspace,
       revisions: [],

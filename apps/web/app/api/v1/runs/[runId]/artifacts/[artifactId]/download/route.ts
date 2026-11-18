@@ -103,7 +103,8 @@ export async function lookupArtifactDownload(
        from artifacts as artifact
        join release_runs as release_run on release_run.id = artifact.run_id
        join repositories as repository on repository.id = release_run.repository_id
-      where artifact.id = $1 and artifact.run_id = $2`,
+      where artifact.id = $1 and artifact.run_id = $2
+        and (artifact.retention_until is null or artifact.retention_until > now())`,
     [artifactId, runId],
   );
   const row = rows(result)[0];

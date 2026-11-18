@@ -17,7 +17,7 @@ import { firstRunAvailability } from "../../lib/first-run-availability.js";
 import { loadWorkspaceProjects, type WorkspaceProjectsImpact } from "../../lib/project-listing.js";
 import {
   loadViewerDesignEvidence,
-  loadViewerRepositories,
+  loadViewerRepositoryResult,
   type ViewerDesignEvidence,
 } from "../../lib/repository-dashboard.js";
 import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
@@ -154,42 +154,55 @@ function projectColumns(role: string, impact: WorkspaceProjectsImpact): readonly
   ];
 }
 
+function HostedReadinessNotice() {
+  return (
+    <section
+      aria-label="Hosted readiness availability"
+      className="rounded-xl border border-warning/40 bg-warning-surface p-4"
+    >
+      <h2 className="font-semibold text-foreground">Hosted PCB checks are not enabled for your repositories yet</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        You can inspect existing setup or check a board locally without creating a CAD workspace. A local finding is not
+        an OIDC-signed hosted review or manufacturing approval.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-4 text-sm">
+        <a
+          href="https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md"
+          className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
+        >
+          Check your PCB locally
+        </a>
+        <Link
+          href="/setup"
+          className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
+        >
+          Inspect repository setup
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 /** Show source-attributed sample artwork only before a workspace has a linked project. */
 function ProjectOnboardingPreview({
   projects,
   total,
   role,
   cloudRunGated,
-}: Readonly<{ projects: readonly ProjectRecord[]; total: number; role: string; cloudRunGated: boolean }>) {
+  showReadinessNotice = true,
+}: Readonly<{
+  projects: readonly ProjectRecord[];
+  total: number;
+  role: string;
+  cloudRunGated: boolean;
+  showReadinessNotice?: boolean;
+}>) {
   const unlinkedPage = projects.length > 0 && projects.every((project) => !project.githubRepoFullName);
   if (total > 0 && !unlinkedPage) return null;
   if (cloudRunGated) {
     return (
       <div className="space-y-3">
-        <section
-          aria-label="Hosted readiness availability"
-          className="rounded-xl border border-warning/40 bg-warning-surface p-4"
-        >
-          <h2 className="font-semibold text-foreground">Hosted PCB checks are not enabled for your repositories yet</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            You can inspect existing setup or check a board locally without creating a CAD workspace. A local finding is
-            not an OIDC-signed hosted review or manufacturing approval.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-4 text-sm">
-            <a
-              href="https://github.com/oaslananka/boardreadyops/blob/main/docs/quickstart.md"
-              className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
-            >
-              Check your PCB locally →
-            </a>
-            <Link
-              href="/setup"
-              className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2"
-            >
-              Inspect repository setup
-            </Link>
-          </div>
-        </section>
+        {showReadinessNotice ? <HostedReadinessNotice /> : null}
         <ReviewEmptyVisualPreview
           mode="onboarding"
           actionHref="/dashboard"
@@ -219,8 +232,17 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
     result.state === "no-workspaces" ||
     (result.state === "ok" &&
       (result.total === 0 || (result.projects.length > 0 && result.projects.every((p) => !p.githubRepoFullName))));
-  const firstUseRepositories =
-    firstUseWorkspace && viewer.session?.installationIds?.length ? await loadViewerRepositories(viewer.session) : [];
+  const needsRepositoryList = firstUseWorkspace || (result.state === "ok" && result.selected.role !== "viewer");
+  const repositoryResult =
+    needsRepositoryList && viewer.session?.installationIds?.length
+      ? await loadViewerRepositoryResult(viewer.session)
+      : { state: "ok" as const, groups: [] };
+  const viewerRepositories = repositoryResult.groups;
+  const repositoryListUnavailable = repositoryResult.state === "access-unavailable";
+  const firstUseRepositories = firstUseWorkspace ? viewerRepositories : [];
+  const repositoryOptions = viewerRepositories.flatMap((group) =>
+    group.repositories.map(({ owner, name, private: isPrivate }) => ({ owner, name, private: isPrivate })),
+  );
   const firstRun = firstRunAvailability(firstUseRepositories);
   const cloudRunGated = firstRun.gated > 0 && firstRun.eligible === 0;
   const designEvidence =
@@ -262,8 +284,8 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
                   Selected workspace: <strong>{result.selected.name}</strong>
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  CAD projects live here. GitHub App installations expose repository runs and published reviews
-                  separately; a repository is not linked to this workspace automatically.
+                  CAD projects live here. GitHub App installations expose repository runs and Reviews separately. Link a
+                  repository when adding a project to bring its stored, signed manufacturing archives into Deliveries.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -276,16 +298,22 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
               </div>
             </section>
 
-            {designEvidence ? (
-              <RealDesignEvidencePanel evidence={designEvidence} />
-            ) : (
-              <ProjectOnboardingPreview
-                projects={result.projects}
-                total={result.total}
-                role={result.selected.role}
-                cloudRunGated={cloudRunGated}
-              />
-            )}
+            {firstUseWorkspace ? (
+              <>
+                {cloudRunGated ? <HostedReadinessNotice /> : null}
+                {designEvidence ? (
+                  <RealDesignEvidencePanel evidence={designEvidence} />
+                ) : (
+                  <ProjectOnboardingPreview
+                    projects={result.projects}
+                    total={result.total}
+                    role={result.selected.role}
+                    cloudRunGated={cloudRunGated}
+                    showReadinessNotice={false}
+                  />
+                )}
+              </>
+            ) : null}
             <Panel
               title={result.selected.name}
               description={`You are ${customerStatusLabel(result.selected.role)} of this workspace · ${customerPlanLabel(result.selected.planTier)} plan`}
@@ -314,8 +342,13 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
             </Panel>
 
             {result.selected.role === "viewer" ? null : (
-              <Panel title="Add a project" description="A project groups the revisions of one board.">
-                <CreateProjectForm workspaceId={result.selected.id} action={createProjectAction} />
+              <Panel id="add-project" title="Add a project" description="A project groups the revisions of one board.">
+                <CreateProjectForm
+                  workspaceId={result.selected.id}
+                  action={createProjectAction}
+                  repositories={repositoryOptions}
+                  repositoryListUnavailable={repositoryListUnavailable}
+                />
               </Panel>
             )}
 
