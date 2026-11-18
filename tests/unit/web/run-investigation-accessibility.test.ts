@@ -493,6 +493,43 @@ describe("run investigation accessibility", () => {
     }
   });
 
+  it("shows a compact rule-first triage for a real run with many repeated KiCad violations", async () => {
+    const run = sampleRun();
+    const finding = run.findings[0];
+    if (!finding) throw new Error("Missing fixture finding");
+    run.findings = Array.from({ length: 25 }, (_, index) => ({
+      ...finding,
+      id: `finding-${index}`,
+      ruleId: index === 24 ? "drc.unconnected_items" : "drc.copper_edge_clearance",
+      message: index === 24 ? "Unconnected pad" : "Board edge clearance violation",
+    }));
+    run.findingsPage = { page: 1, pageSize: 25, total: 326, totalPages: 14 };
+
+    const markup = renderToStaticMarkup(createElement(FindingsView, { run, searchParameters: {} }));
+    expect(markup).toContain("326 matching findings");
+    expect(markup).toContain("Show 23 more findings for drc.copper_edge_clearance on this page");
+    expect(markup).toContain("drc.unconnected_items");
+    expect(markup).toContain("24 on this page");
+    expect(markup.match(/Request exception/g)).toHaveLength(25);
+    expect(await axeViolations(markup, "/runs/run-accessible/findings")).toEqual([]);
+  });
+
+  it("preserves all individual finding rows when the user explicitly disables grouping", () => {
+    const run = sampleRun();
+    const finding = run.findings[0];
+    if (!finding) throw new Error("Missing fixture finding");
+    run.findings = Array.from({ length: 25 }, (_, index) => ({
+      ...finding,
+      id: `finding-${index}`,
+      ruleId: "drc.copper_edge_clearance",
+    }));
+    run.findingsPage = { page: 1, pageSize: 25, total: 326, totalPages: 14 };
+    const markup = renderToStaticMarkup(
+      createElement(FindingsView, { run, searchParameters: { findingGroup: "none" } }),
+    );
+    expect(markup).not.toContain("Show 24 more findings");
+    expect(markup.match(/Request exception/g)).toHaveLength(25);
+  });
   it("puts decision and evidence identity ahead of secondary metadata", () => {
     const markup = viewMarkup("summary");
     expect(markup).toContain("Release readiness");
