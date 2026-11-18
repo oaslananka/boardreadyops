@@ -442,6 +442,57 @@ describe("run investigation accessibility", () => {
     expect(artifacts).toContain("Open repository-owned GitHub Actions artifacts");
   });
 
+  it("explains missing managed artifacts without hiding a linked GitHub Actions report run", async () => {
+    const run = sampleRun();
+    run.artifacts = [];
+    run.artifactsPage = { page: 1, pageSize: 25, total: 0, totalPages: 0 };
+    run.attempts = [
+      {
+        id: "attempt-1",
+        attemptNumber: 1,
+        status: "completed",
+        createdAt: run.startedAt,
+        dispatchRequestedAt: run.startedAt,
+        dispatchedAt: run.startedAt,
+        startedAt: run.startedAt,
+        heartbeatAt: run.completedAt,
+        completedAt: run.completedAt,
+        retryAfterAt: undefined,
+        workflowDispatchId: "456789",
+        workflowRunUrl: "https://github.com/oaslananka/boardreadyops/actions/runs/456789",
+        failureClass: undefined,
+        failureMessage: undefined,
+        resultDigest: "b".repeat(64),
+      },
+    ];
+
+    const summary = renderToStaticMarkup(createElement(SummaryView, { run }));
+    const artifacts = renderToStaticMarkup(createElement(ArtifactsView, { run, searchParameters: {} }));
+    for (const markup of [summary, artifacts]) {
+      expect(markup).toContain("GitHub Actions report uploads are separate");
+      expect(markup).toContain("They are not a signed manufacturing package");
+      expect(markup).toContain("Inspect GitHub Actions reports");
+      expect(markup).toContain('href="https://github.com/oaslananka/boardreadyops/actions/runs/456789"');
+      expect(markup).not.toContain("Signed manufacturing package available");
+    }
+    expect(artifacts).toContain("No BoardReadyOps-managed artifacts");
+    expect(await axeViolations(summary, "/runs/run-accessible")).toEqual([]);
+  });
+
+  it("does not invent a GitHub report link when no workflow run was recorded", () => {
+    const run = sampleRun();
+    run.artifacts = [];
+    run.artifactsPage = { page: 1, pageSize: 25, total: 0, totalPages: 0 };
+    run.attempts = [];
+    for (const markup of [
+      renderToStaticMarkup(createElement(SummaryView, { run })),
+      renderToStaticMarkup(createElement(ArtifactsView, { run, searchParameters: {} })),
+    ]) {
+      expect(markup).not.toContain("Inspect GitHub Actions reports");
+      expect(markup).not.toContain("GitHub Actions report uploads are separate");
+    }
+  });
+
   it("puts decision and evidence identity ahead of secondary metadata", () => {
     const markup = viewMarkup("summary");
     expect(markup).toContain("Release readiness");
