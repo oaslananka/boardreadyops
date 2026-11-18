@@ -210,6 +210,64 @@ describe("DeliveriesListPage", () => {
     expect(markup).not.toContain("Create guest link");
   });
 
+  it("offers the correct project-link handoff for a signed archive from a different authorized repository", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      projects: [{ id: "prj-1", githubRepoFullName: "owner/hardware" }],
+      revisions: [],
+      revisionCandidates: [],
+      deliveries: [],
+    });
+    loadViewerRuns.mockResolvedValueOnce({
+      state: "ok",
+      runs: [
+        { id: "run-1", repository: "owner/signed-board", decision: "pass", commitSha: "a".repeat(40) },
+        { id: "run-2", repository: "OWNER/SIGNED-BOARD", decision: "pass", commitSha: "b".repeat(40) },
+      ],
+      next: undefined,
+    });
+    const markup = await render();
+    expect(markup).toContain("Signed Run archives are not linked to this workspace");
+    expect(markup).toContain("owner/signed-board");
+    expect(markup).toContain('href="/projects?workspace=ws_a&amp;repository=owner%2Fsigned-board#add-project"');
+    expect(markup.match(/Link owner\/signed-board to a project/gu)).toHaveLength(1);
+    expect(markup).toContain("still requires verified, persistent manufacturing evidence");
+    expect(markup).not.toContain("Register an eligible Run");
+  });
+
+  it("never offers repository-link edits to viewers or for an already-linked signed Run", async () => {
+    const archive = {
+      state: "ok",
+      runs: [{ id: "run-1", repository: "owner/signed-board", decision: "pass", commitSha: "a".repeat(40) }],
+      next: undefined,
+    };
+    loadWorkspaceDeliveries.mockResolvedValueOnce({
+      state: "ok",
+      workspaces: [{ ...workspace, role: "viewer" }],
+      selected: { ...workspace, role: "viewer" },
+      projects: [{ id: "prj-1", githubRepoFullName: "owner/hardware" }],
+      revisions: [],
+      revisionCandidates: [],
+      deliveries: [],
+    });
+    loadViewerRuns.mockResolvedValueOnce(archive);
+    expect(await render()).not.toContain("Link owner/signed-board to a project");
+
+    loadWorkspaceDeliveries.mockResolvedValueOnce({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      projects: [{ id: "prj-1", githubRepoFullName: "OWNER/SIGNED-BOARD" }],
+      revisions: [],
+      revisionCandidates: [],
+      deliveries: [],
+    });
+    loadViewerRuns.mockResolvedValueOnce(archive);
+    expect(await render()).not.toContain("Signed Run archives are not linked to this workspace");
+  });
+
   it("directs an already linked owner to setup and persistent storage, never repeats the link step", async () => {
     loadWorkspaceDeliveries.mockResolvedValue({
       state: "ok",

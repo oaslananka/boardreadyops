@@ -15,6 +15,7 @@ import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { customerPlanLabel, customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import { firstRunAvailability } from "../../lib/first-run-availability.js";
 import { loadWorkspaceProjects, type WorkspaceProjectsImpact } from "../../lib/project-listing.js";
+import { authorizedProjectRepositoryHint } from "../../lib/project-repository-hint.js";
 import {
   loadViewerDesignEvidence,
   loadViewerRepositoryResult,
@@ -243,6 +244,9 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
   const repositoryOptions = viewerRepositories.flatMap((group) =>
     group.repositories.map(({ owner, name, private: isPrivate }) => ({ owner, name, private: isPrivate })),
   );
+  // A deep link is a navigation hint, never permission: only preselect a repository
+  // returned for the current GitHub installation grants.
+  const initialProjectRepository = authorizedProjectRepositoryHint(first(parameters.repository), repositoryOptions);
   const firstRun = firstRunAvailability(firstUseRepositories);
   const cloudRunGated = firstRun.gated > 0 && firstRun.eligible === 0;
   const designEvidence =
@@ -348,6 +352,7 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
                   action={createProjectAction}
                   repositories={repositoryOptions}
                   repositoryListUnavailable={repositoryListUnavailable}
+                  {...(initialProjectRepository ? { initialRepository: initialProjectRepository } : {})}
                 />
               </Panel>
             )}

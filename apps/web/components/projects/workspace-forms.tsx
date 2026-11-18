@@ -99,11 +99,13 @@ export function CreateProjectForm({
   action,
   repositories,
   repositoryListUnavailable,
+  initialRepository,
 }: Readonly<{
   workspaceId: string;
   action: typeof createProjectAction;
   repositories: readonly Pick<RepositorySummary, "owner" | "name" | "private">[];
   repositoryListUnavailable: boolean;
+  initialRepository?: string;
 }>) {
   const nameId = useId();
   const formatId = useId();
@@ -159,7 +161,7 @@ export function CreateProjectForm({
             <label className="text-meta font-medium text-foreground" htmlFor={repositoryId}>
               GitHub repository <span className="font-normal text-muted-foreground">(optional)</span>
             </label>
-            <NativeSelect id={repositoryId} name="githubRepoFullName" defaultValue="">
+            <NativeSelect id={repositoryId} name="githubRepoFullName" defaultValue={initialRepository ?? ""}>
               <option value="">No repository linked</option>
               {repositories.map((repository) => (
                 <option key={`${repository.owner}/${repository.name}`} value={`${repository.owner}/${repository.name}`}>
