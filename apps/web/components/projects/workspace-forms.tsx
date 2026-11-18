@@ -109,6 +109,14 @@ export function CreateProjectForm({
   const formatId = useId();
   const descriptionId = useId();
   const repositoryId = useId();
+  let repositoryHelp = "No GitHub repositories are available to link. Connect one from GitHub repositories first.";
+  if (repositoryListUnavailable) {
+    repositoryHelp =
+      "GitHub repository access could not be verified. Try again later; you can still create an unlinked project.";
+  } else if (repositories.length > 0) {
+    repositoryHelp =
+      "Linking a repository brings its currently stored, signed manufacturing archives into Deliveries. Temporary GitHub Actions artifacts stay inspect-only.";
+  }
 
   return (
     <ActionForm action={action} className="flex flex-wrap items-end gap-3">
@@ -160,13 +168,7 @@ export function CreateProjectForm({
                 </option>
               ))}
             </NativeSelect>
-            <p className="max-w-md text-meta text-muted-foreground">
-              {repositoryListUnavailable
-                ? "GitHub repository access could not be verified. Try again later; you can still create an unlinked project."
-                : repositories.length > 0
-                  ? "Linking a repository brings its currently stored, signed manufacturing archives into Deliveries. Temporary GitHub Actions artifacts stay inspect-only."
-                  : "No GitHub repositories are available to link. Connect one from GitHub repositories first."}
-            </p>
+            <p className="max-w-md text-meta text-muted-foreground">{repositoryHelp}</p>
             {fieldError(state, "githubRepoFullName") ? (
               <p className="text-meta text-danger">{fieldError(state, "githubRepoFullName")}</p>
             ) : null}
