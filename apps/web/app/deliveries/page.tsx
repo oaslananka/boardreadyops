@@ -243,14 +243,17 @@ type EmptyRevisionContext = Readonly<{
   role: string;
   hasLinkedProject: boolean;
   hasCandidates: boolean;
+  linkedRepository?: string;
 }>;
 
 function packageRevisionEmptyAction({
   role,
   hasLinkedProject,
   hasCandidates,
+  linkedRepository,
   workspaceId,
 }: EmptyRevisionContext & { workspaceId: string }) {
+  const setupHref = linkedRepository ? `/setup?repository=${encodeURIComponent(linkedRepository)}` : "/setup";
   if (role !== "viewer" && hasCandidates) {
     return (
       <Button asChild variant="outline">
@@ -270,14 +273,14 @@ function packageRevisionEmptyAction({
   if (role !== "viewer") {
     return (
       <Button asChild variant="outline">
-        <Link href="/setup">Check repository setup</Link>
+        <Link href={setupHref}>Check repository setup</Link>
       </Button>
     );
   }
   return (
     <div className="flex flex-wrap gap-2">
       <Button asChild variant="outline">
-        <Link href={hasLinkedProject ? "/setup" : "/reviews"}>
+        <Link href={hasLinkedProject ? setupHref : "/reviews"}>
           {hasLinkedProject ? "View repository setup" : "Review boards"}
         </Link>
       </Button>
@@ -320,6 +323,21 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
   );
   const hasLinkedProject =
     result.state === "ok" && result.projects.some((project) => Boolean(project.githubRepoFullName));
+  const linkedRepositories =
+    result.state === "ok"
+      ? [
+          ...new Set(
+            result.projects.flatMap((project) => {
+              const repository = project.githubRepoFullName
+                ? canonicalRepositoryName(project.githubRepoFullName)
+                : undefined;
+              return repository ? [repository] : [];
+            }),
+          ),
+        ]
+      : [];
+  // Deep-link only when the workspace has one unambiguous linked repository.
+  const linkedRepository = linkedRepositories.length === 1 ? linkedRepositories[0] : undefined;
 
   // Signed Run evidence is repository-scoped, never a delivery from the
   // selected workspace. Reuse the live GitHub installation grant checks.
@@ -390,6 +408,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                       role: result.selected.role,
                       hasLinkedProject,
                       hasCandidates: result.revisionCandidates.length > 0,
+                      ...(linkedRepository === undefined ? {} : { linkedRepository }),
                       workspaceId: result.selected.id,
                     })}
                   >

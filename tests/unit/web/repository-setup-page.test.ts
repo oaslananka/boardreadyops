@@ -30,7 +30,11 @@ beforeEach(() => {
   rolloutMock.mockReturnValue({ enabled: true });
 });
 
-async function render(searchParams: Record<string, string> = {}, connected = false): Promise<string> {
+async function render(
+  searchParams: Record<string, string> = {},
+  connected = false,
+  multipleRepositories = false,
+): Promise<string> {
   if (connected) {
     viewerMock.mockResolvedValueOnce({
       session: { login: "test-user", userId: 1, installationIds: [1001] },
@@ -49,12 +53,32 @@ async function render(searchParams: Record<string, string> = {}, connected = fal
               githubInstallationId: 1001,
               latestRunId: undefined,
             },
+            ...(multipleRepositories
+              ? [
+                  {
+                    id: "second-repo",
+                    owner: "other-org",
+                    name: "board",
+                    accountLogin: "other-org",
+                    githubInstallationId: 1001,
+                    latestRunId: undefined,
+                  },
+                ]
+              : []),
           ],
         },
       ],
     });
   }
   return renderToStaticMarkup(await SetupPage({ searchParams: Promise.resolve(searchParams) }));
+}
+
+async function selectedRepositoryId(markup: string): Promise<string> {
+  const window = new Window({ url: "https://boardreadyops.example/setup" });
+  window.document.write(markup);
+  const selected = window.document.querySelector<HTMLSelectElement>("#one-click-setup-repository")?.value ?? "";
+  await window.close();
+  return selected;
 }
 
 async function axeViolations(markup: string): Promise<string[]> {
@@ -125,6 +149,28 @@ describe("repository setup preview page", () => {
     expect(markup).not.toContain("private-repository-not-in-viewer-installations");
     expect(markup).toContain("First, connect your GitHub account");
     expect(markup).toContain("Sign in with GitHub");
+  });
+
+  it("resolves a repository-name deep link only against the viewer's authorized repositories", async () => {
+    const markup = await render({ repository: "TEST-USER/BOARD" }, true, true);
+    expect(await selectedRepositoryId(markup)).toBe("connected-repo");
+  });
+
+  it("does not silently select the only authorized repository for an unknown repository-name deep link", async () => {
+    const markup = await render({ repository: "unknown-org/board" }, true);
+    expect(await selectedRepositoryId(markup)).toBe("");
+    expect(markup).not.toContain("unknown-org/board");
+  });
+
+  it("does not fall back to a repository-name hint when an explicit repository ID is invalid", async () => {
+    const markup = await render(
+      {
+        repositoryId: "private-repository-not-in-viewer-installations",
+        repository: "test-user/board",
+      },
+      true,
+    );
+    expect(await selectedRepositoryId(markup)).toBe("");
   });
 
   it("does not revive the legacy contract-design preset through a query parameter", async () => {

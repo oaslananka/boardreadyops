@@ -12,6 +12,7 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { loadInstallationCapabilities } from "../../lib/installation-capabilities.js";
 import { releaseRepositoryDispatchAvailability } from "../../lib/release-rollout.js";
 import { loadViewerRepositoryResult } from "../../lib/repository-dashboard.js";
+import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
 export const metadata = {
@@ -106,10 +107,19 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
   // A deep link can select only a repository in the authenticated viewer's installations.
   // Unknown IDs leave the selector empty instead of silently targeting another repository.
   const requestedRepositoryId = first(parameters.repositoryId);
+  const requestedRepositoryName = first(parameters.repository);
+  const canonicalRequestedRepositoryName =
+    requestedRepositoryName === undefined ? undefined : canonicalRepositoryName(requestedRepositoryName);
+  // Repository names are navigation hints, not authority. Resolve them only against
+  // the viewer's installation-scoped list; invalid values leave the picker empty.
   const initialRepositoryId =
-    requestedRepositoryId === undefined
-      ? undefined
-      : (targets.repositories.find((repository) => repository.id === requestedRepositoryId)?.id ?? "");
+    requestedRepositoryId !== undefined
+      ? (targets.repositories.find((repository) => repository.id === requestedRepositoryId)?.id ?? "")
+      : requestedRepositoryName !== undefined
+        ? (targets.repositories.find(
+            (repository) => canonicalRepositoryName(repository.fullName) === canonicalRequestedRepositoryName,
+          )?.id ?? "")
+        : undefined;
   const defaultPreset = repositorySetupPreset("prototype");
   if (!defaultPreset) throw new Error("prototype setup preset is unavailable");
   const selected =
