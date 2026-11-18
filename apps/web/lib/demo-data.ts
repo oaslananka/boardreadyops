@@ -79,7 +79,7 @@ interface DemoEffectivePolicy {
   provenance: EffectivePolicyProvenance;
 }
 
-export interface RelatedSourceRun {
+interface RelatedSourceRun {
   id: string;
   status: string;
 }
