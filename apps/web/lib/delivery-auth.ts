@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { type DeliveryRecord, isHttpsDeliveryArchiveUrl, type SqlQueryExecutor } from "@boardreadyops/db";
-import { availableManufacturingArchiveSql, signedRunnerPassSql } from "@boardreadyops/db/runner-result-trust";
+import {
+  availableManufacturingArchiveSql,
+  signedRunnerPassSql,
+  trustedSignerWorkflowRefSql,
+} from "@boardreadyops/db/runner-result-trust";
 
 export interface DeliveryAuthResult {
   ok: boolean;
@@ -61,7 +65,7 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
                 and evidence.github_run_id = attempt.github_workflow_dispatch_id
                 and evidence.run_attempt = 1
                 and evidence.source_sha = release_runs.commit_sha
-                and evidence.source_ref = release_runs.ref
+                and ${trustedSignerWorkflowRefSql("evidence", "repositories")}
               join manufacturing_share_authorizations as share
                 on share.revision_id = revisions.id
                 and share.workspace_id = projects.workspace_id

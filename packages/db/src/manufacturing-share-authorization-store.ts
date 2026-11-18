@@ -1,5 +1,9 @@
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
-import { availableManufacturingArchiveSql, signedRunnerPassSql } from "./runner-result-trust.js";
+import {
+  availableManufacturingArchiveSql,
+  signedRunnerPassSql,
+  trustedSignerWorkflowRefSql,
+} from "./runner-result-trust.js";
 
 /**
  * Explicit human permission to SHARE an existing manufacturing artifact.
@@ -41,7 +45,7 @@ export async function authorizeManufacturingShare(
     "and evidence.repository_id = repository.id and evidence.installation_id = repository.installation_id",
     "and evidence.github_repository_id = repository.github_repo_id",
     "and evidence.github_run_id = attempt.github_workflow_dispatch_id and evidence.run_attempt = 1",
-    "and evidence.source_sha = run.commit_sha and evidence.source_ref = run.ref",
+    `and evidence.source_sha = run.commit_sha and ${trustedSignerWorkflowRefSql("evidence", "repository")}`,
     "where revision.id = $1 and revision.commit_sha = run.commit_sha",
     "and revision.bundle_sha256 = artifact.sha256",
     "on conflict (revision_id) do nothing returning revision_id",
@@ -102,7 +106,7 @@ export async function authorizedManufacturingRevisionIds(
       "and evidence.repository_id = repository.id and evidence.installation_id = repository.installation_id",
       "and evidence.github_repository_id = repository.github_repo_id",
       "and evidence.github_run_id = attempt.github_workflow_dispatch_id and evidence.run_attempt = 1",
-      "and evidence.source_sha = run.commit_sha and evidence.source_ref = run.ref",
+      `and evidence.source_sha = run.commit_sha and ${trustedSignerWorkflowRefSql("evidence", "repository")}`,
       "where share.workspace_id = $1 and project.workspace_id = $1",
       "and share.revoked_at is null",
       "and share.commit_sha = run.commit_sha",
@@ -145,7 +149,7 @@ export async function revisionHasManufacturingShareAuthorization(
       "and evidence.repository_id = repository.id and evidence.installation_id = repository.installation_id",
       "and evidence.github_repository_id = repository.github_repo_id",
       "and evidence.github_run_id = attempt.github_workflow_dispatch_id and evidence.run_attempt = 1",
-      "and evidence.source_sha = run.commit_sha and evidence.source_ref = run.ref",
+      `and evidence.source_sha = run.commit_sha and ${trustedSignerWorkflowRefSql("evidence", "repository")}`,
       "where share.revision_id = $1 and share.revoked_at is null",
       "and share.workspace_id = project.workspace_id",
       "and share.commit_sha = run.commit_sha and revision.commit_sha = run.commit_sha",

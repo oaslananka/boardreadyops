@@ -68,7 +68,7 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     await executor.query(
       `insert into release_runs
          (id, repository_id, commit_sha, ref, trigger_kind, status, decision, started_at, completed_at)
-       values ($1, $2, $3, 'refs/heads/main', 'push', 'completed', 'pass', now(), now())`,
+       values ($1, $2, $3, 'feature/reviewed-pcb-source', 'push', 'completed', 'pass', now(), now())`,
       [runId, repositoryId, commitSha],
     );
     expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
@@ -163,6 +163,33 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     ).toBeNull();
     await executor.query("update artifacts set storage_path = $2 where id = $1", [artifactId, managedStoragePath]);
 
+    // Signed workflow ref must match the repository's protected default branch,
+    // not the reviewed feature-branch checkout stored on release_runs.ref.
+    await executor.query(
+      "update signed_manufacturing_export_evidence set source_ref = 'refs/heads/untrusted' where artifact_id = $1",
+      [artifactId],
+    );
+    expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    expect(
+      await store.registerValidatedRevisionFromArtifact({
+        workspaceId,
+        projectId: project.id,
+        runId,
+        artifactId,
+        revisionLabel: "Wrong signer branch",
+      }),
+    ).toBeNull();
+    await executor.query(
+      "update signed_manufacturing_export_evidence set source_ref = 'refs/heads/main' where artifact_id = $1",
+      [artifactId],
+    );
+
+    // The signer may not claim a branch different from the configured trusted
+    // workflow branch; this is not permission to trust any branch name.
+    await executor.query("update repositories set default_branch = 'untrusted' where id = $1", [repositoryId]);
+    expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    await executor.query("update repositories set default_branch = 'main' where id = $1", [repositoryId]);
+
     const candidates = await store.listValidatedRevisionCandidatesByWorkspace(workspaceId);
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({
@@ -205,6 +232,21 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
       commitSha,
     });
     expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(true);
+    // Fresh evidence checks must continue to reject a replaced signer claim
+    // after the revision has already been registered.
+    await executor.query(
+      "update signed_manufacturing_export_evidence set source_ref = 'refs/heads/untrusted' where artifact_id = $1",
+      [artifactId],
+    );
+    expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(false);
+    expect(await store.listRevisionsByWorkspace(workspaceId)).toMatchObject([
+      expect.objectContaining({ id: revision?.id, sourceBinding: "not-established" }),
+    ]);
+    await executor.query(
+      "update signed_manufacturing_export_evidence set source_ref = 'refs/heads/main' where artifact_id = $1",
+      [artifactId],
+    );
     expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(true);
     await executor.query("update artifacts set storage_path = $2 where id = $1", [
       artifactId,

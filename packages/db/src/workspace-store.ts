@@ -1,6 +1,10 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
-import { availableManufacturingArchiveSql, signedRunnerPassSql } from "./runner-result-trust.js";
+import {
+  availableManufacturingArchiveSql,
+  signedRunnerPassSql,
+  trustedSignerWorkflowRefSql,
+} from "./runner-result-trust.js";
 
 /** Only HTTPS, credential-free external archive locations may be exposed to guest recipients. */
 export function isHttpsDeliveryArchiveUrl(value: string): boolean {
@@ -272,7 +276,7 @@ function sourceBindingVerifiedExpression(revisionAlias: string): string {
        and source_proof.github_run_id = evidence_attempt.github_workflow_dispatch_id
        and source_proof.run_attempt = 1
        and source_proof.source_sha = evidence_run.commit_sha
-       and source_proof.source_ref = evidence_run.ref
+       and ${trustedSignerWorkflowRefSql("source_proof", "evidence_repository")}
      where evidence_run.id = ${revisionAlias}.validation_run_id
        and evidence_run.status = 'completed'
        and evidence_run.decision = 'pass'
@@ -809,7 +813,7 @@ export class WorkspaceStore {
           and evidence.github_run_id = attempt.github_workflow_dispatch_id
           and evidence.run_attempt = 1
           and evidence.source_sha = release_runs.commit_sha
-          and evidence.source_ref = release_runs.ref
+          and ${trustedSignerWorkflowRefSql("evidence", "repositories")}
         where projects.workspace_id = $1
           and projects.github_repo_full_name is not null
           and not exists (
@@ -934,7 +938,7 @@ export class WorkspaceStore {
           and evidence.github_run_id = attempt.github_workflow_dispatch_id
           and evidence.run_attempt = 1
           and evidence.source_sha = release_runs.commit_sha
-          and evidence.source_ref = release_runs.ref
+          and ${trustedSignerWorkflowRefSql("evidence", "repositories")}
         where projects.workspace_id = $2
           and projects.id = $3
           and projects.github_repo_full_name is not null
@@ -992,7 +996,7 @@ export class WorkspaceStore {
           and evidence.github_run_id = attempt.github_workflow_dispatch_id
           and evidence.run_attempt = 1
           and evidence.source_sha = release_runs.commit_sha
-          and evidence.source_ref = release_runs.ref
+          and ${trustedSignerWorkflowRefSql("evidence", "repositories")}
         where revisions.id = $1
           and revisions.bundle_sha256 = artifacts.sha256
           and revisions.commit_sha = release_runs.commit_sha
@@ -1124,7 +1128,7 @@ export class WorkspaceStore {
          and evidence.repository_id = repository.id and evidence.installation_id = repository.installation_id
          and evidence.github_repository_id = repository.github_repo_id
          and evidence.github_run_id = attempt.github_workflow_dispatch_id and evidence.run_attempt = 1
-         and evidence.source_sha = run.commit_sha and evidence.source_ref = run.ref
+         and evidence.source_sha = run.commit_sha and ${trustedSignerWorkflowRefSql("evidence", "repository")}
        where revision.id = $2
        returning id, revision_id, access_token_hash, expires_at, signed_archive_url, recipient_notes, created_at`,
       [id, input.revisionId, accessTokenHash, expiresAt, input.signedArchiveUrl ?? null, input.recipientNotes ?? null],
