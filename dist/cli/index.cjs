@@ -84049,6 +84049,14 @@ function invalidLocalBundleOptions(root, options) {
   }
   return void 0;
 }
+function repositoryRelativeRuleConfig(root, file3) {
+  if (!file3) return void 0;
+  const relative = import_node_path76.default.relative(root, file3).split(import_node_path76.default.sep).join("/");
+  if (!relative || relative.length > 240 || !/^[a-z0-9_./-]+$/iu.test(relative) || relative.split("/").some((segment2) => !segment2 || segment2 === "." || segment2 === "..")) {
+    return void 0;
+  }
+  return relative;
+}
 function saveLocalReviewBundle(input3) {
   const {
     filename,
@@ -84056,6 +84064,7 @@ function saveLocalReviewBundle(input3) {
     headSha,
     uploadMode,
     nativeVisuals,
+    ruleConfigFile,
     idempotencyKey,
     payload,
     evidenceDigest,
@@ -84071,6 +84080,7 @@ function saveLocalReviewBundle(input3) {
     commitSha: headSha,
     uploadMode,
     sourceArtIncluded: nativeVisuals,
+    ...ruleConfigFile ? { ruleConfigFile } : {},
     createdAt: (/* @__PURE__ */ new Date()).toISOString(),
     idempotencyKey,
     payload
@@ -84328,6 +84338,7 @@ async function reviewPublishCommand(target, options, streams) {
       headSha,
       uploadMode,
       nativeVisuals: options.nativeVisuals === true,
+      ruleConfigFile: repositoryRelativeRuleConfig(root, loaded.path),
       idempotencyKey,
       payload,
       evidenceDigest,

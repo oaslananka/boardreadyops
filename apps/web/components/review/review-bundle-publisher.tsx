@@ -172,6 +172,16 @@ export function ReviewBundlePublisher() {
                 </dd>
               </div>
               <div className="min-w-0 sm:col-span-2">
+                <dt className="text-muted-foreground">Rule configuration used for this Review</dt>
+                <dd className="mt-1 break-all font-mono text-xs">
+                  {preview.ruleConfigFile ?? "Not recorded in this bundle"}
+                </dd>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  The same commit can have different findings under different rule configurations. Match the rules
+                  profile to your Hosted Check before comparing outcomes.
+                </p>
+              </div>
+              <div className="min-w-0 sm:col-span-2">
                 <dt className="text-muted-foreground">Evidence digest</dt>
                 <dd className="mt-1 break-all font-mono text-xs">{preview.evidenceDigest}</dd>
               </div>
@@ -248,8 +258,10 @@ export function ReviewBundlePublisher() {
   --server https://boardreadyops.com`}</code>
         </pre>
         <p className="mt-4 text-sm text-muted-foreground">
-          Replace the project path and repository with your actual Git checkout. The bundle is created locally; choose
-          it above, verify the source and press Publish only when ready.
+          Replace the project path and repository with your actual Git checkout. If your hosted check uses a different
+          rules file, pass --config relative/path/to/boardreadyops.yml as well. Confirm the source and rule
+          configuration before publishing; the bundle is created locally and nothing is uploaded before you choose
+          Publish.
         </p>
       </aside>
     </section>

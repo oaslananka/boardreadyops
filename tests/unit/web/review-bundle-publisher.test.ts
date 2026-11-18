@@ -15,6 +15,7 @@ function bundle() {
     commitSha: head,
     uploadMode: "snapshots",
     sourceArtIncluded: true,
+    ruleConfigFile: ".github/boardreadyops-cloud.yml",
     createdAt: "2026-11-13T17:00:00.000Z",
     idempotencyKey: `publish-${head}-${digest.slice(0, 16)}-${"c".repeat(16)}`,
     payload: {
@@ -82,6 +83,8 @@ describe("browser-native, session-authenticated Review publication", () => {
       expect(container.textContent).toContain("RoyalBlue54L genuine PCB");
       expect(container.textContent).toContain("1 recorded finding");
       expect(container.textContent).toContain("1 PCB layer");
+      expect(container.textContent).toContain(".github/boardreadyops-cloud.yml");
+      expect(container.textContent).toContain("different rule configurations");
       expect(fetchMock).not.toHaveBeenCalled();
       const publish = [...container.querySelectorAll("button")].find(
         (b) => b.textContent?.trim() === "Publish this Review",

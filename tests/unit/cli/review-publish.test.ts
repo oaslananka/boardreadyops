@@ -177,6 +177,7 @@ describe("CLI review publish command", () => {
         repository: "test-org/test-repo",
         commitSha: head,
         uploadMode: "metadata",
+        ruleConfigFile: "boardreadyops.yml",
         payload: {
           repositoryId: "test-org/test-repo",
           commitSha: head,
@@ -191,6 +192,44 @@ describe("CLI review publish command", () => {
       expect(stdout.output).not.toContain("<svg");
       expect(fetchMock).not.toHaveBeenCalled();
       if (process.platform !== "win32") expect(fs.statSync(bundlePath).mode & 0o777).toBe(0o600);
+    } finally {
+      fs.rmSync(bundlePath, { force: true });
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("previews the exact selected hosted rules file without adding it to the server payload", async () => {
+    const { root } = createCommittedPcbReviewFixture();
+    execFileSync("git", ["-C", root, "remote", "add", "origin", "https://github.com/test-org/test-repo.git"]);
+    fs.mkdirSync(path.join(root, ".github"), { recursive: true });
+    fs.copyFileSync(path.join(root, "boardreadyops.yml"), path.join(root, ".github", "boardreadyops-cloud.yml"));
+    execFileSync("git", ["-C", root, "add", ".github/boardreadyops-cloud.yml"]);
+    execFileSync("git", ["-C", root, "commit", "-qm", "add hosted profile"]);
+    const head = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    const bundlePath = path.join(os.tmpdir(), `bro-review-profile-${process.pid}-${Date.now()}.json`);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+    try {
+      const code = await reviewPublishCommand(
+        root,
+        liveOptions({
+          project: "safe-basic.kicad_pro",
+          config: ".github/boardreadyops-cloud.yml",
+          head,
+          repo: "test-org/test-repo",
+          token: undefined,
+          bundle: bundlePath,
+        }),
+        { stdout: stdout.stream, stderr: stderr.stream },
+      );
+      expect(code, stderr.output).toBe(0);
+      const envelope = JSON.parse(fs.readFileSync(bundlePath, "utf8"));
+      expect(envelope.ruleConfigFile).toBe(".github/boardreadyops-cloud.yml");
+      expect(envelope.payload).not.toHaveProperty("ruleConfigFile");
+      expect(JSON.stringify(envelope)).not.toContain(root);
+      expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       fs.rmSync(bundlePath, { force: true });
       fs.rmSync(root, { recursive: true, force: true });
