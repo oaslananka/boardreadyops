@@ -68,7 +68,7 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     await executor.query(
       `insert into release_runs
          (id, repository_id, commit_sha, ref, trigger_kind, status, decision, started_at, completed_at)
-       values ($1, $2, $3, 'refs/heads/main', 'push', 'completed', 'pass', now(), now())`,
+       values ($1, $2, $3, 'feature/reviewed-pcb-source', 'push', 'completed', 'pass', now(), now())`,
       [runId, repositoryId, commitSha],
     );
     expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
@@ -163,6 +163,32 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     ).toBeNull();
     await executor.query("update artifacts set storage_path = $2 where id = $1", [artifactId, managedStoragePath]);
 
+    // Signed evidence is append-only. A tamper attempt must be rejected by
+    // PostgreSQL rather than disabling immutability for the test.
+    await expect(
+      executor.query(
+        "update signed_manufacturing_export_evidence set source_ref = 'refs/heads/untrusted' where artifact_id = $1",
+        [artifactId],
+      ),
+    ).rejects.toThrow("signed manufacturing export evidence is immutable");
+
+    // The cryptographic signer must match the trusted workflow branch,
+    // not the reviewed feature-branch checkout stored on release_runs.ref.
+    // Change only the isolated fixture repository's default branch, never
+    // the immutable evidence, to prove candidates fail closed on mismatch.
+    await executor.query("update repositories set default_branch = 'untrusted' where id = $1", [repositoryId]);
+    expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    expect(
+      await store.registerValidatedRevisionFromArtifact({
+        workspaceId,
+        projectId: project.id,
+        runId,
+        artifactId,
+        revisionLabel: "Wrong signer branch",
+      }),
+    ).toBeNull();
+    await executor.query("update repositories set default_branch = 'main' where id = $1", [repositoryId]);
+
     const candidates = await store.listValidatedRevisionCandidatesByWorkspace(workspaceId);
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({
@@ -205,6 +231,15 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
       commitSha,
     });
     expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(true);
+    // Revalidation fails closed even after registration if the trusted
+    // workflow signer branch no longer matches immutable signed evidence.
+    await executor.query("update repositories set default_branch = 'untrusted' where id = $1", [repositoryId]);
+    expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(false);
+    expect(await store.listRevisionsByWorkspace(workspaceId)).toMatchObject([
+      expect.objectContaining({ id: revision?.id, sourceBinding: "not-established" }),
+    ]);
+    await executor.query("update repositories set default_branch = 'main' where id = $1", [repositoryId]);
     expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(true);
     await executor.query("update artifacts set storage_path = $2 where id = $1", [
       artifactId,

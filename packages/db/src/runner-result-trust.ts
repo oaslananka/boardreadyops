@@ -11,6 +11,22 @@ export function availableManufacturingArchiveSql(
     and (${alias}.retention_until is null or ${alias}.retention_until > now())`;
 }
 
+/**
+ * Signed manufacturing evidence records the GH OIDC workflow_dispatch signer
+ * ref (the trusted default branch), not the separately reviewed PR checkout ref.
+ * This value is independently authenticated and Sigstore-verified on ingestion.
+ *
+ * The checked-out source commit is validated separately by evidence.source_sha.
+ * Never compare source_ref to release_runs.ref: a run can review a feature branch
+ * while the protected workflow must execute on the repository default branch.
+ */
+export function trustedSignerWorkflowRefSql(
+  evidenceAlias: "evidence" | "source_proof",
+  repositoryAlias: "repositories" | "repository" | "repo" | "evidence_repository",
+): string {
+  return `${evidenceAlias}.source_ref = ('refs/heads/' || ${repositoryAlias}.default_branch)`;
+}
+
 /** A raw completed/pass row is only a preview until its accepted runner attempt is bound. */
 export function acceptedRunnerResultSql(alias: "run" | "release_runs"): string {
   return `exists (

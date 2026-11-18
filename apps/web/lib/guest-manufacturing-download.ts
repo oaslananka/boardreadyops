@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import type { SqlQueryExecutor } from "@boardreadyops/db";
-import { availableManufacturingArchiveSql, signedRunnerPassSql } from "@boardreadyops/db/runner-result-trust";
+import {
+  availableManufacturingArchiveSql,
+  signedRunnerPassSql,
+  trustedSignerWorkflowRefSql,
+} from "@boardreadyops/db/runner-result-trust";
 import {
   type ArtifactDownloadRecord,
   recordArtifactDownloadStarted,
@@ -33,7 +37,7 @@ const guestManufacturingArchiveSql = [
   "and evidence.repository_id = repository.id and evidence.installation_id = repository.installation_id",
   "and evidence.github_repository_id = repository.github_repo_id",
   "and evidence.github_run_id = attempt.github_workflow_dispatch_id and evidence.run_attempt = 1",
-  "and evidence.source_sha = run.commit_sha and evidence.source_ref = run.ref",
+  `and evidence.source_sha = run.commit_sha and ${trustedSignerWorkflowRefSql("evidence", "repository")}`,
   "and a.role = 'manufacturing' and a.kind = 'archive'",
   "and a.bytes > 0 and a.sha256 ~ '^[0-9a-f]{64}$'",
   `and ${availableManufacturingArchiveSql("a")}`,

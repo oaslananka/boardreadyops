@@ -1,5 +1,6 @@
 import { historicalOwnerCtes } from "./data-export-historical-inventory.js";
 import type { PgQueryExecutor } from "./pg-executor.js";
+import { trustedSignerWorkflowRefSql } from "./runner-result-trust.js";
 
 const idIsUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(value);
@@ -90,7 +91,7 @@ const sql = `WITH ${historicalOwnerCtes},
        AND lower(project.github_repo_full_name)=lower(repo.owner || '/' || repo.name)
        AND share.commit_sha=run.commit_sha AND rev.commit_sha=run.commit_sha
        AND share.archive_sha256=artifact.sha256 AND rev.bundle_sha256=artifact.sha256
-       AND evidence.source_sha=run.commit_sha AND evidence.source_ref=run.ref
+       AND evidence.source_sha=run.commit_sha AND ${trustedSignerWorkflowRefSql("evidence", "repo")}
      LIMIT 101
   )
   SELECT owner_export.id AS export_id,
