@@ -24,7 +24,7 @@ describe("public roadmap authority contract", () => {
     expect(roadmap).toContain("**Complete.**");
     expect(roadmap).toContain("issues/770");
     expect(roadmap).toContain("issues/771");
-    expect(roadmap).toContain("trusted execution attestation and acceptance remain pending");
+    expect(roadmap).toContain("independent customer-run and signed-handoff acceptance remains open");
     expect(roadmap).not.toContain("currently blocked on the active board-edge geometry work");
     expect(roadmap).not.toContain("design decision required");
   });

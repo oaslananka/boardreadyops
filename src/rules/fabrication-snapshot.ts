@@ -7,8 +7,8 @@ import type { BoardReadyOpsConfig } from "../core/config.js";
 import type { PipelineOptions, ProjectContext } from "../core/context.js";
 import type { FabricationSnapshot } from "../core/diff/fabrication.js";
 import { parseSchematic } from "../kicad/schematic.js";
-import { globFiles } from "../util/glob.js";
 import { toPosixPath } from "../util/path.js";
+import { resolveProjectBomPaths } from "./bom/project-files.js";
 import { projectScopedOutputFiles } from "./output-scope.js";
 
 const manufacturingPatterns: Record<string, string[]> = {
@@ -23,7 +23,7 @@ export async function captureFabricationSnapshot(
   options: PipelineOptions,
   config: BoardReadyOpsConfig,
 ): Promise<FabricationSnapshot> {
-  const loadedBoms = await loadBomRows(await resolveBomPaths(root, options, config));
+  const loadedBoms = await loadBomRows(await resolveProjectBomPaths(root, projects, options, config));
   const bomRows = loadedBoms.paths.length > 0 ? loadedBoms.rows : await loadSchematicRows(root, projects);
   const snapshotBom = bomRows.map((row) => snapshotBomRow(root, row));
   const outputs = await Promise.all(
@@ -39,19 +39,6 @@ export async function captureFabricationSnapshot(
     bom: snapshotBom.toSorted(compareSnapshotBomRows),
     outputs: outputs.toSorted((a, b) => a.kind.localeCompare(b.kind)),
   };
-}
-
-async function resolveBomPaths(root: string, options: PipelineOptions, config: BoardReadyOpsConfig): Promise<string[]> {
-  if (options.bom && options.bom !== "auto") {
-    return [path.resolve(root, options.bom)];
-  }
-  const configured = config.projects
-    ?.flatMap((project) => (project.bom ? [path.resolve(root, project.bom)] : []))
-    .sort((a, b) => a.localeCompare(b));
-  if (configured && configured.length > 0) {
-    return [...new Set(configured)];
-  }
-  return globFiles(root, ["**/bom*.csv", "**/*bom*.csv", "**/bom*.tsv", "**/*bom*.tsv"]);
 }
 
 async function loadBomRows(paths: string[]): Promise<{ paths: string[]; rows: BomRow[] }> {
