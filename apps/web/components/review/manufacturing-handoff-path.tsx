@@ -3,7 +3,7 @@ import type { DemoReview } from "../../lib/demo-data.js";
 import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { Button } from "../ui/button.js";
 
-type HandoffReview = Pick<DemoReview, "id" | "decision" | "headRunId" | "repositoryName">;
+type HandoffReview = Pick<DemoReview, "id" | "decision" | "headRunId" | "otherRunsForHeadCommit" | "repositoryName">;
 
 /** A Review is evidence, never a source-to-export manufacturing authorization. */
 export function ManufacturingHandoffPath({
@@ -27,6 +27,7 @@ export function ManufacturingHandoffPath({
         ? "Review checks met"
         : "Review checks pending";
   const artifactsHref = review.headRunId ? `/runs/${encodeURIComponent(review.headRunId)}/artifacts` : "/runs";
+  const otherRuns = review.otherRunsForHeadCommit ?? [];
   const repository = canonicalRepositoryName(review.repositoryName);
   const deliveriesHref = repository ? `/deliveries?repository=${encodeURIComponent(repository)}` : "/deliveries";
 
@@ -76,12 +77,15 @@ export function ManufacturingHandoffPath({
           <h3 className="mt-1 font-semibold text-foreground">Inspect exports and parts</h3>
           <p className="mt-1 text-xs font-medium text-warning">Not verified by this Review</p>
           <p className="mt-2 flex-1 text-sm text-muted-foreground">
-            Check the linked Run for an accepted signed result, BOM, Gerber files, and a stored manufacturing archive.
-            Draft or missing exports are not delivery-eligible.
+            {otherRuns.length > 0
+              ? "The linked Run and the other runs below are separate executions of the same repository commit. A commit match alone does not prove the same board or rules profile; inspect each Run before relying on its exports."
+              : "Check the linked Run for an accepted signed result, BOM, Gerber files, and a stored manufacturing archive. Draft or missing exports are not delivery-eligible."}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button asChild variant="outline" size="sm">
-              <Link href={artifactsHref}>{review.headRunId ? "Inspect Run artifacts" : "Browse Runs"}</Link>
+              <Link href={artifactsHref}>
+                {review.headRunId ? "Inspect Review-linked run artifacts" : "Browse Runs"}
+              </Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
               <Link href={review.headRunId ? `/runs/${encodeURIComponent(review.headRunId)}#boards` : "/runs"}>
@@ -89,6 +93,28 @@ export function ManufacturingHandoffPath({
               </Link>
             </Button>
           </div>
+          {otherRuns.length > 0 ? (
+            <div className="mt-3 border-t border-border pt-3">
+              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Other runs for this repository commit
+              </p>
+              <ul className="mt-2 space-y-2">
+                {otherRuns.map((run) => (
+                  <li key={run.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground">
+                      {run.status.replaceAll("_", " ")} | Run <code>{run.id.slice(0, 8)}</code>
+                    </span>
+                    <Link
+                      href={`/runs/${encodeURIComponent(run.id)}/artifacts`}
+                      className="font-medium text-primary underline underline-offset-2"
+                    >
+                      Inspect run artifacts
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </li>
         <li className="flex min-w-0 flex-col rounded-md border border-border bg-background/60 p-3">
           <p className="text-xs font-semibold text-muted-foreground">03 · DELIVERY</p>

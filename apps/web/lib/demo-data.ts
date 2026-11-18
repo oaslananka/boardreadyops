@@ -79,6 +79,11 @@ interface DemoEffectivePolicy {
   provenance: EffectivePolicyProvenance;
 }
 
+interface RelatedSourceRun {
+  id: string;
+  status: string;
+}
+
 export interface DemoReview {
   id: string;
   repositoryId: string;
@@ -93,6 +98,8 @@ export interface DemoReview {
   currentRevisionSequence: number;
   /** Persisted revision evidence runs; omitted from bundled demo fixtures. */
   headRunId?: string | undefined;
+  /** Other executions for this exact repository commit; not proof of the same board or rules profile. */
+  otherRunsForHeadCommit?: RelatedSourceRun[] | undefined;
   baseRunId?: string | undefined;
   baseCommitSha: string;
   headCommitSha: string;

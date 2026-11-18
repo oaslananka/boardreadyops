@@ -371,6 +371,30 @@ async function loadBaseSnapshots(
   return snapshots.length > 0 ? { runId: selectedBaseRunId, snapshots } : { snapshots: [] };
 }
 
+async function loadOtherRunsForHeadCommit(
+  executor: PgQueryExecutor,
+  repositoryId: string,
+  headCommitSha: string,
+  headRunId: string,
+): Promise<NonNullable<DemoReview["otherRunsForHeadCommit"]>> {
+  const result = await executor.query(
+    `SELECT matching.id, matching.status
+     FROM release_runs AS matching
+     WHERE matching.repository_id = $1
+       AND matching.commit_sha = $2
+       AND matching.id <> $3
+     ORDER BY matching.completed_at DESC NULLS LAST, matching.started_at DESC, matching.id DESC
+     LIMIT 3`,
+    [repositoryId, headCommitSha, headRunId],
+  );
+  const rows = (result as { rows?: Array<{ id?: unknown; status?: unknown }> }).rows ?? [];
+
+  return rows.flatMap((run) => {
+    if (typeof run.id !== "string" || typeof run.status !== "string") return [];
+    return [{ id: run.id, status: run.status }];
+  });
+}
+
 async function loadReviewGovernanceData(
   executor: PgQueryExecutor,
   reviewId: string,
@@ -524,30 +548,39 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
     const savedPolicyResult = reviewPolicyRecordSchema.safeParse(revision.policy_snapshot);
     const recordedPolicy = savedPolicyResult.success ? savedPolicyResult.data : null;
     // Historical revisions lacking a snapshot must not be silently relabelled as recorded evidence.
-    const [findings, evidenceItems, governance, headSnapshots, baseEvidence, effectivePolicy, pcbFootprintSummary] =
-      await Promise.all([
-        loadReconstructedFindings(executor, reviewId, revision.head_run_id),
-        loadEvidenceArtifacts(executor, revision.head_run_id),
-        loadReviewGovernanceData(executor, reviewId, row.repository_id),
-        loadHeadSnapshots(executor, revision.head_run_id),
-        loadBaseSnapshots(
-          executor,
-          row.repository_id,
-          revision.base_commit_sha,
-          revision.base_run_id,
-          revision.head_run_id,
-        ),
-        session && !recordedPolicy
-          ? resolveReviewEffectivePolicy({ executor, repositoryId: row.repository_id, tenantId: row.account_login })
-          : Promise.resolve(null),
-        loadRunPcbFootprintSummary(
-          executor,
-          row.repository_id,
-          revision.head_run_id,
-          revision.base_commit_sha,
-          revision.head_commit_sha,
-        ),
-      ]);
+    const [
+      findings,
+      evidenceItems,
+      governance,
+      headSnapshots,
+      baseEvidence,
+      effectivePolicy,
+      pcbFootprintSummary,
+      otherRunsForHeadCommit,
+    ] = await Promise.all([
+      loadReconstructedFindings(executor, reviewId, revision.head_run_id),
+      loadEvidenceArtifacts(executor, revision.head_run_id),
+      loadReviewGovernanceData(executor, reviewId, row.repository_id),
+      loadHeadSnapshots(executor, revision.head_run_id),
+      loadBaseSnapshots(
+        executor,
+        row.repository_id,
+        revision.base_commit_sha,
+        revision.base_run_id,
+        revision.head_run_id,
+      ),
+      session && !recordedPolicy
+        ? resolveReviewEffectivePolicy({ executor, repositoryId: row.repository_id, tenantId: row.account_login })
+        : Promise.resolve(null),
+      loadRunPcbFootprintSummary(
+        executor,
+        row.repository_id,
+        revision.head_run_id,
+        revision.base_commit_sha,
+        revision.head_commit_sha,
+      ),
+      loadOtherRunsForHeadCommit(executor, row.repository_id, revision.head_commit_sha, revision.head_run_id),
+    ]);
 
     const baseCommit = revision.base_commit_sha ?? "0000000000000000000000000000000000000000";
 
@@ -563,6 +596,7 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       currentRevisionId: revision.id,
       currentRevisionSequence: revision.sequence,
       headRunId: revision.head_run_id,
+      ...(otherRunsForHeadCommit.length > 0 ? { otherRunsForHeadCommit } : {}),
       ...((revision.base_run_id ?? baseEvidence.runId)
         ? { baseRunId: revision.base_run_id ?? baseEvidence.runId }
         : {}),

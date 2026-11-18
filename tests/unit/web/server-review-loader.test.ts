@@ -94,6 +94,22 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
         };
       }
 
+      if (norm.includes("from release_runs as matching")) {
+        expect(norm).toContain("matching.repository_id = $1");
+        expect(norm).toContain("matching.commit_sha = $2");
+        expect(norm).toContain("matching.id <> $3");
+        expect(norm).toContain("limit 3");
+        expect(params).toEqual(["repo-hw-prod", "1".repeat(40), "run-hw-105"]);
+        return {
+          rows: [
+            {
+              id: "run-matching-source",
+              status: "completed",
+            },
+          ],
+        };
+      }
+
       if (norm.includes("from findings where run_id = $1")) {
         return {
           rows: [
@@ -213,6 +229,12 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
     expect(review?.id).toBe(reviewId);
     expect(review?.viewerCanEdit).toBe(true);
     expect(review?.headRunId).toBe("run-hw-105");
+    expect(review?.otherRunsForHeadCommit).toEqual([
+      {
+        id: "run-matching-source",
+        status: "completed",
+      },
+    ]);
     expect(review?.baseRunId).toBeUndefined();
     expect(review?.decision).toBe("approved");
     expect(review?.currentRevisionId).toBe("rev_db_v1");
@@ -472,7 +494,7 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
         };
       }
 
-      if (norm.includes("from release_runs")) {
+      if (norm.includes("from release_runs as base")) {
         expect(params).toEqual(["repo-hw-prod", baseCommitSha, baseRunId, "run-hw-105"]);
         expect(norm).toContain("exists (select 1 from run_snapshots");
         expect(norm).toContain("base.id = $3");
