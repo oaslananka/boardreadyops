@@ -346,6 +346,25 @@ function githubRepositoryBaseUrl(run: RunDetail): string {
   return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}`;
 }
 
+function GitHubActionsReportHint({ run }: Readonly<{ run: RunDetail }>) {
+  const workflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
+  if (!workflowRunUrl) return null;
+  return (
+    <div className="mt-3 space-y-2 text-sm">
+      <p className="text-muted-foreground">
+        GitHub Actions report uploads are separate from BoardReadyOps-managed artifacts. A linked workflow exists, but
+        its report files may not have been uploaded or may have expired. They are not a signed manufacturing package.
+      </p>
+      <a
+        href={workflowRunUrl}
+        className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-2"
+      >
+        Inspect GitHub Actions reports
+      </a>
+    </div>
+  );
+}
+
 function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
   if (run.boards.length === 0) {
     return (
@@ -965,8 +984,9 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
             </div>
           ) : null}
           {run.artifacts.length === 0 ? (
-            <EmptyState title="No artifacts">
-              <p>No managed artifact metadata is attached to this run.</p>
+            <EmptyState title="No managed artifacts">
+              <p>No BoardReadyOps-managed artifact metadata is attached to this run.</p>
+              <GitHubActionsReportHint run={run} />
             </EmptyState>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -1525,7 +1545,7 @@ export function ArtifactsView({
       description="Checksums, availability, how long each file is kept, and who can download it."
       id="artifacts"
       actions={
-        latestWorkflowRunUrl ? (
+        latestWorkflowRunUrl && !hasNoStoredArtifacts ? (
           <a href={latestWorkflowRunUrl} className="text-sm text-primary hover:underline">
             Open repository-owned GitHub Actions artifacts
           </a>
@@ -1633,9 +1653,10 @@ export function ArtifactsView({
         {hasNoStoredArtifacts ? (
           <EmptyState title="No stored artifacts for this run">
             <p>
-              A passing readiness check does not automatically produce a manufacturing package. This run has no recorded
-              artifact uploads; inspect execution attempts to see what was produced.
+              No BoardReadyOps-managed artifacts were recorded for this run. A passing readiness check does not
+              automatically produce a manufacturing package.
             </p>
+            <GitHubActionsReportHint run={run} />
             <Link className="text-sm text-primary underline underline-offset-2" href={`/runs/${run.id}/attempts`}>
               Inspect execution attempts
             </Link>
