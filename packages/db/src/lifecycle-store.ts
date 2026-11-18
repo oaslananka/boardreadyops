@@ -37,6 +37,7 @@ export type GitHubAppMetadataStore = Pick<
 export const releaseRepositoryRolloutEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES";
 export const releaseRepositoryRolloutFileEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES_FILE";
 export const releaseRepositoryPilotEnvName = "BOARDREADYOPS_RELEASE_PILOT_REPOSITORY";
+export const releaseRepositoryCanaryEnvName = "BOARDREADYOPS_RELEASE_CANARY_REPOSITORIES";
 
 const maximumReleaseRepositoryRolloutFileBytes = 64 * 1024;
 
@@ -200,13 +201,21 @@ export function releaseRepositoryRolloutPolicyFromEnvironment(env: Environment):
     return parseReleaseRepositoryRolloutPolicy(releaseRepositoryRolloutFile(configuredFile));
   }
   const policy = parseReleaseRepositoryRolloutPolicy(env[releaseRepositoryRolloutEnvName]);
-  // Add exactly one canary repository without replacing the existing (possibly sensitive)
-  // allowlist. Do not interpret commas, whitespace, or "*" as a wider rollout.
+  // Add explicitly named canaries without replacing the existing, possibly
+  // write-only, allowlist or the original single-repository pilot. Never
+  // interpret wildcards or "all" as an invitation to expand this canary list.
+  if (policy.allowAllRepositories) return policy;
+  const exactRepository = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/u;
   const pilot = env[releaseRepositoryPilotEnvName]?.trim().toLowerCase();
-  if (!pilot || !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/u.test(pilot) || policy.allowAllRepositories) {
-    return policy;
-  }
-  return { repositories: [...new Set([...(policy.repositories ?? []), pilot])] };
+  const canaries = (env[releaseRepositoryCanaryEnvName] ?? "")
+    .split(/[\s,]+/u)
+    .map((token) => token.trim().toLowerCase())
+    .filter((token) => exactRepository.test(token))
+    .slice(0, 16);
+  const additions = [...(pilot && exactRepository.test(pilot) ? [pilot] : []), ...canaries];
+  return additions.length === 0
+    ? policy
+    : { repositories: [...new Set([...(policy.repositories ?? []), ...additions])] };
 }
 
 export function createSqlGitHubAppMetadataStore(

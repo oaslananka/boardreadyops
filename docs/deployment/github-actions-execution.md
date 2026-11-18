@@ -108,6 +108,16 @@ BOARDREADYOPS_PUBLIC_URL=https://boardreadyops.example.com
 BOARDREADYOPS_RELEASE_REPOSITORIES=owner/repository
 ```
 
+For Vercel production with an existing write-only rollout allowlist, do **not**
+replace the secret just to add another test repository. Set the non-secret,
+production-scoped `BOARDREADYOPS_RELEASE_CANARY_REPOSITORIES=owner/repository`
+configuration variable and redeploy the existing production build instead.
+It adds at most 16 explicitly named `owner/repository` entries to the existing
+allowlist and single-repository pilot; `*`, `all`, and malformed entries
+never widen rollout. An explicit file-based policy still takes precedence.
+Adding a repository permits bounded readiness checks, not fabrication or
+guest sharing.
+
 To keep the rollout allow-list outside the secret-bearing runtime environment, store one repository per line in a non-secret policy file and deploy with `BOARDREADYOPS_CLOUD_RELEASE_REPOSITORIES_FILE=/home/ubuntu/boardreadyops-cloud/release-repositories` on newly commissioned hosts. The deployer mounts it read-only as `BOARDREADYOPS_RELEASE_REPOSITORIES_FILE`; a configured file takes precedence and fails closed if it cannot be read or exceeds 64 KiB.
 
 Existing deployments with `/opt/boardreadyops-cloud/release-repositories` are **not migrated automatically** by merging new code. Before further commissioning, run the reviewed `bash scripts/migrate-cloud-release-policy.sh --check` in the commissioned host's checkout, and separately authorize `--apply`. The operator script checks that both consumers use the same running image, their policy contents/readiness match, and the host-local `deploy.sh` really preserves the running image tag. Older wrappers that override `BOARDREADYOPS_IMAGE_TAG` with the checkout SHA cause a preflight failure **before container changes**; fix such wrappers only through separately authorized production change control. The original root-owned file and a protected legacy override backup are retained for `--rollback`. `cloud-deploy` accepts only the two known policy mount sources and rejects mixed or ambiguous overrides. No secret-bearing runtime files or privileged directory permissions are changed.
