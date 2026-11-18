@@ -12,6 +12,7 @@ function bundle() {
     commitSha: commit,
     uploadMode: "snapshots",
     sourceArtIncluded: true,
+    ruleConfigFile: ".github/boardreadyops-cloud.yml",
     createdAt: "2026-11-13T17:00:00.000Z",
     idempotencyKey: `publish-${commit}-${digest.slice(0, 16)}-${"c".repeat(16)}`,
     payload: {
@@ -63,8 +64,23 @@ describe("signed-in browser Review bundle parsing", () => {
     expect(parsed.findingCount).toBe(1);
     expect(parsed.blockingCount).toBe(1);
     expect(parsed.includesDesignArtwork).toBe(true);
+    expect(parsed.ruleConfigFile).toBe(".github/boardreadyops-cloud.yml");
     expect(parsed.payload.repositoryId).toBe(repository);
     expect(reviewBundleLimitBytes).toBeGreaterThan(20 * 1024 * 1024);
+  });
+
+  it("only previews safe source-relative config paths, retaining older bundles without profiles", () => {
+    const { ruleConfigFile: _omitted, ...legacy } = bundle();
+    expect(parseReviewBundle(legacy).ruleConfigFile).toBeUndefined();
+    for (const ruleConfigFile of [
+      "/tmp/private.yml",
+      "../private.yml",
+      "C:\\private.yml",
+      "https://site.test/config",
+      "a".repeat(300),
+    ]) {
+      expect(() => parseReviewBundle({ ...bundle(), ruleConfigFile })).toThrow();
+    }
   });
 
   it("rejects a spoofed repository alias, commit, digest or idempotency identity", () => {

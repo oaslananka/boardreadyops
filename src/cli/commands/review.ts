@@ -204,12 +204,29 @@ function invalidLocalBundleOptions(root: string, options: ReviewPublishOptions):
   return undefined;
 }
 
+/** Never disclose an absolute path or a config outside the source checkout in an export. */
+function repositoryRelativeRuleConfig(root: string, file?: string): string | undefined {
+  if (!file) return undefined;
+  const relative = path.relative(root, file).split(path.sep).join("/");
+  if (
+    !relative ||
+    relative.length > 240 ||
+    !/^[a-z0-9_./-]+$/iu.test(relative) ||
+    relative.split("/").some((segment) => !segment || segment === "." || segment === "..")
+  ) {
+    return undefined;
+  }
+  return relative;
+}
+
 type LocalReviewBundleInput = {
   filename: string;
   repositoryId: string;
   headSha: string;
   uploadMode: UploadMode;
   nativeVisuals: boolean;
+  /** Source-relative rules profile used by the local scan; never a workstation path. */
+  ruleConfigFile?: string | undefined;
   idempotencyKey: string;
   payload: Record<string, unknown>;
   evidenceDigest: string;
@@ -226,6 +243,7 @@ function saveLocalReviewBundle(input: LocalReviewBundleInput): number {
     headSha,
     uploadMode,
     nativeVisuals,
+    ruleConfigFile,
     idempotencyKey,
     payload,
     evidenceDigest,
@@ -241,6 +259,7 @@ function saveLocalReviewBundle(input: LocalReviewBundleInput): number {
     commitSha: headSha,
     uploadMode,
     sourceArtIncluded: nativeVisuals,
+    ...(ruleConfigFile ? { ruleConfigFile } : {}),
     createdAt: new Date().toISOString(),
     idempotencyKey,
     payload,
@@ -526,6 +545,7 @@ export async function reviewPublishCommand(
       headSha,
       uploadMode,
       nativeVisuals: options.nativeVisuals === true,
+      ruleConfigFile: repositoryRelativeRuleConfig(root, loaded.path),
       idempotencyKey,
       payload,
       evidenceDigest,

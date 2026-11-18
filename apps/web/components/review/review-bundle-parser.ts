@@ -11,6 +11,7 @@ export interface ParsedReviewBundle {
   repository: string;
   commitSha: string;
   evidenceDigest: string;
+  ruleConfigFile?: string;
   title: string;
   idempotencyKey: string;
   findingCount: number;
@@ -48,6 +49,13 @@ function invalid(): never {
   throw new Error("This file is not a valid source-bound BoardReadyOps Review bundle.");
 }
 
+function validSourceRelativeRuleConfig(value: unknown): boolean {
+  if (value === undefined) return true; // Older local bundle exports remain readable.
+  if (typeof value !== "string" || value.length === 0 || value.length > 240) return false;
+  if (!/^[a-z0-9_./-]+$/iu.test(value)) return false;
+  return value.split("/").every((part) => Boolean(part) && part !== "." && part !== "..");
+}
+
 function validBundleHeader(envelope: RecordValue, payload: RecordValue): boolean {
   const repository = envelope.repository;
   const commitSha = envelope.commitSha;
@@ -55,6 +63,7 @@ function validBundleHeader(envelope: RecordValue, payload: RecordValue): boolean
   const idempotencyKey = envelope.idempotencyKey;
   if (
     envelope.format !== "boardreadyops-review-bundle-v1" ||
+    !validSourceRelativeRuleConfig(envelope.ruleConfigFile) ||
     typeof repository !== "string" ||
     !repositoryPattern.test(repository) ||
     typeof commitSha !== "string" ||
@@ -151,6 +160,7 @@ export function parseReviewBundle(input: unknown): ParsedReviewBundle {
     repository,
     commitSha,
     evidenceDigest,
+    ...(typeof input.ruleConfigFile === "string" ? { ruleConfigFile: input.ruleConfigFile } : {}),
     title: typeof payload.title === "string" && payload.title ? payload.title : `Review for ${commitSha.slice(0, 8)}`,
     idempotencyKey,
     findingCount: findings.length,
