@@ -366,6 +366,35 @@ describe("Review Detail Tabs", () => {
     expect(html).not.toContain("Ready for fabrication");
   });
 
+  it("shows separate runs for the same repository commit without implying the same board or policy", () => {
+    const html = renderToStaticMarkup(
+      createElement(ManufacturingHandoffPath, {
+        review: {
+          id: "review-42",
+          decision: "pending",
+          headRunId: "review-linked-run",
+          repositoryName: "owner/review-board",
+          otherRunsForHeadCommit: [
+            {
+              id: "matching-hosted-run",
+              status: "completed",
+            },
+          ],
+        },
+        blockingCount: 0,
+        reviewChecksMet: false,
+      }),
+    );
+    expect(html).toContain("Other runs for this repository commit");
+    expect(html).toContain("same repository commit");
+    expect(html).toContain("same board or rules profile");
+    expect(html).toContain('href="/runs/review-linked-run/artifacts"');
+    expect(html).toContain('href="/runs/matching-hosted-run/artifacts"');
+    expect(html).toContain("Inspect run artifacts");
+    expect(html).not.toContain("Signed hosted run");
+    expect(html).not.toContain("manufacturing approval");
+  });
+
   it("never promotes a fully checked Review to an eligible manufacturing package", () => {
     const html = renderToStaticMarkup(
       createElement(ManufacturingHandoffPath, {
@@ -377,6 +406,7 @@ describe("Review Detail Tabs", () => {
     expect(html).toContain("Review checks met");
     expect(html).toContain("release readiness remains unverified");
     expect(html).toContain("Not verified by this Review");
+    expect(html).not.toContain("Other runs for this repository commit");
     expect(html).toContain("Separate release authorization required");
     expect(html).toContain('href="/runs"');
     expect(html).toContain("Browse Runs");
