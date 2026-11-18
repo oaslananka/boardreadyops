@@ -353,6 +353,20 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
           process.env,
         )
       : undefined;
+  const unlinkedSignedArchiveRepositories =
+    result.state === "ok" &&
+    hasLinkedProject &&
+    result.selected.role !== "viewer" &&
+    result.revisionCandidates.length === 0 &&
+    signedRunListing?.state === "ok"
+      ? [
+          ...new Set(
+            signedRunListing.runs
+              .map((run) => canonicalRepositoryName(run.repository))
+              .filter((repository): repository is string => repository !== undefined),
+          ),
+        ].filter((repository) => !linkedRepositories.includes(repository))
+      : [];
 
   // The copied value has to be a URL the recipient can open, so the origin comes from the request
   // rather than being assumed.
@@ -380,6 +394,38 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
           selectedRepository={selectedRepository}
           signedRunListing={signedRunListing}
         />
+
+        {result.state === "ok" && unlinkedSignedArchiveRepositories.length > 0 ? (
+          <section
+            aria-label="Unlinked signed Run archives"
+            className="space-y-3 rounded-md border border-border bg-muted/20 p-4"
+          >
+            <h2 className="text-sm font-semibold text-foreground">
+              Signed Run archives are not linked to this workspace
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              The archives above belong to repositories other than this workspace&apos;s linked projects. Linking an
+              authorized project still requires verified, persistent manufacturing evidence before a revision can be
+              registered. This does not approve fabrication.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {unlinkedSignedArchiveRepositories.map((repository) => (
+                <Button
+                  key={repository}
+                  asChild
+                  variant="outline"
+                  className="min-h-11 max-w-full whitespace-normal break-all"
+                >
+                  <Link
+                    href={`/projects?workspace=${encodeURIComponent(result.selected.id)}&repository=${encodeURIComponent(repository)}#add-project`}
+                  >
+                    Link {repository} to a project
+                  </Link>
+                </Button>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {selectedRepository && result.state === "ok" ? (
           <p className="text-sm text-muted-foreground">
