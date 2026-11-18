@@ -3,6 +3,7 @@
 import { useId } from "react";
 import type { createProjectAction, createWorkspaceAction } from "../../app/projects/actions.js";
 import { fieldError } from "../../lib/action-result.js";
+import type { RepositorySummary } from "../../lib/repository-dashboard.js";
 import { ActionForm } from "../ui/action-form.js";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
@@ -96,10 +97,18 @@ export function CreateWorkspaceForm({ action }: Readonly<{ action: typeof create
 export function CreateProjectForm({
   workspaceId,
   action,
-}: Readonly<{ workspaceId: string; action: typeof createProjectAction }>) {
+  repositories,
+  repositoryListUnavailable,
+}: Readonly<{
+  workspaceId: string;
+  action: typeof createProjectAction;
+  repositories: readonly Pick<RepositorySummary, "owner" | "name" | "private">[];
+  repositoryListUnavailable: boolean;
+}>) {
   const nameId = useId();
   const formatId = useId();
   const descriptionId = useId();
+  const repositoryId = useId();
 
   return (
     <ActionForm action={action} className="flex flex-wrap items-end gap-3">
@@ -136,6 +145,31 @@ export function CreateProjectForm({
               <option value="ipc2581">IPC-2581</option>
               <option value="generic_gerber">Gerber package</option>
             </NativeSelect>
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label className="text-meta font-medium text-foreground" htmlFor={repositoryId}>
+              GitHub repository <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+            <NativeSelect id={repositoryId} name="githubRepoFullName" defaultValue="">
+              <option value="">No repository linked</option>
+              {repositories.map((repository) => (
+                <option key={`${repository.owner}/${repository.name}`} value={`${repository.owner}/${repository.name}`}>
+                  {repository.owner}/{repository.name}
+                  {repository.private ? " (private)" : ""}
+                </option>
+              ))}
+            </NativeSelect>
+            <p className="max-w-md text-meta text-muted-foreground">
+              {repositoryListUnavailable
+                ? "GitHub repository access could not be verified. Try again later; you can still create an unlinked project."
+                : repositories.length > 0
+                  ? "Linking a repository brings its currently stored, signed manufacturing archives into Deliveries. Temporary GitHub Actions artifacts stay inspect-only."
+                  : "No GitHub repositories are available to link. Connect one from GitHub repositories first."}
+            </p>
+            {fieldError(state, "githubRepoFullName") ? (
+              <p className="text-meta text-danger">{fieldError(state, "githubRepoFullName")}</p>
+            ) : null}
           </div>
 
           <Button type="submit" disabled={pending}>

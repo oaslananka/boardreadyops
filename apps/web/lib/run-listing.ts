@@ -1,4 +1,4 @@
-import { displayedRunnerDecisionSql } from "@boardreadyops/db/runner-result-trust";
+import { availableManufacturingArchiveSql, displayedRunnerDecisionSql } from "@boardreadyops/db/runner-result-trust";
 import { resolveLiveInstallationRepositoryIds } from "./live-installation-repositories.js";
 import { notCancelledSubscription } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
@@ -92,10 +92,7 @@ const signedManufacturingEvidenceFilter = `
           and signed_evidence.source_sha = release_runs.commit_sha
           and archive.role = 'manufacturing'
           and archive.kind = 'archive'
-          and archive.storage_path is not null
-          and archive.storage_path <> ''
-          and archive.storage_path not like 'github-actions/%'
-          and (archive.retention_until is null or archive.retention_until > now())
+          and ${availableManufacturingArchiveSql("archive")}
      )`;
 
 const runListingQuery = (signedManufacturingOnly: boolean) => `

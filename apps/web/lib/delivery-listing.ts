@@ -1,4 +1,5 @@
 import type {
+  ProjectRecord,
   ValidatedRevisionCandidate,
   WorkspaceDeliveryRecord,
   WorkspaceMembershipRecord,
@@ -31,6 +32,8 @@ export type DeliveryListingResult =
       state: "ok";
       workspaces: readonly WorkspaceMembershipRecord[];
       selected: WorkspaceMembershipRecord;
+      /** Projects reveal whether the next useful step is linking a board or enabling its hosted workflow. */
+      projects: readonly ProjectRecord[];
       deliveries: readonly WorkspaceDeliveryRecord[];
       /**
        * Revisions a link can be minted against. Empty is a real and common state: a revision only
@@ -68,7 +71,8 @@ export async function loadWorkspaceDeliveries(
     const total = counts.deliveries;
     const totalPages = Math.max(1, Math.ceil(total / workspaceListingPageSize));
     const page = parseListingPage(requestedPage, totalPages);
-    const [deliveries, revisions, revisionCandidates, authorizedRevisionIds] = await Promise.all([
+    const [projects, deliveries, revisions, revisionCandidates, authorizedRevisionIds] = await Promise.all([
+      store.listProjectsByWorkspace(selected.id),
       store.listDeliveriesByWorkspace(selected.id, workspaceListingPageSize, (page - 1) * workspaceListingPageSize),
       // The revision picker in the create form is unpaged on purpose: it is a dropdown of things
       // you might share, not a listing, and a paged dropdown cannot be searched.
@@ -80,6 +84,7 @@ export async function loadWorkspaceDeliveries(
       state: "ok",
       workspaces,
       selected,
+      projects,
       deliveries,
       revisions,
       revisionCandidates,

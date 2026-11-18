@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { type DeliveryRecord, isHttpsDeliveryArchiveUrl, type SqlQueryExecutor } from "@boardreadyops/db";
-import { signedRunnerPassSql } from "@boardreadyops/db/runner-result-trust";
+import { availableManufacturingArchiveSql, signedRunnerPassSql } from "@boardreadyops/db/runner-result-trust";
 
 export interface DeliveryAuthResult {
   ok: boolean;
@@ -49,6 +49,7 @@ export async function verifyDeliveryToken(rawToken: string, executor: SqlQueryEx
                 and artifacts.role = 'manufacturing'
                 and artifacts.kind = 'archive'
                 and artifacts.bytes > 0
+                and ${availableManufacturingArchiveSql("artifacts")}
                 and artifacts.sha256 ~ '^[0-9a-f]{64}$'
                 and artifacts.execution_attempt_id = release_runs.execution_attempt_id
               join signed_manufacturing_export_evidence as evidence on evidence.artifact_id = artifacts.id

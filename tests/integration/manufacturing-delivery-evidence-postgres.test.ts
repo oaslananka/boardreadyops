@@ -37,6 +37,7 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     const repoFullName = `evidence-test-${randomUUID().slice(0, 8)}/pcb-board`;
     const commitSha = "a".repeat(40);
     const archiveSha256 = createHash("sha256").update("isolated metadata fixture").digest("hex");
+    const managedStoragePath = "fixtures/only-in-disposable-db.zip";
 
     await executor.query(
       `insert into installations (id, github_installation_id, account_login, account_type)
@@ -76,7 +77,7 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
     await executor.query(
       `insert into artifacts (id, run_id, kind, name, storage_path, sha256, bytes, role)
        values ($1, $2, 'archive', 'fixture-gerbers.zip', $3, $4, 512, 'manufacturing')`,
-      [artifactId, runId, "fixtures/only-in-disposable-db.zip", archiveSha256],
+      [artifactId, runId, managedStoragePath, archiveSha256],
     );
 
     expect(await store.listValidatedRevisionCandidatesByWorkspace(`ws_other_${randomUUID()}`)).toEqual([]);
@@ -144,6 +145,24 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
       ],
     );
 
+    // A signed temporary GitHub Actions artifact is inspectable on its Run, but it is not a
+    // durable workspace revision and must never be registered as a delivery source.
+    await executor.query("update artifacts set storage_path = $2 where id = $1", [
+      artifactId,
+      "github-actions/123456789/987654321",
+    ]);
+    expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    expect(
+      await store.registerValidatedRevisionFromArtifact({
+        workspaceId,
+        projectId: project.id,
+        runId,
+        artifactId,
+        revisionLabel: "Temporary archive",
+      }),
+    ).toBeNull();
+    await executor.query("update artifacts set storage_path = $2 where id = $1", [artifactId, managedStoragePath]);
+
     const candidates = await store.listValidatedRevisionCandidatesByWorkspace(workspaceId);
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({
@@ -186,6 +205,22 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
       commitSha,
     });
     expect(await store.listValidatedRevisionCandidatesByWorkspace(workspaceId)).toEqual([]);
+    expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(true);
+    await executor.query("update artifacts set storage_path = $2 where id = $1", [
+      artifactId,
+      "github-actions/123456789/987654321",
+    ]);
+    expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(false);
+    expect(await store.listRevisionsByWorkspace(workspaceId)).toMatchObject([
+      expect.objectContaining({ id: revision?.id, sourceBinding: "not-established" }),
+    ]);
+    expect(
+      await authorizeManufacturingShare(executor, revision?.id ?? "", {
+        githubUserId: 4711,
+        login: "fixture-owner",
+      }),
+    ).toBe(false);
+    await executor.query("update artifacts set storage_path = $2 where id = $1", [artifactId, managedStoragePath]);
     expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(true);
     expect(await store.listRevisionsByWorkspace(workspaceId)).toMatchObject([
       expect.objectContaining({ id: revision?.id, sourceBinding: "source-bound-verified" }),
@@ -233,6 +268,40 @@ describeDatabase("Manufacturing delivery evidence (PostgreSQL)", () => {
       role: "manufacturing",
       kind: "archive",
     });
+
+    // A path that points at GitHub's short-lived artifact store invalidates every delivery path.
+    await executor.query("update artifacts set storage_path = $2 where id = $1", [
+      artifactId,
+      "github-actions/123456789/987654321",
+    ]);
+    expect(await store.getDeliveryByToken(rawToken)).toBeNull();
+    expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(404);
+    expect(await authorizedManufacturingRevisionIds(executor, workspaceId)).toEqual([]);
+    expect(await lookupGuestManufacturingArtifact(rawToken, executor)).toBeNull();
+    await expect(
+      store.createDeliveryLink({ revisionId: revision?.id ?? "", expiresAt: new Date(Date.now() + 60_000) }),
+    ).rejects.toThrow("Failed to insert delivery");
+    await executor.query("update artifacts set storage_path = $2 where id = $1", [artifactId, managedStoragePath]);
+    expect((await store.getDeliveryByToken(rawToken))?.id).toBe(delivery.id);
+    expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(200);
+
+    // A managed object is also ineligible after its explicit retention window closes.
+    await executor.query(
+      "update artifacts set uploaded_at = now() - interval '1 day', retention_until = now() - interval '1 second' where id = $1",
+      [artifactId],
+    );
+    expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(false);
+    expect(await store.getDeliveryByToken(rawToken)).toBeNull();
+    expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(404);
+    expect(await authorizedManufacturingRevisionIds(executor, workspaceId)).toEqual([]);
+    expect(await lookupGuestManufacturingArtifact(rawToken, executor)).toBeNull();
+    await expect(
+      store.createDeliveryLink({ revisionId: revision?.id ?? "", expiresAt: new Date(Date.now() + 60_000) }),
+    ).rejects.toThrow("Failed to insert delivery");
+    await executor.query("update artifacts set retention_until = null where id = $1", [artifactId]);
+    expect((await store.getDeliveryByToken(rawToken))?.id).toBe(delivery.id);
+    expect((await verifyDeliveryToken(rawToken, executor)).status).toBe(200);
+    expect(await lookupGuestManufacturingArtifact(rawToken, executor)).toMatchObject({ id: artifactId });
 
     await executor.query("update release_runs set decision = 'fail' where id = $1", [runId]);
     expect(await store.revisionHasValidatedManufacturingEvidence(revision?.id ?? "")).toBe(false);

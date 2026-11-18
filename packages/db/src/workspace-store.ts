@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
-import { signedRunnerPassSql } from "./runner-result-trust.js";
+import { availableManufacturingArchiveSql, signedRunnerPassSql } from "./runner-result-trust.js";
 
 /** Only HTTPS, credential-free external archive locations may be exposed to guest recipients. */
 export function isHttpsDeliveryArchiveUrl(value: string): boolean {
@@ -261,6 +261,7 @@ function sourceBindingVerifiedExpression(revisionAlias: string): string {
        and evidence_artifact.role = 'manufacturing'
        and evidence_artifact.kind = 'archive'
        and evidence_artifact.bytes > 0
+       and ${availableManufacturingArchiveSql("evidence_artifact")}
       join signed_manufacturing_export_evidence as source_proof
         on source_proof.artifact_id = evidence_artifact.id
        and source_proof.run_id = evidence_run.id
@@ -796,6 +797,7 @@ export class WorkspaceStore {
           and artifacts.role = 'manufacturing'
           and artifacts.kind = 'archive'
           and artifacts.bytes > 0
+          and ${availableManufacturingArchiveSql("artifacts")}
           and artifacts.sha256 ~ '^[0-9a-f]{64}$'
          join signed_manufacturing_export_evidence as evidence
            on evidence.artifact_id = artifacts.id
@@ -920,6 +922,7 @@ export class WorkspaceStore {
           and artifacts.role = 'manufacturing'
           and artifacts.kind = 'archive'
           and artifacts.bytes > 0
+          and ${availableManufacturingArchiveSql("artifacts")}
           and artifacts.sha256 ~ '^[0-9a-f]{64}$'
          join signed_manufacturing_export_evidence as evidence
            on evidence.artifact_id = artifacts.id
@@ -978,6 +981,7 @@ export class WorkspaceStore {
           and artifacts.role = 'manufacturing'
           and artifacts.kind = 'archive'
           and artifacts.bytes > 0
+          and ${availableManufacturingArchiveSql("artifacts")}
          join signed_manufacturing_export_evidence as evidence
            on evidence.artifact_id = artifacts.id
           and evidence.run_id = release_runs.id
@@ -1113,6 +1117,7 @@ export class WorkspaceStore {
          and artifact.run_id = run.id and artifact.execution_attempt_id = run.execution_attempt_id
          and artifact.role = 'manufacturing'
          and artifact.kind = 'archive' and artifact.bytes > 0
+         and ${availableManufacturingArchiveSql("artifact")}
          and artifact.sha256 = revision.bundle_sha256
        join signed_manufacturing_export_evidence as evidence on evidence.artifact_id = artifact.id
          and evidence.run_id = run.id and evidence.execution_attempt_id = run.execution_attempt_id
@@ -1260,6 +1265,7 @@ export class WorkspaceStore {
               and artifacts.role = 'manufacturing'
               and artifacts.kind = 'archive'
               and artifacts.bytes > 0
+          and ${availableManufacturingArchiveSql("artifacts")}
               and artifacts.sha256 ~ '^[0-9a-f]{64}$'
             join manufacturing_share_authorizations as share
               on share.revision_id = revisions.id

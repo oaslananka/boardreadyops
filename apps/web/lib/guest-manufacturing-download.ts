@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { SqlQueryExecutor } from "@boardreadyops/db";
-import { signedRunnerPassSql } from "@boardreadyops/db/runner-result-trust";
+import { availableManufacturingArchiveSql, signedRunnerPassSql } from "@boardreadyops/db/runner-result-trust";
 import {
   type ArtifactDownloadRecord,
   recordArtifactDownloadStarted,
@@ -36,6 +36,7 @@ const guestManufacturingArchiveSql = [
   "and evidence.source_sha = run.commit_sha and evidence.source_ref = run.ref",
   "and a.role = 'manufacturing' and a.kind = 'archive'",
   "and a.bytes > 0 and a.sha256 ~ '^[0-9a-f]{64}$'",
+  `and ${availableManufacturingArchiveSql("a")}`,
   "join manufacturing_share_authorizations as share",
   "on share.revision_id = revision.id and share.revoked_at is null",
   "and share.workspace_id = project.workspace_id",

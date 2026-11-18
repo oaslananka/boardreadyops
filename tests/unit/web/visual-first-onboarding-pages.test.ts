@@ -17,7 +17,7 @@ vi.mock("../../../apps/web/lib/repository-dashboard.js", async (importOriginal) 
   return {
     ...original,
     loadViewerRepositories: repositoriesMock,
-    loadViewerRepositoryResult: vi.fn(async () => ({ state: "ok", groups: await repositoriesMock() })),
+    loadViewerRepositoryResult: vi.fn(async (session) => ({ state: "ok", groups: await repositoriesMock(session) })),
     summarizeViewerRepositories: summaryMock,
     loadViewerDesignEvidence: designEvidenceMock,
   };

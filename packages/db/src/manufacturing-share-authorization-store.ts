@@ -1,5 +1,5 @@
 import type { SqlQueryExecutor } from "./lifecycle-store.js";
-import { signedRunnerPassSql } from "./runner-result-trust.js";
+import { availableManufacturingArchiveSql, signedRunnerPassSql } from "./runner-result-trust.js";
 
 /**
  * Explicit human permission to SHARE an existing manufacturing artifact.
@@ -35,6 +35,7 @@ export async function authorizeManufacturingShare(
     "and artifact.run_id = run.id and artifact.execution_attempt_id = run.execution_attempt_id",
     "and artifact.role = 'manufacturing' and artifact.kind = 'archive' and artifact.bytes > 0",
     "and artifact.sha256 ~ '^[0-9a-f]{64}$'",
+    `and ${availableManufacturingArchiveSql("artifact")}`,
     "join signed_manufacturing_export_evidence as evidence on evidence.artifact_id = artifact.id",
     "and evidence.run_id = run.id and evidence.execution_attempt_id = run.execution_attempt_id",
     "and evidence.repository_id = repository.id and evidence.installation_id = repository.installation_id",
@@ -95,6 +96,7 @@ export async function authorizedManufacturingRevisionIds(
       "and artifact.execution_attempt_id = run.execution_attempt_id",
       "and artifact.kind = 'archive' and artifact.role = 'manufacturing'",
       "and artifact.bytes > 0 and artifact.sha256 ~ '^[0-9a-f]{64}$'",
+      `and ${availableManufacturingArchiveSql("artifact")}`,
       "join signed_manufacturing_export_evidence as evidence on evidence.artifact_id = artifact.id",
       "and evidence.run_id = run.id and evidence.execution_attempt_id = run.execution_attempt_id",
       "and evidence.repository_id = repository.id and evidence.installation_id = repository.installation_id",
@@ -137,6 +139,7 @@ export async function revisionHasManufacturingShareAuthorization(
       "and artifact.execution_attempt_id = run.execution_attempt_id",
       "and artifact.kind = 'archive' and artifact.role = 'manufacturing'",
       "and artifact.bytes > 0 and artifact.sha256 ~ '^[0-9a-f]{64}$'",
+      `and ${availableManufacturingArchiveSql("artifact")}`,
       "join signed_manufacturing_export_evidence as evidence on evidence.artifact_id = artifact.id",
       "and evidence.run_id = run.id and evidence.execution_attempt_id = run.execution_attempt_id",
       "and evidence.repository_id = repository.id and evidence.installation_id = repository.installation_id",

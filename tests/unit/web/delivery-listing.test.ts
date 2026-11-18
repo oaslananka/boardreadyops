@@ -4,6 +4,7 @@ import type { UserSession } from "../../../apps/web/lib/user-session.js";
 
 const workspaceListingCounts = vi.fn(async () => ({ projects: 0, deliveries: 0, members: 0 }));
 const listWorkspacesForUser = vi.fn();
+const listProjectsByWorkspace = vi.fn();
 const listDeliveriesByWorkspace = vi.fn();
 const listRevisionsByWorkspace = vi.fn();
 const listValidatedRevisionCandidatesByWorkspace = vi.fn();
@@ -17,6 +18,7 @@ vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
   WorkspaceStore: class {
     workspaceListingCounts = workspaceListingCounts;
     listWorkspacesForUser = listWorkspacesForUser;
+    listProjectsByWorkspace = listProjectsByWorkspace;
     listDeliveriesByWorkspace = listDeliveriesByWorkspace;
     listRevisionsByWorkspace = listRevisionsByWorkspace;
     listValidatedRevisionCandidatesByWorkspace = listValidatedRevisionCandidatesByWorkspace;
@@ -78,6 +80,9 @@ describe("deliveryExpired", () => {
 describe("loadWorkspaceDeliveries", () => {
   it("lists deliveries and shareable revisions for the selected workspace", async () => {
     listWorkspacesForUser.mockReset().mockResolvedValue([workspace("ws_a", "Alpha"), workspace("ws_b", "Beta")]);
+    listProjectsByWorkspace
+      .mockReset()
+      .mockResolvedValue([{ id: "project-1", githubRepoFullName: "oaslananka-iot/board" }]);
     listDeliveriesByWorkspace.mockReset().mockResolvedValue([{ id: "del_1" }]);
     listRevisionsByWorkspace.mockReset().mockResolvedValue([{ id: "rev_1" }]);
     listValidatedRevisionCandidatesByWorkspace.mockReset().mockResolvedValue([]);
@@ -86,6 +91,10 @@ describe("loadWorkspaceDeliveries", () => {
 
     expect(result.state).toBe("ok");
     expect(result.state === "ok" && result.selected.id).toBe("ws_b");
+    expect(listProjectsByWorkspace).toHaveBeenCalledWith("ws_b");
+    expect(result.state === "ok" && result.projects).toEqual([
+      { id: "project-1", githubRepoFullName: "oaslananka-iot/board" },
+    ]);
     expect(listDeliveriesByWorkspace).toHaveBeenCalledWith("ws_b", 25, 0);
     expect(listRevisionsByWorkspace).toHaveBeenCalledWith("ws_b");
     expect(listValidatedRevisionCandidatesByWorkspace).toHaveBeenCalledWith("ws_b");
@@ -98,6 +107,7 @@ describe("loadWorkspaceDeliveries", () => {
 
   it("keys the workspace list on the viewer's login", async () => {
     listWorkspacesForUser.mockReset().mockResolvedValue([workspace("ws_a")]);
+    listProjectsByWorkspace.mockReset().mockResolvedValue([]);
     listDeliveriesByWorkspace.mockReset().mockResolvedValue([]);
     listRevisionsByWorkspace.mockReset().mockResolvedValue([]);
     listValidatedRevisionCandidatesByWorkspace.mockReset().mockResolvedValue([]);
@@ -109,6 +119,7 @@ describe("loadWorkspaceDeliveries", () => {
 
   it("never reads a workspace the viewer is not a member of", async () => {
     listWorkspacesForUser.mockReset().mockResolvedValue([workspace("ws_a", "Alpha")]);
+    listProjectsByWorkspace.mockReset().mockResolvedValue([]);
     listDeliveriesByWorkspace.mockReset().mockResolvedValue([]);
     listRevisionsByWorkspace.mockReset().mockResolvedValue([]);
     listValidatedRevisionCandidatesByWorkspace.mockReset().mockResolvedValue([]);
@@ -123,6 +134,7 @@ describe("loadWorkspaceDeliveries", () => {
 
   it("reports no-workspaces without listing anything", async () => {
     listWorkspacesForUser.mockReset().mockResolvedValue([]);
+    listProjectsByWorkspace.mockReset();
     listDeliveriesByWorkspace.mockReset();
     listRevisionsByWorkspace.mockReset();
     listValidatedRevisionCandidatesByWorkspace.mockReset();
@@ -146,6 +158,7 @@ describe("loadWorkspaceDeliveries", () => {
   it("closes the connection even when a listing throws", async () => {
     close.mockReset();
     listWorkspacesForUser.mockReset().mockResolvedValue([workspace("ws_a")]);
+    listProjectsByWorkspace.mockReset().mockResolvedValue([]);
     listDeliveriesByWorkspace.mockReset().mockRejectedValue(new Error("connection reset"));
     listRevisionsByWorkspace.mockReset().mockResolvedValue([]);
     listValidatedRevisionCandidatesByWorkspace.mockReset().mockResolvedValue([]);

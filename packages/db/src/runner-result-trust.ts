@@ -1,3 +1,16 @@
+/**
+ * A manufacturing archive can back a revision or guest delivery only while a first-party stored
+ * copy is available. GitHub Actions artifacts are temporary and must remain inspect-only.
+ */
+export function availableManufacturingArchiveSql(
+  alias: "archive" | "artifacts" | "evidence_artifact" | "artifact" | "a",
+): string {
+  return `${alias}.storage_path is not null
+    and ${alias}.storage_path <> ''
+    and ${alias}.storage_path not like 'github-actions/%'
+    and (${alias}.retention_until is null or ${alias}.retention_until > now())`;
+}
+
 /** A raw completed/pass row is only a preview until its accepted runner attempt is bound. */
 export function acceptedRunnerResultSql(alias: "run" | "release_runs"): string {
   return `exists (

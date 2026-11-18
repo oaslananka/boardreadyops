@@ -253,6 +253,8 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
     process.env,
     parameters.page,
   );
+  const hasLinkedProject =
+    result.state === "ok" && result.projects.some((project) => Boolean(project.githubRepoFullName));
 
   // Signed Run evidence is repository-scoped, never a delivery from the
   // selected workspace. Reuse the live GitHub installation grant checks.
@@ -324,6 +326,25 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                         <Button asChild variant="outline">
                           <a href="#register-run-backed-revision">Register an eligible Run</a>
                         </Button>
+                      ) : result.selected.role !== "viewer" && !hasLinkedProject ? (
+                        <Button asChild variant="outline">
+                          <Link href={`/projects?workspace=${encodeURIComponent(result.selected.id)}#add-project`}>
+                            Link a repository to a project
+                          </Link>
+                        </Button>
+                      ) : result.selected.role !== "viewer" ? (
+                        <Button asChild variant="outline">
+                          <Link href="/setup">Check repository setup</Link>
+                        </Button>
+                      ) : hasLinkedProject ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Button asChild variant="outline">
+                            <Link href="/setup">View repository setup</Link>
+                          </Button>
+                          <Button asChild variant="ghost">
+                            <Link href="/runs">Inspect runs</Link>
+                          </Button>
+                        </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           <Button asChild variant="outline">
@@ -339,7 +360,13 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                     <p>
                       {result.revisionCandidates.length > 0
                         ? "A run-backed archive candidate is available in this workspace. Inspect its source and validation evidence before registering a revision; this does not approve fabrication."
-                        : "No manufacturing package revision is registered in this workspace. A passing Run, including one from another repository, does not automatically become a delivery. Inspect its evidence and resolve outstanding Review blockers first."}
+                        : hasLinkedProject
+                          ? result.selected.role === "viewer"
+                            ? "A project is linked to a GitHub repository, but no currently stored, signed manufacturing archive is eligible yet. Ask a workspace owner to check repository setup, hosted readiness and persistent artifact storage. Temporary GitHub Actions artifacts remain inspect-only."
+                            : "A project is already linked to a GitHub repository, but no currently stored, signed manufacturing archive is eligible yet. Check repository setup and confirm hosted readiness and persistent artifact storage are configured, then run a new signed Review. Temporary GitHub Actions artifacts remain inspect-only."
+                          : result.selected.role !== "viewer"
+                            ? "No manufacturing package revision is registered in this workspace. Add a project linked to your board repository from Projects. Only currently stored, signed archives can become revision candidates; temporary GitHub Actions artifacts remain inspect-only. Resolve Review blockers before sharing."
+                            : "No project in this workspace is linked to a GitHub repository yet. Ask a workspace owner or admin to link the board repository in Projects. Only currently stored, signed archives can become revision candidates."}
                     </p>
                   </EmptyState>
                 }

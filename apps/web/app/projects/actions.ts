@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { fail, ok } from "../../lib/action-result.js";
+import { loadViewerRepositoryResult } from "../../lib/repository-dashboard.js";
+import { canonicalRepositoryName } from "../../lib/review-list-filters.js";
 import { defineAction } from "../../lib/server-action.js";
 import { openWorkspaceStore } from "../../lib/workspace-store-access.js";
 
@@ -31,6 +33,12 @@ const createProjectSchema = z.object({
   name: z.string().trim().min(1, "Give the project a name.").max(128),
   description: z.string().trim().max(1024).optional(),
   defaultCadFormat: z.enum(["kicad", "altium", "easyeda", "fusion360", "ipc2581", "generic_gerber"]).default("kicad"),
+  githubRepoFullName: z
+    .string()
+    .trim()
+    .max(255)
+    .optional()
+    .transform((value) => value || undefined),
 });
 
 /**
@@ -98,6 +106,25 @@ export const createProjectAction = defineAction(createProjectSchema, async (inpu
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return fail("This deployment has no database configured.");
 
+  // A repository name is a locator, not permission. Resolve it against the viewer's current
+  // GitHub App installation grants before persisting the association.
+  let githubRepoFullName: string | undefined;
+  if (input.githubRepoFullName) {
+    const selectedRepository = canonicalRepositoryName(input.githubRepoFullName);
+    if (!selectedRepository) return fail("Choose a valid GitHub owner/name repository.");
+    const repositoryResult = await loadViewerRepositoryResult(session);
+    if (repositoryResult.state !== "ok") {
+      return fail("GitHub repository access could not be verified. Try again later.");
+    }
+    const accessibleRepository = repositoryResult.groups
+      .flatMap((group) => group.repositories)
+      .find((repository) => canonicalRepositoryName(`${repository.owner}/${repository.name}`) === selectedRepository);
+    if (!accessibleRepository) {
+      return fail("That repository is not available through your current GitHub App installations.");
+    }
+    githubRepoFullName = `${accessibleRepository.owner}/${accessibleRepository.name}`;
+  }
+
   const { store, executor } = await openWorkspaceStore(connectionString);
   try {
     // Re-authorized here rather than trusted from the form: the workspace id is a hidden input,
@@ -115,6 +142,7 @@ export const createProjectAction = defineAction(createProjectSchema, async (inpu
       name: input.name,
       ...(input.description ? { description: input.description } : {}),
       defaultCadFormat: input.defaultCadFormat,
+      ...(githubRepoFullName ? { githubRepoFullName } : {}),
     });
     revalidatePath("/projects");
     return ok({ projectId: project.id }, `Created ${project.name}.`);

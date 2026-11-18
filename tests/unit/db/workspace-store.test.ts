@@ -360,7 +360,11 @@ describe("WorkspaceStore", () => {
     expect(revisions[0]?.sourceBinding).toBe("not-established");
     expect(revisions[0]?.sourceEvidence).toBeUndefined();
     expect(String(query.mock.calls[0]?.[0])).toContain("source_binding_verified");
-    expect(String(query.mock.calls[0]?.[0])).toContain("join signed_manufacturing_export_evidence");
+    const sql = String(query.mock.calls[0]?.[0]).toLowerCase();
+    expect(sql).toContain("join signed_manufacturing_export_evidence");
+    expect(sql).toContain("evidence_artifact.storage_path is not null");
+    expect(sql).toContain("evidence_artifact.storage_path not like 'github-actions/%'");
+    expect(sql).toContain("evidence_artifact.retention_until is null or evidence_artifact.retention_until > now()");
   });
 
   it("derives validated revision candidates only through the trusted evidence query", async () => {
@@ -398,6 +402,9 @@ describe("WorkspaceStore", () => {
     expect(sql).toContain("release_runs.decision = 'pass'");
     expect(sql).toContain("artifacts.role = 'manufacturing'");
     expect(sql).toContain("artifacts.kind = 'archive'");
+    expect(sql).toContain("artifacts.storage_path is not null");
+    expect(sql).toContain("artifacts.storage_path not like 'github-actions/%'");
+    expect(sql).toContain("artifacts.retention_until is null or artifacts.retention_until > now()");
     expect(sql).toContain("join signed_manufacturing_export_evidence");
     expect(sql).toContain("evidence.source_sha = release_runs.commit_sha");
     expect(sql).toContain("evidence.github_run_id = attempt.github_workflow_dispatch_id");
@@ -482,6 +489,9 @@ describe("WorkspaceStore", () => {
     expect(sql).toContain("release_runs.decision = 'pass'");
     expect(sql).toContain("artifacts.role = 'manufacturing'");
     expect(sql).toContain("artifacts.kind = 'archive'");
+    expect(sql).toContain("artifacts.storage_path is not null");
+    expect(sql).toContain("artifacts.storage_path not like 'github-actions/%'");
+    expect(sql).toContain("artifacts.retention_until is null or artifacts.retention_until > now()");
     expect(sql).toContain("join signed_manufacturing_export_evidence");
     expect(sql).toContain("sourcebinding");
     expect(sql).toContain("projects.workspace_id = $2");
@@ -503,6 +513,25 @@ describe("WorkspaceStore", () => {
     expect(sql).toContain("join signed_manufacturing_export_evidence as evidence");
     expect(sql).toContain("evidence.execution_attempt_id = release_runs.execution_attempt_id");
     expect(sql).toContain("artifacts.role = 'manufacturing'");
+    expect(sql).toContain("artifacts.storage_path not like 'github-actions/%'");
+    expect(sql).toContain("artifacts.retention_until is null or artifacts.retention_until > now()");
+  });
+
+  it("does not create guest links from temporary or expired manufacturing archives", async () => {
+    const query = vi.fn(async (_sql: string, _params: readonly unknown[] = []) => ({ rows: [] }));
+    const store = new WorkspaceStore({ query });
+
+    await expect(
+      store.createDeliveryLink({
+        revisionId: "rev-temporary-or-expired",
+        expiresAt: new Date(Date.now() + 60_000),
+      }),
+    ).rejects.toThrow("Failed to insert delivery");
+
+    const sql = String(query.mock.calls[0]?.[0]).toLowerCase();
+    expect(sql).toContain("artifact.storage_path is not null");
+    expect(sql).toContain("artifact.storage_path not like 'github-actions/%'");
+    expect(sql).toContain("artifact.retention_until is null or artifact.retention_until > now()");
   });
 
   it("rejects unsafe archive URLs before a delivery is persisted", async () => {
