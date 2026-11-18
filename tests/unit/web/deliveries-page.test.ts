@@ -222,7 +222,7 @@ describe("DeliveriesListPage", () => {
     });
     const markup = await render();
     expect(markup).toContain("Check repository setup");
-    expect(markup).toContain('href="/setup"');
+    expect(markup).toContain('href="/setup?repository=owner%2Fboard"');
     expect(markup).toContain("no currently stored, signed manufacturing archive is eligible yet");
     expect(markup).toContain("Temporary GitHub Actions artifacts remain inspect-only");
     expect(markup).not.toContain("Link a repository to a project");
