@@ -100,6 +100,41 @@ describe("SQL GitHub App metadata store", () => {
     ).toEqual({ repositories: ["oaslananka/boardreadyops"] });
   });
 
+  it("adds an explicit canary list without replacing the existing secret allowlist or single pilot", () => {
+    expect(
+      releaseRepositoryRolloutPolicyFromEnvironment({
+        [releaseRepositoryRolloutEnvName]: "acme/existing-board",
+        [releaseRepositoryPilotEnvName]: "oaslananka/boardreadyops",
+        BOARDREADYOPS_RELEASE_CANARY_REPOSITORIES:
+          "Oaslananka-Iot/RoyalBlue54L-Feather-Hardware,octo-org/another-board",
+      }),
+    ).toEqual({
+      repositories: [
+        "acme/existing-board",
+        "oaslananka/boardreadyops",
+        "oaslananka-iot/royalblue54l-feather-hardware",
+        "octo-org/another-board",
+      ],
+    });
+  });
+
+  it("fails closed on wildcard, malformed and broad canary tokens", () => {
+    expect(
+      releaseRepositoryRolloutPolicyFromEnvironment({
+        [releaseRepositoryRolloutEnvName]: "acme/existing-board",
+        BOARDREADYOPS_RELEASE_CANARY_REPOSITORIES:
+          "all * owner/../repository https://example.com/x octo-org/valid-board,octo-org/valid-board",
+      }),
+    ).toEqual({ repositories: ["acme/existing-board", "octo-org/valid-board"] });
+
+    expect(
+      releaseRepositoryRolloutPolicyFromEnvironment({
+        [releaseRepositoryRolloutFileEnvName]: "/missing/boardreadyops-rollout-policy",
+        BOARDREADYOPS_RELEASE_CANARY_REPOSITORIES: "octo-org/valid-board",
+      }),
+    ).toEqual({ repositories: [] });
+  });
+
   it("never expands a single-repository pilot to wildcards or multiple names", () => {
     for (const invalid of ["all", "*", "acme/one,acme/two", "acme/one acme/two", "acme/../two", "not-a-repository"]) {
       expect(
