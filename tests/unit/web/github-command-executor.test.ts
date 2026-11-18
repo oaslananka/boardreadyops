@@ -375,6 +375,52 @@ describe("GitHub command API helpers", () => {
     ).resolves.toMatchObject({ pullRequestFromFork: false });
   });
 
+  it("does not mark a first-party branch PR as untrusted merely because its repository is a fork", async () => {
+    const request = vi.fn(async () =>
+      jsonResponse({
+        head: {
+          ref: "docs/badge",
+          sha: "a".repeat(40),
+          repo: { id: 1450010771, full_name: "octo/board", fork: true },
+        },
+        base: { sha: "b".repeat(40), repo: { id: 1450010771, full_name: "octo/board" } },
+      }),
+    );
+    await expect(
+      readGitHubPullRequestContext({
+        apiBaseUrl: "https://github.test/api/v3",
+        token: "token",
+        owner: "octo",
+        repo: "board",
+        pullRequestNumber: 7,
+        request,
+      }),
+    ).resolves.toMatchObject({ pullRequestFromFork: false });
+  });
+
+  it("rejects conflicting GitHub repository IDs even when head repository name matches", async () => {
+    const request = vi.fn(async () =>
+      jsonResponse({
+        head: {
+          ref: "docs/badge",
+          sha: "a".repeat(40),
+          repo: { id: 1450010772, full_name: "octo/board", fork: false },
+        },
+        base: { sha: "b".repeat(40), repo: { id: 1450010771, full_name: "octo/board" } },
+      }),
+    );
+    await expect(
+      readGitHubPullRequestContext({
+        apiBaseUrl: "https://github.test/api/v3",
+        token: "token",
+        owner: "octo",
+        repo: "board",
+        pullRequestNumber: 7,
+        request,
+      }),
+    ).resolves.toMatchObject({ pullRequestFromFork: true });
+  });
+
   it("derives draft and fork state from the GitHub pull request response", async () => {
     const request = vi.fn(async () =>
       jsonResponse({

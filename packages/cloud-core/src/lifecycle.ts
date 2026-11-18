@@ -327,11 +327,15 @@ function pullRequestHeadRepositoryIsFork(pullRequest: Record<string, unknown>): 
 
 function pullRequestIsFromFork(repository: GitHubRepositoryRef, pullRequest: Record<string, unknown>): boolean {
   const headRepository = pullRequestHeadRepository(pullRequest);
-  // A missing or deleted head repository is NOT proof that the PR belongs to
-  // the base repository. Preserve restricted execution until origin is known.
-  return (
-    pullRequestHeadRepositoryIsFork(pullRequest) || headRepository?.toLowerCase() !== repository.fullName.toLowerCase()
-  );
+  // A forked repository can receive PRs from its *own* branches. The repository's
+  // fork flag describes its history, not the origin of the current pull request.
+  // Keep deleted, mismatched, or unverified sources restricted.
+  if (!headRepository || headRepository.toLowerCase() !== repository.fullName.toLowerCase()) return true;
+  const head = isRecord(pullRequest.head) ? pullRequest.head : undefined;
+  const headRepo = head && isRecord(head.repo) ? head.repo : undefined;
+  const headId = headRepo ? numberValue(headRepo, "id") : undefined;
+  if (headId !== undefined) return headId !== repository.id;
+  return pullRequestHeadRepositoryIsFork(pullRequest);
 }
 
 export function pullRequestSafeMode(
