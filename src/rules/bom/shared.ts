@@ -4,7 +4,7 @@ import type { BomRow } from "../../bom/types.js";
 import type { RuleContext } from "../../core/context.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { parseSchematic } from "../../kicad/schematic.js";
-import { globFiles } from "../../util/glob.js";
+import { resolveProjectBomPaths } from "./project-files.js";
 
 export async function loadBomContext(context: RuleContext): Promise<{
   bomRows: BomRow[];
@@ -36,13 +36,6 @@ export async function loadBomContext(context: RuleContext): Promise<{
 }
 
 async function resolveBomPath(context: RuleContext): Promise<string | undefined> {
-  if (context.options.bom && context.options.bom !== "auto") {
-    return path.resolve(context.root, context.options.bom);
-  }
-  const configured = context.config.projects?.find((project) => project.bom)?.bom;
-  if (configured) {
-    return path.resolve(context.root, configured);
-  }
-  const found = await globFiles(context.root, ["**/bom*.csv", "**/*bom*.csv", "**/bom*.tsv", "**/*bom*.tsv"]);
-  return found[0];
+  const paths = await resolveProjectBomPaths(context.root, context.projects, context.options, context.config);
+  return paths[0];
 }
