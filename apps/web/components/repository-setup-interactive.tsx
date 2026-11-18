@@ -1222,6 +1222,15 @@ function OneClickSetup({
 }: Readonly<OneClickSetupProps>) {
   const setupVerified = repository !== undefined && deriveRepositorySetupState(repository).id === "ready";
   const setupNeedsRepair = needsReviewableSetupRepair(repository);
+  const canUpdatePendingSetup =
+    repository !== undefined &&
+    !setupVerified &&
+    !setupNeedsRepair &&
+    typeof repository.setupRevision === "number" &&
+    Number.isSafeInteger(repository.setupRevision) &&
+    repository.setupRevision > 0 &&
+    repository.setupProbeStatus !== "pending" &&
+    repository.setupProbeStatus !== "dispatched";
 
   if (!signedIn) {
     return (
@@ -1308,6 +1317,39 @@ function OneClickSetup({
             className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50"
           >
             {isCreating ? "Opening pull request…" : "Open configuration update PR"}
+          </button>
+        </details>
+      ) : null}
+
+      {canUpdatePendingSetup ? (
+        <details className="rounded-md border border-border p-3">
+          <summary className="min-h-11 cursor-pointer text-sm font-medium text-foreground">
+            Existing workflow failing setup validation?
+          </summary>
+          <p className="mt-2 text-sm text-muted-foreground">
+            If an older probe stopped during checkout or submodule resolution, your installed workflow may still require
+            a full checkout. Current setup probes read the tracked configuration without that checkout.
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            A reviewable update can replace the existing <code>boardreadyops.yml</code> and{" "}
+            <code>.github/workflows/{workflowPath}</code>. Carefully review the proposed file changes before merging;
+            nothing is changed on the default branch by opening the pull request.
+          </p>
+          <a
+            href={`https://github.com/${repository?.fullName}/actions/workflows/${workflowPath}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-primary underline underline-offset-2"
+          >
+            Inspect existing workflow runs
+          </a>
+          <button
+            type="button"
+            disabled={isCreating || blockedReason !== undefined || !repositoryId}
+            onClick={onUpdate}
+            className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50"
+          >
+            {isCreating ? "Opening pull request…" : "Review existing workflow update PR"}
           </button>
         </details>
       ) : null}

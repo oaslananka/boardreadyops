@@ -773,6 +773,74 @@ describe("repository setup readiness controls", () => {
     },
   );
 
+  it("offers a deliberate workflow-update PR when existing setup is awaiting validation", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        ok: true,
+        outcome: "created",
+        pullRequestNumber: 51,
+        pullRequestUrl: "https://github.test/octo/board-one/pull/51",
+        setupRevision: 3,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...readyForProbe, setupRevision: 2, setupProbeStatus: undefined }],
+        }),
+      );
+    });
+
+    expect(container.textContent).toContain("Existing workflow failing setup validation?");
+    expect(container.textContent).toContain("checkout or submodule");
+    expect(container.textContent).toContain("review the proposed file changes before merging");
+    expect(
+      [...container.querySelectorAll("a")]
+        .find((link) => link.textContent?.includes("Inspect existing workflow runs"))
+        ?.getAttribute("href"),
+    ).toBe("https://github.com/octo/board-one/actions/workflows/readiness-runner.yml");
+    expect(button(container, "Open setup pull request").disabled).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const repair = button(container, "Review existing workflow update PR");
+    await act(async () => {
+      repair.click();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+      action: "setup",
+      updateExistingSetup: true,
+    });
+    expect(container.textContent).toContain("Setup pull request #51");
+  });
+
+  it("does not offer the alternative repair on unconfigured repositories or active probes", async () => {
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...readyForProbe, setupRevision: 0 }],
+        }),
+      );
+    });
+    expect(() => button(container, "Review existing workflow update PR")).toThrow("button not found");
+
+    await act(async () => {
+      root.render(
+        createElement(RepositorySetupInteractive, {
+          ...baseProps,
+          signedIn: true,
+          repositories: [{ ...readyForProbe, setupProbeStatus: "dispatched" }],
+        }),
+      );
+    });
+    expect(() => button(container, "Review existing workflow update PR")).toThrow("button not found");
+  });
+
   it("does not offer to overwrite an existing workflow without a persisted setup revision", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ ok: false, error: "Setup already exists" }, false));
     vi.stubGlobal("fetch", fetchMock);
