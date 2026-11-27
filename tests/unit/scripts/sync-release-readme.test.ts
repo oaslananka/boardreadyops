@@ -1,5 +1,7 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -44,6 +46,58 @@ describe("sync-release-readme", () => {
       "package version is `boardreadyops@1.69.0`; it may not be published",
     );
     expect(() => verifyPublicReleaseFiles(candidate, "1.69.0")).not.toThrow();
+  });
+
+  it("documents immutable historical Git tags separately from moving GHCR image aliases", () => {
+    const candidate = syncPublicReleaseFiles(sourceFiles, "1.69.0");
+    expect(candidate["README.md"]).toContain("Historical shortened Git tags such as `v1` are immutable");
+    expect(candidate["docs/action.md"]).toContain("Historical shortened Git tags such as `v1` are immutable");
+    expect(candidate["docs/release/channel-verification.md"]).toContain(
+      "historical Git tags such as `v1` are immutable",
+    );
+    expect(candidate["docs/release/channel-verification.md"]).toContain(
+      "Confirm actual published `v1`/`latest` digests independently",
+    );
+  });
+
+  it("rejects a stale quickstart Action pin, not just the main README pin", () => {
+    expect(IMMUTABLE_ACTION_PIN_PATHS).toContain("docs/quickstart.md");
+    const candidate = syncPublicReleaseFiles(sourceFiles, "1.69.0");
+    const quickstart = candidate["docs/quickstart.md"];
+    if (quickstart === undefined) throw new Error("Quickstart source is missing");
+    const stale = {
+      ...candidate,
+      "docs/quickstart.md": quickstart.replace(
+        /oaslananka\/boardreadyops@[0-9a-f]{40}\s+#\s+v[\d.]+/u,
+        "oaslananka/boardreadyops@1111111111111111111111111111111111111111 # v1.4.6",
+      ),
+    };
+    expect(() => verifyPublicReleaseFiles(stale, "1.69.0")).toThrow(/immutable Action pin drift/u);
+  });
+
+  it("actually rejects stale public surface files through the direct CLI", () => {
+    const root = mkdtempSync(join(tmpdir(), "boardreadyops-release-surface-"));
+    try {
+      const candidate = syncPublicReleaseFiles(sourceFiles, "1.69.0");
+      for (const [file, content] of Object.entries(candidate)) {
+        const target = join(root, file);
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(
+          target,
+          file === "README.md" ? content.replace("boardreadyops@1.69.0", "boardreadyops@0.0.0") : content,
+        );
+      }
+      writeFileSync(join(root, "package.json"), JSON.stringify({ version: "1.69.0" }));
+      const result = spawnSync(process.execPath, [resolve("scripts/sync-release-readme.mjs"), "--check"], {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      expect(result.status, result.error?.message ?? result.stderr).toBe(1);
+      expect(result.stderr).toContain("public release reference drift");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("retains historical evidence and immutable Action SHA pins during candidate generation", () => {

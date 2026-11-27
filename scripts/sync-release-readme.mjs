@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const VERSION_PATTERN = String.raw`\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?`;
 
@@ -21,6 +22,7 @@ export const IMMUTABLE_ACTION_PIN_PATHS = [
   "docs/integrations/kibot.md",
   "docs/sbom.md",
   "docs/review-app.md",
+  "docs/quickstart.md",
 ];
 
 const VERSION_NEUTRAL_PATHS = [".github/ISSUE_TEMPLATE/bug_report.yml"];
@@ -30,7 +32,7 @@ const PUBLIC_SURFACE_PATHS = [
 
 export function syncReleaseReadme(readme, version) {
   assertReleaseVersion(version);
-  return replaceExactlyOnce(
+  const next = replaceExactlyOnce(
     readme,
     /(?:The current public npm package is|\*\*Repository-prepared version:\*\*)[\s\S]*?(?=\n\n## Runtime Support)/u,
     `**Repository-prepared version:** \`boardreadyops@${version}\`. This is the package version
@@ -42,6 +44,12 @@ latest publicly available version. Verify the selected release's binaries,
 [release channel verification](docs/release/channel-verification.md)
 for historical verified snapshots and outstanding follow-ups.`,
     "repository-prepared version",
+  );
+  return replaceExactlyOnce(
+    next,
+    /(?:The floating `v1` alias is convenient|Historical shortened Git tags such as `v1` are immutable)[\s\S]*?(?=\n\nSARIF upload)/u,
+    "Historical shortened Git tags such as `v1` are immutable, not an automatic update channel.\nSelect a newer reviewed full release tag or commit SHA to upgrade.",
+    "immutable Git tag guidance",
   );
 }
 
@@ -125,8 +133,9 @@ function syncPublicReleaseFile(path, content, version) {
         /This example pins the reviewed release commit shown above\.[\s\S]*?(?=\n\n## Inputs)|This example pins a reviewed, immutable Action commit\.[\s\S]*?(?=\n\n## Inputs)/u,
         `This example pins a reviewed, immutable Action commit. Find the latest
 **published** version in [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases);
-the version prepared in a release pull request may not be available yet. The
-floating \`v1\` alias moves with stable releases.`,
+the version prepared in a release pull request may not be available yet.
+Historical shortened Git tags such as \`v1\` are immutable, not an automatic
+update channel. Select a newer reviewed full release tag or commit SHA to upgrade.`,
         "Action published-release guidance",
       );
     case "docs/security/release-integrity.md":
@@ -167,8 +176,8 @@ the current release status.`,
 > in this repository revision, **not necessarily published**. Check
 > [npm](https://www.npmjs.com/package/boardreadyops) and
 > [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases)
-> for the latest actual release. Verify tag, floating aliases, checksums, SBOM,
-> and image digests independently before recording public acceptance.
+> for the latest actual release. Verify the full release tag, checksums, SBOM,
+> and GHCR image aliases independently before recording public acceptance.
 
 ## Current Release Contract
 
@@ -178,7 +187,7 @@ the current release status.`,
 | Public release | Check [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) |
 | npm package | Check the registry's actual \`latest\` dist-tag |
 | Binary assets | Confirm platform binaries, \`SHA256SUMS\`, and \`sbom.cyclonedx.json\` on the published tag |
-| Root Action | Pin a reviewed release commit SHA for reproducibility; \`v1\` can move |
+| Root Action | Pin a reviewed release commit SHA; historical Git tags such as \`v1\` are immutable |
 | Container Action | Pin the same reviewed release commit SHA and verify image digest |
 | Container aliases | Confirm actual published \`v1\`/\`latest\` digests independently |
 | Homebrew formula | \`Formula/boardreadyops.rb\` is independently versioned; check the formula's tag and checksums before use |
@@ -272,7 +281,7 @@ function replaceExactlyOnce(input, pattern, replacement, label) {
   return `${input.slice(0, first.index)}${rendered}${input.slice(first.index + first[0].length)}`;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try {
     await main();
   } catch (error) {

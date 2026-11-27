@@ -40,7 +40,7 @@ function healthySnapshot(overrides: Record<string, unknown> = {}) {
         },
       ],
     },
-    floatingV1Commit: releaseCommit,
+    floatingV1Commit: "1111111111111111111111111111111111111111",
     checksumEntries: binaryDigests,
     downloadedAssetDigests: {
       SHA256SUMS: "90be0ca72010506a3b895db251130ff0708eed120fb2f6a969a55018ebae1ee8",
@@ -58,24 +58,24 @@ function healthySnapshot(overrides: Record<string, unknown> = {}) {
       { path: "docs/integrations/kibot.md", sha: releaseCommit, version },
       { path: "docs/sbom.md", sha: releaseCommit, version },
       { path: "docs/review-app.md", sha: releaseCommit, version },
+      { path: "docs/quickstart.md", sha: releaseCommit, version },
     ],
     actionMetadataMatchesRelease: true,
     formula: {
       version,
-      digests: Object.values(binaryDigests).filter((_, index) => index < 4),
+      assetChecksums: Object.fromEntries(Object.entries(binaryDigests).filter(([name]) => !name.endsWith(".exe"))),
     },
     ...overrides,
   };
 }
 
 describe("public release channel snapshot", () => {
-  it("accepts aligned npm, release, assets, aliases, Action pins, and formula state", () => {
+  it("accepts aligned published channels even when the historical shortened Git tag is older", () => {
     expect(evaluatePublicReleaseSnapshot(healthySnapshot())).toEqual([]);
   });
 
-  it("rejects stale floating aliases and immutable Action pins", () => {
+  it("rejects stale GHCR aliases and immutable Action pins", () => {
     const snapshot = healthySnapshot({
-      floatingV1Commit: "1111111111111111111111111111111111111111",
       ghcr: {
         exact: { digest: indexDigest, platforms: ["linux/amd64", "linux/arm64"] },
         major: { digest: "sha256:deadbeef", platforms: ["linux/amd64", "linux/arm64"] },
@@ -86,11 +86,34 @@ describe("public release channel snapshot", () => {
 
     expect(evaluatePublicReleaseSnapshot(snapshot).map((failure) => failure.name)).toEqual(
       expect.arrayContaining([
-        "floating v1 tag matches the exact release commit",
         "GHCR stable aliases resolve to the exact release index",
         "recommended immutable Action pins match the reviewed release commit",
       ]),
     );
+  });
+
+  it("requires every copy-paste Action surface even if another file has multiple matching pins", () => {
+    const snapshot = healthySnapshot();
+    const actionPins = snapshot.actionPins.filter((pin) => pin.path !== "docs/quickstart.md");
+    actionPins.push({ path: "README.md", sha: releaseCommit, version });
+    expect(evaluatePublicReleaseSnapshot({ ...snapshot, actionPins }).map((failure) => failure.name)).toContain(
+      "recommended immutable Action pins match the reviewed release commit",
+    );
+  });
+
+  it("rejects Homebrew checksums assigned to the wrong platform even when all four hashes exist", () => {
+    const snapshot = healthySnapshot();
+    const assetChecksums = {
+      ...snapshot.formula.assetChecksums,
+      "boardreadyops-linux-x64": binaryDigests["boardreadyops-linux-arm64"],
+      "boardreadyops-linux-arm64": binaryDigests["boardreadyops-linux-x64"],
+    };
+    expect(
+      evaluatePublicReleaseSnapshot({
+        ...snapshot,
+        formula: { ...snapshot.formula, assetChecksums },
+      }).map((failure) => failure.name),
+    ).toContain("repository Homebrew formula matches the current release checksums");
   });
 
   it("rejects release asset and checksum drift", () => {

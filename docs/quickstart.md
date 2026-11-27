@@ -92,7 +92,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops@9bc8a075d885ad1182e2ad4fcd4c9160f8160c94 # v1.31.2
+      - uses: oaslananka/boardreadyops@6b41a224869f9a0ae646566663a914a89402fb47 # v1.72.0
         with:
           config: boardreadyops.yml
           mode: enforce
