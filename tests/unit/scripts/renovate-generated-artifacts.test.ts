@@ -58,6 +58,57 @@ describe("Mend Renovate generated-file privilege separation", () => {
     expect(authorizeRenovatePullRequest(event, null, repository)).toBeNull();
   });
 
+  function matchingBranch(ref: string) {
+    const pullRequest = { ...currentPr, head: { ...currentPr.head, ref } };
+    return { event: { ...event, pull_request: pullRequest }, live: pullRequest };
+  }
+
+  it.each([
+    "renovate/patch-developer-tooling-(non-major)",
+    "renovate/glob-=10.0.0-14.0.2-14.0.x",
+    "renovate/hono-node-server@-2.0.12-2.1.x",
+  ])("authorizes an observed, valid Mend branch: %s", (ref) => {
+    const f = matchingBranch(ref);
+    expect(authorizeRenovatePullRequest(f.event, f.live, repository)).toEqual({ sha, branch: ref, number: 88 });
+  });
+
+  it.each([
+    "feature/renovate",
+    "renovate/",
+    "renovate//x",
+    "renovate/x/",
+    "renovate/.hidden/x",
+    "renovate/x.lock/y",
+    "renovate/x.lock",
+    "renovate/x.",
+    "renovate/x..y",
+    "renovate/../x",
+    "renovate/x@{y",
+    "renovate/x y",
+    "renovate/x;touch",
+    "renovate/x$(id)",
+    "renovate/x`id`",
+    "renovate/x\\y",
+    "renovate/x\n",
+    "renovate/x\r",
+    "renovate/x\t",
+    "renovate/x:refs/heads/main",
+    `renovate/${"x".repeat(221)}`,
+  ])("rejects malformed or unsafe matched branch: %j", (ref) => {
+    const f = matchingBranch(ref);
+    expect(authorizeRenovatePullRequest(f.event, f.live, repository)).toBeNull();
+  });
+
+  it("still refuses a different live branch or stale SHA for an allowed grouped ref", () => {
+    const f = matchingBranch("renovate/patch-developer-tooling-(non-major)");
+    expect(
+      authorizeRenovatePullRequest(f.event, { ...f.live, head: { ...f.live.head, ref: "renovate/other" } }, repository),
+    ).toBeNull();
+    expect(
+      authorizeRenovatePullRequest(f.event, { ...f.live, head: { ...f.live.head, sha: "b".repeat(40) } }, repository),
+    ).toBeNull();
+  });
+
   it("rejects forks, actor changes, malformed branch names and unrelated repositories", () => {
     expect(authorizeRenovatePullRequest(event, { ...currentPr, user: { login: "attacker" } }, repository)).toBeNull();
     expect(
