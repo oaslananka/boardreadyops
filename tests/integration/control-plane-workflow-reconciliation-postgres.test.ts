@@ -637,10 +637,14 @@ describeDatabase("GitHub workflow PostgreSQL reconciliation", () => {
     ).resolves.toMatchObject({ expectedConclusion: "failure", resultReported: false });
   });
 
+  // Migration 0129 permits only pre-2026-11-09 items less than 24 days old.
+  // Its real recovery window is deliberately finite; test the historical incident
+  // at a fixed observation time instead of moving the fixture with the CI date.
+  const legacyIncidentAt = "2026-11-08T16:00:00.000Z";
+  const legacyRecoveryAt = "2026-11-18T16:00:00.000Z";
+
   async function exhaustedLegacyCallback(label: string) {
-    // This live incident is ten days old; keep the sample duration inside the
-    // release_runs.duration_ms integer contract while retaining a pre-fix item.
-    const fixture = await createFixture(label, { now: new Date(Date.now() - 10 * 24 * 60 * 60_000) });
+    const fixture = await createFixture(label, { now: new Date(legacyIncidentAt) });
     const checkRunId = externalIdSeed + externalIdOffset + 10_000;
     await database().query("update release_runs set github_check_run_id = $2 where id = $1", [
       fixture.releaseRunId,
@@ -668,20 +672,56 @@ describeDatabase("GitHub workflow PostgreSQL reconciliation", () => {
     reconciliationId: string;
     checkRunId: number;
     workflowId?: string;
+    useWallClock?: boolean;
   }) {
-    const response = await database().query(
-      `select boardreadyops_reactivate_legacy_callback_dead_letter(
-          $1, $2, $3, $4::bigint, $5
-        ) as outcome`,
-      [
-        input.installationId,
-        input.reconciliationId,
-        input.workflowId ?? "987654321",
-        input.checkRunId,
-        "operator.recovery-test",
-      ],
-    );
-    return rows(response)[0]?.outcome;
+    const params = [
+      input.installationId,
+      input.reconciliationId,
+      input.workflowId ?? "987654321",
+      input.checkRunId,
+      "operator.recovery-test",
+    ];
+    if (input.useWallClock) {
+      return rows(
+        await database().query(
+          "select public.boardreadyops_reactivate_legacy_callback_dead_letter($1, $2, $3, $4::bigint, $5) as outcome",
+          params,
+        ),
+      )[0]?.outcome;
+    }
+
+    // Use the installed migration's actual function body and substitute only its
+    // clock in a session-local copy. No production function or guard is changed.
+    return database().withTransaction(async (transaction) => {
+      const definition = rows(
+        await transaction.query(
+          `select pg_get_functiondef(
+            'public.boardreadyops_reactivate_legacy_callback_dead_letter(text,text,text,bigint,text)'::regprocedure
+          ) as definition`,
+        ),
+      )[0]?.definition;
+      const functionName = "FUNCTION public.boardreadyops_reactivate_legacy_callback_dead_letter(";
+      const clock = "clock_timestamp()";
+      if (
+        typeof definition !== "string" ||
+        !definition.includes(functionName) ||
+        definition.split(clock).length !== 2
+      ) {
+        throw new Error("Expected the installed legacy recovery function and its single wall clock");
+      }
+      const historicalDefinition = definition
+        .replace(functionName, "FUNCTION pg_temp.boardreadyops_legacy_recovery_at_test_time(")
+        .replace(clock, `'${legacyRecoveryAt}'::timestamptz`);
+      await transaction.query(historicalDefinition);
+      const result = await transaction.query(
+        "select pg_temp.boardreadyops_legacy_recovery_at_test_time($1, $2, $3, $4::bigint, $5) as outcome",
+        params,
+      );
+      await transaction.query(
+        "drop function pg_temp.boardreadyops_legacy_recovery_at_test_time(text,text,text,bigint,text)",
+      );
+      return rows(result)[0]?.outcome;
+    });
   }
 
   it("reactivates only a pre-fix dead letter, then fails closed using existing signed-callback reconciliation", async () => {
@@ -709,7 +749,10 @@ describeDatabase("GitHub workflow PostgreSQL reconciliation", () => {
       outcome_code: "operator_legacy_callback_recovery",
     });
 
-    const after = createSqlControlPlaneOperationsStore(database(), { now: () => new Date(), leaseSeconds: 60 });
+    const after = createSqlControlPlaneOperationsStore(database(), {
+      now: () => new Date(legacyRecoveryAt),
+      leaseSeconds: 60,
+    });
     const workerId = `${testPrefix}-legacy-current-worker`;
     const claim = (await after.claimWorkflowReconciliationItems({ workerId, limit: 1 }))[0];
     expect(claim).toMatchObject({ reconciliationId: target.reconciliationId, attemptCount: 1 });
@@ -838,8 +881,9 @@ describeDatabase("GitHub workflow PostgreSQL reconciliation", () => {
         fixture.executionAttemptId,
       ]);
     } else if (variant === "too-old-to-terminalize") {
-      await database().query("update release_runs set started_at=now()-interval '30 days' where id=$1", [
+      await database().query("update release_runs set started_at=$2::timestamptz-interval '30 days' where id=$1", [
         fixture.releaseRunId,
+        legacyRecoveryAt,
       ]);
     } else if (variant === "signed-result") {
       await database().query("update release_runs set terminal_result_digest=$2 where id=$1", [
@@ -847,9 +891,20 @@ describeDatabase("GitHub workflow PostgreSQL reconciliation", () => {
         "a".repeat(64),
       ]);
     } else if (variant === "newer-than-fix") {
-      await database().query("update control_plane_reconciliation_items set created_at=now() where id=$1", [
+      await database().query("update control_plane_reconciliation_items set created_at=$2::timestamptz where id=$1", [
         target.reconciliationId,
+        legacyRecoveryAt,
       ]);
+      // Independently exercise the unmodified installed function: the fixed
+      // post-cutoff item must never be recovered using the real database clock.
+      await expect(
+        reactivateLegacy({
+          installationId: fixture.installationId,
+          reconciliationId: target.reconciliationId,
+          checkRunId: target.checkRunId,
+          useWallClock: true,
+        }),
+      ).resolves.toBe("not_recoverable");
     }
     await expect(
       reactivateLegacy({

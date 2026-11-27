@@ -1651,7 +1651,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `ee-first@1.1.1`
   - Description: return the first event in a set of ee/event pairs
   - Homepage: https://github.com/jonathanong/ee-first#readme
-- `effect@3.20.0`
+- `effect@3.22.5`
   - Description: The missing standard library for TypeScript, for writing production-grade software.
   - Homepage: https://effect.website
 - `emoji-regex@8.0.0`, `emoji-regex@10.6.0`
