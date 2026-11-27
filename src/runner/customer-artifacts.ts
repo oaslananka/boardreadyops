@@ -1,9 +1,8 @@
-import { createHash } from "node:crypto";
-import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
 import { assertRunnerWorkspaceDirectories } from "./source.js";
+import { readVerifiedRunnerArtifact } from "./verified-artifact.js";
 
 type CustomerRunnerArtifact = {
   kind: string;
@@ -95,23 +94,18 @@ export async function persistCustomerRunnerArtifacts(input: {
         input.signal?.throwIfAborted();
         const realSource = await realpath(artifact.filePath);
         if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-        const handle = await open(artifact.filePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-        let content: Buffer;
-        try {
-          const stats = await handle.stat();
-          if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
-            throw new Error("runner artifact is not a bounded regular file");
-          }
-          content = await handle.readFile();
-        } finally {
-          await handle.close();
-        }
-        const digest = createHash("sha256").update(content).digest("hex");
-        if (content.length !== artifact.bytes || digest !== artifact.sha256) {
-          throw new Error("runner artifact bytes do not match its declaration");
-        }
+        const content = await readVerifiedRunnerArtifact(
+          artifact.filePath,
+          artifact.bytes,
+          artifact.sha256,
+          maximumLocalArtifactBytes,
+        );
         const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
-        await writeFile(path.join(staging, filename), content, { flag: "wx", mode: 0o600 });
+        try {
+          await writeFile(path.join(staging, filename), content, { flag: "wx", mode: 0o600 });
+        } finally {
+          content.fill(0);
+        }
         manifestArtifacts.push({
           filename,
           kind: artifact.kind,

@@ -8761,9 +8761,9 @@ var require_picocolors = __commonJS({
     var argv = p.argv || [];
     var env = p.env || {};
     var isColorSupported = !(!!env.NO_COLOR || argv.includes("--no-color")) && (!!env.FORCE_COLOR || argv.includes("--color") || p.platform === "win32" || (p.stdout || {}).isTTY && env.TERM !== "dumb" || !!env.CI);
-    var formatter = (open6, close, replace = open6) => (input3) => {
-      let string7 = "" + input3, index = string7.indexOf(close, open6.length);
-      return ~index ? open6 + replaceClose(string7, close, replace, index) + close : open6 + string7 + close;
+    var formatter = (open7, close, replace = open7) => (input3) => {
+      let string7 = "" + input3, index = string7.indexOf(close, open7.length);
+      return ~index ? open7 + replaceClose(string7, close, replace, index) + close : open7 + string7 + close;
     };
     var replaceClose = (string7, close, replace, index) => {
       let result = "", cursor = 0;
@@ -12715,8 +12715,8 @@ var require_util2 = __commonJS({
     }
     async function isDirectory(path87) {
       try {
-        const stat5 = await fs_1.promises.stat(path87);
-        return stat5.isDirectory();
+        const stat4 = await fs_1.promises.stat(path87);
+        return stat4.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
           return false;
@@ -12726,8 +12726,8 @@ var require_util2 = __commonJS({
     }
     function isDirectorySync(path87) {
       try {
-        const stat5 = fs_1.default.statSync(path87);
-        return stat5.isDirectory();
+        const stat4 = fs_1.default.statSync(path87);
+        return stat4.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
           return false;
@@ -14458,16 +14458,16 @@ var require_parse = __commonJS({
         const analysis = analyzeRepeatedExtglob(body, opts);
         if ((token.type === "plus" || token.type === "star") && analysis.risky) {
           const safeOutput = analysis.safeOutput ? (token.output ? "" : ONE_CHAR) + (opts.capture ? `(${analysis.safeOutput})` : analysis.safeOutput) : void 0;
-          const open6 = tokens[token.tokensIndex];
-          open6.type = "text";
-          open6.value = literal3;
-          open6.output = safeOutput || utils.escapeRegex(literal3);
+          const open7 = tokens[token.tokensIndex];
+          open7.type = "text";
+          open7.value = literal3;
+          open7.output = safeOutput || utils.escapeRegex(literal3);
           for (let i = token.tokensIndex + 1; i < tokens.length; i++) {
             tokens[i].value = "";
             tokens[i].output = "";
             delete tokens[i].suffix;
           }
-          state.output = token.output + open6.output;
+          state.output = token.output + open7.output;
           state.backtrack = true;
           push2({ type: "paren", extglob: true, value, output: "" });
           decrement("parens");
@@ -14687,15 +14687,15 @@ var require_parse = __commonJS({
         }
         if (value === "{" && opts.nobrace !== true) {
           increment("braces");
-          const open6 = {
+          const open7 = {
             type: "brace",
             value,
             output: "(",
             outputIndex: state.output.length,
             tokensIndex: state.tokens.length
           };
-          braces.push(open6);
-          push2(open6);
+          braces.push(open7);
+          push2(open7);
           continue;
         }
         if (value === "}") {
@@ -15251,17 +15251,17 @@ function recordOutputFile(result, relative) {
 async function recordOutputEntry(current, name, root, manifestPath, expectedDirectories, pending, result) {
   const relative = current.relative ? `${current.relative}/${name}` : name;
   const absolute = import_node_path38.default.join(current.absolute, name);
-  const stat5 = await import_promises13.default.lstat(absolute);
-  if (stat5.isSymbolicLink()) {
+  const stat4 = await import_promises13.default.lstat(absolute);
+  if (stat4.isSymbolicLink()) {
     result.reasons.push(`Symlink in generated output: ${relative}`);
-  } else if (stat5.isDirectory()) {
+  } else if (stat4.isDirectory()) {
     if (!expectedDirectories.has(relative)) result.reasons.push(`Undeclared generated directory: ${relative}`);
     if (current.depth >= MAX_OUTPUT_DEPTH) throw new Error(`Output tree scan exceeds depth ${MAX_OUTPUT_DEPTH}.`);
     if (await import_promises13.default.realpath(absolute) !== import_node_path38.default.resolve(root, relative)) {
       throw new Error(`Generated directory has a noncanonical real path: ${relative}`);
     }
     pending.push({ absolute, relative, depth: current.depth + 1 });
-  } else if (!stat5.isFile()) {
+  } else if (!stat4.isFile()) {
     result.reasons.push(`Non-file entry in generated output: ${relative}`);
   } else if (absolute !== manifestPath) {
     recordOutputFile(result, relative);
@@ -37851,14 +37851,14 @@ async function assertSafeReleaseOutputCleanup(root, outputDirectory2, kind) {
       "Release output overlaps a project, Git metadata, or a filesystem ancestor; choose a safe --output path."
     );
   }
-  let stat5;
+  let stat4;
   try {
-    stat5 = await import_promises26.default.lstat(output3);
+    stat4 = await import_promises26.default.lstat(output3);
   } catch (error123) {
     if (error123.code === "ENOENT") return;
     throw error123;
   }
-  if (!stat5.isDirectory() || stat5.isSymbolicLink()) {
+  if (!stat4.isDirectory() || stat4.isSymbolicLink()) {
     throw new Error("Release output must be a real directory, not a file or symlink.");
   }
   if ((await import_promises26.default.readdir(output3)).length === 0) return;
@@ -68489,8 +68489,8 @@ function aggregateLabels(rootFiles, sheets) {
 }
 async function fileExists(file3) {
   try {
-    const stat5 = await import_promises10.default.stat(file3);
-    return stat5.isFile();
+    const stat4 = await import_promises10.default.stat(file3);
+    return stat4.isFile();
   } catch {
     return false;
   }
@@ -74022,8 +74022,8 @@ async function discoverProjects(root, explicitProject) {
 async function explicitProjectFiles(root, explicitProject) {
   const target = import_node_path48.default.resolve(root, normalizePathInput(explicitProject));
   try {
-    const stat5 = await import_promises15.default.stat(target);
-    if (stat5.isDirectory()) {
+    const stat4 = await import_promises15.default.stat(target);
+    if (stat4.isDirectory()) {
       const files = await globFiles(target, ["**/*.kicad_pro"]);
       return files.map((file3) => import_node_path48.default.resolve(file3));
     }
@@ -78286,8 +78286,8 @@ async function prepareAttestedArchiveInventory(root, manifestPath, reviewedSha) 
       throw new Error("Signed export subject escaped the archive root.");
     }
     await assertCanonicalSubjectPath(absolute);
-    const stat5 = await import_promises19.default.stat(absolute);
-    if (!stat5.isFile() || stat5.size !== item2.bytes) throw new Error("Signed export subject size mismatch.");
+    const stat4 = await import_promises19.default.stat(absolute);
+    if (!stat4.isFile() || stat4.size !== item2.bytes) throw new Error("Signed export subject size mismatch.");
     const actual = await fileSha256(absolute);
     if (actual !== item2.sha256) throw new Error("Signed export subject digest mismatch.");
     const relative = import_node_path58.default.relative(absoluteRoot, absolute).split(import_node_path58.default.sep).join("/");
@@ -79521,13 +79521,13 @@ function isPreviousArtifact(value) {
 }
 async function readManagedOutputManifest(directory) {
   const filename = import_node_path63.default.join(directory, "manifest.json");
-  let stat5;
+  let stat4;
   try {
-    stat5 = await import_promises22.default.lstat(filename);
+    stat4 = await import_promises22.default.lstat(filename);
   } catch {
     throw new Error("Output directory is not an identifiable BoardReadyOps generation; choose a fresh --output path.");
   }
-  if (!stat5.isFile() || stat5.size > MAX_MANIFEST_BYTES) {
+  if (!stat4.isFile() || stat4.size > MAX_MANIFEST_BYTES) {
     throw new Error("Existing generation manifest is missing, unsafe or too large; choose a fresh --output path.");
   }
   let manifest;
@@ -79553,8 +79553,8 @@ async function readManagedOutputManifest(directory) {
 async function verifyExistingArtifactBytes(directory, artifacts) {
   for (const artifact of artifacts) {
     const filename = import_node_path63.default.join(directory, artifact.path);
-    const stat5 = await import_promises22.default.lstat(filename);
-    if (!stat5.isFile() || stat5.size !== artifact.bytes) {
+    const stat4 = await import_promises22.default.lstat(filename);
+    if (!stat4.isFile() || stat4.size !== artifact.bytes) {
       throw new Error("A previously generated artifact has changed; choose a fresh --output path.");
     }
     const hash3 = (0, import_node_crypto8.createHash)("sha256");
@@ -79600,14 +79600,14 @@ async function assertSafeGenerateOutputCleanup(outputDirectory2, inputs) {
       throw new Error("Refusing to delete repository Git metadata as generated output.");
     }
   }
-  let stat5;
+  let stat4;
   try {
-    stat5 = await import_promises22.default.lstat(output3);
+    stat4 = await import_promises22.default.lstat(output3);
   } catch (error123) {
     if (isNoEntry2(error123)) return;
     throw error123;
   }
-  if (!stat5.isDirectory()) {
+  if (!stat4.isDirectory()) {
     throw new Error("Generated output must be a real directory, not a file or symlink.");
   }
   const entries = await import_promises22.default.readdir(output3);
@@ -79807,14 +79807,14 @@ async function assertReviewedSource(gitRoot, expected) {
   return root;
 }
 async function assertFreshReviewedOutput(outputDir) {
-  let stat5;
+  let stat4;
   try {
-    stat5 = await import_promises23.default.lstat(outputDir);
+    stat4 = await import_promises23.default.lstat(outputDir);
   } catch (error123) {
     if (error123.code === "ENOENT") return;
     throw error123;
   }
-  if (!stat5.isDirectory() || (await import_promises23.default.readdir(outputDir)).length !== 0) {
+  if (!stat4.isDirectory() || (await import_promises23.default.readdir(outputDir)).length !== 0) {
     throw new Error("Reviewed export requires a new or empty generated-output directory.");
   }
 }
@@ -81645,8 +81645,8 @@ async function releaseAuditClausesCommand(passportFile, options, streams) {
   const maxInputBytes = 1024 * 1024;
   async function readJsonFile(file3) {
     const source = import_node_path74.default.resolve(normalizePathInput(file3));
-    const stat5 = await import_promises29.default.stat(source);
-    if (!stat5.isFile() || stat5.size > maxInputBytes) {
+    const stat4 = await import_promises29.default.stat(source);
+    if (!stat4.isFile() || stat4.size > maxInputBytes) {
       throw new Error("Audit clause input must be a regular JSON file no larger than 1 MiB.");
     }
     return JSON.parse(await import_promises29.default.readFile(source, "utf8"));
@@ -83589,8 +83589,8 @@ async function copyStagedSource(context, file3) {
   const canonical = await import_promises30.default.realpath(absolute).catch(() => void 0);
   if (!canonical || !isInside(context.sourceRootInput, absolute) || !isInside(context.sourceRootCanonical, canonical))
     return void 0;
-  const stat5 = await import_promises30.default.stat(canonical);
-  if (!stat5.isFile() || stat5.size > MAX_SVG_BYTES * 4) return void 0;
+  const stat4 = await import_promises30.default.stat(canonical);
+  if (!stat4.isFile() || stat4.size > MAX_SVG_BYTES * 4) return void 0;
   const sha2564 = await sourceDigest(canonical);
   const target = import_node_path75.default.join(context.directory, import_node_path75.default.relative(context.sourceRootInput, absolute));
   await import_promises30.default.mkdir(import_node_path75.default.dirname(target), { recursive: true });
@@ -85069,16 +85069,77 @@ async function assertPrivateFile(filePath, label) {
 init_version();
 
 // src/runner/identity.ts
-var import_node_crypto25 = require("node:crypto");
-var import_promises34 = require("node:fs/promises");
+var import_node_crypto26 = require("node:crypto");
+var import_promises35 = require("node:fs/promises");
 var import_node_os6 = __toESM(require("node:os"), 1);
 var import_node_path79 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/client.ts
-var import_node_crypto24 = require("node:crypto");
-var import_promises32 = require("node:fs/promises");
+var import_node_crypto25 = require("node:crypto");
+var import_promises33 = require("node:fs/promises");
 init_src();
+
+// src/runner/verified-artifact.ts
+var import_node_crypto24 = require("node:crypto");
+var import_node_fs12 = require("node:fs");
+var import_promises32 = require("node:fs/promises");
+function sameArtifact(before, after) {
+  return after.isFile() && after.size === before.size && after.dev === before.dev && after.ino === before.ino && after.mtimeMs === before.mtimeMs && after.ctimeMs === before.ctimeMs;
+}
+async function readDeclaredBytes(handle, content) {
+  let offset = 0;
+  while (offset < content.length) {
+    const { bytesRead } = await handle.read(content, offset, Math.min(64 * 1024, content.length - offset), offset);
+    if (bytesRead === 0) throw new Error("artifact size changed before transfer");
+    offset += bytesRead;
+  }
+  const extra = Buffer.alloc(1);
+  try {
+    if ((await handle.read(extra, 0, 1, content.length)).bytesRead !== 0) {
+      throw new Error("artifact size changed before transfer");
+    }
+  } finally {
+    extra.fill(0);
+  }
+}
+async function readVerifiedRunnerArtifact(filePath, byteLength, expectedSha256, maximumBytes) {
+  if (!Number.isSafeInteger(byteLength) || byteLength < 0 || byteLength > maximumBytes) {
+    throw new Error("artifact size declaration is outside the permitted bound");
+  }
+  if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
+    throw new Error("artifact upload SHA-256 declaration is invalid");
+  }
+  const pathInfo = await (0, import_promises32.lstat)(filePath);
+  if (!pathInfo.isFile()) throw new Error("artifact is not a regular file");
+  if (pathInfo.size !== byteLength) throw new Error("artifact size changed before transfer");
+  const handle = await (0, import_promises32.open)(filePath, import_node_fs12.constants.O_RDONLY | (import_node_fs12.constants.O_NOFOLLOW ?? 0) | (import_node_fs12.constants.O_NONBLOCK ?? 0));
+  let content;
+  let verified = false;
+  try {
+    const before = await handle.stat();
+    if (!sameArtifact(pathInfo, before)) throw new Error("artifact changed before transfer");
+    content = Buffer.alloc(byteLength);
+    await readDeclaredBytes(handle, content);
+    if (!sameArtifact(before, await handle.stat())) throw new Error("artifact changed before transfer");
+    if ((0, import_node_crypto24.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
+      throw new Error("artifact digest changed: bytes do not match its declaration");
+    }
+    verified = true;
+  } finally {
+    let closed = false;
+    try {
+      await handle.close();
+      closed = true;
+    } finally {
+      if (!verified || !closed) content?.fill(0);
+    }
+  }
+  if (!content) throw new Error("artifact verification did not complete");
+  return content;
+}
+
+// src/runner/client.ts
 var responseBodyLimitBytes = 1024 * 1024;
 var runnerProtocolHeaderNames = {
   protocolVersion: "x-boardreadyops-runner-protocol-version",
@@ -85117,7 +85178,7 @@ var RunnerControlPlaneClient = class {
     this.privateKey = options.privateKey;
     this.fetchImpl = options.fetch ?? fetch;
     this.now = options.now ?? (() => /* @__PURE__ */ new Date());
-    this.nonce = options.nonce ?? (() => (0, import_node_crypto24.randomBytes)(24).toString("base64url"));
+    this.nonce = options.nonce ?? (() => (0, import_node_crypto25.randomBytes)(24).toString("base64url"));
     this.requestTimeoutMs = positiveInteger4(options.requestTimeoutMs ?? 3e4, "requestTimeoutMs");
   }
   async claim(input3) {
@@ -85143,23 +85204,7 @@ var RunnerControlPlaneClient = class {
   }
   async uploadArtifact(uploadUrl, filePath, maximumBytes, expectedSha256) {
     const url3 = normalizeUploadUrl(uploadUrl);
-    if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
-      throw new Error("artifact upload SHA-256 declaration is invalid");
-    }
-    const file3 = await (0, import_promises32.stat)(filePath);
-    if (!file3.isFile()) {
-      throw new Error("artifact is not a regular file");
-    }
-    if (file3.size !== maximumBytes) {
-      throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${file3.size}`);
-    }
-    const content = await (0, import_promises32.readFile)(filePath);
-    if (content.byteLength !== maximumBytes) {
-      throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${content.byteLength}`);
-    }
-    if ((0, import_node_crypto24.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
-      throw new Error("artifact digest changed before upload");
-    }
+    const content = await readVerifiedRunnerArtifact(filePath, maximumBytes, expectedSha256, 2147483647);
     const response = await this.fetchImpl(url3, {
       method: "PUT",
       redirect: "error",
@@ -85275,7 +85320,7 @@ async function activateRunner(input3) {
   }
 }
 async function loadRunnerPrivateKey(filePath) {
-  return (0, import_node_crypto24.createPrivateKey)(await (0, import_promises32.readFile)(filePath, "utf8"));
+  return (0, import_node_crypto25.createPrivateKey)(await (0, import_promises33.readFile)(filePath, "utf8"));
 }
 function normalizeControlPlaneUrl(value) {
   let url3;
@@ -85353,7 +85398,7 @@ function positiveInteger4(value, name) {
 
 // src/runner/source.ts
 var import_node_child_process7 = require("node:child_process");
-var import_promises33 = require("node:fs/promises");
+var import_promises34 = require("node:fs/promises");
 var import_node_path78 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
 async function checkoutRunnerSource(options) {
@@ -85364,10 +85409,10 @@ async function checkoutRunnerSource(options) {
   const repository = await repositoryRemote(options.job, options.repositoryMirrorRoot);
   const workspaceRoot = import_node_path78.default.resolve(options.workspaceRoot);
   await assertRunnerWorkspaceDirectories(workspaceRoot);
-  await (0, import_promises33.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
+  await (0, import_promises34.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
   await assertRunnerWorkspaceDirectories(workspaceRoot);
-  if (process.platform !== "win32") await (0, import_promises33.chmod)(workspaceRoot, 448);
-  const workspace = await (0, import_promises33.mkdtemp)(import_node_path78.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
+  if (process.platform !== "win32") await (0, import_promises34.chmod)(workspaceRoot, 448);
+  const workspace = await (0, import_promises34.mkdtemp)(import_node_path78.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
   const git2 = async (args) => {
@@ -85379,7 +85424,7 @@ async function checkoutRunnerSource(options) {
     });
   };
   try {
-    if (process.platform !== "win32") await (0, import_promises33.chmod)(workspace, 448);
+    if (process.platform !== "win32") await (0, import_promises34.chmod)(workspace, 448);
     await git2(["init", "--quiet"]);
     await git2(["remote", "add", "origin", repository]);
     await git2(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
@@ -85392,7 +85437,7 @@ async function checkoutRunnerSource(options) {
     options.signal?.throwIfAborted();
     return workspace;
   } catch (error123) {
-    await (0, import_promises33.rm)(workspace, { recursive: true, force: true });
+    await (0, import_promises34.rm)(workspace, { recursive: true, force: true });
     throw error123;
   }
 }
@@ -85402,14 +85447,14 @@ async function assertRunnerWorkspaceDirectories(workspaceRoot) {
   let directory = root;
   for (const part of parts) {
     directory = import_node_path78.default.join(directory, part);
-    const info = await (0, import_promises33.lstat)(directory).catch((error123) => {
+    const info = await (0, import_promises34.lstat)(directory).catch((error123) => {
       if (error123.code === "ENOENT") return void 0;
       throw error123;
     });
     if (!info) continue;
     if (info.isSymbolicLink()) {
-      const parent = await (0, import_promises33.lstat)(import_node_path78.default.dirname(directory));
-      const target = await (0, import_promises33.stat)(directory);
+      const parent = await (0, import_promises34.lstat)(import_node_path78.default.dirname(directory));
+      const target = await (0, import_promises34.stat)(directory);
       const protectedSystemAlias = process.platform === "darwin" && info.uid === 0 && parent.uid === 0 && (parent.mode & 18) === 0 && target.isDirectory();
       if (!protectedSystemAlias) {
         throw new Error("runner workspace path contains a symlink or non-directory component");
@@ -85516,7 +85561,7 @@ async function activateRunnerIdentity(options) {
   const controlPlaneUrl = normalizeControlPlaneUrl(options.controlPlaneUrl).origin;
   const enrollmentTokenFile = import_node_path79.default.resolve(options.enrollmentTokenFile);
   await assertPrivateFile2(enrollmentTokenFile, "runner enrollment token file");
-  const enrollmentToken = (await (0, import_promises34.readFile)(enrollmentTokenFile, "utf8")).trim();
+  const enrollmentToken = (await (0, import_promises35.readFile)(enrollmentTokenFile, "utf8")).trim();
   if (enrollmentToken.length < 43 || enrollmentToken.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(enrollmentToken)) {
     throw new Error("runner enrollment token file does not contain a valid enrollment token");
   }
@@ -85528,7 +85573,7 @@ async function activateRunnerIdentity(options) {
   const privateKeyFile = import_node_path79.default.join(identityDirectory, privateKeyName);
   const publicKeyFile = import_node_path79.default.join(identityDirectory, publicKeyName);
   await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
-  const generated = (0, import_node_crypto25.generateKeyPairSync)("ed25519");
+  const generated = (0, import_node_crypto26.generateKeyPairSync)("ed25519");
   const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
   const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
   const activated = await activateRunner({
@@ -85560,7 +85605,7 @@ async function activateRunnerIdentity(options) {
 `, 384);
     written.push(identityFile);
   } catch (error123) {
-    await Promise.all(written.map((file3) => (0, import_promises34.unlink)(file3).catch(() => void 0)));
+    await Promise.all(written.map((file3) => (0, import_promises35.unlink)(file3).catch(() => void 0)));
     throw error123;
   }
   return {
@@ -85578,7 +85623,7 @@ async function loadRunnerIdentity(identityFileInput) {
   await assertPrivateFile2(identityFile, "runner identity file");
   let value;
   try {
-    value = JSON.parse(await (0, import_promises34.readFile)(identityFile, "utf8"));
+    value = JSON.parse(await (0, import_promises35.readFile)(identityFile, "utf8"));
   } catch {
     throw new Error("runner identity file is not valid JSON");
   }
@@ -85657,18 +85702,18 @@ function resolveIdentityChild(directory, relative, name) {
 }
 async function prepareIdentityDirectory(directory) {
   await assertRunnerWorkspaceDirectories(directory);
-  const existing = await (0, import_promises34.lstat)(directory).catch(() => void 0);
+  const existing = await (0, import_promises35.lstat)(directory).catch(() => void 0);
   if (existing && (existing.isSymbolicLink() || !existing.isDirectory())) {
     throw new Error(`runner identity directory is not a directory: ${directory}`);
   }
   if (!existing) {
-    await (0, import_promises34.mkdir)(directory, { recursive: true, mode: 448 });
+    await (0, import_promises35.mkdir)(directory, { recursive: true, mode: 448 });
   }
   await assertRunnerWorkspaceDirectories(directory);
-  if (process.platform !== "win32") await (0, import_promises34.chmod)(directory, 448);
+  if (process.platform !== "win32") await (0, import_promises35.chmod)(directory, 448);
 }
 async function assertPrivateDirectory(directory, label) {
-  const info = await (0, import_promises34.lstat)(directory).catch(() => void 0);
+  const info = await (0, import_promises35.lstat)(directory).catch(() => void 0);
   if (!info?.isDirectory() || info.isSymbolicLink()) {
     throw new Error(`${label} does not exist or is not a regular directory`);
   }
@@ -85677,7 +85722,7 @@ async function assertPrivateDirectory(directory, label) {
   }
 }
 async function assertPrivateFile2(filePath, label) {
-  const info = await (0, import_promises34.lstat)(filePath).catch(() => void 0);
+  const info = await (0, import_promises35.lstat)(filePath).catch(() => void 0);
   if (!info?.isFile() || info.isSymbolicLink()) throw new Error(`${label} does not exist or is not a regular file`);
   if (process.platform !== "win32" && (info.mode & 63) !== 0) {
     throw new Error(`${label} must not be readable or writable by group or other users`);
@@ -85685,26 +85730,24 @@ async function assertPrivateFile2(filePath, label) {
 }
 async function assertTargetsDoNotExist(files) {
   for (const file3 of files) {
-    if (await (0, import_promises34.lstat)(file3).catch(() => void 0)) {
+    if (await (0, import_promises35.lstat)(file3).catch(() => void 0)) {
       throw new Error(`refusing to overwrite existing runner identity material: ${file3}`);
     }
   }
 }
 async function writeExclusive(filePath, content, mode) {
-  await (0, import_promises34.writeFile)(filePath, content, { encoding: "utf8", flag: "wx", mode });
-  if (process.platform !== "win32") await (0, import_promises34.chmod)(filePath, mode);
+  await (0, import_promises35.writeFile)(filePath, content, { encoding: "utf8", flag: "wx", mode });
+  if (process.platform !== "win32") await (0, import_promises35.chmod)(filePath, mode);
 }
 
 // src/runner/worker.ts
-var import_promises37 = require("node:fs/promises");
+var import_promises38 = require("node:fs/promises");
 var import_node_os7 = __toESM(require("node:os"), 1);
 var import_node_path82 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/customer-artifacts.ts
-var import_node_crypto26 = require("node:crypto");
-var import_node_fs12 = require("node:fs");
-var import_promises35 = require("node:fs/promises");
+var import_promises36 = require("node:fs/promises");
 var import_node_path80 = __toESM(require("node:path"), 1);
 var maximumLocalArtifactBytes = 64 * 1024 * 1024;
 var uuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -85713,7 +85756,7 @@ function inside(parent, candidate) {
   return relative === "" || relative !== ".." && !relative.startsWith(`..${import_node_path80.default.sep}`) && !import_node_path80.default.isAbsolute(relative);
 }
 async function privateDirectory(directory) {
-  const info = await (0, import_promises35.lstat)(directory);
+  const info = await (0, import_promises36.lstat)(directory);
   if (!info.isDirectory() || info.isSymbolicLink()) {
     throw new Error("customer artifact directory is not a regular directory");
   }
@@ -85728,24 +85771,24 @@ async function persistCustomerRunnerArtifacts(input3) {
   }
   if (input3.artifacts.length > 100) throw new Error("too many customer artifacts");
   const root = import_node_path80.default.resolve(input3.root);
-  const workspace = await (0, import_promises35.realpath)(input3.workspace);
+  const workspace = await (0, import_promises36.realpath)(input3.workspace);
   await assertRunnerWorkspaceDirectories(root);
-  await (0, import_promises35.mkdir)(root, { recursive: true, mode: 448 });
+  await (0, import_promises36.mkdir)(root, { recursive: true, mode: 448 });
   await assertRunnerWorkspaceDirectories(root);
   await privateDirectory(root);
-  const realRoot = await (0, import_promises35.realpath)(root);
+  const realRoot = await (0, import_promises36.realpath)(root);
   if (inside(realRoot, workspace) || inside(workspace, realRoot)) {
     throw new Error("customer artifact root must not overlap the temporary source workspace");
   }
   const runRoot = import_node_path80.default.join(root, input3.job.runId);
-  await (0, import_promises35.mkdir)(runRoot, { mode: 448 }).catch((error123) => {
+  await (0, import_promises36.mkdir)(runRoot, { mode: 448 }).catch((error123) => {
     if (error123.code !== "EEXIST") throw error123;
   });
   await privateDirectory(runRoot);
   const claimPath = import_node_path80.default.join(runRoot, `.claim-${input3.job.executionAttemptId}`);
   let claim3;
   try {
-    claim3 = await (0, import_promises35.open)(claimPath, "wx", 384);
+    claim3 = await (0, import_promises36.open)(claimPath, "wx", 384);
   } catch (error123) {
     if (error123.code === "EEXIST") {
       throw new Error("customer artifact attempt is already claimed; inspect before retrying");
@@ -85755,35 +85798,30 @@ async function persistCustomerRunnerArtifacts(input3) {
   try {
     await claim3.close();
     const destination = import_node_path80.default.join(runRoot, input3.job.executionAttemptId);
-    const existing = await (0, import_promises35.lstat)(destination).catch((error123) => {
+    const existing = await (0, import_promises36.lstat)(destination).catch((error123) => {
       if (error123.code === "ENOENT") return void 0;
       throw error123;
     });
     if (existing) throw new Error("customer artifacts for this run attempt already exist");
-    const staging = await (0, import_promises35.mkdtemp)(import_node_path80.default.join(runRoot, ".pending-"));
+    const staging = await (0, import_promises36.mkdtemp)(import_node_path80.default.join(runRoot, ".pending-"));
     try {
       const manifestArtifacts = [];
       for (const [index, artifact] of input3.artifacts.entries()) {
         input3.signal?.throwIfAborted();
-        const realSource = await (0, import_promises35.realpath)(artifact.filePath);
+        const realSource = await (0, import_promises36.realpath)(artifact.filePath);
         if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-        const handle = await (0, import_promises35.open)(artifact.filePath, import_node_fs12.constants.O_RDONLY | (import_node_fs12.constants.O_NOFOLLOW ?? 0));
-        let content;
-        try {
-          const stats = await handle.stat();
-          if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
-            throw new Error("runner artifact is not a bounded regular file");
-          }
-          content = await handle.readFile();
-        } finally {
-          await handle.close();
-        }
-        const digest3 = (0, import_node_crypto26.createHash)("sha256").update(content).digest("hex");
-        if (content.length !== artifact.bytes || digest3 !== artifact.sha256) {
-          throw new Error("runner artifact bytes do not match its declaration");
-        }
+        const content = await readVerifiedRunnerArtifact(
+          artifact.filePath,
+          artifact.bytes,
+          artifact.sha256,
+          maximumLocalArtifactBytes
+        );
         const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
-        await (0, import_promises35.writeFile)(import_node_path80.default.join(staging, filename), content, { flag: "wx", mode: 384 });
+        try {
+          await (0, import_promises36.writeFile)(import_node_path80.default.join(staging, filename), content, { flag: "wx", mode: 384 });
+        } finally {
+          content.fill(0);
+        }
         manifestArtifacts.push({
           filename,
           kind: artifact.kind,
@@ -85801,27 +85839,27 @@ async function persistCustomerRunnerArtifacts(input3) {
         executionAttemptId: input3.job.executionAttemptId,
         artifacts: manifestArtifacts
       };
-      await (0, import_promises35.writeFile)(import_node_path80.default.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}
+      await (0, import_promises36.writeFile)(import_node_path80.default.join(staging, "manifest.json"), `${JSON.stringify(manifest, null, 2)}
 `, {
         flag: "wx",
         mode: 384
       });
       input3.signal?.throwIfAborted();
-      await (0, import_promises35.rename)(staging, destination);
+      await (0, import_promises36.rename)(staging, destination);
       return input3.artifacts.length;
     } catch (error123) {
-      await (0, import_promises35.rm)(staging, { recursive: true, force: true });
+      await (0, import_promises36.rm)(staging, { recursive: true, force: true });
       throw error123;
     }
   } finally {
-    await (0, import_promises35.rm)(claimPath, { force: true });
+    await (0, import_promises36.rm)(claimPath, { force: true });
   }
 }
 
 // src/runner/draft-attestation.ts
 var import_node_crypto27 = require("node:crypto");
 var import_node_fs13 = require("node:fs");
-var import_promises36 = require("node:fs/promises");
+var import_promises37 = require("node:fs/promises");
 var import_node_path81 = __toESM(require("node:path"), 1);
 var domain3 = "boardreadyops-runner-draft-receipt-v1\n";
 var uuid8 = external_exports.string().uuid();
@@ -85861,13 +85899,13 @@ async function createManufacturingDraftReceiptArtifact(input3) {
   if (archive.kind !== "archive" || archive.role !== "draft-manufacturing" || archive.contentType !== "application/zip") {
     throw new Error("draft provenance must reference a draft manufacturing ZIP");
   }
-  const workspace = await (0, import_promises36.realpath)(import_node_path81.default.resolve(input3.workspace));
-  const archivePath = await (0, import_promises36.realpath)(import_node_path81.default.resolve(archive.filePath));
+  const workspace = await (0, import_promises37.realpath)(import_node_path81.default.resolve(input3.workspace));
+  const archivePath = await (0, import_promises37.realpath)(import_node_path81.default.resolve(archive.filePath));
   const relative = import_node_path81.default.relative(workspace, archivePath);
   if (!relative || relative.startsWith("..") || import_node_path81.default.isAbsolute(relative) || relative.split(import_node_path81.default.sep).includes("..")) {
     throw new Error("draft archive escaped the disposable runner checkout");
   }
-  const handle = await (0, import_promises36.open)(archivePath, import_node_fs13.constants.O_RDONLY | (import_node_fs13.constants.O_NOFOLLOW ?? 0));
+  const handle = await (0, import_promises37.open)(archivePath, import_node_fs13.constants.O_RDONLY | (import_node_fs13.constants.O_NOFOLLOW ?? 0));
   let data;
   try {
     const stats = await handle.stat();
@@ -85898,7 +85936,7 @@ async function createManufacturingDraftReceiptArtifact(input3) {
   const content = Buffer.from(`${JSON.stringify(receipt)}
 `, "utf8");
   const filePath = import_node_path81.default.join(import_node_path81.default.dirname(archivePath), "manufacturing-draft-receipt.json");
-  await (0, import_promises36.writeFile)(filePath, content, { flag: "wx", mode: 384 });
+  await (0, import_promises37.writeFile)(filePath, content, { flag: "wx", mode: 384 });
   return {
     kind: "attestation",
     role: "draft-provenance",
@@ -85924,7 +85962,7 @@ var defaultDependencies2 = {
   executePipeline: async () => {
     throw new Error("runner execution pipeline adapter is not configured");
   },
-  removeWorkspace: async (workspace) => await (0, import_promises37.rm)(workspace, { recursive: true, force: true }),
+  removeWorkspace: async (workspace) => await (0, import_promises38.rm)(workspace, { recursive: true, force: true }),
   recoverCrashWorkspaces: recoverRunnerCrashWorkspaces,
   sleep: abortableSleep,
   log: () => void 0
@@ -86197,16 +86235,16 @@ function createHeartbeatController(client, job, heartbeatSeconds, log) {
 }
 async function publishArtifacts(client, job, artifacts, workspace) {
   if (artifacts.length === 0) return [];
-  const workspacePath2 = await (0, import_promises37.realpath)(workspace);
+  const workspacePath2 = await (0, import_promises38.realpath)(workspace);
   const validatedArtifacts = await Promise.all(
     artifacts.map(async (artifact) => {
       await assertRunnerWorkspaceDirectories(import_node_path82.default.dirname(import_node_path82.default.resolve(artifact.filePath)));
-      const actualPath = await (0, import_promises37.realpath)(artifact.filePath);
+      const actualPath = await (0, import_promises38.realpath)(artifact.filePath);
       const relative = import_node_path82.default.relative(workspacePath2, actualPath);
       if (relative === "" || relative === ".." || relative.startsWith(`..${import_node_path82.default.sep}`) || import_node_path82.default.isAbsolute(relative)) {
         throw new Error("runner cloud artifact escaped the source workspace");
       }
-      const info = await (0, import_promises37.lstat)(artifact.filePath);
+      const info = await (0, import_promises38.lstat)(artifact.filePath);
       if (!info.isFile() || info.isSymbolicLink()) {
         throw new Error("runner cloud artifact is not a regular non-symlink file");
       }
@@ -86352,7 +86390,7 @@ async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
   const root = import_node_path82.default.resolve(workspaceRoot);
   await assertRunnerWorkspaceDirectories(root);
   const namespace = import_node_path82.default.join(root, ".boardreadyops-active");
-  const namespaceInfo = await (0, import_promises37.lstat)(namespace).catch((error123) => {
+  const namespaceInfo = await (0, import_promises38.lstat)(namespace).catch((error123) => {
     if (error123.code === "ENOENT") return void 0;
     throw error123;
   });
@@ -86361,7 +86399,7 @@ async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
     throw new Error("runner active workspace namespace is not a regular directory");
   }
   const activeRoot = runnerActiveWorkspaceRoot(root, runnerId);
-  const activeInfo = await (0, import_promises37.lstat)(activeRoot).catch((error123) => {
+  const activeInfo = await (0, import_promises38.lstat)(activeRoot).catch((error123) => {
     if (error123.code === "ENOENT") return void 0;
     throw error123;
   });
@@ -86369,8 +86407,8 @@ async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
   if (activeInfo.isSymbolicLink() || !activeInfo.isDirectory()) {
     throw new Error("runner identity workspace namespace is not a regular directory");
   }
-  const entries = await (0, import_promises37.readdir)(activeRoot);
-  await (0, import_promises37.rm)(activeRoot, { recursive: true, force: true });
+  const entries = await (0, import_promises38.readdir)(activeRoot);
+  await (0, import_promises38.rm)(activeRoot, { recursive: true, force: true });
   return entries.length;
 }
 function boundedSeconds(value, name, minimum, maximum) {
@@ -86417,12 +86455,12 @@ var RunnerShutdownError = class extends Error {
 
 // src/cli/runner-pipeline.ts
 var import_node_crypto28 = require("node:crypto");
-var import_promises39 = require("node:fs/promises");
+var import_promises40 = require("node:fs/promises");
 var import_node_path84 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
 
 // src/cli/runner-manufacturing-draft.ts
-var import_promises38 = require("node:fs/promises");
+var import_promises39 = require("node:fs/promises");
 var import_node_path83 = __toESM(require("node:path"), 1);
 async function prepareRunnerManufacturingDraft(workspace, job, options) {
   options.signal?.throwIfAborted();
@@ -86438,7 +86476,7 @@ async function prepareRunnerManufacturingDraft(workspace, job, options) {
     throw new Error("Manufacturing draft requires KiCad CLI version 10.0.x");
   }
   options.signal?.throwIfAborted();
-  await (0, import_promises38.appendFile)(import_node_path83.default.join(workspace, ".git", "info", "exclude"), "\n/.boardreadyops-runner/\n");
+  await (0, import_promises39.appendFile)(import_node_path83.default.join(workspace, ".git", "info", "exclude"), "\n/.boardreadyops-runner/\n");
   const generated = await runGenerate(
     { schemaVersion: 1, steps: [{ kind: "gerbers" }, { kind: "drill" }] },
     {
@@ -86476,7 +86514,7 @@ async function executeRunnerPipeline(workspace, job, options) {
   const manufacturingDraft = options.manufacturingDraftUpload ? await prepareRunnerManufacturingDraft(workspace, job, options) : void 0;
   const relativeOutputDirectory = import_node_path84.default.join(".boardreadyops-runner", job.executionAttemptId);
   const outputDirectory2 = import_node_path84.default.join(workspace, relativeOutputDirectory);
-  await (0, import_promises39.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
+  await (0, import_promises40.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
   const targets = [
     {
       kind: "report/json",
@@ -86536,9 +86574,9 @@ async function executeRunnerPipeline(workspace, job, options) {
   };
 }
 async function runnerArtifact(filePath, kind, name, role) {
-  const info = await (0, import_promises39.stat)(filePath);
+  const info = await (0, import_promises40.stat)(filePath);
   if (!info.isFile() || info.size > 2147483647) throw new Error(`runner artifact is invalid: ${filePath}`);
-  const content = await (0, import_promises39.readFile)(filePath);
+  const content = await (0, import_promises40.readFile)(filePath);
   return {
     kind,
     name,
@@ -86598,7 +86636,7 @@ function runnerReportFromResult(report) {
 }
 async function readRunReport(filePath) {
   try {
-    const value = JSON.parse(await (0, import_promises39.readFile)(filePath, "utf8"));
+    const value = JSON.parse(await (0, import_promises40.readFile)(filePath, "utf8"));
     return value.schemaVersion === 1 && value.tool?.name === "boardreadyops" && Array.isArray(value.findings) ? value : void 0;
   } catch {
     return void 0;
@@ -88807,12 +88845,12 @@ function assuranceLine(profile) {
 }
 
 // src/cli/commands/verify-export-attestation.ts
-var import_promises40 = __toESM(require("node:fs/promises"), 1);
+var import_promises41 = __toESM(require("node:fs/promises"), 1);
 var import_node_path87 = __toESM(require("node:path"), 1);
 init_path();
 async function exportVerifyCommand(pathInput, options, streams) {
   try {
-    const root = await import_promises40.default.realpath(import_node_path87.default.resolve(normalizePathInput(pathInput)));
+    const root = await import_promises41.default.realpath(import_node_path87.default.resolve(normalizePathInput(pathInput)));
     const attempt = Number(options.runAttempt);
     const result = await verifyReviewedExportAttestation({
       root,

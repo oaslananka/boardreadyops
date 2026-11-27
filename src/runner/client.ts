@@ -1,5 +1,5 @@
-import { createHash, createPrivateKey, type KeyLike, randomBytes } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { createPrivateKey, type KeyLike, randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { signRunnerRequest } from "../../packages/cloud-core/src/runner-request-signature.js";
 import {
   type RunnerArtifactCapabilityRequest,
@@ -17,6 +17,7 @@ import {
   runnerRegistrationActivationResponseSchema,
   runnerVersionSchema,
 } from "../../packages/contracts/src/index.js";
+import { readVerifiedRunnerArtifact } from "./verified-artifact.js";
 
 export type RunnerFetch = typeof fetch;
 
@@ -126,25 +127,7 @@ export class RunnerControlPlaneClient {
     expectedSha256: string,
   ): Promise<void> {
     const url = normalizeUploadUrl(uploadUrl);
-    if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
-      throw new Error("artifact upload SHA-256 declaration is invalid");
-    }
-    // Do not buffer an unexpectedly large or non-file artifact into memory.
-    // Recheck the bytes after reading as the file could change in between.
-    const file = await stat(filePath);
-    if (!file.isFile()) {
-      throw new Error("artifact is not a regular file");
-    }
-    if (file.size !== maximumBytes) {
-      throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${file.size}`);
-    }
-    const content = await readFile(filePath);
-    if (content.byteLength !== maximumBytes) {
-      throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${content.byteLength}`);
-    }
-    if (createHash("sha256").update(content).digest("hex") !== expectedSha256) {
-      throw new Error("artifact digest changed before upload");
-    }
+    const content = await readVerifiedRunnerArtifact(filePath, maximumBytes, expectedSha256, 2_147_483_647);
     const response = await this.fetchImpl(url, {
       method: "PUT",
       redirect: "error",
