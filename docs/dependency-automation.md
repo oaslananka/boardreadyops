@@ -33,11 +33,11 @@ CodeQL without suppressions or runtime regressions.
 
 This repository-local baseline replaced an unavailable shared preset after the October 2, 2026 validation failure. It remains authoritative for Mend-hosted package policy without requiring cross-repository token access. The schedule, package managers, protected groups, vulnerability-PR policy and merge routing remain local. Generated files are refreshed by the isolated, repository-owned GitHub Actions flow described above. Generated output, dependency trees, and test fixtures remain excluded from discovery.
 
-## Automatic path
+## Routine update path
 
 Low-risk development dependency and `@types/*` non-major updates remain the routine path. Same-version GitHub Action digest refreshes are also routine when they do not touch security, release, provenance, publication, container-release, or binary-release workflows.
 
-Routine classification never bypasses GitHub Rulesets. Required checks must pass and review conversations must be resolved before an explicit maintainer squash merge. The `automerge` label on low-risk dependency groups is classification metadata only; BoardReadyOps does not enable Renovate's own `automerge: true` path and Mergify does not queue or merge these pull requests.
+Routine classification never bypasses GitHub Rulesets. Required checks must pass and review conversations must be resolved before an explicit maintainer squash merge. The `automerge` label on low-risk dependency groups is classification metadata only; BoardReadyOps does not enable Renovate's own `automerge: true` path; Mergify queues and merges these pull requests only after an explicit maintainer request.
 
 ## Exception path
 
@@ -61,7 +61,7 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 
 ## Last verification
 
-- On October 4, 2026, Mergify was configured as a manual-only queue: there is no auto-merge/auto-queue condition, and a maintainer must explicitly enqueue a PR with `@mergifyio queue main`. GitHub Rulesets remain authoritative for merge eligibility and required checks.
+- On October 4, 2026, Mergify was configured as a manual-only queue: there is no auto-merge/auto-queue condition, and a maintainer must explicitly enqueue a PR with `@mergifyio queue`. GitHub Rulesets remain authoritative for merge eligibility and required checks.
 - On July 20, 2026, Renovate `43.272.4` completed a full dry-run under Node.js `24.18.0`.
 - The repository reported `activated`, `enabled`, and `onboarded`, and Renovate discovered 269 dependencies across npm, GitHub Actions, Dockerfiles, and Docker Compose.
 - After the workflow reached `main`, manual workflow run `29767533207` completed both `renovate / validate` and `renovate / run` successfully.
@@ -81,6 +81,6 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 3. Confirm `security-automation-config.test.ts` and `mergify-integration.test.ts` pass.
 4. Confirm `manual-review` is present on protected updates and absent from an eligible low-risk update.
 5. Confirm the PR receives the repository's required Ruleset checks and that review conversations are resolved.
-6. After the PR is intentionally approved for merge, enqueue it with `@mergifyio queue main` (or the Mergify queue control). Do not enable Mergify auto-merge/auto-queue; an open green PR should remain open until a maintainer explicitly queues it.
+6. After the PR is intentionally approved for merge, enqueue it with [`@mergifyio queue`](https://docs.mergify.com/commands/queue/) (or the Mergify queue control). The command takes no queue name; Mergify selects the first matching queue rule. Do not enable Mergify auto-merge/auto-queue; an open green PR should remain open until a maintainer explicitly queues it.
 7. Confirm Mend-hosted Renovate updates canonical dashboard #978; the repository workflow is validation-only and must never run a second Renovate writer.
 8. Rotate `GH_AUTH_TOKEN` immediately if its owner or permissions change unexpectedly and verify restricted regenerated-file branch updates still work.
