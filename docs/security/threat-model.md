@@ -47,7 +47,7 @@ inside GitHub Actions.
 ## Required hardening follow-ups
 
 1. ~~Implement plugin runtime sandboxing or explicitly document plugins as trusted
-   code execution with stronger warnings.~~ Resolved: [ADR 0009](../architecture/adr/0009-plugin-sandboxing.md)
+   code execution with stronger warnings.~~ Resolved: [ADR 0020](../architecture/adr/0020-plugin-sandboxing.md)
    documents plugins as trusted-workspace code and rejects `node:vm`/Permission Model
    sandboxing as a false security claim. Runtime sandboxing remains a possible future
    major-version change requiring real OS/container isolation.
