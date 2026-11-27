@@ -78,6 +78,22 @@ async function assertNoTransfer(f: Awaited<ReturnType<typeof fixture>>, mode: "c
 }
 
 describe("runner artifact reads", () => {
+  it.each(["cloud", "customer"] as const)("transfers exact empty and multi-chunk artifacts: %s", async (mode) => {
+    for (const content of [Buffer.alloc(0), Buffer.alloc(128 * 1024 + 1, 65)]) {
+      const f = await fixture();
+      await fs.writeFile(f.artifact.filePath, content);
+      f.artifact.bytes = content.length;
+      f.artifact.sha256 = createHash("sha256").update(content).digest("hex");
+      await transfer(f, mode);
+      if (mode === "cloud") {
+        expect(f.fetchMock).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ body: content }));
+      } else {
+        expect(await fs.readFile(path.join(f.root, runId, executionAttemptId, "artifact-001.bin"))).toEqual(content);
+        expect(f.fetchMock).not.toHaveBeenCalled();
+      }
+    }
+  });
+
   it.each(["cloud", "customer"] as const)("rejects growth after stat without a full-file read: %s", async (mode) => {
     const f = await fixture();
     const original = await vi.importActual<typeof fs>("node:fs/promises");

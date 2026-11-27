@@ -13,12 +13,24 @@ function sameArtifact(before: Stats, after: Stats): boolean {
   );
 }
 
-async function readDeclaredBytes(handle: FileHandle, content: Buffer): Promise<void> {
+// Each yielded chunk is a view of the single declared-size allocation.
+// The async generator settles a read before advancing to the next offset.
+async function* readDeclaredChunks(handle: FileHandle, content: Buffer): AsyncGenerator<Buffer> {
   let offset = 0;
   while (offset < content.length) {
-    const { bytesRead } = await handle.read(content, offset, Math.min(64 * 1024, content.length - offset), offset);
-    if (bytesRead === 0) throw new Error("artifact size changed before transfer");
-    offset += bytesRead;
+    yield handle.read(content, offset, Math.min(64 * 1024, content.length - offset), offset).then(({ bytesRead }) => {
+      if (bytesRead === 0) throw new Error("artifact size changed before transfer");
+      const chunk = content.subarray(offset, offset + bytesRead);
+      offset += bytesRead;
+      return chunk;
+    });
+  }
+}
+
+async function readDeclaredDigest(handle: FileHandle, content: Buffer): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of readDeclaredChunks(handle, content)) {
+    hash.update(chunk);
   }
   const extra = Buffer.alloc(1);
   try {
@@ -28,6 +40,7 @@ async function readDeclaredBytes(handle: FileHandle, content: Buffer): Promise<v
   } finally {
     extra.fill(0);
   }
+  return hash.digest("hex");
 }
 
 /** Read a declared artifact from one descriptor, never beyond its declared size plus a one-byte probe. */
@@ -53,9 +66,9 @@ export async function readVerifiedRunnerArtifact(
     const before = await handle.stat();
     if (!sameArtifact(pathInfo, before)) throw new Error("artifact changed before transfer");
     content = Buffer.alloc(byteLength);
-    await readDeclaredBytes(handle, content);
+    const digest = await readDeclaredDigest(handle, content);
     if (!sameArtifact(before, await handle.stat())) throw new Error("artifact changed before transfer");
-    if (createHash("sha256").update(content).digest("hex") !== expectedSha256) {
+    if (digest !== expectedSha256) {
       throw new Error("artifact digest changed: bytes do not match its declaration");
     }
     verified = true;

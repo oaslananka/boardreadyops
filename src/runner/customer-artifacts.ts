@@ -31,6 +31,38 @@ async function privateDirectory(directory: string): Promise<void> {
   }
 }
 
+type StagedArtifact = Omit<CustomerRunnerArtifact, "filePath"> & { filename: string };
+
+async function stageArtifact(
+  workspace: string,
+  staging: string,
+  artifact: CustomerRunnerArtifact,
+  index: number,
+): Promise<StagedArtifact> {
+  const realSource = await realpath(artifact.filePath);
+  if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
+  const content = await readVerifiedRunnerArtifact(
+    artifact.filePath,
+    artifact.bytes,
+    artifact.sha256,
+    maximumLocalArtifactBytes,
+  );
+  const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
+  try {
+    await writeFile(path.join(staging, filename), content, { flag: "wx", mode: 0o600 });
+  } finally {
+    content.fill(0);
+  }
+  return {
+    filename,
+    kind: artifact.kind,
+    name: artifact.name,
+    role: artifact.role,
+    bytes: artifact.bytes,
+    sha256: artifact.sha256,
+  };
+}
+
 /**
  * Keep report bytes entirely within a customer-controlled directory.
  * This is a local filesystem handoff, not a cloud storage provider integration
@@ -89,32 +121,16 @@ export async function persistCustomerRunnerArtifacts(input: {
 
     const staging = await mkdtemp(path.join(runRoot, ".pending-"));
     try {
-      const manifestArtifacts = [];
-      for (const [index, artifact] of input.artifacts.entries()) {
-        input.signal?.throwIfAborted();
-        const realSource = await realpath(artifact.filePath);
-        if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-        const content = await readVerifiedRunnerArtifact(
-          artifact.filePath,
-          artifact.bytes,
-          artifact.sha256,
-          maximumLocalArtifactBytes,
-        );
-        const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
-        try {
-          await writeFile(path.join(staging, filename), content, { flag: "wx", mode: 0o600 });
-        } finally {
-          content.fill(0);
-        }
-        manifestArtifacts.push({
-          filename,
-          kind: artifact.kind,
-          name: artifact.name,
-          role: artifact.role,
-          bytes: artifact.bytes,
-          sha256: artifact.sha256,
-        });
-      }
+      // Stage one artifact at a time to preserve the per-file memory bound.
+      const manifestArtifacts = await input.artifacts.reduce<Promise<StagedArtifact[]>>(
+        async (previous, artifact, index) => {
+          const entries = await previous;
+          input.signal?.throwIfAborted();
+          entries.push(await stageArtifact(workspace, staging, artifact, index));
+          return entries;
+        },
+        Promise.resolve([]),
+      );
       const manifest = {
         version: 1,
         repository: `${input.job.repository.owner}/${input.job.repository.name}`,

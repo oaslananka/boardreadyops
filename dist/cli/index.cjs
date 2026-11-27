@@ -85087,12 +85087,21 @@ var import_promises32 = require("node:fs/promises");
 function sameArtifact(before, after) {
   return after.isFile() && after.size === before.size && after.dev === before.dev && after.ino === before.ino && after.mtimeMs === before.mtimeMs && after.ctimeMs === before.ctimeMs;
 }
-async function readDeclaredBytes(handle, content) {
+async function* readDeclaredChunks(handle, content) {
   let offset = 0;
   while (offset < content.length) {
-    const { bytesRead } = await handle.read(content, offset, Math.min(64 * 1024, content.length - offset), offset);
-    if (bytesRead === 0) throw new Error("artifact size changed before transfer");
-    offset += bytesRead;
+    yield handle.read(content, offset, Math.min(64 * 1024, content.length - offset), offset).then(({ bytesRead }) => {
+      if (bytesRead === 0) throw new Error("artifact size changed before transfer");
+      const chunk = content.subarray(offset, offset + bytesRead);
+      offset += bytesRead;
+      return chunk;
+    });
+  }
+}
+async function readDeclaredDigest(handle, content) {
+  const hash3 = (0, import_node_crypto24.createHash)("sha256");
+  for await (const chunk of readDeclaredChunks(handle, content)) {
+    hash3.update(chunk);
   }
   const extra = Buffer.alloc(1);
   try {
@@ -85102,6 +85111,7 @@ async function readDeclaredBytes(handle, content) {
   } finally {
     extra.fill(0);
   }
+  return hash3.digest("hex");
 }
 async function readVerifiedRunnerArtifact(filePath, byteLength, expectedSha256, maximumBytes) {
   if (!Number.isSafeInteger(byteLength) || byteLength < 0 || byteLength > maximumBytes) {
@@ -85120,9 +85130,9 @@ async function readVerifiedRunnerArtifact(filePath, byteLength, expectedSha256, 
     const before = await handle.stat();
     if (!sameArtifact(pathInfo, before)) throw new Error("artifact changed before transfer");
     content = Buffer.alloc(byteLength);
-    await readDeclaredBytes(handle, content);
+    const digest3 = await readDeclaredDigest(handle, content);
     if (!sameArtifact(before, await handle.stat())) throw new Error("artifact changed before transfer");
-    if ((0, import_node_crypto24.createHash)("sha256").update(content).digest("hex") !== expectedSha256) {
+    if (digest3 !== expectedSha256) {
       throw new Error("artifact digest changed: bytes do not match its declaration");
     }
     verified = true;
@@ -85764,6 +85774,30 @@ async function privateDirectory(directory) {
     throw new Error("customer artifact directory must not be accessible by group or others");
   }
 }
+async function stageArtifact(workspace, staging, artifact, index) {
+  const realSource = await (0, import_promises36.realpath)(artifact.filePath);
+  if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
+  const content = await readVerifiedRunnerArtifact(
+    artifact.filePath,
+    artifact.bytes,
+    artifact.sha256,
+    maximumLocalArtifactBytes
+  );
+  const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
+  try {
+    await (0, import_promises36.writeFile)(import_node_path80.default.join(staging, filename), content, { flag: "wx", mode: 384 });
+  } finally {
+    content.fill(0);
+  }
+  return {
+    filename,
+    kind: artifact.kind,
+    name: artifact.name,
+    role: artifact.role,
+    bytes: artifact.bytes,
+    sha256: artifact.sha256
+  };
+}
 async function persistCustomerRunnerArtifacts(input3) {
   input3.signal?.throwIfAborted();
   if (!uuidPattern2.test(input3.job.runId) || !uuidPattern2.test(input3.job.executionAttemptId)) {
@@ -85805,32 +85839,15 @@ async function persistCustomerRunnerArtifacts(input3) {
     if (existing) throw new Error("customer artifacts for this run attempt already exist");
     const staging = await (0, import_promises36.mkdtemp)(import_node_path80.default.join(runRoot, ".pending-"));
     try {
-      const manifestArtifacts = [];
-      for (const [index, artifact] of input3.artifacts.entries()) {
-        input3.signal?.throwIfAborted();
-        const realSource = await (0, import_promises36.realpath)(artifact.filePath);
-        if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-        const content = await readVerifiedRunnerArtifact(
-          artifact.filePath,
-          artifact.bytes,
-          artifact.sha256,
-          maximumLocalArtifactBytes
-        );
-        const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
-        try {
-          await (0, import_promises36.writeFile)(import_node_path80.default.join(staging, filename), content, { flag: "wx", mode: 384 });
-        } finally {
-          content.fill(0);
-        }
-        manifestArtifacts.push({
-          filename,
-          kind: artifact.kind,
-          name: artifact.name,
-          role: artifact.role,
-          bytes: artifact.bytes,
-          sha256: artifact.sha256
-        });
-      }
+      const manifestArtifacts = await input3.artifacts.reduce(
+        async (previous, artifact, index) => {
+          const entries = await previous;
+          input3.signal?.throwIfAborted();
+          entries.push(await stageArtifact(workspace, staging, artifact, index));
+          return entries;
+        },
+        Promise.resolve([])
+      );
       const manifest = {
         version: 1,
         repository: `${input3.job.repository.owner}/${input3.job.repository.name}`,
