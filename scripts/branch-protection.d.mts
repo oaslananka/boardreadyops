@@ -3,3 +3,4 @@ export function reconcileBranchProtection(
   api: (endpoint: string, body?: unknown) => unknown,
   apply?: boolean,
 ): "aligned" | "stale-review-drift" | "updated";
+export function resolveGithubExecutable(candidate?: string): string;

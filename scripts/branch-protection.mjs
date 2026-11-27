@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
@@ -50,37 +51,40 @@ function findLiveRule(api) {
   return live;
 }
 
-// This helper is intentionally limited to an established, owner-specific repo.
-// Do not create rulesets or replace unrecognized live protections automatically.
-export function reconcileBranchProtection(desired, api, apply = false) {
-  const repo = api(endpoint);
-  if (
-    repo.full_name !== repository ||
-    repo.owner?.login !== "oaslananka" ||
-    repo.owner?.id !== ownerId ||
-    repo.owner?.type !== "User" ||
-    repo.archived !== false ||
-    !repo.default_branch
-  ) {
+function assertRepository(repo) {
+  const identity = {
+    full_name: repo.full_name,
+    owner: { login: repo.owner?.login, id: repo.owner?.id, type: repo.owner?.type },
+    archived: repo.archived,
+  };
+  const expected = {
+    full_name: repository,
+    owner: { login: "oaslananka", id: ownerId, type: "User" },
+    archived: false,
+  };
+  if (!isDeepStrictEqual(identity, expected) || !repo.default_branch) {
     throw new Error("Unexpected repository identity or lifecycle state.");
   }
+}
+
+function committedProtection(desired) {
   const expected = protectionFields(desired);
-  if (
-    expected.name !== rulesetName ||
-    expected.target !== "branch" ||
-    expected.enforcement !== "active" ||
-    !isDeepStrictEqual(expected.conditions, { ref_name: { include: ["~DEFAULT_BRANCH"], exclude: [] } }) ||
-    !isDeepStrictEqual(expected.bypass_actors, [{ actor_id: ownerId, actor_type: "User", bypass_mode: "pull_request" }])
-  ) {
+  const { rules, ...identity } = expected;
+  const contract = {
+    name: rulesetName,
+    target: "branch",
+    enforcement: "active",
+    conditions: { ref_name: { include: ["~DEFAULT_BRANCH"], exclude: [] } },
+    bypass_actors: [{ actor_id: ownerId, actor_type: "User", bypass_mode: "pull_request" }],
+  };
+  if (!isDeepStrictEqual(identity, contract) || !Array.isArray(rules)) {
     throw new Error("Committed ruleset does not satisfy the owner-specific contract.");
   }
-  const live = findLiveRule(api);
-  const actual = structuredClone(protectionFields(live));
-  if (isDeepStrictEqual(actual, expected)) return "aligned";
+  return expected;
+}
 
-  // Preserve the stronger committed stale-review policy. Every other difference
-  // (including missing bypass data, new requirements or changed check IDs) is
-  // deliberately a manual review, never a blind replacement.
+function assertSoleKnownDrift(expected, actual) {
+  // Keep the stronger source policy; any other difference requires manual review.
   const previous = structuredClone(expected);
   const review = previous.rules.find((rule) => rule.type === "pull_request");
   if (review?.parameters?.dismiss_stale_reviews_on_push !== true) {
@@ -92,27 +96,66 @@ export function reconcileBranchProtection(desired, api, apply = false) {
       "Unexpected protection drift; refusing to overwrite live settings. Compare the committed JSON with the live ruleset.",
     );
   }
+}
+
+function assertCurrentRule(api, id, expected, message) {
+  const current = findLiveRule(api);
+  if (current.id !== id || !isDeepStrictEqual(protectionFields(current), expected)) {
+    throw new Error(message);
+  }
+}
+
+// This helper is intentionally limited to an established, owner-specific repo.
+// Do not create rulesets or replace unrecognized live protections automatically.
+export function reconcileBranchProtection(desired, api, apply = false) {
+  assertRepository(api(endpoint));
+  const expected = committedProtection(desired);
+  const live = findLiveRule(api);
+  const actual = structuredClone(protectionFields(live));
+  if (isDeepStrictEqual(actual, expected)) return "aligned";
+  assertSoleKnownDrift(expected, actual);
   if (!apply) return "stale-review-drift";
 
-  const confirmed = findLiveRule(api);
-  if (confirmed.id !== live.id || !isDeepStrictEqual(protectionFields(confirmed), actual)) {
-    throw new Error("Ruleset changed during inspection; no update performed.");
-  }
+  assertCurrentRule(api, live.id, actual, "Ruleset changed during inspection; no update performed.");
   api(`${endpoint}/rulesets/${live.id}`, expected);
-  const updated = findLiveRule(api);
-  if (updated.id !== live.id || !isDeepStrictEqual(protectionFields(updated), expected)) {
-    throw new Error("Updated ruleset could not be verified; inspect GitHub before retrying.");
-  }
+  assertCurrentRule(api, live.id, expected, "Updated ruleset could not be verified; inspect GitHub before retrying.");
   return "updated";
 }
 
-function githubApi(resource, body) {
+function defaultGithubExecutable() {
+  const candidates =
+    process.platform === "win32"
+      ? ["C:/Program Files/GitHub CLI/gh.exe"]
+      : ["/usr/bin/gh", "/usr/local/bin/gh", "/opt/homebrew/bin/gh"];
+  return candidates.find((candidate) => existsSync(candidate));
+}
+
+// The operator may explicitly select a trusted local installation. Never
+// search PATH, the working directory, or a repository-provided executable.
+export function resolveGithubExecutable(candidate = process.env.BOARDREADYOPS_GH_PATH ?? defaultGithubExecutable()) {
+  if (typeof candidate !== "string" || !path.isAbsolute(candidate)) {
+    throw new Error("Set BOARDREADYOPS_GH_PATH to an absolute path to a trusted GitHub CLI installation.");
+  }
+  const executable = realpathSync(candidate);
+  const expectedName = process.platform === "win32" ? "gh.exe" : "gh";
+  if (path.basename(executable).toLowerCase() !== expectedName || !statSync(executable).isFile()) {
+    throw new Error("Expected an absolute GitHub CLI executable file.");
+  }
+  const repoRoot = realpathSync(new URL("..", import.meta.url));
+  const relative = path.relative(repoRoot, executable);
+  if (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative)) {
+    throw new Error("GitHub CLI must be installed outside the repository.");
+  }
+  return executable;
+}
+
+function githubApi(executable, resource, body) {
   const args = ["api", "--hostname", "github.com"];
   if (resource === rulesetsEndpoint) args.push("--paginate", "--slurp");
   if (body !== undefined) args.push("--method", "PUT", "--input", "-");
   args.push(resource);
   return JSON.parse(
-    execFileSync("gh", args, {
+    execFileSync(executable, args, {
       encoding: "utf8",
       ...(body === undefined ? {} : { input: JSON.stringify(body) }),
       timeout: 30_000,
@@ -133,7 +176,8 @@ function main(args) {
     throw new Error("Usage: scripts/setup-branch-protection.sh [oaslananka/boardreadyops [main-standard]] [--apply]");
   }
   const desired = JSON.parse(readFileSync(new URL("../.github/rulesets/main.json", import.meta.url), "utf8"));
-  const result = reconcileBranchProtection(desired, githubApi, apply);
+  const executable = resolveGithubExecutable();
+  const result = reconcileBranchProtection(desired, (resource, body) => githubApi(executable, resource, body), apply);
   if (result === "stale-review-drift") {
     process.stderr.write(
       "Live stale-review dismissal is disabled; the committed policy requires it. No changes made. Use --apply only after reviewing the change.\n",

@@ -23,6 +23,12 @@ within two business days.
 scripts/setup-branch-protection.sh oaslananka/boardreadyops main-standard
 ```
 
+Use a trusted local Node.js and GitHub CLI installation. The helper invokes GitHub
+CLI by absolute path, not through PATH or repository files. Common system
+installation paths are detected automatically; for a different installation,
+set `BOARDREADYOPS_GH_PATH` to its trusted absolute executable path (outside
+the checkout). Do not select an executable from an untrusted directory.
+
 The helper checks the authenticated repository identity and the complete
 repository ruleset inventory. A missing, legacy, duplicate, unrecognized, or
 stronger live branch ruleset fails closed instead of being overwritten.

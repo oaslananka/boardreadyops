@@ -1,7 +1,8 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { reconcileBranchProtection } from "../../../scripts/branch-protection.mjs";
+import { reconcileBranchProtection, resolveGithubExecutable } from "../../../scripts/branch-protection.mjs";
 
 const root = path.resolve(import.meta.dirname, "../../..");
 
@@ -116,6 +117,36 @@ describe("main branch governance ruleset", () => {
     return { desired, live, repository, rows, calls, api };
   }
 
+  it.each(["gh", "./gh", "../gh", "gh.exe"])("rejects PATH or relative CLI lookup: %s", (candidate) => {
+    expect(() => resolveGithubExecutable(candidate)).toThrow("absolute");
+  });
+
+  it("accepts an explicit absolute GitHub CLI file, without searching PATH", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-gh-path-"));
+    try {
+      const executable = path.join(directory, process.platform === "win32" ? "gh.exe" : "gh");
+      await writeFile(executable, "not executed");
+      expect(resolveGithubExecutable(executable)).toBe(await realpath(executable));
+      expect(() => resolveGithubExecutable(directory)).toThrow();
+      expect(() => resolveGithubExecutable(path.join(directory, "missing", path.basename(executable)))).toThrow();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses an executable located inside the repository", async () => {
+    const verification = path.join(root, ".boardreadyops", "verification");
+    await mkdir(verification, { recursive: true });
+    const directory = await mkdtemp(path.join(verification, "gh-path-"));
+    try {
+      const executable = path.join(directory, process.platform === "win32" ? "gh.exe" : "gh");
+      await writeFile(executable, "not executed");
+      expect(() => resolveGithubExecutable(executable)).toThrow("outside the repository");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("checks matching protection without writes, even with apply requested", async () => {
     const f = await fixture();
     expect(reconcileBranchProtection(f.desired, f.api, false)).toBe("aligned");
@@ -136,23 +167,63 @@ describe("main branch governance ruleset", () => {
     expect(f.calls.at(-1)?.body).toBeUndefined();
   });
 
-  it.each(["missing", "duplicate", "legacy", "foreign", "stronger", "hidden-bypass", "wrong-owner"] as const)(
-    "fails closed on %s protection without writes",
-    async (kind) => {
-      const f = await fixture();
-      const branchRule = f.rows[0];
-      if (!branchRule) throw new Error("Missing fixture branch rule");
-      if (kind === "missing") f.rows.shift();
-      if (kind === "duplicate") f.rows.push({ ...branchRule, id: 123 });
-      if (kind === "legacy") branchRule.name = "main";
-      if (kind === "foreign") branchRule.source = "someone/other";
-      if (kind === "stronger") f.live.rules.push({ type: "required_signatures" });
-      if (kind === "hidden-bypass") delete f.live.bypass_actors;
-      if (kind === "wrong-owner") f.repository.owner.id = 1;
-      expect(() => reconcileBranchProtection(f.desired, f.api, true)).toThrow();
-      expect(f.calls.every((call) => call.body === undefined)).toBe(true);
-    },
-  );
+  type Fixture = Awaited<ReturnType<typeof fixture>>;
+
+  const refusalCases: Array<[string, (f: Fixture) => void]> = [
+    [
+      "missing",
+      (f) => {
+        f.rows.shift();
+      },
+    ],
+    [
+      "duplicate",
+      (f) => {
+        const rule = f.rows[0];
+        if (!rule) throw new Error("Missing fixture branch rule");
+        f.rows.push({ ...rule, id: 123 });
+      },
+    ],
+    [
+      "legacy",
+      (f) => {
+        const rule = f.rows[0];
+        if (rule) rule.name = "main";
+      },
+    ],
+    [
+      "foreign",
+      (f) => {
+        const rule = f.rows[0];
+        if (rule) rule.source = "someone/other";
+      },
+    ],
+    [
+      "stronger",
+      (f) => {
+        f.live.rules.push({ type: "required_signatures" });
+      },
+    ],
+    [
+      "hidden-bypass",
+      (f) => {
+        delete f.live.bypass_actors;
+      },
+    ],
+    [
+      "wrong-owner",
+      (f) => {
+        f.repository.owner.id = 1;
+      },
+    ],
+  ];
+
+  it.each(refusalCases)("fails closed on %s protection without writes", async (_kind, mutate) => {
+    const f = await fixture();
+    mutate(f);
+    expect(() => reconcileBranchProtection(f.desired, f.api, true)).toThrow();
+    expect(f.calls.every((call) => call.body === undefined)).toBe(true);
+  });
 
   it("refuses an update when a stronger rule appears during the final inspection", async () => {
     const f = await fixture();
