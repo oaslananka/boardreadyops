@@ -446,6 +446,7 @@ describe("dependency and security automation configuration", () => {
       "browserslist",
       "deepmerge-ts",
       "diff",
+      "effect",
       "esbuild",
       "fast-uri",
       "glob",
