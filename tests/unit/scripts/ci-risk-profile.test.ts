@@ -164,6 +164,13 @@ describe("ci-risk-profile", () => {
     }
   });
 
+  it("requires the real KiCad integration lane for changes to the reviewed manufacturing generator", () => {
+    const profile = classifyChangedFiles(["src/release/generate.ts"], { eventName: "pull_request" });
+    expect(profile.needs_integration).toBe(true);
+    expect(profile.needs_kicad).toBe(true);
+    expect(profile.needs_unit_matrix).toBe(true);
+  });
+
   it("does not exempt mixed billing and manufacturing/database changes", () => {
     const profile = classifyChangedFiles(
       ["packages/db/src/billing-store.ts", "packages/db/src/runner-artifact-store.ts"],
