@@ -21,6 +21,10 @@ const headSha = "1234567890abcdef1234567890abcdef12345678";
 const server = "https://cloud.example";
 const leakedSecret = "private-token-value-that-must-not-leak";
 const nativeCli = await detectKicadCli();
+// Native artwork exercises real KiCad processes, whose export deadline alone is
+// 45 seconds. Match the offline native Action integration test's bounded budget
+// without relaxing the default timeout for mocked unit cases.
+const NATIVE_ARTWORK_TEST_TIMEOUT_MS = 60_000;
 
 function createMockStream(): { stream: NodeJS.WritableStream; output: string } {
   const chunks: string[] = [];
@@ -547,6 +551,7 @@ describe("CLI review publish command", () => {
         fs.rmSync(root, { recursive: true, force: true });
       }
     },
+    NATIVE_ARTWORK_TEST_TIMEOUT_MS,
   );
 
   it("resolves default review head from the target repository, not CLI process cwd", async () => {
@@ -634,25 +639,29 @@ describe("CLI review publish command", () => {
     }
   });
 
-  it("never enables source-derived design artwork without an explicit opt-in", async () => {
-    const stdout = createMockStream();
-    const stderr = createMockStream();
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
+  it(
+    "never enables source-derived design artwork without an explicit opt-in",
+    async () => {
+      const stdout = createMockStream();
+      const stderr = createMockStream();
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
 
-    const exitCode = await reviewPublishCommand(fixtureRoot, liveOptions({ dryRun: true, nativeVisuals: true }), {
-      stdout: stdout.stream,
-      stderr: stderr.stream,
-    });
-    expect(exitCode).toBe(nativeCli.found ? 0 : 1);
-    if (nativeCli.found) {
-      expect(stdout.output).toContain("Upload Mode: snapshots");
-      expect(stdout.output).toContain("Verified KiCad artwork:");
-    } else {
-      expect(stderr.output).toContain("Native visual preflight failed");
-    }
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+      const exitCode = await reviewPublishCommand(fixtureRoot, liveOptions({ dryRun: true, nativeVisuals: true }), {
+        stdout: stdout.stream,
+        stderr: stderr.stream,
+      });
+      expect(exitCode).toBe(nativeCli.found ? 0 : 1);
+      if (nativeCli.found) {
+        expect(stdout.output).toContain("Upload Mode: snapshots");
+        expect(stdout.output).toContain("Verified KiCad artwork:");
+      } else {
+        expect(stderr.output).toContain("Native visual preflight failed");
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+    NATIVE_ARTWORK_TEST_TIMEOUT_MS,
+  );
 
   it("preserves the human-oriented text result by default", async () => {
     const stdout = createMockStream();
