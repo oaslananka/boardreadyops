@@ -496,7 +496,7 @@ describe("plugin loader", () => {
     ]);
   });
 
-  it("documents the known trust-boundary limit: permissions declared only on the exported object still run top-level code before the permission decision (ADR 0009)", async () => {
+  it("documents the known trust-boundary limit: permissions declared only on the exported object still run top-level code before the permission decision (ADR 0020)", async () => {
     const root = await makeProjectRoot();
     const markerFile = path.join(root, "import-ran.marker");
     const pluginFile = path.join(root, "undeclared-permissions-plugin.js");
@@ -526,7 +526,7 @@ export default {
     // plugin, and the loader must import the module to read its exported `permissions`
     // in the first place. The marker file proves the top-level code already executed
     // before the denial was known. This is the accepted, documented trust boundary
-    // (ADR 0009): standard-mode plugins are trusted workspace code, not sandboxed.
+    // (ADR 0020): standard-mode plugins are trusted workspace code, not sandboxed.
     await expect(fs.stat(markerFile)).resolves.toBeDefined();
   });
 

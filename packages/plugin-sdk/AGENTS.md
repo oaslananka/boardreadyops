@@ -13,7 +13,7 @@ Plugins are not a sandbox.
 - Safe mode loading zero plugins is the enforced boundary for untrusted execution contexts.
 - Do not describe `node:vm`, the Node permission model, or SDK permission metadata as a security boundary.
 
-Read `docs/architecture/adr/0009-plugin-sandboxing.md` before changing this contract.
+Read `docs/architecture/adr/0020-plugin-sandboxing.md` before changing this contract.
 
 ## Public API discipline
 

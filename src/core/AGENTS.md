@@ -38,7 +38,7 @@ Safe mode is the security boundary for plugin execution.
 - Static permission checks may reject an honestly declared capability before import, but they cannot make imported third-party code safe.
 - A change that enables plugin execution in an untrusted context is security-sensitive and requires explicit design review.
 
-Read `docs/architecture/adr/0009-plugin-sandboxing.md` before changing plugin loading semantics.
+Read `docs/architecture/adr/0020-plugin-sandboxing.md` before changing plugin loading semantics.
 
 ## Verification
 

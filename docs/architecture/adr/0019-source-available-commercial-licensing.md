@@ -1,6 +1,6 @@
 # ADR-0019 - Source-Available and Commercial Licensing
 
-**Status:** Accepted
+**Status:** Superseded on 2026-11-15 by [ADR-0021 - AGPL and contribution licensing](0021-agpl-contribution-licensing.md). Historical decision; the terms below describe the September 2026 revision, not current project policy.
 **Date:** 2026-09-14
 
 ## Context
@@ -18,14 +18,14 @@ components also retain their own licenses.
 
 ## Decision
 
-Current project-authored source is licensed under PolyForm Noncommercial 1.0.0.
+At the time of this decision, project-authored source was licensed under PolyForm Noncommercial 1.0.0.
 Commercial use requires a separate written commercial license. Earlier revisions
 already published under MIT remain usable under their original MIT terms.
 
 Third-party material is not relicensed. In particular, the full container keeps
 KiCad and other bundled components under their applicable upstream terms.
 
-## Consequences
+## Historical consequences
 
 - BoardReadyOps should be described as source-available, not OSI-approved open source.
 - Package, citation, image, and REUSE metadata must identify the new project license.

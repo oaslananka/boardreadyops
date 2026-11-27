@@ -62,6 +62,7 @@ not_in_nav: |
   !rules/release.md
   reference/plugin-sdk/**
   !reference/plugin-sdk/README.md
+  architecture/adr/0009-plugin-sandboxing.md
 
 nav:
   - Start:
@@ -212,3 +213,6 @@ nav:
               - "0016: UI/UX Design System Migration": architecture/adr/0016-ui-ux-design-system-migration.md
               - "0017: Brand and Design Token System": architecture/adr/0017-brand-and-design-token-system.md
               - "0018: GitHub App Permission Profile": architecture/adr/0018-github-app-permission-profile.md
+              - "0019: Historical Source-Available Licensing": architecture/adr/0019-source-available-commercial-licensing.md
+              - "0020: Plugin Trust Boundary": architecture/adr/0020-plugin-sandboxing.md
+              - "0021: AGPL and Contribution Licensing": architecture/adr/0021-agpl-contribution-licensing.md
