@@ -11,6 +11,12 @@ const actionPath = path.resolve(".github/actions/manufacturing-attested-export")
 const fixtureRoot = path.resolve("tests/fixtures/projects/safe-basic");
 const ownedRoots: string[] = [];
 const SHA_REGEX = /^[0-9a-f]{40}$/u;
+const EXPORT_PROCESS_TIMEOUT_MS = 150_000;
+// Real KiCad exports run multiple child processes. Allow the existing bounded
+// shell deadline to expire before Vitest, with room for fixture and hash checks.
+const EXPORT_TEST_TIMEOUT_MS = EXPORT_PROCESS_TIMEOUT_MS + 15_000;
+const GOLDEN_PROCESS_TIMEOUT_MS = 30_000;
+const GOLDEN_TEST_TIMEOUT_MS = 2 * GOLDEN_PROCESS_TIMEOUT_MS + 15_000;
 
 function runnerTempInBash(value: string): string {
   if (process.platform !== "win32") return value;
@@ -62,10 +68,10 @@ async function runExport(f: Awaited<ReturnType<typeof fixture>>, overrides: Reco
   const action = await loadAction();
   const script = action.runs.steps[0]?.run;
   if (!script) throw new Error("Missing composite export shell");
-  return spawnSync("bash", ["-e", "-c", script], {
+  const result = spawnSync("bash", ["-e", "-c", script], {
     cwd: f.root,
     encoding: "utf8",
-    timeout: 150_000,
+    timeout: EXPORT_PROCESS_TIMEOUT_MS,
     env: {
       ...process.env,
       VITEST: undefined,
@@ -85,6 +91,12 @@ async function runExport(f: Awaited<ReturnType<typeof fixture>>, overrides: Reco
       ...overrides,
     },
   });
+  // A timeout or signal is not evidence that the signer rejected an invalid
+  // source. Fail the harness instead of accepting a missing exit status.
+  if (result.error || result.status === null) {
+    throw new Error(`Export shell did not exit normally: ${result.error?.message ?? result.signal}`);
+  }
+  return result;
 }
 
 describe("target-repository reviewed fabrication export signer boundary", () => {
@@ -351,140 +363,158 @@ describe("target-repository reviewed fabrication export signer boundary", () => 
     expect(await fs.readFile(path.join(f.root, filename), "utf8")).toContain("schemaVersion");
     await expect(fs.readFile(path.join(f.runnerTemp, filename))).rejects.toThrow();
   });
-  it("exports a real BOM from the fixed golden demo used by hosted manufacturing", async (ctx) => {
-    const schematic = path.resolve("examples/golden-demo/fixed/demo.kicad_sch");
-    const source = await fs.readFile(schematic, "utf8");
-    expect(source).toContain("(version 20250114)");
-    for (const ref of ["R1", "R2", "C1"]) {
-      expect(source).toContain(`(property "Reference" "${ref}"`);
-    }
-    // KiCad writes local project session state; it must not dirty the exact-SHA signer checkout.
-    const sessionFile = spawnSync("git", ["check-ignore", "-q", "examples/golden-demo/fixed/demo.kicad_prl"], {
-      encoding: "utf8",
-    });
-    expect(sessionFile.status).toBe(0);
-    const cli = await detectKicadCli();
-    if (!process.env.CI) ctx.skip(!cli.found || !/^10\.0\./u.test(cli.version ?? ""), "Requires KiCad 10");
-    expect(cli.found).toBe(true);
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-golden-demo-bom-"));
-    ownedRoots.push(dir);
-    const output = path.join(dir, "bom.csv");
-    const result = spawnSync(cli.path ?? "kicad-cli", ["sch", "export", "bom", "--output", output, schematic], {
-      encoding: "utf8",
-      timeout: 30_000,
-    });
-    expect(result.status, result.stderr || result.stdout).toBe(0);
-    const csv = await fs.readFile(output, "utf8");
-    for (const ref of ["R1", "R2", "C1"]) expect(csv).toContain(ref);
-    // This is a visible design schematic, not only a CSV-shaped placeholder.
-    const svgDir = path.join(dir, "svg");
-    await fs.mkdir(svgDir);
-    const svg = spawnSync(cli.path ?? "kicad-cli", ["sch", "export", "svg", "--output", svgDir, schematic], {
-      encoding: "utf8",
-      timeout: 30_000,
-    });
-    expect(svg.status, svg.stderr || svg.stdout).toBe(0);
-    const artwork = await fs.readFile(path.join(svgDir, "demo.svg"), "utf8");
-    for (const ref of ["R1", "R2", "C1"]) expect(artwork).toContain(ref);
-  });
-  it("exports REAL KiCad Gerbers, drill, BOM and CPL from the exact clean SHA and inventories all bytes", async (ctx) => {
-    const cli = await detectKicadCli();
-    if (!process.env.CI) ctx.skip(!cli.found || !/^10\.0\./u.test(cli.version ?? ""), "Requires KiCad 10");
-    expect(cli.found).toBe(true);
-    expect(cli.version).toMatch(/^10\.0\./u);
-    const f = await fixture();
-    const result = await runExport(f);
-    if (result.status !== 0)
-      throw new Error(`Export shell exited ${result.status}: stdout=${result.stdout} stderr=${result.stderr}`);
-    expect(result.status, result.stderr).toBe(0);
-    const outputs = new Map(
-      (await fs.readFile(f.output, "utf8"))
-        .trim()
-        .split("\n")
-        .map((s) => s.split("=", 2) as [string, string]),
-    );
-    expect(outputs.get("manifest")).toBe("build/boardreadyops-attested/manifest.json");
-    const checksumFile = outputs.get("subject-checksums");
-    if (!checksumFile) throw new Error("Checksum output not emitted");
-    const manifestPath = outputs.get("manifest");
-    if (!manifestPath) throw new Error("Manifest output not emitted");
-    const manifest = JSON.parse(await fs.readFile(path.join(f.root, manifestPath), "utf8")) as {
-      git: { sha: string; dirty: boolean };
-      steps: Array<{ kind: string; status: string }>;
-      artifacts: Array<{ path: string; sha256: string; kind: string }>;
-    };
-    expect(manifest.git).toEqual({ sha: f.sha, dirty: false });
-    expect(manifest.steps.filter((s) => s.status === "generated").map((s) => s.kind)).toEqual([
-      "gerbers",
-      "drill",
-      "bom",
-      "positions",
-    ]);
-    for (const kind of ["gerber", "drill", "bom", "cpl"]) {
-      expect(manifest.artifacts.some((artifact) => artifact.kind === kind && artifact.sha256.length === 64)).toBe(true);
-    }
-    const checksumLines = (await fs.readFile(checksumFile, "utf8")).trim().split("\n");
-    expect(checksumLines).toHaveLength(manifest.artifacts.length + 1);
-    const subjects = new Set<string>();
-    for (const line of checksumLines) {
-      const match = /^([a-f0-9]{64}) {2}([^\r\n]+)$/u.exec(line);
-      expect(match).not.toBeNull();
-      if (!match) throw new Error("Invalid attestation subject checksum");
-      const [, expected, name] = match;
-      if (!expected || !name) throw new Error("Missing digest or subject name");
-      expect(subjects.has(name)).toBe(false);
-      subjects.add(name);
-      const data = await fs.readFile(path.join(f.root, name));
-      expect(createHash("sha256").update(data).digest("hex")).toBe(expected);
-    }
-    expect(subjects.has("build/boardreadyops-attested/manifest.json")).toBe(true);
-    expect(subjects.has("build/boardreadyops-attested/gerbers/safe-basic-F_Cu.gtl")).toBe(true);
-    expect(subjects.has("build/boardreadyops-attested/assembly/bom.csv")).toBe(true);
-    expect(subjects.has("build/boardreadyops-attested/assembly/positions.csv")).toBe(true);
-  });
+  it(
+    "exports a real BOM from the fixed golden demo used by hosted manufacturing",
+    async (ctx) => {
+      const schematic = path.resolve("examples/golden-demo/fixed/demo.kicad_sch");
+      const source = await fs.readFile(schematic, "utf8");
+      expect(source).toContain("(version 20250114)");
+      for (const ref of ["R1", "R2", "C1"]) {
+        expect(source).toContain(`(property "Reference" "${ref}"`);
+      }
+      // KiCad writes local project session state; it must not dirty the exact-SHA signer checkout.
+      const sessionFile = spawnSync("git", ["check-ignore", "-q", "examples/golden-demo/fixed/demo.kicad_prl"], {
+        encoding: "utf8",
+      });
+      expect(sessionFile.status).toBe(0);
+      const cli = await detectKicadCli();
+      if (!process.env.CI) ctx.skip(!cli.found || !/^10\.0\./u.test(cli.version ?? ""), "Requires KiCad 10");
+      expect(cli.found).toBe(true);
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-golden-demo-bom-"));
+      ownedRoots.push(dir);
+      const output = path.join(dir, "bom.csv");
+      const result = spawnSync(cli.path ?? "kicad-cli", ["sch", "export", "bom", "--output", output, schematic], {
+        encoding: "utf8",
+        timeout: GOLDEN_PROCESS_TIMEOUT_MS,
+      });
+      expect(result.status, result.stderr || result.stdout).toBe(0);
+      const csv = await fs.readFile(output, "utf8");
+      for (const ref of ["R1", "R2", "C1"]) expect(csv).toContain(ref);
+      // This is a visible design schematic, not only a CSV-shaped placeholder.
+      const svgDir = path.join(dir, "svg");
+      await fs.mkdir(svgDir);
+      const svg = spawnSync(cli.path ?? "kicad-cli", ["sch", "export", "svg", "--output", svgDir, schematic], {
+        encoding: "utf8",
+        timeout: GOLDEN_PROCESS_TIMEOUT_MS,
+      });
+      expect(svg.status, svg.stderr || svg.stdout).toBe(0);
+      const artwork = await fs.readFile(path.join(svgDir, "demo.svg"), "utf8");
+      for (const ref of ["R1", "R2", "C1"]) expect(artwork).toContain(ref);
+    },
+    GOLDEN_TEST_TIMEOUT_MS,
+  );
+  it(
+    "exports REAL KiCad Gerbers, drill, BOM and CPL from the exact clean SHA and inventories all bytes",
+    async (ctx) => {
+      const cli = await detectKicadCli();
+      if (!process.env.CI) ctx.skip(!cli.found || !/^10\.0\./u.test(cli.version ?? ""), "Requires KiCad 10");
+      expect(cli.found).toBe(true);
+      expect(cli.version).toMatch(/^10\.0\./u);
+      const f = await fixture();
+      const result = await runExport(f);
+      if (result.status !== 0)
+        throw new Error(`Export shell exited ${result.status}: stdout=${result.stdout} stderr=${result.stderr}`);
+      expect(result.status, result.stderr).toBe(0);
+      const outputs = new Map(
+        (await fs.readFile(f.output, "utf8"))
+          .trim()
+          .split("\n")
+          .map((s) => s.split("=", 2) as [string, string]),
+      );
+      expect(outputs.get("manifest")).toBe("build/boardreadyops-attested/manifest.json");
+      const checksumFile = outputs.get("subject-checksums");
+      if (!checksumFile) throw new Error("Checksum output not emitted");
+      const manifestPath = outputs.get("manifest");
+      if (!manifestPath) throw new Error("Manifest output not emitted");
+      const manifest = JSON.parse(await fs.readFile(path.join(f.root, manifestPath), "utf8")) as {
+        git: { sha: string; dirty: boolean };
+        steps: Array<{ kind: string; status: string }>;
+        artifacts: Array<{ path: string; sha256: string; kind: string }>;
+      };
+      expect(manifest.git).toEqual({ sha: f.sha, dirty: false });
+      expect(manifest.steps.filter((s) => s.status === "generated").map((s) => s.kind)).toEqual([
+        "gerbers",
+        "drill",
+        "bom",
+        "positions",
+      ]);
+      for (const kind of ["gerber", "drill", "bom", "cpl"]) {
+        expect(manifest.artifacts.some((artifact) => artifact.kind === kind && artifact.sha256.length === 64)).toBe(
+          true,
+        );
+      }
+      const checksumLines = (await fs.readFile(checksumFile, "utf8")).trim().split("\n");
+      expect(checksumLines).toHaveLength(manifest.artifacts.length + 1);
+      const subjects = new Set<string>();
+      for (const line of checksumLines) {
+        const match = /^([a-f0-9]{64}) {2}([^\r\n]+)$/u.exec(line);
+        expect(match).not.toBeNull();
+        if (!match) throw new Error("Invalid attestation subject checksum");
+        const [, expected, name] = match;
+        if (!expected || !name) throw new Error("Missing digest or subject name");
+        expect(subjects.has(name)).toBe(false);
+        subjects.add(name);
+        const data = await fs.readFile(path.join(f.root, name));
+        expect(createHash("sha256").update(data).digest("hex")).toBe(expected);
+      }
+      expect(subjects.has("build/boardreadyops-attested/manifest.json")).toBe(true);
+      expect(subjects.has("build/boardreadyops-attested/gerbers/safe-basic-F_Cu.gtl")).toBe(true);
+      expect(subjects.has("build/boardreadyops-attested/assembly/bom.csv")).toBe(true);
+      expect(subjects.has("build/boardreadyops-attested/assembly/positions.csv")).toBe(true);
+    },
+    EXPORT_TEST_TIMEOUT_MS,
+  );
 
-  it("binds generated bytes to the checked-out reviewed source SHA even when the signer workflow SHA differs", async () => {
-    const f = await fixture();
-    const signerWorkflowSha = "b".repeat(40);
-    const result = await runExport(f, { GITHUB_SHA: signerWorkflowSha });
-    expect(result.status, result.stderr).toBe(0);
-    const outputs = new Map(
-      (await fs.readFile(f.output, "utf8"))
-        .trim()
-        .split("\n")
-        .map((line) => line.split("=", 2) as [string, string]),
-    );
-    const manifest = JSON.parse(await fs.readFile(path.join(f.root, outputs.get("manifest") ?? ""), "utf8")) as {
-      git?: { sha?: string };
-    };
-    expect(manifest.git?.sha).toBe(f.sha);
-    expect(manifest.git?.sha).not.toBe(signerWorkflowSha);
-  });
+  it(
+    "binds generated bytes to the checked-out reviewed source SHA even when the signer workflow SHA differs",
+    async () => {
+      const f = await fixture();
+      const signerWorkflowSha = "b".repeat(40);
+      const result = await runExport(f, { GITHUB_SHA: signerWorkflowSha });
+      expect(result.status, result.stderr).toBe(0);
+      const outputs = new Map(
+        (await fs.readFile(f.output, "utf8"))
+          .trim()
+          .split("\n")
+          .map((line) => line.split("=", 2) as [string, string]),
+      );
+      const manifest = JSON.parse(await fs.readFile(path.join(f.root, outputs.get("manifest") ?? ""), "utf8")) as {
+        git?: { sha?: string };
+      };
+      expect(manifest.git?.sha).toBe(f.sha);
+      expect(manifest.git?.sha).not.toBe(signerWorkflowSha);
+    },
+    EXPORT_TEST_TIMEOUT_MS,
+  );
 
-  it("refuses an archive when the reviewed source has no BOM schematic", async () => {
-    const f = await fixture();
-    await fs.rm(path.join(f.root, "safe-basic.kicad_sch"));
-    execFileSync("git", ["add", "-A"], { cwd: f.root });
-    execFileSync(
-      "git",
-      [
-        "-c",
-        "user.name=Fixture",
-        "-c",
-        "user.email=fixture@example.invalid",
-        "commit",
-        "--quiet",
-        "-m",
-        "remove schematic",
-      ],
-      { cwd: f.root },
-    );
-    f.sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
-    const result = await runExport(f);
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("Incomplete manufacturing export");
-    expect(await fs.readFile(f.output, "utf8")).not.toContain("subject-checksums=");
-  });
+  it(
+    "refuses an archive when the reviewed source has no BOM schematic",
+    async () => {
+      const f = await fixture();
+      await fs.rm(path.join(f.root, "safe-basic.kicad_sch"));
+      execFileSync("git", ["add", "-A"], { cwd: f.root });
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=Fixture",
+          "-c",
+          "user.email=fixture@example.invalid",
+          "commit",
+          "--quiet",
+          "-m",
+          "remove schematic",
+        ],
+        { cwd: f.root },
+      );
+      f.sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim();
+      const result = await runExport(f);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Incomplete manufacturing export");
+      expect(await fs.readFile(f.output, "utf8")).not.toContain("subject-checksums=");
+    },
+    EXPORT_TEST_TIMEOUT_MS,
+  );
 
   it.each([
     ["different SHA", { BOARDREADYOPS_REVIEWED_SHA: "f".repeat(40) }],
