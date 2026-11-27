@@ -105,6 +105,25 @@ describe("63-class original-numeric-user bounded FK row candidates remain source
     expect(f.withTransaction).toHaveBeenCalledOnce();
   });
 
+  it("preserves the exact catalog-derived SQL for composite FK joins and numeric owner binding", async () => {
+    const f = fixture({
+      edges: edges.map((edge) =>
+        edge.source_table === "boards"
+          ? { ...edge, source_columns: ["repository_id", "tenant_id"], target_columns: ["id", "tenant_id"] }
+          : edge,
+      ),
+    });
+    const report = await assessHistoricalUserUnresolvedOwnerRows(f.db, f.identity);
+    expect(report?.releaseDecision).toBe("NO_GO");
+    expect(report?.customerDeliveryAllowed).toBe(false);
+    const finalQuery = f.query.mock.calls.at(-1);
+    expect(finalQuery?.[1]).toEqual([f.identity.exportId, f.identity.verifiedGitHubUserId]);
+    expect(finalQuery?.[0]).toContain(
+      "FROM public.boards AS r0 JOIN public.repositories AS r1 ON r0.repository_id=r1.id AND r0.tenant_id=r1.tenant_id JOIN public.installations AS r2 ON r1.installation_id=r2.id JOIN former_installations AS original_user_installation ON original_user_installation.id=r2.id LIMIT 101",
+    );
+    expect(finalQuery?.[0]).toMatchSnapshot();
+  });
+
   it("pins the numeric USER before any awaited catalog request", async () => {
     let original: ReturnType<typeof fixture> | undefined;
     const f = fixture({
