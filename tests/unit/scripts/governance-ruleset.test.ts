@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -143,6 +143,27 @@ describe("main branch governance ruleset", () => {
       await writeFile(executable, "not executed");
       expect(() => resolveGithubExecutable(executable)).toThrow("outside the repository");
     } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a repository executable reached through an external directory alias", async () => {
+    const verification = path.join(root, ".boardreadyops", "verification");
+    await mkdir(verification, { recursive: true });
+    const directory = await mkdtemp(path.join(verification, "gh-alias-target-"));
+    const external = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-gh-alias-"));
+    const alias = path.join(external, "alias");
+    const filename = process.platform === "win32" ? "gh.exe" : "gh";
+    try {
+      await writeFile(path.join(directory, filename), "not executed");
+      await symlink(directory, alias, process.platform === "win32" ? "junction" : "dir");
+      expect(() => resolveGithubExecutable(path.join(alias, filename))).toThrow("outside the repository");
+    } finally {
+      // Remove the alias itself before removing either temporary directory.
+      await unlink(alias).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+      await rm(external, { recursive: true, force: true });
       await rm(directory, { recursive: true, force: true });
     }
   });

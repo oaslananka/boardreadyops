@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
 const repository = "oaslananka/boardreadyops";
@@ -136,12 +136,13 @@ export function resolveGithubExecutable(candidate = process.env.BOARDREADYOPS_GH
   if (typeof candidate !== "string" || !path.isAbsolute(candidate)) {
     throw new Error("Set BOARDREADYOPS_GH_PATH to an absolute path to a trusted GitHub CLI installation.");
   }
-  const executable = realpathSync(candidate);
+  // Use the native filesystem spelling, including Windows short-name aliases.
+  const executable = realpathSync.native(candidate);
   const expectedName = process.platform === "win32" ? "gh.exe" : "gh";
   if (path.basename(executable).toLowerCase() !== expectedName || !statSync(executable).isFile()) {
     throw new Error("Expected an absolute GitHub CLI executable file.");
   }
-  const repoRoot = realpathSync(new URL("..", import.meta.url));
+  const repoRoot = realpathSync.native(fileURLToPath(new URL("..", import.meta.url)));
   const relative = path.relative(repoRoot, executable);
   if (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative)) {
     throw new Error("GitHub CLI must be installed outside the repository.");
