@@ -3,7 +3,7 @@
 # Merge eligibility, required checks, review-thread resolution, update policy, and squash
 # enforcement remain authoritative in the GitHub main ruleset. Mergify auto-merge is
 # intentionally disabled: a maintainer must explicitly enqueue a PR with
-# @mergifyio queue main (or the equivalent Mergify queue control).
+# @mergifyio queue (or the equivalent Mergify queue control).
 
 # In-place serial checks preserve the GitHub main ruleset requirement that
 # every PR must be up to date before merge; no ruleset bypass is needed.

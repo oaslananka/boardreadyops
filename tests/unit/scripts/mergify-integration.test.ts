@@ -58,6 +58,23 @@ describe("Mergify integration contract", () => {
     }
   });
 
+  it("documents the supported manual queue command without promising automatic merges", () => {
+    const docs = readFileSync("docs/dependency-automation.md", "utf8");
+    const renovate = JSON.parse(readFileSync("renovate.json", "utf8")) as {
+      packageRules: Array<{ groupName?: string; description?: string; addLabels?: string[]; automerge?: boolean }>;
+    };
+    expect(mergify).toContain("@mergifyio queue (");
+    expect(docs).toContain("`@mergifyio queue`");
+    expect(mergify + docs).not.toMatch(/@mergifyio queue\s+main\b/u);
+    for (const groupName of ["developer tooling (non-major)", "type definitions (non-major)"]) {
+      const rule = renovate.packageRules.find((entry) => entry.groupName === groupName);
+      expect(rule?.addLabels).toContain("automerge");
+      expect(rule?.automerge).not.toBe(true);
+      expect(rule?.description).toContain("manual");
+      expect(rule?.description).not.toContain("auto-merge");
+    }
+  });
+
   it("requires the optional OS/Node matrix through a stable Mergify queue gate", () => {
     const workflow = yaml.load(ci) as {
       jobs: Record<

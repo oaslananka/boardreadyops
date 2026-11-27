@@ -50,7 +50,7 @@
       "minimumReleaseAge": "7 days"
     },
     {
-      "description": "Allow Mergify to auto-merge low-risk development dependency updates after required checks pass.",
+      "description": "Classify low-risk development dependency updates for manual Mergify queueing after required checks pass.",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "minimumReleaseAge": "7 days",
@@ -65,7 +65,7 @@
       "addLabels": ["manual-review"]
     },
     {
-      "description": "Allow Mergify to auto-merge non-breaking type package updates after required checks pass.",
+      "description": "Classify non-breaking type package updates for manual Mergify queueing after required checks pass.",
       "matchPackageNames": ["/^@types\\//"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "minimumReleaseAge": "7 days",
