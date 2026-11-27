@@ -13,18 +13,29 @@ function sameArtifact(before: Stats, after: Stats): boolean {
   );
 }
 
-// Each yielded chunk is a view of the single declared-size allocation.
-// The async generator settles a read before advancing to the next offset.
-async function* readDeclaredChunks(handle: FileHandle, content: Buffer): AsyncGenerator<Buffer> {
-  let offset = 0;
-  while (offset < content.length) {
-    yield handle.read(content, offset, Math.min(64 * 1024, content.length - offset), offset).then(({ bytesRead }) => {
-      if (bytesRead === 0) throw new Error("artifact size changed before transfer");
-      const chunk = content.subarray(offset, offset + bytesRead);
-      offset += bytesRead;
-      return chunk;
-    });
-  }
+// Each chunk is a view of the single declared-size allocation.
+// The iterator settles one read before advancing to the next offset.
+function readDeclaredChunks(handle: FileHandle, content: Buffer): AsyncIterable<Buffer> {
+  return {
+    [Symbol.asyncIterator]() {
+      let offset = 0;
+      return {
+        async next(): Promise<IteratorResult<Buffer>> {
+          if (offset === content.length) return { done: true, value: undefined };
+          const { bytesRead } = await handle.read(
+            content,
+            offset,
+            Math.min(64 * 1024, content.length - offset),
+            offset,
+          );
+          if (bytesRead === 0) throw new Error("artifact size changed before transfer");
+          const chunk = content.subarray(offset, offset + bytesRead);
+          offset += bytesRead;
+          return { done: false, value: chunk };
+        },
+      };
+    },
+  };
 }
 
 async function readDeclaredDigest(handle: FileHandle, content: Buffer): Promise<string> {

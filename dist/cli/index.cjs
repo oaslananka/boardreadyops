@@ -85087,16 +85087,27 @@ var import_promises32 = require("node:fs/promises");
 function sameArtifact(before, after) {
   return after.isFile() && after.size === before.size && after.dev === before.dev && after.ino === before.ino && after.mtimeMs === before.mtimeMs && after.ctimeMs === before.ctimeMs;
 }
-async function* readDeclaredChunks(handle, content) {
-  let offset = 0;
-  while (offset < content.length) {
-    yield handle.read(content, offset, Math.min(64 * 1024, content.length - offset), offset).then(({ bytesRead }) => {
-      if (bytesRead === 0) throw new Error("artifact size changed before transfer");
-      const chunk = content.subarray(offset, offset + bytesRead);
-      offset += bytesRead;
-      return chunk;
-    });
-  }
+function readDeclaredChunks(handle, content) {
+  return {
+    [Symbol.asyncIterator]() {
+      let offset = 0;
+      return {
+        async next() {
+          if (offset === content.length) return { done: true, value: void 0 };
+          const { bytesRead } = await handle.read(
+            content,
+            offset,
+            Math.min(64 * 1024, content.length - offset),
+            offset
+          );
+          if (bytesRead === 0) throw new Error("artifact size changed before transfer");
+          const chunk = content.subarray(offset, offset + bytesRead);
+          offset += bytesRead;
+          return { done: false, value: chunk };
+        }
+      };
+    }
+  };
 }
 async function readDeclaredDigest(handle, content) {
   const hash3 = (0, import_node_crypto24.createHash)("sha256");
