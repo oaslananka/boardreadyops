@@ -1,12 +1,9 @@
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { reconcileBranchProtection } from "../../../scripts/branch-protection.mjs";
 
 const root = path.resolve(import.meta.dirname, "../../..");
-const execFileAsync = promisify(execFile);
 
 async function repositoryFile(file: string): Promise<string> {
   return readFile(path.join(root, file), "utf8");
@@ -36,11 +33,21 @@ type StatusChecksRule = {
 describe("main branch governance ruleset", () => {
   it("supports solo-maintainer merges while requiring resolved conversations", async () => {
     const ruleset = JSON.parse(await repositoryFile(".github/rulesets/main.json")) as {
+      name: string;
+      target: string;
+      enforcement: string;
+      conditions: { ref_name: { include: string[]; exclude: string[] } };
       rules: Array<PullRequestRule | StatusChecksRule | { type: string }>;
       bypass_actors: Array<{ actor_id: number; actor_type: string; bypass_mode: string }>;
     };
     const pullRequest = ruleset.rules.find((rule): rule is PullRequestRule => rule.type === "pull_request");
 
+    expect(ruleset).toMatchObject({
+      name: "main-standard",
+      target: "branch",
+      enforcement: "active",
+      conditions: { ref_name: { include: ["~DEFAULT_BRANCH"], exclude: [] } },
+    });
     expect(pullRequest?.parameters).toMatchObject({
       allowed_merge_methods: ["squash"],
       dismiss_stale_reviews_on_push: true,
@@ -50,7 +57,7 @@ describe("main branch governance ruleset", () => {
       required_approving_review_count: 0,
       required_review_thread_resolution: true,
     });
-    expect(ruleset.bypass_actors).toEqual([{ actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "pull_request" }]);
+    expect(ruleset.bypass_actors).toEqual([{ actor_id: 285490571, actor_type: "User", bypass_mode: "pull_request" }]);
   });
 
   it("keeps the committed stable merge gates aligned with the live baseline", async () => {
@@ -75,44 +82,127 @@ describe("main branch governance ruleset", () => {
     ]);
   });
 
-  it.skipIf(process.platform === "win32")(
-    "updates the repository ruleset instead of legacy classic protection",
-    async () => {
-      const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-ruleset-sync-"));
-      const fakeGh = path.join(temporaryRoot, "gh");
-      const commandLog = path.join(temporaryRoot, "commands.log");
-
-      await writeFile(
-        fakeGh,
-        [
-          "#!/usr/bin/env bash",
-          `printf "%s\n" "$*" >>"\${GH_COMMAND_LOG}"`,
-          'if [[ "$*" == *"repos/oaslananka/boardreadyops/rulesets --jq"* ]]; then',
-          "  printf '18628144\n'",
-          "fi",
-        ].join("\n"),
-        { mode: 0o755 },
-      );
-
-      try {
-        await execFileAsync("bash", [path.join(root, "scripts/setup-branch-protection.sh")], {
-          cwd: root,
-          env: {
-            ...process.env,
-            GH_COMMAND_LOG: commandLog,
-            PATH: `${temporaryRoot}${path.delimiter}${process.env.PATH ?? ""}`,
-          },
-        });
-        const commands = await readFile(commandLog, "utf8");
-
-        expect(commands).toContain("api --method PUT repos/oaslananka/boardreadyops/rulesets/18628144 --input");
-        expect(commands).toContain("api --method PATCH repos/oaslananka/boardreadyops");
-        expect(commands).not.toContain("branches/main/protection");
-      } finally {
-        await rm(temporaryRoot, { recursive: true, force: true });
+  async function fixture() {
+    const desired = JSON.parse(await repositoryFile(".github/rulesets/main.json"));
+    const live = structuredClone(desired);
+    const repository = {
+      full_name: "oaslananka/boardreadyops",
+      owner: { login: "oaslananka", id: 285490571, type: "User" },
+      archived: false,
+      default_branch: "main",
+    };
+    const rows = [
+      {
+        id: 19863729,
+        name: "main-standard",
+        target: "branch",
+        source_type: "Repository",
+        source: repository.full_name,
+      },
+      { id: 24511899, name: "release-tags", target: "tag", source_type: "Repository", source: repository.full_name },
+    ];
+    const calls: Array<{ endpoint: string; body?: unknown }> = [];
+    let current = live;
+    const api = (endpoint: string, body?: unknown): unknown => {
+      calls.push(body === undefined ? { endpoint } : { endpoint, body });
+      if (endpoint === "repos/oaslananka/boardreadyops") return repository;
+      if (endpoint === "repos/oaslananka/boardreadyops/rulesets?includes_parents=false&per_page=100") return [rows];
+      if (endpoint === "repos/oaslananka/boardreadyops/rulesets/19863729") {
+        if (body !== undefined) current = structuredClone(body);
+        return { ...current, id: 19863729, source_type: "Repository", source: repository.full_name };
       }
+      throw new Error(`Unexpected API endpoint: ${endpoint}`);
+    };
+    return { desired, live, repository, rows, calls, api };
+  }
+
+  it("checks matching protection without writes, even with apply requested", async () => {
+    const f = await fixture();
+    expect(reconcileBranchProtection(f.desired, f.api, false)).toBe("aligned");
+    expect(reconcileBranchProtection(f.desired, f.api, true)).toBe("aligned");
+    expect(f.calls.every((call) => call.body === undefined)).toBe(true);
+  });
+
+  it("reports stale-review drift read-only, then allows only the known strengthening in place", async () => {
+    const f = await fixture();
+    f.live.rules.find(
+      (rule: { type: string }) => rule.type === "pull_request",
+    ).parameters.dismiss_stale_reviews_on_push = false;
+    expect(reconcileBranchProtection(f.desired, f.api, false)).toBe("stale-review-drift");
+    expect(f.calls.every((call) => call.body === undefined)).toBe(true);
+    expect(reconcileBranchProtection(f.desired, f.api, true)).toBe("updated");
+    const writes = f.calls.filter((call) => call.body !== undefined);
+    expect(writes).toEqual([{ endpoint: "repos/oaslananka/boardreadyops/rulesets/19863729", body: f.desired }]);
+    expect(f.calls.at(-1)?.body).toBeUndefined();
+  });
+
+  it.each(["missing", "duplicate", "legacy", "foreign", "stronger", "hidden-bypass", "wrong-owner"] as const)(
+    "fails closed on %s protection without writes",
+    async (kind) => {
+      const f = await fixture();
+      const branchRule = f.rows[0];
+      if (!branchRule) throw new Error("Missing fixture branch rule");
+      if (kind === "missing") f.rows.shift();
+      if (kind === "duplicate") f.rows.push({ ...branchRule, id: 123 });
+      if (kind === "legacy") branchRule.name = "main";
+      if (kind === "foreign") branchRule.source = "someone/other";
+      if (kind === "stronger") f.live.rules.push({ type: "required_signatures" });
+      if (kind === "hidden-bypass") delete f.live.bypass_actors;
+      if (kind === "wrong-owner") f.repository.owner.id = 1;
+      expect(() => reconcileBranchProtection(f.desired, f.api, true)).toThrow();
+      expect(f.calls.every((call) => call.body === undefined)).toBe(true);
     },
   );
+
+  it("refuses an update when a stronger rule appears during the final inspection", async () => {
+    const f = await fixture();
+    f.live.rules.find(
+      (rule: { type: string }) => rule.type === "pull_request",
+    ).parameters.dismiss_stale_reviews_on_push = false;
+    let reads = 0;
+    const api = (endpoint: string, body?: unknown): unknown => {
+      if (endpoint.endsWith("/19863729") && body === undefined && ++reads === 2) {
+        f.live.rules.push({ type: "required_signatures" });
+      }
+      return f.api(endpoint, body);
+    };
+    expect(() => reconcileBranchProtection(f.desired, api, true)).toThrow("Ruleset changed");
+    expect(f.calls.every((call) => call.body === undefined)).toBe(true);
+  });
+
+  it("does not retry a write when the updated ruleset cannot be verified", async () => {
+    const f = await fixture();
+    f.live.rules.find(
+      (rule: { type: string }) => rule.type === "pull_request",
+    ).parameters.dismiss_stale_reviews_on_push = false;
+    const api = (endpoint: string, body?: unknown): unknown => {
+      if (body !== undefined) {
+        f.calls.push({ endpoint, body });
+        return f.live; // Simulate a successful response without the expected persisted change.
+      }
+      return f.api(endpoint);
+    };
+    expect(() => reconcileBranchProtection(f.desired, api, true)).toThrow("could not be verified");
+    expect(f.calls.filter((call) => call.body !== undefined)).toHaveLength(1);
+  });
+
+  it("documents every required merge context in the governance, CI, and release policies", async () => {
+    const ruleset = JSON.parse(await repositoryFile(".github/rulesets/main.json")) as {
+      rules: Array<StatusChecksRule | { type: string }>;
+    };
+    const checks = ruleset.rules.find((rule): rule is StatusChecksRule => rule.type === "required_status_checks");
+    expect(checks?.parameters.required_status_checks).toHaveLength(10);
+    for (const file of [
+      "docs/governance.md",
+      "docs/development/ci-policy.md",
+      "docs/development/release-assurance.md",
+    ]) {
+      const document = await repositoryFile(file);
+      for (const check of checks?.parameters.required_status_checks ?? []) {
+        expect(document, `${file}: ${check.context}`).toContain(`\`${check.context}\``);
+      }
+    }
+  });
 
   it("keeps GitHub rules authoritative while Mergify only merges explicitly queued PRs", async () => {
     const mergifySource = await repositoryFile(".mergify.yml");
@@ -194,7 +284,7 @@ describe("main branch governance ruleset", () => {
       expect(normalized).toContain("retrospective review");
     }
     expect(detailedGovernance.replace(/\s+/g, " ")).toContain("CODEOWNERS review is not required");
-    expect(setup).toContain(`repos/\${repo}/rulesets`);
+    expect(setup).toContain("branch-protection.mjs");
     expect(setup).not.toContain(`branches/\${branch}/protection`);
   });
 });

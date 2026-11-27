@@ -6,7 +6,7 @@ Audit date: 2026-07-02
 Repository: `oaslananka/boardreadyops`
 Mode: audit plus low-risk implementation pull request
 
-Current-policy note: since 2026-07-23, the live and committed `main` ruleset uses zero required human approvals for the single-maintainer model while retaining signed commits, strict checks, resolved review conversations, and squash-only merges. Statements below about one required approval describe the 2026-07-02 audit snapshot.
+Current-policy note (2026-11-27): the live `main-standard` ruleset uses zero required human approvals for the single-maintainer model, ten strict checks, resolved review conversations, and squash-only merges. A separate signature requirement is not enabled. Statements below about one required approval describe the 2026-07-02 audit snapshot. See [Branch Protection](branch-protection.md) for current verification.
 
 ## Executive summary
 

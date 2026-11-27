@@ -6,18 +6,20 @@ BoardReadyOps releases must be repeatable, reviewable, and easy to audit.
 
 The `main` branch uses strict required checks, zero required human approvals for
 the current single-maintainer model, resolved review conversations, linear
-history, signed commits, disabled force pushes, disabled deletion, squash-only
-merges, and a PR-only administrator bypass. CODEOWNERS review is not required
+history, disabled force pushes, disabled deletion, squash-only
+merges, and a PR-only owner bypass. CODEOWNERS review is not required
 while the sole code owner and sole maintainer are the same person.
 
-Every squash merge to `main` must produce a GitHub-verified commit. Review and
-CODEOWNERS approval requirements should be reconsidered when a second trusted
-maintainer is onboarded.
+Every squash merge to `main` must produce a GitHub-verified commit as release
+evidence. The live ruleset does not enforce a separate signature requirement;
+verify commit signatures rather than assuming branch protection guarantees them.
+Review and CODEOWNERS approval requirements should be reconsidered when a second
+trusted maintainer is onboarded.
 
 ### Required status checks
 
-The effective `main-standard` ruleset requires nine checks: `ci / risk-profile`,
-`ci / lint`, `ci / typecheck`, `ci / test-unit`, `ci / build`,
+The effective `main-standard` ruleset requires ten checks: `ci / risk-profile`,
+`ci / lint`, `ci / typecheck`, `ci / test-unit`, `ci / unit-matrix-gate`, `ci / build`,
 `ci / verify-dist`, `ci / coverage-gate`, `SonarCloud Code Analysis`,
 and `security / gate`.
 
