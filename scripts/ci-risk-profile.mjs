@@ -49,6 +49,8 @@ const ACTION_PATTERNS = [
 const KICAD_PATTERNS = [
   // Installer changes must prove the real KiCad CLI lane on the PR head.
   /^scripts\/install-kicad-ci\.sh$/,
+  // Reviewed manufacturing exports must exercise actual KiCad before merge.
+  /^src\/release\/generate\.ts$/,
   /^src\/kicad\//,
   /^src\/rules\/manufacturing\//,
   /^src\/action\//,

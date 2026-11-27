@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type GenerateRunner, runGenerate } from "../../../src/release/generate.js";
+import { type GenerateOptions, type GenerateRunner, runGenerate } from "../../../src/release/generate.js";
 
 const roots: string[] = [];
 
@@ -228,6 +228,110 @@ describe("opt-in reviewed manufacturing source preflight (NOT cryptographic atte
       runGenerate(manufacturing, { ...f, gitRoot: f.root, reviewedSourceSha: f.sha, runner: altering }),
     ).rejects.toThrow(/unchanged source snapshot/);
     await expect(fs.stat(path.join(f.outputDir, "manifest.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("does not let caller option mutation disable the reviewed source checks during export", async () => {
+    const f = await fixture();
+    const successful = runner();
+    const options: GenerateOptions = {
+      ...f,
+      gitRoot: f.root,
+      reviewedSourceSha: f.sha,
+      runner: async (args: string[]) => {
+        const result = await successful(args);
+        options.reviewedSourceSha = undefined;
+        await fs.appendFile(f.boardFile, "(modified during export)\n");
+        return result;
+      },
+    };
+    await expect(runGenerate(manufacturing, options)).rejects.toThrow(/unchanged source snapshot/);
+    await expect(fs.stat(path.join(f.outputDir, "manifest.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("verifies an unchanged checkout when the source root and generated output use the same stable alias", async () => {
+    const f = await fixture();
+    const aliasParent = await fs.mkdtemp(path.join(os.tmpdir(), "brops-reviewed-stable-alias-"));
+    roots.push(aliasParent);
+    const alias = path.join(aliasParent, "checkout");
+    await fs.symlink(f.root, alias, "junction");
+    const outputDir = path.join(alias, "build", "generated");
+    const result = await runGenerate(manufacturing, {
+      ...f,
+      gitRoot: alias,
+      boardFile: path.join(alias, "board.kicad_pcb"),
+      outputDir,
+      reviewedSourceSha: f.sha,
+      runner: runner(),
+    });
+    expect(result.failures).toBe(0);
+    expect(result.manifestPath).toBe(path.join(outputDir, "manifest.json"));
+    expect(await fs.realpath(result.manifestPath)).toBe(await fs.realpath(path.join(f.outputDir, "manifest.json")));
+    expect(git(f.root, "status", "--porcelain", "--untracked-files=all")).toBe("");
+  });
+
+  it("rejects a reviewed Git root alias retargeted to an identical checkout before writing the manifest", async () => {
+    const f = await fixture();
+    const other = await fs.mkdtemp(path.join(os.tmpdir(), "brops-reviewed-copy-"));
+    roots.push(other);
+    await fs.cp(f.root, other, { recursive: true });
+    const aliasParent = await fs.mkdtemp(path.join(os.tmpdir(), "brops-reviewed-alias-"));
+    roots.push(aliasParent);
+    const alias = path.join(aliasParent, "checkout");
+    await fs.symlink(f.root, alias, "junction");
+    const successful = runner();
+    let retargeted = false;
+    const changingRoot: GenerateRunner = async (args) => {
+      const result = await successful(args);
+      if (!retargeted) {
+        await fs.unlink(alias);
+        await fs.symlink(other, alias, "junction");
+        retargeted = true;
+      }
+      return result;
+    };
+    await expect(
+      runGenerate(manufacturing, {
+        ...f,
+        gitRoot: alias,
+        boardFile: path.join(alias, "board.kicad_pcb"),
+        reviewedSourceSha: f.sha,
+        runner: changingRoot,
+      }),
+    ).rejects.toThrow(/Git root changed during generation/);
+    await expect(fs.stat(path.join(f.outputDir, "manifest.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("rejects a generated-output parent alias retargeted during export before writing the manifest", async () => {
+    const f = await fixture();
+    const original = path.join(f.root, "build", "original");
+    const replacement = path.join(f.root, "build", "replacement");
+    const alias = path.join(f.root, "build", ".output-alias");
+    await fs.mkdir(original, { recursive: true });
+    await fs.mkdir(replacement, { recursive: true });
+    await fs.symlink(original, alias, "junction");
+    const outputDir = path.join(alias, "generated");
+    const successful = runner();
+    const changingOutput: GenerateRunner = async (args) => {
+      const result = await successful(args);
+      if (args[2] === "drill") {
+        await fs.cp(path.join(original, "generated"), path.join(replacement, "generated"), { recursive: true });
+        await fs.unlink(alias);
+        await fs.symlink(replacement, alias, "junction");
+      }
+      return result;
+    };
+    await expect(
+      runGenerate(manufacturing, {
+        ...f,
+        gitRoot: f.root,
+        outputDir,
+        reviewedSourceSha: f.sha,
+        runner: changingOutput,
+      }),
+    ).rejects.toThrow(/output directory changed during generation/);
+    for (const parent of [original, replacement]) {
+      await expect(fs.stat(path.join(parent, "generated", "manifest.json"))).rejects.toMatchObject({ code: "ENOENT" });
+    }
   });
 
   it("rejects new untracked source-side artifacts even when KiCad file fingerprints remain stable", async () => {
