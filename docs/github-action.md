@@ -6,9 +6,10 @@ Use the full container action when CI must run KiCad checks without a separate
 KiCad installation step. The container image includes KiCad CLI, Node.js, and
 the published BoardReadyOps package.
 
-The `ghcr.io/oaslananka/boardreadyops-full:v1` and `latest` images are
-anonymously readable as of the 2026-08-07 verification. Pin the Action reference
-to a release commit SHA for reproducibility.
+Pin the Action reference to a reviewed release commit SHA to fix its metadata.
+The container Action uses a moving GHCR image alias; a pinned Action reference
+does not by itself freeze the image bytes. For direct container runs requiring
+an immutable image, use the verified version and digest shown below.
 
 ```yaml
 name: BoardReadyOps full
@@ -26,7 +27,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops/apps/container@9bc8a075d885ad1182e2ad4fcd4c9160f8160c94 # v1.31.2
+      - uses: oaslananka/boardreadyops/apps/container@6b41a224869f9a0ae646566663a914a89402fb47 # v1.72.0
         with:
           config: boardreadyops.yml
           require-kicad: "true"
@@ -51,10 +52,16 @@ The default image entrypoint remains the CLI for direct use:
 docker run --rm ghcr.io/oaslananka/boardreadyops-full:v1 --help
 ```
 
-The public `v1` and `latest` images were re-verified anonymously on
-2026-08-07 with OCI index digest
-`sha256:4df163600bd03126f072a5870db33f72db9991bf932fe275b5858e54f73fc650`.
-The exact `v1.30.1`, `v1`, and `latest` tags all resolve to that same digest.
+On 2026-11-27, the public GHCR `v1.72.0`, `v1`, and `latest` image tags
+resolved to OCI index digest
+`sha256:92e5be92e7883a1c250c08adb9782c3441aeb8a99a77e6a64f5b6c7d811cc058`
+with Linux amd64 and arm64 manifests. This is dated registry metadata evidence,
+not a fresh runtime smoke test. The moving image aliases may change; verify
+them again before use. An exact digest pins the selected image bytes:
+
+```bash
+docker run --rm ghcr.io/oaslananka/boardreadyops-full:v1.72.0@sha256:92e5be92e7883a1c250c08adb9782c3441aeb8a99a77e6a64f5b6c7d811cc058 --help
+```
 
 The image includes the unprivileged `boardreadyops` account at UID `10001` for
 direct container runs that can provide writable mounts for that user. The

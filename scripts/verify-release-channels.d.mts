@@ -18,7 +18,6 @@ export interface PublicReleaseSnapshot {
     commit?: string;
     assets?: Array<{ name: string; digest?: string }>;
   };
-  floatingV1Commit?: string;
   checksumEntries?: Record<string, string>;
   downloadedAssetDigests?: Record<string, string>;
   ghcr?: {
@@ -28,7 +27,7 @@ export interface PublicReleaseSnapshot {
   };
   actionPins?: Array<{ path: string; sha: string; version: string }>;
   actionMetadataMatchesRelease?: boolean;
-  formula?: { version?: string; digests?: string[] };
+  formula?: { version?: string; assetChecksums?: Record<string, string> };
 }
 
 export function evaluatePublicReleaseSnapshot(snapshot: PublicReleaseSnapshot): PublicReleaseFailure[];

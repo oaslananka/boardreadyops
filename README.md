@@ -150,16 +150,16 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops@9bc8a075d885ad1182e2ad4fcd4c9160f8160c94 # v1.31.2
+      - uses: oaslananka/boardreadyops@6b41a224869f9a0ae646566663a914a89402fb47 # v1.72.0
         with:
           config: boardreadyops.yml
           mode: enforce
           fail-on: high
 ```
 
-The examples pin the reviewed `v1.31.2` release commit for reproducibility.
-The floating `v1` alias is convenient for opt-in automatic minor/patch updates,
-but it moves as stable releases are published.
+The examples pin the reviewed `v1.72.0` release commit for reproducibility.
+Historical shortened Git tags such as `v1` are immutable, not an automatic update channel.
+Select a newer reviewed full release tag or commit SHA to upgrade.
 
 SARIF upload requires `security-events: write`. Pull request comments require `pull-requests: write`.
 
@@ -167,12 +167,16 @@ Use the full container action when a workflow should carry KiCad CLI inside the
 BoardReadyOps runtime instead of installing KiCad separately:
 
 ```yaml
-      - uses: oaslananka/boardreadyops/apps/container@9bc8a075d885ad1182e2ad4fcd4c9160f8160c94 # v1.31.2
+      - uses: oaslananka/boardreadyops/apps/container@6b41a224869f9a0ae646566663a914a89402fb47 # v1.72.0
         with:
           config: boardreadyops.yml
           require-kicad: "true"
           mode: enforce
 ```
+
+The pinned container Action fixes its metadata, not its moving GHCR image
+alias. For immutable image bytes in direct container runs, select a verified
+version and digest from [Container Action documentation](docs/github-action.md).
 
 The same image can run as a CLI:
 

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
+import { IMMUTABLE_ACTION_PIN_PATHS as ACTION_REFERENCE_FILES } from "./sync-release-readme.mjs";
 
 const EXPECTED_BINARY_ASSETS = [
   "boardreadyops-linux-x64",
@@ -17,14 +18,6 @@ const FORMULA_BINARY_ASSETS = [
   "boardreadyops-linux-arm64",
   "boardreadyops-macos-x64",
   "boardreadyops-macos-arm64",
-];
-const ACTION_REFERENCE_FILES = [
-  "README.md",
-  "docs/action.md",
-  "docs/github-action.md",
-  "docs/integrations/kibot.md",
-  "docs/sbom.md",
-  "docs/review-app.md",
 ];
 
 export function evaluatePublicReleaseSnapshot(snapshot) {
@@ -51,10 +44,8 @@ export function evaluatePublicReleaseSnapshot(snapshot) {
     snapshot.release?.tag === tag && snapshot.release?.draft === false && snapshot.release?.prerelease === false,
     { expected: tag, actual: snapshot.release?.tag },
   );
-  fail("floating v1 tag matches the exact release commit", snapshot.floatingV1Commit === snapshot.release?.commit, {
-    exact: snapshot.release?.commit,
-    floating: snapshot.floatingV1Commit,
-  });
+  // Shortened Git release tags are protected historical refs, not moving
+  // aliases. Verify the immutable full tag and GHCR aliases independently.
 
   const assets = new Map((snapshot.release?.assets ?? []).map((asset) => [asset.name, asset]));
   const compareAssetNames = (left, right) => left.localeCompare(right, "en");
@@ -96,7 +87,7 @@ export function evaluatePublicReleaseSnapshot(snapshot) {
 
   const actionPins = snapshot.actionPins ?? [];
   const actionPinsMatch =
-    actionPins.length >= ACTION_REFERENCE_FILES.length &&
+    ACTION_REFERENCE_FILES.every((path) => actionPins.some((pin) => pin.path === path)) &&
     actionPins.every((pin) => pin.sha === snapshot.release?.commit && pin.version === snapshot.version);
   fail("recommended immutable Action pins match the reviewed release commit", actionPinsMatch, {
     expectedCommit: snapshot.release?.commit,
@@ -108,13 +99,15 @@ export function evaluatePublicReleaseSnapshot(snapshot) {
     snapshot.actionMetadataMatchesRelease === true,
   );
 
-  const expectedFormulaDigests = FORMULA_BINARY_ASSETS.map((name) => snapshot.checksumEntries?.[name]).filter(Boolean);
-  const formulaDigests = new Set(snapshot.formula?.digests ?? []);
+  const formulaChecksums = snapshot.formula?.assetChecksums ?? {};
   fail(
     "repository Homebrew formula matches the current release checksums",
     snapshot.formula?.version === snapshot.version &&
-      expectedFormulaDigests.length === FORMULA_BINARY_ASSETS.length &&
-      expectedFormulaDigests.every((digest) => formulaDigests.has(digest)),
+      Object.keys(formulaChecksums).length === FORMULA_BINARY_ASSETS.length &&
+      FORMULA_BINARY_ASSETS.every(
+        (name) =>
+          Boolean(snapshot.checksumEntries?.[name]) && formulaChecksums[name] === snapshot.checksumEntries[name],
+      ),
     { expectedVersion: snapshot.version, formula: snapshot.formula },
   );
 
@@ -203,7 +196,6 @@ export async function runReleaseChannelChecks({
         "npm latest dist-tag matches package.json version",
         "public npm engines match package.json",
         "latest GitHub release matches package.json version",
-        "floating v1 tag matches the exact release commit",
         "GitHub release exposes the expected binary, checksum, and SBOM assets",
         "release binary checksums match GitHub asset digests",
         "downloaded checksum and SBOM files match GitHub asset digests",
@@ -237,7 +229,6 @@ async function collectPublicReleaseSnapshot({ version, expectedNodeEngines, root
     githubHeaders,
   );
   const exactCommit = await resolveGitHubTagCommit(tag, fetchImpl, githubHeaders);
-  const floatingV1Commit = await resolveGitHubTagCommit("v1", fetchImpl, githubHeaders);
 
   const assets = (release.assets ?? []).map((asset) => ({
     name: asset.name,
@@ -282,7 +273,13 @@ async function collectPublicReleaseSnapshot({ version, expectedNodeEngines, root
 
   const formulaText = await readFile(join(root, "Formula/boardreadyops.rb"), "utf8");
   const formulaVersion = /\bversion\s+"([^"]+)"/.exec(formulaText)?.[1];
-  const formulaDigests = [...formulaText.matchAll(/\bsha256\s+"([0-9a-f]{64})"/g)].map((match) => match[1]);
+  const formulaEntries = [
+    ...formulaText.matchAll(
+      /\burl\s+"https:\/\/github\.com\/oaslananka\/boardreadyops\/releases\/download\/v#\{version\}\/(boardreadyops-(?:linux|macos)-(?:arm64|x64))"\s+sha256\s+"([0-9a-f]{64})"/g,
+    ),
+  ].map((match) => [match[1], match[2]]);
+  const formulaChecksums =
+    formulaEntries.length === FORMULA_BINARY_ASSETS.length ? Object.fromEntries(formulaEntries) : {};
 
   return {
     version,
@@ -295,7 +292,6 @@ async function collectPublicReleaseSnapshot({ version, expectedNodeEngines, root
       commit: exactCommit,
       assets,
     },
-    floatingV1Commit,
     checksumEntries: parseChecksumFile(checksumText),
     downloadedAssetDigests: {
       SHA256SUMS: sha256(checksumBytes),
@@ -305,7 +301,7 @@ async function collectPublicReleaseSnapshot({ version, expectedNodeEngines, root
     actionPins,
     actionMetadataMatchesRelease:
       localRootAction === releaseRootAction && localContainerAction === releaseContainerAction,
-    formula: { version: formulaVersion, digests: formulaDigests },
+    formula: { version: formulaVersion, assetChecksums: formulaChecksums },
   };
 }
 

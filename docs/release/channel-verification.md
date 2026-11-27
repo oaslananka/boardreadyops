@@ -9,8 +9,8 @@ immutable evidence and are not rewritten by release bumps.
 > in this repository revision, **not necessarily published**. Check
 > [npm](https://www.npmjs.com/package/boardreadyops) and
 > [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases)
-> for the latest actual release. Verify tag, floating aliases, checksums, SBOM,
-> and image digests independently before recording public acceptance.
+> for the latest actual release. Verify the full release tag, checksums, SBOM,
+> and GHCR image aliases independently before recording public acceptance.
 
 ## Current Release Contract
 
@@ -20,7 +20,7 @@ immutable evidence and are not rewritten by release bumps.
 | Public release | Check [GitHub Releases](https://github.com/oaslananka/boardreadyops/releases) |
 | npm package | Check the registry's actual `latest` dist-tag |
 | Binary assets | Confirm platform binaries, `SHA256SUMS`, and `sbom.cyclonedx.json` on the published tag |
-| Root Action | Pin a reviewed release commit SHA for reproducibility; `v1` can move |
+| Root Action | Pin a reviewed release commit SHA; historical Git tags such as `v1` are immutable |
 | Container Action | Pin the same reviewed release commit SHA and verify image digest |
 | Container aliases | Confirm actual published `v1`/`latest` digests independently |
 | Homebrew formula | `Formula/boardreadyops.rb` is independently versioned; check the formula's tag and checksums before use |
