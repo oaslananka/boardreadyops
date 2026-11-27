@@ -1,8 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { launch as launchChrome } from "chrome-launcher";
-import lighthouse from "lighthouse";
 import { firstAccessiblePath } from "./lib/files.mjs";
 import { discoverAuthenticatedRoutes } from "./unlighthouse-auth-routes.mjs";
 
@@ -101,8 +99,8 @@ export async function runAuthenticatedAudit({
   discoverImpl = discoverAuthenticatedRoutes,
   writeManifestImpl = defaultWriteManifest,
   writeAuditSummaryImpl = defaultWriteAuditSummary,
-  lighthouseImpl = lighthouse,
-  launchChromeImpl = launchChrome,
+  lighthouseImpl,
+  launchChromeImpl,
   detectChromeImpl = detectInstalledChrome,
 } = {}) {
   const options = parseAuthenticatedAuditOptions(environment, argv);
@@ -115,7 +113,12 @@ export async function runAuthenticatedAudit({
   const chromePath = await detectChromeImpl();
   if (!chromePath) throw new Error("Installed Chrome is required for authenticated Lighthouse audit");
 
-  const chrome = await launchChromeImpl({
+  // Parsing, route-only discovery and invalid/missing-browser requests do not
+  // need the heavyweight audit engines. Resolve both before launching Chrome
+  // so a failed import cannot leave a browser process running.
+  const audit = lighthouseImpl ?? (await import("lighthouse")).default;
+  const launch = launchChromeImpl ?? (await import("chrome-launcher")).launch;
+  const chrome = await launch({
     chromePath,
     chromeFlags: [
       ...(options.headful ? [] : ["--headless=new"]),
@@ -132,7 +135,7 @@ export async function runAuthenticatedAudit({
       const url = new URL(route, options.site).href;
       let result;
       try {
-        result = await lighthouseImpl(
+        result = await audit(
           url,
           buildAuthenticatedLighthouseFlags({
             session: options.session,
