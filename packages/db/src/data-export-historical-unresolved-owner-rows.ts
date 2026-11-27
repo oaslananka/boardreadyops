@@ -124,7 +124,7 @@ function hasCompetingInstallationPaths(table: string, fks: readonly Fk[]): boole
  */
 function boundedRowSql(table: string, path: string[], required: boolean, fks: Fk[]): string | "ambiguous" | null {
   if (!identifier.test(table) || path[0] !== table || path.at(-1) !== "installations") return null;
-  let from = "public." + table + " AS r0";
+  let from = `public.${table} AS r0`;
   for (let i = 0; i < path.length - 1; i++) {
     const source = path[i];
     const target = path[i + 1];
@@ -139,9 +139,9 @@ function boundedRowSql(table: string, path: string[], required: boolean, fks: Fk
     if (!fk) return null;
     const joins = fk.source_columns.map((col, index) => {
       const opposite = fk.target_columns[index];
-      return "r" + i + "." + col + "=r" + (i + 1) + "." + opposite;
+      return `r${i}.${col}=r${i + 1}.${opposite}`;
     });
-    from += " JOIN public." + target + " AS r" + (i + 1) + " ON " + joins.join(" AND ");
+    from += ` JOIN public.${target} AS r${i + 1} ON ${joins.join(" AND ")}`;
   }
   from +=
     " JOIN former_installations AS original_user_installation ON original_user_installation.id=r" +
@@ -209,7 +209,7 @@ export async function assessHistoricalUserUnresolvedOwnerRows(
         )
           return null;
         const fks = mappings as Fk[];
-        if (new Set(fks.map((fk) => fk.source_table + ":" + fk.constraint_name)).size !== fks.length) return null;
+        if (new Set(fks.map((fk) => `${fk.source_table}:${fk.constraint_name}`)).size !== fks.length) return null;
 
         const linked = lineage.entries.filter((entry) => entry.installationPath !== null);
         const unlinked = lineage.entries.filter((entry) => entry.installationPath === null);
@@ -236,7 +236,7 @@ export async function assessHistoricalUserUnresolvedOwnerRows(
             continue;
           }
           selected.push(entry);
-          statements.push("'" + entry.table + "'," + expression);
+          statements.push(`'${entry.table}',${expression}`);
         }
         // A single statement checks original numeric USER/expiry/hold/erasure
         // and counts every selected FK-linked class in the SAME snapshot.

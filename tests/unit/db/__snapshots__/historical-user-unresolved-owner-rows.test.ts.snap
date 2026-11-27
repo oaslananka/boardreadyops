@@ -1,0 +1,51 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`63-class original-numeric-user bounded FK row candidates remain source-only > preserves the exact catalog-derived SQL for composite FK joins and numeric owner binding 1`] = `
+"WITH owner_export AS MATERIALIZED (
+          SELECT exports.id, exports.tenant_id, exports.original_github_user_id
+            FROM data_exports AS exports
+           WHERE exports.id=$1
+             AND exports.original_github_user_id=$2::bigint
+             AND exports.scope='user'
+             AND exports.installation_id IS NULL
+             AND exports.requested_by='github_app_uninstall'
+             AND exports.status='pending'
+             AND (exports.expires_at IS NULL OR exports.expires_at>clock_timestamp())
+             AND lower(exports.scope_id)=lower(exports.tenant_id)
+             -- This source snapshot is private but still contains opaque
+             -- owner data. A revoked/expired request, any active tenant
+             -- legal hold, or any non-dry-run erasure in progress must
+             -- fail BEFORE even the earliest inventory read. Publication
+             -- still requires independent locked reauthorization.
+             AND NOT EXISTS (
+               SELECT 1 FROM legal_holds AS hold
+                WHERE lower(hold.tenant_id)=lower(exports.tenant_id)
+                  AND hold.active=TRUE
+             )
+             AND NOT EXISTS (
+               SELECT 1 FROM erasure_requests AS erasure
+                WHERE lower(erasure.tenant_id)=lower(exports.tenant_id)
+                  AND erasure.status IN ('running','completed')
+                  AND erasure.dry_run=FALSE
+             )
+        ), former_installations AS MATERIALIZED (
+          SELECT installations.id
+            FROM installations
+            JOIN owner_export ON installations.account_user_id=owner_export.original_github_user_id
+                             AND lower(installations.account_login)=lower(owner_export.tenant_id)
+           WHERE lower(installations.account_type)='user'
+             AND installations.suspended_at IS NOT NULL
+        ) SELECT owner_export.id AS export_id,jsonb_build_object('installations',(SELECT jsonb_build_object(
+    'count',count(*)::integer,
+    'sha256',encode(digest(COALESCE(string_agg(row_hash, ':' ORDER BY row_hash), ''), 'sha256'),'hex')
+  ) FROM (
+    SELECT encode(digest(to_jsonb(r0)::text,'sha256'),'hex') AS row_hash
+    FROM public.installations AS r0 JOIN former_installations AS original_user_installation ON original_user_installation.id=r0.id LIMIT 101
+  ) AS bounded_rows),'boards',(SELECT jsonb_build_object(
+    'count',count(*)::integer,
+    'sha256',encode(digest(COALESCE(string_agg(row_hash, ':' ORDER BY row_hash), ''), 'sha256'),'hex')
+  ) FROM (
+    SELECT encode(digest(to_jsonb(r0)::text,'sha256'),'hex') AS row_hash
+    FROM public.boards AS r0 JOIN public.repositories AS r1 ON r0.repository_id=r1.id AND r0.tenant_id=r1.tenant_id JOIN public.installations AS r2 ON r1.installation_id=r2.id JOIN former_installations AS original_user_installation ON original_user_installation.id=r2.id LIMIT 101
+  ) AS bounded_rows)) AS linked_counts FROM owner_export WHERE EXISTS (SELECT 1 FROM former_installations) LIMIT 1"
+`;
