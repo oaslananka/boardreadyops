@@ -403,6 +403,7 @@ async function ensureGenerateStepOutputDirectory(absoluteOutput: string, step: G
 interface ReviewedSourceIdentity {
   root: string;
   sha: string;
+  outputDir: string;
 }
 
 async function prepareReviewedSource(
@@ -422,7 +423,7 @@ async function prepareReviewedSource(
   if (canonicalOutput === canonicalRoot || !isInside(canonicalRoot, canonicalOutput)) {
     throw new Error("Reviewed export output must be an in-root, separate generated directory.");
   }
-  return { root: canonicalRoot, sha: options.reviewedSourceSha };
+  return { root: canonicalRoot, sha: options.reviewedSourceSha, outputDir: canonicalOutput };
 }
 
 async function executeGeneratePlan(
@@ -493,6 +494,9 @@ async function assertReviewedGeneration(
   const currentRoot = await assertReviewedSource(options.gitRoot, reviewedSource.sha);
   if (currentRoot !== reviewedSource.root) {
     throw new Error("Reviewed export Git root changed during generation.");
+  }
+  if ((await fs.realpath(path.resolve(options.outputDir))) !== reviewedSource.outputDir) {
+    throw new Error("Reviewed export output directory changed during generation.");
   }
 }
 
@@ -578,7 +582,9 @@ export async function runGenerate(recipe: GenerateRecipe, inputOptions: Generate
   await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
   if (reviewedSource) {
-    const verification = await verifyExportProvenance(reviewedSource.root, manifestPath, {
+    // Use the same canonical coordinate system for the verified root and manifest.
+    const canonicalManifestPath = path.join(reviewedSource.outputDir, "manifest.json");
+    const verification = await verifyExportProvenance(reviewedSource.root, canonicalManifestPath, {
       currentGitSha: reviewedSource.sha,
     });
     if (verification.status !== "verified" || verification.gitShaMatch !== true) {

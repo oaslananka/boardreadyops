@@ -79851,7 +79851,7 @@ async function prepareReviewedSource(options, plan, outputDir) {
   if (canonicalOutput === canonicalRoot2 || !isInside(canonicalRoot2, canonicalOutput)) {
     throw new Error("Reviewed export output must be an in-root, separate generated directory.");
   }
-  return { root: canonicalRoot2, sha: options.reviewedSourceSha };
+  return { root: canonicalRoot2, sha: options.reviewedSourceSha, outputDir: canonicalOutput };
 }
 async function executeGeneratePlan(plan, outputDir, options) {
   const outcomes = plan.skipped.map((entry) => ({
@@ -79900,6 +79900,9 @@ async function assertReviewedGeneration(options, reviewedSource, sourceSnapshot,
   const currentRoot = await assertReviewedSource(options.gitRoot, reviewedSource.sha);
   if (currentRoot !== reviewedSource.root) {
     throw new Error("Reviewed export Git root changed during generation.");
+  }
+  if (await import_promises23.default.realpath(import_node_path64.default.resolve(options.outputDir)) !== reviewedSource.outputDir) {
+    throw new Error("Reviewed export output directory changed during generation.");
   }
 }
 function buildGenerateManifest(recipe, options, evidence) {
@@ -79962,7 +79965,8 @@ async function runGenerate(recipe, inputOptions) {
   await import_promises23.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
   if (reviewedSource) {
-    const verification = await verifyExportProvenance(reviewedSource.root, manifestPath, {
+    const canonicalManifestPath = import_node_path64.default.join(reviewedSource.outputDir, "manifest.json");
+    const verification = await verifyExportProvenance(reviewedSource.root, canonicalManifestPath, {
       currentGitSha: reviewedSource.sha
     });
     if (verification.status !== "verified" || verification.gitShaMatch !== true) {
