@@ -79757,13 +79757,11 @@ var reviewedSourcePatterns = [
   "**/*.kicad_dru",
   "**/*.kicad_wks"
 ];
-async function assertReviewedSource(options) {
-  const expected = options.reviewedSourceSha;
-  if (expected === void 0) return;
-  if (!reviewedShaPattern.test(expected) || !options.gitRoot) {
+async function assertReviewedSource(gitRoot, expected) {
+  if (!reviewedShaPattern.test(expected) || !gitRoot) {
     throw new Error("Reviewed export requires a full lowercase source SHA and explicit Git root.");
   }
-  const root = await import_promises23.default.realpath(options.gitRoot);
+  const root = await import_promises23.default.realpath(gitRoot);
   const executable = resolveGitExecutable();
   const env = gitDiscoveryEnv();
   const [top, head, status] = await Promise.all([
@@ -79806,6 +79804,7 @@ async function assertReviewedSource(options) {
   if (sourcePaths.some((sourcePath2) => !trackedPaths.has(sourcePath2))) {
     throw new Error("Reviewed export includes a KiCad source input not tracked by the pinned commit.");
   }
+  return root;
 }
 async function assertFreshReviewedOutput(outputDir) {
   let stat5;
@@ -79842,30 +79841,32 @@ async function ensureGenerateStepOutputDirectory(absoluteOutput, step) {
   const directory = step.isDirectory ? absoluteOutput : import_node_path64.default.dirname(absoluteOutput);
   await import_promises23.default.mkdir(directory, { recursive: true });
 }
-async function runGenerate(recipe, options) {
+async function runGenerate(recipe, inputOptions) {
+  const options = { ...inputOptions };
   const outputDir = import_node_path64.default.resolve(options.outputDir);
   const available = {
     board: Boolean(options.boardFile),
     schematic: Boolean(options.schematicFile)
   };
   const plan = buildGeneratePlan(recipe, available);
+  let reviewedSource;
   if (options.reviewedSourceSha !== void 0) {
     if (!options.boardFile || !["gerbers", "drill"].every((kind) => plan.steps.some((step) => step.kind === kind))) {
       throw new Error("Reviewed manufacturing export requires both Gerber and drill steps.");
     }
-    await assertReviewedSource(options);
-    const canonicalRoot2 = await import_promises23.default.realpath(options.gitRoot);
+    const canonicalRoot2 = await assertReviewedSource(options.gitRoot, options.reviewedSourceSha);
+    reviewedSource = { root: canonicalRoot2, sha: options.reviewedSourceSha };
     const canonicalOutput = await resolveExistingPathAlias(outputDir);
     if (canonicalOutput === canonicalRoot2 || !isInside(canonicalRoot2, canonicalOutput)) {
       throw new Error("Reviewed export output must be an in-root, separate generated directory.");
     }
   }
   const sourceFingerprintBefore = await sourceInputFingerprint(options);
-  if (options.reviewedSourceSha !== void 0 && !sourceFingerprintBefore) {
+  if (reviewedSource && !sourceFingerprintBefore) {
     throw new Error("Reviewed manufacturing export requires in-root, readable KiCad source inputs.");
   }
   await assertSafeGenerateOutputCleanup(outputDir, options);
-  if (options.reviewedSourceSha !== void 0) await assertFreshReviewedOutput(outputDir);
+  if (reviewedSource) await assertFreshReviewedOutput(outputDir);
   await import_promises23.default.rm(outputDir, { recursive: true, force: true });
   await import_promises23.default.mkdir(outputDir, { recursive: true });
   const outcomes = plan.skipped.map((entry) => ({
@@ -79903,7 +79904,7 @@ ${result.stderr}`).trim() || `${step.kind} export failed`
   const sourceFingerprintAfter = sourceFingerprintBefore ? await sourceInputFingerprint(options) : void 0;
   const sourceSnapshot = sourceFingerprintBefore === void 0 ? void 0 : sourceFingerprintBefore === sourceFingerprintAfter ? "stable" : "changed";
   const recipeHash = (0, import_node_crypto9.createHash)("sha256").update(canonicalizeJson(recipe)).digest("hex");
-  if (options.reviewedSourceSha !== void 0) {
+  if (reviewedSource) {
     const missingManufacturingOutput = ["gerbers", "drill"].some(
       (kind) => !outcomes.some(
         (outcome) => outcome.kind === kind && outcome.status === "generated" && (outcome.files ?? 0) > 0
@@ -79914,7 +79915,10 @@ ${result.stderr}`).trim() || `${step.kind} export failed`
         "Reviewed manufacturing export requires successful Gerber/drill generation from an unchanged source snapshot."
       );
     }
-    await assertReviewedSource(options);
+    const currentRoot = await assertReviewedSource(options.gitRoot, reviewedSource.sha);
+    if (currentRoot !== reviewedSource.root) {
+      throw new Error("Reviewed export Git root changed during generation.");
+    }
   }
   const git2 = options.gitRoot ? await gitState(options.gitRoot) : {};
   const manifest = {
@@ -79940,9 +79944,9 @@ ${result.stderr}`).trim() || `${step.kind} export failed`
   const manifestPath = import_node_path64.default.join(outputDir, "manifest.json");
   await import_promises23.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
-  if (options.reviewedSourceSha !== void 0) {
-    const verification = await verifyExportProvenance(options.gitRoot, manifestPath, {
-      currentGitSha: options.reviewedSourceSha
+  if (reviewedSource) {
+    const verification = await verifyExportProvenance(reviewedSource.root, manifestPath, {
+      currentGitSha: reviewedSource.sha
     });
     if (verification.status !== "verified" || verification.gitShaMatch !== true) {
       throw new Error("Reviewed manufacturing export failed local source and output byte-consistency checks.");
