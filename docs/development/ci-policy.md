@@ -6,12 +6,13 @@ The `ci` workflow always starts with `ci / risk-profile`. That job lists changed
 
 ## Required merge gate
 
-The effective `main-standard` ruleset requires exactly these nine contexts:
+The effective `main-standard` ruleset requires exactly these ten contexts:
 
 - `ci / risk-profile`
 - `ci / lint`
 - `ci / typecheck`
 - `ci / test-unit`
+- `ci / unit-matrix-gate`
 - `ci / build`
 - `ci / verify-dist`
 - `ci / coverage-gate`
@@ -77,4 +78,4 @@ real KiCad release gates are unchanged.
 
 ## Updating the policy
 
-When adding a new source area, update `scripts/ci-risk-profile.mjs` and add a unit test in `tests/unit/scripts/ci-risk-profile.test.ts`. If the new area should block merges, also update `scripts/setup-branch-protection.sh`.
+When adding a new source area, update `scripts/ci-risk-profile.mjs` and add a unit test in `tests/unit/scripts/ci-risk-profile.test.ts`. If the new area should block merges, reconcile the verified required context in `.github/rulesets/main.json` and the live ruleset through reviewed governance change control.

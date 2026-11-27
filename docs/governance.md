@@ -34,8 +34,8 @@ Every pull request targeting `main` must pass the required checks. While
 `@oaslananka` is the sole maintainer, the ruleset uses zero required human
 approvals. Unresolved review conversations still block merge. GitHub Rulesets
 remain the source of truth, and a maintainer makes an explicit maintainer merge
-decision after required checks pass. Mergify is limited to pull-request labels;
-it does not queue or merge pull requests. `manual-review` and `do-not-merge` are
+decision after required checks pass. Mergify supports routing labels and the
+explicit manual-only serial queue; it does not auto-merge or bypass rulesets. `manual-review` and `do-not-merge` are
 explicit hold signals that must be cleared before merge.
 
 `CODEOWNERS` continues to identify responsible ownership. CODEOWNERS review is
@@ -52,19 +52,20 @@ labels, but merge remains an explicit maintainer action. Maintainers apply
 
 ## Branch Protection Baseline
 
-`main` is protected by `.github/rulesets/main.json`, which is the repository
-source of truth. The active baseline requires:
+The live `main-standard` ruleset protects the default branch. The committed
+`.github/rulesets/main.json` records intended protection. The baseline requires:
 
 - zero required human approvals while the repository remains single-maintainer;
-- stale approvals dismissed after reviewable pushes;
+- stale approvals dismissed after reviewable pushes (committed requirement;
+  live dismissal was disabled on 2026-11-27, and reconciliation remains pending);
 - all review conversations resolved;
 - strict required status checks and an up-to-date branch;
 - squash-only merges and linear history;
 - no force pushes or branch deletion; and
-- a PR-only emergency bypass for the repository administrator role.
+- a PR-only emergency bypass for the repository owner alone.
 
-Mergify has no ruleset bypass and no merge-queue role; its repository config is
-limited to pull-request labelling.
+Mergify has no ruleset bypass; its serial queue requires an explicit maintainer
+decision and successful checks, with no automatic admission.
 
 The stable required checks are:
 
@@ -74,6 +75,7 @@ The stable required checks are:
 | `ci / lint` | Code style, workflow, and policy validation |
 | `ci / typecheck` | TypeScript type safety |
 | `ci / test-unit` | Deterministic unit regression suite |
+| `ci / unit-matrix-gate` | Required decision over the risk-conditioned OS/Node matrix |
 | `ci / build` | Bundle and artifact compilation |
 | `ci / verify-dist` | Committed bundle integrity |
 | `ci / coverage-gate` | Core and cloud coverage enforcement |
@@ -88,11 +90,13 @@ branch-protection contracts.
 
 ## Emergency Bypass
 
-The human emergency bypass is the repository administrator role with
+The human emergency bypass belongs only to the repository owner with
 `bypass_mode: pull_request`. This PR-only emergency bypass preserves the pull
 request and audit trail and cannot be used for a direct push. No integration has
 an automation bypass for normal merges; required checks and conversation
 resolution stay authoritative until the explicit maintainer merge decision.
+Only the owner acting manually in the GitHub UI may use this exception; agents
+and automation must never exercise it.
 
 Use it only when a ruleset or CI infrastructure failure blocks a material
 security, release, or availability fix. Before merge:
@@ -107,14 +111,16 @@ captured as follow-up issues and linked from the bypassed pull request.
 
 ## Applying And Verifying Protection
 
-Apply the committed ruleset and squash-only repository merge settings with:
+Inspect the existing ruleset without changing live settings:
 
 ```bash
-scripts/setup-branch-protection.sh oaslananka/boardreadyops main
+scripts/setup-branch-protection.sh oaslananka/boardreadyops main-standard
 ```
 
-The helper creates or updates the repository ruleset through the GitHub API. It
-does not apply legacy classic branch protection.
+The helper verifies the exact repository owner and a single existing ruleset.
+It never creates a duplicate ruleset or patches repository-wide merge settings.
+See [Branch Protection](branch-protection.md) for explicit application of the
+known stale-review strengthening and fail-closed handling of other drift.
 
 Verify the active ruleset with:
 

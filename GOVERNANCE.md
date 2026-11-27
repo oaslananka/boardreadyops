@@ -47,8 +47,9 @@ Every pull request targeting `main` must pass the required CI gates. Because the
 repository currently has one maintainer, the branch ruleset enforces zero
 required human approvals. All review conversations must still be resolved before
 merge. GitHub Rulesets are the merge authority, and a maintainer makes an explicit maintainer
-merge decision after the required checks pass. Mergify is limited to lightweight
-pull-request labelling; it does not admit or merge pull requests. `manual-review`
+merge decision after the required checks pass. Mergify provides routing labels
+and an explicit, manual-only serial queue; it does not auto-merge or bypass
+GitHub Rulesets. `manual-review`
 and `do-not-merge` remain explicit hold signals and must be cleared before a
 maintainer merges.
 
@@ -57,10 +58,11 @@ revisit this policy and consider requiring one independent approval. Until then,
 requiring the sole author to obtain an impossible independent review would block
 normal maintenance without adding a real control.
 
-The administrator role retains a PR-only emergency bypass for exceptional
+Only the repository owner retains a PR-only emergency bypass for exceptional
 ruleset or CI infrastructure failures; it does not permit direct pushes to
 `main`. Use the bypass only when delaying a material security, release, or
-availability fix is riskier than proceeding. The pull request must have all
+availability fix is riskier than proceeding. Only the owner acting manually
+in the GitHub UI may exercise it; agents and automation must never use this bypass. The pull request must have all
 available checks green, carry `manual-review`, and document the reason, scope,
 and rollback plan. Record a retrospective review within two business days and
 open follow-up issues for any findings.
@@ -74,7 +76,7 @@ until the relevant exception or review is cleared.
 
 ## CODEOWNERS
 
-The repository has a root `CODEOWNERS` file that currently assigns all files to
+The repository has `.github/CODEOWNERS`, which currently assigns all files to
 `@oaslananka`. GitHub supports CODEOWNERS files in `.github/`, repository root,
 or `docs/`; if multiple files exist, GitHub uses the first match in that order.
 
@@ -106,18 +108,23 @@ Required policy:
 
 ## Branch Protection
 
-The committed repository ruleset at `.github/rulesets/main.json` is the source
-of truth for `main`. It requires zero human approvals while the project is
-single-maintainer, stale-review dismissal, resolved review conversations, strict
-stable status checks, linear history, and squash-only merging. The administrator
-retains a PR-only emergency bypass. Mergify has no merge-queue authority or ruleset
-bypass; `.mergify.yml` is intentionally limited to pull-request labelling.
+The committed repository ruleset at `.github/rulesets/main.json` describes the
+intended `main-standard` policy for the default branch. GitHub's live ruleset
+enforces zero human approvals while the project is single-maintainer, resolved
+review conversations, ten strict status checks, linear history, and squash-only
+merging. The repository owner alone retains a PR-only emergency bypass. The
+committed stale-review dismissal requirement is stronger than the live setting
+verified on 2026-11-27; this difference is explicitly reported until reconciled.
+Mergify's manual-only queue never bypasses ruleset enforcement.
 
-Apply or update the ruleset from an authenticated administrator context:
+Check the existing ruleset without writing from an authenticated administrator context:
 
 ```bash
-scripts/setup-branch-protection.sh oaslananka/boardreadyops main
+scripts/setup-branch-protection.sh oaslananka/boardreadyops main-standard
 ```
+
+See [Branch Protection](docs/branch-protection.md) for the bounded, explicit
+`--apply` operation and manual handling of unexpected drift.
 
 Verify the live configuration with:
 

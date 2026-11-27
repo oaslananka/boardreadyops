@@ -65,8 +65,8 @@ Before tagging, inspect each external workflow action metadata and confirm no Ja
 Verify the committed ruleset is aligned:
 
 ```bash
-gh api repos/oaslananka/boardreadyops/rulesets --jq '.[] | select(.name == "main")'
-git diff .github/rulesets/main.json
+gh api repos/oaslananka/boardreadyops/rulesets --jq '.[] | select(.name == "main-standard")'
+scripts/setup-branch-protection.sh oaslananka/boardreadyops main-standard
 ```
 
 ## Manual tag and GitHub Release recovery (exception only)
