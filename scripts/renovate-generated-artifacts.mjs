@@ -10,7 +10,15 @@ const MAX_BYTES = Object.freeze({
   "dist/cli/index.cjs": 32 * 1024 * 1024,
 });
 const SHA_RE = /^[a-f0-9]{40}$/u;
-const BRANCH_RE = /^renovate\/[a-zA-Z0-9._/-]{1,220}$/u;
+// Mend uses parentheses in group names, equals signs in advisory ranges and
+// at-signs for scoped dependencies. Keep the alphabet deliberately narrow.
+const BRANCH_RE = /^renovate\/[a-zA-Z0-9._/()=@-]{1,220}$/u;
+
+function isSafeRenovateBranch(branch) {
+  if (typeof branch !== "string" || !BRANCH_RE.test(branch)) return false;
+  if (branch.includes("..") || branch.endsWith(".")) return false;
+  return branch.split("/").every((part) => part.length > 0 && !part.startsWith(".") && !part.endsWith(".lock"));
+}
 
 function isTrustedRenovateContext(pr, livePr, repository) {
   return (
@@ -30,9 +38,7 @@ function isUnchangedBotHead(pr, livePr) {
   return (
     SHA_RE.test(sha ?? "") &&
     livePr?.head?.sha === sha &&
-    typeof branch === "string" &&
-    BRANCH_RE.test(branch) &&
-    !branch.includes("..") &&
+    isSafeRenovateBranch(branch) &&
     livePr?.head?.ref === branch &&
     Number.isSafeInteger(pr?.number) &&
     pr.number > 0 &&
