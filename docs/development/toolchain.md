@@ -22,6 +22,8 @@ An explicit override is not silently replaced by another interpreter if it is in
 
 If the pinned `uv` version from `toolchain.json` is already available on the host, bootstrap uses it to create the repository virtual environment with the selected Python. Otherwise it falls back to the selected interpreter's standard `venv` module and then installs the pinned `uv` release inside the repository-local environment. A different host `uv` version is not used for environment creation.
 
+Bootstrap installs the manifest-pinned validation tools first, then installs documentation dependencies from the same hash-verified `docs/requirements.lock.txt` used in CI, using the repository-local uv. It checks the combined Python environment for incompatible dependencies before preparing hooks. Update the documentation lock when its input requirements change; do not replace it with an unpinned install.
+
 The bootstrap keeps project executables inside the repository and reusable downloads in the current user's XDG cache:
 
 - `node_modules/` for JavaScript dependencies;

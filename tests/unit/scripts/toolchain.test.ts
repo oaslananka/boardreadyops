@@ -195,6 +195,13 @@ describe("reproducible contributor toolchain", () => {
     expect(preCommit).toContain(`rev: v${config.validation.semgrep}`);
     expect(preCommit).toContain(`rev: v${config.validation.gitleaks}`);
     expect(preCommit).toContain(`rev: v${config.validation.zizmor}`);
+    expect(preCommit).toContain(`repo: https://github.com/google/osv-scanner
+    rev: v${config.validation.osvScanner}`);
+    const osvWorkflow = await repositoryFile(".github/workflows/osv.yml");
+    expect(osvWorkflow).toContain(`# v${config.validation.osvScanner}`);
+    expect(security.match(new RegExp(`# v${config.validation.osvScanner.replaceAll(".", "\\.")}`, "gu"))).toHaveLength(
+      2,
+    );
     for (const workflow of workflows) {
       expect(workflow).toContain(`NODE_VERSION: "${config.node.preferred}"`);
       expect(workflow).not.toContain('NODE_VERSION: "24"');
@@ -499,6 +506,31 @@ exit 0
       plan.some((step) => step.command.includes(`shellcheck-py==${config.validation.shellcheck.packageVersion}`)),
     ).toBe(true);
     expect(plan.some((step) => step.command.join(" ").includes("puppeteer browsers install chrome"))).toBe(true);
+  });
+
+  it("installs documentation from the CI hash lock and checks the combined Python environment", async () => {
+    const config = await manifest();
+    const paths = resolveToolchainPaths("/repo", "/cache/boardreadyops");
+    const plan = buildBootstrapPlan(config, paths);
+    const tools = plan.findIndex((step) => step.command.includes(`uv==${config.python.uv}`));
+    const docs = plan.findIndex((step) => step.command.includes(path.join("/repo", "docs", "requirements.lock.txt")));
+    const check = plan.findIndex((step) => step.command.join(" ").endsWith("-m pip check"));
+    const hooks = plan.findIndex((step) => step.name === "Prepare pinned validation hooks");
+    expect(tools).toBeGreaterThanOrEqual(0);
+    expect(docs).toBeGreaterThan(tools);
+    expect(plan[docs]?.command).toEqual([
+      paths.uv,
+      "pip",
+      "install",
+      "--python",
+      paths.python,
+      "--require-hashes",
+      "-r",
+      path.join("/repo", "docs", "requirements.lock.txt"),
+    ]);
+    expect(check).toBeGreaterThan(docs);
+    expect(hooks).toBeGreaterThan(check);
+    expect(plan.flatMap((step) => step.command)).not.toContain(path.join("/repo", "docs", "requirements.txt"));
   });
 
   it("provides a secretless Prisma configuration default", () => {
