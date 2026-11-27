@@ -99,8 +99,8 @@ export async function runAuthenticatedAudit({
   discoverImpl = discoverAuthenticatedRoutes,
   writeManifestImpl = defaultWriteManifest,
   writeAuditSummaryImpl = defaultWriteAuditSummary,
-  lighthouseImpl,
-  launchChromeImpl,
+  lighthouseImpl: suppliedLighthouseImpl,
+  launchChromeImpl: suppliedLaunchChromeImpl,
   detectChromeImpl = detectInstalledChrome,
 } = {}) {
   const options = parseAuthenticatedAuditOptions(environment, argv);
@@ -116,9 +116,9 @@ export async function runAuthenticatedAudit({
   // Parsing, route-only discovery and invalid/missing-browser requests do not
   // need the heavyweight audit engines. Resolve both before launching Chrome
   // so a failed import cannot leave a browser process running.
-  const audit = lighthouseImpl ?? (await import("lighthouse")).default;
-  const launch = launchChromeImpl ?? (await import("chrome-launcher")).launch;
-  const chrome = await launch({
+  const lighthouseImpl = suppliedLighthouseImpl ?? (await import("lighthouse")).default;
+  const launchChromeImpl = suppliedLaunchChromeImpl ?? (await import("chrome-launcher")).launch;
+  const chrome = await launchChromeImpl({
     chromePath,
     chromeFlags: [
       ...(options.headful ? [] : ["--headless=new"]),
@@ -131,11 +131,12 @@ export async function runAuthenticatedAudit({
   const reports = [];
   const scanFailures = [];
   try {
+    // One Chrome debugging port is shared by every audit. Never overlap scans.
     for (const route of manifest.routes) {
       const url = new URL(route, options.site).href;
       let result;
       try {
-        result = await audit(
+        result = await lighthouseImpl(
           url,
           buildAuthenticatedLighthouseFlags({
             session: options.session,

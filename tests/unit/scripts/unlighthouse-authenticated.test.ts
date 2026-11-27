@@ -204,6 +204,40 @@ it("fails closed on a Lighthouse route error but still closes Chrome", async () 
   expect(kill).toHaveBeenCalledOnce();
 });
 
+it("audits routes serially on the shared Chrome port and continues after a route failure", async () => {
+  const { runAuthenticatedAudit } = await import("../../../scripts/unlighthouse-authenticated.mjs");
+  const kill = vi.fn(async () => undefined);
+  const events: string[] = [];
+  const lighthouseImpl = vi.fn(async (url: string) => {
+    const route = new URL(url).pathname;
+    events.push(`start:${route}`);
+    await Promise.resolve();
+    events.push(`finish:${route}`);
+    if (route === "/dashboard") throw new Error("audit failed");
+    return { lhr: { categories: { accessibility: { score: 1 } } } };
+  });
+
+  const result = await runAuthenticatedAudit({
+    environment: { BROPS_SESSION: "ephemeral" },
+    discoverImpl: async () => ({
+      site: "https://boardreadyops.com",
+      generatedAt: "now",
+      routes: ["/dashboard", "/reviews"],
+    }),
+    writeManifestImpl: async () => undefined,
+    writeAuditSummaryImpl: async () => undefined,
+    detectChromeImpl: async () => "/usr/bin/google-chrome",
+    launchChromeImpl: async () => ({ port: 9222, kill }),
+    lighthouseImpl,
+  });
+
+  expect(events).toEqual(["start:/dashboard", "finish:/dashboard", "start:/reviews", "finish:/reviews"]);
+  expect(result.exitCode).toBe(1);
+  expect(result.scanFailures).toEqual([{ path: "/dashboard", status: "audit failed" }]);
+  expect(lighthouseImpl).toHaveBeenCalledTimes(2);
+  expect(kill).toHaveBeenCalledOnce();
+});
+
 it("fails before launching when no installed Chrome is available", async () => {
   const { runAuthenticatedAudit } = await import("../../../scripts/unlighthouse-authenticated.mjs");
 
