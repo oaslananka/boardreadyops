@@ -225,11 +225,13 @@ describe("BoardReadyOps runtime image retention", () => {
   }, 45_000);
 
   it("only removes exact unreferenced tags after explicit apply", () => {
-    const run = runRetention(["retire", "--apply"]);
-    expect(run.status).toBe(0);
+    // Applying rechecks running and rollback identities before each removal,
+    // so it needs at least the same bounded test budget as the dry run.
+    const run = runRetention(["retire", "--apply"], {}, 30_000);
+    expect(run.status, run.error?.message ?? run.stderr).toBe(0);
     const calls = run.dockerCalls.trim().split("\n").sort();
     expect(calls).toEqual([`image rm ${obsoleteTag}`, "image rm boardreadyops-rollback-safety:pre-old"].sort());
     expect(run.dockerCalls).not.toContain("--force");
     expect(run.dockerCalls).not.toContain("prune");
-  });
+  }, 45_000);
 });

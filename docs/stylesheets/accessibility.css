@@ -171,17 +171,17 @@
   opacity: 1;
 }
 
-[data-md-color-scheme="default"] .md-nav__item--nested > .md-nav__link,
-[data-md-color-scheme="default"] .md-nav__item--nested > .md-nav__link .md-ellipsis {
-  color: #111827;
-  opacity: 1;
-}
-
 [data-md-color-scheme="slate"] .md-nav__link,
 [data-md-color-scheme="slate"] .md-nav__link .md-ellipsis,
 [data-md-color-scheme="slate"] .md-nav__label,
 [data-md-color-scheme="slate"] .md-nav__title {
   color: #f9fafb;
+  opacity: 1;
+}
+
+[data-md-color-scheme="default"] .md-nav__item--nested > .md-nav__link,
+[data-md-color-scheme="default"] .md-nav__item--nested > .md-nav__link .md-ellipsis {
+  color: #111827;
   opacity: 1;
 }
 
@@ -192,7 +192,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* biome-ignore lint/style/noDescendingSpecificity: universal reduced-motion reset must apply after every other rule regardless of selector specificity */
   *,
   *::before,
   *::after {

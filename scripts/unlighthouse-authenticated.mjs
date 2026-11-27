@@ -1,8 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { launch as launchChrome } from "chrome-launcher";
-import lighthouse from "lighthouse";
 import { firstAccessiblePath } from "./lib/files.mjs";
 import { discoverAuthenticatedRoutes } from "./unlighthouse-auth-routes.mjs";
 
@@ -101,8 +99,8 @@ export async function runAuthenticatedAudit({
   discoverImpl = discoverAuthenticatedRoutes,
   writeManifestImpl = defaultWriteManifest,
   writeAuditSummaryImpl = defaultWriteAuditSummary,
-  lighthouseImpl = lighthouse,
-  launchChromeImpl = launchChrome,
+  lighthouseImpl: suppliedLighthouseImpl,
+  launchChromeImpl: suppliedLaunchChromeImpl,
   detectChromeImpl = detectInstalledChrome,
 } = {}) {
   const options = parseAuthenticatedAuditOptions(environment, argv);
@@ -115,6 +113,11 @@ export async function runAuthenticatedAudit({
   const chromePath = await detectChromeImpl();
   if (!chromePath) throw new Error("Installed Chrome is required for authenticated Lighthouse audit");
 
+  // Parsing, route-only discovery and invalid/missing-browser requests do not
+  // need the heavyweight audit engines. Resolve both before launching Chrome
+  // so a failed import cannot leave a browser process running.
+  const lighthouseImpl = suppliedLighthouseImpl ?? (await import("lighthouse")).default;
+  const launchChromeImpl = suppliedLaunchChromeImpl ?? (await import("chrome-launcher")).launch;
   const chrome = await launchChromeImpl({
     chromePath,
     chromeFlags: [
@@ -128,6 +131,7 @@ export async function runAuthenticatedAudit({
   const reports = [];
   const scanFailures = [];
   try {
+    // One Chrome debugging port is shared by every audit. Never overlap scans.
     for (const route of manifest.routes) {
       const url = new URL(route, options.site).href;
       let result;
