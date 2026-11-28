@@ -1,14 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
-import { chmod, lstat, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { appendFile, chmod, lstat, mkdtemp, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ensurePrivateLocalExportArchiveDirectory,
   readSealedLocalExportArchive,
   sealLocalExportArchive,
 } from "../../../apps/web/lib/data-export-local-archive-storage.js";
 import { createZipBuffer } from "../../../src/util/zip.js";
+
+vi.mock("node:fs/promises", { spy: true });
 
 const roots: string[] = [];
 const digest = (value: Buffer): string => createHash("sha256").update(value).digest("hex");
@@ -48,6 +50,8 @@ function zip(exportId: string, content = "synthetic, not customer data") {
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks();
+  vi.mocked(open).mockReset();
   await Promise.all(roots.splice(0).map(async (directory) => await rm(directory, { recursive: true, force: true })));
 });
 
@@ -143,6 +147,37 @@ describe("private, locally sealed export ZIP", () => {
       expect(await readFile(path.join(archiveRoot, `${exportId}.zip`))).toEqual(first.bytes);
     },
   );
+
+  linuxIt("refuses real growth after descriptor stat with bounded reads and wiped buffers", async () => {
+    const archiveRoot = await root();
+    const exportId = randomUUID();
+    const archive = zip(exportId);
+    const filename = path.join(archiveRoot, `${exportId}.zip`);
+    await writeFile(filename, archive.bytes, { mode: 0o600 });
+    const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    const lengths: number[] = [];
+    const buffers: Buffer[] = [];
+    vi.mocked(open).mockImplementationOnce(async (...args) => {
+      const file = await actual.open(...args);
+      const stat = file.stat.bind(file);
+      vi.spyOn(file, "stat").mockImplementationOnce(async () => {
+        const before = await stat();
+        await appendFile(filename, Buffer.alloc(128 * 1024, 65));
+        return before;
+      });
+      const read = file.read.bind(file);
+      file.read = (async (target: Buffer, offset: number, length: number, position: number) => {
+        lengths.push(length);
+        buffers.push(target);
+        return read(target, offset, length, position);
+      }) as typeof file.read;
+      return file;
+    });
+    await expect(readSealedLocalExportArchive({ archiveRoot, exportId, ...archive })).resolves.toBeNull();
+    expect(lengths).toEqual([archive.byteLength, 1]);
+    expect(buffers).toHaveLength(2);
+    expect(buffers.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
+  });
 
   linuxIt("rejects a modified, truncated, or renamed ZIP before an internal reader returns bytes", async () => {
     const archiveRoot = await root();

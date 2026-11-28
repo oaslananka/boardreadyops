@@ -850,7 +850,15 @@ in private local storage and record a claim-bound, immutable SHA-256/size
 commitment with a 15-minute availability window. The server independently
 revalidates its ZIP integrity and the original requester's continuing
 installation/repository authority on internal reads; verification attempts
-are append-only audited. A legal-hold-aware database preview classifies active, held, expired
+are append-only audited. The ordinary sealed ZIP reader pins its archive
+identity and committed length before asynchronous IO, reads only that
+allocation (at most 64 MiB) and probes one additional byte to detect
+growth. Short reads, changed file identity/permissions, invalid integrity
+and descriptor-close failures deny delivery and clear the temporary read
+buffer. Seal readback, rejected final requester audits and finished or
+failed transaction-owned consumption also clear their temporary ZIP
+buffers. This does not change the existing authorization or retention
+contract, nor prove customer receipt. A legal-hold-aware database preview classifies active, held, expired
 and cleaned commitments. The new **internal, not scheduled** physical
 cleanup function accepts only a claim-bound expired/revoked ZIP with
 a verifiable original tenant/installation relationship, private owner-only

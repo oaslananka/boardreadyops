@@ -626,16 +626,19 @@ describeDatabase("local export post-packaging PostgreSQL admission", () => {
       finishTransfer = resolve;
     });
     let observedBytes: Buffer | undefined;
+    let verifiedDuringTransfer = false;
     const transfer = consumeAuthorizedSealedLocalExportArchive(
       { ...requester, db: executor(), archiveRoot: privateArchiveRoot },
       async (bytes) => {
         observedBytes = bytes;
+        verifiedDuringTransfer = verifyClaimedExportArchiveIntegrity(bytes, sealed.sha256, exportId);
         signalTransfer();
         await transferCompleted;
       },
     );
     try {
       await transferStarted;
+      expect(verifiedDuringTransfer).toBe(true);
       const revoke = new DataExportArchiveCommitmentStore(executor()).revokeForRequester(requester);
       const earlier = await Promise.race([
         revoke.then(() => "revoked" as const),
@@ -646,7 +649,7 @@ describeDatabase("local export post-packaging PostgreSQL admission", () => {
       expect(await transfer).toBe(true);
       expect(await revoke).toBe(true);
       expect(observedBytes).toBeInstanceOf(Buffer);
-      expect(verifyClaimedExportArchiveIntegrity(observedBytes ?? Buffer.alloc(0), sealed.sha256, exportId)).toBe(true);
+      expect(observedBytes).toEqual(Buffer.alloc(sealed.byteLength));
       expect(
         await consumeAuthorizedSealedLocalExportArchive(
           { ...requester, db: executor(), archiveRoot: privateArchiveRoot },

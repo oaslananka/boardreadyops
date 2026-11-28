@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { constants, type Stats } from "node:fs";
-import { link, lstat, mkdir, open, realpath, unlink } from "node:fs/promises";
+import { type FileHandle, link, lstat, mkdir, open, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
 import { verifyClaimedExportArchiveIntegrity } from "./data-export-archive-integrity.js";
 
@@ -97,28 +97,75 @@ function validSealedArchiveStat(stat: Stats, expectedByteLength: number): boolea
   );
 }
 
+/** Read only the committed allocation, checking one extra byte for growth. */
+async function readExactArchive(file: FileHandle, length: number): Promise<Buffer | null> {
+  const bytes = Buffer.alloc(length);
+  const probe = Buffer.alloc(1);
+  let complete = false;
+  try {
+    let offset = 0;
+    const reads: AsyncIterable<number> = {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            if (offset === length) return { done: true, value: undefined };
+            const { bytesRead } = await file.read(bytes, offset, Math.min(64 * 1024, length - offset), offset);
+            offset += bytesRead;
+            return { done: false, value: bytesRead };
+          },
+        };
+      },
+    };
+    for await (const count of reads) {
+      if (count === 0) return null;
+    }
+    if ((await file.read(probe, 0, 1, length)).bytesRead !== 0) return null;
+    complete = true;
+    return bytes;
+  } finally {
+    probe.fill(0);
+    if (!complete) bytes.fill(0);
+  }
+}
+
 /** Bounded private read; caller must independently recheck current DB requester authority. */
 export async function readSealedLocalExportArchive(input: SealedArchiveRead): Promise<Buffer | null> {
-  if (!validSealedArchiveRead(input)) return null;
-  const root = await privateArchiveDirectory(input.archiveRoot);
+  const request = { ...input };
+  if (!validSealedArchiveRead(request)) return null;
+  const root = await privateArchiveDirectory(request.archiveRoot);
   if (!root) return null;
-  const filename = path.join(root, `${input.exportId}.zip`);
+  const filename = path.join(root, `${request.exportId}.zip`);
   const flags = constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK;
   const file = await open(filename, flags).catch(() => null);
   if (!file) return null;
+  let bytes: Buffer | null = null;
+  let accepted = false;
   try {
     const stat = await file.stat();
-    if (!validSealedArchiveStat(stat, input.byteLength)) return null;
-    const bytes = await file.readFile();
-    if (bytes.length !== input.byteLength) return null;
+    if (!validSealedArchiveStat(stat, request.byteLength)) return null;
+    bytes = await readExactArchive(file, request.byteLength);
+    if (!bytes) return null;
     const after = await file.stat();
-    if (after.size !== stat.size || after.ino !== stat.ino || after.mtimeMs !== stat.mtimeMs) return null;
-    return verifyClaimedExportArchiveIntegrity(bytes, input.sha256, input.exportId) ? bytes : null;
+    if (
+      !validSealedArchiveStat(after, request.byteLength) ||
+      after.dev !== stat.dev ||
+      after.ino !== stat.ino ||
+      after.mtimeMs !== stat.mtimeMs ||
+      after.ctimeMs !== stat.ctimeMs
+    )
+      return null;
+    accepted = verifyClaimedExportArchiveIntegrity(bytes, request.sha256, request.exportId);
   } catch {
     return null;
   } finally {
-    await file.close();
+    try {
+      await file.close();
+    } catch {
+      accepted = false;
+    }
+    if (!accepted) bytes?.fill(0);
   }
+  return accepted ? bytes : null;
 }
 
 /**
@@ -192,5 +239,7 @@ export async function sealLocalExportArchive(input: {
     sha256: archive.sha256,
     byteLength: archive.byteLength,
   });
-  return verified ? { exportId, sha256: archive.sha256, byteLength: archive.byteLength } : null;
+  if (!verified) return null;
+  verified.fill(0);
+  return { exportId, sha256: archive.sha256, byteLength: archive.byteLength };
 }

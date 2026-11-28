@@ -215,25 +215,28 @@ export async function readAuthorizedSealedLocalExportArchive(input: {
     installationId: input.installationId,
     actorLogin: input.actorLogin,
   };
+  const archiveRoot = input.archiveRoot;
   const first = await store.readForRequester(request);
   if (!first) return null;
   const bytes = await readSealedLocalExportArchive({
-    archiveRoot: input.archiveRoot,
-    exportId: input.exportId,
+    archiveRoot,
+    exportId: request.exportId,
     sha256: first.sha256,
     byteLength: first.byteLength,
   });
   if (!bytes) return null;
-  const last = await store.auditVerifiedReadForRequester(request, first);
-  if (
-    last?.sha256 !== first.sha256 ||
-    last.byteLength !== first.byteLength ||
-    last.files !== first.files ||
-    last.expiresAt !== first.expiresAt
-  ) {
-    return null;
+  let accepted = false;
+  try {
+    const last = await store.auditVerifiedReadForRequester(request, first);
+    accepted =
+      last?.sha256 === first.sha256 &&
+      last.byteLength === first.byteLength &&
+      last.files === first.files &&
+      last.expiresAt === first.expiresAt;
+    return accepted ? bytes : null;
+  } finally {
+    if (!accepted) bytes.fill(0);
   }
-  return bytes;
 }
 
 /**
@@ -303,8 +306,12 @@ export async function consumeAuthorizedSealedLocalExportArchive(
     async (tx) => {
       const bytes = await readAuthorizedSealedLocalExportArchive({ ...input, db: tx });
       if (!bytes) return false;
-      await consume(bytes);
-      return true;
+      try {
+        await consume(bytes);
+        return true;
+      } finally {
+        bytes.fill(0);
+      }
     },
     { statementTimeoutMs: 30_000 },
   );
