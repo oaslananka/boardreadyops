@@ -1,8 +1,46 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import * as artifact from "../../../packages/db/src/data-export-artifact-snapshot.js";
 import { ExportArtifactSnapshotUnavailableError } from "../../../packages/db/src/data-export-artifact-snapshot.js";
 import { prepareClaimedConsistentMetadataSlices } from "../../../packages/db/src/data-export-consistent-snapshot.js";
+import * as collaboration from "../../../packages/db/src/data-export-finding-collaboration-snapshot.js";
+import * as manifest from "../../../packages/db/src/data-export-manifest.js";
+import * as record from "../../../packages/db/src/data-export-record-snapshot.js";
 import { ExportRecordSnapshotUnavailableError } from "../../../packages/db/src/data-export-record-snapshot.js";
+import * as audit from "../../../packages/db/src/data-export-review-audit-snapshot.js";
+import * as comments from "../../../packages/db/src/data-export-review-comments-snapshot.js";
+import * as workflow from "../../../packages/db/src/data-export-review-workflow-snapshot.js";
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
+
+vi.mock("../../../packages/db/src/data-export-artifact-snapshot.js", { spy: true });
+vi.mock("../../../packages/db/src/data-export-manifest.js", { spy: true });
+vi.mock("../../../packages/db/src/data-export-record-snapshot.js", { spy: true });
+vi.mock("../../../packages/db/src/data-export-review-audit-snapshot.js", { spy: true });
+vi.mock("../../../packages/db/src/data-export-review-comments-snapshot.js", { spy: true });
+vi.mock("../../../packages/db/src/data-export-review-workflow-snapshot.js", { spy: true });
+vi.mock("../../../packages/db/src/data-export-finding-collaboration-snapshot.js", { spy: true });
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+});
+
+async function capturedSlices(): Promise<Buffer[]> {
+  const calls = [
+    ...vi.mocked(artifact.prepareClaimedArtifactMetadataSnapshot).mock.results,
+    ...vi.mocked(manifest.prepareClaimedExportManifest).mock.results,
+    ...vi.mocked(record.prepareClaimedRunFindingSnapshot).mock.results,
+    ...vi.mocked(audit.prepareClaimedReviewAuditSnapshot).mock.results,
+    ...vi.mocked(comments.prepareClaimedReviewCommentsSnapshot).mock.results,
+    ...vi.mocked(workflow.prepareClaimedReviewWorkflowSnapshot).mock.results,
+    ...vi.mocked(collaboration.prepareClaimedFindingCollaborationSnapshot).mock.results,
+  ];
+  const buffers: Buffer[] = [];
+  for (const call of calls) {
+    const slice = await Promise.resolve(call.value).catch(() => null);
+    if (slice?.bytes) buffers.push(slice.bytes);
+  }
+  return buffers;
+}
 
 const claim = {
   exportId: "export-1",
@@ -105,26 +143,79 @@ const reviewWorkflow = { approvals: [], checklist: [] };
 const findingCollaboration = { decisions: [], assignments: [] };
 const artifacts = { artifacts: [] };
 
-function fixture(
-  replies: readonly unknown[] = [
-    { rows: [inventory] },
-    { rows: [records] },
-    { rows: [reviewAudit] },
-    { rows: [reviewComments] },
-    { rows: [reviewWorkflow] },
-    { rows: [findingCollaboration] },
-    { rows: [artifacts] },
-  ],
-) {
+const successfulReplies = [
+  { rows: [inventory] },
+  { rows: [records] },
+  { rows: [reviewAudit] },
+  { rows: [reviewComments] },
+  { rows: [reviewWorkflow] },
+  { rows: [findingCollaboration] },
+  { rows: [artifacts] },
+];
+
+function fixture(replies: readonly unknown[] = successfulReplies, settlementError?: Error) {
   const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => replies[query.mock.calls.length - 1]);
   const withTransaction = vi.fn(async (work: (tx: { query: typeof query }) => Promise<unknown>, options: unknown) => {
     expect(options).toEqual({ consistentRead: true, statementTimeoutMs: 5000 });
-    return await work({ query });
+    const result = await work({ query });
+    if (settlementError) throw settlementError;
+    return result;
   });
   return { db: { withTransaction } as unknown as Pick<PgQueryExecutor, "withTransaction">, query, withTransaction };
 }
 
 describe("claimed consistent repository and record preparation", () => {
+  it.each([1, 2, 3, 4, 5, 6])("clears already prepared slices when query %s is denied", async (index) => {
+    const { db, query } = fixture([...successfulReplies.slice(0, index), { rows: [] }]);
+    await expect(prepareClaimedConsistentMetadataSlices(db, claim)).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(index + 1);
+    const buffers = await capturedSlices();
+    expect(buffers).toHaveLength(index);
+    expect(buffers.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
+  });
+
+  it("clears partial slices when a later query throws", async () => {
+    const { db, query } = fixture();
+    const original = query.getMockImplementation();
+    if (!original) throw new Error("Missing synthetic query");
+    query.mockImplementation(async (...args) => {
+      if (query.mock.calls.length === 4) throw new Error("synthetic database failure");
+      return original(...args);
+    });
+    await expect(prepareClaimedConsistentMetadataSlices(db, claim)).rejects.toThrow("synthetic database failure");
+    const buffers = await capturedSlices();
+    expect(buffers).toHaveLength(3);
+    expect(buffers.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
+  });
+
+  it("clears all seven slices if transaction settlement fails after successful preparation", async () => {
+    const { db } = fixture(successfulReplies, new Error("synthetic commit failure"));
+    await expect(prepareClaimedConsistentMetadataSlices(db, claim)).rejects.toThrow("synthetic commit failure");
+    const buffers = await capturedSlices();
+    expect(buffers).toHaveLength(7);
+    expect(buffers.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
+  });
+
+  it("pins the original claim across the transaction and preserves successful returned buffers", async () => {
+    const { db, query } = fixture();
+    const request = { ...claim };
+    const original = query.getMockImplementation();
+    if (!original) throw new Error("Missing synthetic query");
+    query.mockImplementationOnce(async (...args) => {
+      request.exportId = "different-export";
+      request.workerId = "different-worker";
+      request.token = "different-token";
+      return original(...args);
+    });
+    const result = await prepareClaimedConsistentMetadataSlices(db, request);
+    expect(result).not.toBeNull();
+    for (const [, params] of query.mock.calls) expect(params).toEqual(Object.values(claim));
+    const buffers = await capturedSlices();
+    expect(buffers).toHaveLength(7);
+    expect(buffers.every((bytes) => bytes.some((byte) => byte !== 0))).toBe(true);
+    expect(Object.values(result ?? {}).map((slice) => slice.bytes)).toEqual(expect.arrayContaining(buffers));
+  });
+
   it("queries seven scoped slices in the same readonly transaction without completing an export", async () => {
     const { db, query, withTransaction } = fixture();
     const result = await prepareClaimedConsistentMetadataSlices(db, claim);
@@ -226,11 +317,15 @@ describe("claimed consistent repository and record preparation", () => {
     expect(JSON.parse(result?.artifactMetadata.bytes.toString("utf8") ?? "{}").artifacts).toEqual([
       expect.objectContaining({ id: artifact.id, runId: "run-1" }),
     ]);
+    vi.clearAllMocks();
     const invalid = fixture([...prefix, { rows: [{ artifacts: [{ ...artifact, run_id: "foreign-run" }] }] }]);
     await expect(prepareClaimedConsistentMetadataSlices(invalid.db, claim)).rejects.toThrow(
       ExportArtifactSnapshotUnavailableError,
     );
     expect(invalid.query).toHaveBeenCalledTimes(7);
+    const buffers = await capturedSlices();
+    expect(buffers).toHaveLength(7);
+    expect(buffers.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
   });
 
   it("rejects overflow rather than returning an incomplete record package", async () => {
@@ -242,5 +337,8 @@ describe("claimed consistent repository and record preparation", () => {
       ExportRecordSnapshotUnavailableError,
     );
     expect(exceeded.withTransaction).toHaveBeenCalledTimes(1);
+    const buffers = await capturedSlices();
+    expect(buffers).toHaveLength(1);
+    expect(buffers.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
   });
 });

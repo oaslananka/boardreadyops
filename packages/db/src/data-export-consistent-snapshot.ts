@@ -45,43 +45,63 @@ export async function prepareClaimedConsistentMetadataSlices(
   findingCollaboration: ClaimedFindingCollaborationSnapshot;
   artifactMetadata: ClaimedRecordSnapshot;
 } | null> {
-  return await db.withTransaction(
-    async (transaction) => {
-      const repositories = await prepareClaimedExportManifest(new DataExportInventoryStore(transaction), claim);
-      if (!repositories) return null;
-      const records = await prepareClaimedRunFindingSnapshot(transaction, claim);
-      if (!records) return null;
-      const reviewAudit = await prepareClaimedReviewAuditSnapshot(transaction, claim);
-      if (!reviewAudit) return null;
-      const reviewComments = await prepareClaimedReviewCommentsSnapshot(transaction, claim);
-      if (!reviewComments) return null;
-      const reviewWorkflow = await prepareClaimedReviewWorkflowSnapshot(transaction, claim);
-      if (!reviewWorkflow) return null;
-      const findingCollaboration = await prepareClaimedFindingCollaborationSnapshot(transaction, claim);
-      if (!findingCollaboration) return null;
-      const artifactMetadata = await prepareClaimedArtifactMetadataSnapshot(transaction, claim);
-      if (!artifactMetadata) return null;
-      const includedRunIds = new Set(
-        (JSON.parse(records.bytes.toString("utf8")) as { runs: Array<{ id: string }> }).runs.map((run) => run.id),
-      );
-      const artifactRows = (
-        JSON.parse(artifactMetadata.bytes.toString("utf8")) as {
-          artifacts: Array<{ runId: string }>;
+  const request = { ...claim };
+  const owned: Buffer[] = [];
+  function own<T extends { bytes: Buffer }>(slice: T | null): T | null {
+    if (slice) owned.push(slice.bytes);
+    return slice;
+  }
+
+  let transferred = false;
+  try {
+    const result = await db.withTransaction(
+      async (transaction) => {
+        const repositories = own(
+          await prepareClaimedExportManifest(new DataExportInventoryStore(transaction), request),
+        );
+        if (!repositories) return null;
+        const records = own(await prepareClaimedRunFindingSnapshot(transaction, request));
+        if (!records) return null;
+        const reviewAudit = own(await prepareClaimedReviewAuditSnapshot(transaction, request));
+        if (!reviewAudit) return null;
+        const reviewComments = own(await prepareClaimedReviewCommentsSnapshot(transaction, request));
+        if (!reviewComments) return null;
+        const reviewWorkflow = own(await prepareClaimedReviewWorkflowSnapshot(transaction, request));
+        if (!reviewWorkflow) return null;
+        const findingCollaboration = own(await prepareClaimedFindingCollaborationSnapshot(transaction, request));
+        if (!findingCollaboration) return null;
+        const artifactMetadata = own(await prepareClaimedArtifactMetadataSnapshot(transaction, request));
+        if (!artifactMetadata) return null;
+        const includedRunIds = new Set(
+          (JSON.parse(records.bytes.toString("utf8")) as { runs: Array<{ id: string }> }).runs.map((run) => run.id),
+        );
+        const artifactRows = (
+          JSON.parse(artifactMetadata.bytes.toString("utf8")) as {
+            artifacts: Array<{ runId: string }>;
+          }
+        ).artifacts;
+        if (artifactRows.some((artifact) => !includedRunIds.has(artifact.runId))) {
+          throw new ExportArtifactSnapshotUnavailableError();
         }
-      ).artifacts;
-      if (artifactRows.some((artifact) => !includedRunIds.has(artifact.runId))) {
-        throw new ExportArtifactSnapshotUnavailableError();
-      }
-      return {
-        repositories,
-        records,
-        reviewAudit,
-        reviewComments,
-        reviewWorkflow,
-        findingCollaboration,
-        artifactMetadata,
-      };
-    },
-    { consistentRead: true, statementTimeoutMs: 5_000 },
-  );
+        return {
+          repositories,
+          records,
+          reviewAudit,
+          reviewComments,
+          reviewWorkflow,
+          findingCollaboration,
+          artifactMetadata,
+        };
+      },
+      { consistentRead: true, statementTimeoutMs: 5_000 },
+    );
+    // The callback's successful return is not a successful transaction.
+    // Transfer ownership only after COMMIT (and executor settlement) succeeds.
+    transferred = result !== null;
+    return result;
+  } finally {
+    if (!transferred) {
+      for (const bytes of owned) bytes.fill(0);
+    }
+  }
 }
