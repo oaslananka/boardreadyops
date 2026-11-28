@@ -105,6 +105,7 @@ export function RunHeader({
   headingTag: HeadingTag = "h1",
 }: Readonly<{ run: RunDetail; signedIn: boolean; returnPath: string; headingTag?: "h1" | "h2" | "div" }>) {
   const dispatch = releaseRepositoryDispatchAvailability(run.repository);
+  const dispatchBlockedReason = dispatch.enabled ? undefined : dispatch.reason;
   return (
     <header className="flex min-w-0 flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-e2 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
@@ -148,11 +149,7 @@ export function RunHeader({
             {...(dispatch.enabled ? {} : { dispatchBlockedReason: dispatch.reason })}
           />
         ) : (
-          <PublicRunActions
-            run={run}
-            returnPath={returnPath}
-            dispatchBlockedReason={dispatch.enabled ? undefined : dispatch.reason}
-          />
+          <PublicRunActions run={run} returnPath={returnPath} dispatchBlockedReason={dispatchBlockedReason} />
         )}
       </div>
     </header>
