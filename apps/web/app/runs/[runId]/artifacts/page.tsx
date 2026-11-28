@@ -37,7 +37,12 @@ export default async function ArtifactsPage({ params, searchParams }: PageProps)
   if (result.state === "not-found") notFound();
   if (result.state === "not-configured") return <RunUnavailable runId={runId} />;
   return (
-    <RunPageFrame run={result.run} active="artifacts" liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}>
+    <RunPageFrame
+      signedIn={Boolean(viewer.session)}
+      run={result.run}
+      active="artifacts"
+      liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}
+    >
       <ArtifactsView run={result.run} searchParameters={query} />
     </RunPageFrame>
   );

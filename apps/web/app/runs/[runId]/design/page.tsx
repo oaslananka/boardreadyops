@@ -47,7 +47,12 @@ export default async function RunDesignPage({ params, searchParams }: Readonly<R
     loadRunDesignBaseSnapshots(runId, result.run.repositoryId),
   ]);
   return (
-    <RunPageFrame run={result.run} active="design" liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}>
+    <RunPageFrame
+      signedIn={Boolean(viewer.session)}
+      run={result.run}
+      active="design"
+      liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}
+    >
       <RunDesignView
         runId={runId}
         snapshots={snapshots}

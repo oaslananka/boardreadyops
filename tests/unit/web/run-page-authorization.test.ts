@@ -46,6 +46,17 @@ describe("run page authorization", () => {
     expect(failures).toEqual([]);
   });
 
+  it("passes actual session state to every Run frame and the finding action view", async () => {
+    const failures: string[] = [];
+    for (const page of await runPagePaths()) {
+      const source = await readFile(page, "utf8");
+      if (!/<RunPageFrame\b[^>]*signedIn=\{Boolean\(viewer.session\)\}/su.test(source)) failures.push(page);
+    }
+    expect(failures).toEqual([]);
+    const findings = await readFile(join(runPagesRoot, "findings", "page.tsx"), "utf8");
+    expect(findings).toMatch(/<FindingsView\b[^>]*signedIn=\{Boolean\(viewer.session\)\}/su);
+  });
+
   it("reads cookies unconditionally, so a page rendering the viewer stays per-request", async () => {
     // Gating cookies() on SESSION_SECRET made a page's dynamism depend on whether that variable
     // was set during `next build`. It is not passed to the build, so the landing page was

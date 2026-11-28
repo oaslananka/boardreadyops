@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { authenticatedStorageState } from "./fixtures/auth.js";
+
+test.use({ storageState: authenticatedStorageState });
 
 for (const width of [320, 390, 1440]) {
   test(`run design keeps evidence accessible at ${width}px`, async ({ page }) => {
@@ -44,4 +47,37 @@ test("blocked run goes straight to the first recorded finding on mobile", async 
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(
     false,
   );
+});
+
+// The public evidence remains readable without rendering controls that would
+// inevitably require a session. Do not click the real OAuth or mutation links.
+test.describe("public Run permissions", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  for (const width of [390, 1440]) {
+    test(`signed-out visitor can inspect findings without unavailable actions at ${width}px @smoke`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/runs/demo-fail/findings");
+      await expect(
+        page.getByRole("link", { name: width < 1024 ? "Sign in" : "Sign in with GitHub", exact: true }),
+      ).toBeVisible();
+      await expect(page.getByText("bom.missing-mpn", { exact: true }).first()).toBeVisible();
+      await expect(page.getByRole("button", { name: "Re-run readiness" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Queue release preview" })).toHaveCount(0);
+      await expect(page.getByText("Request exception", { exact: true })).toHaveCount(0);
+      const signIn = page.getByRole("link", { name: "Sign in to request an exception" });
+      await expect(signIn).toBeVisible();
+      await expect(signIn).toHaveAttribute("href", "/api/auth/github/login?return_to=%2Fruns%2Fdemo-fail%2Ffindings");
+      if (width < 1024) {
+        await page.locator("main > details > summary").first().click();
+        await expect(page.getByRole("button", { name: "Re-run readiness" })).toHaveCount(0);
+        await expect(page.getByRole("button", { name: "Queue release preview" })).toHaveCount(0);
+      }
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth),
+      ).toBe(false);
+    });
+  }
 });

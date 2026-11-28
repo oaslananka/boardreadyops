@@ -174,9 +174,9 @@ function viewMarkup(view: "artifacts" | "attempts" | "findings" | "summary"): st
       : view === "attempts"
         ? createElement(AttemptsView, { run })
         : view === "findings"
-          ? createElement(FindingsView, { run, searchParameters: { findingGroup: "severity" } })
+          ? createElement(FindingsView, { run, signedIn: true, searchParameters: { findingGroup: "severity" } })
           : createElement(ArtifactsView, { run, searchParameters: {} });
-  return renderToStaticMarkup(createElement(RunPageFrame, { run, active: view, children }));
+  return renderToStaticMarkup(createElement(RunPageFrame, { run, active: view, signedIn: true, children }));
 }
 
 async function axeViolations(markup: string, path: string): Promise<string[]> {
@@ -206,12 +206,62 @@ describe("run investigation accessibility", () => {
     vi.unstubAllEnvs();
   });
 
+  it.each(["summary", "findings", "design", "attempts", "artifacts", "publication", "audit"] as const)(
+    "keeps signed-out %s evidence readable and replaces unavailable Run actions with contextual sign-in",
+    (active) => {
+      const run = sampleRun();
+      const markup = renderToStaticMarkup(
+        createElement(RunPageFrame, { run, active, signedIn: false }, "Recorded evidence"),
+      );
+      expect(markup).toContain("Recorded evidence");
+      expect(markup).toContain("Readiness checks passed");
+      expect(markup).not.toContain("Re-run readiness");
+      expect(markup).not.toContain("Queue release preview");
+      expect(markup).toContain("Sign in to manage this run");
+      expect(markup).toContain("Repository access is required");
+      const suffix = active === "summary" ? "" : `/${active}`;
+      expect(markup).toContain(
+        `href="/api/auth/github/login?return_to=${encodeURIComponent(`/runs/${run.id}${suffix}`)}"`,
+      );
+    },
+  );
+
+  it("does not imply that signing in enables actions on a branch-only run", () => {
+    const run = sampleRun();
+    run.pullRequestNumber = undefined;
+    const markup = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "summary", signedIn: false }, "Recorded evidence"),
+    );
+    expect(markup).toContain("Open a pull request");
+    expect(markup).not.toContain("Sign in to manage this run");
+    expect(markup).not.toContain("Re-run readiness");
+    expect(markup).not.toContain("Queue release preview");
+  });
+
+  it("keeps signed-out finding evidence and grouping while offering one contextual sign-in instead of exception actions", async () => {
+    const run = sampleRun();
+    const finding = run.findings[0];
+    if (!finding) throw new Error("Missing test finding");
+    run.findings = [finding, { ...finding, id: "finding-2" }];
+    run.findingsPage = { ...run.findingsPage, total: 2 };
+    const markup = renderToStaticMarkup(
+      createElement(FindingsView, { run, signedIn: false, searchParameters: { findingGroup: "rule" } }),
+    );
+    expect(markup).toContain("2 matching findings");
+    expect(markup).toContain("Show 1 more findings for bom.missing-mpn on this page");
+    expect(markup).toContain("A populated component has no manufacturer part number.");
+    expect(markup).not.toContain("Request exception");
+    expect(markup.match(/Sign in to request an exception/g)).toHaveLength(1);
+    expect(markup).toContain('href="/api/auth/github/login?return_to=%2Fruns%2Frun-accessible%2Ffindings"');
+    expect(await axeViolations(markup, "/runs/run-accessible/findings")).toEqual([]);
+  });
+
   it("lets mobile design viewers reach source-bound evidence before optional metadata and actions", async () => {
     const run = sampleRun();
     const markup = renderToStaticMarkup(
       createElement(
         RunPageFrame,
-        { run, active: "design" },
+        { run, active: "design", signedIn: true },
         createElement("section", { id: "design-evidence" }, "Design view"),
       ),
     );
@@ -231,7 +281,7 @@ describe("run investigation accessibility", () => {
     const markup = renderToStaticMarkup(
       createElement(
         RunPageFrame,
-        { run, active: "design" },
+        { run, active: "design", signedIn: true },
         createElement("section", { id: "design-evidence" }, "Source-bound design"),
       ),
     );
@@ -249,7 +299,11 @@ describe("run investigation accessibility", () => {
     expect(await axeViolations(markup, "/runs/run-accessible/design")).toEqual([]);
 
     const summary = renderToStaticMarkup(
-      createElement(RunPageFrame, { run, active: "summary" }, createElement("section", null, "Summary")),
+      createElement(
+        RunPageFrame,
+        { run, active: "summary", signedIn: true },
+        createElement("section", null, "Summary"),
+      ),
     );
     expect(summary).toContain("This run has partial data");
     expect(summary).toContain("Inspect missing result");
@@ -338,7 +392,11 @@ describe("run investigation accessibility", () => {
     run.lastPublicationAttemptAt = undefined;
 
     const markup = renderToStaticMarkup(
-      createElement(RunPageFrame, { run, active: "publication" }, createElement(PublicationView, { run })),
+      createElement(
+        RunPageFrame,
+        { run, active: "publication", signedIn: true },
+        createElement(PublicationView, { run }),
+      ),
     );
 
     expect(markup).toContain("No signed result arrived, so numeric metrics cannot be verified");
@@ -386,7 +444,7 @@ describe("run investigation accessibility", () => {
 
     expect(markup).toContain("A GitHub Actions run is linked to this record");
     const summary = renderToStaticMarkup(
-      createElement(RunPageFrame, { run, active: "summary" }, createElement(SummaryView, { run })),
+      createElement(RunPageFrame, { run, active: "summary", signedIn: true }, createElement(SummaryView, { run })),
     );
     expect(summary).toContain("workflow logs do not replace a signed result");
     expect(summary).not.toContain("workflow logs in GitHub are the record to trust");
@@ -505,7 +563,7 @@ describe("run investigation accessibility", () => {
     }));
     run.findingsPage = { page: 1, pageSize: 25, total: 326, totalPages: 14 };
 
-    const markup = renderToStaticMarkup(createElement(FindingsView, { run, searchParameters: {} }));
+    const markup = renderToStaticMarkup(createElement(FindingsView, { run, signedIn: true, searchParameters: {} }));
     expect(markup).toContain("326 matching findings");
     expect(markup).toContain("Show 23 more findings for drc.copper_edge_clearance on this page");
     expect(markup).toContain("drc.unconnected_items");
@@ -525,7 +583,7 @@ describe("run investigation accessibility", () => {
     }));
     run.findingsPage = { page: 1, pageSize: 25, total: 326, totalPages: 14 };
     const markup = renderToStaticMarkup(
-      createElement(FindingsView, { run, searchParameters: { findingGroup: "none" } }),
+      createElement(FindingsView, { run, signedIn: true, searchParameters: { findingGroup: "none" } }),
     );
     expect(markup).not.toContain("Show 24 more findings");
     expect(markup.match(/Request exception/g)).toHaveLength(25);
@@ -555,7 +613,9 @@ describe("run investigation accessibility", () => {
     const run = sampleRun();
     run.readinessScore = undefined;
     const children = createElement(SummaryView, { run });
-    const markup = renderToStaticMarkup(createElement(RunPageFrame, { run, active: "summary", children }));
+    const markup = renderToStaticMarkup(
+      createElement(RunPageFrame, { run, active: "summary", signedIn: true, children }),
+    );
     expect(markup).toContain("Not reported");
     expect(markup).toContain("Readiness score unavailable");
     expect(markup).toContain("Safe (restricted execution)");
@@ -567,7 +627,7 @@ describe("run investigation accessibility", () => {
     const run = sampleRun();
     run.investigationState = "partial_data";
     const html = renderToStaticMarkup(
-      createElement(RunPageFrame, { run, active: "summary" }, createElement(SummaryView, { run })),
+      createElement(RunPageFrame, { run, active: "summary", signedIn: true }, createElement(SummaryView, { run })),
     );
     expect(html).toContain("Readiness not verified");
     expect(html).toContain("This run has partial data");
@@ -784,7 +844,7 @@ describe("run investigation accessibility", () => {
       kind: "electrical",
       waivedAt: undefined,
     }));
-    const markup = renderToStaticMarkup(createElement(FindingsView, { run, searchParameters: {} }));
+    const markup = renderToStaticMarkup(createElement(FindingsView, { run, signedIn: true, searchParameters: {} }));
     expect(markup.match(/Restore the check/gu)).toHaveLength(2);
     expect(markup.match(/missing execution evidence/gu)).toHaveLength(2);
     expect(markup).toContain("require-kicad: true");
@@ -806,7 +866,7 @@ describe("run investigation accessibility", () => {
         waivedAt: undefined,
       },
     ];
-    const markup = renderToStaticMarkup(createElement(FindingsView, { run, searchParameters: {} }));
+    const markup = renderToStaticMarkup(createElement(FindingsView, { run, signedIn: true, searchParameters: {} }));
     expect(markup).toContain("Set the PCB title-block revision first");
     expect(markup).toContain("CHANGELOG.md");
     expect(markup).toContain("Repository-level finding");

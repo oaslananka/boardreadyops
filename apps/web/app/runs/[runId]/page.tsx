@@ -29,7 +29,12 @@ export default async function RunPage({ params }: Readonly<RunPageProps>) {
   if (result.state === "not-found") notFound();
   if (result.state === "not-configured") return <RunUnavailable runId={runId} />;
   return (
-    <RunPageFrame run={result.run} active="summary" liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}>
+    <RunPageFrame
+      signedIn={Boolean(viewer.session)}
+      run={result.run}
+      active="summary"
+      liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}
+    >
       <SummaryView run={result.run} />
     </RunPageFrame>
   );
