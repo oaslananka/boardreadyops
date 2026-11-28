@@ -99,46 +99,64 @@ export async function prepareClaimedLocalArchiveZip(input: {
 }): Promise<ReturnType<typeof prepareClaimedArchiveZip> | null> {
   if (!input?.db || !input.claim || input.storageDriver !== "local" || !input.storageRoot) return null;
 
-  const slices = await prepareClaimedConsistentMetadataSlices(input.db, input.claim);
+  const request = { ...input, claim: { ...input.claim } };
+  const slices = await prepareClaimedConsistentMetadataSlices(request.db, request.claim);
   if (!slices) return null;
 
-  const artifactIds = boundedClaimedArtifactIds(slices, input.claim.exportId);
-
   const verifiedObjects: VerifiedArchiveObject[] = [];
-  for (const artifactId of artifactIds) {
-    const verified = await readClaimedVerifiedLocalExportObject({
-      db: input.db,
-      claim: input.claim,
-      artifactId,
-      storageDriver: input.storageDriver,
-      storageRoot: input.storageRoot,
-    });
-    if (!verified) return null;
-    verifiedObjects.push(verified);
-  }
+  let archive: ReturnType<typeof prepareClaimedArchiveZip> | null = null;
+  let accepted = false;
+  try {
+    const artifactIds = boundedClaimedArtifactIds(slices, request.claim.exportId);
+    // Keep reservations and physical reads sequential, stopping on first denial.
+    const allVerified = await artifactIds.reduce(
+      (pending, artifactId) =>
+        pending.then(async (previous) => {
+          if (!previous) return false;
+          const verified = await readClaimedVerifiedLocalExportObject({ ...request, artifactId });
+          if (!verified) return false;
+          verifiedObjects.push(verified);
+          return true;
+        }),
+      Promise.resolve(true),
+    );
+    if (!allVerified) return null;
 
-  // Recheck earlier artifacts after all filesystem IO, not only immediately
-  // after each read. Revocation or a deletion fence on a prior artifact is
-  // never masked by a later successful read.
-  for (const candidate of verifiedObjects) {
-    const current = await lookupClaimedExportObject(input.db, input.claim, candidate.object.artifactId);
-    if (!current || !sameObject(current, candidate.object)) return null;
+    // Recheck all objects and the original claim both before and after
+    // packaging. A later successful object read never masks an earlier denial.
+    if (!(await recheckArchiveInputs(request, verifiedObjects, slices.repositories.sha256))) return null;
+    archive = prepareClaimedArchiveZip({ slices, verifiedObjects });
+    if (!(await recheckArchiveInputs(request, verifiedObjects, slices.repositories.sha256))) return null;
+    accepted = true;
+    return archive;
+  } finally {
+    for (const slice of Object.values(slices)) slice.bytes.fill(0);
+    for (const object of verifiedObjects) object.bytes.fill(0);
+    if (!accepted) archive?.bytes.fill(0);
   }
+}
 
-  const currentManifest = await prepareClaimedExportManifest(new DataExportInventoryStore(input.db), input.claim);
-  if (!currentManifest || currentManifest.sha256 !== slices.repositories.sha256) return null;
-
-  const archive = prepareClaimedArchiveZip({ slices, verifiedObjects });
-  // ZIP construction can outlast a claim or race an external object deletion.
-  // Recheck both physical-object authority and the original lease/scope after
-  // packaging, before making even this internal in-memory result available.
-  for (const candidate of verifiedObjects) {
-    const current = await lookupClaimedExportObject(input.db, input.claim, candidate.object.artifactId);
-    if (!current || !sameObject(current, candidate.object)) return null;
+async function recheckArchiveInputs(
+  request: Parameters<typeof prepareClaimedLocalArchiveZip>[0],
+  verifiedObjects: readonly VerifiedArchiveObject[],
+  inventorySha: string,
+): Promise<boolean> {
+  const allCurrent = await verifiedObjects.reduce(
+    (pending, candidate) =>
+      pending.then(async (previous) => {
+        if (!previous) return false;
+        const current = await lookupClaimedExportObject(request.db, request.claim, candidate.object.artifactId);
+        return current !== null && sameObject(current, candidate.object);
+      }),
+    Promise.resolve(true),
+  );
+  if (!allCurrent) return false;
+  const manifest = await prepareClaimedExportManifest(new DataExportInventoryStore(request.db), request.claim);
+  try {
+    return manifest?.sha256 === inventorySha;
+  } finally {
+    manifest?.bytes.fill(0);
   }
-  const afterPackaging = await prepareClaimedExportManifest(new DataExportInventoryStore(input.db), input.claim);
-  if (afterPackaging?.sha256 !== slices.repositories.sha256) return null;
-  return archive;
 }
 
 /**
@@ -154,16 +172,28 @@ export async function stageClaimedLocalArchiveCommitment(
   archive: NonNullable<Awaited<ReturnType<typeof prepareClaimedLocalArchiveZip>>>;
   expiresAt: string;
 } | null> {
-  const archive = await prepareClaimedLocalArchiveZip(input);
+  if (!input?.db || !input.claim || input.storageDriver !== "local" || !input.storageRoot) return null;
+  const request = { ...input, claim: { ...input.claim } };
+  const archive = await prepareClaimedLocalArchiveZip(request);
   if (!archive) return null;
-  if (!verifyClaimedExportArchiveIntegrity(archive.bytes, archive.sha256, input.claim.exportId)) {
-    throw new ExportArchivePreflightError();
+  let accepted = false;
+  try {
+    if (!verifyClaimedExportArchiveIntegrity(archive.bytes, archive.sha256, request.claim.exportId)) {
+      throw new ExportArchivePreflightError();
+    }
+    const staged = await new DataExportArchiveCommitmentStore(request.db).stage(request.claim, archive);
+    if (
+      staged?.sha256 !== archive.sha256 ||
+      staged.byteLength !== archive.byteLength ||
+      staged.files !== archive.files
+    ) {
+      return null;
+    }
+    accepted = true;
+    return { archive, expiresAt: staged.expiresAt };
+  } finally {
+    if (!accepted) archive.bytes.fill(0);
   }
-  const staged = await new DataExportArchiveCommitmentStore(input.db).stage(input.claim, archive);
-  if (staged?.sha256 !== archive.sha256 || staged.byteLength !== archive.byteLength || staged.files !== archive.files) {
-    return null;
-  }
-  return { archive, expiresAt: staged.expiresAt };
 }
 
 /**
@@ -178,18 +208,24 @@ export async function stageClaimedLocalArchiveCommitment(
 export async function stageClaimedDurableLocalArchiveCommitment(
   input: Parameters<typeof prepareClaimedLocalArchiveZip>[0] & { privateArchiveRoot: string },
 ): Promise<{ sha256: string; byteLength: number; files: number; expiresAt: string } | null> {
-  const archive = await prepareClaimedLocalArchiveZip(input);
+  if (!input?.db || !input.claim || input.storageDriver !== "local" || !input.storageRoot) return null;
+  const request = { ...input, claim: { ...input.claim } };
+  const archive = await prepareClaimedLocalArchiveZip(request);
   if (!archive) return null;
-  const sealed = await sealLocalExportArchive({
-    archiveRoot: input.privateArchiveRoot,
-    exportId: input.claim.exportId,
-    archive,
-  });
-  if (sealed?.sha256 !== archive.sha256 || sealed.byteLength !== archive.byteLength) return null;
-  const staged = await new DataExportArchiveCommitmentStore(input.db).stage(input.claim, archive);
-  if (staged?.sha256 !== archive.sha256 || staged.byteLength !== archive.byteLength || staged.files !== archive.files)
-    return null;
-  return { ...staged };
+  try {
+    const sealed = await sealLocalExportArchive({
+      archiveRoot: request.privateArchiveRoot,
+      exportId: request.claim.exportId,
+      archive,
+    });
+    if (sealed?.sha256 !== archive.sha256 || sealed.byteLength !== archive.byteLength) return null;
+    const staged = await new DataExportArchiveCommitmentStore(request.db).stage(request.claim, archive);
+    if (staged?.sha256 !== archive.sha256 || staged.byteLength !== archive.byteLength || staged.files !== archive.files)
+      return null;
+    return { ...staged };
+  } finally {
+    archive.bytes.fill(0);
+  }
 }
 
 /**

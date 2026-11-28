@@ -22,6 +22,14 @@ export function prepareClaimedArchiveZip(input: Parameters<typeof prepareClaimed
   readonly files: number;
 } {
   const prepared = prepareClaimedArchiveEntries(input);
+  try {
+    return buildPreparedZip(prepared);
+  } finally {
+    for (const entry of prepared.entries) entry.bytes.fill(0);
+  }
+}
+
+function buildPreparedZip(prepared: ReturnType<typeof prepareClaimedArchiveEntries>) {
   if (prepared.entries.length < 7 || prepared.entries.length > 107 || prepared.totalBytes > maxArchiveBytes) {
     throw new ExportArchivePreflightError();
   }
@@ -58,43 +66,50 @@ export function prepareClaimedArchiveZip(input: Parameters<typeof prepareClaimed
       entries: entries.map(({ path, byteLength, sha256 }) => ({ path, byteLength, sha256 })),
     }),
   );
-  if (
-    receiptBytes.length > maxReceiptBytes ||
-    !Number.isSafeInteger(prepared.totalBytes + receiptBytes.length) ||
-    prepared.totalBytes + receiptBytes.length > maxArchiveBytes
-  ) {
-    throw new ExportArchivePreflightError();
-  }
-  entries.push({
-    path: receiptPath,
-    bytes: receiptBytes,
-    sha256: createHash("sha256").update(receiptBytes).digest("hex"),
-    byteLength: receiptBytes.length,
-  });
-  entries.sort((a, b) => {
-    if (a.path < b.path) return -1;
-    if (a.path > b.path) return 1;
-    return 0;
-  });
+  try {
+    if (
+      receiptBytes.length > maxReceiptBytes ||
+      !Number.isSafeInteger(prepared.totalBytes + receiptBytes.length) ||
+      prepared.totalBytes + receiptBytes.length > maxArchiveBytes
+    ) {
+      throw new ExportArchivePreflightError();
+    }
+    entries.push({
+      path: receiptPath,
+      bytes: receiptBytes,
+      sha256: createHash("sha256").update(receiptBytes).digest("hex"),
+      byteLength: receiptBytes.length,
+    });
+    entries.sort((a, b) => {
+      if (a.path < b.path) return -1;
+      if (a.path > b.path) return 1;
+      return 0;
+    });
 
-  // Reuse the repository's established ZIP writer; no external service, disk,
-  // secret or database mutation. Fail closed if ZIP framing exceeds the budget.
-  const bytes = createZipBuffer(
-    entries.map((entry) => ({
-      name: entry.path,
-      data: entry.bytes,
-      // Managed bytes may be legitimate but extremely compressible. Storing
-      // them avoids the ZIP-bomb ratio rejection in independent extractors
-      // without changing their security thresholds or shared writer defaults.
-      store: entry.path.startsWith("objects/"),
-    })),
-    archiveTimestamp,
-  );
-  if (bytes.length > maxArchiveBytes) throw new ExportArchivePreflightError();
-  return {
-    bytes,
-    sha256: createHash("sha256").update(bytes).digest("hex"),
-    byteLength: bytes.length,
-    files: entries.length,
-  };
+    // Reuse the repository's established ZIP writer; no external service, disk,
+    // secret or database mutation. Fail closed if ZIP framing exceeds the budget.
+    const bytes = createZipBuffer(
+      entries.map((entry) => ({
+        name: entry.path,
+        data: entry.bytes,
+        // Managed bytes may be legitimate but extremely compressible. Storing
+        // them avoids the ZIP-bomb ratio rejection in independent extractors
+        // without changing their security thresholds or shared writer defaults.
+        store: entry.path.startsWith("objects/"),
+      })),
+      archiveTimestamp,
+    );
+    if (bytes.length > maxArchiveBytes) {
+      bytes.fill(0);
+      throw new ExportArchivePreflightError();
+    }
+    return {
+      bytes,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      byteLength: bytes.length,
+      files: entries.length,
+    };
+  } finally {
+    receiptBytes.fill(0);
+  }
 }

@@ -3,9 +3,23 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { prepareClaimedLocalArchiveZip } from "../../../apps/web/lib/data-export-local-archive.js";
+import * as zipBuilder from "../../../apps/web/lib/data-export-archive-zip.js";
+import {
+  prepareClaimedLocalArchiveZip,
+  stageClaimedDurableLocalArchiveCommitment,
+  stageClaimedLocalArchiveCommitment,
+} from "../../../apps/web/lib/data-export-local-archive.js";
+import * as archiveStorage from "../../../apps/web/lib/data-export-local-archive-storage.js";
+import * as objectReader from "../../../apps/web/lib/data-export-verified-object.js";
 import { sanitizeAndExtractArchive } from "../../../packages/cloud-core/src/archive-sanitizer.js";
+import { DataExportArchiveCommitmentStore } from "../../../packages/db/src/data-export-archive-commitment-store.js";
+import * as snapshotReader from "../../../packages/db/src/data-export-consistent-snapshot.js";
 import type { PgQueryExecutor } from "../../../packages/db/src/pg-executor.js";
+
+vi.mock("../../../apps/web/lib/data-export-archive-zip.js", { spy: true });
+vi.mock("../../../apps/web/lib/data-export-verified-object.js", { spy: true });
+vi.mock("../../../packages/db/src/data-export-consistent-snapshot.js", { spy: true });
+vi.mock("../../../apps/web/lib/data-export-local-archive-storage.js", { spy: true });
 
 const folders: string[] = [];
 const claim = {
@@ -116,10 +130,102 @@ async function fixture(options: { artifacts?: boolean } = {}) {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.clearAllMocks();
   await Promise.all(folders.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 describe("internal claim-bound local archive assembly", () => {
+  it.each(["success", "prepack", "postpack"] as const)(
+    "clears owned snapshot and object buffers on %s",
+    async (phase) => {
+      const f = await fixture();
+      if (phase === "prepack") f.liveReplies[3] = { rows: [] };
+      if (phase === "postpack") f.liveReplies[5] = { rows: [] };
+      const result = await prepareClaimedLocalArchiveZip(f.input);
+      const slices = await vi.mocked(snapshotReader.prepareClaimedConsistentMetadataSlices).mock.results[0]?.value;
+      expect(slices).not.toBeNull();
+      if (!slices) throw new Error("Missing snapshot");
+      expect(Object.values(slices).every((slice) => slice.bytes.every((byte) => byte === 0))).toBe(true);
+      const object = await vi.mocked(objectReader.readClaimedVerifiedLocalExportObject).mock.results[0]?.value;
+      expect(object?.bytes).toEqual(Buffer.alloc(f.bytes.length));
+      const zip = vi.mocked(zipBuilder.prepareClaimedArchiveZip).mock.results[0]?.value;
+      if (phase === "success") {
+        expect(result?.bytes).toBe(zip.bytes);
+        expect(result?.sha256).toBe(sha(result?.bytes ?? Buffer.alloc(0)));
+        expect(sanitizeAndExtractArchive(result?.bytes ?? Buffer.alloc(0)).fileCount).toBe(9);
+      } else {
+        expect(result).toBeNull();
+        if (phase === "postpack") expect(zip?.bytes).toEqual(Buffer.alloc(zip.byteLength));
+      }
+    },
+  );
+
+  it.each(["denied", "error", "success"] as const)("clears unreturned ZIP on staging %s", async (outcome) => {
+    const f = await fixture();
+    const stage = vi.spyOn(DataExportArchiveCommitmentStore.prototype, "stage");
+    if (outcome === "error") stage.mockRejectedValueOnce(new Error("synthetic stage failure"));
+    else if (outcome === "denied") stage.mockResolvedValueOnce(null);
+    else
+      stage.mockImplementationOnce(async (_claim, archive) => ({
+        sha256: archive.sha256,
+        byteLength: archive.byteLength,
+        files: archive.files,
+        expiresAt: "2027-01-01T00:00:00.000Z",
+      }));
+    const result = stageClaimedLocalArchiveCommitment(f.input);
+    if (outcome === "error") await expect(result).rejects.toThrow("synthetic stage failure");
+    else if (outcome === "denied") await expect(result).resolves.toBeNull();
+    else expect((await result)?.archive.sha256).toBe(sha((await result)?.archive.bytes ?? Buffer.alloc(0)));
+    const zip = vi.mocked(zipBuilder.prepareClaimedArchiveZip).mock.results[0]?.value;
+    expect(zip).toBeDefined();
+    if (outcome !== "success") expect(zip.bytes).toEqual(Buffer.alloc(zip.byteLength));
+  });
+
+  it.each(["denied", "success"] as const)("clears durable staging ZIP on %s", async (outcome) => {
+    const f = await fixture();
+    const seal = vi.spyOn(archiveStorage, "sealLocalExportArchive");
+    seal.mockImplementationOnce(async ({ exportId, archive }) =>
+      outcome === "denied" ? null : { exportId, sha256: archive.sha256, byteLength: archive.byteLength },
+    );
+    vi.spyOn(DataExportArchiveCommitmentStore.prototype, "stage").mockImplementationOnce(async (_claim, archive) => ({
+      sha256: archive.sha256,
+      byteLength: archive.byteLength,
+      files: archive.files,
+      expiresAt: "2027-01-01T00:00:00.000Z",
+    }));
+    const result = await stageClaimedDurableLocalArchiveCommitment({ ...f.input, privateArchiveRoot: f.root });
+    const zip = vi.mocked(zipBuilder.prepareClaimedArchiveZip).mock.results[0]?.value;
+    expect(zip).toBeDefined();
+    expect(zip.bytes).toEqual(Buffer.alloc(zip.byteLength));
+    if (outcome === "success") expect(result?.sha256).toBe(zip.sha256);
+    else expect(result).toBeNull();
+  });
+
+  it("keeps the original claim and storage root through asynchronous snapshot and staging", async () => {
+    const f = await fixture();
+    const request = { ...f.input, claim: { ...claim } };
+    const original = f.queryInside.getMockImplementation();
+    if (!original) throw new Error("Missing synthetic snapshot query");
+    f.queryInside.mockImplementationOnce(async () => {
+      request.claim.exportId = "different-export";
+      request.claim.workerId = "different-worker";
+      request.storageRoot = path.join(f.root, "missing");
+      return original();
+    });
+    const stage = vi
+      .spyOn(DataExportArchiveCommitmentStore.prototype, "stage")
+      .mockImplementationOnce(async (_claim, archive) => ({
+        sha256: archive.sha256,
+        byteLength: archive.byteLength,
+        files: archive.files,
+        expiresAt: "2027-01-01T00:00:00.000Z",
+      }));
+    const result = await stageClaimedLocalArchiveCommitment(request);
+    expect(result?.archive.files).toBe(9);
+    expect(stage.mock.calls[0]?.[0]).toEqual(claim);
+    expect(result?.archive.sha256).toBe(sha(result?.archive.bytes ?? Buffer.alloc(0)));
+  });
+
   it("builds an independently verifiable ZIP only after snapshot and repeated live claim checks", async () => {
     const f = await fixture();
     const result = await prepareClaimedLocalArchiveZip(f.input);
