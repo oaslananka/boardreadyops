@@ -100,9 +100,12 @@ function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunV
 
 export function RunHeader({
   run,
+  signedIn,
+  returnPath,
   headingTag: HeadingTag = "h1",
-}: Readonly<{ run: RunDetail; headingTag?: "h1" | "h2" | "div" }>) {
+}: Readonly<{ run: RunDetail; signedIn: boolean; returnPath: string; headingTag?: "h1" | "h2" | "div" }>) {
   const dispatch = releaseRepositoryDispatchAvailability(run.repository);
+  const dispatchProps = dispatch.enabled ? {} : { dispatchBlockedReason: dispatch.reason };
   return (
     <header className="flex min-w-0 flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-e2 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
@@ -138,25 +141,65 @@ export function RunHeader({
             </span>
           </div>
         </fieldset>
-        <RunActionBar
-          repositoryId={run.repositoryId}
-          runId={run.id}
-          hasPullRequest={run.pullRequestNumber !== undefined}
-          {...(dispatch.enabled ? {} : { dispatchBlockedReason: dispatch.reason })}
-        />
+        {signedIn ? (
+          <RunActionBar
+            repositoryId={run.repositoryId}
+            runId={run.id}
+            hasPullRequest={run.pullRequestNumber !== undefined}
+            {...dispatchProps}
+          />
+        ) : (
+          <PublicRunActions
+            run={run}
+            returnPath={returnPath}
+            dispatchBlockedReason={dispatchProps.dispatchBlockedReason}
+          />
+        )}
       </div>
     </header>
+  );
+}
+
+function runSignInHref(returnPath: string): string {
+  return `/api/auth/github/login?return_to=${encodeURIComponent(returnPath)}`;
+}
+
+function PublicRunActions({
+  run,
+  returnPath,
+  dispatchBlockedReason,
+}: Readonly<{ run: RunDetail; returnPath: string; dispatchBlockedReason: string | undefined }>) {
+  if (run.pullRequestNumber === undefined) {
+    return (
+      <p className="text-meta text-muted-foreground">
+        This run came from a branch push. Open a pull request for the branch to manage readiness or preview a release.
+      </p>
+    );
+  }
+  if (dispatchBlockedReason) return <p className="text-meta text-muted-foreground">{dispatchBlockedReason}</p>;
+  return (
+    <div className="flex flex-col items-start gap-2 lg:items-end">
+      <a className={buttonVariants({ size: "sm", variant: "outline" })} href={runSignInHref(returnPath)}>
+        Sign in to manage this run
+      </a>
+      <p className="text-xs text-muted-foreground lg:text-right">
+        Repository access is required to re-run checks or queue a release preview. You can still inspect recorded
+        evidence.
+      </p>
+    </div>
   );
 }
 
 export function RunPageFrame({
   run,
   active,
+  signedIn,
   children,
   liveRefresh,
-}: Readonly<{ run: RunDetail; active: RunView; children: ReactNode; liveRefresh?: boolean }>) {
-  const currentLabel =
-    [...primaryNavigationItems, ...evidenceNavigationItems].find((item) => item.view === active)?.label ?? "Run";
+}: Readonly<{ run: RunDetail; active: RunView; signedIn: boolean; children: ReactNode; liveRefresh?: boolean }>) {
+  const currentItem = [...primaryNavigationItems, ...evidenceNavigationItems].find((item) => item.view === active);
+  const currentLabel = currentItem?.label ?? "Run";
+  const returnPath = `/runs/${encodeURIComponent(run.id)}${currentItem?.suffix ?? ""}`;
   return (
     <AppShell
       viewerNav={<ViewerNav />}
@@ -178,11 +221,11 @@ export function RunPageFrame({
             </span>
           </summary>
           <div className="p-2 pt-0">
-            <RunHeader run={run} headingTag="h2" />
+            <RunHeader run={run} headingTag="h2" signedIn={signedIn} returnPath={returnPath} />
           </div>
         </details>
         <div className="hidden lg:block">
-          <RunHeader run={run} />
+          <RunHeader run={run} signedIn={signedIn} returnPath={returnPath} />
         </div>
         <RunVerdictBanner run={run} compact={active === "design" && run.investigationState === "partial_data"} />
         {liveRefresh ? <RunLiveRefresh enabled /> : null}
@@ -1183,12 +1226,14 @@ export function FindingList({
   repositoryId,
   repository,
   commitSha,
+  signedIn,
   group = "none",
 }: Readonly<{
   findings: FindingDetail[];
   repositoryId: string;
   repository?: string;
   commitSha?: string;
+  signedIn: boolean;
   group?: FindingGroup;
 }>) {
   if (findings.length === 0) {
@@ -1208,6 +1253,7 @@ export function FindingList({
             repositoryId={repositoryId}
             repository={repository}
             commitSha={commitSha}
+            signedIn={signedIn}
           />
         ))}
       </ul>
@@ -1236,6 +1282,7 @@ export function FindingList({
                 repositoryId={repositoryId}
                 repository={repository}
                 commitSha={commitSha}
+                signedIn={signedIn}
               />
             ))}
             {group === "rule" && entries.length > 1 ? (
@@ -1252,6 +1299,7 @@ export function FindingList({
                         repositoryId={repositoryId}
                         repository={repository}
                         commitSha={commitSha}
+                        signedIn={signedIn}
                       />
                     ))}
                   </ul>
@@ -1278,7 +1326,8 @@ function safeDomId(value: string): string {
 export function FindingsView({
   run,
   searchParameters,
-}: Readonly<{ run: RunDetail; searchParameters: SearchParameterMap }>) {
+  signedIn,
+}: Readonly<{ run: RunDetail; searchParameters: SearchParameterMap; signedIn: boolean }>) {
   const current = stringSearchParameters(searchParameters);
   const requestedGroup = firstParameter(searchParameters, "findingGroup");
   const group =
@@ -1363,12 +1412,24 @@ export function FindingsView({
         <p className="mt-3 text-sm font-medium text-foreground" aria-live="polite">
           {run.findingsPage.total} matching finding{run.findingsPage.total === 1 ? "" : "s"}
         </p>
+        {!signedIn && run.findings.length > 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            <a
+              className="text-primary underline underline-offset-2"
+              href={runSignInHref(`/runs/${encodeURIComponent(run.id)}/findings`)}
+            >
+              Sign in to request an exception
+            </a>{" "}
+            with repository access. Exceptions record decisions; they do not fix findings.
+          </p>
+        ) : null}
         <div className="mt-3">
           <FindingList
             findings={run.findings}
             repositoryId={run.repositoryId}
             repository={run.repository}
             commitSha={run.commitSha}
+            signedIn={signedIn}
             group={group}
           />
         </div>
@@ -1391,11 +1452,13 @@ function FindingRow({
   repositoryId,
   repository,
   commitSha,
+  signedIn,
 }: Readonly<{
   finding: FindingDetail;
   repositoryId: string;
   repository: string | undefined;
   commitSha: string | undefined;
+  signedIn: boolean;
 }>) {
   const sourceUrl = githubFindingSourceUrl(repository ?? "", commitSha ?? "", finding.path);
   const domain = findingDomainFromRule(finding.ruleId);
@@ -1410,17 +1473,19 @@ function FindingRow({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge value={finding.waivedAt ? "waived" : "active"} />
-          <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer underline underline-offset-2">Request exception</summary>
-            <p className="my-2 max-w-xs">
-              An exception records an engineering decision; it does not fix the underlying issue.
-            </p>
-            <FindingWaiverButton
-              repositoryId={repositoryId}
-              ruleId={finding.ruleId}
-              alreadyWaived={finding.waivedAt !== undefined}
-            />
-          </details>
+          {signedIn ? (
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer underline underline-offset-2">Request exception</summary>
+              <p className="my-2 max-w-xs">
+                An exception records an engineering decision; it does not fix the underlying issue.
+              </p>
+              <FindingWaiverButton
+                repositoryId={repositoryId}
+                ruleId={finding.ruleId}
+                alreadyWaived={finding.waivedAt !== undefined}
+              />
+            </details>
+          ) : null}
         </div>
       </header>
       <p className="mt-1 text-sm text-foreground">{finding.message}</p>

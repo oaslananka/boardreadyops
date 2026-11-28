@@ -33,7 +33,12 @@ export default async function AttemptsPage({ params }: PageProps) {
   if (result.state === "not-found") notFound();
   if (result.state === "not-configured") return <RunUnavailable runId={runId} />;
   return (
-    <RunPageFrame run={result.run} active="attempts" liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}>
+    <RunPageFrame
+      signedIn={Boolean(viewer.session)}
+      run={result.run}
+      active="attempts"
+      liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}
+    >
       <AttemptsView run={result.run} />
     </RunPageFrame>
   );

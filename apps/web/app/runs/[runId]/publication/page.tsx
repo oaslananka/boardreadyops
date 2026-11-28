@@ -34,6 +34,7 @@ export default async function PublicationPage({ params }: PageProps) {
   if (result.state === "not-configured") return <RunUnavailable runId={runId} />;
   return (
     <RunPageFrame
+      signedIn={Boolean(viewer.session)}
       run={result.run}
       active="publication"
       liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}
