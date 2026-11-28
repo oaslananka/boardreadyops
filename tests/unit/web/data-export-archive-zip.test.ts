@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import * as sanitizer from "@boardreadyops/cloud-core/archive-sanitizer";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ExportArchivePreflightError } from "../../../apps/web/lib/data-export-archive-entries.js";
 import { verifyClaimedExportArchiveIntegrity } from "../../../apps/web/lib/data-export-archive-integrity.js";
 import { prepareClaimedArchiveZip } from "../../../apps/web/lib/data-export-archive-zip.js";
 import { sanitizeAndExtractArchive } from "../../../packages/cloud-core/src/archive-sanitizer.js";
 import { createZipBuffer } from "../../../src/util/zip.js";
+
+vi.mock("@boardreadyops/cloud-core/archive-sanitizer", { spy: true });
+vi.mock("../../../src/util/zip.js", { spy: true });
+afterEach(() => vi.clearAllMocks());
 
 type ZipInput = Parameters<typeof prepareClaimedArchiveZip>[0];
 const sha256 = (value: Buffer): string => createHash("sha256").update(value).digest("hex");
@@ -66,6 +71,32 @@ function fixture() {
 }
 
 describe("bounded, internal claim-scoped ZIP packaging", () => {
+  it("clears builder-owned entries and receipt without changing caller inputs or output", () => {
+    const { input, bytes } = fixture();
+    const original = Buffer.from(bytes);
+    const metadata = Buffer.from(input.slices.repositories.bytes);
+    const result = prepareClaimedArchiveZip(input);
+    const entries = vi.mocked(createZipBuffer).mock.calls[0]?.[0];
+    expect(entries).toHaveLength(9);
+    expect(entries?.every((entry) => entry.data.every((byte) => byte === 0))).toBe(true);
+    expect(bytes).toEqual(original);
+    expect(input.slices.repositories.bytes).toEqual(metadata);
+    expect(result.sha256).toBe(sha256(result.bytes));
+    expect(sanitizeAndExtractArchive(result.bytes).fileCount).toBe(9);
+  });
+
+  it.each([true, false])("clears extracted temporary bytes after integrity verification (%s)", (valid) => {
+    const result = prepareClaimedArchiveZip(fixture().input);
+    const original = Buffer.from(result.bytes);
+    expect(verifyClaimedExportArchiveIntegrity(result.bytes, result.sha256, valid ? "export-1" : "other-export")).toBe(
+      valid,
+    );
+    const extracted = vi.mocked(sanitizer.sanitizeAndExtractArchive).mock.results[0]?.value;
+    expect(extracted?.files).toHaveLength(9);
+    expect(extracted?.files.every((entry) => entry.data.every((byte) => byte === 0))).toBe(true);
+    expect(result.bytes).toEqual(original);
+  });
+
   it("creates deterministic, independently extractable bytes with seven metadata entries and the exact object", () => {
     const { input, bytes, artifact } = fixture();
     const first = prepareClaimedArchiveZip(input);

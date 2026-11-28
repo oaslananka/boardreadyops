@@ -105,8 +105,9 @@ export function verifyClaimedExportArchiveIntegrity(
 ): boolean {
   if (!validArchiveClaim(archiveBytes, trustedZipSha256, expectedExportId)) return false;
 
+  let extracted: ReturnType<typeof sanitizeAndExtractArchive> | null = null;
   try {
-    const extracted = sanitizeAndExtractArchive(archiveBytes, {
+    extracted = sanitizeAndExtractArchive(archiveBytes, {
       maxCompressedSizeBytes: maxArchiveBytes,
       maxSingleFileBytes: maxArchiveBytes,
       maxTotalExtractedBytes: maxArchiveBytes,
@@ -123,5 +124,8 @@ export function verifyClaimedExportArchiveIntegrity(
     // Corrupted, oversized, ambiguously named or unparseable archives fail
     // closed without reflecting private filenames or parser diagnostics.
     return false;
+  } finally {
+    // Extracted entries are verifier-owned copies, never caller ZIP bytes.
+    for (const file of extracted?.files ?? []) file.data.fill(0);
   }
 }

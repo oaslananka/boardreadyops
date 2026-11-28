@@ -3,9 +3,12 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as physicalReader from "../../../apps/web/lib/data-export-local-object.js";
 import { readClaimedVerifiedLocalExportObject } from "../../../apps/web/lib/data-export-verified-object.js";
 import type { ExportRecordClaim } from "../../../packages/db/src/data-export-record-snapshot.js";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
+
+vi.mock("../../../apps/web/lib/data-export-local-object.js", { spy: true });
 
 const roots: string[] = [];
 const claim: ExportRecordClaim = {
@@ -46,10 +49,53 @@ function input(root: string, db: SqlQueryExecutor) {
 }
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.clearAllMocks();
   await Promise.all(roots.splice(0).map((p) => rm(p, { recursive: true, force: true })));
 });
 
 describe("claimed export object post-IO authority recheck", () => {
+  it.each(["revoked", "release-failed"] as const)("wipes physical bytes after %s", async (outcome) => {
+    const f = await fixture();
+    const { db, query } = dbWithRows(f.row, f.row, outcome === "revoked" ? null : f.row);
+    if (outcome === "release-failed") {
+      query.mockImplementation(async (sql: string) => {
+        if (sql.includes("boardreadyops_begin_export_object_copy")) return { rows: [{ outcome: "reserved" }] };
+        if (sql.includes("boardreadyops_finish_export_object_copy")) return { rows: [{ outcome: "stale" }] };
+        return { rows: [f.row] };
+      });
+    }
+    const result = readClaimedVerifiedLocalExportObject(input(f.root, db));
+    if (outcome === "revoked") await expect(result).resolves.toBeNull();
+    else await expect(result).rejects.toThrow("Export object copy reservation could not be settled");
+    const read = await vi.mocked(physicalReader.readVerifiedLocalExportObject).mock.results[0]?.value;
+    expect(read).toEqual(Buffer.alloc(f.bytes.length));
+  });
+
+  it("pins the original object and reservation identity across asynchronous lookup", async () => {
+    const f = await fixture();
+    const { db, query } = dbWithRows(f.row, f.row, f.row);
+    const request = { ...input(f.root, db), claim: { ...claim } };
+    const original = query.getMockImplementation();
+    if (!original) throw new Error("Missing synthetic query");
+    query.mockImplementationOnce(async (...args) => {
+      request.claim.exportId = "different-export";
+      request.claim.workerId = "different-worker";
+      request.artifactId = "different-object";
+      request.storageRoot = path.join(f.root, "missing");
+      return original(...args);
+    });
+    const result = await readClaimedVerifiedLocalExportObject(request);
+    expect(result?.bytes).toEqual(f.bytes);
+    expect(
+      query.mock.calls.filter(([sql]) => sql.includes("FROM data_exports AS exports")).map(([, args]) => args),
+    ).toEqual(Array.from({ length: 3 }, () => [...Object.values(claim), f.row.id]));
+    expect(query.mock.calls.find(([sql]) => sql.includes("boardreadyops_finish_export_object_copy"))?.[1]).toEqual([
+      claim.exportId,
+      claim.workerId,
+      expect.any(String),
+    ]);
+  });
+
   it("returns verified bytes only if the original scoped claim survives both DB reads", async () => {
     const f = await fixture();
     const { db, query } = dbWithRows(f.row, f.row, f.row);

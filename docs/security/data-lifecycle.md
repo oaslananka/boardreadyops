@@ -857,8 +857,17 @@ growth. Short reads, changed file identity/permissions, invalid integrity
 and descriptor-close failures deny delivery and clear the temporary read
 buffer. Seal readback, rejected final requester audits and finished or
 failed transaction-owned consumption also clear their temporary ZIP
-buffers. This does not change the existing authorization or retention
-contract, nor prove customer receipt. A legal-hold-aware database preview classifies active, held, expired
+buffers. Ordinary claim-bound ZIP preparation also pins the original
+claim and storage root, clears verified object and snapshot buffers after
+assembly or rejection, and clears any unreturned ZIP on late authorization
+or staging failure. Metadata-only durable staging clears its in-memory
+ZIP after the seal and commitment operations settle. The archive builder
+and integrity verifier clear their owned entry and receipt buffers without
+modifying caller-owned data. A failed durable object-copy release denies
+the pending result and clears its physical read buffer. These targeted
+buffer-lifetime safeguards do not guarantee erasure of every runtime or
+operating-system copy. This does not change the existing authorization or
+retention contract, nor prove customer receipt. A legal-hold-aware database preview classifies active, held, expired
 and cleaned commitments. The new **internal, not scheduled** physical
 cleanup function accepts only a claim-bound expired/revoked ZIP with
 a verifiable original tenant/installation relationship, private owner-only
