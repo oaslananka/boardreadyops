@@ -864,7 +864,11 @@ or staging failure. Metadata-only durable staging clears its in-memory
 ZIP after the seal and commitment operations settle. The archive builder
 and integrity verifier clear their owned entry and receipt buffers without
 modifying caller-owned data. A failed durable object-copy release denies
-the pending result and clears its physical read buffer. These targeted
+the pending result and clears its physical read buffer. The consistent
+metadata snapshot pins its original claim and transfers its seven owned
+slice buffers only after the read-only transaction successfully settles.
+A rejected slice, inconsistent snapshot or transaction failure clears
+every previously prepared slice. These targeted
 buffer-lifetime safeguards do not guarantee erasure of every runtime or
 operating-system copy. This does not change the existing authorization or
 retention contract, nor prove customer receipt. A legal-hold-aware database preview classifies active, held, expired
