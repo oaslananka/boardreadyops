@@ -10,7 +10,8 @@ const lifecycleDocumentation = readFileSync("docs/product/run-lifecycle.md", "ut
 describe("run investigation routes", () => {
   it("provides route-level navigation and shared investigation components", () => {
     for (const route of ["attempts", "findings", "artifacts", "publication", "audit"]) {
-      expect(readFileSync(`apps/web/app/runs/[runId]/${route}/page.tsx`, "utf8")).toContain(`active="${route}"`);
+      const page = readFileSync(`apps/web/app/runs/[runId]/${route}/page.tsx`, "utf8");
+      expect(page).toContain(page.includes("renderFilteredRunPage") ? `active: "${route}"` : `active="${route}"`);
     }
     expect(component).toContain('aria-label="Run investigation"');
     // The trail now lives in the topbar, so the frame passes items up rather than rendering them.
@@ -41,14 +42,20 @@ describe("run investigation routes", () => {
       "audit/page.tsx",
     ]) {
       const page = readFileSync(`apps/web/app/runs/[runId]/${route}`, "utf8");
-      expect(page).toContain("shouldLiveRefreshRun");
-      expect(page).toContain("liveRefresh={");
+      const frame = page.includes("renderFilteredRunPage")
+        ? readFileSync("apps/web/app/runs/[runId]/filtered-run-page.tsx", "utf8")
+        : page;
+      expect(frame).toContain("shouldLiveRefreshRun");
+      expect(frame).toContain("liveRefresh={");
     }
   });
 
   it("blocks run actions when the deployment rollout excludes the repository", () => {
     expect(component).toContain("releaseRepositoryDispatchAvailability(run.repository)");
-    expect(component).toContain("{...(dispatch.enabled ? {} : { dispatchBlockedReason: dispatch.reason })}");
+    expect(component).toContain(
+      "const dispatchProps = dispatch.enabled ? {} : { dispatchBlockedReason: dispatch.reason }",
+    );
+    expect(component).toContain("{...dispatchProps}");
   });
 
   it("uses flat summary sections for first-pass run evidence", () => {

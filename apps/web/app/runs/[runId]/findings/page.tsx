@@ -1,49 +1,11 @@
-import { notFound } from "next/navigation";
-import {
-  FindingsView,
-  filtersFromSearchParameters,
-  RunPageFrame,
-  RunUnavailable,
-  type SearchParameterMap,
-} from "../../../../components/run-investigation.js";
-import {
-  loadRunDashboard,
-  resolveRunPageTitle,
-  runDashboardLoaderDependencies,
-} from "../../../../lib/run-dashboard.js";
-import { shouldLiveRefreshRun } from "../../../../lib/run-live-refresh.js";
-import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
+import { type FilteredRunPageProps, renderFilteredRunPage, resolveFilteredRunMetadata } from "../filtered-run-page.js";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = Readonly<{
-  params: Promise<{ runId: string }>;
-  searchParams: Promise<SearchParameterMap>;
-}>;
-
-export async function generateMetadata({ params }: PageProps) {
-  const { runId } = await params;
-  const viewer = await viewerAuthorization();
-  return { title: await resolveRunPageTitle(runId, "Findings", viewer.authorizeRepository) };
+export async function generateMetadata({ params }: FilteredRunPageProps) {
+  return resolveFilteredRunMetadata(params, "Findings");
 }
 
-export default async function FindingsPage({ params, searchParams }: PageProps) {
-  const [{ runId }, query] = await Promise.all([params, searchParams]);
-  const viewer = await viewerAuthorization();
-  const result = await loadRunDashboard(runId, process.env, filtersFromSearchParameters(query), {
-    ...runDashboardLoaderDependencies,
-    authorizeRepository: viewer.authorizeRepository,
-  });
-  if (result.state === "not-found") notFound();
-  if (result.state === "not-configured") return <RunUnavailable runId={runId} />;
-  return (
-    <RunPageFrame
-      signedIn={Boolean(viewer.session)}
-      run={result.run}
-      active="findings"
-      liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}
-    >
-      <FindingsView signedIn={Boolean(viewer.session)} run={result.run} searchParameters={query} />
-    </RunPageFrame>
-  );
+export default async function FindingsPage(props: FilteredRunPageProps) {
+  return renderFilteredRunPage({ ...props, active: "findings" });
 }

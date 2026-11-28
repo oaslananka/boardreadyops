@@ -32,14 +32,32 @@ describe("run page authorization", () => {
     expect(source).toContain('if (result.state === "not-found") notFound()');
   });
 
+  it("uses a single authorized filtered-page renderer for Findings and Artifacts", async () => {
+    for (const route of ["findings", "artifacts"]) {
+      const source = await readFile(join(runPagesRoot, route, "page.tsx"), "utf8");
+      expect(source).toContain("renderFilteredRunPage");
+      expect(source).not.toContain("await loadRunDashboard(");
+    }
+    const shared = await readFile(join(runPagesRoot, "filtered-run-page.tsx"), "utf8");
+    expect(shared).toContain("viewerAuthorization()");
+    expect(shared).toContain("authorizeRepository: viewer.authorizeRepository");
+    expect(shared).toContain("filtersFromSearchParameters(query)");
+    expect(shared).toContain("const signedIn = Boolean(viewer.session)");
+    expect(shared).toContain('if (result.state === "not-found") notFound()');
+  });
+
   it("passes a viewer authorizer on every run page", async () => {
     // Without one, loadRunDashboard resolves a private repository to "not found" for everyone
     // including its owner, which is exactly the regression this guards.
     const failures: string[] = [];
     for (const page of await runPagePaths()) {
       const source = await readFile(page, "utf8");
+      const authorizationSource = source.includes("renderFilteredRunPage")
+        ? await readFile(join(runPagesRoot, "filtered-run-page.tsx"), "utf8")
+        : source;
       const wired =
-        source.includes("viewerAuthorization") && source.includes("authorizeRepository: viewer.authorizeRepository");
+        authorizationSource.includes("viewerAuthorization") &&
+        authorizationSource.includes("authorizeRepository: viewer.authorizeRepository");
       if (!wired) failures.push(page);
     }
 
@@ -50,11 +68,19 @@ describe("run page authorization", () => {
     const failures: string[] = [];
     for (const page of await runPagePaths()) {
       const source = await readFile(page, "utf8");
-      if (!/<RunPageFrame\b[^>]*signedIn=\{Boolean\(viewer.session\)\}/su.test(source)) failures.push(page);
+      const frameSource = source.includes("renderFilteredRunPage")
+        ? await readFile(join(runPagesRoot, "filtered-run-page.tsx"), "utf8")
+        : source;
+      const wired =
+        /<RunPageFrame\b[^>]*signedIn=\{Boolean\(viewer.session\)\}/su.test(frameSource) ||
+        (frameSource.includes("const signedIn = Boolean(viewer.session)") &&
+          /<RunPageFrame\b[^>]*signedIn=\{signedIn\}/su.test(frameSource));
+      if (!wired) failures.push(page);
     }
     expect(failures).toEqual([]);
-    const findings = await readFile(join(runPagesRoot, "findings", "page.tsx"), "utf8");
-    expect(findings).toMatch(/<FindingsView\b[^>]*signedIn=\{Boolean\(viewer.session\)\}/su);
+    const findings = await readFile(join(runPagesRoot, "filtered-run-page.tsx"), "utf8");
+    expect(findings).toContain("const signedIn = Boolean(viewer.session)");
+    expect(findings).toMatch(/<FindingsView\b[^>]*signedIn=\{signedIn\}/su);
   });
 
   it("reads cookies unconditionally, so a page rendering the viewer stays per-request", async () => {
@@ -68,7 +94,7 @@ describe("run page authorization", () => {
   });
 
   it("never hardcodes an authorizer that always allows", async () => {
-    for (const page of await runPagePaths()) {
+    for (const page of [...(await runPagePaths()), join(runPagesRoot, "filtered-run-page.tsx")]) {
       const source = await readFile(page, "utf8");
       expect(source).not.toMatch(/authorizeRepository:\s*\(\)\s*=>\s*true/u);
       expect(source).not.toMatch(/authorizeRepository:\s*async\s*\(\)\s*=>\s*true/u);
