@@ -17,7 +17,8 @@ function nested(a, b) {
 async function rootDirectory(input) {
   if (typeof input !== "string" || !path.isAbsolute(input) || path.normalize(input) !== input)
     throw Error("invalid_root");
-  const state = await lstat(input);
+  // Preserve the full native file identity (NTFS IDs can exceed Number.MAX_SAFE_INTEGER).
+  const state = await lstat(input, { bigint: true });
   if (!state.isDirectory() || state.isSymbolicLink()) throw Error("unsafe_entry");
   const resolved = await realpath(input);
   // /var -> /private/var on macOS and normalized drive paths on Windows
@@ -29,23 +30,23 @@ async function rootDirectory(input) {
 async function digest(file, expected) {
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
-    const before = await handle.stat();
+    const before = await handle.stat({ bigint: true });
     if (
       !before.isFile() ||
       before.dev !== expected.dev ||
       before.ino !== expected.ino ||
       before.size !== expected.size ||
-      before.mtimeMs !== expected.mtimeMs
+      before.mtimeNs !== expected.mtimeNs
     )
       throw Error("changed_during_scan");
     const hash = createHash("sha256");
     for await (const chunk of handle.createReadStream({ autoClose: false })) hash.update(chunk);
-    const after = await handle.stat();
+    const after = await handle.stat({ bigint: true });
     if (
       after.dev !== before.dev ||
       after.ino !== before.ino ||
       after.size !== before.size ||
-      after.mtimeMs !== before.mtimeMs
+      after.mtimeNs !== before.mtimeNs
     )
       throw Error("changed_during_scan");
     return hash.digest("hex");
@@ -62,15 +63,17 @@ async function inventory(root, limits) {
     for (const entry of entries) {
       const nextRel = rel ? path.join(rel, entry.name) : entry.name;
       const next = path.join(dir, entry.name);
-      const state = await lstat(next);
+      const state = await lstat(next, { bigint: true });
       if (state.isSymbolicLink()) throw Error("unsafe_entry");
       if (state.isDirectory()) {
         if ((await realpath(next)) !== next) throw Error("unsafe_entry");
         await walk(next, nextRel);
       } else if (state.isFile()) {
-        if (files.size >= limits.maxFiles || totalBytes + state.size > limits.maxBytes) throw Error("budget_exceeded");
-        totalBytes += state.size;
-        files.set(nextRel, { bytes: state.size, sha: await digest(next, state) });
+        if (files.size >= limits.maxFiles || state.size > BigInt(limits.maxBytes - totalBytes))
+          throw Error("budget_exceeded");
+        const bytes = Number(state.size);
+        totalBytes += bytes;
+        files.set(nextRel, { bytes, sha: await digest(next, state) });
       } else throw Error("unsafe_entry");
     }
   }

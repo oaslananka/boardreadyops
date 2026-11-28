@@ -119,6 +119,17 @@ describe("ci-risk-profile", () => {
     }
   });
 
+  it("requires native matrix checks for artifact restore identity verification", () => {
+    for (const file of [
+      "scripts/verify-artifact-volume-restore.mjs",
+      "tests/unit/scripts/verify-artifact-volume-restore.test.ts",
+    ]) {
+      const profile = classifyChangedFiles([file], { eventName: "pull_request" });
+      expect(profile.needs_unit_matrix, file).toBe(true);
+      expect(profile.needs_cross_platform, file).toBe(true);
+    }
+  });
+
   it("runs the native path matrix for signed export storage key changes", () => {
     const profile = classifyChangedFiles(["apps/web/lib/signed-manufacturing-export-import.ts"], {
       eventName: "pull_request",

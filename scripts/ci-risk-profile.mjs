@@ -123,6 +123,9 @@ const PATH_PATTERNS = [
   // Signed export archive names are persisted across OS-native storage paths.
   /^apps\/web\/lib\/signed-manufacturing-export-import\.ts$/,
   // Runner filesystem, process, and descriptor contracts vary across platforms.
+  // Restore proof must compare native file identities without precision loss.
+  /^scripts\/verify-artifact-volume-restore\.mjs$/,
+  /^tests\/unit\/scripts\/verify-artifact-volume-restore\.test\.ts$/,
   /^src\/runner\//,
   /^tests\/unit\/runner\//,
   /^src\/(core|kicad|cli|release|vendor)\//,
