@@ -23,6 +23,8 @@ The control plane does not send a GitHub App installation token, repository arch
 
 The runner always sends signed claim, heartbeat, relinquish, and terminal-result requests plus bounded result data such as normalized findings and metrics. In the default `control-plane` artifact mode it may additionally request artifact capabilities and upload explicitly generated JSON, SARIF, and Markdown reports using server-issued, single-use upload capabilities. In `metadata-only` artifact mode it does not request artifact capabilities or send report artifact bytes.
 
+Before cloud upload or customer-local artifact retention, the runner verifies the declared byte count and SHA-256 from one regular-file descriptor. It reads only the declared bytes plus a one-byte growth probe and rejects short reads, changed file metadata, digest mismatches, or failed descriptor close before transferring bytes. The existing cloud capability and 64 MiB customer-local per-artifact limits remain unchanged. This bounds the file read, not the entire runner process or the customer's filesystem security boundary.
+
 Neither mode uploads the checked-out workspace. Findings and diagnostic messages may still contain repository-relative paths or engineering details, so `metadata-only` is an artifact-transfer policy rather than an anonymous-results mode.
 
 ## Prerequisites

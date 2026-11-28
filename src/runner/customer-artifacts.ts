@@ -1,9 +1,8 @@
-import { createHash } from "node:crypto";
-import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RunnerClaimedJob } from "../../packages/contracts/src/index.js";
 import { assertRunnerWorkspaceDirectories } from "./source.js";
+import { readVerifiedRunnerArtifact } from "./verified-artifact.js";
 
 type CustomerRunnerArtifact = {
   kind: string;
@@ -30,6 +29,38 @@ async function privateDirectory(directory: string): Promise<void> {
   if (process.platform !== "win32" && (info.mode & 0o077) !== 0) {
     throw new Error("customer artifact directory must not be accessible by group or others");
   }
+}
+
+type StagedArtifact = Omit<CustomerRunnerArtifact, "filePath"> & { filename: string };
+
+async function stageArtifact(
+  workspace: string,
+  staging: string,
+  artifact: CustomerRunnerArtifact,
+  index: number,
+): Promise<StagedArtifact> {
+  const realSource = await realpath(artifact.filePath);
+  if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
+  const content = await readVerifiedRunnerArtifact(
+    artifact.filePath,
+    artifact.bytes,
+    artifact.sha256,
+    maximumLocalArtifactBytes,
+  );
+  const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
+  try {
+    await writeFile(path.join(staging, filename), content, { flag: "wx", mode: 0o600 });
+  } finally {
+    content.fill(0);
+  }
+  return {
+    filename,
+    kind: artifact.kind,
+    name: artifact.name,
+    role: artifact.role,
+    bytes: artifact.bytes,
+    sha256: artifact.sha256,
+  };
 }
 
 /**
@@ -90,37 +121,16 @@ export async function persistCustomerRunnerArtifacts(input: {
 
     const staging = await mkdtemp(path.join(runRoot, ".pending-"));
     try {
-      const manifestArtifacts = [];
-      for (const [index, artifact] of input.artifacts.entries()) {
-        input.signal?.throwIfAborted();
-        const realSource = await realpath(artifact.filePath);
-        if (!inside(workspace, realSource)) throw new Error("runner artifact escaped the source workspace");
-        const handle = await open(artifact.filePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-        let content: Buffer;
-        try {
-          const stats = await handle.stat();
-          if (!stats.isFile() || stats.size > maximumLocalArtifactBytes) {
-            throw new Error("runner artifact is not a bounded regular file");
-          }
-          content = await handle.readFile();
-        } finally {
-          await handle.close();
-        }
-        const digest = createHash("sha256").update(content).digest("hex");
-        if (content.length !== artifact.bytes || digest !== artifact.sha256) {
-          throw new Error("runner artifact bytes do not match its declaration");
-        }
-        const filename = `artifact-${String(index + 1).padStart(3, "0")}.bin`;
-        await writeFile(path.join(staging, filename), content, { flag: "wx", mode: 0o600 });
-        manifestArtifacts.push({
-          filename,
-          kind: artifact.kind,
-          name: artifact.name,
-          role: artifact.role,
-          bytes: artifact.bytes,
-          sha256: artifact.sha256,
-        });
-      }
+      // Stage one artifact at a time to preserve the per-file memory bound.
+      const manifestArtifacts = await input.artifacts.reduce<Promise<StagedArtifact[]>>(
+        async (previous, artifact, index) => {
+          const entries = await previous;
+          input.signal?.throwIfAborted();
+          entries.push(await stageArtifact(workspace, staging, artifact, index));
+          return entries;
+        },
+        Promise.resolve([]),
+      );
       const manifest = {
         version: 1,
         repository: `${input.job.repository.owner}/${input.job.repository.name}`,
