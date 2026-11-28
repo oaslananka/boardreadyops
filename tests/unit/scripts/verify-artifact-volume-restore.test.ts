@@ -1,14 +1,16 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ARTIFACT_RESTORE_CONFIRMATION,
   verifyArtifactVolumeRestore,
 } from "../../../scripts/verify-artifact-volume-restore.mjs";
+
+vi.mock("node:fs/promises", { spy: true });
 
 let tempDir: string;
 let sourceDir: string;
@@ -59,6 +61,29 @@ describe("isolated nonempty artifact byte restore proof", () => {
         confirmation: ARTIFACT_RESTORE_CONFIRMATION,
       }),
     ).resolves.toEqual({ status: "verified", fileCount: 1, totalBytes: 5 });
+  });
+
+  it("distinguishes directory identities that collide as JavaScript numbers", async () => {
+    await writeFile(path.join(sourceDir, "artifact"), "bytes");
+    await writeFile(path.join(restoredDir, "artifact"), "bytes");
+    const original = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    const sourceInode = 9007199254740992n;
+    const restoredInode = sourceInode + 1n;
+    const statMock = vi.mocked(lstat).mockImplementation(async (file, options) => {
+      const state = await original.lstat(file, options);
+      if (file !== sourceDir && file !== restoredDir) return state;
+      const inode = file === sourceDir ? sourceInode : restoredInode;
+      return Object.assign(state, { ino: options?.bigint ? inode : Number(inode) });
+    });
+    try {
+      expect(Number(sourceInode)).toBe(Number(restoredInode));
+      await expect(proof()).resolves.toEqual({ status: "verified", fileCount: 1, totalBytes: 5 });
+      await expect(
+        verifyArtifactVolumeRestore({ sourceDir, restoredDir: sourceDir, confirmation: ARTIFACT_RESTORE_CONFIRMATION }),
+      ).rejects.toThrow("same_directory");
+    } finally {
+      statMock.mockReset();
+    }
   });
 
   it("refuses empty volumes", async () => {

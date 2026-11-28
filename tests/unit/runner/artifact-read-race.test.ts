@@ -105,11 +105,14 @@ describe("runner artifact reads", () => {
     };
     // Exercise the former path-based cloud preflight too. The new reader
     // uses lstat and a descriptor; the old reader used stat and readFile.
-    vi.mocked(fs.stat).mockImplementationOnce(async (...args) => {
+    vi.mocked(fs.stat).mockImplementation(async (...args) => {
       const before = await original.stat(...args);
-      await grow();
+      if (args[0] === f.artifact.filePath) await grow();
       return before;
     });
+    // An unrelated preflight stat must not mutate the artifact (e.g. macOS /var).
+    await fs.stat(f.root);
+    expect(grew).toBe(false);
     let fullRead: ReturnType<typeof vi.spyOn> | undefined;
     let boundedRead: ReturnType<typeof vi.spyOn> | undefined;
     vi.mocked(fs.open).mockImplementation(async (...args) => {

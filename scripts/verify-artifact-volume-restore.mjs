@@ -16,9 +16,10 @@ function nested(a, b) {
 
 async function rootDirectory(input) {
   if (typeof input !== "string" || !path.isAbsolute(input) || path.normalize(input) !== input)
-    throw Error("invalid_root");
-  const state = await lstat(input);
-  if (!state.isDirectory() || state.isSymbolicLink()) throw Error("unsafe_entry");
+    throw new Error("invalid_root");
+  // Preserve the full native file identity (NTFS IDs can exceed Number.MAX_SAFE_INTEGER).
+  const state = await lstat(input, { bigint: true });
+  if (!state.isDirectory() || state.isSymbolicLink()) throw new Error("unsafe_entry");
   const resolved = await realpath(input);
   // /var -> /private/var on macOS and normalized drive paths on Windows
   // can change an ancestor without making the root itself a symlink.
@@ -29,25 +30,25 @@ async function rootDirectory(input) {
 async function digest(file, expected) {
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
-    const before = await handle.stat();
+    const before = await handle.stat({ bigint: true });
     if (
       !before.isFile() ||
       before.dev !== expected.dev ||
       before.ino !== expected.ino ||
       before.size !== expected.size ||
-      before.mtimeMs !== expected.mtimeMs
+      before.mtimeNs !== expected.mtimeNs
     )
-      throw Error("changed_during_scan");
+      throw new Error("changed_during_scan");
     const hash = createHash("sha256");
     for await (const chunk of handle.createReadStream({ autoClose: false })) hash.update(chunk);
-    const after = await handle.stat();
+    const after = await handle.stat({ bigint: true });
     if (
       after.dev !== before.dev ||
       after.ino !== before.ino ||
       after.size !== before.size ||
-      after.mtimeMs !== before.mtimeMs
+      after.mtimeNs !== before.mtimeNs
     )
-      throw Error("changed_during_scan");
+      throw new Error("changed_during_scan");
     return hash.digest("hex");
   } finally {
     await handle.close();
@@ -59,20 +60,28 @@ async function inventory(root, limits) {
   let totalBytes = 0;
   async function walk(dir, rel) {
     const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const nextRel = rel ? path.join(rel, entry.name) : entry.name;
-      const next = path.join(dir, entry.name);
-      const state = await lstat(next);
-      if (state.isSymbolicLink()) throw Error("unsafe_entry");
-      if (state.isDirectory()) {
-        if ((await realpath(next)) !== next) throw Error("unsafe_entry");
-        await walk(next, nextRel);
-      } else if (state.isFile()) {
-        if (files.size >= limits.maxFiles || totalBytes + state.size > limits.maxBytes) throw Error("budget_exceeded");
-        totalBytes += state.size;
-        files.set(nextRel, { bytes: state.size, sha: await digest(next, state) });
-      } else throw Error("unsafe_entry");
-    }
+    // Each entry must settle before the next starts: share one byte/file
+    // budget and keep at most one file descriptor open for hashing.
+    await entries.reduce(
+      (previous, entry) => previous.then(() => inspectEntry(dir, rel, entry.name)),
+      Promise.resolve(),
+    );
+  }
+  async function inspectEntry(dir, rel, name) {
+    const nextRel = rel ? path.join(rel, name) : name;
+    const next = path.join(dir, name);
+    const state = await lstat(next, { bigint: true });
+    if (state.isSymbolicLink()) throw new Error("unsafe_entry");
+    if (state.isDirectory()) {
+      if ((await realpath(next)) !== next) throw new Error("unsafe_entry");
+      await walk(next, nextRel);
+    } else if (state.isFile()) {
+      if (files.size >= limits.maxFiles || state.size > BigInt(limits.maxBytes - totalBytes))
+        throw new Error("budget_exceeded");
+      const bytes = Number(state.size);
+      totalBytes += bytes;
+      files.set(nextRel, { bytes, sha: await digest(next, state) });
+    } else throw new Error("unsafe_entry");
   }
   await walk(root, "");
   return { files, totalBytes };
@@ -86,24 +95,25 @@ export async function verifyArtifactVolumeRestore({
   maxFiles = DEFAULT_MAX_FILES,
   maxBytes = DEFAULT_MAX_BYTES,
 }) {
-  if (confirmation !== ARTIFACT_RESTORE_CONFIRMATION) throw Error("confirmation_required");
+  if (confirmation !== ARTIFACT_RESTORE_CONFIRMATION) throw new Error("confirmation_required");
   if (!Number.isSafeInteger(maxFiles) || maxFiles < 1 || !Number.isSafeInteger(maxBytes) || maxBytes < 1) {
-    throw Error("invalid_budget");
+    throw new Error("invalid_budget");
   }
   const source = await rootDirectory(sourceDir);
   const restored = await rootDirectory(restoredDir);
-  if (source.state.dev === restored.state.dev && source.state.ino === restored.state.ino) throw Error("same_directory");
+  if (source.state.dev === restored.state.dev && source.state.ino === restored.state.ino)
+    throw new Error("same_directory");
   if (nested(source.resolved, restored.resolved) || nested(restored.resolved, source.resolved))
-    throw Error("nested_directory");
+    throw new Error("nested_directory");
   const original = await inventory(source.resolved, { maxFiles, maxBytes });
   const recovered = await inventory(restored.resolved, { maxFiles, maxBytes });
-  if (!original.files.size || !recovered.files.size) throw Error("empty_volume");
+  if (!original.files.size || !recovered.files.size) throw new Error("empty_volume");
   if (original.totalBytes !== recovered.totalBytes || original.files.size !== recovered.files.size) {
-    throw Error("integrity_mismatch");
+    throw new Error("integrity_mismatch");
   }
   for (const [name, proof] of original.files) {
     const other = recovered.files.get(name);
-    if (!other || other.bytes !== proof.bytes || other.sha !== proof.sha) throw Error("integrity_mismatch");
+    if (!other || other.bytes !== proof.bytes || other.sha !== proof.sha) throw new Error("integrity_mismatch");
   }
   return { status: "verified", fileCount: original.files.size, totalBytes: original.totalBytes };
 }
